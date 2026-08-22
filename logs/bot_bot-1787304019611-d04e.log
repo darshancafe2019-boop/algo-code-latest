@@ -1,0 +1,101 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 18:15:21,374 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 18:15:24,397 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 18:15:25,586 - INFO - Initializing scheduled trading bot live runner for bot-1787304019611-d04e...
+2026-08-21 18:15:27,745 - INFO - SQLite database tables verified/created.
+2026-08-21 18:15:29,837 - INFO - Initializing CCXT Binance in TESTNET mode.
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 20:28:50,724 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 20:28:52,502 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 20:28:52,559 - INFO - Initializing scheduled trading bot live runner for bot-1787304019611-d04e...
+2026-08-21 20:28:54,228 - INFO - SQLite database tables verified/created.
+2026-08-21 20:28:55,876 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 20:32:22,693 - INFO - [bot-1787304019611-d04e] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 20:32:33,205 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 20:32:33,244 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:35:55,413 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:36:02,507 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:36:04,604 - INFO - Initializing scheduled trading bot live runner for bot-1787304019611-d04e...
+2026-08-21 21:36:06,201 - INFO - SQLite database tables verified/created.
+2026-08-21 21:36:09,501 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:38:59,853 - INFO - [bot-1787304019611-d04e] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 21:39:02,673 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 21:39:04,008 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:02:35,709 - INFO - Indicators computed | close=2400.30 ema_9=2396.56 ema_20=2395.08 ema_50=2391.85 ema_200=2371.23 macd=1.8514 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:02:36,115 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:25:00+00:00 at Close price: 2402.91
+2026-08-21 22:02:38,112 - INFO - Confluence Evaluation | Regime: RANGING (ADX=24.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:02:38,816 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-21 22:02:40,191 - INFO - Logged heartbeat status: OK
+2026-08-21 22:02:42,926 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 22:02:42,943 - INFO - Bot bot-1787304019611-d04e scheduled to check every 5 minutes.
+2026-08-21 22:02:44,112 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 22:02:44,114 - INFO - Scheduler started
+2026-08-21 22:07:42,503 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:07:42 IST)" (scheduled at 2026-08-21 22:07:42.432998+05:30)
+2026-08-21 22:07:42,523 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:07:42,604 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:07:43,089 - INFO - Indicators computed | close=2401.06 ema_9=2397.78 ema_20=2395.83 ema_50=2392.29 ema_200=2371.54 macd=2.2309 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:07:43,091 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:30:00+00:00 at Close price: 2402.31
+2026-08-21 22:07:43,173 - INFO - Confluence Evaluation | Regime: RANGING (ADX=23.6) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:07:43,272 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:07:43,518 - INFO - Logged heartbeat status: OK
+2026-08-21 22:07:43,519 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:12:42 IST)" executed successfully
+2026-08-21 22:12:42,584 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:12:42 IST)" (scheduled at 2026-08-21 22:12:42.432998+05:30)
+2026-08-21 22:12:42,730 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:12:42,786 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:12:43,338 - INFO - Indicators computed | close=2401.05 ema_9=2398.51 ema_20=2396.36 ema_50=2392.65 ema_200=2371.84 macd=2.4035 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:12:43,340 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:35:00+00:00 at Close price: 2401.50
+2026-08-21 22:12:43,449 - INFO - Confluence Evaluation | Regime: RANGING (ADX=22.0) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:12:43,583 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:12:43,803 - INFO - Logged heartbeat status: OK
+2026-08-21 22:12:43,803 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:17:42 IST)" executed successfully
+2026-08-21 22:17:42,454 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:22:42 IST)" (scheduled at 2026-08-21 22:17:42.432998+05:30)
+2026-08-21 22:17:42,485 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:17:42,586 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:17:43,101 - INFO - Indicators computed | close=2403.60 ema_9=2399.61 ema_20=2397.10 ema_50=2393.10 ema_200=2372.16 macd=2.7211 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:17:43,102 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:40:00+00:00 at Close price: 2401.60
+2026-08-21 22:17:43,187 - INFO - Confluence Evaluation | Regime: RANGING (ADX=20.1) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:17:43,292 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:17:43,502 - INFO - Logged heartbeat status: OK
+2026-08-21 22:17:43,502 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:22:42 IST)" executed successfully
+2026-08-21 22:22:42,698 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:27:42 IST)" (scheduled at 2026-08-21 22:22:42.432998+05:30)
+2026-08-21 22:22:42,953 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:22:43,159 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:22:43,974 - INFO - Indicators computed | close=2409.73 ema_9=2402.47 ema_20=2398.75 ema_50=2393.95 ema_200=2372.59 macd=3.7139 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:22:43,978 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:45:00+00:00 at Close price: 2408.80
+2026-08-21 22:22:44,090 - INFO - Confluence Evaluation | Regime: RANGING (ADX=19.2) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:22:44,226 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:22:44,507 - INFO - Logged heartbeat status: OK
+2026-08-21 22:22:44,515 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:27:42 IST)" executed successfully
+2026-08-21 22:27:42,456 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:32:42 IST)" (scheduled at 2026-08-21 22:27:42.432998+05:30)
+2026-08-21 22:27:42,465 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:27:42,516 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:27:43,026 - INFO - Indicators computed | close=2407.53 ema_9=2403.51 ema_20=2399.60 ema_50=2394.49 ema_200=2372.94 macd=3.9600 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:27:43,028 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:50:00+00:00 at Close price: 2409.91
+2026-08-21 22:27:43,115 - INFO - Confluence Evaluation | Regime: RANGING (ADX=18.7) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:27:43,210 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:27:43,496 - INFO - Logged heartbeat status: OK
+2026-08-21 22:27:43,496 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:32:42 IST)" executed successfully
+2026-08-21 22:32:42,554 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:37:42 IST)" (scheduled at 2026-08-21 22:32:42.432998+05:30)
+2026-08-21 22:32:42,632 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:32:42,874 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:32:44,560 - INFO - Indicators computed | close=2410.51 ema_9=2404.66 ema_20=2400.51 ema_50=2395.06 ema_200=2373.29 macd=4.2380 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:32:44,896 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 16:55:00+00:00 at Close price: 2405.97
+2026-08-21 22:32:45,244 - INFO - Confluence Evaluation | Regime: RANGING (ADX=14.6) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:32:45,395 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:32:45,693 - INFO - Logged heartbeat status: OK
+2026-08-21 22:32:45,693 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:37:42 IST)" executed successfully
+2026-08-21 22:37:42,534 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:42:42 IST)" (scheduled at 2026-08-21 22:37:42.432998+05:30)
+2026-08-21 22:37:42,545 - INFO - [bot-1787304019611-d04e] Starting signal check cycle for ETH/USDT (5m)...
+2026-08-21 22:37:42,595 - INFO - Fetching recent candles for ETH/USDT (5m) [Bot: bot-1787304019611-d04e] via ProviderManager...
+2026-08-21 22:37:43,005 - INFO - Indicators computed | close=2413.96 ema_9=2406.15 ema_20=2401.59 ema_50=2395.71 ema_200=2373.68 macd=4.6392 poc=2250.0 val=2100.0 vah=2425.0
+2026-08-21 22:37:43,006 - INFO - [bot-1787304019611-d04e] Evaluating strategy on completed candle: 2026-08-21 17:00:00+00:00 at Close price: 2408.22
+2026-08-21 22:37:43,081 - INFO - Confluence Evaluation | Regime: RANGING (ADX=15.3) | Direction: HOLD | BullScore: 67.4% | BearScore: 0.0% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:37:43,194 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:37:43,361 - INFO - Logged heartbeat status: OK
+2026-08-21 22:37:43,361 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:42:42 IST)" executed successfully

@@ -1,0 +1,638 @@
+{
+  "timestamp": "2026-08-21T13:14:37.503Z",
+  "totalChecks": 105,
+  "passedCount": 105,
+  "failedCount": 0,
+  "results": [
+    {
+      "tab": "HOME",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "HOME",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/"
+    },
+    {
+      "tab": "HOME",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1758 chars"
+    },
+    {
+      "tab": "HOME",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "HOME",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1752 chars"
+    },
+    {
+      "tab": "INTELLIGENCE",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "INTELLIGENCE",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/intelligence"
+    },
+    {
+      "tab": "INTELLIGENCE",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "4591 chars"
+    },
+    {
+      "tab": "INTELLIGENCE",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "INTELLIGENCE",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "4591 chars"
+    },
+    {
+      "tab": "MARKETS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "MARKETS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/charts"
+    },
+    {
+      "tab": "MARKETS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "25959 chars"
+    },
+    {
+      "tab": "MARKETS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "MARKETS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "25958 chars"
+    },
+    {
+      "tab": "WATCHLIST",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "WATCHLIST",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/watchlists"
+    },
+    {
+      "tab": "WATCHLIST",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "25959 chars"
+    },
+    {
+      "tab": "WATCHLIST",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "WATCHLIST",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "25958 chars"
+    },
+    {
+      "tab": "SCANNER",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "SCANNER",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/scanner"
+    },
+    {
+      "tab": "SCANNER",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "6373 chars"
+    },
+    {
+      "tab": "SCANNER",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "SCANNER",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "6346 chars"
+    },
+    {
+      "tab": "BOTS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "BOTS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/bots"
+    },
+    {
+      "tab": "BOTS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "4859 chars"
+    },
+    {
+      "tab": "BOTS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "BOTS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "17815 chars"
+    },
+    {
+      "tab": "STRATEGIES",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "STRATEGIES",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/strategies"
+    },
+    {
+      "tab": "STRATEGIES",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "5701 chars"
+    },
+    {
+      "tab": "STRATEGIES",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "STRATEGIES",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "5700 chars"
+    },
+    {
+      "tab": "OPTIONS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "OPTIONS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/options"
+    },
+    {
+      "tab": "OPTIONS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1308 chars"
+    },
+    {
+      "tab": "OPTIONS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "OPTIONS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1308 chars"
+    },
+    {
+      "tab": "FUTURES",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "FUTURES",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/crypto/futures"
+    },
+    {
+      "tab": "FUTURES",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "4975 chars"
+    },
+    {
+      "tab": "FUTURES",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "FUTURES",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "4975 chars"
+    },
+    {
+      "tab": "RISK",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "RISK",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/risk"
+    },
+    {
+      "tab": "RISK",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "2219 chars"
+    },
+    {
+      "tab": "RISK",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "RISK",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "2217 chars"
+    },
+    {
+      "tab": "ORDERS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "ORDERS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/orders"
+    },
+    {
+      "tab": "ORDERS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "2423 chars"
+    },
+    {
+      "tab": "ORDERS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "ORDERS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "2423 chars"
+    },
+    {
+      "tab": "POSITIONS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "POSITIONS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/positions"
+    },
+    {
+      "tab": "POSITIONS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1957 chars"
+    },
+    {
+      "tab": "POSITIONS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "POSITIONS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1955 chars"
+    },
+    {
+      "tab": "P&L",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "P&L",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/pnl"
+    },
+    {
+      "tab": "P&L",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "4672 chars"
+    },
+    {
+      "tab": "P&L",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "P&L",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "4671 chars"
+    },
+    {
+      "tab": "TRADE JOURNAL",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "TRADE JOURNAL",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/trade-journal"
+    },
+    {
+      "tab": "TRADE JOURNAL",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "5345 chars"
+    },
+    {
+      "tab": "TRADE JOURNAL",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "TRADE JOURNAL",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "5345 chars"
+    },
+    {
+      "tab": "ALERTS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "ALERTS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/alerts"
+    },
+    {
+      "tab": "ALERTS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "18561 chars"
+    },
+    {
+      "tab": "ALERTS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "ALERTS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "18562 chars"
+    },
+    {
+      "tab": "AUDIT LOGS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "AUDIT LOGS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/logs"
+    },
+    {
+      "tab": "AUDIT LOGS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "27901 chars"
+    },
+    {
+      "tab": "AUDIT LOGS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "AUDIT LOGS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "27900 chars"
+    },
+    {
+      "tab": "COMMAND CENTER",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "COMMAND CENTER",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/dashboard"
+    },
+    {
+      "tab": "COMMAND CENTER",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1837 chars"
+    },
+    {
+      "tab": "COMMAND CENTER",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "COMMAND CENTER",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1837 chars"
+    },
+    {
+      "tab": "SYSTEM HEALTH",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "SYSTEM HEALTH",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/system-health"
+    },
+    {
+      "tab": "SYSTEM HEALTH",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1831 chars"
+    },
+    {
+      "tab": "SYSTEM HEALTH",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "SYSTEM HEALTH",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1832 chars"
+    },
+    {
+      "tab": "PROVIDERS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "PROVIDERS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/providers"
+    },
+    {
+      "tab": "PROVIDERS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "2003 chars"
+    },
+    {
+      "tab": "PROVIDERS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "PROVIDERS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "2003 chars"
+    },
+    {
+      "tab": "SETTINGS",
+      "check": "Click Event",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "SETTINGS",
+      "check": "Route URL Updated",
+      "status": "PASS",
+      "details": "Current: http://localhost:3000/settings"
+    },
+    {
+      "tab": "SETTINGS",
+      "check": "Page Content Rendered",
+      "status": "PASS",
+      "details": "1804 chars"
+    },
+    {
+      "tab": "SETTINGS",
+      "check": "Direct URL Access",
+      "status": "PASS",
+      "details": "HTTP 200"
+    },
+    {
+      "tab": "SETTINGS",
+      "check": "Page Refresh Stability",
+      "status": "PASS",
+      "details": "1804 chars"
+    },
+    {
+      "tab": "TOP_BAR",
+      "check": "Theme Studio Drawer Trigger",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "TOP_BAR",
+      "check": "Emergency Kill Switch Modal Trigger",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "tab": "GLOBAL",
+      "check": "Zero Hydration Errors",
+      "status": "PASS",
+      "details": "Errors: 0"
+    },
+    {
+      "tab": "GLOBAL",
+      "check": "Zero Uncaught JS Exceptions",
+      "status": "PASS",
+      "details": "Errors: 0"
+    },
+    {
+      "tab": "GLOBAL",
+      "check": "Zero Broken Network Requests",
+      "status": "PASS",
+      "details": "Failed: 0"
+    }
+  ]
+}

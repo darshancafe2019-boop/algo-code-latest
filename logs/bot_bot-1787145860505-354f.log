@@ -1,0 +1,60 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-19 20:20:45,192 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-19 20:20:45,321 - INFO - Initializing scheduled trading bot live runner for bot-1787145860505-354f...
+2026-08-19 20:20:45,376 - INFO - SQLite database tables verified/created.
+2026-08-19 20:20:45,439 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-19 20:20:47,856 - INFO - Initializing CCXT Binance in MAINNET mode (Public endpoints).
+2026-08-19 20:20:47,975 - INFO - [bot-1787145860505-354f] Starting signal check cycle for BTC/USDT (5m)...
+2026-08-19 20:20:48,010 - INFO - Fetching recent candles for BTC/USDT (5m) [Bot: bot-1787145860505-354f]...
+2026-08-19 20:20:55,154 - INFO - Indicators computed | close=65592.95 ema_9=65433.90 ema_20=65259.24 ema_50=64959.07 ema_200=64608.69 macd=202.4125 poc=64325.0 val=63575.0 vah=65200.0
+2026-08-19 20:20:55,158 - INFO - [bot-1787145860505-354f] Evaluating strategy on completed candle: 2026-08-19T14:45:00+00:00 at Close price: 65526.89
+2026-08-19 20:20:55,199 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=46.4) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-19 20:20:55,234 - INFO - Capping position size 0.378501 BTC to available cash equivalent 0.076305 BTC.
+2026-08-19 20:20:55,287 - INFO - Created pending signal approval ID 28 for bot bot-1787145860505-354f (LONG @ $65526.89, status: WAITING_APPROVAL)
+2026-08-19 20:20:55,337 - INFO - [bot-1787145860505-354f] Signal LONG generated (ID: 28). Waiting for manual user approval.
+2026-08-19 20:20:55,435 - INFO - Logged heartbeat status: OK
+2026-08-19 20:20:55,443 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-19 20:20:55,446 - INFO - Bot bot-1787145860505-354f scheduled to check every 5 minutes.
+2026-08-19 20:20:55,448 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-19 20:20:55,448 - INFO - Scheduler started
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 12:27:08,950 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 12:27:09,288 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 12:27:09,296 - INFO - Initializing scheduled trading bot live runner for bot-1787145860505-354f...
+2026-08-20 12:27:09,543 - INFO - SQLite database tables verified/created.
+2026-08-20 12:27:09,673 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-20 12:27:17,061 - INFO - [bot-1787145860505-354f] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-20 12:27:17,193 - INFO - [bot-1787145860505-354f] Starting signal check cycle for BTC/USDT (5m)...
+2026-08-20 12:27:17,252 - INFO - Fetching recent candles for BTC/USDT (5m) [Bot: bot-1787145860505-354f] via ProviderManager...
+2026-08-20 12:27:41,050 - INFO - Indicators computed | close=69852.00 ema_9=69735.34 ema_20=69621.18 ema_50=69497.38 ema_200=68575.36 macd=111.2962 poc=64325.0 val=62725.0 vah=68350.0
+2026-08-20 12:27:41,058 - INFO - [bot-1787145860505-354f] Evaluating strategy on completed candle: 2026-08-20 06:50:00+00:00 at Close price: 69855.58
+2026-08-20 12:27:41,244 - INFO - Confluence Evaluation | Regime: RANGING (ADX=23.6) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-20 12:27:41,268 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-20 12:27:41,447 - INFO - Logged heartbeat status: OK
+2026-08-20 12:27:41,461 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-20 12:27:41,461 - INFO - Bot bot-1787145860505-354f scheduled to check every 5 minutes.
+2026-08-20 12:27:41,463 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-20 12:27:41,463 - INFO - Scheduler started
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 12:39:26,335 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 12:39:26,648 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 12:39:26,663 - INFO - Initializing scheduled trading bot live runner for bot-1787145860505-354f...
+2026-08-20 12:39:26,704 - INFO - SQLite database tables verified/created.
+2026-08-20 12:39:26,973 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-20 12:39:35,294 - INFO - [bot-1787145860505-354f] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-20 12:39:35,333 - INFO - [bot-1787145860505-354f] Starting signal check cycle for BTC/USDT (5m)...
+2026-08-20 12:39:35,340 - INFO - Fetching recent candles for BTC/USDT (5m) [Bot: bot-1787145860505-354f] via ProviderManager...
+2026-08-20 12:39:58,521 - INFO - Indicators computed | close=69935.36 ema_9=69796.25 ema_20=69672.20 ema_50=69528.45 ema_200=68601.61 macd=125.1212 poc=64325.0 val=62725.0 vah=68375.0
+2026-08-20 12:39:58,526 - INFO - [bot-1787145860505-354f] Evaluating strategy on completed candle: 2026-08-20 07:00:00+00:00 at Close price: 69866.00
+2026-08-20 12:39:58,692 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=29.4) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-20 12:39:58,722 - INFO - Capping position size 0.473194 BTC to available cash equivalent 0.071566 BTC.
+2026-08-20 12:39:58,789 - INFO - Created pending signal approval ID 31 for bot bot-1787145860505-354f (LONG @ $69866.00, status: WAITING_APPROVAL)
+2026-08-20 12:39:58,862 - INFO - [bot-1787145860505-354f] Signal LONG generated (ID: 31). Waiting for manual user approval.
+2026-08-20 12:39:58,982 - INFO - Logged heartbeat status: OK
+2026-08-20 12:39:59,023 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-20 12:39:59,023 - INFO - Bot bot-1787145860505-354f scheduled to check every 5 minutes.
+2026-08-20 12:39:59,027 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-20 12:39:59,028 - INFO - Scheduler started

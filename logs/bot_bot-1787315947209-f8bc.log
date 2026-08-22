@@ -1,0 +1,39 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:40:17,812 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:40:22,232 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:40:23,737 - INFO - Initializing scheduled trading bot live runner for bot-1787315947209-f8bc...
+2026-08-21 21:40:25,207 - INFO - SQLite database tables verified/created.
+2026-08-21 21:40:28,220 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:45:10,726 - INFO - [bot-1787315947209-f8bc] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-21 21:45:17,456 - INFO - [bot-1787315947209-f8bc] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 21:45:18,136 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787315947209-f8bc] via ProviderManager...
+2026-08-21 22:01:39,625 - INFO - Indicators computed | close=77312.25 ema_9=77283.24 ema_20=77240.22 ema_50=76623.95 ema_200=72841.94 macd=111.5254 poc=63050.0 val=62700.0 vah=72550.0
+2026-08-21 22:01:40,580 - INFO - [bot-1787315947209-f8bc] Evaluating strategy on completed candle: 2026-08-21 16:15:00+00:00 at Close price: 77383.87
+2026-08-21 22:01:44,488 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=29.4) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:01:45,929 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:01:47,878 - INFO - Logged heartbeat status: OK
+2026-08-21 22:01:51,981 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 22:01:52,158 - INFO - Bot bot-1787315947209-f8bc scheduled to check every 15 minutes.
+2026-08-21 22:01:53,246 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 22:01:53,263 - INFO - Scheduler started
+2026-08-21 22:16:51,736 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:31:51 IST)" (scheduled at 2026-08-21 22:16:51.458110+05:30)
+2026-08-21 22:16:51,888 - INFO - [bot-1787315947209-f8bc] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 22:16:52,018 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787315947209-f8bc] via ProviderManager...
+2026-08-21 22:16:54,405 - INFO - Indicators computed | close=77412.49 ema_9=77317.06 ema_20=77260.91 ema_50=76656.75 ema_200=72887.91 macd=116.9795 poc=63050.0 val=62700.0 vah=72575.0
+2026-08-21 22:16:54,414 - INFO - [bot-1787315947209-f8bc] Evaluating strategy on completed candle: 2026-08-21 16:30:00+00:00 at Close price: 77362.04
+2026-08-21 22:16:54,500 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=28.9) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:16:54,607 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:16:54,816 - INFO - Logged heartbeat status: OK
+2026-08-21 22:16:54,821 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:31:51 IST)" executed successfully
+2026-08-21 22:31:51,563 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:46:51 IST)" (scheduled at 2026-08-21 22:31:51.458110+05:30)
+2026-08-21 22:31:51,707 - INFO - [bot-1787315947209-f8bc] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 22:31:51,774 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787315947209-f8bc] via ProviderManager...
+2026-08-21 22:31:53,415 - INFO - Indicators computed | close=77511.33 ema_9=77367.67 ema_20=77291.10 ema_50=76693.03 ema_200=72934.63 macd=129.2206 poc=63050.0 val=62700.0 vah=72575.0
+2026-08-21 22:31:53,433 - INFO - [bot-1787315947209-f8bc] Evaluating strategy on completed candle: 2026-08-21 16:45:00+00:00 at Close price: 77486.01
+2026-08-21 22:31:53,612 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.4) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:31:53,725 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:31:54,027 - INFO - Logged heartbeat status: OK
+2026-08-21 22:31:54,028 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:46:51 IST)" executed successfully

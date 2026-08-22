@@ -1,0 +1,111 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 13:24:10,228 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 13:24:10,865 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 13:24:10,876 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-20 13:24:10,946 - INFO - SQLite database tables verified/created.
+2026-08-20 13:24:11,280 - INFO - Initializing CCXT Binance in TESTNET mode.
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 13:25:45,991 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 13:25:46,272 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 13:25:46,437 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-20 13:25:46,605 - INFO - SQLite database tables verified/created.
+2026-08-20 13:25:46,936 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-20 13:26:01,227 - INFO - [test-ks-bot] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-20 13:26:01,593 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-20 13:26:01,826 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 22:18:35,027 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 22:18:37,359 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 22:18:37,376 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-20 22:18:37,424 - INFO - SQLite database tables verified/created.
+2026-08-20 22:18:38,280 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-20 22:19:06,618 - INFO - [test-ks-bot] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-20 22:19:07,727 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-20 22:19:07,958 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+2026-08-20 22:20:02,509 - INFO - Indicators computed | close=72567.99 ema_9=71755.77 ema_20=70599.45 ema_50=68348.34 ema_200=65354.53 macd=1409.0267 poc=63050.0 val=62525.0 vah=69250.0
+2026-08-20 22:20:02,527 - INFO - [test-ks-bot] Evaluating strategy on completed candle: 2026-08-20 15:00:00+00:00 at Close price: 72470.83
+2026-08-20 22:20:02,632 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=67.8) | Direction: LONG | BullScore: 78.9% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-20 22:20:02,779 - INFO - Capping position size 0.141848 BTC to available cash equivalent 0.137987 BTC.
+2026-08-20 22:20:02,813 - INFO - Created pending signal approval ID 63 for bot test-ks-bot (LONG @ $72470.83, status: WAITING_APPROVAL)
+2026-08-20 22:20:02,923 - INFO - [test-ks-bot] Signal LONG generated (ID: 63). Waiting for manual user approval.
+2026-08-20 22:20:03,023 - INFO - Logged heartbeat status: OK
+2026-08-20 22:20:03,054 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-20 22:20:03,054 - INFO - Bot test-ks-bot scheduled to check every 60 minutes.
+2026-08-20 22:20:03,063 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-20 22:20:03,063 - INFO - Scheduler started
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 06:22:08,190 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 06:22:08,973 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 06:22:08,983 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-21 06:22:10,057 - INFO - SQLite database tables verified/created.
+2026-08-21 06:22:10,915 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 06:22:40,025 - INFO - [test-ks-bot] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-21 06:22:40,501 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-21 06:22:40,549 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+2026-08-21 06:23:15,768 - INFO - Indicators computed | close=73783.58 ema_9=72805.16 ema_20=71886.01 ema_50=69594.76 ema_200=65933.38 macd=1215.1979 poc=63050.0 val=62525.0 vah=69550.0
+2026-08-21 06:23:15,792 - INFO - [test-ks-bot] Evaluating strategy on completed candle: 2026-08-20 23:00:00+00:00 at Close price: 73025.15
+2026-08-21 06:23:15,857 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=60.4) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 06:23:15,905 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 06:23:16,145 - INFO - Logged heartbeat status: OK
+2026-08-21 06:23:16,157 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 06:23:16,157 - INFO - Bot test-ks-bot scheduled to check every 60 minutes.
+2026-08-21 06:23:16,159 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 06:23:16,162 - INFO - Scheduler started
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 12:14:50,968 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 12:14:52,232 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 12:14:52,662 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-21 12:14:52,736 - INFO - SQLite database tables verified/created.
+2026-08-21 12:14:53,814 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 12:15:26,737 - INFO - [test-ks-bot] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-21 12:15:27,475 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-21 12:15:27,536 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+2026-08-21 12:16:09,903 - INFO - Indicators computed | close=75322.00 ema_9=74476.52 ema_20=73298.54 ema_50=70745.69 ema_200=66459.92 macd=1431.2536 poc=63050.0 val=62525.0 vah=70150.0
+2026-08-21 12:16:09,918 - INFO - [test-ks-bot] Evaluating strategy on completed candle: 2026-08-21 05:00:00+00:00 at Close price: 75472.73
+2026-08-21 12:16:10,096 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=62.3) | Direction: LONG | BullScore: 78.9% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 12:16:10,305 - INFO - Created pending signal approval ID 151 for bot test-ks-bot (LONG @ $75472.73, status: WAITING_APPROVAL)
+2026-08-21 12:16:10,372 - INFO - [test-ks-bot] Signal LONG generated (ID: 151). Waiting for manual user approval.
+2026-08-21 12:16:10,589 - INFO - Logged heartbeat status: OK
+2026-08-21 12:16:10,614 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 12:16:10,614 - INFO - Bot test-ks-bot scheduled to check every 60 minutes.
+2026-08-21 12:16:10,622 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 12:16:10,623 - INFO - Scheduler started
+2026-08-21 13:16:11,123 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[1:00:00], next run at: 2026-08-21 14:16:10 IST)" (scheduled at 2026-08-21 13:16:10.613681+05:30)
+2026-08-21 13:16:11,298 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-21 13:16:11,423 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+2026-08-21 13:16:13,129 - INFO - Indicators computed | close=76467.94 ema_9=74926.67 ema_20=73628.33 ema_50=70982.31 ema_200=66562.69 macd=1531.0818 poc=63050.0 val=62525.0 vah=71225.0
+2026-08-21 13:16:13,130 - INFO - [test-ks-bot] Evaluating strategy on completed candle: 2026-08-21 06:00:00+00:00 at Close price: 75646.21
+2026-08-21 13:16:13,227 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=63.9) | Direction: LONG | BullScore: 78.9% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 13:16:13,329 - INFO - Capping position size 0.135777 BTC to available cash equivalent 0.132194 BTC.
+2026-08-21 13:16:13,352 - INFO - Created pending signal approval ID 193 for bot test-ks-bot (LONG @ $75646.21, status: WAITING_APPROVAL)
+2026-08-21 13:16:13,414 - INFO - [test-ks-bot] Signal LONG generated (ID: 193). Waiting for manual user approval.
+2026-08-21 13:16:13,684 - INFO - Logged heartbeat status: OK
+2026-08-21 13:16:13,685 - INFO - Job "LiveRunner.process_cycle (trigger: interval[1:00:00], next run at: 2026-08-21 14:16:10 IST)" executed successfully
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:44:50,186 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:44:55,962 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:44:57,672 - INFO - Initializing scheduled trading bot live runner for test-ks-bot...
+2026-08-21 21:44:58,868 - INFO - SQLite database tables verified/created.
+2026-08-21 21:45:01,386 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:46:52,570 - INFO - [test-ks-bot] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-21 21:46:56,065 - INFO - [test-ks-bot] Starting signal check cycle for BTC/USDT (1h)...
+2026-08-21 21:46:56,651 - INFO - Fetching recent candles for BTC/USDT (1h) [Bot: test-ks-bot] via ProviderManager...
+2026-08-21 21:57:56,064 - INFO - Indicators computed | close=77108.93 ema_9=77007.87 ema_20=75882.53 ema_50=72948.12 ema_200=67505.46 macd=1513.8280 poc=63050.0 val=62750.0 vah=72575.0
+2026-08-21 21:57:57,678 - INFO - [test-ks-bot] Evaluating strategy on completed candle: 2026-08-21 15:00:00+00:00 at Close price: 77221.98
+2026-08-21 21:58:04,366 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=76.6) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 21:58:08,015 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 21:58:12,886 - INFO - Logged heartbeat status: OK
+2026-08-21 21:58:21,020 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 21:58:21,047 - INFO - Bot test-ks-bot scheduled to check every 60 minutes.
+2026-08-21 21:58:23,383 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 21:58:23,397 - INFO - Scheduler started

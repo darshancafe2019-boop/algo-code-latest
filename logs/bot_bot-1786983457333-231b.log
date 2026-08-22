@@ -1,0 +1,660 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-17 21:47:45,299 - INFO - Initializing scheduled trading bot live runner for bot-1786983457333-231b...
+2026-08-17 21:47:45,360 - INFO - SQLite database tables verified/created.
+2026-08-17 21:47:45,436 - WARNING - Telegram alerts are DISABLED. Set TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID in your .env file.
+2026-08-17 21:47:45,439 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-17 21:47:53,348 - INFO - Initializing CCXT Binance in MAINNET mode (Public endpoints).
+2026-08-17 21:47:53,363 - INFO - Skipping Telegram notification (disabled): 🚀 <b>alpha bot Started</b>
+• <b>Symbol</b>: BTC/USDT
+• <b>Timeframe</b>: 1m
+• <b>Status</b>: RUNNING
+2026-08-17 21:47:53,365 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:47:53,410 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:47:57,711 - INFO - Indicators computed | close=64075.36 ema_9=64094.95 ema_20=64114.28 ema_50=64083.58 ema_200=63862.04 macd=-12.4519 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:47:57,712 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:16:00+00:00 at Close price: 64091.96
+2026-08-17 21:47:57,787 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=51.6) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:47:57,789 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:47:57,834 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:47:58,004 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:47:58,005 - INFO - Logged heartbeat status: OK
+2026-08-17 21:47:58,021 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-17 21:47:58,021 - INFO - Bot bot-1786983457333-231b scheduled to check every 1 minutes.
+2026-08-17 21:47:58,023 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-17 21:47:58,023 - INFO - Scheduler started
+2026-08-17 21:48:58,025 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:48:58 IST)" (scheduled at 2026-08-17 21:48:58.021124+05:30)
+2026-08-17 21:48:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:48:58,073 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:48:58,456 - INFO - Indicators computed | close=64086.24 ema_9=64093.21 ema_20=64111.61 ema_50=64083.68 ema_200=63864.27 macd=-12.8317 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:48:58,457 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:17:00+00:00 at Close price: 64075.37
+2026-08-17 21:48:58,506 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=53.4) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:48:58,508 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:48:58,553 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:48:58,716 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:48:58,717 - INFO - Logged heartbeat status: OK
+2026-08-17 21:48:58,717 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:49:58 IST)" executed successfully
+2026-08-17 21:49:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:50:58 IST)" (scheduled at 2026-08-17 21:49:58.021124+05:30)
+2026-08-17 21:49:58,034 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:49:58,080 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:49:58,344 - INFO - Indicators computed | close=64079.99 ema_9=64090.57 ema_20=64108.60 ema_50=64083.54 ema_200=63866.42 macd=-13.4822 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:49:58,345 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:18:00+00:00 at Close price: 64086.24
+2026-08-17 21:49:58,403 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=54.8) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:49:58,404 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:49:58,445 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:49:58,607 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:49:58,608 - INFO - Logged heartbeat status: OK
+2026-08-17 21:49:58,608 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:50:58 IST)" executed successfully
+2026-08-17 21:50:58,025 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:51:58 IST)" (scheduled at 2026-08-17 21:50:58.021124+05:30)
+2026-08-17 21:50:58,030 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:50:58,072 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:50:58,345 - INFO - Indicators computed | close=64072.01 ema_9=64086.98 ema_20=64105.18 ema_50=64083.11 ema_200=63868.47 macd=-14.4261 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:50:58,346 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:19:00+00:00 at Close price: 64080.78
+2026-08-17 21:50:58,410 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=55.4) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:50:58,412 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:50:58,452 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:50:58,599 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:50:58,600 - INFO - Logged heartbeat status: OK
+2026-08-17 21:50:58,600 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:51:58 IST)" executed successfully
+2026-08-17 21:51:58,024 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:52:58 IST)" (scheduled at 2026-08-17 21:51:58.021124+05:30)
+2026-08-17 21:51:58,030 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:51:58,074 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:51:58,337 - INFO - Indicators computed | close=64084.00 ema_9=64086.39 ema_20=64103.16 ema_50=64083.15 ema_200=63870.61 macd=-14.0942 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:51:58,338 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:20:00+00:00 at Close price: 64072.01
+2026-08-17 21:51:58,402 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=56.0) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:51:58,404 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:51:58,423 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:51:58,566 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:51:58,567 - INFO - Logged heartbeat status: OK
+2026-08-17 21:51:58,568 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:52:58 IST)" executed successfully
+2026-08-17 21:52:58,025 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:53:58 IST)" (scheduled at 2026-08-17 21:52:58.021124+05:30)
+2026-08-17 21:52:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:52:58,075 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:52:58,600 - INFO - Indicators computed | close=64130.86 ema_9=64095.28 ema_20=64105.80 ema_50=64085.02 ema_200=63873.20 macd=-9.9354 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:52:58,601 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:21:00+00:00 at Close price: 64084.00
+2026-08-17 21:52:58,659 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=55.5) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:52:58,661 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:52:58,706 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:52:58,860 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:52:58,861 - INFO - Logged heartbeat status: OK
+2026-08-17 21:52:58,861 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:53:58 IST)" executed successfully
+2026-08-17 21:53:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:54:58 IST)" (scheduled at 2026-08-17 21:53:58.021124+05:30)
+2026-08-17 21:53:58,033 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:53:58,077 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:53:58,447 - INFO - Indicators computed | close=64080.70 ema_9=64092.36 ema_20=64103.41 ema_50=64084.85 ema_200=63875.27 macd=-10.5652 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:53:58,447 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:22:00+00:00 at Close price: 64130.86
+2026-08-17 21:53:58,512 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=51.8) | Direction: HOLD | BullScore: 32.6% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:53:58,514 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:53:58,535 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:53:58,680 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:53:58,680 - INFO - Logged heartbeat status: OK
+2026-08-17 21:53:58,681 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:54:58 IST)" executed successfully
+2026-08-17 21:54:58,025 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:55:58 IST)" (scheduled at 2026-08-17 21:54:58.021124+05:30)
+2026-08-17 21:54:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:54:58,082 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:54:58,363 - INFO - Indicators computed | close=64098.54 ema_9=64093.60 ema_20=64102.95 ema_50=64085.39 ema_200=63877.49 macd=-9.5151 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:54:58,366 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:23:00+00:00 at Close price: 64080.70
+2026-08-17 21:54:58,432 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=49.1) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:54:58,434 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:54:58,452 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:54:58,647 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:54:58,648 - INFO - Logged heartbeat status: OK
+2026-08-17 21:54:58,649 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:55:58 IST)" executed successfully
+2026-08-17 21:55:58,028 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:56:58 IST)" (scheduled at 2026-08-17 21:55:58.021124+05:30)
+2026-08-17 21:55:58,035 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:55:58,079 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:55:58,352 - INFO - Indicators computed | close=64097.99 ema_9=64094.48 ema_20=64102.48 ema_50=64085.88 ema_200=63879.68 macd=-8.6279 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:55:58,352 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:24:00+00:00 at Close price: 64098.54
+2026-08-17 21:55:58,409 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=46.2) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:55:58,411 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:55:58,454 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 21:55:58,619 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:55:58,620 - INFO - Logged heartbeat status: OK
+2026-08-17 21:55:58,621 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:56:58 IST)" executed successfully
+2026-08-17 21:56:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:57:58 IST)" (scheduled at 2026-08-17 21:56:58.021124+05:30)
+2026-08-17 21:56:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:56:58,282 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:56:58,553 - INFO - Indicators computed | close=64116.43 ema_9=64102.38 ema_20=64105.01 ema_50=64088.23 ema_200=63884.37 macd=-4.5162 poc=63500.0 val=63275.0 vah=63825.0
+2026-08-17 21:56:58,555 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:26:00+00:00 at Close price: 64116.43
+2026-08-17 21:56:58,619 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=44.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:56:58,621 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:56:58,668 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 21:56:58,800 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:56:58,800 - INFO - Logged heartbeat status: OK
+2026-08-17 21:56:58,800 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:57:58 IST)" executed successfully
+2026-08-17 21:57:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:58:58 IST)" (scheduled at 2026-08-17 21:57:58.021124+05:30)
+2026-08-17 21:57:58,033 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:57:58,076 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:57:58,341 - INFO - Indicators computed | close=64113.22 ema_9=64101.74 ema_20=64104.70 ema_50=64088.10 ema_200=63884.34 macd=-4.7723 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 21:57:58,341 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:26:00+00:00 at Close price: 64116.43
+2026-08-17 21:57:58,405 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=44.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:57:58,407 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:57:58,451 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 21:57:58,611 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:57:58,612 - INFO - Logged heartbeat status: OK
+2026-08-17 21:57:58,612 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:58:58 IST)" executed successfully
+2026-08-17 21:58:58,023 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:59:58 IST)" (scheduled at 2026-08-17 21:58:58.021124+05:30)
+2026-08-17 21:58:58,027 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:58:58,081 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:58:58,345 - INFO - Indicators computed | close=64098.01 ema_9=64100.99 ema_20=64104.06 ema_50=64088.49 ema_200=63886.46 macd=-4.6852 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 21:58:58,346 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:27:00+00:00 at Close price: 64113.22
+2026-08-17 21:58:58,409 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=43.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:58:58,411 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:58:58,459 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 21:58:58,616 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:58:58,617 - INFO - Logged heartbeat status: OK
+2026-08-17 21:58:58,618 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 21:59:58 IST)" executed successfully
+2026-08-17 21:59:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:00:58 IST)" (scheduled at 2026-08-17 21:59:58.021124+05:30)
+2026-08-17 21:59:58,032 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 21:59:58,079 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 21:59:58,342 - INFO - Indicators computed | close=64097.07 ema_9=64100.21 ema_20=64103.40 ema_50=64088.83 ema_200=63888.56 macd=-4.6385 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 21:59:58,343 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:28:00+00:00 at Close price: 64098.01
+2026-08-17 21:59:58,398 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=42.3) | Direction: HOLD | BullScore: 17.4% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 21:59:58,400 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 21:59:58,439 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 17% (HOLD)
+2026-08-17 21:59:58,596 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 21:59:58,597 - INFO - Logged heartbeat status: OK
+2026-08-17 21:59:58,597 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:00:58 IST)" executed successfully
+2026-08-17 22:00:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:01:58 IST)" (scheduled at 2026-08-17 22:00:58.021124+05:30)
+2026-08-17 22:00:58,032 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:00:58,079 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:00:58,348 - INFO - Indicators computed | close=64116.00 ema_9=64103.37 ema_20=64104.60 ema_50=64089.89 ema_200=63890.82 macd=-3.0390 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:00:58,348 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:29:00+00:00 at Close price: 64097.07
+2026-08-17 22:00:58,425 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=41.4) | Direction: HOLD | BullScore: 17.4% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:00:58,428 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:00:58,471 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 17% (HOLD)
+2026-08-17 22:00:58,648 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:00:58,648 - INFO - Logged heartbeat status: OK
+2026-08-17 22:00:58,649 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:01:58 IST)" executed successfully
+2026-08-17 22:01:58,026 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:02:58 IST)" (scheduled at 2026-08-17 22:01:58.021124+05:30)
+2026-08-17 22:01:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:01:58,116 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:01:58,399 - INFO - Indicators computed | close=64092.00 ema_9=64101.09 ema_20=64103.40 ema_50=64089.98 ema_200=63892.82 macd=-3.6657 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:01:58,400 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:30:00+00:00 at Close price: 64116.00
+2026-08-17 22:01:58,468 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=41.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:01:58,470 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:01:58,513 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 22:01:58,641 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:01:58,642 - INFO - Logged heartbeat status: OK
+2026-08-17 22:01:58,642 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:02:58 IST)" executed successfully
+2026-08-17 22:02:58,028 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:03:58 IST)" (scheduled at 2026-08-17 22:02:58.021124+05:30)
+2026-08-17 22:02:58,033 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:02:58,074 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:02:58,344 - INFO - Indicators computed | close=64118.00 ema_9=64104.48 ema_20=64104.79 ema_50=64091.08 ema_200=63895.06 macd=-2.0409 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:02:58,346 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:31:00+00:00 at Close price: 64092.00
+2026-08-17 22:02:58,404 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=41.5) | Direction: HOLD | BullScore: 17.4% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:02:58,406 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:02:58,447 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 17% (HOLD)
+2026-08-17 22:02:58,562 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:02:58,563 - INFO - Logged heartbeat status: OK
+2026-08-17 22:02:58,563 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:03:58 IST)" executed successfully
+2026-08-17 22:03:58,026 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:04:58 IST)" (scheduled at 2026-08-17 22:03:58.021124+05:30)
+2026-08-17 22:03:58,030 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:03:58,080 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:03:58,400 - INFO - Indicators computed | close=64122.55 ema_9=64108.09 ema_20=64106.48 ema_50=64092.31 ema_200=63897.33 macd=-0.3816 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:03:58,401 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:32:00+00:00 at Close price: 64118.00
+2026-08-17 22:03:58,459 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=41.1) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:03:58,461 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:03:58,506 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 22:03:58,662 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:03:58,663 - INFO - Logged heartbeat status: OK
+2026-08-17 22:03:58,663 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:04:58 IST)" executed successfully
+2026-08-17 22:04:58,026 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:05:58 IST)" (scheduled at 2026-08-17 22:04:58.021124+05:30)
+2026-08-17 22:04:58,031 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:04:58,077 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:04:58,988 - INFO - Indicators computed | close=64127.99 ema_9=64112.07 ema_20=64108.53 ema_50=64093.71 ema_200=63899.62 macd=1.3567 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:04:58,989 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:33:00+00:00 at Close price: 64122.55
+2026-08-17 22:04:59,036 - INFO - LONG signal blocked | Momentum blocked (MACD -0.3816 <= 0) | context={'close': 64122.55, 'ema_9': 64108.09000277103, 'ema_20': 64106.48081042277, 'ema_50': 64092.31037736177, 'ema_200': 63897.32783162133, 'macd_line': -0.3816154988380731, 'macd_signal': -3.9349202909318293, 'macd_hist': 3.553304792093756, 'poc': np.float64(63500.0), 'val': np.float64(63275.0), 'vah': np.float64(63850.0)}
+2026-08-17 22:04:59,053 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=41.0) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:04:59,059 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:04:59,103 - INFO - Signal evaluated: HOLD. Reason/Details: LONG setup blocked: Momentum blocked (MACD -0.3816 <= 0)
+2026-08-17 22:04:59,104 - INFO - Skipping Telegram notification (disabled): 🚫 <b>SIGNAL BLOCKED</b>
+• <b>Reason</b>: LONG setup blocked: Momentum blocked (MACD -0.3816 <= 0)
+2026-08-17 22:04:59,247 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:04:59,247 - INFO - Logged heartbeat status: OK
+2026-08-17 22:04:59,248 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:05:58 IST)" executed successfully
+2026-08-17 22:05:59,951 - WARNING - Run time of job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:06:58 IST)" was missed by 0:00:01.929953
+2026-08-17 22:09:54,677 - WARNING - Run time of job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:09:58 IST)" was missed by 0:00:56.655942
+2026-08-17 22:09:58,024 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:10:58 IST)" (scheduled at 2026-08-17 22:09:58.021124+05:30)
+2026-08-17 22:09:58,029 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:09:58,079 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:09:58,129 - ERROR - CCXT Network/Timeout error for BTC/USDT 1m: binance GET https://api.binance.com/api/v3/klines?interval=1m&limit=1000&symbol=BTCUSDT
+2026-08-17 22:09:58,130 - ERROR - System Error in runner execution cycle: binance GET https://api.binance.com/api/v3/klines?interval=1m&limit=1000&symbol=BTCUSDT
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1349, in getresponse
+    response.begin()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1241, in recv_into
+    return self.read(nbytes, buffer)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1099, in read
+    return self._sslobj.read(len, buffer)
+ConnectionResetError: [Errno 54] Connection reset by peer
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/util.py", line 38, in reraise
+    raise value.with_traceback(tb)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1349, in getresponse
+    response.begin()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1241, in recv_into
+    return self.read(nbytes, buffer)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1099, in read
+    return self._sslobj.read(len, buffer)
+urllib3.exceptions.ProtocolError: ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 665, in fetch
+    response = self.session.request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 659, in send
+    raise ConnectionError(err, request=request)
+requests.exceptions.ConnectionError: ('Connection aborted.', ConnectionResetError(54, 'Connection reset by peer'))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/live_runner.py", line 167, in process_cycle
+    df = self.mainnet_fetcher.fetch_live_ohlcv(self.symbol, self.timeframe, limit=1000)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/data_fetcher.py", line 193, in fetch_live_ohlcv
+    raise net_err
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/data_fetcher.py", line 175, in fetch_live_ohlcv
+    candles = self.exchange.fetch_ohlcv(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 4759, in fetch_ohlcv
+    response = self.publicGetKlines(self.extend(request, params))
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/types.py", line 35, in unbound_method
+    return _self.request(self.path, self.api, self.method, params, config=self.config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 11724, in request
+    response = self.fetch2(path, api, method, params, headers, body, config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5566, in fetch2
+    raise e
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5549, in fetch2
+    response = self.fetch(request['url'], request['method'], request['headers'], request['body'])
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 721, in fetch
+    raise NetworkError(details) from e
+ccxt.base.errors.NetworkError: binance GET https://api.binance.com/api/v3/klines?interval=1m&limit=1000&symbol=BTCUSDT
+2026-08-17 22:09:58,545 - INFO - Skipping Telegram notification (disabled): 🚨 <b>CRITICAL ERROR</b>: System Error in runner execution cycle: binance GET https://api.binance.com/api/v3/klines?interval=1m&limit=1000&symbol=BTCUSDT
+2026-08-17 22:09:58,796 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:09:58,796 - INFO - Logged heartbeat status: ERROR
+2026-08-17 22:09:58,796 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:10:58 IST)" executed successfully
+2026-08-17 22:10:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:11:58 IST)" (scheduled at 2026-08-17 22:10:58.021124+05:30)
+2026-08-17 22:10:58,036 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:10:58,083 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:10:58,979 - INFO - Indicators computed | close=64155.33 ema_9=64139.36 ema_20=64125.28 ema_50=64104.40 ema_200=63913.79 macd=11.7500 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:10:58,982 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:39:00+00:00 at Close price: 64171.93
+2026-08-17 22:10:59,140 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=48.2) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:10:59,168 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:10:59,221 - INFO - Capping position size 1.581778 BTC to available cash equivalent 0.155831 BTC.
+2026-08-17 22:10:59,269 - ERROR - Error creating pending signal approval: table pending_signal_approvals has no column named timestamp
+2026-08-17 22:10:59,270 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>LONG</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,171.93</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:10:59,308 - INFO - [bot-1786983457333-231b] Signal LONG generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:10:59,353 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:10:59,354 - INFO - Logged heartbeat status: OK
+2026-08-17 22:10:59,354 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:11:58 IST)" executed successfully
+2026-08-17 22:11:58,028 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:12:58 IST)" (scheduled at 2026-08-17 22:11:58.021124+05:30)
+2026-08-17 22:11:58,044 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:11:58,091 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:11:59,101 - INFO - Indicators computed | close=64137.90 ema_9=64139.07 ema_20=64126.48 ema_50=64105.71 ema_200=63916.02 macd=11.2120 poc=63500.0 val=63275.0 vah=63850.0
+2026-08-17 22:11:59,116 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:40:00+00:00 at Close price: 64155.32
+2026-08-17 22:11:59,260 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=47.9) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:11:59,277 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:11:59,324 - INFO - Capping position size 1.820996 BTC to available cash equivalent 0.155872 BTC.
+2026-08-17 22:11:59,379 - ERROR - Error creating pending signal approval: table pending_signal_approvals has no column named timestamp
+2026-08-17 22:11:59,385 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>LONG</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,155.32</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:11:59,437 - INFO - [bot-1786983457333-231b] Signal LONG generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:11:59,588 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:11:59,589 - INFO - Logged heartbeat status: OK
+2026-08-17 22:11:59,589 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:12:58 IST)" executed successfully
+2026-08-17 22:12:58,032 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:13:58 IST)" (scheduled at 2026-08-17 22:12:58.021124+05:30)
+2026-08-17 22:12:58,040 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:12:58,082 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:12:58,381 - INFO - Indicators computed | close=64132.99 ema_9=64137.55 ema_20=64126.94 ema_50=64106.71 ema_200=63918.16 macd=10.1547 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:12:58,382 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:41:00+00:00 at Close price: 64136.00
+2026-08-17 22:12:58,444 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=46.0) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:12:58,446 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:12:58,490 - INFO - Capping position size 2.543235 BTC to available cash equivalent 0.155919 BTC.
+2026-08-17 22:12:58,548 - ERROR - Error creating pending signal approval: table pending_signal_approvals has no column named timestamp
+2026-08-17 22:12:58,550 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>LONG</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,136.00</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:12:58,589 - INFO - [bot-1786983457333-231b] Signal LONG generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:12:58,743 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:12:58,744 - INFO - Logged heartbeat status: OK
+2026-08-17 22:12:58,745 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:13:58 IST)" executed successfully
+2026-08-17 22:13:58,029 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:14:58 IST)" (scheduled at 2026-08-17 22:13:58.021124+05:30)
+2026-08-17 22:13:58,035 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:13:58,078 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:13:58,397 - INFO - Indicators computed | close=64106.96 ema_9=64131.43 ema_20=64125.04 ema_50=64106.72 ema_200=63920.03 macd=7.2523 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:13:58,397 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:42:00+00:00 at Close price: 64132.98
+2026-08-17 22:13:58,466 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=43.0) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:13:58,468 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:13:58,517 - INFO - Capping position size 3.118665 BTC to available cash equivalent 0.155926 BTC.
+2026-08-17 22:13:58,529 - ERROR - Error creating pending signal approval: table pending_signal_approvals has no column named timestamp
+2026-08-17 22:13:58,529 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>LONG</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,132.98</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:13:58,590 - INFO - [bot-1786983457333-231b] Signal LONG generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:13:58,738 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:13:58,739 - INFO - Logged heartbeat status: OK
+2026-08-17 22:13:58,739 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:14:58 IST)" executed successfully
+2026-08-17 22:14:58,030 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:15:58 IST)" (scheduled at 2026-08-17 22:14:58.021124+05:30)
+2026-08-17 22:14:58,040 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:14:58,086 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:14:58,416 - INFO - Indicators computed | close=64084.00 ema_9=64121.94 ema_20=64121.13 ema_50=64105.83 ema_200=63921.67 macd=3.0648 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:14:58,418 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:43:00+00:00 at Close price: 64106.96
+2026-08-17 22:14:58,472 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=38.4) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:14:58,474 - ERROR - Error logging bot decision for bot-1786983457333-231b: table bot_decision_logs has no column named price
+2026-08-17 22:14:58,517 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 22:14:58,652 - ERROR - Error logging daily statistics: table daily_statistics has no column named timestamp
+2026-08-17 22:14:58,653 - INFO - Logged heartbeat status: OK
+2026-08-17 22:14:58,653 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:15:58 IST)" executed successfully
+2026-08-17 22:15:58,024 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:16:58 IST)" (scheduled at 2026-08-17 22:15:58.021124+05:30)
+2026-08-17 22:15:58,028 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:15:58,321 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:15:58,604 - INFO - Indicators computed | close=64080.00 ema_9=64113.55 ema_20=64117.21 ema_50=64104.82 ema_200=63923.24 macd=-0.5701 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:15:58,605 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:44:00+00:00 at Close price: 64084.00
+2026-08-17 22:15:58,662 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=35.4) | Direction: HOLD | BullScore: 0.0% | BearScore: 34.8% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:15:58,665 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:15:58,713 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 35% (HOLD)
+2026-08-17 22:15:58,882 - INFO - Logged heartbeat status: OK
+2026-08-17 22:15:58,882 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:16:58 IST)" executed successfully
+2026-08-17 22:16:58,032 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:17:58 IST)" (scheduled at 2026-08-17 22:16:58.021124+05:30)
+2026-08-17 22:16:58,039 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:16:58,083 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:16:58,361 - INFO - Indicators computed | close=64090.00 ema_9=64108.84 ema_20=64114.62 ema_50=64104.23 ema_200=63924.90 macd=-2.6131 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:16:58,362 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:45:00+00:00 at Close price: 64080.01
+2026-08-17 22:16:58,412 - INFO - SHORT signal blocked | Trend blocked (Close 64080.01 >= EMA200 63923.24) | context={'close': 64080.01, 'ema_9': 64113.55619071648, 'ema_20': 64117.21259019138, 'ema_50': 64104.815790095134, 'ema_200': 63923.24139994394, 'macd_line': -0.5693257375824032, 'macd_signal': 4.8571054543409, 'macd_hist': -5.426431191923303, 'poc': np.float64(63500.0), 'val': np.float64(63275.0), 'vah': np.float64(63875.0)}
+2026-08-17 22:16:58,429 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=32.9) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:16:58,431 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:16:58,473 - INFO - Signal evaluated: HOLD. Reason/Details: SHORT setup blocked: Trend blocked (Close 64080.01 >= EMA200 63923.24)
+2026-08-17 22:16:58,474 - INFO - Skipping Telegram notification (disabled): 🚫 <b>SIGNAL BLOCKED</b>
+• <b>Reason</b>: SHORT setup blocked: Trend blocked (Close 64080.01 >= EMA200 63923.24)
+2026-08-17 22:16:58,662 - INFO - Logged heartbeat status: OK
+2026-08-17 22:16:58,662 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:17:58 IST)" executed successfully
+2026-08-17 22:17:58,030 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:18:58 IST)" (scheduled at 2026-08-17 22:17:58.021124+05:30)
+2026-08-17 22:17:58,036 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:17:58,075 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:17:58,421 - INFO - Indicators computed | close=64091.03 ema_9=64105.28 ema_20=64112.37 ema_50=64103.72 ema_200=63926.55 macd=-4.1024 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:17:58,427 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:46:00+00:00 at Close price: 64090.00
+2026-08-17 22:17:58,507 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=30.4) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:17:58,510 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:17:58,552 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 22:17:58,717 - INFO - Logged heartbeat status: OK
+2026-08-17 22:17:58,717 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:18:58 IST)" executed successfully
+2026-08-17 22:18:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:19:58 IST)" (scheduled at 2026-08-17 22:18:58.021124+05:30)
+2026-08-17 22:18:58,032 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:18:58,072 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:18:58,340 - INFO - Indicators computed | close=64112.27 ema_9=64106.68 ema_20=64112.36 ema_50=64104.05 ema_200=63928.40 macd=-3.5282 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:18:58,341 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:47:00+00:00 at Close price: 64091.03
+2026-08-17 22:18:58,398 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=28.7) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:18:58,400 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:18:58,442 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 22:18:58,635 - INFO - Logged heartbeat status: OK
+2026-08-17 22:18:58,635 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:19:58 IST)" executed successfully
+2026-08-17 22:19:58,033 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:20:58 IST)" (scheduled at 2026-08-17 22:19:58.021124+05:30)
+2026-08-17 22:19:58,043 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:19:58,090 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:19:58,372 - INFO - Indicators computed | close=64133.22 ema_9=64111.99 ema_20=64114.35 ema_50=64105.20 ema_200=63930.44 macd=-1.3656 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:19:58,373 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:48:00+00:00 at Close price: 64112.29
+2026-08-17 22:19:58,445 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=25.8) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:19:58,447 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:19:58,494 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-17 22:19:58,701 - INFO - Logged heartbeat status: OK
+2026-08-17 22:19:58,701 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:20:58 IST)" executed successfully
+2026-08-17 22:20:58,032 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:21:58 IST)" (scheduled at 2026-08-17 22:20:58.021124+05:30)
+2026-08-17 22:20:58,042 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:20:58,090 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:20:58,414 - INFO - Indicators computed | close=64104.12 ema_9=64110.42 ema_20=64113.38 ema_50=64105.15 ema_200=63932.17 macd=-1.9783 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:20:58,415 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:49:00+00:00 at Close price: 64133.22
+2026-08-17 22:20:58,503 - INFO - Confluence Evaluation | Regime: RANGING (ADX=23.1) | Direction: HOLD | BullScore: 50.0% | BearScore: 50.0% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:20:58,506 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:20:58,562 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 50% (HOLD)
+2026-08-17 22:20:58,763 - INFO - Logged heartbeat status: OK
+2026-08-17 22:20:58,763 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:21:58 IST)" executed successfully
+2026-08-17 22:21:58,029 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:22:58 IST)" (scheduled at 2026-08-17 22:21:58.021124+05:30)
+2026-08-17 22:21:58,042 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:21:58,085 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:21:58,516 - INFO - Indicators computed | close=64107.86 ema_9=64109.91 ema_20=64112.85 ema_50=64105.26 ema_200=63933.92 macd=-2.1369 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:21:58,517 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:50:00+00:00 at Close price: 64104.13
+2026-08-17 22:21:58,583 - INFO - Confluence Evaluation | Regime: RANGING (ADX=22.3) | Direction: SHORT | BullScore: 0.0% | BearScore: 82.6% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:21:58,586 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:21:58,629 - INFO - Capping position size 2.027781 BTC to available cash equivalent 0.155996 BTC.
+2026-08-17 22:21:58,649 - ERROR - Error creating pending signal approval: NOT NULL constraint failed: pending_signal_approvals.confidence
+2026-08-17 22:21:58,678 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>SHORT</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,104.13</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:21:58,738 - INFO - [bot-1786983457333-231b] Signal SHORT generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:21:58,938 - INFO - Logged heartbeat status: OK
+2026-08-17 22:21:58,938 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:22:58 IST)" executed successfully
+2026-08-17 22:22:58,027 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:23:58 IST)" (scheduled at 2026-08-17 22:22:58.021124+05:30)
+2026-08-17 22:22:58,037 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:22:58,093 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:22:58,378 - INFO - Indicators computed | close=64116.03 ema_9=64111.13 ema_20=64113.15 ema_50=64105.68 ema_200=63935.73 macd=-1.5862 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:22:58,379 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:51:00+00:00 at Close price: 64107.85
+2026-08-17 22:22:58,460 - INFO - Confluence Evaluation | Regime: RANGING (ADX=20.4) | Direction: SHORT | BullScore: 0.0% | BearScore: 82.6% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:22:58,462 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:22:58,511 - INFO - Capping position size 2.107260 BTC to available cash equivalent 0.155987 BTC.
+2026-08-17 22:22:58,540 - ERROR - Error creating pending signal approval: NOT NULL constraint failed: pending_signal_approvals.confidence
+2026-08-17 22:22:58,570 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>SHORT</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,107.85</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:22:58,595 - INFO - [bot-1786983457333-231b] Signal SHORT generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:22:58,780 - INFO - Logged heartbeat status: OK
+2026-08-17 22:22:58,780 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:23:58 IST)" executed successfully
+2026-08-17 22:23:58,035 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:24:58 IST)" (scheduled at 2026-08-17 22:23:58.021124+05:30)
+2026-08-17 22:23:58,050 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:23:58,103 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:23:58,515 - INFO - Indicators computed | close=64082.75 ema_9=64105.45 ema_20=64110.26 ema_50=64104.78 ema_200=63937.19 macd=-3.7909 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:23:58,516 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:52:00+00:00 at Close price: 64116.03
+2026-08-17 22:23:58,582 - INFO - Confluence Evaluation | Regime: RANGING (ADX=17.3) | Direction: SHORT | BullScore: 17.4% | BearScore: 82.6% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:23:58,585 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:23:58,637 - INFO - Capping position size 2.306007 BTC to available cash equivalent 0.155967 BTC.
+2026-08-17 22:23:58,669 - ERROR - Error creating pending signal approval: NOT NULL constraint failed: pending_signal_approvals.confidence
+2026-08-17 22:23:58,698 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>SHORT</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,116.03</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:23:58,739 - INFO - [bot-1786983457333-231b] Signal SHORT generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:23:58,947 - INFO - Logged heartbeat status: OK
+2026-08-17 22:23:58,947 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:24:58 IST)" executed successfully
+2026-08-17 22:24:58,028 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:25:58 IST)" (scheduled at 2026-08-17 22:24:58.021124+05:30)
+2026-08-17 22:24:58,033 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:24:58,074 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:24:58,350 - INFO - Indicators computed | close=64082.71 ema_9=64100.91 ema_20=64107.64 ema_50=64103.92 ema_200=63938.64 macd=-5.4783 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:24:58,351 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:53:00+00:00 at Close price: 64082.75
+2026-08-17 22:24:58,418 - INFO - Confluence Evaluation | Regime: RANGING (ADX=15.1) | Direction: SHORT | BullScore: 0.0% | BearScore: 82.6% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:24:58,422 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:24:58,468 - INFO - Capping position size 1.666528 BTC to available cash equivalent 0.156048 BTC.
+2026-08-17 22:24:58,497 - ERROR - Error creating pending signal approval: NOT NULL constraint failed: pending_signal_approvals.confidence
+2026-08-17 22:24:58,529 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>SHORT</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,082.75</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:24:58,571 - INFO - [bot-1786983457333-231b] Signal SHORT generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:24:58,754 - INFO - Logged heartbeat status: OK
+2026-08-17 22:24:58,755 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:25:58 IST)" executed successfully
+2026-08-17 22:25:58,049 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:26:58 IST)" (scheduled at 2026-08-17 22:25:58.021124+05:30)
+2026-08-17 22:25:58,059 - INFO - [bot-1786983457333-231b] Starting signal check cycle for BTC/USDT (1m)...
+2026-08-17 22:25:58,109 - INFO - Fetching recent candles for BTC/USDT (1m) [Bot: bot-1786983457333-231b]...
+2026-08-17 22:25:58,478 - INFO - Indicators computed | close=64085.03 ema_9=64097.73 ema_20=64105.48 ema_50=64103.18 ema_200=63940.10 macd=-6.5527 poc=63500.0 val=63275.0 vah=63875.0
+2026-08-17 22:25:58,479 - INFO - [bot-1786983457333-231b] Evaluating strategy on completed candle: 2026-08-17T16:54:00+00:00 at Close price: 64082.71
+2026-08-17 22:25:58,564 - INFO - Confluence Evaluation | Regime: RANGING (ADX=13.9) | Direction: SHORT | BullScore: 0.0% | BearScore: 82.6% | Active: ['ema_cross', 'macd', 'rsi', 'volume_profile']
+2026-08-17 22:25:58,595 - ERROR - Error logging bot decision for bot-1786983457333-231b: NOT NULL constraint failed: bot_decision_logs.candle_timestamp
+2026-08-17 22:25:58,643 - INFO - Capping position size 1.665973 BTC to available cash equivalent 0.156048 BTC.
+2026-08-17 22:25:58,671 - ERROR - Error creating pending signal approval: NOT NULL constraint failed: pending_signal_approvals.confidence
+2026-08-17 22:25:58,672 - INFO - Skipping interactive Telegram notification (disabled): 🚨 <b>TRADE SIGNAL GENERATED</b>
+
+<b>BTC/USDT</b>
+Timeframe: 15m
+
+Signal: <b>SHORT</b>
+Confidence: <b>83%</b>
+Required Threshold: <b>75%</b>
+
+Price: <b>$64,082.71</b>
+
+EMA: Bullish
+MACD: Bullish
+Volume Profile: Bullish
+
+⚠️ <b>NO TRADE EXECUTED</b>
+
+Waiting for your decision.
+2026-08-17 22:25:58,731 - INFO - [bot-1786983457333-231b] Signal SHORT generated (ID: -1). Waiting for manual user approval.
+2026-08-17 22:25:58,803 - INFO - Logged heartbeat status: OK
+2026-08-17 22:25:58,803 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:01:00], next run at: 2026-08-17 22:26:58 IST)" executed successfully

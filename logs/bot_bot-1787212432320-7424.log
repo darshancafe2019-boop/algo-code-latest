@@ -1,0 +1,443 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-20 22:18:04,569 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-20 22:18:05,611 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-20 22:18:05,896 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-20 22:18:06,112 - INFO - SQLite database tables verified/created.
+2026-08-20 22:18:07,142 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-20 22:18:38,592 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-20 22:18:38,649 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-20 22:18:38,668 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-20 22:19:55,095 - INFO - Indicators computed | close=2342.10 ema_9=2321.40 ema_20=2305.64 ema_50=2278.97 ema_200=2130.48 macd=15.3895 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-20 22:19:55,100 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-20 16:30:00+00:00 at Close price: 2348.94
+2026-08-20 22:19:55,371 - INFO - Confluence Evaluation | Regime: RANGING (ADX=17.9) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-20 22:19:55,458 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-20 22:19:55,986 - INFO - Logged heartbeat status: OK
+2026-08-20 22:19:56,049 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-20 22:19:56,056 - INFO - Bot bot-1787212432320-7424 scheduled to check every 15 minutes.
+2026-08-20 22:19:56,059 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-20 22:19:56,065 - INFO - Scheduler started
+2026-08-20 22:34:56,573 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-20 22:49:56 IST)" (scheduled at 2026-08-20 22:34:56.047968+05:30)
+2026-08-20 22:34:56,807 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-20 22:34:56,902 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-20 22:34:58,079 - INFO - Indicators computed | close=2340.01 ema_9=2325.50 ema_20=2309.12 ema_50=2281.45 ema_200=2132.59 macd=16.3388 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-20 22:34:58,081 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-20 16:45:00+00:00 at Close price: 2344.48
+2026-08-20 22:34:58,181 - INFO - Confluence Evaluation | Regime: RANGING (ADX=18.4) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-20 22:34:58,267 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-20 22:34:58,377 - INFO - Logged heartbeat status: OK
+2026-08-20 22:34:58,381 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-20 22:49:56 IST)" executed successfully
+2026-08-20 22:49:56,123 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-20 23:04:56 IST)" (scheduled at 2026-08-20 22:49:56.047968+05:30)
+2026-08-20 22:49:56,158 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-20 22:49:56,191 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-20 22:49:57,496 - INFO - Indicators computed | close=2338.90 ema_9=2327.82 ema_20=2311.76 ema_50=2283.62 ema_200=2134.62 macd=16.5187 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-20 22:49:57,501 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-20 17:00:00+00:00 at Close price: 2337.73
+2026-08-20 22:49:57,608 - INFO - Confluence Evaluation | Regime: RANGING (ADX=23.6) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-20 22:49:57,668 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-20 22:49:57,802 - INFO - Logged heartbeat status: OK
+2026-08-20 22:49:57,802 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-20 23:04:56 IST)" executed successfully
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 06:21:30,431 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 06:21:31,633 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 06:21:31,665 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 06:21:32,257 - INFO - SQLite database tables verified/created.
+2026-08-21 06:21:32,914 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 06:22:02,747 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 06:22:02,795 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 06:22:03,530 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 06:23:04,484 - INFO - Indicators computed | close=2347.99 ema_9=2333.56 ema_20=2327.52 ema_50=2313.41 ema_200=2184.15 macd=5.9697 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-21 06:23:04,490 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 00:30:00+00:00 at Close price: 2337.89
+2026-08-21 06:23:05,102 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=26.2) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 06:23:05,345 - INFO - Capping position size 6.013229 BTC to available cash equivalent 2.138681 BTC.
+2026-08-21 06:23:05,586 - INFO - Created pending signal approval ID 100 for bot bot-1787212432320-7424 (LONG @ $2337.89, status: WAITING_APPROVAL)
+2026-08-21 06:23:05,783 - INFO - [bot-1787212432320-7424] Signal LONG generated (ID: 100). Waiting for manual user approval.
+2026-08-21 06:23:06,068 - INFO - Logged heartbeat status: OK
+2026-08-21 06:23:06,089 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 06:23:06,089 - INFO - Bot bot-1787212432320-7424 scheduled to check every 15 minutes.
+2026-08-21 06:23:06,094 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 06:23:06,094 - INFO - Scheduler started
+2026-08-21 06:38:06,377 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 06:53:06 IST)" (scheduled at 2026-08-21 06:38:06.088396+05:30)
+2026-08-21 06:38:06,467 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 06:38:06,562 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 06:38:07,501 - INFO - Indicators computed | close=2344.34 ema_9=2334.57 ema_20=2328.50 ema_50=2314.35 ema_200=2185.68 macd=6.1314 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-21 06:38:07,502 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 00:45:00+00:00 at Close price: 2340.82
+2026-08-21 06:38:07,587 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.7) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 06:38:07,694 - INFO - Capping position size 5.112474 BTC to available cash equivalent 2.136004 BTC.
+2026-08-21 06:38:07,704 - INFO - [bot-1787212432320-7424] Signal LONG active pending approval already exists (ID: 100).
+2026-08-21 06:38:08,060 - INFO - Logged heartbeat status: OK
+2026-08-21 06:38:08,063 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 06:53:06 IST)" executed successfully
+2026-08-21 06:53:06,180 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 07:08:06 IST)" (scheduled at 2026-08-21 06:53:06.088396+05:30)
+2026-08-21 06:53:06,225 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 06:53:06,281 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 06:53:07,243 - INFO - Indicators computed | close=2340.72 ema_9=2336.02 ema_20=2329.79 ema_50=2315.44 ema_200=2187.23 macd=6.4344 poc=1875.0 val=1850.0 vah=2250.0
+2026-08-21 06:53:07,245 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 01:00:00+00:00 at Close price: 2345.75
+2026-08-21 06:53:07,339 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=31.0) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 06:53:07,444 - INFO - Capping position size 4.332756 BTC to available cash equivalent 2.131514 BTC.
+2026-08-21 06:53:07,555 - INFO - Created pending signal approval ID 130 for bot bot-1787212432320-7424 (LONG @ $2345.75, status: WAITING_APPROVAL)
+2026-08-21 06:53:07,642 - INFO - [bot-1787212432320-7424] Signal LONG generated (ID: 130). Waiting for manual user approval.
+2026-08-21 06:53:07,845 - INFO - Logged heartbeat status: OK
+2026-08-21 06:53:07,846 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 07:08:06 IST)" executed successfully
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 12:14:15,393 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 12:14:16,235 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 12:14:16,250 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 12:14:16,288 - INFO - SQLite database tables verified/created.
+2026-08-21 12:14:17,257 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 12:14:47,391 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 12:14:47,447 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 12:14:47,474 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 12:15:55,403 - INFO - Indicators computed | close=2368.12 ema_9=2361.97 ema_20=2355.29 ema_50=2339.54 ema_200=2220.54 macd=7.7943 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 12:15:55,459 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 06:30:00+00:00 at Close price: 2369.66
+2026-08-21 12:15:56,210 - INFO - Confluence Evaluation | Regime: RANGING (ADX=19.2) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 12:15:56,318 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 12:15:56,712 - INFO - Logged heartbeat status: OK
+2026-08-21 12:15:56,882 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 12:15:56,882 - INFO - Bot bot-1787212432320-7424 scheduled to check every 15 minutes.
+2026-08-21 12:15:56,888 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 12:15:56,888 - INFO - Scheduler started
+2026-08-21 12:30:57,202 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 12:45:56 IST)" (scheduled at 2026-08-21 12:30:56.880640+05:30)
+2026-08-21 12:30:57,466 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 12:30:57,535 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 12:30:58,726 - INFO - Indicators computed | close=2373.22 ema_9=2364.91 ema_20=2357.37 ema_50=2341.03 ema_200=2222.11 macd=8.5454 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 12:30:58,731 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 06:45:00+00:00 at Close price: 2372.47
+2026-08-21 12:30:58,880 - INFO - Confluence Evaluation | Regime: RANGING (ADX=21.1) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 12:30:58,975 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 12:30:59,180 - INFO - Logged heartbeat status: OK
+2026-08-21 12:30:59,181 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 12:45:56 IST)" executed successfully
+2026-08-21 12:45:56,946 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:00:56 IST)" (scheduled at 2026-08-21 12:45:56.880640+05:30)
+2026-08-21 12:45:56,957 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 12:45:57,010 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 12:45:57,923 - INFO - Indicators computed | close=2385.93 ema_9=2371.24 ema_20=2361.23 ema_50=2343.29 ema_200=2223.87 macd=10.5946 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 12:45:57,940 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 07:00:00+00:00 at Close price: 2386.47
+2026-08-21 12:45:58,051 - INFO - Confluence Evaluation | Regime: RANGING (ADX=23.3) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 12:45:58,170 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 12:45:58,381 - INFO - Logged heartbeat status: OK
+2026-08-21 12:45:58,381 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:00:56 IST)" executed successfully
+2026-08-21 13:00:56,972 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:15:56 IST)" (scheduled at 2026-08-21 13:00:56.880640+05:30)
+2026-08-21 13:00:57,009 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 13:00:57,078 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 13:01:07,204 - ERROR - Binance Spot Network Error: binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT
+--- Logging error ---
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 204, in _new_conn
+    sock = connection.create_connection(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+socket.timeout: timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 488, in _make_request
+    raise new_e
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 759, in connect
+    self.sock = sock = self._new_conn()
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise ConnectTimeoutError(
+urllib3.exceptions.ConnectTimeoutError: (<HTTPSConnection(host='api.binance.com', port=443) at 0x112616b20>, 'Connection to api.binance.com timed out. (connect timeout=10.0)')
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 535, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPSConnectionPool(host='api.binance.com', port=443): Max retries exceeded with url: /api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT (Caused by ConnectTimeoutError(<HTTPSConnection(host='api.binance.com', port=443) at 0x112616b20>, 'Connection to api.binance.com timed out. (connect timeout=10.0)'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 665, in fetch
+    response = self.session.request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 665, in send
+    raise ConnectTimeout(e, request=request)
+requests.exceptions.ConnectTimeout: HTTPSConnectionPool(host='api.binance.com', port=443): Max retries exceeded with url: /api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT (Caused by ConnectTimeoutError(<HTTPSConnection(host='api.binance.com', port=443) at 0x112616b20>, 'Connection to api.binance.com timed out. (connect timeout=10.0)'))
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 351, in fetch_ohlcv_safe
+    df = adapter.fetch_ohlcv(instrument, timeframe, limit=limit)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 211, in fetch_ohlcv
+    raise net_err
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 183, in fetch_ohlcv
+    raw_candles = self.exchange.fetch_ohlcv(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 4759, in fetch_ohlcv
+    response = self.publicGetKlines(self.extend(request, params))
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/types.py", line 35, in unbound_method
+    return _self.request(self.path, self.api, self.method, params, config=self.config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 11724, in request
+    response = self.fetch2(path, api, method, params, headers, body, config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5566, in fetch2
+    raise e
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5549, in fetch2
+    response = self.fetch(request['url'], request['method'], request['headers'], request['body'])
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 698, in fetch
+    raise RequestTimeout(details) from e
+ccxt.base.errors.RequestTimeout: binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 1083, in emit
+    msg = self.format(record)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 927, in format
+    return fmt.format(record)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 663, in format
+    record.message = record.getMessage()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 367, in getMessage
+    msg = msg % self.args
+TypeError: must be real number, not RequestTimeout
+Call stack:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 930, in _bootstrap
+    self._bootstrap_inner()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 973, in _bootstrap_inner
+    self.run()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 910, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 77, in _worker
+    work_item.run()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/apscheduler/executors/base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/live_runner.py", line 199, in process_cycle
+    df, _ = self.provider_manager.fetch_ohlcv_safe(self.symbol, self.timeframe, limit=1000)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 362, in fetch_ohlcv_safe
+    logger.warning(
+Message: 'Retryable network failure for %s (Attempt %d/%d). Backing off %.2fs: %s'
+Arguments: ('ETH/USDT', 1, 3, RequestTimeout('binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT'))
+2026-08-21 13:01:10,784 - INFO - Indicators computed | close=2382.94 ema_9=2372.91 ema_20=2362.94 ema_50=2344.68 ema_200=2225.41 macd=10.7547 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 13:01:10,786 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 07:15:00+00:00 at Close price: 2381.74
+2026-08-21 13:01:10,887 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.9) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 13:01:10,970 - INFO - Capping position size 3.454231 BTC to available cash equivalent 2.099306 BTC.
+2026-08-21 13:01:11,076 - INFO - Created pending signal approval ID 185 for bot bot-1787212432320-7424 (LONG @ $2381.74, status: WAITING_APPROVAL)
+2026-08-21 13:01:11,155 - INFO - [bot-1787212432320-7424] Signal LONG generated (ID: 185). Waiting for manual user approval.
+2026-08-21 13:01:11,279 - INFO - Logged heartbeat status: OK
+2026-08-21 13:01:11,279 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:15:56 IST)" executed successfully
+2026-08-21 13:15:56,997 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:30:56 IST)" (scheduled at 2026-08-21 13:15:56.880640+05:30)
+2026-08-21 13:15:57,055 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 13:15:57,114 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 13:15:57,785 - INFO - Indicators computed | close=2381.66 ema_9=2374.31 ema_20=2364.54 ema_50=2346.05 ema_200=2226.94 macd=10.7843 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 13:15:57,788 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 07:30:00+00:00 at Close price: 2380.78
+2026-08-21 13:15:57,864 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=31.8) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 13:15:57,968 - INFO - Capping position size 4.456328 BTC to available cash equivalent 2.100152 BTC.
+2026-08-21 13:15:57,980 - INFO - [bot-1787212432320-7424] Signal LONG active pending approval already exists (ID: 185).
+2026-08-21 13:15:58,198 - INFO - Logged heartbeat status: OK
+2026-08-21 13:15:58,199 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:30:56 IST)" executed successfully
+2026-08-21 13:30:57,006 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:30:56 IST)" (scheduled at 2026-08-21 13:30:56.880640+05:30)
+2026-08-21 13:30:57,068 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 13:30:57,133 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 13:31:07,226 - ERROR - Binance Spot Network Error: binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT
+--- Logging error ---
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 534, in _make_request
+    response = conn.getresponse()
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connection.py", line 571, in getresponse
+    httplib_response = super().getresponse()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 1349, in getresponse
+    response.begin()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 316, in begin
+    version, status, reason = self._read_status()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/http/client.py", line 277, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/socket.py", line 704, in readinto
+    return self._sock.recv_into(b)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1241, in recv_into
+    return self.read(nbytes, buffer)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/ssl.py", line 1099, in read
+    return self._sslobj.read(len, buffer)
+socket.timeout: The read operation timed out
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/retry.py", line 490, in increment
+    raise reraise(type(error), error, _stacktrace)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/util/util.py", line 39, in reraise
+    raise value
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 536, in _make_request
+    self._raise_timeout(err=e, url=url, timeout_value=read_timeout)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/connectionpool.py", line 367, in _raise_timeout
+    raise ReadTimeoutError(
+urllib3.exceptions.ReadTimeoutError: HTTPSConnectionPool(host='api.binance.com', port=443): Read timed out. (read timeout=10.0)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 665, in fetch
+    response = self.session.request(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/requests/adapters.py", line 690, in send
+    raise ReadTimeout(e, request=request)
+requests.exceptions.ReadTimeout: HTTPSConnectionPool(host='api.binance.com', port=443): Read timed out. (read timeout=10.0)
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 351, in fetch_ohlcv_safe
+    df = adapter.fetch_ohlcv(instrument, timeframe, limit=limit)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 211, in fetch_ohlcv
+    raise net_err
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 183, in fetch_ohlcv
+    raw_candles = self.exchange.fetch_ohlcv(
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 4759, in fetch_ohlcv
+    response = self.publicGetKlines(self.extend(request, params))
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/types.py", line 35, in unbound_method
+    return _self.request(self.path, self.api, self.method, params, config=self.config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/binance.py", line 11724, in request
+    response = self.fetch2(path, api, method, params, headers, body, config)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5566, in fetch2
+    raise e
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 5549, in fetch2
+    response = self.fetch(request['url'], request['method'], request['headers'], request['body'])
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/ccxt/base/exchange.py", line 698, in fetch
+    raise RequestTimeout(details) from e
+ccxt.base.errors.RequestTimeout: binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 1083, in emit
+    msg = self.format(record)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 927, in format
+    return fmt.format(record)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 663, in format
+    record.message = record.getMessage()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/logging/__init__.py", line 367, in getMessage
+    msg = msg % self.args
+TypeError: must be real number, not RequestTimeout
+Call stack:
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 930, in _bootstrap
+    self._bootstrap_inner()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 973, in _bootstrap_inner
+    self.run()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/threading.py", line 910, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 77, in _worker
+    work_item.run()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/apscheduler/executors/base.py", line 131, in run_job
+    retval = job.func(*job.args, **job.kwargs)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/live_runner.py", line 199, in process_cycle
+    df, _ = self.provider_manager.fetch_ohlcv_safe(self.symbol, self.timeframe, limit=1000)
+  File "/Users/ashishparadkar/Downloads/algo-code-main/src/provider_manager.py", line 362, in fetch_ohlcv_safe
+    logger.warning(
+Message: 'Retryable network failure for %s (Attempt %d/%d). Backing off %.2fs: %s'
+Arguments: ('ETH/USDT', 1, 3, RequestTimeout('binance GET https://api.binance.com/api/v3/klines?interval=15m&limit=1000&symbol=ETHUSDT'))
+2026-08-21 13:31:11,152 - INFO - Indicators computed | close=2374.66 ema_9=2372.78 ema_20=2364.64 ema_50=2346.80 ema_200=2228.31 macd=9.6453 poc=1900.0 val=1850.0 vah=2275.0
+2026-08-21 13:31:11,155 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 07:45:00+00:00 at Close price: 2371.66
+2026-08-21 13:31:11,383 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=34.5) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 13:31:11,516 - INFO - Capping position size 8.802817 BTC to available cash equivalent 2.108228 BTC.
+2026-08-21 13:31:11,636 - INFO - Created pending signal approval ID 196 for bot bot-1787212432320-7424 (LONG @ $2371.66, status: WAITING_APPROVAL)
+2026-08-21 13:31:11,737 - INFO - [bot-1787212432320-7424] Signal LONG generated (ID: 196). Waiting for manual user approval.
+2026-08-21 13:31:12,004 - INFO - Logged heartbeat status: OK
+2026-08-21 13:31:12,004 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 13:45:56 IST)" executed successfully
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 14:51:32,385 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 14:51:33,449 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 14:51:33,863 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 14:51:34,506 - INFO - SQLite database tables verified/created.
+2026-08-21 14:51:35,596 - INFO - Initializing CCXT Binance in TESTNET mode.
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 15:30:48,179 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 15:30:49,318 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 15:30:49,332 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 15:30:49,370 - INFO - SQLite database tables verified/created.
+2026-08-21 15:30:50,566 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 15:31:48,066 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 15:31:49,383 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 15:31:50,686 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 18:14:02,364 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 18:14:02,881 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 18:14:03,379 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 18:14:03,871 - INFO - SQLite database tables verified/created.
+2026-08-21 18:14:04,503 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 18:14:52,999 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 18:14:54,350 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 18:14:54,900 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 20:27:35,194 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 20:27:35,945 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 20:27:36,980 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 20:27:37,433 - INFO - SQLite database tables verified/created.
+2026-08-21 20:27:39,398 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 20:28:29,613 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 20:28:31,873 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 20:28:32,526 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:33:43,611 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:33:44,842 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:33:45,858 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 21:33:45,947 - INFO - SQLite database tables verified/created.
+2026-08-21 21:33:47,569 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:35:07,563 - INFO - [bot-1787212432320-7424] Pre-flight instrument resolved: ETH/USDT (SPOT via binance_spot)
+2026-08-21 21:35:10,598 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 21:35:10,615 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 21:46:03,286 - INFO - Indicators computed | close=2386.13 ema_9=2392.60 ema_20=2390.68 ema_50=2379.61 ema_200=2273.44 macd=2.9682 poc=1900.0 val=1850.0 vah=2300.0
+2026-08-21 21:46:05,235 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 15:45:00+00:00 at Close price: 2393.65
+2026-08-21 21:46:13,767 - INFO - Confluence Evaluation | Regime: RANGING (ADX=19.0) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 21:46:16,767 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 21:46:20,207 - INFO - Logged heartbeat status: OK
+2026-08-21 21:46:29,303 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 21:46:29,341 - INFO - Bot bot-1787212432320-7424 scheduled to check every 15 minutes.
+2026-08-21 21:46:31,460 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 21:46:31,460 - INFO - Scheduler started
+2026-08-21 22:01:35,177 - WARNING - Run time of job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:16:28 IST)" was missed by 0:00:06.407597
+2026-08-21 22:16:29,388 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:31:28 IST)" (scheduled at 2026-08-21 22:16:28.338368+05:30)
+2026-08-21 22:16:30,203 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 22:16:30,361 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 22:16:39,982 - INFO - Indicators computed | close=2403.49 ema_9=2397.40 ema_20=2393.70 ema_50=2382.17 ema_200=2277.25 macd=4.3014 poc=1900.0 val=1850.0 vah=2300.0
+2026-08-21 22:16:40,046 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 16:30:00+00:00 at Close price: 2401.60
+2026-08-21 22:16:40,570 - INFO - Confluence Evaluation | Regime: RANGING (ADX=20.5) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:16:41,084 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:16:41,875 - INFO - Logged heartbeat status: OK
+2026-08-21 22:16:41,932 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:31:28 IST)" executed successfully
+2026-08-21 22:31:28,687 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:46:28 IST)" (scheduled at 2026-08-21 22:31:28.338368+05:30)
+2026-08-21 22:31:28,978 - INFO - [bot-1787212432320-7424] Starting signal check cycle for ETH/USDT (15m)...
+2026-08-21 22:31:29,093 - INFO - Fetching recent candles for ETH/USDT (15m) [Bot: bot-1787212432320-7424] via ProviderManager...
+2026-08-21 22:31:32,095 - INFO - Indicators computed | close=2406.28 ema_9=2399.57 ema_20=2395.11 ema_50=2383.21 ema_200=2278.56 macd=4.9423 poc=1900.0 val=1850.0 vah=2300.0
+2026-08-21 22:31:32,098 - INFO - [bot-1787212432320-7424] Evaluating strategy on completed candle: 2026-08-21 16:45:00+00:00 at Close price: 2405.97
+2026-08-21 22:31:32,430 - INFO - Confluence Evaluation | Regime: RANGING (ADX=19.8) | Direction: HOLD | BullScore: 67.4% | BearScore: 32.6% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:31:32,488 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:31:32,679 - INFO - Logged heartbeat status: OK
+2026-08-21 22:31:32,680 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:46:28 IST)" executed successfully
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 22:45:38,699 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 22:45:40,155 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 22:45:40,169 - INFO - Initializing scheduled trading bot live runner for bot-1787212432320-7424...
+2026-08-21 22:45:40,940 - INFO - SQLite database tables verified/created.
+2026-08-21 22:45:42,867 - INFO - Initializing CCXT Binance in TESTNET mode.

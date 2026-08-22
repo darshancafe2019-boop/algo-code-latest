@@ -1,0 +1,18 @@
+{
+  "name": "Quant.OS - Institutional Trading OS",
+  "short_name": "Quant.OS",
+  "description": "Continuous Institutional Quantitative Trading Platform with Multi-Exchange Execution, Risk Management, and Autonomous Systems.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#070D14",
+  "theme_color": "#00F0FF",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64 32x32 24x24 16x16",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["finance", "productivity", "utilities"]
+}

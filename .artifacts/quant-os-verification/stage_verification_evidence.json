@@ -1,0 +1,17 @@
+{
+  "timestamp": "2026-08-21T13:17:18.199187+00:00",
+  "test_bot_id": "bot-1787318234506-4061",
+  "test_trade_id": 101689,
+  "order_id": "PAPER_ORD_5be32eb81d",
+  "starting_balance": 399953.0,
+  "ending_balance": 399979.14,
+  "net_pnl": 26.14,
+  "fees": 6.57,
+  "unexplained_difference": 0.0,
+  "bot_lifecycle": "PASS",
+  "market_data": "PASS",
+  "risk_controls": "PASS",
+  "kill_switch": "PASS",
+  "order_idempotency": "PASS",
+  "pnl_reconciliation": "PASS"
+}

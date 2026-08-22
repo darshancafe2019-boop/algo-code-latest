@@ -1,0 +1,51 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 18:16:41,773 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 18:16:46,966 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 18:16:48,602 - INFO - Initializing scheduled trading bot live runner for bot-1787305999468-cd73...
+2026-08-21 18:16:50,969 - INFO - SQLite database tables verified/created.
+2026-08-21 18:16:52,538 - INFO - Initializing CCXT Binance in TESTNET mode.
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 20:30:43,360 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 20:30:48,566 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 20:30:48,623 - INFO - Initializing scheduled trading bot live runner for bot-1787305999468-cd73...
+2026-08-21 20:30:50,317 - INFO - SQLite database tables verified/created.
+2026-08-21 20:30:53,741 - INFO - Initializing CCXT Binance in TESTNET mode.
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:37:49,206 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:37:58,426 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:37:59,942 - INFO - Initializing scheduled trading bot live runner for bot-1787305999468-cd73...
+2026-08-21 21:38:02,325 - INFO - SQLite database tables verified/created.
+2026-08-21 21:38:05,513 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:41:24,269 - INFO - [bot-1787305999468-cd73] Pre-flight instrument resolved: BTC/USDT (SPOT via binance_spot)
+2026-08-21 21:41:36,258 - INFO - [bot-1787305999468-cd73] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 21:41:36,322 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787305999468-cd73] via ProviderManager...
+2026-08-21 22:03:37,098 - INFO - Indicators computed | close=77305.75 ema_9=77281.94 ema_20=77239.60 ema_50=76623.70 ema_200=72841.87 macd=111.0069 poc=63050.0 val=62700.0 vah=72550.0
+2026-08-21 22:03:37,494 - INFO - [bot-1787305999468-cd73] Evaluating strategy on completed candle: 2026-08-21 16:15:00+00:00 at Close price: 77383.87
+2026-08-21 22:03:38,148 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=29.4) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:03:38,548 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:03:39,184 - INFO - Logged heartbeat status: OK
+2026-08-21 22:03:39,900 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 22:03:39,924 - INFO - Bot bot-1787305999468-cd73 scheduled to check every 15 minutes.
+2026-08-21 22:03:40,247 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 22:03:40,247 - INFO - Scheduler started
+2026-08-21 22:18:40,096 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:33:39 IST)" (scheduled at 2026-08-21 22:18:39.751550+05:30)
+2026-08-21 22:18:40,215 - INFO - [bot-1787305999468-cd73] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 22:18:40,299 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787305999468-cd73] via ProviderManager...
+2026-08-21 22:18:41,160 - INFO - Indicators computed | close=77433.24 ema_9=77321.21 ema_20=77262.89 ema_50=76657.56 ema_200=72888.11 macd=118.6348 poc=63050.0 val=62700.0 vah=72575.0
+2026-08-21 22:18:41,162 - INFO - [bot-1787305999468-cd73] Evaluating strategy on completed candle: 2026-08-21 16:30:00+00:00 at Close price: 77362.04
+2026-08-21 22:18:41,232 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=28.9) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:18:41,343 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:18:41,559 - INFO - Logged heartbeat status: OK
+2026-08-21 22:18:41,560 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:33:39 IST)" executed successfully
+2026-08-21 22:33:39,959 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:48:39 IST)" (scheduled at 2026-08-21 22:33:39.751550+05:30)
+2026-08-21 22:33:40,089 - INFO - [bot-1787305999468-cd73] Starting signal check cycle for BTC/USDT (15m)...
+2026-08-21 22:33:40,122 - INFO - Fetching recent candles for BTC/USDT (15m) [Bot: bot-1787305999468-cd73] via ProviderManager...
+2026-08-21 22:33:47,024 - INFO - Indicators computed | close=77562.94 ema_9=77378.00 ema_20=77296.01 ema_50=76695.06 ema_200=72935.15 macd=133.3376 poc=63050.0 val=62700.0 vah=72600.0
+2026-08-21 22:33:47,034 - INFO - [bot-1787305999468-cd73] Evaluating strategy on completed candle: 2026-08-21 16:45:00+00:00 at Close price: 77486.01
+2026-08-21 22:33:47,207 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.4) | Direction: HOLD | BullScore: 39.5% | BearScore: 21.1% | Active: ['ema', 'macd', 'vp']
+2026-08-21 22:33:47,442 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 40% (HOLD)
+2026-08-21 22:33:47,550 - INFO - Logged heartbeat status: OK
+2026-08-21 22:33:47,677 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:15:00], next run at: 2026-08-21 22:48:39 IST)" executed successfully

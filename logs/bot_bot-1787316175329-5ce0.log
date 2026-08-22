@@ -1,0 +1,98 @@
+/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+2026-08-21 21:41:14,656 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
+2026-08-21 21:41:23,002 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
+2026-08-21 21:41:23,043 - INFO - Initializing scheduled trading bot live runner for bot-1787316175329-5ce0...
+2026-08-21 21:41:27,617 - INFO - SQLite database tables verified/created.
+2026-08-21 21:41:30,385 - INFO - Initializing CCXT Binance in TESTNET mode.
+2026-08-21 21:45:32,611 - INFO - [bot-1787316175329-5ce0] Pre-flight instrument resolved: SOL/USDT (SPOT via binance_spot)
+2026-08-21 21:45:38,259 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 21:45:39,022 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:00:33,646 - INFO - Indicators computed | close=91.51 ema_9=91.29 ema_20=91.33 ema_50=91.22 ema_200=90.23 macd=-0.0059 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:00:34,953 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:20:00+00:00 at Close price: 91.27
+2026-08-21 22:00:40,782 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=37.4) | Direction: HOLD | BullScore: 0.0% | BearScore: 67.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:00:42,468 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 67% (HOLD)
+2026-08-21 22:00:45,479 - INFO - Logged heartbeat status: OK
+2026-08-21 22:00:51,845 - INFO - Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-08-21 22:00:51,878 - INFO - Bot bot-1787316175329-5ce0 scheduled to check every 5 minutes.
+2026-08-21 22:00:53,962 - INFO - Added job "LiveRunner.process_cycle" to job store "default"
+2026-08-21 22:00:53,971 - INFO - Scheduler started
+2026-08-21 22:05:50,881 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:05:50 IST)" (scheduled at 2026-08-21 22:05:50.810329+05:30)
+2026-08-21 22:05:50,979 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:05:51,063 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:05:52,374 - INFO - Indicators computed | close=91.55 ema_9=91.38 ema_20=91.37 ema_50=91.25 ema_200=90.26 macd=0.0264 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:05:52,375 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:30:00+00:00 at Close price: 91.52
+2026-08-21 22:05:52,475 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=32.9) | Direction: HOLD | BullScore: 32.6% | BearScore: 34.8% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:05:52,607 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 35% (HOLD)
+2026-08-21 22:05:52,845 - INFO - Logged heartbeat status: OK
+2026-08-21 22:05:52,846 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:10:50 IST)" executed successfully
+2026-08-21 22:10:50,885 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:15:50 IST)" (scheduled at 2026-08-21 22:10:50.810329+05:30)
+2026-08-21 22:10:50,944 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:10:51,004 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:10:51,976 - INFO - Indicators computed | close=91.49 ema_9=91.41 ema_20=91.39 ema_50=91.26 ema_200=90.27 macd=0.0358 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:10:51,978 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:35:00+00:00 at Close price: 91.59
+2026-08-21 22:10:52,154 - INFO - LONG signal blocked | Location blocked (Close 91.59 outside Value Area [73.50 - 76.50], VAL=75.00, VAH=75.00) | context={'close': 91.59, 'ema_9': 91.38839763928361, 'ema_20': 91.37506947835311, 'ema_50': 91.24986974854684, 'ema_200': 90.26007095397489, 'macd_line': 0.02956168449264851, 'macd_signal': 0.03348612307182361, 'macd_hist': -0.003924438579175099, 'poc': np.float64(75.0), 'val': np.float64(75.0), 'vah': np.float64(75.0)}
+2026-08-21 22:10:52,189 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=30.8) | Direction: HOLD | BullScore: 50.0% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:10:52,319 - INFO - Signal evaluated: HOLD. Reason/Details: LONG setup blocked: Location blocked (Close 91.59 outside Value Area [73.50 - 76.50], VAL=75.00, VAH=75.00)
+2026-08-21 22:10:52,738 - INFO - Logged heartbeat status: OK
+2026-08-21 22:10:52,738 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:15:50 IST)" executed successfully
+2026-08-21 22:15:50,856 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:20:50 IST)" (scheduled at 2026-08-21 22:15:50.810329+05:30)
+2026-08-21 22:15:50,919 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:15:50,987 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:15:51,457 - INFO - Indicators computed | close=91.38 ema_9=91.39 ema_20=91.38 ema_50=91.26 ema_200=90.28 macd=0.0254 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:15:51,458 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:40:00+00:00 at Close price: 91.39
+2026-08-21 22:15:51,556 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=29.8) | Direction: HOLD | BullScore: 32.6% | BearScore: 34.8% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:15:51,688 - INFO - Signal evaluated: HOLD. Reason/Details: Confluence score: 35% (HOLD)
+2026-08-21 22:15:51,939 - INFO - Logged heartbeat status: OK
+2026-08-21 22:15:51,939 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:20:50 IST)" executed successfully
+2026-08-21 22:20:50,855 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:20:50 IST)" (scheduled at 2026-08-21 22:20:50.810329+05:30)
+2026-08-21 22:20:50,913 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:20:50,996 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:20:51,522 - INFO - Indicators computed | close=91.70 ema_9=91.50 ema_20=91.44 ema_50=91.29 ema_200=90.30 macd=0.0684 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:20:51,525 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:45:00+00:00 at Close price: 91.70
+2026-08-21 22:20:51,608 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=28.6) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:20:51,744 - INFO - Capping position size 275.862069 BTC to available cash equivalent 87.241003 BTC.
+2026-08-21 22:20:51,806 - INFO - Created pending signal approval ID 227 for bot bot-1787316175329-5ce0 (LONG @ $91.70, status: WAITING_APPROVAL)
+2026-08-21 22:20:51,928 - INFO - [bot-1787316175329-5ce0] Signal LONG generated (ID: 227). Waiting for manual user approval.
+2026-08-21 22:20:52,175 - INFO - Logged heartbeat status: OK
+2026-08-21 22:20:52,180 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:25:50 IST)" executed successfully
+2026-08-21 22:25:50,863 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:30:50 IST)" (scheduled at 2026-08-21 22:25:50.810329+05:30)
+2026-08-21 22:25:50,903 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:25:50,960 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:25:51,549 - INFO - Indicators computed | close=91.68 ema_9=91.54 ema_20=91.46 ema_50=91.31 ema_200=90.31 macd=0.0810 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:25:51,550 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:50:00+00:00 at Close price: 91.72
+2026-08-21 22:25:51,620 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.0) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:25:51,728 - INFO - Capping position size 326.530612 BTC to available cash equivalent 87.221980 BTC.
+2026-08-21 22:25:51,735 - INFO - [bot-1787316175329-5ce0] Signal LONG active pending approval already exists (ID: 227).
+2026-08-21 22:25:51,941 - INFO - Logged heartbeat status: OK
+2026-08-21 22:25:51,942 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:30:50 IST)" executed successfully
+2026-08-21 22:30:50,869 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:35:50 IST)" (scheduled at 2026-08-21 22:30:50.810329+05:30)
+2026-08-21 22:30:50,919 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:30:51,093 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:30:52,602 - INFO - Indicators computed | close=91.62 ema_9=91.55 ema_20=91.47 ema_50=91.32 ema_200=90.33 macd=0.0808 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:30:52,607 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 16:55:00+00:00 at Close price: 91.63
+2026-08-21 22:30:52,992 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=27.1) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:30:53,180 - INFO - Capping position size 400.000000 BTC to available cash equivalent 87.307650 BTC.
+2026-08-21 22:30:53,259 - INFO - [bot-1787316175329-5ce0] Signal LONG active pending approval already exists (ID: 227).
+2026-08-21 22:30:53,535 - INFO - Logged heartbeat status: OK
+2026-08-21 22:30:53,536 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:35:50 IST)" executed successfully
+2026-08-21 22:35:50,826 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:40:50 IST)" (scheduled at 2026-08-21 22:35:50.810329+05:30)
+2026-08-21 22:35:50,871 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:35:50,967 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:35:51,437 - INFO - Indicators computed | close=91.65 ema_9=91.57 ema_20=91.49 ema_50=91.33 ema_200=90.34 macd=0.0865 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:35:51,438 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 17:00:00+00:00 at Close price: 91.64
+2026-08-21 22:35:51,526 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=26.9) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:35:51,638 - INFO - Capping position size 390.243902 BTC to available cash equivalent 87.298123 BTC.
+2026-08-21 22:35:51,646 - INFO - [bot-1787316175329-5ce0] Signal LONG active pending approval already exists (ID: 227).
+2026-08-21 22:35:51,864 - INFO - Logged heartbeat status: OK
+2026-08-21 22:35:51,865 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:40:50 IST)" executed successfully
+2026-08-21 22:40:50,945 - INFO - Running job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:45:50 IST)" (scheduled at 2026-08-21 22:40:50.810329+05:30)
+2026-08-21 22:40:51,007 - INFO - [bot-1787316175329-5ce0] Starting signal check cycle for SOL/USDT (5m)...
+2026-08-21 22:40:51,063 - INFO - Fetching recent candles for SOL/USDT (5m) [Bot: bot-1787316175329-5ce0] via ProviderManager...
+2026-08-21 22:40:51,587 - INFO - Indicators computed | close=91.84 ema_9=91.65 ema_20=91.53 ema_50=91.35 ema_200=90.36 macd=0.1119 poc=75.0 val=75.0 vah=75.0
+2026-08-21 22:40:51,588 - INFO - [bot-1787316175329-5ce0] Evaluating strategy on completed candle: 2026-08-21 17:05:00+00:00 at Close price: 91.78
+2026-08-21 22:40:51,667 - INFO - Confluence Evaluation | Regime: TRENDING (ADX=26.2) | Direction: LONG | BullScore: 82.6% | BearScore: 17.4% | Active: ['ema', 'macd', 'rsi', 'vp']
+2026-08-21 22:40:51,769 - INFO - Capping position size 307.692308 BTC to available cash equivalent 87.164960 BTC.
+2026-08-21 22:40:51,774 - INFO - [bot-1787316175329-5ce0] Signal LONG active pending approval already exists (ID: 227).
+2026-08-21 22:40:52,004 - INFO - Logged heartbeat status: OK
+2026-08-21 22:40:52,004 - INFO - Job "LiveRunner.process_cycle (trigger: interval[0:05:00], next run at: 2026-08-21 22:45:50 IST)" executed successfully

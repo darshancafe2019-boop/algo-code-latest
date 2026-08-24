@@ -10,7 +10,7 @@ print("=========================================================================
 print("PHASE 4E AUDIT: DETAILED DATA CONSISTENCY & INTEGRITY AUDIT")
 print("================================================================================")
 
-BASE_URL = "http://localhost:3001"
+BASE_URL = "http://localhost:3100"
 
 # 1. TRACE 50 VALUE
 print("\n--- 1. TRACE THE 50 VALUE ---")

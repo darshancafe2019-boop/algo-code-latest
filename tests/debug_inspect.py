@@ -19,14 +19,14 @@ async def inspect():
         "--disable-gpu",
         "--no-sandbox",
         f"--user-data-dir={user_data}",
-        "http://localhost:3001"
+        "http://localhost:3100"
     ]
     proc = subprocess.Popen(cmd)
     time.sleep(3.0)
     try:
         with urllib.request.urlopen("http://127.0.0.1:9666/json") as r:
             targets = json.loads(r.read())
-        p = next(t for t in targets if "3001" in t.get("url", ""))
+        p = next(t for t in targets if "3100" in t.get("url", ""))
         ws = await websockets.connect(p["webSocketDebuggerUrl"])
         
         # Click backtesting tab

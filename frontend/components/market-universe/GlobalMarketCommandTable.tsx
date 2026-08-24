@@ -11,9 +11,10 @@ import {
   Sparkles,
   LineChart,
   ArrowUpDown,
-  ExternalLink
+  ExternalLink,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
 
 interface GlobalMarketCommandTableProps {
   instruments: MarketInstrument[];
@@ -209,12 +210,8 @@ export function GlobalMarketCommandTable({
                       }`}
                     >
                       {/* Watchlist Star */}
-                      <td className="py-3 px-3 w-8" onClick={(e) => { e.stopPropagation(); onToggleWatchlist(inst); }}>
-                        <Star
-                          className={`h-4 w-4 transition-colors ${
-                            isWatched ? "text-amber-400 fill-amber-400" : "text-slate-600 hover:text-amber-400"
-                          }`}
-                        />
+                      <td className="py-3 px-3 w-8" onClick={(e) => e.stopPropagation()}>
+                        <WatchlistStarButton instrument={inst} size="sm" />
                       </td>
 
                       {/* Symbol / Exchange */}

@@ -5,6 +5,7 @@ import { MarketInstrument } from "@/types/market-universe";
 import { MarketAnalysisModal } from "./MarketAnalysisModal";
 import { OptionChainModal } from "./OptionChainModal";
 import { FuturesChainModal } from "./FuturesChainModal";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
 import {
   TrendingUp,
   TrendingDown,
@@ -29,7 +30,6 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
   const [selectedForAnalysis, setSelectedForAnalysis] = useState<MarketInstrument | null>(null);
   const [selectedForOptions, setSelectedForOptions] = useState<string | null>(null);
   const [selectedForFutures, setSelectedForFutures] = useState<string | null>(null);
-  const [watchlistToast, setWatchlistToast] = useState<string | null>(null);
 
   const handleToggleControl = async (inst: MarketInstrument, field: "paper" | "strategy" | "live", currentVal: boolean) => {
     try {
@@ -47,23 +47,6 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
     }
   };
 
-  const handleAddToWatchlist = async (inst: MarketInstrument) => {
-    try {
-      const id = inst.instrument_id || inst.canonical_symbol || inst.symbol;
-      const res = await fetch("/api/universe/watchlists/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ watchlist_id: "wl_main", instrument_id: id, notes: "Added from Universe Hub" }),
-      });
-      if (res.ok) {
-        setWatchlistToast(`Added ${inst.canonical_symbol || inst.symbol} to Watchlist`);
-        setTimeout(() => setWatchlistToast(null), 2500);
-      }
-    } catch (err) {
-      console.error("Failed to add to watchlist:", err);
-    }
-  };
-
   if (!instruments || instruments.length === 0) {
     return (
       <div className="p-12 text-center rounded-xl bg-[#121824] border border-[#1E293B] text-slate-400">
@@ -78,13 +61,6 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
 
   return (
     <div className="space-y-3">
-      {watchlistToast && (
-        <div className="p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center justify-between animate-fadeIn">
-          <span>✓ {watchlistToast}</span>
-          <button onClick={() => setWatchlistToast(null)} className="text-emerald-400 font-bold ml-2">✕</button>
-        </div>
-      )}
-
       <div className="rounded-xl border border-[#1E293B] overflow-hidden bg-[#0F141F] shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
@@ -128,13 +104,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                     {/* Symbol & Info */}
                     <td className="py-3 px-3">
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleAddToWatchlist(inst)}
-                          className="text-slate-600 hover:text-amber-400 transition-colors"
-                          title="Add to Watchlist"
-                        >
-                          <Star className="h-3.5 w-3.5" />
-                        </button>
+                        <WatchlistStarButton instrument={inst} size="sm" />
                         <div>
                           <div className="flex items-center gap-1.5">
                             <span className="font-bold text-white font-mono group-hover:text-cyan-300 transition-colors">

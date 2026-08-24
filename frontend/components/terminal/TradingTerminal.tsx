@@ -10,6 +10,7 @@ import { TerminalPositionsPanel } from "./TerminalPositionsPanel";
 import { TradingViewTimeframeSelector } from "./TradingViewTimeframeSelector";
 import { MultiTimeframeSignalMatrix } from "./MultiTimeframeSignalMatrix";
 import { QuickTradePanel } from "./QuickTradePanel";
+import { TradingViewChart } from "@/components/chart/TradingViewChart";
 import { executeCommand } from "@/lib/commandClient";
 import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric } from "@/lib/formatters";
 import {
@@ -69,10 +70,35 @@ export function TradingTerminal() {
   const queryClient = useQueryClient();
   const { activeSymbol, setActiveSymbol, activeTimeframe, setActiveTimeframe } = useActiveBot();
 
-  const [activeCenterView, setActiveCenterView] = useState<"market" | "signals" | "positions" | "orders">("market");
+  const [activeCenterView, setActiveCenterView] = useState<"chart" | "market" | "signals" | "positions" | "orders">("chart");
   const [rightPanelTab, setRightPanelTab] = useState<"order" | "watchlist" | "scanner" | "quick-trade">("quick-trade");
   const [executionMode, setExecutionMode] = useState<"PAPER" | "LIVE">("PAPER");
   const [isConfirmingLive, setIsConfirmingLive] = useState(false);
+
+  // 0. Fetch Real-time System Status for Top Metric Cards
+  const { data: statusData } = useQuery({
+    queryKey: ["terminalStatus"],
+    queryFn: async () => {
+      try {
+        const res = await fetch("/api/status");
+        if (res.ok) return await res.json();
+      } catch (err) {
+        console.warn("Status fetch fallback:", err);
+      }
+      return null;
+    },
+    staleTime: 4000,
+    refetchInterval: 6000,
+  });
+
+  const accountBalance = Number(statusData?.health?.balance ?? 10000.0);
+  const terminalPnl = statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0;
+  const terminalPnlPct = statusData?.todays_pnl_pct !== undefined 
+    ? Number(statusData.todays_pnl_pct) 
+    : (accountBalance > 0 ? (terminalPnl / accountBalance) * 100 : null);
+  const isTermProfit = terminalPnl >= 0;
+  const openPosCount = statusData?.open_positions_count ?? statusData?.health?.open_positions_count ?? 0;
+  const terminalRiskStatus = statusData?.risk_status || "14/14 Checks Passed";
 
   // 1. Fetch Real-time Market Overview Data
   const { data: marketData, isLoading: isLoadingMarket, refetch: refetchMarket } = useQuery<MarketTickerItem[]>({
@@ -213,6 +239,7 @@ export function TradingTerminal() {
           {/* Center View Selector */}
           <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] font-mono">
             {[
+              { id: "chart", label: "Chart" },
               { id: "market", label: "Market Overview" },
               { id: "signals", label: "Signals" },
               { id: "positions", label: "Positions" },
@@ -318,7 +345,7 @@ export function TradingTerminal() {
             <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl flex items-center justify-between shadow-md">
               <div>
                 <div className="text-[10px] uppercase font-bold text-[#70877A]">Account Balance</div>
-                <div className="text-sm sm:text-base font-extrabold text-[#E8F3EC]">$10,450.00</div>
+                <div className="text-sm sm:text-base font-extrabold text-[#E8F3EC]">${formatPrice(accountBalance, "", 2)}</div>
               </div>
               <DollarSign className="h-5 w-5 text-[#55C98A]" />
             </div>
@@ -326,15 +353,26 @@ export function TradingTerminal() {
             <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl flex items-center justify-between shadow-md">
               <div>
                 <div className="text-[10px] uppercase font-bold text-[#70877A]">Today P&L</div>
-                <div className="text-sm sm:text-base font-extrabold text-[#39B978]">+$450.00 (+4.50%)</div>
+                <div className={`text-sm sm:text-base font-extrabold ${isTermProfit ? "text-[#39B978]" : "text-[#E05252]"}`}>
+                  {isTermProfit && terminalPnl > 0 ? "+" : terminalPnl < 0 ? "-" : ""}${formatPrice(Math.abs(terminalPnl), "", 2)}
+                  <span className="text-xs font-semibold ml-1 opacity-90">
+                    {terminalPnlPct !== null && !isNaN(terminalPnlPct)
+                      ? `(${terminalPnlPct > 0 ? "+" : ""}${terminalPnlPct.toFixed(2)}%)`
+                      : "(N/A)"}
+                  </span>
+                </div>
               </div>
-              <TrendingUp className="h-5 w-5 text-[#39B978]" />
+              {isTermProfit ? (
+                <TrendingUp className="h-5 w-5 text-[#39B978]" />
+              ) : (
+                <TrendingDown className="h-5 w-5 text-[#E05252]" />
+              )}
             </div>
 
             <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl flex items-center justify-between shadow-md">
               <div>
                 <div className="text-[10px] uppercase font-bold text-[#70877A]">Active Positions</div>
-                <div className="text-sm sm:text-base font-extrabold text-[#78A88A]">2 OPEN</div>
+                <div className="text-sm sm:text-base font-extrabold text-[#78A88A]">{openPosCount} OPEN</div>
               </div>
               <Layers className="h-5 w-5 text-[#55C98A]" />
             </div>
@@ -342,11 +380,21 @@ export function TradingTerminal() {
             <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl flex items-center justify-between shadow-md">
               <div>
                 <div className="text-[10px] uppercase font-bold text-[#70877A]">Risk Gate Status</div>
-                <div className="text-sm sm:text-base font-extrabold text-[#55C98A]">14/14 PASSED</div>
+                <div className="text-sm sm:text-base font-extrabold text-[#55C98A]">{terminalRiskStatus}</div>
               </div>
               <Shield className="h-5 w-5 text-[#55C98A]" />
             </div>
           </div>
+
+          {/* VIEW 0: Interactive TradingView Chart */}
+          {activeCenterView === "chart" && (
+            <TradingViewChart
+              symbol={activeSymbol}
+              timeframe={activeTimeframe}
+              onTimeframeChange={setActiveTimeframe}
+              height={480}
+            />
+          )}
 
           {/* VIEW 1: Market Overview Table */}
           {activeCenterView === "market" && (

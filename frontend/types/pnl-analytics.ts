@@ -36,10 +36,69 @@ export interface PortfolioKPIs {
 export interface EquityCurvePoint {
   timestamp: string;
   equity: number;
-  high_water_mark: number;
-  drawdown_pct: number;
-  realized_pnl: number;
-  unrealized_pnl: number;
+  high_water_mark?: number;
+  highWaterMark?: number;
+  drawdown?: number;
+  drawdown_pct?: number;
+  drawdownPct?: number;
+  realized_pnl?: number;
+  realizedPnl?: number;
+  unrealized_pnl?: number;
+  unrealizedPnl?: number;
+  fees?: number;
+  funding?: number;
+  netCashFlow?: number;
+}
+
+export interface EquityCurveEvent {
+  id: string;
+  timestamp: string;
+  type: string;
+  title: string;
+  description: string;
+  symbol?: string;
+  botId?: string;
+  strategyId?: string;
+  equityBefore?: number;
+  equityAfter?: number;
+  pnl?: number;
+  severity?: "INFO" | "SUCCESS" | "WARNING" | "DANGER" | string;
+}
+
+export interface ContributionItem {
+  name: string;
+  pnl: number;
+  trades: number;
+  wins: number;
+}
+
+export interface EquityCurveSummary {
+  startingEquity: number;
+  currentEquity: number;
+  netPnl: number;
+  totalReturnPct: number;
+  highWaterMark: number;
+  distanceFromPeakPct: number;
+  maxDrawdownPct: number;
+  recoveryFactor: number;
+}
+
+export interface EquityCurveResponse {
+  status: string;
+  asOf: string;
+  mode: "PAPER" | "LIVE";
+  baseCurrency: string;
+  reconciliationStatus: "RECONCILED" | "UNRECONCILED";
+  freshness: "LIVE" | "DELAYED" | "STALE";
+  summary: EquityCurveSummary;
+  points: EquityCurvePoint[];
+  events: EquityCurveEvent[];
+  contributions: {
+    by_bot: ContributionItem[];
+    by_strategy: ContributionItem[];
+    by_symbol: ContributionItem[];
+    by_asset_class: ContributionItem[];
+  };
 }
 
 export interface SymbolPerformanceRow {
@@ -116,4 +175,167 @@ export interface AssetClassExposure {
   exposure_usd: number;
   allocation_pct: number;
   color: string;
+}
+
+export type ChartMetricType =
+  | "NET_PNL"
+  | "RETURN_PCT"
+  | "GROSS_PNL"
+  | "REALIZED_PNL"
+  | "UNREALIZED_CHANGE"
+  | "FEES"
+  | "DRAWDOWN"
+  | "TRADES";
+
+export type ChartViewMode =
+  | "DAILY_BARS"
+  | "WEEKLY_BARS"
+  | "MONTHLY_BARS"
+  | "CUMULATIVE_EQUITY"
+  | "EQUITY_AND_DAILY"
+  | "DRAWDOWN";
+
+export interface DailyProfitabilityBar {
+  date: string;
+  displayDate: string;
+  dayOfWeek: string;
+  openingEquity: number;
+  closingEquity: number;
+  grossPnl: number;
+  realizedPnl: number;
+  unrealizedChange: number;
+  fees: number;
+  commissions: number;
+  funding: number;
+  deposits: number;
+  withdrawals: number;
+  netExternalCashFlow: number;
+  netPnl: number;
+  returnPct: number;
+  highWaterMark: number;
+  drawdown: number;
+  drawdownPct: number;
+  trades: number;
+  wins: number;
+  losses: number;
+  winRate: number;
+  bestTrade: number;
+  worstTrade: number;
+  intensity: number;
+  status: "COMPLETE" | "INCOMPLETE" | "LIVE";
+  reconciliationStatus: "RECONCILED" | "UNRECONCILED";
+}
+
+export interface DailyProfitabilitySummary {
+  totalNetPnl: number;
+  totalGrossPnl: number;
+  totalFees: number;
+  totalFunding: number;
+  startingEquity: number;
+  currentEquity: number;
+  profitableDays: number;
+  losingDays: number;
+  flatDays: number;
+  dailyWinRate: number;
+  bestDay: number;
+  worstDay: number;
+  avgProfitableDay: number;
+  avgLosingDay: number;
+  profitFactor: number;
+  currentStreak: string;
+  highWaterMark: number;
+  maxDrawdownPct: number;
+  reconciliationStatus: "RECONCILED" | "UNRECONCILED";
+}
+
+export interface DailyProfitabilityResponse {
+  status: string;
+  asOf: string;
+  mode: "PAPER" | "LIVE";
+  timezone: string;
+  baseCurrency: string;
+  aggregation: "daily" | "weekly" | "monthly" | string;
+  metric: string;
+  freshness: "LIVE" | "DELAYED" | "STALE";
+  summary: DailyProfitabilitySummary;
+  bars: DailyProfitabilityBar[];
+  contributions: {
+    by_bot: ContributionItem[];
+    by_strategy: ContributionItem[];
+    by_symbol: ContributionItem[];
+    by_asset_class: ContributionItem[];
+  };
+  selectedDayContributions?: {
+    date: string;
+    by_bot: ContributionItem[];
+    by_strategy: ContributionItem[];
+    by_symbol: ContributionItem[];
+    by_asset_class: ContributionItem[];
+  } | null;
+}
+
+export interface DayTradeDetail {
+  id: number | string;
+  orderId: string;
+  symbol: string;
+  direction: string;
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  netPnl: number;
+  grossPnl: number;
+  fees: number;
+  pnlPercent: number;
+  botId: string;
+  strategy: string;
+  entryTime: string;
+  exitTime: string;
+  confidenceScore: number;
+  status: string;
+}
+
+export interface DayAnalysisDetail {
+  status: string;
+  date: string;
+  mode: string;
+  timezone: string;
+  summary: {
+    date: string;
+    netPnl: number;
+    grossPnl: number;
+    fees: number;
+    tradesCount: number;
+    wins: number;
+    losses: number;
+    winRate: number;
+    largestGain: number;
+    largestLoss: number;
+    explanation: string;
+  };
+  trades: DayTradeDetail[];
+  intradayEquity: Array<{
+    time: string;
+    stepPnL: number;
+    cumulativePnL: number;
+    tradeId: number | string;
+    symbol: string;
+  }>;
+  events: Array<{
+    id: string;
+    timestamp: string;
+    type: string;
+    message: string;
+    severity: string;
+    details?: string;
+  }>;
+  signals: Array<{
+    id: number | string;
+    timestamp: string;
+    symbol: string;
+    signal_type: string;
+    price: number;
+    confidence: number;
+    is_blocked: boolean;
+    reason: string;
+  }>;
 }

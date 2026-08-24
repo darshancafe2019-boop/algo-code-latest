@@ -4,6 +4,8 @@ import QueryProvider from "@/components/QueryProvider";
 import { ActiveBotProvider } from "@/context/ActiveBotContext";
 import { GlobalLayoutProvider } from "@/context/GlobalLayoutContext";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { MarketGatewayProvider } from "@/context/MarketGatewayContext";
+import { GlobalDataProvider } from "@/context/GlobalDataContext";
 
 export const metadata: Metadata = {
   title: "BTC/USDT | Alpha Algo Terminal",
@@ -60,14 +62,23 @@ export default function RootLayout({
             `,
           }}
         />
-        {/* Register Service Worker for Offline PWA Support */}
+        {/* Unregister obsolete service workers and purge legacy caches to guarantee zero asset interception */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').catch(function() {});
-                });
+              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for (var i = 0; i < registrations.length; i++) {
+                    registrations[i].unregister();
+                  }
+                }).catch(function() {});
+                if ('caches' in window) {
+                  caches.keys().then(function(keys) {
+                    for (var i = 0; i < keys.length; i++) {
+                      caches.delete(keys[i]);
+                    }
+                  }).catch(function() {});
+                }
               }
             `,
           }}
@@ -77,7 +88,13 @@ export default function RootLayout({
         <QueryProvider>
           <ThemeProvider>
             <ActiveBotProvider>
-              <GlobalLayoutProvider>{children}</GlobalLayoutProvider>
+              <GlobalLayoutProvider>
+                <MarketGatewayProvider>
+                  <GlobalDataProvider>
+                    {children}
+                  </GlobalDataProvider>
+                </MarketGatewayProvider>
+              </GlobalLayoutProvider>
             </ActiveBotProvider>
           </ThemeProvider>
         </QueryProvider>

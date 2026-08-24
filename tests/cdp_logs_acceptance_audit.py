@@ -85,15 +85,15 @@ async def run_audit():
 
     # 1. Direct Backend API Queries
     print("\n--- STEP 1: DIRECT BACKEND API AUDIT ---")
-    with urllib.request.urlopen("http://localhost:3001/api/audit/events?limit=200") as r:
+    with urllib.request.urlopen("http://localhost:3100/api/audit/events?limit=200") as r:
         backend_audit_200 = json.loads(r.read())
-    with urllib.request.urlopen("http://localhost:3001/api/logs?limit=200") as r:
+    with urllib.request.urlopen("http://localhost:3100/api/logs?limit=200") as r:
         backend_logs = json.loads(r.read())
-    with urllib.request.urlopen("http://localhost:3001/api/diagnostics/state") as r:
+    with urllib.request.urlopen("http://localhost:3100/api/diagnostics/state") as r:
         backend_diag = json.loads(r.read())
-    with urllib.request.urlopen("http://localhost:3001/api/logs/diagnostic_report") as r:
+    with urllib.request.urlopen("http://localhost:3100/api/logs/diagnostic_report") as r:
         backend_report = json.loads(r.read())
-    with urllib.request.urlopen("http://localhost:3001/api/audit/export-csv") as r:
+    with urllib.request.urlopen("http://localhost:3100/api/audit/export-csv") as r:
         csv_bytes = r.read()
         csv_text = csv_bytes.decode("utf-8", errors="ignore")
         csv_rows = list(csv.reader(io.StringIO(csv_text)))
@@ -112,7 +112,7 @@ async def run_audit():
         "--no-sandbox",
         "--disable-extensions",
         f"--user-data-dir={USER_DATA_DIR}",
-        "http://localhost:3001"
+        "http://localhost:3100"
     ]
     proc = subprocess.Popen(chrome_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"\n[+] Launched Headless Chrome (PID: {proc.pid}) on CDP Port {CDP_PORT}")
@@ -122,7 +122,7 @@ async def run_audit():
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read())
         
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Page Target: {main_page['title']} ({main_page['url']})")
         
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])

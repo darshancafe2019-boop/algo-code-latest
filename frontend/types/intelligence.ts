@@ -314,3 +314,61 @@ export interface AssistantCommandResponse {
     route?: string;
   };
 }
+
+export interface AIDecisionSignal {
+  symbol: string;
+  timeframe: string;
+  decision: "LONG" | "SHORT" | "HOLD";
+  confidence: number;
+  expectedReturn: number;
+  predictionHorizonBars: number;
+  lightgbmProbability: number;
+  xgboostProbability: number;
+  modelAgreement: boolean;
+  marketRegime: string;
+  sentiment: string;
+  dataAgeMs: number;
+  inferenceLatencyMs?: number;
+  modelVersion: string;
+  topFactors: Array<{
+    feature: string;
+    value: number;
+    shap_value?: number;
+    importance?: number;
+    impact: string;
+  }>;
+  riskStatus: "PASSED" | "BLOCKED";
+  vetoReasons: string[];
+  chronosForecast?: {
+    status: string;
+    predicted_direction: string;
+    p10_return: number;
+    p50_return: number;
+    p90_return: number;
+    expected_drift_pct: number;
+    horizon_bars: number;
+  };
+  createdAt: string;
+}
+
+export interface AIStatusResponse {
+  status: "OPERATIONAL" | "DISABLED";
+  is_enabled: boolean;
+  auto_execute_paper: boolean;
+  active_symbol: string;
+  active_timeframe: string;
+  confidence_threshold: number;
+  prediction_horizon_bars: number;
+  active_model_version: string;
+  is_model_trained: boolean;
+  model_metrics: Record<string, any>;
+  training_status: {
+    status: "IDLE" | "RUNNING" | "COMPLETED" | "FAILED";
+    started_at?: string;
+    completed_at?: string;
+    model_version?: string;
+    metrics?: Record<string, any>;
+    error?: string;
+  };
+  last_prediction_time?: string;
+}

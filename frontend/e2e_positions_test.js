@@ -27,7 +27,7 @@ async function runPositionsE2ETests() {
     // 1. DESKTOP VIEWPORT TEST (1440 x 900)
     console.log("\n[TEST 1] Testing Desktop Viewport (1440 x 900)...");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
-    await page.goto("http://localhost:3000/positions", { waitUntil: "networkidle2", timeout: 20000 });
+    await page.goto("http://localhost:3100/positions", { waitUntil: "networkidle2", timeout: 20000 });
     await delay(1500);
 
     // Verify Title & Command Header
@@ -114,30 +114,6 @@ async function runPositionsE2ETests() {
     const mobileShotPath = path.join(screenshotDir, "positions_mobile.png");
     await page.screenshot({ path: mobileShotPath, fullPage: false });
     console.log(`  ✓ Mobile Screenshot Saved: ${mobileShotPath}`);
-
-    // 6. THEME SWITCHING TEST (JARVIS <-> ULTRON)
-    console.log("\n[TEST 6] Testing AI Core Theme Switcher on Positions...");
-    await page.setViewport({ width: 1440, height: 900 });
-    
-    // Switch to ULTRON CORE
-    const ultronBtn = await page.$('button[title*="ULTRON CORE"]');
-    if (ultronBtn) {
-      await ultronBtn.click();
-      await delay(600);
-      console.log("  ✓ Switched to ULTRON CORE theme (Crimson/Graphite)");
-      const ultronShotPath = path.join(screenshotDir, "positions_ultron.png");
-      await page.screenshot({ path: ultronShotPath, fullPage: false });
-    }
-
-    // Switch to JARVIS CORE
-    const jarvisBtn = await page.$('button[title*="JARVIS CORE"]');
-    if (jarvisBtn) {
-      await jarvisBtn.click();
-      await delay(600);
-      console.log("  ✓ Switched back to JARVIS CORE theme (Cyan/Blue)");
-      const jarvisShotPath = path.join(screenshotDir, "positions_jarvis.png");
-      await page.screenshot({ path: jarvisShotPath, fullPage: false });
-    }
 
     console.log("\n==================================================");
     console.log("🎉 ALL E2E BROWSER TESTS PASSED (0 ERRORS)");

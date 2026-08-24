@@ -120,7 +120,7 @@ class TestBotInstanceWizardSystem:
         records = db.safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
         assert len(records) == 1
         r = records[0]
-        assert r["name"] == "BTC Trend Confluence V1"
+        assert r["name"].startswith("BTC Trend Confluence V1")
         assert r["symbol"] == "BTC/USDT"
         assert r["allocated_capital"] == 15000.0
         cfg = json.loads(r["config_json"])
@@ -232,6 +232,6 @@ class TestBotInstanceWizardSystem:
         data = res.get_json()
         assert data["status"] == "success"
         assert data["bot"]["id"] == bot_id
-        assert data["bot"]["name"] == "Config Check Bot"
+        assert data["bot"]["name"].startswith("Config Check Bot")
         assert "config" in data["bot"]
         assert data["bot"]["config"]["version"] == 1

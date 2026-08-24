@@ -89,7 +89,7 @@ async def run_audit():
         "--no-sandbox",
         "--disable-extensions",
         f"--user-data-dir={USER_DATA_DIR}",
-        "http://localhost:3001"
+        "http://localhost:3100"
     ]
     proc = subprocess.Popen(chrome_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"[+] Launched Headless Chrome (PID: {proc.pid}) on CDP Port {CDP_PORT}")
@@ -99,7 +99,7 @@ async def run_audit():
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read())
         
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Page Target: {main_page['title']} ({main_page['url']})")
         
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])
@@ -142,9 +142,9 @@ async def run_audit():
 
         # Step 3: Compare Backend Data vs Browser Data
         print("\n--- STEP 3: DATA CONSISTENCY PROOF (BACKEND vs BROWSER) ---")
-        with urllib.request.urlopen("http://localhost:3001/api/audit/events?limit=50") as r:
+        with urllib.request.urlopen("http://localhost:3100/api/audit/events?limit=50") as r:
             backend_audit = json.loads(r.read())
-        with urllib.request.urlopen("http://localhost:3001/api/logs") as r:
+        with urllib.request.urlopen("http://localhost:3100/api/logs") as r:
             backend_logs = json.loads(r.read())
 
         first_evt = backend_audit["events"][0] if backend_audit["events"] else {}

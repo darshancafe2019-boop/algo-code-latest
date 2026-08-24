@@ -17,9 +17,9 @@ import {
   Send,
   BarChart2,
   Radio,
-  FileText,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
 
 interface InstrumentDetailDrawerProps {
   instrument: MarketInstrument | null;
@@ -91,9 +91,12 @@ export function InstrumentDetailDrawer({
             </div>
           </div>
 
-          <button onClick={onClose} className="text-[#A8BDB0] hover:text-white p-1">
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <WatchlistStarButton instrument={instrument} size="md" showLabel={true} />
+            <button onClick={onClose} className="text-[#A8BDB0] hover:text-white p-1" title="Close Drawer">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* 11-Tab Navigation Strip */}

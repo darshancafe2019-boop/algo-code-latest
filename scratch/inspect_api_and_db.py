@@ -4,7 +4,7 @@ import sqlite3
 import csv
 import io
 
-BASE_URL = "http://localhost:3001"
+BASE_URL = "http://localhost:3100"
 
 print("==================================================")
 print("1. DIRECT API RESPONSES & COUNTS")

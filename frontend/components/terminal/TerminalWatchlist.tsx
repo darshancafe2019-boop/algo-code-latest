@@ -1,208 +1,166 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Search, Star, ArrowUpRight, ArrowDownRight, RefreshCw, Filter, Zap } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Search, Star, ArrowUpRight, ArrowDownRight, RefreshCw, Zap } from "lucide-react";
 import { useActiveBot } from "@/context/ActiveBotContext";
-
-interface WatchlistInstrument {
-  symbol: string;
-  name?: string;
-  asset_class?: string;
-  price?: number;
-  change_24h?: number;
-  volume?: number;
-  signal?: "BUY" | "SELL" | "HOLD";
-  confidence?: number;
-  is_favorite?: boolean;
-}
+import { useWatchlist } from "@/hooks/useWatchlist";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
+import Link from "next/link";
 
 export function TerminalWatchlist() {
   const { activeSymbol, setActiveSymbol } = useActiveBot();
+  const {
+    watchedItems,
+    watchedCount,
+    isLoading,
+    refetch,
+  } = useWatchlist("wl_main");
+
   const [search, setSearch] = useState("");
   const [filterClass, setFilterClass] = useState("ALL");
-  const [favoritesOnly, setFavoritesOnly] = useState(false);
-  const [customFavorites, setCustomFavorites] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("terminal_favorites");
-      if (saved) {
-        setCustomFavorites(JSON.parse(saved));
-      }
-    } catch {
-      // Ignore corrupted localStorage
-    }
-  }, []);
-
-  const { data: instruments, isLoading, refetch } = useQuery<WatchlistInstrument[]>({
-    queryKey: ["universeInstruments", filterClass],
-    queryFn: async () => {
-      const classParam = filterClass !== "ALL" ? `&asset_class=${filterClass}` : "";
-      const res = await fetch(`/api/universe/instruments?limit=50${classParam}`);
-      if (!res.ok) throw new Error("Failed to fetch watchlist instruments");
-      const json = await res.json();
-      return (json.instruments || json.data || []) as WatchlistInstrument[];
-    },
-    refetchInterval: 10000,
-  });
-
-  const toggleFavorite = (symbol: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const updated = { ...customFavorites, [symbol]: !customFavorites[symbol] };
-    setCustomFavorites(updated);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("terminal_favorites", JSON.stringify(updated));
-    }
-  };
 
   const filteredList = useMemo(() => {
-    if (!instruments) return [];
-    return instruments.filter((inst) => {
-      const matchSearch =
-        inst.symbol.toLowerCase().includes(search.toLowerCase()) ||
-        (inst.name && inst.name.toLowerCase().includes(search.toLowerCase()));
-      const isFav = customFavorites[inst.symbol] || inst.is_favorite;
-      if (favoritesOnly && !isFav) return false;
-      return matchSearch;
-    });
-  }, [instruments, search, favoritesOnly, customFavorites]);
+    let list = [...watchedItems];
+    if (filterClass !== "ALL") {
+      list = list.filter((i) => (i.asset_class || "CRYPTO").toUpperCase() === filterClass);
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase().trim();
+      list = list.filter(
+        (i) =>
+          (i.symbol && i.symbol.toLowerCase().includes(q)) ||
+          (i.canonical_symbol && i.canonical_symbol.toLowerCase().includes(q)) ||
+          (i.name && i.name.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [watchedItems, filterClass, search]);
 
   return (
-    <div className="flex flex-col h-full bg-[#0E1524] border-l border-[#1A2333]">
+    <div className="flex flex-col h-full bg-[var(--theme-surface)] border-l border-[var(--theme-border)] select-none font-sans">
       {/* Header & Search */}
-      <div className="p-3 border-b border-[#1A2333] space-y-2">
+      <div className="p-3 border-b border-[var(--theme-border)] space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Zap className="h-4 w-4 text-cyan-400" />
-            <h2 className="text-xs font-bold text-white tracking-wide uppercase">Watchlist</h2>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+            <Zap className="h-4 w-4 text-[var(--theme-accent)]" />
+            <h2 className="text-xs font-bold text-[var(--theme-text-primary)] tracking-wide uppercase font-mono">
+              Watchlist
+            </h2>
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--theme-elevated)] text-[var(--theme-text-secondary)] font-mono">
               {filteredList.length}
             </span>
           </div>
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => setFavoritesOnly(!favoritesOnly)}
-              className={`p-1 rounded transition-colors ${
-                favoritesOnly ? "bg-amber-500/20 text-amber-400" : "text-slate-400 hover:text-slate-200"
-              }`}
-              title="Show Favorites Only"
-            >
-              <Star className="h-3.5 w-3.5 fill-current" />
-            </button>
-            <button
-              onClick={() => refetch()}
-              className="p-1 rounded text-slate-400 hover:text-slate-200"
-              title="Refresh Watchlist"
-            >
-              <RefreshCw className="h-3.5 w-3.5" />
-            </button>
-          </div>
+          <button
+            onClick={() => refetch()}
+            className="p-1 rounded text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-colors"
+            title="Refresh Watchlist"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${isLoading ? "animate-spin" : ""}`} />
+          </button>
         </div>
 
-        {/* Search input */}
+        {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-500" />
+          <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-[var(--theme-text-muted)]" />
           <input
             type="text"
-            placeholder="Search symbol (e.g. BTC, ETH)..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#121927] border border-[#1E293B] rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+            placeholder="Filter saved..."
+            className="w-full pl-8 pr-3 py-1.5 bg-[var(--theme-bg)] border border-[var(--theme-border)] rounded-lg text-xs font-mono text-[var(--theme-text-primary)] placeholder-[var(--theme-text-muted)] focus:outline-none focus:border-[var(--theme-accent)] transition-all"
           />
         </div>
 
-        {/* Asset Class Filter Pills */}
-        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pt-0.5">
-          {["ALL", "CRYPTO", "EQUITY", "FOREX"].map((ac) => (
+        {/* Asset Class Filter Tabs */}
+        <div className="flex gap-1 overflow-x-auto scrollbar-none text-[10px] font-mono">
+          {["ALL", "CRYPTO", "EQUITIES", "INDICES", "FOREX"].map((cls) => (
             <button
-              key={ac}
-              onClick={() => setFilterClass(ac)}
-              className={`px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap transition-colors ${
-                filterClass === ac
-                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
-                  : "bg-[#162032] text-slate-400 hover:text-slate-200"
+              key={cls}
+              onClick={() => setFilterClass(cls)}
+              className={`px-2 py-0.5 rounded transition-colors whitespace-nowrap ${
+                filterClass === cls
+                  ? "bg-[var(--theme-accent)] text-[var(--theme-bg)] font-bold"
+                  : "text-[var(--theme-text-secondary)] hover:bg-[var(--theme-elevated)]"
               }`}
             >
-              {ac}
+              {cls}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Watchlist Items */}
-      <div className="flex-1 overflow-y-auto divide-y divide-[#162032]">
+      {/* List */}
+      <div className="flex-1 overflow-y-auto divide-y divide-[var(--theme-border-subtle)]">
         {isLoading ? (
-          <div className="p-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-            <RefreshCw className="h-4 w-4 animate-spin text-cyan-400" />
-            Loading Watchlist...
+          <div className="p-8 text-center text-xs text-[var(--theme-text-muted)] font-mono">
+            Loading watchlist...
+          </div>
+        ) : watchedCount === 0 ? (
+          <div className="p-6 text-center space-y-2.5 font-mono">
+            <Star className="h-6 w-6 mx-auto text-[var(--theme-accent)] opacity-60" />
+            <p className="text-xs text-[var(--theme-text-muted)] leading-relaxed">
+              Your watchlist is empty. Search the markets and select the star icon to add instruments.
+            </p>
+            <Link
+              href="/watchlists"
+              className="inline-block px-3 py-1 text-[11px] font-bold rounded-lg bg-[var(--theme-accent)]/10 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/20 transition-all border border-[var(--theme-accent)]/30"
+            >
+              Manage Watchlist
+            </Link>
           </div>
         ) : filteredList.length === 0 ? (
-          <div className="p-6 text-center text-xs text-slate-500">
-            No instruments found matching criteria.
+          <div className="p-8 text-center text-xs text-[var(--theme-text-muted)] font-mono">
+            No instruments match filter
           </div>
         ) : (
-          filteredList.map((item) => {
-            const isSelected = item.symbol === activeSymbol;
-            const isFav = customFavorites[item.symbol] || item.is_favorite;
-            const chg = item.change_24h || 0;
-            const isPos = chg >= 0;
+          filteredList.map((inst) => {
+            const sym = inst.canonical_symbol || inst.symbol;
+            const isSelected = activeSymbol === sym;
+            const isPos = (inst.change_24h || 0) >= 0;
+            const currSymbol = inst.currency === "INR" ? "₹" : "$";
 
             return (
               <div
-                key={item.symbol}
-                onClick={() => setActiveSymbol(item.symbol)}
-                className={`px-3 py-2 flex items-center justify-between cursor-pointer transition-colors ${
+                key={inst.instrument_id || sym}
+                onClick={() => setActiveSymbol(sym)}
+                className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors group ${
                   isSelected
-                    ? "bg-cyan-950/40 border-l-2 border-cyan-400"
-                    : "hover:bg-[#131D2E]"
+                    ? "bg-[var(--theme-accent)]/15 border-l-2 border-[var(--theme-accent)]"
+                    : "hover:bg-[var(--theme-elevated)]"
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={(e) => toggleFavorite(item.symbol, e)}
-                    className="text-slate-500 hover:text-amber-400"
-                  >
-                    <Star
-                      className={`h-3.5 w-3.5 ${
-                        isFav ? "fill-amber-400 text-amber-400" : "text-slate-600"
-                      }`}
-                    />
-                  </button>
-                  <div>
-                    <div className="text-xs font-bold text-slate-200 flex items-center gap-1">
-                      {item.symbol}
-                      {item.signal && (
-                        <span
-                          className={`text-[9px] px-1 py-0.2 rounded font-bold ${
-                            item.signal === "BUY"
-                              ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                              : item.signal === "SELL"
-                              ? "bg-red-950 text-red-400 border border-red-800"
-                              : "bg-slate-800 text-slate-400"
-                          }`}
-                        >
-                          {item.signal}
-                        </span>
-                      )}
+                <div className="flex items-center gap-2 min-w-0">
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <WatchlistStarButton instrument={inst} size="sm" />
+                  </div>
+                  <div className="truncate">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-[var(--theme-text-primary)] font-mono group-hover:text-[var(--theme-accent)] transition-colors truncate">
+                        {sym}
+                      </span>
                     </div>
-                    <div className="text-[10px] text-slate-500">
-                      {item.asset_class || "CRYPTO"}
+                    <div className="text-[10px] text-[var(--theme-text-muted)] truncate max-w-[110px]">
+                      {inst.name || inst.exchange || "Instrument"}
                     </div>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <div className="text-xs font-mono font-bold text-slate-200">
-                    ${(item.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                <div className="text-right font-mono shrink-0">
+                  <div className="text-xs font-bold text-[var(--theme-text-primary)]">
+                    {inst.last_price ? `${currSymbol}${inst.last_price.toLocaleString()}` : "—"}
                   </div>
                   <div
-                    className={`text-[10px] font-mono font-semibold flex items-center justify-end gap-0.5 ${
-                      isPos ? "text-emerald-400" : "text-red-400"
+                    className={`text-[10px] font-bold flex items-center justify-end gap-0.5 ${
+                      isPos ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
                     }`}
                   >
-                    {isPos ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                    <span>{isPos ? "+" : ""}{chg.toFixed(2)}%</span>
+                    {isPos ? (
+                      <ArrowUpRight className="h-3 w-3" />
+                    ) : (
+                      <ArrowDownRight className="h-3 w-3" />
+                    )}
+                    {isPos ? "+" : ""}
+                    {(inst.change_24h || 0).toFixed(2)}%
                   </div>
                 </div>
               </div>

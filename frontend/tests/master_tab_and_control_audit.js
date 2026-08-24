@@ -9,7 +9,7 @@ const fs = require("fs");
 const path = require("path");
 
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:3100";
 const ARTIFACTS_DIR = path.join(__dirname, "../../.artifacts/quant-os-verification");
 
 if (!fs.existsSync(ARTIFACTS_DIR)) {

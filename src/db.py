@@ -60,6 +60,7 @@ def get_connection() -> sqlite3.Connection:
     Create and return an optimized SQLite connection with 30s timeout and busy_timeout=10000ms.
     Does NOT change journal_mode on every connect to avoid exclusive lock contention.
     """
+    config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
@@ -1405,6 +1406,7 @@ def init_db(force: bool = False) -> None:
                         ("exit_reason", "ALTER TABLE trades_log ADD COLUMN exit_reason TEXT DEFAULT ''"),
                         ("net_pnl", "ALTER TABLE trades_log ADD COLUMN net_pnl REAL DEFAULT 0.0"),
                         ("unrealized_pnl", "ALTER TABLE trades_log ADD COLUMN unrealized_pnl REAL DEFAULT 0.0"),
+                        ("realized_pnl", "ALTER TABLE trades_log ADD COLUMN realized_pnl REAL DEFAULT 0.0"),
                         ("broker_order_id", "ALTER TABLE trades_log ADD COLUMN broker_order_id TEXT DEFAULT ''"),
                         ("exchange_order_id", "ALTER TABLE trades_log ADD COLUMN exchange_order_id TEXT DEFAULT ''"),
                         ("fill_id", "ALTER TABLE trades_log ADD COLUMN fill_id TEXT DEFAULT ''"),
@@ -7703,23 +7705,15 @@ def save_strategy_permission(bot_id: str, asset_class: str, strategy_name: str, 
 
 
 def get_user_watchlists() -> List[Dict[str, Any]]:
-    """Fetches user watchlists with structured items, notes, tags, and custom columns."""
+    """Fetches user watchlists with structured items, notes, tags, and custom columns. Never seeds demo items."""
     watchlists = safe_query("SELECT * FROM user_watchlists ORDER BY is_default DESC, name ASC")
     if not watchlists:
-        # Seed default watchlists
+        # Create a single clean default container with 0 items (NEVER auto-populate default instruments)
         now_utc = datetime.now(timezone.utc).isoformat()
-        default_lists = [
-            ("wl_main", "My Watchlist", "Primary active trading watchlist", "General", 1),
-            ("wl_crypto", "Crypto Top 10", "Major liquid crypto assets", "Crypto", 0),
-            ("wl_indian", "Indian Bluechips", "NSE Largecap leaders", "Equities", 0),
-            ("wl_options", "F&O Active", "High volume derivatives", "Derivatives", 0),
-            ("wl_volatility", "High Volatility", "Breakout and momentum scanner", "Scanners", 0)
-        ]
-        for w_id, w_name, w_desc, w_folder, w_def in default_lists:
-            safe_execute(
-                "INSERT INTO user_watchlists (id, name, description, folder, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (w_id, w_name, w_desc, w_folder, w_def, now_utc, now_utc)
-            )
+        safe_execute(
+            "INSERT INTO user_watchlists (id, name, description, folder, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("wl_main", "My Watchlist", "Primary active trading watchlist", "General", 1, now_utc, now_utc)
+        )
         watchlists = safe_query("SELECT * FROM user_watchlists ORDER BY is_default DESC, name ASC")
 
     for wl in watchlists:
@@ -7729,11 +7723,33 @@ def get_user_watchlists() -> List[Dict[str, Any]]:
         except Exception:
             wl["custom_columns"] = []
 
+        # LEFT JOIN instruments so that user-added items are always returned even if not in instruments master
         items = safe_query(
             """
-            SELECT i.*, wi.notes, wi.sort_order, wi.tags_json, wi.added_at as item_added_at
-            FROM instruments i
-            JOIN user_watchlist_items wi ON i.instrument_id = wi.instrument_id
+            SELECT 
+                wi.id as watchlist_item_id,
+                wi.watchlist_id,
+                wi.instrument_id,
+                wi.notes,
+                wi.sort_order,
+                wi.tags_json,
+                wi.added_at as item_added_at,
+                COALESCE(i.canonical_symbol, i.display_symbol, wi.instrument_id) as symbol,
+                COALESCE(i.canonical_symbol, wi.instrument_id) as canonical_symbol,
+                COALESCE(i.provider_symbol, wi.instrument_id) as provider_symbol,
+                COALESCE(i.display_symbol, wi.instrument_id) as display_symbol,
+                COALESCE(i.company_name, i.display_symbol, wi.instrument_id) as name,
+                COALESCE(i.exchange, 'BINANCE') as exchange,
+                COALESCE(i.asset_class, 'CRYPTO') as asset_class,
+                COALESCE(i.segment, 'CASH') as segment,
+                COALESCE(i.market_status, 'OPEN') as market_status,
+                COALESCE(i.tradability, 'TRADABLE') as tradability,
+                COALESCE(i.data_status, 'LIVE') as data_status,
+                COALESCE(i.last_price, 0.0) as last_price,
+                COALESCE(i.change_24h, 0.0) as change_24h,
+                COALESCE(i.volume_24h, 0.0) as volume_24h
+            FROM user_watchlist_items wi
+            LEFT JOIN instruments i ON wi.instrument_id = i.instrument_id
             WHERE wi.watchlist_id = ?
             ORDER BY wi.sort_order ASC, wi.added_at DESC
             """,
@@ -7788,20 +7804,29 @@ def delete_user_watchlist(watchlist_id: str) -> bool:
     return safe_execute("DELETE FROM user_watchlists WHERE id = ?", (watchlist_id,))
 
 
+def clear_user_watchlist(watchlist_id: str = "wl_main") -> bool:
+    """Clears all instruments from a user watchlist."""
+    return safe_execute("DELETE FROM user_watchlist_items WHERE watchlist_id = ?", (watchlist_id,))
+
+
 def add_item_to_watchlist(watchlist_id: str, instrument_id: str, notes: str = "", tags: Optional[List[str]] = None) -> bool:
     """Adds an instrument to a watchlist."""
     now_utc = datetime.now(timezone.utc).isoformat()
     tags_json = json.dumps(tags or [])
+    # Get current max sort_order
+    max_order_row = safe_query("SELECT MAX(sort_order) as m FROM user_watchlist_items WHERE watchlist_id = ?", (watchlist_id,))
+    next_order = (max_order_row[0]["m"] or 0) + 1 if max_order_row and max_order_row[0]["m"] is not None else 0
+
     return safe_execute(
         """
-        INSERT INTO user_watchlist_items (watchlist_id, instrument_id, added_at, notes, tags_json)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO user_watchlist_items (watchlist_id, instrument_id, added_at, sort_order, notes, tags_json)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(watchlist_id, instrument_id) DO UPDATE SET
             added_at = excluded.added_at,
             notes = excluded.notes,
             tags_json = excluded.tags_json
         """,
-        (watchlist_id, instrument_id, now_utc, notes, tags_json)
+        (watchlist_id, instrument_id, now_utc, next_order, notes, tags_json)
     )
 
 

@@ -15,9 +15,11 @@ import { PositionsEmptyState } from "./PositionsEmptyState";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { executeCommand } from "@/lib/commandClient";
+import { useGlobalData } from "@/context/GlobalDataContext";
 
 export function EcoPositionsView() {
   const queryClient = useQueryClient();
+  const { positions, portfolioSnapshot, riskSummary, tradingMode, refreshAll } = useGlobalData();
 
   // State
   const [viewMode, setViewMode] = useState<PositionViewMode>("table");

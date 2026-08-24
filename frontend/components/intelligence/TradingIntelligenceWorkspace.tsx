@@ -2,17 +2,18 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IntelligenceSnapshot } from "@/types/intelligence";
+import { IntelligenceSnapshot, AIDecisionSignal, AIStatusResponse } from "@/types/intelligence";
 import { GlobalIntelligenceCommandBar } from "./GlobalIntelligenceCommandBar";
+import { AIMLopsControlCard } from "./AIMLopsControlCard";
 import { PrimaryDecisionHero } from "./PrimaryDecisionHero";
 import { MultiTimeframeRegimeMatrix } from "./MultiTimeframeRegimeMatrix";
-import { ConfluenceScorecard } from "./ConfluenceScorecard";
-import { StrategyRuleASTTree } from "./StrategyRuleASTTree";
 import { CentralPreTradeRiskInspector } from "./CentralPreTradeRiskInspector";
 import { ProviderSystemHealthCard } from "./ProviderSystemHealthCard";
 import { WhyNoTradeDiagnostic } from "./WhyNoTradeDiagnostic";
+import { GlobalMarketScanner } from "./GlobalMarketScanner";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { apiClient } from "@/lib/apiClient";
+import { useGlobalData } from "@/context/GlobalDataContext";
 
 interface TradingIntelligenceWorkspaceProps {
   botId?: string;
@@ -22,6 +23,7 @@ export function TradingIntelligenceWorkspace({
   botId = "bot-1",
 }: TradingIntelligenceWorkspaceProps) {
   const { activeSymbol, activeTimeframe } = useActiveBot();
+  const { portfolioSnapshot, riskSummary, positions } = useGlobalData();
   const [liveSnapshot, setLiveSnapshot] = useState<IntelligenceSnapshot | null>(null);
   const [showWhyNoTradeModal, setShowWhyNoTradeModal] = useState(false);
 
@@ -38,6 +40,31 @@ export function TradingIntelligenceWorkspace({
     staleTime: 4000,
     refetchInterval: 6000,
     placeholderData: (prev) => prev,
+  });
+
+  // 1b. Fetch AI Ensemble Signal & Status
+  const { data: aiSignalData, refetch: refetchAISignal } = useQuery({
+    queryKey: ["aiSignal", activeSymbol, activeTimeframe],
+    queryFn: async () => {
+      const res = await apiClient.get<any>(`/api/ai/signal?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}&timeframe=${encodeURIComponent(activeTimeframe || "5m")}`, {
+        timeoutMs: 5000,
+      });
+      if (!res.ok) return null;
+      return res.data?.result as AIDecisionSignal;
+    },
+    staleTime: 4000,
+    refetchInterval: 5000,
+  });
+
+  const { data: aiStatusData } = useQuery({
+    queryKey: ["aiStatus"],
+    queryFn: async () => {
+      const res = await apiClient.get<any>("/api/ai/status", { timeoutMs: 5000 });
+      if (!res.ok) return null;
+      return res.data?.result as AIStatusResponse;
+    },
+    staleTime: 6000,
+    refetchInterval: 8000,
   });
 
   // 2. Real-time SSE Stream Listener for Sub-Second Updates
@@ -71,19 +98,33 @@ export function TradingIntelligenceWorkspace({
       {/* 1. Global Intelligence Command & Telemetry Bar */}
       <GlobalIntelligenceCommandBar
         symbol={activeSymbol || "BTC/USDT"}
-        exchange="Binance Futures"
-        strategyName="EMA 9/21 MACD Volume Profile Trend Strategy"
-        timeframe={activeTimeframe || "15m Primary"}
+        exchange="Binance Futures / NSE India / Global"
+        strategyName="LightGBM + XGBoost AI Multi-Model Ensemble"
+        timeframe={activeTimeframe || "5m Primary"}
         isRefreshing={isFetching}
-        onRefresh={() => refetch()}
+        onRefresh={() => {
+          refetch();
+          refetchAISignal();
+        }}
         feedLatencyMs={14.5}
         marketStatus="MARKET OPEN 24/7"
+        feedStatus={activeSymbol?.includes("AAPL") || activeSymbol?.includes("SPX") ? "DELAYED" : "REAL-TIME"}
       />
 
       {/* 2. Responsive 12-Column Intelligence Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* Left Column (8 / 12 Cols on XL Displays): Decision, Multi-Timeframe Heatmap, Confluence, AST Tree */}
+        {/* Left Column (8 / 12 Cols on XL Displays): AI MLOps Card, Decision Hero, Heatmap, Confluence */}
         <div className="xl:col-span-8 space-y-4 min-w-0">
+          {/* AI MLOps Model Ensemble Control Card */}
+          <AIMLopsControlCard
+            aiSignal={aiSignalData || null}
+            aiStatus={aiStatusData || null}
+            onRefresh={() => {
+              refetch();
+              refetchAISignal();
+            }}
+          />
+
           {/* Primary Decision Hero */}
           <PrimaryDecisionHero
             snapshot={snapshot}
@@ -96,37 +137,26 @@ export function TradingIntelligenceWorkspace({
             matrixData={snapshot?.timeframe_matrix}
             symbol={activeSymbol || "BTC/USDT"}
           />
-
-          {/* Confluence Scorecard (Mathematically Reconciled) */}
-          <ConfluenceScorecard
-            confluenceData={snapshot?.confluence}
-          />
-
-          {/* Strategy AST / Mandatory Rule Evaluation Tree */}
-          <StrategyRuleASTTree
-            rules={snapshot?.rules_evaluation}
-            strategyName="EMA 9/21 Trend Confluence Strategy"
-          />
         </div>
 
         {/* Right Column (4 / 12 Cols on XL Displays): Central Risk Engine & Provider Health */}
         <div className="xl:col-span-4 space-y-4 min-w-0">
           {/* Central Pre-Trade Risk Engine */}
           <CentralPreTradeRiskInspector
-            totalEquity={10450.0}
-            allocatedCapital={2800.0}
-            availableMargin={7650.0}
-            dailyDrawdownPct={0.42}
+            totalEquity={portfolioSnapshot?.equity ?? 50000.0}
+            allocatedCapital={portfolioSnapshot?.startingBalance ?? 50000.0}
+            availableMargin={portfolioSnapshot?.availableCapital ?? 50000.0}
+            dailyDrawdownPct={portfolioSnapshot?.currentDrawdownPct ?? 0.35}
             maxDailyLossPct={3.0}
-            riskPerTradePct={1.0}
-            riskRewardRatio={2.45}
-            openPositionsCount={2}
+            riskPerTradePct={1.5}
+            riskRewardRatio={portfolioSnapshot?.riskRewardRatio ?? 2.0}
+            openPositionsCount={positions.length}
             maxPositionsCount={5}
           />
 
           {/* Data Provider & System Health Telemetry */}
           <ProviderSystemHealthCard
-            providerName="Binance Futures (CCXT Direct)"
+            providerName="Multi-Provider Router (Binance / NSE / TwelveData)"
             latencyMs={14.5}
             gapCount={0}
             reconnectCount={0}
@@ -138,7 +168,10 @@ export function TradingIntelligenceWorkspace({
         </div>
       </div>
 
-      {/* 3. Why-No-Trade Deep Diagnostic Modal */}
+      {/* 3. Tier 2 Global Multi-Asset Market Scanner */}
+      <GlobalMarketScanner />
+
+      {/* 4. Why-No-Trade Deep Diagnostic Modal */}
       {showWhyNoTradeModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
           <div className="max-w-4xl w-full max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-2xl p-6 relative">

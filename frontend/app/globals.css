@@ -8,37 +8,37 @@
  * Design Tokens & Semantic CSS Variables
  * ---------------------------------------------------------------------- */
 :root {
-  /* Dynamic Theme Colors (Default: JARVIS CORE AI Intelligence) */
-  --theme-bg: #060B13;
-  --theme-surface: #0B1528;
-  --theme-elevated: #0F1D36;
-  --theme-border: #1D355E;
-  --theme-border-subtle: #122442;
-  --theme-text-primary: #F0F6FC;
-  --theme-text-secondary: #9DB2CE;
-  --theme-text-muted: #5F7597;
+  /* Dynamic Institutional Theme Colors (Default: Obsidian Blue) */
+  --theme-bg: #070B14;
+  --theme-surface: #0E1626;
+  --theme-elevated: #15213A;
+  --theme-border: #233553;
+  --theme-border-subtle: #18263E;
+  --theme-text-primary: #F4F7FB;
+  --theme-text-secondary: #A9B6CA;
+  --theme-text-muted: #6B7B94;
   
   /* Financial & Status Semantics */
-  --theme-accent: #00E5FF;
-  --theme-profit: #00F2A9;
-  --theme-loss: #FF4757;
-  --theme-warning: #FFB800;
+  --theme-accent: #4F8CFF;
+  --theme-profit: #34D399;
+  --theme-loss: #FB7185;
+  --theme-warning: #FBBF24;
   --theme-info: #38BDF8;
-  --theme-live: #00F2A9;
+  --theme-live: #34D399;
   --theme-paper: #38BDF8;
-  --theme-halted: #FF4757;
-  --theme-neutral: #5F7597;
+  --theme-halted: #FB7185;
+  --theme-neutral: #6B7B94;
 
   /* Chart & Canvas Styling */
-  --theme-chart-bg: #060B13;
-  --theme-chart-grid: #13233E;
-  --theme-chart-grid-opacity: 0.35;
-  --theme-chart-candle-up: #00F2A9;
-  --theme-chart-candle-down: #FF4757;
+  --theme-chart-bg: #070B14;
+  --theme-chart-grid: #233553;
+  --theme-chart-grid-opacity: 0.4;
+  --theme-chart-candle-up: #34D399;
+  --theme-chart-candle-down: #FB7185;
   --theme-chart-line-thickness: 2px;
-  --theme-radius: 14px;
+  --theme-radius: 16px;
   --theme-radius-sm: 8px;
-  --theme-radius-lg: 18px;
+  --theme-radius-lg: 20px;
 
   /* Typography & Density Variables */
   --theme-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;

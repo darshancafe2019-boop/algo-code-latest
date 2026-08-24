@@ -11,8 +11,47 @@ data/
 # Backup directory
 backup/
 
+# Logs & locks
+logs/
+*.log
+*.lock
+quantos_supervisor.lock
+quantos_runtime_state.json
+
+# Virtual environments
+.venv/
+.venv_py39/
+venv/
+env/
+ENV/
+
+# Node & Frontend build
+node_modules/
+frontend/node_modules/
+.next/
+frontend/.next/
+out/
+frontend/out/
+.vercel/
+
+# OS and IDE files
+.DS_Store
+*/.DS_Store
+*/**/.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Temp and archive files
+*.zip
+.zip
+.artifacts/
+.chrome_dev_audit/
+
 # Python cache & build files
 __pycache__/
+*/__pycache__/
+*/**/__pycache__/
 *.pyc
 *.pyo
 *.pyd

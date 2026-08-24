@@ -68,6 +68,9 @@ export interface MarketInstrument {
 
   // Backwards compatibility legacy fields
   symbol?: string;
+  name?: string;
+  notes?: string;
+  tags?: string[];
   display_name?: string;
   watch_enabled?: boolean;
   last_change?: number;

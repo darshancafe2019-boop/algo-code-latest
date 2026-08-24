@@ -111,7 +111,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [isPreviewActive, setIsPreviewActive] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
 
-  // Initialize from localStorage and backend
+  // Initialize from localStorage and backend with defensive migration
   useEffect(() => {
     try {
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -125,6 +125,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             typography: { ...DEFAULT_APPEARANCE_CONFIG.typography, ...parsed.typography },
             chart: { ...DEFAULT_APPEARANCE_CONFIG.chart, ...parsed.chart },
           };
+          if (merged.themeId !== "custom" && !(merged.themeId in BUILTIN_THEMES)) {
+            merged.themeId = "obsidian-blue";
+            merged.name = BUILTIN_THEMES["obsidian-blue"].name;
+            merged.colors = { ...BUILTIN_THEMES["obsidian-blue"].colors };
+          }
           setConfig(merged);
           setDraftConfig(merged);
           applyCssTokensToDom(merged);
@@ -149,6 +154,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
             typography: { ...DEFAULT_APPEARANCE_CONFIG.typography, ...data.appearance.typography },
             chart: { ...DEFAULT_APPEARANCE_CONFIG.chart, ...data.appearance.chart },
           };
+          if (serverConfig.themeId !== "custom" && !(serverConfig.themeId in BUILTIN_THEMES)) {
+            serverConfig.themeId = "obsidian-blue";
+            serverConfig.name = BUILTIN_THEMES["obsidian-blue"].name;
+            serverConfig.colors = { ...BUILTIN_THEMES["obsidian-blue"].colors };
+          }
           setConfig(serverConfig);
           setDraftConfig(serverConfig);
           applyCssTokensToDom(serverConfig);

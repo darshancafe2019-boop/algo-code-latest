@@ -1,9 +1,11 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useGlobalData } from "@/context/GlobalDataContext";
 import { executeCommand } from "@/lib/commandClient";
 import { apiClient } from "@/lib/apiClient";
 import {
@@ -19,18 +21,19 @@ import {
   Lock,
 } from "lucide-react";
 import { EcoBadge } from "@/components/eco/EcoBadge";
-import { AICoreThemeSelector } from "@/components/common/AICoreThemeSelector";
 
 interface TopCommandBarProps {
-  onOpenSearch: () => void;
+  onOpenSearch?: () => void;
 }
 
 export function TopCommandBar({
   onOpenSearch,
 }: TopCommandBarProps) {
+  const router = useRouter();
   const queryClient = useQueryClient();
   const { activeBot, activeSymbol, activeTimeframe } = useActiveBot();
   const { openAppearanceDrawer, config: currentThemeConfig } = useTheme();
+  const { portfolioSnapshot, riskSummary, tradingMode: globalTradingMode, reconciliationStatus } = useGlobalData();
 
   const [showKillSwitchModal, setShowKillSwitchModal] = useState(false);
   const [confirmWord, setConfirmWord] = useState("");
@@ -62,11 +65,11 @@ export function TopCommandBar({
     queryKey: ["botsSummary"],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/bots/summary", { timeoutMs: 5000 });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to fetch summary");
+      if (!res.ok) return {};
       return res.data;
     },
-    staleTime: 4000,
-    refetchInterval: 6000,
+    staleTime: 6000,
+    refetchInterval: isBrowserOnline ? 8000 : 20000,
     placeholderData: (prev) => prev,
   });
 
@@ -75,11 +78,11 @@ export function TopCommandBar({
     queryKey: ["systemStatus"],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to fetch status");
+      if (!res.ok) return {};
       return res.data;
     },
-    staleTime: 4000,
-    refetchInterval: 6000,
+    staleTime: 6000,
+    refetchInterval: isBrowserOnline ? 8000 : 20000,
     placeholderData: (prev) => prev,
   });
 
@@ -91,15 +94,16 @@ export function TopCommandBar({
       if (!res.ok) return null;
       return res.data;
     },
-    staleTime: 5000,
-    refetchInterval: 8000,
+    staleTime: 6000,
+    refetchInterval: isBrowserOnline ? 10000 : 25000,
     placeholderData: (prev) => prev,
   });
 
-  const isKillSwitchActive = statusData?.system_summary?.kill_switch_active || false;
+  const isKillSwitchActive = riskSummary?.globalKillSwitchActive || statusData?.system_summary?.kill_switch_active || false;
   const isFeedLive = healthData?.feed_health?.is_feed_live !== false;
-  const tradingMode = statusData?.trading_mode || "PAPER";
-  const todaysPnl = statusData?.todays_pnl !== undefined ? statusData.todays_pnl : 4250.0;
+  const tradingMode = globalTradingMode || statusData?.trading_mode || "PAPER";
+  const todaysPnl = portfolioSnapshot?.dailyPnl ?? (statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0);
+  const totalEquity = portfolioSnapshot?.equity ?? Number(statusData?.health?.balance ?? 50000.0);
   const isProfit = todaysPnl >= 0;
 
   // Operating Mode Calculation: ONLINE, DEGRADED, OFFLINE
@@ -109,6 +113,41 @@ export function TopCommandBar({
   } else if (!isFeedLive || isKillSwitchActive) {
     operatingMode = "DEGRADED";
   }
+
+  // Mode Switch States & Mutation
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [liveConfirmCheck1, setLiveConfirmCheck1] = useState(false);
+  const [liveConfirmCheck2, setLiveConfirmCheck2] = useState(false);
+  const [modeError, setModeError] = useState<string | null>(null);
+
+  const modeMutation = useMutation({
+    mutationFn: async (targetMode: "PAPER" | "LIVE") => {
+      setModeError(null);
+      if (targetMode === "LIVE") {
+        const res = await apiClient.post<any>("/api/live-trading/arm", {
+          user_confirm: true,
+          user_ack_risk: true,
+        });
+        if (!res.ok) throw new Error(res.error?.message || "Failed to arm live trading");
+        return res.data;
+      } else {
+        const res = await apiClient.post<any>("/api/live-trading/disarm", {});
+        if (!res.ok) throw new Error(res.error?.message || "Failed to disarm live trading");
+        return res.data;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["systemStatus"] });
+      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["terminalStatus"] });
+      setShowModeModal(false);
+      setLiveConfirmCheck1(false);
+      setLiveConfirmCheck2(false);
+    },
+    onError: (err: any) => {
+      setModeError(err.message || "Failed to toggle trading mode");
+    },
+  });
 
   // Kill Switch Mutation
   const killSwitchMutation = useMutation({
@@ -207,11 +246,11 @@ export function TopCommandBar({
           </div>
         </div>
 
-        {/* Center: Global Search Bar Trigger (⌘K) & AI Core Theme Selector */}
-        <div className="flex items-center gap-2 max-w-lg w-full justify-center">
+        {/* Center: Global Search Bar Trigger (⌘K) */}
+        <div className="flex items-center max-w-md w-full justify-center">
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 rounded-xl text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-all flex-1"
+            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 rounded-xl text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-all w-full"
           >
             <Search className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
             <span className="flex-1 text-left truncate">Search spots, futures, options, strikes...</span>
@@ -219,24 +258,88 @@ export function TopCommandBar({
               ⌘K
             </kbd>
           </button>
-
-          {/* AI Core Switcher (JARVIS vs ULTRON) */}
-          <AICoreThemeSelector compact />
         </div>
 
         {/* Right: Account Capital, P&L, Mode, and Tool Toggles */}
         <div className="flex items-center gap-2.5 font-mono text-xs">
-          {/* Trading Mode (Paper / Live) */}
-          <EcoBadge variant={tradingMode === "LIVE" ? "live" : "paper"} size="sm" dot pulse>
-            {tradingMode}
-          </EcoBadge>
+          {/* Quick Order Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+              setQuickOrderSide("BUY");
+              setOrderPlacementModalOpen(true);
+            }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--theme-profit)]/15 hover:bg-[var(--theme-profit)]/25 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30 font-bold transition-all shadow-sm active:scale-98"
+            title="Open Quick Order Router (Buy / Long)"
+          >
+            <span>+ ORDER</span>
+          </button>
 
-          {/* Today's Net P&L */}
+          {/* Quick Bot Deploy Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              const { setCreateBotModalOpen } = require("@/lib/store/useUIStore").useUIStore.getState();
+              setCreateBotModalOpen(true);
+            }}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--theme-accent)]/15 hover:bg-[var(--theme-accent)]/25 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30 font-bold transition-all shadow-sm active:scale-98"
+            title="Deploy New Quant Bot Instance"
+          >
+            <span>+ BOT</span>
+          </button>
+
+          {/* Quick Start All Bots */}
+          <button
+            type="button"
+            onClick={async () => {
+              await apiClient.post("/api/bots/start-all", {});
+              queryClient.invalidateQueries({ queryKey: ["botsList"] });
+              queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+            }}
+            className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold transition-all shadow-sm active:scale-98"
+            title="Start All Eligible Bot Workers"
+          >
+            <span className="text-[10px]">▶ START ALL</span>
+          </button>
+
+          {/* Quick Pause All Bots */}
+          <button
+            type="button"
+            onClick={async () => {
+              await apiClient.post("/api/bots/pause-all", {});
+              queryClient.invalidateQueries({ queryKey: ["botsList"] });
+              queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+            }}
+            className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold transition-all shadow-sm active:scale-98"
+            title="Pause All Running Bots"
+          >
+            <span className="text-[10px]">⏸ PAUSE ALL</span>
+          </button>
+
+          {/* Trading Mode (Paper / Live) Toggle Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowModeModal(true)}
+            className="cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] rounded-lg"
+            title="Click to manage live execution / paper mode gate"
+          >
+            <EcoBadge variant={tradingMode === "LIVE" ? "live" : "paper"} size="sm" dot pulse>
+              {tradingMode}
+            </EcoBadge>
+          </button>
+
+          {/* Account Equity & Today's Net P&L */}
           <div className="hidden sm:flex flex-col items-end pr-2 border-r border-[var(--theme-border-subtle)]">
-            <span className="text-[9px] text-[var(--theme-text-muted)] uppercase">TODAY P&L</span>
-            <span className={`text-xs font-extrabold ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-              {isProfit ? `+₹${todaysPnl.toLocaleString()}` : `-₹${Math.abs(todaysPnl).toLocaleString()}`}
-            </span>
+            <span className="text-[9px] text-[var(--theme-text-muted)] uppercase tracking-wider">EQUITY / TODAY</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-[var(--theme-text-primary)]">
+                ${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </span>
+              <span className={`text-xs font-extrabold ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
+                {isProfit ? `+$${todaysPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(todaysPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              </span>
+            </div>
           </div>
 
           {/* Emergency Kill Switch Button */}
@@ -264,6 +367,111 @@ export function TopCommandBar({
           </button>
         </div>
       </header>
+
+      {/* Mode Switch Modal */}
+      {showModeModal && (
+        <div className="fixed inset-0 z-50 bg-[var(--theme-bg)]/80 backdrop-blur-md flex items-center justify-center p-4 font-sans">
+          <div className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4 text-[var(--theme-text-primary)]">
+            <div className="flex items-center gap-3">
+              <div className={`p-3 rounded-2xl border ${
+                tradingMode === "LIVE" 
+                  ? "bg-[var(--theme-profit)]/15 border-[var(--theme-profit)]/40 text-[var(--theme-profit)]" 
+                  : "bg-amber-500/15 border-amber-500/40 text-amber-400"
+              }`}>
+                <ShieldCheck className="h-6 w-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-[var(--theme-text-primary)]">
+                  {tradingMode === "LIVE" ? "Revert to PAPER Simulation Mode" : "Arm Real LIVE Trading Gate"}
+                </h3>
+                <p className="text-xs text-[var(--theme-text-secondary)]">
+                  {tradingMode === "LIVE"
+                    ? "Safe simulated orders with 0 risk to real broker capital."
+                    : "Authorizes real order execution against configured exchange accounts."}
+                </p>
+              </div>
+            </div>
+
+            {modeError && (
+              <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-300">
+                {modeError}
+              </div>
+            )}
+
+            {tradingMode === "PAPER" ? (
+              <div className="space-y-3 pt-2">
+                <div className="p-3 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl text-xs space-y-2 text-[var(--theme-text-secondary)]">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={liveConfirmCheck1}
+                      onChange={(e) => setLiveConfirmCheck1(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-[11px] leading-tight">
+                      I understand that LIVE trading places real market orders using real funds.
+                    </span>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={liveConfirmCheck2}
+                      onChange={(e) => setLiveConfirmCheck2(e.target.checked)}
+                      className="mt-0.5 rounded border-slate-700 text-rose-600 focus:ring-rose-500"
+                    />
+                    <span className="text-[11px] leading-tight">
+                      I have verified my exchange API credentials, leverage limits, and risk stops.
+                    </span>
+                  </label>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setShowModeModal(false)}
+                    className="px-4 py-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => modeMutation.mutate("LIVE")}
+                    disabled={!liveConfirmCheck1 || !liveConfirmCheck2 || modeMutation.isPending}
+                    className={`px-5 py-2 rounded-xl text-xs font-bold font-mono transition-all ${
+                      liveConfirmCheck1 && liveConfirmCheck2
+                        ? "bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-900/30"
+                        : "bg-slate-800 text-slate-500 cursor-not-allowed"
+                    }`}
+                  >
+                    {modeMutation.isPending ? "Arming..." : "ARM LIVE TRADING"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 pt-2">
+                <p className="text-xs text-[var(--theme-text-secondary)]">
+                  Switching back to PAPER mode will immediately disarm live execution and safely route all bot signals to paper simulations.
+                </p>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <button
+                    onClick={() => setShowModeModal(false)}
+                    className="px-4 py-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => modeMutation.mutate("PAPER")}
+                    disabled={modeMutation.isPending}
+                    className="px-5 py-2 rounded-xl text-xs font-bold font-mono bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/30 transition-all"
+                  >
+                    {modeMutation.isPending ? "Disarming..." : "Switch to PAPER Mode"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Kill Switch Modal */}
       {showKillSwitchModal && (

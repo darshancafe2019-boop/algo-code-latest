@@ -24,6 +24,7 @@ import { StopLossTakeProfitMatrix } from "./StopLossTakeProfitMatrix";
 import { PreOrderRiskGatekeeper } from "./PreOrderRiskGatekeeper";
 import { PositionAwarenessPanel } from "./PositionAwarenessPanel";
 import { OrderConfirmationDrawer } from "./OrderConfirmationDrawer";
+import { useGlobalData } from "@/context/GlobalDataContext";
 
 interface OrderExecutionCenterProps {
   initialInstrument?: MarketInstrument | null;
@@ -35,6 +36,7 @@ export function OrderExecutionCenter({
   initialPrice,
 }: OrderExecutionCenterProps) {
   const queryClient = useQueryClient();
+  const { portfolioSnapshot, positions: globalPositions, riskSummary, tradingMode: globalTradingMode, refreshAll } = useGlobalData();
 
   // State
   const [selectedSymbol, setSelectedSymbol] = useState<string>(
@@ -56,14 +58,14 @@ export function OrderExecutionCenter({
   const [leverage, setLeverage] = useState<number>(1);
   const [stopLoss, setStopLoss] = useState<string>((safeCurrentPrice * 0.98).toFixed(2));
   const [takeProfit, setTakeProfit] = useState<string>((safeCurrentPrice * 1.04).toFixed(2));
-  const [executionMode, setExecutionMode] = useState<ExecutionMode>("PAPER");
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>(globalTradingMode === "LIVE" ? "LIVE" : "PAPER");
 
   // Modal & Drawer States
   const [isPreviewOpen, setIsPreviewOpen] = useState<boolean>(false);
   const [orderFeedback, setOrderFeedback] = useState<{ status: "success" | "error"; message: string } | null>(null);
 
-  // Available Capital Query
-  const availableCapital = 10000.0;
+  // Available Capital derived from authoritative GlobalData
+  const availableCapital = portfolioSnapshot?.availableCapital ?? 50000.0;
 
   // Derived Financial Calculations
   const parsedQty = parseFloat(quantity) || 0.05;

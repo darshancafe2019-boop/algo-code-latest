@@ -28,16 +28,18 @@ import {
 } from "lucide-react";
 import { formatNumber, formatPrice, formatPercent } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
+import { useGlobalData } from "@/context/GlobalDataContext";
 
 export function HomeExecutiveOverview() {
   const router = useRouter();
+  const { portfolioSnapshot, positions, riskSummary, tradingMode } = useGlobalData();
 
   // 1. Fetch Summary Metrics (Balance, Today's PnL, Open Positions, Risk Gate)
   const { data: statusData, isLoading: isLoadingStatus } = useQuery({
     queryKey: ["homeSystemStatus"],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to fetch system status");
+      if (!res.ok) return {};
       return res.data;
     },
     staleTime: 4000,
@@ -101,14 +103,13 @@ export function HomeExecutiveOverview() {
     placeholderData: (prev) => prev,
   });
 
-  const balance = statusData?.health?.balance || 10450.0;
-  const todaysPnl = statusData?.todays_pnl !== undefined ? statusData.todays_pnl : 450.0;
-  const todaysPnlPct = statusData?.todays_pnl_pct !== undefined ? statusData.todays_pnl_pct : 4.5;
+  const balance = portfolioSnapshot?.equity ?? Number(statusData?.health?.balance ?? 50000.0);
+  const todaysPnl = portfolioSnapshot?.dailyPnl ?? (statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0);
   const isProfit = todaysPnl >= 0;
-  const openPositionsCount = statusData?.open_positions_count ?? 2;
-  const riskStatus = statusData?.risk_status || "14/14 PASSED";
-  const tradingMode = statusData?.trading_mode || "PAPER";
-  const killSwitchActive = statusData?.system_summary?.kill_switch_active || false;
+  const todaysPnlPct = balance > 0 ? (todaysPnl / balance) * 100 : null;
+  const openPositionsCount = portfolioSnapshot?.openPositions ?? positions.length ?? 0;
+  const riskStatus = riskSummary?.universalRiskGateStatus || statusData?.risk_status || "14/14 Checks Passed";
+  const killSwitchActive = riskSummary?.globalKillSwitchActive || statusData?.system_summary?.kill_switch_active || false;
 
   return (
     <div className="w-full space-y-5 text-[var(--theme-text-primary)] font-sans max-w-7xl mx-auto pb-12">
@@ -191,9 +192,11 @@ export function HomeExecutiveOverview() {
             )}
           </div>
           <div className={`mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-            {isProfit ? "+" : ""}${formatPrice(Math.abs(todaysPnl), "", 2)}
+            {isProfit && todaysPnl > 0 ? "+" : todaysPnl < 0 ? "-" : ""}${formatPrice(Math.abs(todaysPnl), "", 2)}
             <span className="text-xs font-semibold ml-1.5 opacity-90">
-              ({isProfit ? "+" : ""}{todaysPnlPct.toFixed(2)}%)
+              {todaysPnlPct !== null && !isNaN(todaysPnlPct)
+                ? `(${todaysPnlPct > 0 ? "+" : ""}${todaysPnlPct.toFixed(2)}%)`
+                : "(N/A)"}
             </span>
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
@@ -237,7 +240,7 @@ export function HomeExecutiveOverview() {
             {riskStatus}
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
-            <span>20 Pre-Order Checks</span>
+            <span>14 Pre-Order Gates</span>
             <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
               Risk Engine <ChevronRight className="h-3 w-3" />
             </span>

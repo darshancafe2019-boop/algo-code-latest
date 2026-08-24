@@ -89,7 +89,7 @@ async def run_audit():
         "--no-sandbox",
         "--disable-extensions",
         f"--user-data-dir={USER_DATA_DIR}",
-        "http://localhost:3001"
+        "http://localhost:3100"
     ]
     proc = subprocess.Popen(chrome_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"[+] Launched Headless Chrome (PID: {proc.pid}) on CDP Port {CDP_PORT}")
@@ -99,7 +99,7 @@ async def run_audit():
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read())
         
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Page Target: {main_page['title']} ({main_page['url']})")
         
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])
@@ -159,7 +159,7 @@ async def run_audit():
             "allow_shorts": True
         }
         api_req = urllib.request.Request(
-            "http://localhost:3001/api/backtest/run",
+            "http://localhost:3100/api/backtest/run",
             data=json.dumps(req_body).encode(),
             headers={"Content-Type": "application/json"}
         )

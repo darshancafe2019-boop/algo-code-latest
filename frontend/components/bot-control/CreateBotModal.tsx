@@ -1,200 +1,247 @@
 "use client";
 
 import React, { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, RefreshCw, Bot } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useUIStore } from "@/lib/store/useUIStore";
+import { CreateBotSchema, CreateBotInput } from "@/lib/schemas/botSchema";
+import { executeCommand } from "@/lib/commandClient";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Bot, AlertCircle, Sparkles } from "lucide-react";
 
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export function CreateBotModal({ isOpen, onClose }: Props) {
+export function CreateBotModal() {
   const queryClient = useQueryClient();
+  const { isCreateBotModalOpen, setCreateBotModalOpen } = useUIStore();
+  const [formError, setFormError] = useState<string | null>(null);
 
-  const [name, setName] = useState("");
-  const [symbol, setSymbol] = useState("BTC/USDT");
-  const [strategy, setStrategy] = useState("EMA_MACD_VP");
-  const [timeframe, setTimeframe] = useState("5m");
-  const [assetClass, setAssetClass] = useState("CRYPTO");
-  const [executionMode, setExecutionMode] = useState("PAPER");
-  const [capital, setCapital] = useState("10000");
-  const [errorMessage, setErrorMessage] = useState("");
-
-  const createMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/bots/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name,
-          symbol,
-          strategy,
-          timeframe,
-          asset_class: assetClass,
-          execution_mode: executionMode,
-          allocated_capital: parseFloat(capital),
-          required_confidence: 75.0,
-          indicators: ["ema_cross", "macd", "rsi", "volume_profile"],
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.status === "error") {
-        throw new Error(data.message || "Failed to create bot instance");
-      }
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-      onClose();
-      resetForm();
-    },
-    onError: (err: any) => {
-      setErrorMessage(err.message);
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<CreateBotInput>({
+    resolver: zodResolver(CreateBotSchema),
+    defaultValues: {
+      name: "Alpha-Momentum-BTC",
+      symbol: "BTC/USDT",
+      timeframe: "5m",
+      strategy_name: "EMA_MACD_VP",
+      trading_mode: "PAPER",
+      allocated_capital: 10000,
+      max_position_size: 1.0,
+      max_daily_loss: 500,
+      stop_loss_pct: 1.5,
+      take_profit_pct: 3.0,
+      allow_shorts: true,
+      confluence_threshold: 75,
     },
   });
 
-  const resetForm = () => {
-    setName("");
-    setSymbol("BTC/USDT");
-    setStrategy("EMA_MACD_VP");
-    setTimeframe("5m");
-    setAssetClass("CRYPTO");
-    setExecutionMode("PAPER");
-    setCapital("10000");
-    setErrorMessage("");
+  const tradingMode = watch("trading_mode") || "PAPER";
+  const isLive = tradingMode === "LIVE";
+
+  const createMutation = useMutation({
+    mutationFn: async (data: CreateBotInput) => {
+      setFormError(null);
+      return await executeCommand(
+        "CREATE_BOT",
+        null,
+        data,
+        queryClient,
+        ["botsList", "botsSummary", "systemStatus"]
+      );
+    },
+    onSuccess: () => {
+      setCreateBotModalOpen(false);
+    },
+    onError: (err: any) => {
+      setFormError(err.message || "Failed to create bot instance");
+    },
+  });
+
+  const onSubmit = (data: CreateBotInput) => {
+    createMutation.mutate(data);
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg bg-[#121824] border border-[#1E293B] rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
-          <div className="flex items-center gap-2 text-cyan-400">
-            <Bot className="h-5 w-5" />
-            <h2 className="text-base font-bold text-white">Create New Bot Instance</h2>
+    <Dialog open={isCreateBotModalOpen} onOpenChange={setCreateBotModalOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bot className="h-5 w-5 text-[var(--theme-accent)]" />
+              <DialogTitle>LAUNCH BOT INSTANCE</DialogTitle>
+            </div>
+            <Badge variant={isLive ? "live" : "paper"} dot>
+              {tradingMode}
+            </Badge>
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 p-1 rounded-lg hover:bg-slate-800"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          <DialogDescription>
+            Configure execution parameters and risk boundaries for autonomous quantitative execution.
+          </DialogDescription>
+        </DialogHeader>
 
-        {errorMessage && (
-          <div className="mb-4 p-3 rounded-lg bg-red-950/50 border border-red-800 text-xs text-red-300">
-            {errorMessage}
+        {formError && (
+          <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-300">
+            <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+            <span>{formError}</span>
           </div>
         )}
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            createMutation.mutate();
-          }}
-          className="space-y-4 text-xs"
-        >
-          <div>
-            <label className="block text-slate-300 font-medium mb-1">Bot Instance Name *</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Alpha BTC Scalper #2"
-              className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 font-sans text-xs">
+          {/* Bot Name & Mode */}
+          <div className="grid grid-cols-2 gap-3 font-mono">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Symbol</label>
-              <select
-                value={symbol}
-                onChange={(e) => setSymbol(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-              >
-                <option value="BTC/USDT">BTC/USDT</option>
-                <option value="ETH/USDT">ETH/USDT</option>
-                <option value="SOL/USDT">SOL/USDT</option>
-                <option value="RELIANCE">RELIANCE (Indian Stocks)</option>
-              </select>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">INSTANCE NAME</label>
+              <input
+                type="text"
+                {...register("name")}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+              />
+              {errors.name && <p className="text-[10px] text-rose-400 mt-1">{errors.name.message}</p>}
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Strategy</label>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">EXECUTION MODE</label>
               <select
-                value={strategy}
-                onChange={(e) => setStrategy(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+                {...register("trading_mode")}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
               >
-                <option value="EMA_MACD_VP">EMA + MACD + Volume Profile</option>
-                <option value="RSI_MEAN_REVERSION">RSI Mean Reversion</option>
-                <option value="TREND_BREAKOUT">Trend Breakout Pro</option>
+                <option value="PAPER">PAPER SANDBOX</option>
+                <option value="LIVE">LIVE MONEY (AUTHORIZED)</option>
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          {/* Symbol & Timeframe */}
+          <div className="grid grid-cols-2 gap-3 font-mono">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Timeframe</label>
-              <select
-                value={timeframe}
-                onChange={(e) => setTimeframe(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
-              >
-                <option value="1m">1m</option>
-                <option value="5m">5m</option>
-                <option value="15m">15m</option>
-                <option value="1h">1h</option>
-              </select>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">SYMBOL</label>
+              <input
+                type="text"
+                {...register("symbol")}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+              />
+              {errors.symbol && <p className="text-[10px] text-rose-400 mt-1">{errors.symbol.message}</p>}
             </div>
 
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Execution Mode</label>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">TIMEFRAME</label>
               <select
-                value={executionMode}
-                onChange={(e) => setExecutionMode(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+                {...register("timeframe")}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
               >
-                <option value="PAPER">PAPER (Simulation)</option>
-                <option value="LIVE">LIVE (Real Funds)</option>
+                <option value="1m">1 Minute (1m)</option>
+                <option value="3m">3 Minutes (3m)</option>
+                <option value="5m">5 Minutes (5m)</option>
+                <option value="15m">15 Minutes (15m)</option>
+                <option value="1h">1 Hour (1h)</option>
+                <option value="4h">4 Hours (4h)</option>
+                <option value="1d">1 Day (1d)</option>
               </select>
             </div>
+          </div>
 
+          {/* Strategy Assignment */}
+          <div className="font-mono">
+            <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">QUANT STRATEGY</label>
+            <select
+              {...register("strategy_name")}
+              className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+            >
+              <option value="EMA_MACD_VP">EMA + MACD + Volume Profile Trend Confluence</option>
+              <option value="RSI_MACD">RSI Multi-Timeframe Mean Reversion</option>
+              <option value="ORDER_FLOW_SCALPER">Order Flow Microstructure Scalper</option>
+              <option value="CONFLUENCE_MASTER">Institutional Multi-Signal Confluence Master</option>
+            </select>
+          </div>
+
+          {/* Capital & Position Limits */}
+          <div className="grid grid-cols-3 gap-2.5 font-mono">
             <div>
-              <label className="block text-slate-300 font-medium mb-1">Allocated Capital ($)</label>
+              <label className="block text-[10px] text-[var(--theme-text-secondary)] mb-1">CAPITAL ($)</label>
               <input
                 type="number"
-                value={capital}
-                onChange={(e) => setCapital(e.target.value)}
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-white focus:border-cyan-500 focus:outline-none"
+                step="any"
+                {...register("allocated_capital", { valueAsNumber: true })}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-[var(--theme-text-secondary)] mb-1">MAX SIZE</label>
+              <input
+                type="number"
+                step="any"
+                {...register("max_position_size", { valueAsNumber: true })}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] text-[var(--theme-text-secondary)] mb-1">MAX LOSS ($)</label>
+              <input
+                type="number"
+                step="any"
+                {...register("max_daily_loss", { valueAsNumber: true })}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)]"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1E293B]">
-            <button
+          {/* Stop Loss & Take Profit */}
+          <div className="grid grid-cols-2 gap-3 font-mono">
+            <div>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">STOP LOSS (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                {...register("stop_loss_pct", { valueAsNumber: true })}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">TAKE PROFIT (%)</label>
+              <input
+                type="number"
+                step="0.1"
+                {...register("take_profit_pct", { valueAsNumber: true })}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)]"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="pt-3">
+            <Button
               type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+              variant="outline"
+              onClick={() => setCreateBotModalOpen(false)}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              variant={isLive ? "destructive" : "default"}
               disabled={createMutation.isPending}
-              className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors"
+              className="font-mono font-bold"
             >
-              {createMutation.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
-              Create Bot Instance
-            </button>
-          </div>
+              {createMutation.isPending ? "INITIALIZING..." : isLive ? "LAUNCH LIVE BOT" : "DEPLOY PAPER BOT"}
+            </Button>
+          </DialogFooter>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -198,7 +198,8 @@ class MarketIntelligenceEngine:
         symbol_direction_map = {}
         for t in active_trades:
             sym = t.get("symbol")
-            side = t.get("direction", "LONG").upper()
+            raw_side = str(t.get("direction", "LONG")).upper()
+            side = "LONG" if raw_side in ["BUY", "LONG"] else ("SHORT" if raw_side in ["SELL", "SHORT"] else "LONG")
             if sym not in symbol_direction_map:
                 symbol_direction_map[sym] = {"LONG": 0, "SHORT": 0, "bots": set()}
             symbol_direction_map[sym][side] += 1
@@ -269,7 +270,8 @@ class MarketIntelligenceEngine:
         bot_scan = self.perform_all_bot_scan()
 
         conf_pct = round(confidence_score * 100.0 if confidence_score <= 1.0 else confidence_score, 1)
-        conf_thresh = config.CONFLUENCE_THRESHOLD * 100.0
+        raw_thresh = getattr(config, "CONFLUENCE_THRESHOLD", 75.0)
+        conf_thresh = raw_thresh if raw_thresh > 1.0 else (raw_thresh * 100.0)
 
         # Stage 1: Market Data Health Check
         if is_stale and market_tick_iso:

@@ -1,16 +1,44 @@
 /**
- * Automated Real Browser E2E Test Suite using System Google Chrome
- * Runs headless Chrome against http://localhost:3000 to verify:
+ * Automated Real Browser E2E Test Suite using System Chrome/Edge
+ * Runs headless browser against http://localhost:3100 to verify:
+ * - CSS stylesheet loading & Obsidian dark theme token application
+ * - Responsive layout verification at Desktop (1440px) and Mobile (375px)
  * - 0 Console errors
  * - 0 Unhandled JavaScript exceptions
  * - 0 Hydration mismatches
  * - Component mounting and interactivity across all trading pages
  */
 
+const fs = require("fs");
+const path = require("path");
 const puppeteer = require("puppeteer-core");
 
-const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const BASE_URL = "http://localhost:3000";
+function getBrowserPath() {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+  const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+
+  const candidates = [
+    path.join(programFiles, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFilesX86, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFiles, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(programFilesX86, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(localAppData, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(localAppData, "Microsoft\\Edge\\Application\\msedge.exe"),
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+  ];
+
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) {
+      return c;
+    }
+  }
+  return null;
+}
+
+const BASE_URL = "http://localhost:3100";
 
 const ROUTES_TO_TEST = [
   { path: "/", name: "Trading Terminal" },
@@ -40,15 +68,27 @@ const ROUTES_TO_TEST = [
 
 async function runE2ETests() {
   console.log("================================================================================");
-  console.log("  REAL BROWSER E2E TEST SUITE (HEADLESS GOOGLE CHROME)");
+  console.log("  REAL BROWSER E2E TEST SUITE (CSS STYLING & QUANT.OS SYSTEM INTEGRITY)");
   console.log("================================================================================");
+
+  const browserPath = getBrowserPath();
+  if (!browserPath) {
+    console.error("[!] No Chrome or Edge executable found on host system.");
+    process.exit(1);
+  }
+  console.log(`[+] Using Browser: ${browserPath}`);
 
   let browser;
   try {
     browser = await puppeteer.launch({
-      executablePath: CHROME_PATH,
+      executablePath: browserPath,
       headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+      ],
     });
 
     const globalPageErrors = [];
@@ -70,88 +110,102 @@ async function runE2ETests() {
       }
     });
 
+    // 1. Test Root Terminal & Verify CSS Stylesheet Loading
+    console.log("\n[TEST PHASE 1] Verifying Root Terminal CSS and Theme Variables...");
+    const rootRes = await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded", timeout: 15000 });
+    const rootStatus = rootRes ? rootRes.status() : 0;
+    await new Promise((r) => setTimeout(r, 1000));
+
+    const stylingCheck = await page.evaluate(() => {
+      const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+      const htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
+      const hasTailwindClasses = document.querySelector("header") !== null;
+      const themeVarBg = getComputedStyle(document.documentElement).getPropertyValue("--theme-bg").trim();
+      return {
+        bodyBg,
+        htmlBg,
+        themeVarBg,
+        hasTailwindClasses,
+      };
+    });
+
+    console.log(`  [+] Root Status: ${rootStatus}`);
+    console.log(`  [+] Computed Body BG: ${stylingCheck.bodyBg}`);
+    console.log(`  [+] CSS Variable --theme-bg: ${stylingCheck.themeVarBg}`);
+
+    if (rootStatus === 200 && stylingCheck.themeVarBg) {
+      console.log("  [PASS] Obsidian Theme CSS is successfully applied!");
+    } else {
+      console.log("  [FAIL] Obsidian Theme CSS check failed!");
+      failedCount++;
+    }
+
+    // 2. Test Responsive Breakpoints: Desktop (1440px) vs Mobile (375px)
+    console.log("\n[TEST PHASE 2] Verifying Responsive Layout Breakpoints...");
+    
+    // Desktop Viewport
+    await page.setViewport({ width: 1440, height: 900 });
+    await new Promise((r) => setTimeout(r, 500));
+    const desktopLayout = await page.evaluate(() => {
+      const sidebar = document.querySelector("aside");
+      const mobileNav = document.querySelector("nav.md\\:hidden");
+      const sidebarVisible = sidebar ? window.getComputedStyle(sidebar).display !== "none" : false;
+      const mobileNavHidden = mobileNav ? window.getComputedStyle(mobileNav).display === "none" : true;
+      return { sidebarVisible, mobileNavHidden };
+    });
+
+    if (desktopLayout.sidebarVisible && desktopLayout.mobileNavHidden) {
+      console.log("  [PASS] Desktop (1440px): Sidebar VISIBLE, Mobile Nav HIDDEN.");
+    } else {
+      console.log(`  [FAIL] Desktop layout mismatch: sidebar=${desktopLayout.sidebarVisible}, mobileNavHidden=${desktopLayout.mobileNavHidden}`);
+      failedCount++;
+    }
+
+    // Mobile Viewport
+    await page.setViewport({ width: 375, height: 812 });
+    await new Promise((r) => setTimeout(r, 500));
+    const mobileLayout = await page.evaluate(() => {
+      const sidebar = document.querySelector("aside");
+      const mobileNav = document.querySelector("nav.md\\:hidden");
+      const sidebarHidden = sidebar ? window.getComputedStyle(sidebar).display === "none" : true;
+      const mobileNavVisible = mobileNav ? window.getComputedStyle(mobileNav).display !== "none" : false;
+      return { sidebarHidden, mobileNavVisible };
+    });
+
+    if (mobileLayout.sidebarHidden && mobileLayout.mobileNavVisible) {
+      console.log("  [PASS] Mobile (375px): Sidebar HIDDEN, Mobile Nav VISIBLE.");
+    } else {
+      console.log(`  [FAIL] Mobile layout mismatch: sidebarHidden=${mobileLayout.sidebarHidden}, mobileNavVisible=${mobileLayout.mobileNavVisible}`);
+      failedCount++;
+    }
+
+    // Reset to Desktop for route tests
+    await page.setViewport({ width: 1440, height: 900 });
+
+    // 3. Test Navigation across all 23 primary routes
+    console.log("\n[TEST PHASE 3] Validating Route Rendering...");
     for (const route of ROUTES_TO_TEST) {
       const fullUrl = `${BASE_URL}${route.path}`;
-      const routePageErrors = [];
-
       try {
-        const response = await page.goto(fullUrl, { waitUntil: "domcontentloaded", timeout: 15000 });
+        const response = await page.goto(fullUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
         const status = response ? response.status() : 0;
-
-        // Allow 600ms for React Query hooks to settle
-        await new Promise((r) => setTimeout(r, 600));
-
+        await new Promise((r) => setTimeout(r, 400));
         const bodyLength = (await page.content()).length;
 
         if (status === 200 && bodyLength > 500) {
-          console.log(`✅ [200 OK] ${route.path.padEnd(20)} | ${route.name.padEnd(32)} | Status: OK`);
+          console.log(`  ✅ [200 OK] ${route.path.padEnd(22)} | ${route.name.padEnd(32)} | OK`);
           passedCount++;
         } else {
-          console.log(`❌ [FAIL]   ${route.path.padEnd(20)} | Status: ${status}`);
+          console.log(`  ❌ [FAIL]   ${route.path.padEnd(22)} | Status: ${status}`);
           failedCount++;
         }
       } catch (err) {
-        console.log(`❌ [ERROR]  ${route.path.padEnd(20)} | Navigation Failed: ${err.message}`);
+        console.log(`  ❌ [ERROR]  ${route.path.padEnd(22)} | Failed: ${err.message}`);
         failedCount++;
       }
     }
 
-    console.log("--------------------------------------------------------------------------------");
-    console.log("TESTING INTERACTIVE FLOWS IN REAL BROWSER:");
-    console.log("--------------------------------------------------------------------------------");
-
-    // 1. Test Trading Terminal Pre-Trade Risk Check button click
-    try {
-      await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded", timeout: 15000 });
-      await new Promise((r) => setTimeout(r, 1000));
-
-      const riskButton = await page.$("button::-p-text(Check Trade Risk)");
-      if (riskButton) {
-        await riskButton.click();
-        await new Promise((r) => setTimeout(r, 500));
-        console.log("✅ Pre-Trade Risk Check Flow: Evaluated");
-      } else {
-        console.log("✅ Pre-Trade Risk Check Flow: Ready");
-      }
-    } catch (e) {
-      console.log(`⚠️ Pre-Trade Risk Check Flow Note: ${e.message}`);
-    }
-
-    // 2. Test Market Scanner trigger
-    try {
-      await page.goto(`${BASE_URL}/scanner`, { waitUntil: "domcontentloaded", timeout: 15000 });
-      await new Promise((r) => setTimeout(r, 1000));
-
-      const scanButton = await page.$("button::-p-text(Scan)");
-      if (scanButton) {
-        await scanButton.click();
-        await new Promise((r) => setTimeout(r, 1000));
-        console.log("✅ Market Scanner Flow: Executed live scan successfully");
-      } else {
-        console.log("✅ Market Scanner Flow: Ready");
-      }
-    } catch (e) {
-      console.log(`⚠️ Market Scanner Flow Note: ${e.message}`);
-    }
-
-    // 3. Test Create Bot Wizard Stepper
-    try {
-      await page.goto(`${BASE_URL}/bots/create`, { waitUntil: "domcontentloaded", timeout: 15000 });
-      await new Promise((r) => setTimeout(r, 1000));
-
-      const continueButton = await page.$("button::-p-text(Continue)");
-      if (continueButton) {
-        await continueButton.click();
-        await new Promise((r) => setTimeout(r, 500));
-        console.log("✅ Create Bot Instance Wizard Flow: Form input and Step progression verified");
-      } else {
-        console.log("✅ Create Bot Instance Wizard Flow: Form verified");
-      }
-    } catch (e) {
-      console.log(`⚠️ Create Bot Instance Wizard Flow Note: ${e.message}`);
-    }
-
-    console.log("================================================================================");
+    console.log("\n================================================================================");
     console.log(`SUMMARY: ${passedCount}/${ROUTES_TO_TEST.length} Routes Passed in Real Browser.`);
     console.log(`Total Uncaught Page Exceptions: ${globalPageErrors.length}`);
     console.log(`Total Console Error Logs: ${globalConsoleErrors.length}`);

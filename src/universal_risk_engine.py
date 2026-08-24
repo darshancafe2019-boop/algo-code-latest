@@ -642,6 +642,61 @@ def set_kill_switch_state(state: str, reason: str = "", triggered_by: str = "USE
 # =============================================================================
 # 8. 20-STAGE TRADE PRE-CHECK & COMPLIANCE ENGINE
 # =============================================================================
+def get_universal_risk_limits() -> Dict[str, Any]:
+    """Returns the central 20-stage risk limit configuration."""
+    return {
+        "max_risk_per_trade_pct": 2.0,
+        "max_daily_loss_pct": 3.0,
+        "max_drawdown_pct": 6.0,
+        "max_leverage": 5.0,
+        "max_spread_pct": 0.5,
+        "min_risk_reward_ratio": 1.50,
+        "require_take_profit": True,
+        "max_tick_age_seconds": 60.0,
+        "max_asset_concentration_pct": 30.0,
+        "max_consecutive_losses": 3,
+        "cooldown_minutes": 15,
+        "min_cash_reserve_pct": 10.0,
+    }
+
+
+def get_kill_switch_status() -> Dict[str, Any]:
+    """Returns the centralized emergency kill switch status."""
+    is_active = config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_KILL_SWITCH", False) or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
+    return {
+        "is_active": is_active,
+        "state": "HALTED" if is_active else "NORMAL",
+        "file_exists": config.KILL_SWITCH_FILE.exists(),
+    }
+
+
+def validate_trade_against_risk_limits(
+    trade_request: Dict[str, Any],
+    account_balance: float = 50000.0,
+    available_balance: Optional[float] = None,
+    portfolio_positions: Optional[List[Dict[str, Any]]] = None,
+    daily_pnl: float = 0.0,
+    peak_equity: Optional[float] = None,
+    consecutive_losses: int = 0,
+    risk_limits: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Convenience adapter for evaluating trade request against 20 pre-trade gates."""
+    acct_state = {
+        "balance": account_balance,
+        "available_capital": available_balance if available_balance is not None else account_balance,
+        "daily_pnl": daily_pnl,
+        "peak_equity": peak_equity if peak_equity is not None else account_balance,
+        "consecutive_losses": consecutive_losses,
+    }
+    limits = risk_limits or get_universal_risk_limits()
+    return evaluate_trade_precheck(
+        trade_request=trade_request,
+        account_state=acct_state,
+        portfolio_positions=portfolio_positions or [],
+        risk_limits=limits,
+    )
+
+
 def evaluate_trade_precheck(
     trade_request: Dict[str, Any],
     account_state: Dict[str, Any],
@@ -868,7 +923,12 @@ def evaluate_trade_precheck(
     else:
         stage_results["18_broker_status"] = "PASSED"
 
-    # Stage 19: Order & Stop-Loss / Take-Profit Integrity
+    # Stage 19: Order & Stop-Loss / Take-Profit & Risk/Reward Integrity
+    min_required_rr = float(risk_limits.get("min_risk_reward_ratio", 1.50))
+    risk_dist = abs(entry - sl) if (entry > 0 and sl > 0) else 0.0
+    reward_dist = abs(tp - entry) if (entry > 0 and tp > 0) else 0.0
+    rr_ratio = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 0.0
+
     if sl <= 0 or sl == entry:
         blocks.append("Stage 19 (SL/TP Validation): Stop loss must be explicitly specified and distinct from entry price.")
         stage_results["19_order_validation"] = "FAILED"
@@ -877,6 +937,18 @@ def evaluate_trade_precheck(
         stage_results["19_order_validation"] = "FAILED"
     elif direction == "SHORT" and sl <= entry:
         blocks.append(f"Stage 19 (SL/TP Validation): Short SL (${sl:,.2f}) must be strictly greater than Entry (${entry:,.2f}).")
+        stage_results["19_order_validation"] = "FAILED"
+    elif tp > 0 and direction == "LONG" and tp <= entry:
+        blocks.append(f"Stage 19 (SL/TP Validation): Long TP (${tp:,.2f}) must be strictly greater than Entry (${entry:,.2f}).")
+        stage_results["19_order_validation"] = "FAILED"
+    elif tp > 0 and direction == "SHORT" and tp >= entry:
+        blocks.append(f"Stage 19 (SL/TP Validation): Short TP (${tp:,.2f}) must be strictly less than Entry (${entry:,.2f}).")
+        stage_results["19_order_validation"] = "FAILED"
+    elif tp > 0 and rr_ratio < min_required_rr:
+        blocks.append(f"Stage 19 (SL/TP Validation): Risk/Reward ratio 1:{rr_ratio:.2f} is below mandatory minimum 1:{min_required_rr:.2f} (SL: ${sl:,.2f}, TP: ${tp:,.2f}).")
+        stage_results["19_order_validation"] = "FAILED"
+    elif tp <= 0 and risk_limits.get("require_take_profit", False):
+        blocks.append(f"Stage 19 (SL/TP Validation): Take profit must be specified. Current TP: ${tp:,.2f} (Risk/Reward 1:0.00 is strictly prohibited).")
         stage_results["19_order_validation"] = "FAILED"
     else:
         stage_results["19_order_validation"] = "PASSED"

@@ -1,7 +1,0 @@
-/Users/ashishparadkar/Downloads/algo-code-main/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
-  warnings.warn(
-2026-08-20 12:54:27,843 - INFO - Bot state startup reconciliation finished: 0 bot(s) reconciled to STOPPED.
-2026-08-20 12:54:27,875 - INFO - Telegram notification service initialized successfully (Chat ID: 5657...)
-2026-08-20 12:54:27,881 - INFO - Initializing scheduled trading bot live runner for bot-1787210665850-d6f7...
-2026-08-20 12:54:27,919 - INFO - SQLite database tables verified/created.
-2026-08-20 12:54:27,955 - INFO - Initializing CCXT Binance in TESTNET mode.

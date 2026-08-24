@@ -18,7 +18,7 @@ import json
 import urllib.request
 import urllib.error
 
-BASE_URL = "http://localhost:3000"
+BASE_URL = "http://localhost:3100"
 
 def test_endpoint(name, url, method="GET", data=None):
     print(f"[*] Testing {name}: {method} {url}")

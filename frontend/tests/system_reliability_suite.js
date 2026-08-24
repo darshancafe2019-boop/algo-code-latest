@@ -11,7 +11,7 @@ const path = require("path");
 const fs = require("fs");
 
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:3100";
 const ARTIFACTS_DIR = "/Users/ashishparadkar/.gemini/antigravity-ide/brain/aad7af73-cb2a-4d73-b0d5-ffdefb01de48";
 
 function checkEndpoint(endpoint) {

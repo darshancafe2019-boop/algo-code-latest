@@ -9,6 +9,9 @@ import { BottomActivityDock } from "./BottomActivityDock";
 import { GlobalSearchModal } from "@/components/common/GlobalSearchModal";
 import { AppearanceDrawer } from "@/components/settings/AppearanceDrawer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MobileCommandSheet } from "./MobileCommandSheet";
+import { QuickOrderModal } from "@/components/order-execution/QuickOrderModal";
+import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
 
 interface CommandCenterShellProps {
   children: React.ReactNode;
@@ -122,6 +125,11 @@ export function CommandCenterShell({
 
       {/* 5. CUSTOM APPEARANCE & THEME EDITOR DRAWER */}
       <AppearanceDrawer />
+
+      {/* 6. MOBILE COMMAND DOCK & QUICK MODALS */}
+      <MobileCommandSheet />
+      <QuickOrderModal />
+      <CreateBotModal />
     </div>
   );
 }

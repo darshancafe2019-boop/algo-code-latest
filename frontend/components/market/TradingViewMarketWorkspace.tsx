@@ -24,6 +24,7 @@ import { MultiTimeframeSignalMatrix } from "@/components/terminal/MultiTimeframe
 import { QuickTradePanel } from "@/components/terminal/QuickTradePanel";
 import { MarketHealthTelemetry } from "./MarketHealthTelemetry";
 import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric } from "@/lib/formatters";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
 
 export function TradingViewMarketWorkspace() {
   const { activeSymbol, setActiveSymbol, activeTimeframe, setActiveTimeframe } = useActiveBot();
@@ -139,8 +140,8 @@ export function TradingViewMarketWorkspace() {
             ))}
           </div>
 
-          {/* Symbol Dropdown */}
-          <div className="relative">
+          {/* Symbol Dropdown & Watchlist Star */}
+          <div className="relative flex items-center gap-1.5">
             <select
               value={activeSymbol}
               onChange={(e) => setActiveSymbol(e.target.value)}
@@ -152,6 +153,7 @@ export function TradingViewMarketWorkspace() {
                 </option>
               ))}
             </select>
+            <WatchlistStarButton instrument={activeSymbol} size="sm" />
           </div>
 
           {/* Dynamic Expiry Selector if available */}

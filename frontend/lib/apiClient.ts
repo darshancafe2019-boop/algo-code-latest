@@ -4,11 +4,12 @@
  * Capabilities:
  * 1. Single in-flight request deduplication for identical concurrent GET requests.
  * 2. Exponential backoff with random jitter for idempotent GET requests.
- * 3. Circuit breaker protecting backend against request storms during restarts/outages.
- * 4. Tab visibility awareness (pauses/slows requests when document is hidden).
- * 5. Safe content-type detection & JSON parsing preventing unhandled syntax exceptions.
- * 6. Server/Client environment isolation: uses relative paths on browser, BACKEND_INTERNAL_URL on server.
- * 7. Standardized ApiResponse envelope with request correlation IDs and audit timestamps.
+ * 3. Global & per-endpoint circuit breaker protecting backend against request storms.
+ * 4. Automatic dispatch of 'quantos:offline' and 'quantos:online' lifecycle events.
+ * 5. Tab visibility awareness (pauses/slows requests when document is hidden).
+ * 6. Safe content-type detection & JSON parsing preventing unhandled syntax exceptions.
+ * 7. Server/Client environment isolation: uses relative paths on browser, BACKEND_INTERNAL_URL on server.
+ * 8. Standardized ApiResponse envelope with request correlation IDs and audit timestamps.
  */
 
 export interface ApiError {
@@ -49,8 +50,10 @@ interface CircuitState {
 class ResilientApiClient {
   private inFlightRequests: Map<string, Promise<ApiResponse<any>>> = new Map();
   private circuitBreakers: Map<string, CircuitState> = new Map();
-  private maxConsecutiveFailures = 4;
-  private circuitCooldownMs = 6000; // 6s cooldown before half-open probe
+  private maxConsecutiveFailures = 3;
+  private circuitCooldownMs = 8000; // 8s cooldown before probe
+  private isBackendOffline = false;
+  private consecutiveGlobalFailures = 0;
 
   /**
    * Generates a unique correlation request ID
@@ -122,9 +125,9 @@ class ResilientApiClient {
   }
 
   /**
-   * Record circuit success or failure
+   * Record circuit success or failure and notify window event bus
    */
-  private recordCircuitResult(endpointKey: string, success: boolean) {
+  private recordCircuitResult(endpointKey: string, success: boolean, statusCode?: number) {
     let state = this.circuitBreakers.get(endpointKey);
     if (!state) {
       state = {
@@ -141,12 +144,25 @@ class ResilientApiClient {
     if (success) {
       state.failures = 0;
       state.state = "CLOSED";
+      this.consecutiveGlobalFailures = 0;
+
+      if (this.isBackendOffline && typeof window !== "undefined") {
+        this.isBackendOffline = false;
+        window.dispatchEvent(new CustomEvent("quantos:online"));
+      }
     } else {
       state.failures += 1;
       state.lastFailureTime = now;
+      this.consecutiveGlobalFailures += 1;
+
       if (state.failures >= this.maxConsecutiveFailures || state.state === "HALF_OPEN") {
         state.state = "OPEN";
         state.nextAttemptTime = now + this.circuitCooldownMs;
+      }
+
+      if (this.consecutiveGlobalFailures >= 3 && !this.isBackendOffline && typeof window !== "undefined") {
+        this.isBackendOffline = true;
+        window.dispatchEvent(new CustomEvent("quantos:offline", { detail: { statusCode } }));
       }
     }
   }
@@ -184,7 +200,7 @@ class ResilientApiClient {
         ...options,
         headers: {
           ...headers,
-          ...(options.headers as Record<string, string> || {}),
+          ...((options.headers as Record<string, string>) || {}),
         },
         signal: options.signal || controller.signal,
       });
@@ -282,6 +298,7 @@ class ResilientApiClient {
           message: isAbort ? `Request timed out after ${timeoutMs}ms` : err.message || "Network connection failed",
           details: err,
           retryable: true,
+          statusCode: isAbort ? 504 : 503,
         },
         requestId,
         timestamp: new Date().toISOString(),
@@ -302,7 +319,7 @@ class ResilientApiClient {
     const endpointKey = `${method}:${path.split("?")[0]}`;
     const isIdempotent = method === "GET" || method === "HEAD";
     const shouldDeduplicate = options.deduplicate !== false && isIdempotent;
-    const maxRetries = isIdempotent ? (options.retries !== undefined ? options.retries : 2) : 0;
+    const maxRetries = isIdempotent ? (options.retries !== undefined ? options.retries : 1) : 0;
     const requestId = this.generateRequestId();
 
     // Check circuit breaker for idempotent reads
@@ -316,6 +333,7 @@ class ResilientApiClient {
             code: "CIRCUIT_BREAKER_OPEN",
             message: circuit.reason || "Circuit breaker open: backend is temporarily unavailable",
             retryable: true,
+            statusCode: 503,
           },
           requestId,
           timestamp: new Date().toISOString(),
@@ -347,13 +365,13 @@ class ResilientApiClient {
 
         lastResult = result;
 
-        // Only retry if error is retryable and we have remaining attempts
-        if (result.error?.retryable && attempt < maxRetries) {
+        // Only retry if error is retryable, backend isn't globally offline, and we have remaining attempts
+        if (result.error?.retryable && attempt < maxRetries && !this.isBackendOffline) {
           attempt++;
-          // Exponential backoff with random jitter (e.g. 300ms, 600ms, 1200ms)
+          // Exponential backoff with random jitter (e.g. 300ms, 600ms)
           const baseDelay = 300 * Math.pow(2, attempt - 1);
           const jitter = Math.floor(Math.random() * 150);
-          const delay = Math.min(3000, baseDelay + jitter);
+          const delay = Math.min(2500, baseDelay + jitter);
           await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
@@ -361,7 +379,7 @@ class ResilientApiClient {
         break;
       }
 
-      this.recordCircuitResult(endpointKey, false);
+      this.recordCircuitResult(endpointKey, false, lastResult?.error?.statusCode);
       return lastResult!;
     })();
 

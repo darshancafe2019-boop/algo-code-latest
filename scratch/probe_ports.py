@@ -1,7 +1,7 @@
 import urllib.request
 import sys
 
-ports = [3000, 3001, 5000, 5001]
+ports = [3100, 5050, 5051]
 paths = ["/", "/api/health", "/api/logs", "/api/audit/events", "/api/diagnostics/state"]
 
 for p in ports:

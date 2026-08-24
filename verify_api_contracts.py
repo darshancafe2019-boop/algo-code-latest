@@ -31,12 +31,12 @@ def test_api_contracts():
     ]
 
     print("=" * 80)
-    print("  VERIFYING FRONTEND -> BACKEND PROXIED API CONTRACTS (PORT 3000)")
+    print("  VERIFYING FRONTEND -> BACKEND PROXIED API CONTRACTS (PORT 3100)")
     print("=" * 80)
 
     all_passed = True
     for path, expected_type, required_keys in endpoints:
-        url = f"http://127.0.0.1:3000{path}"
+        url = f"http://127.0.0.1:3100{path}"
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "ContractTester/1.0"})
             with urllib.request.urlopen(req, timeout=5) as resp:

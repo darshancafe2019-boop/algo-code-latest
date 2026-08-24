@@ -10,7 +10,7 @@ import io
 import csv
 
 CDP_PORT = 9222
-FRONTEND_URL = "http://localhost:3001"
+FRONTEND_URL = "http://localhost:3100"
 USER_DATA_DIR = r"h:\algo\algo\btc-bot\.chrome_dev_audit"
 
 class CDPClient:
@@ -124,7 +124,7 @@ async def run_audit():
     try:
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read().decode("utf-8"))
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Target: {main_page['title']} ({main_page['url']})")
 
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])

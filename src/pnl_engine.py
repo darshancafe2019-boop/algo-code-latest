@@ -149,7 +149,8 @@ def compute_unrealized_pnl(
     entry_price: float,
     live_price: float,
     quantity: float,
-    estimated_fees: float = 0.0
+    estimated_fees: float = 0.0,
+    fees: float = 0.0,
 ) -> Dict[str, Any]:
     """
     Computes real-time mark-to-market unrealized P&L for open positions.
@@ -158,12 +159,14 @@ def compute_unrealized_pnl(
     qty = abs(float(quantity or 0.0))
     entry_p = float(entry_price or 0.0)
     live_p = float(live_price or 0.0)
+    fee_total = float(fees or estimated_fees or 0.0)
 
     if qty <= 0 or entry_p <= 0 or live_p <= 0:
         return {
+            "unrealized_pnl": 0.0,
             "unrealized_gross_pnl": 0.0,
             "unrealized_net_pnl": 0.0,
-            "unrealized_pnl_pct": 0.0
+            "unrealized_pnl_pct": 0.0,
         }
 
     if is_long:
@@ -171,12 +174,13 @@ def compute_unrealized_pnl(
     else:
         gross_upnl = (entry_p - live_p) * qty
 
-    net_upnl = gross_upnl - float(estimated_fees)
+    net_upnl = gross_upnl - fee_total
     notional = entry_p * qty
     upnl_pct = (net_upnl / notional * 100.0) if notional > 0 else 0.0
 
     return {
+        "unrealized_pnl": round(net_upnl, 2),
         "unrealized_gross_pnl": round(gross_upnl, 2),
         "unrealized_net_pnl": round(net_upnl, 2),
-        "unrealized_pnl_pct": round(upnl_pct, 2)
+        "unrealized_pnl_pct": round(upnl_pct, 2),
     }

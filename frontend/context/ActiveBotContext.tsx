@@ -77,8 +77,8 @@ export function ActiveBotProvider({ children }: { children: React.ReactNode }) {
       const list = json.bots || json.data || (Array.isArray(json) ? json : []);
       return (Array.isArray(list) ? list : []) as BotInstance[];
     },
-    staleTime: 4000,
-    refetchInterval: 6000,
+    staleTime: 6000,
+    refetchInterval: 10000,
     placeholderData: (prev) => prev, // Never replace valid data with empty/zero on transient network error
   });
 

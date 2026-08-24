@@ -13,10 +13,65 @@ from src.audit import log_audit_event, log_notification
 
 logger = logging.getLogger("ProcessManager")
 
-def kill_process_by_pid(pid: int):
-    """Safely terminate a process by PID."""
-    if not pid or pid <= 0:
+def _is_protected_pid(pid: int) -> bool:
+    """Returns True if the PID belongs to the supervisor, backend, gateway, frontend, self or parent."""
+    if not pid or pid <= 0 or pid == os.getpid():
+        return True
+    try:
+        if hasattr(os, "getppid") and pid == os.getppid():
+            return True
+    except Exception:
+        pass
+
+    # Check runtime state file
+    state_file = config.BASE_DIR / "quantos_runtime_state.json"
+    if state_file.exists():
+        try:
+            import json
+            data = json.loads(state_file.read_text(encoding="utf-8"))
+            if pid == data.get("supervisor_pid"):
+                return True
+            if pid in data.get("protected_pids", []):
+                return True
+            for svc_pid in data.get("services", {}).values():
+                if pid == svc_pid:
+                    return True
+        except Exception:
+            pass
+    return False
+
+
+def _is_live_runner_process(pid: int, bot_id: Optional[str] = None) -> bool:
+    """Verifies that the target PID is actually a python live_runner bot process."""
+    if pid <= 0:
+        return False
+    if sys.platform == "win32":
+        try:
+            wmic_out = subprocess.check_output(
+                ["wmic", "process", "where", f"processid={pid}", "get", "commandline,name", "/format:csv"],
+                text=True,
+                stderr=subprocess.DEVNULL
+            ).lower()
+            if "live_runner.py" not in wmic_out:
+                return False
+            if bot_id and bot_id.lower() not in wmic_out:
+                return False
+            return True
+        except Exception:
+            return False
+    return True
+
+
+def kill_process_by_pid(pid: int, bot_id: Optional[str] = None):
+    """Safely terminate ONLY verified live_runner bot worker processes by PID."""
+    if _is_protected_pid(pid):
+        logger.warning(f"[SAFETY] Refusing to kill protected system process (PID: {pid}).")
         return
+
+    if not _is_live_runner_process(pid, bot_id):
+        logger.warning(f"[SAFETY] PID {pid} is not a verified live_runner bot process. Skipping kill.")
+        return
+
     try:
         if os.name == 'nt':
             import ctypes
@@ -28,20 +83,25 @@ def kill_process_by_pid(pid: int):
         else:
             import signal
             os.kill(pid, signal.SIGKILL)
+        logger.info(f"Terminated bot worker process (PID: {pid}).")
     except Exception as e:
-        logger.warning(f"Could not kill process {pid}: {e}")
+        logger.warning(f"Could not kill bot process {pid}: {e}")
+
 
 def get_bot_pid_file(bot_id: str) -> Path:
     data_dir = config.BASE_DIR / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     return data_dir / f"bot_{bot_id}.pid"
 
+
 def cleanup_orphan_bot_process(bot_id: str):
     pid_file = get_bot_pid_file(bot_id)
     if pid_file.exists():
         try:
-            pid = int(pid_file.read_text().strip())
-            kill_process_by_pid(pid)
+            content = pid_file.read_text().strip()
+            if content.isdigit():
+                pid = int(content)
+                kill_process_by_pid(pid, bot_id=bot_id)
         except Exception as e:
             logger.warning(f"Error cleaning up orphan process for bot {bot_id}: {e}")
         finally:
@@ -183,12 +243,17 @@ class BotProcessManager:
             bot_log_file = log_dir / f"bot_{self.bot_id}.log"
             self.log_file_handle = open(bot_log_file, "ab", buffering=0)
 
-            # Spawn process with --bot_id and unbuffered output redirected to log file
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
+
+            # Spawn process with --bot_id and unbuffered output redirected to log file in an isolated process group
             self.process = subprocess.Popen(
                 [python_executable, "-u", str(runner_path), "--bot_id", self.bot_id],
                 cwd=str(config.BASE_DIR),
                 stdout=self.log_file_handle,
-                stderr=self.log_file_handle
+                stderr=self.log_file_handle,
+                creationflags=creation_flags
             )
 
             now_utc = datetime.now(timezone.utc)

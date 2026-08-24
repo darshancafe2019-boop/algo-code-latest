@@ -92,7 +92,7 @@ async def run_audit():
         "--no-sandbox",
         "--disable-extensions",
         f"--user-data-dir={USER_DATA_DIR}",
-        "http://localhost:3001"
+        "http://localhost:3100"
     ]
     proc = subprocess.Popen(chrome_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print(f"[+] Launched Headless Chrome (PID: {proc.pid}) on CDP Port {CDP_PORT}")
@@ -103,7 +103,7 @@ async def run_audit():
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read())
         
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Page Target: {main_page['title']} ({main_page['url']})")
         
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])
@@ -152,7 +152,7 @@ async def run_audit():
 
         # Step 5: Compare Backend Data vs Browser Data
         print("\n--- STEP 3: DATA CONSISTENCY PROOF (BACKEND vs BROWSER) ---")
-        with urllib.request.urlopen("http://localhost:3001/api/risk/overview") as r:
+        with urllib.request.urlopen("http://localhost:3100/api/risk/overview") as r:
             backend_ov = json.loads(r.read())["overview"]
 
         checks = [
@@ -215,7 +215,7 @@ async def run_audit():
             print("    [+] Activated New Profile successfully.")
 
             # Restore original default profile (conservative)
-            urllib.request.urlopen(urllib.request.Request("http://localhost:3001/api/risk/profiles/default", data=json.dumps({"profile_id": "conservative"}).encode(), headers={"Content-Type": "application/json"}))
+            urllib.request.urlopen(urllib.request.Request("http://localhost:3100/api/risk/profiles/default", data=json.dumps({"profile_id": "conservative"}).encode(), headers={"Content-Type": "application/json"}))
             print("    [+] Restored Original Default Profile (conservative).")
 
         # Step 7: Test Sub-Tab 3: Rules & Safety Gates + Toggle Mutation
@@ -261,7 +261,7 @@ async def run_audit():
             print("    [+] Rule Toggled Successfully.")
 
             # Restore original rule state
-            urllib.request.urlopen(urllib.request.Request("http://localhost:3001/api/risk/rules/rule_drawdown_lock/toggle", data=json.dumps({"enabled": True}).encode(), headers={"Content-Type": "application/json"}))
+            urllib.request.urlopen(urllib.request.Request("http://localhost:3100/api/risk/rules/rule_drawdown_lock/toggle", data=json.dumps({"enabled": True}).encode(), headers={"Content-Type": "application/json"}))
             print("    [+] Restored Original Rule State (rule_drawdown_lock -> ENABLED).")
 
 

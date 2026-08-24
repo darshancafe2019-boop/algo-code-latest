@@ -9,7 +9,7 @@ const path = require("path");
 const fs = require("fs");
 
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const BASE_URL = "http://localhost:3000";
+const BASE_URL = "http://localhost:3100";
 const ARTIFACTS_DIR = path.resolve(__dirname, "../../.artifacts/final-verification");
 
 fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
@@ -197,16 +197,6 @@ async function runFinalAudit() {
       const multiTimeframeMatches = (text.match(/Multi-Timeframe Regime Heatmap/gi) || []).length;
       const oldTimeframeMatrixMatches = (text.match(/Multi-Timeframe Regime Matrix/gi) || []).length;
 
-      const confluenceScorecardMatches = (text.match(/Confluence Scorecard/gi) || []).length;
-      const oldConfluenceBreakdownMatches = (text.match(/Confluence Factor Scorecard/gi) || []).length;
-
-      const macroTrendPillar = text.includes("Macro Trend Bias");
-      const emaRibbonPillar = text.includes("EMA Ribbon Structure");
-      const rsiPillar = text.includes("RSI Momentum Zone");
-      const volumePillar = text.includes("Volume Confirmation");
-      const htfPillar = text.includes("Higher-Timeframe Alignment");
-      const atrPillar = text.includes("Volatility / ATR Buffer");
-
       const emptyContainers = Array.from(document.querySelectorAll("div")).filter(
         (el) => el.children.length === 0 && el.innerText.trim() === "" && el.className.includes("grid")
       ).length;
@@ -214,9 +204,6 @@ async function runFinalAudit() {
       return {
         canonicalTimeframeHeatmapCount: multiTimeframeMatches,
         duplicateTimeframeMatrixCount: oldTimeframeMatrixMatches,
-        canonicalConfluenceScorecardCount: confluenceScorecardMatches,
-        duplicateConfluenceScorecardCount: oldConfluenceBreakdownMatches,
-        allPillarsPresent: macroTrendPillar && emaRibbonPillar && rsiPillar && volumePillar && htfPillar && atrPillar,
         emptyContainersCount: emptyContainers,
       };
     });

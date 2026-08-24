@@ -37,6 +37,8 @@ import {
   Brain,
 } from "lucide-react";
 
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
+
 interface GlobalSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -56,7 +58,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
   const router = useRouter();
   const queryClient = useQueryClient();
   const { activeBot, setActiveSymbol } = useActiveBot();
-  const { setTheme, applyDraft, openAppearanceDrawer } = useTheme();
+  const { openAppearanceDrawer } = useTheme();
 
   const [query, setQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
@@ -293,7 +295,87 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         },
       },
 
-      // 3. Bot Actions
+      // 3. Bot & System Execution Commands (Urgent Access)
+      {
+        id: "cmd-quick-order-buy",
+        category: "TOOL",
+        title: "⚡ Quick Order: BUY / LONG",
+        subtitle: "Open validated pre-trade order router for BUY orders",
+        icon: TrendingUp,
+        action: () => {
+          const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+          setQuickOrderSide("BUY");
+          setOrderPlacementModalOpen(true);
+          onClose();
+        },
+      },
+      {
+        id: "cmd-quick-order-sell",
+        category: "TOOL",
+        title: "⚡ Quick Order: SELL / SHORT",
+        subtitle: "Open validated pre-trade order router for SELL orders",
+        icon: TrendingUp,
+        action: () => {
+          const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+          setQuickOrderSide("SELL");
+          setOrderPlacementModalOpen(true);
+          onClose();
+        },
+      },
+      {
+        id: "cmd-launch-bot",
+        category: "BOT",
+        title: "🤖 Launch New Bot Instance",
+        subtitle: "Deploy a new automated quantitative bot with risk controls",
+        icon: PlusCircle,
+        action: () => {
+          const { setCreateBotModalOpen } = require("@/lib/store/useUIStore").useUIStore.getState();
+          setCreateBotModalOpen(true);
+          onClose();
+        },
+      },
+      {
+        id: "cmd-start-all-bots",
+        category: "BOT",
+        title: "▶ Start All Bot Instances",
+        subtitle: "Safely start all eligible bot workers in parallel",
+        icon: Play,
+        action: async () => {
+          const { apiClient } = require("@/lib/apiClient");
+          await apiClient.post("/api/bots/start-all", {});
+          queryClient.invalidateQueries({ queryKey: ["botsList"] });
+          queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+          onClose();
+        },
+      },
+      {
+        id: "cmd-pause-all-bots",
+        category: "BOT",
+        title: "⏸ Pause All Active Bots",
+        subtitle: "Pause evaluation cycles for all running bots",
+        icon: Square,
+        action: async () => {
+          const { apiClient } = require("@/lib/apiClient");
+          await apiClient.post("/api/bots/pause-all", {});
+          queryClient.invalidateQueries({ queryKey: ["botsList"] });
+          queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+          onClose();
+        },
+      },
+      {
+        id: "cmd-resume-all-bots",
+        category: "BOT",
+        title: "▶ Resume All Paused Bots",
+        subtitle: "Resume execution for all paused bot instances",
+        icon: Play,
+        action: async () => {
+          const { apiClient } = require("@/lib/apiClient");
+          await apiClient.post("/api/bots/resume-all", {});
+          queryClient.invalidateQueries({ queryKey: ["botsList"] });
+          queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+          onClose();
+        },
+      },
       {
         id: "bot-start",
         category: "BOT",
@@ -321,12 +403,12 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         },
       },
 
-      // 4. Tools
+      // 4. Tools & Emergency
       {
         id: "tool-kill-switch",
         category: "TOOL",
-        title: "⛔ Emergency Kill Switch",
-        subtitle: "Halt all active bots and lock order execution immediately",
+        title: "🛑 EMERGENCY KILL SWITCH (HALT ALL)",
+        subtitle: "Immediately halt all active bots and lock order execution",
         icon: ShieldAlert,
         action: async () => {
           if (confirm("Are you sure you want to activate the EMERGENCY KILL SWITCH?")) {
@@ -358,31 +440,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         },
       },
 
-      // 5. AI Theme Switching
-      {
-        id: "theme-jarvis",
-        category: "THEME",
-        title: "⚡ Switch to JARVIS CORE",
-        subtitle: "Analytical, calm, deep blue/cyan AI trading matrix",
-        icon: Sparkles,
-        action: async () => {
-          setTheme("jarvis-core");
-          setTimeout(() => applyDraft(), 50);
-          onClose();
-        },
-      },
-      {
-        id: "theme-ultron",
-        category: "THEME",
-        title: "🔥 Switch to ULTRON CORE",
-        subtitle: "Tactical, high-contrast, graphite/crimson execution engine",
-        icon: Zap,
-        action: async () => {
-          setTheme("ultron-core");
-          setTimeout(() => applyDraft(), 50);
-          onClose();
-        },
-      },
+      // 5. Theme Settings
       {
         id: "theme-appearance",
         category: "THEME",
@@ -395,7 +453,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         },
       },
     ],
-    [activeBot, applyDraft, onClose, onNavigateTab, openAppearanceDrawer, queryClient, router, setActiveSymbol, setTheme]
+    [activeBot, onClose, onNavigateTab, openAppearanceDrawer, queryClient, router, setActiveSymbol]
   );
 
   const filteredItems = useMemo(() => {
@@ -525,7 +583,14 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-mono text-[var(--theme-accent)] font-bold">↵ Select</span>
+                  <div className="flex items-center gap-2">
+                    {item.category === "SYMBOL" && (
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <WatchlistStarButton instrument={item.title} size="sm" />
+                      </div>
+                    )}
+                    <span className="text-[10px] font-mono text-[var(--theme-accent)] font-bold">↵ Select</span>
+                  </div>
                 </div>
               );
             })

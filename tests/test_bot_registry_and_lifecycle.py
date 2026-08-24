@@ -83,8 +83,9 @@ class TestBotRegistryAndLifecycle(unittest.TestCase):
 
     def test_02_bot_creation_api(self):
         """Verify /api/bots/create endpoint creates bot instance in PAPER mode."""
+        unique_name = f"Test Registry Bot {int(time.time()*1000)}"
         res = self.client.post("/api/bots/create", json={
-            "name": "Test Registry Bot",
+            "name": unique_name,
             "symbol": "ETH/USDT",
             "strategy": "RSI_MEAN_REVERSION",
             "timeframe": "15m",
@@ -102,7 +103,7 @@ class TestBotRegistryAndLifecycle(unittest.TestCase):
         bots = db.safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
         self.assertEqual(len(bots), 1)
         b = dict(bots[0])
-        self.assertEqual(b["name"], "Test Registry Bot")
+        self.assertEqual(b["name"], unique_name)
         self.assertEqual(b["symbol"], "ETH/USDT")
         self.assertEqual(b["status"], "CREATED")
         self.assertEqual(b["execution_mode"], "PAPER")
@@ -169,14 +170,16 @@ class TestBotRegistryAndLifecycle(unittest.TestCase):
 
     def test_05_start_all_bots_validation_loop(self):
         """Verify POST /api/bots/start-all validates all bot instances and returns detailed report."""
-        res = self.client.post("/api/bots/start-all")
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertEqual(data["status"], "success")
-        self.assertIn("started_count", data)
-        self.assertIn("skipped_count", data)
-        self.assertIn("started", data)
-        self.assertIn("skipped", data)
+        from unittest.mock import patch
+        with patch("src.process_manager.BotProcessManager.start_bot", return_value={"status": "success", "pid": 99999}):
+            res = self.client.post("/api/bots/start-all")
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertEqual(data["status"], "success")
+            self.assertIn("started_count", data)
+            self.assertIn("skipped_count", data)
+            self.assertIn("started", data)
+            self.assertIn("skipped", data)
 
 
 if __name__ == "__main__":

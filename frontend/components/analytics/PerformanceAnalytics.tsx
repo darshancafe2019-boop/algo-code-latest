@@ -2,8 +2,8 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { TrendingUp, RefreshCw } from "lucide-react";
 import { PortfolioKPIs, QuantitativeMetrics } from "@/types/pnl-analytics";
+import { apiClient } from "@/lib/apiClient";
 
 import { LivePnLCommandHeader } from "./LivePnLCommandHeader";
 import { PortfolioSummaryKPIStrip } from "./PortfolioSummaryKPIStrip";
@@ -17,151 +17,134 @@ import { OpenPositionsVsClosedTradesReconciliation } from "./OpenPositionsVsClos
 import { AuditableTradeLedgerTable } from "./AuditableTradeLedgerTable";
 import { AnalyticsError } from "./AnalyticsError";
 
+import { useGlobalData } from "@/context/GlobalDataContext";
+
 export function PerformanceAnalytics() {
   const queryClient = useQueryClient();
+  const { portfolioSnapshot, positions, riskSummary, tradingMode, refreshAll } = useGlobalData();
 
   const [timeframe, setTimeframe] = useState<string>("ALL");
   const [botFilter, setBotFilter] = useState<string>("ALL");
   const [strategyFilter, setStrategyFilter] = useState<string>("ALL");
 
   // 1. Fetch Analytics & P&L Data
-  const { data, isLoading, error, refetch, isFetching } = useQuery({
+  const { data, error, refetch, isFetching } = useQuery({
     queryKey: ["analyticsData", timeframe, botFilter, strategyFilter],
     queryFn: async () => {
       const url = `/api/analytics?bot_id=${botFilter}&strategy=${strategyFilter}&timeframe=${timeframe}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to load analytics payload");
-      return res.json();
+      const res = await apiClient.get<any>(url, { timeoutMs: 6000 });
+      if (!res.ok) {
+        return {};
+      }
+      return res.data;
     },
-    staleTime: 3000,
-    refetchInterval: 5000,
+    staleTime: 5000,
+    refetchInterval: 8000,
+    placeholderData: (prev) => prev,
   });
 
-  // 2. Fetch Account Summary (Balance / Equity / Margin)
-  const { data: accountData } = useQuery({
-    queryKey: ["accountSummary"],
-    queryFn: async () => {
-      const res = await fetch("/api/account/summary");
-      if (!res.ok) return null;
-      return res.json();
-    },
-    staleTime: 3000,
-  });
-
-  // 3. Fetch Positions
-  const { data: positionsData } = useQuery({
-    queryKey: ["terminalPositions"],
-    queryFn: async () => {
-      const res = await fetch("/api/positions");
-      if (!res.ok) return { positions: [] };
-      return res.json();
-    },
-    staleTime: 3000,
-  });
-
-  // 4. Fetch Trades
+  // 2. Fetch Trades
   const { data: tradesData } = useQuery({
     queryKey: ["tradesList"],
     queryFn: async () => {
-      const res = await fetch("/api/trades?limit=50");
+      const res = await apiClient.get<any>("/api/trades?limit=50", { timeoutMs: 5000 });
       if (!res.ok) return { trades: [] };
-      return res.json();
+      return res.data;
     },
-    staleTime: 3000,
+    staleTime: 5000,
+    refetchInterval: 8000,
+    placeholderData: (prev) => prev,
   });
 
   // Reconcile Account Mutation
   const reconcileMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "RECONCILE_ACCOUNT",
-          bot_id: "bot-1",
-        }),
+      const res = await apiClient.post("/api/command", {
+        action: "RECONCILE_ACCOUNT",
+        bot_id: "bot-1",
       });
-      return res.json();
+      return res.data;
     },
     onSuccess: () => {
-      refetch();
-      queryClient.invalidateQueries({ queryKey: ["accountSummary"] });
-      queryClient.invalidateQueries({ queryKey: ["terminalPositions"] });
+      refreshAll();
       queryClient.invalidateQueries({ queryKey: ["tradesList"] });
     },
   });
 
   // Derive Canonical Portfolio KPIs
-  const totalEquity = accountData?.total_equity || accountData?.balance || 10450.25;
-  const startingEquity = 10000.0;
-  const netPnL = totalEquity - startingEquity;
-  const todayPnL = data?.trade_summary?.net_pnl ?? (netPnL * 0.4);
-  const realizedPnL = data?.trade_summary?.realized_pnl ?? netPnL;
-  const unrealizedPnL = positionsData?.positions?.reduce((acc: number, p: any) => acc + (p.unrealized_pnl || 0), 0) ?? 0;
-  const totalFees = data?.trade_summary?.fees ?? 34.50;
+  const totalEquity = portfolioSnapshot?.equity ?? 50000.0;
+  const startingEquity = portfolioSnapshot?.startingBalance ?? 50000.0;
+  const netPnL = portfolioSnapshot?.netPnl ?? (totalEquity - startingEquity);
+  const todayPnL = portfolioSnapshot?.dailyPnl ?? 0.0;
+  const realizedPnL = portfolioSnapshot?.netRealizedPnl ?? 0.0;
+  const unrealizedPnL = portfolioSnapshot?.unrealizedPnl ?? 0.0;
+  const totalFees = portfolioSnapshot?.fees ?? 0.0;
+  const availableBalance = portfolioSnapshot?.availableCapital ?? (totalEquity - (portfolioSnapshot?.marginUsed ?? 0.0));
+  const usedMargin = portfolioSnapshot?.marginUsed ?? 0.0;
+  const marginUtilPct = totalEquity > 0 ? (usedMargin / totalEquity) * 100.0 : 0.0;
 
   const kpis: PortfolioKPIs = {
     total_equity: totalEquity,
     starting_equity: startingEquity,
-    available_balance: accountData?.available_balance || 8450.25,
-    used_capital: accountData?.used_margin || 2000.0,
-    available_margin: accountData?.available_margin || 8450.25,
-    required_margin: accountData?.required_margin || 2000.0,
-    margin_utilization_pct: accountData?.margin_utilization_pct || 19.1,
+    available_balance: availableBalance,
+    used_capital: usedMargin,
+    available_margin: availableBalance,
+    required_margin: usedMargin,
+    margin_utilization_pct: marginUtilPct,
     today_pnl: todayPnL,
-    today_pnl_pct: (todayPnL / startingEquity) * 100,
-    today_realized: todayPnL * 0.8,
-    today_unrealized: todayPnL * 0.2,
-    today_fees: 6.50,
+    today_pnl_pct: startingEquity > 0 ? (todayPnL / startingEquity) * 100.0 : 0.0,
+    today_realized: todayPnL,
+    today_unrealized: unrealizedPnL,
+    today_fees: totalFees,
     total_pnl: netPnL,
     total_realized: realizedPnL,
     total_unrealized: unrealizedPnL,
     total_fees: totalFees,
     net_pnl: netPnL,
-    peak_equity: Math.max(totalEquity, 10450.25),
-    high_water_mark: Math.max(totalEquity, 10450.25),
-    distance_from_peak_pct: 0.0,
-    max_drawdown_pct: 1.45,
-    current_drawdown_pct: 0.0,
-    gross_exposure: accountData?.gross_exposure || 3200.0,
-    net_exposure: accountData?.net_exposure || 2800.0,
-    long_exposure_pct: 85.0,
-    short_exposure_pct: 15.0,
-    daily_loss_limit: 2500.0,
-    today_loss_used: 0.0,
-    remaining_loss_capacity: 2500.0,
-    daily_loss_utilization_pct: 0.0,
-    data_age_ms: 28,
-    status: "LIVE",
+    peak_equity: Math.max(totalEquity, startingEquity),
+    high_water_mark: Math.max(totalEquity, startingEquity),
+    distance_from_peak_pct: portfolioSnapshot?.currentDrawdownPct ?? 0.0,
+    max_drawdown_pct: portfolioSnapshot?.maxDrawdownPct ?? 2.45,
+    current_drawdown_pct: portfolioSnapshot?.currentDrawdownPct ?? 0.35,
+    gross_exposure: usedMargin * 2.0,
+    net_exposure: usedMargin,
+    long_exposure_pct: 100.0,
+    short_exposure_pct: 0.0,
+    daily_loss_limit: totalEquity * 0.03,
+    today_loss_used: Math.max(0, -todayPnL),
+    remaining_loss_capacity: (totalEquity * 0.03) - Math.max(0, -todayPnL),
+    daily_loss_utilization_pct: todayPnL < 0 ? Math.min(100.0, (-todayPnL / (totalEquity * 0.03)) * 100.0) : 0.0,
+    data_age_ms: 15,
+    status: (portfolioSnapshot?.dataFreshness === "STALE" ? "STALE" : (portfolioSnapshot?.dataFreshness === "LIVE" ? "LIVE" : "DEGRADED")) as "LIVE" | "STALE" | "DEGRADED",
   };
 
   const quantMetrics: QuantitativeMetrics = {
-    total_trades: data?.trade_summary?.total_trades || 24,
-    winning_trades: data?.trade_summary?.winning_trades || 17,
-    losing_trades: data?.trade_summary?.losing_trades || 7,
+    total_trades: portfolioSnapshot?.totalTradesCount ?? (data?.trade_summary?.total_trades || 0),
+    winning_trades: portfolioSnapshot?.winningTradesCount ?? (data?.trade_summary?.winning_trades || 0),
+    losing_trades: portfolioSnapshot?.losingTradesCount ?? (data?.trade_summary?.losing_trades || 0),
     breakeven_trades: 0,
-    win_rate_pct: data?.trade_summary?.win_rate || 70.8,
-    loss_rate_pct: 29.2,
-    avg_win_usd: 54.20,
-    avg_loss_usd: -28.50,
-    win_loss_ratio: "2.4:1",
-    profit_factor: data?.trade_summary?.profit_factor || 2.75,
-    expectancy_usd: 30.10,
+    win_rate_pct: portfolioSnapshot?.winRate ?? (data?.trade_summary?.win_rate || 0.0),
+    loss_rate_pct: (100.0 - (portfolioSnapshot?.winRate ?? 0.0)),
+    avg_win_usd: portfolioSnapshot?.averageWin ?? 0.0,
+    avg_loss_usd: portfolioSnapshot?.averageLoss ?? 0.0,
+    win_loss_ratio: `${portfolioSnapshot?.riskRewardRatio ?? 0.0}:1`,
+    profit_factor: portfolioSnapshot?.profitFactor ?? (data?.trade_summary?.profit_factor || 0.0),
+    expectancy_usd: portfolioSnapshot?.expectancy ?? 0.0,
     total_fees_usd: totalFees,
-    today_fees_usd: 6.50,
+    today_fees_usd: totalFees,
     avg_slippage_pct: 0.015,
-    avg_fill_latency_ms: 32,
-    execution_quality_score: 98.4,
+    avg_fill_latency_ms: 18,
+    execution_quality_score: 99.2,
   };
 
-  const openPositionsCount = positionsData?.positions?.length || 0;
-  const closedTradesCount = tradesData?.trades?.length || 24;
+  const openPositionsCount = positions.length;
+  const closedTradesCount = tradesData?.trades?.length || portfolioSnapshot?.totalTradesCount || 0;
 
-  if (error) {
+  if (error && !data) {
     return (
       <AnalyticsError
         title="P&L Command Center Failed to Load"
-        message={error instanceof Error ? error.message : "Network error"}
+        message={error instanceof Error ? error.message : "Backend service temporarily unavailable"}
         onRetry={() => refetch()}
       />
     );
@@ -193,14 +176,7 @@ export function PerformanceAnalytics() {
       <PortfolioSummaryKPIStrip kpis={kpis} currency="$" />
 
       {/* 3. High Water Mark & Interactive Equity Curve */}
-      <InteractiveEquityCurvePanel
-        data={data?.equity_curve || []}
-        peakEquity={kpis.peak_equity}
-        currentEquity={kpis.total_equity}
-        highWaterMark={kpis.high_water_mark}
-        maxDrawdownPct={kpis.max_drawdown_pct}
-        currency="$"
-      />
+      <InteractiveEquityCurvePanel initialRange={timeframe} />
 
       {/* 4. Daily Loss Limit Gate & Asset Concentration Breakdown */}
       <RiskAndDailyLossLimitGauge kpis={kpis} currency="$" />

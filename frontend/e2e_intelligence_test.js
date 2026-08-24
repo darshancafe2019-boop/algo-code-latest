@@ -30,7 +30,7 @@ async function runIntelligenceE2ETests() {
     // 1. ULTRAWIDE & FULL DESKTOP VIEWPORT TEST (1920 x 1080)
     console.log("\n[TEST 1] Testing Ultrawide 1920x1080 Viewport (Verifying No Empty Right Space)...");
     await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-    await page.goto("http://localhost:3000/intelligence", { waitUntil: "networkidle2", timeout: 25000 });
+    await page.goto("http://localhost:3100/intelligence", { waitUntil: "networkidle2", timeout: 25000 });
     await delay(1500);
 
     // Verify Title & Global Command Bar
@@ -54,14 +54,6 @@ async function runIntelligenceE2ETests() {
     console.log("\n[TEST 2] Testing Standard Desktop 1440x900 Viewport...");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await delay(1000);
-
-    // Click "Explain Decision" button in AST Tree
-    const explainBtn = await page.$('button ::-p-text(Explain Decision)');
-    if (explainBtn) {
-      await explainBtn.click();
-      await delay(600);
-      console.log("  ✓ Toggled Deterministic AST Rule Explanation");
-    }
 
     // Click a timeframe card to expand quantitative deep dive
     const firstTf = await page.$("div.grid > div.p-3\\.5.rounded-xl.border");
@@ -90,32 +82,6 @@ async function runIntelligenceE2ETests() {
     const shotMobile = path.join(screenshotDir, "intelligence_mobile.png");
     await page.screenshot({ path: shotMobile, fullPage: false });
     console.log(`  ✓ Saved Mobile Screenshot: ${shotMobile}`);
-
-    // 5. THEME SWITCHING TEST (JARVIS <-> ULTRON)
-    console.log("\n[TEST 5] Testing AI Core Theme Switcher on Intelligence Operating System...");
-    await page.setViewport({ width: 1440, height: 900 });
-
-    // Switch to ULTRON CORE
-    const ultronBtn = await page.$('button[title*="ULTRON CORE"]');
-    if (ultronBtn) {
-      await ultronBtn.click();
-      await delay(800);
-      console.log("  ✓ Switched to ULTRON CORE (Crimson/Graphite)");
-      const shotUltron = path.join(screenshotDir, "intelligence_ultron.png");
-      await page.screenshot({ path: shotUltron, fullPage: false });
-      console.log(`  ✓ Saved ULTRON Screenshot: ${shotUltron}`);
-    }
-
-    // Switch to JARVIS CORE
-    const jarvisBtn = await page.$('button[title*="JARVIS CORE"]');
-    if (jarvisBtn) {
-      await jarvisBtn.click();
-      await delay(800);
-      console.log("  ✓ Switched back to JARVIS CORE (Cyan/Blue)");
-      const shotJarvis = path.join(screenshotDir, "intelligence_jarvis.png");
-      await page.screenshot({ path: shotJarvis, fullPage: false });
-      console.log(`  ✓ Saved JARVIS Screenshot: ${shotJarvis}`);
-    }
 
     console.log("\n==================================================");
     console.log("🎉 ALL E2E BROWSER TESTS PASSED (0 ERRORS)");

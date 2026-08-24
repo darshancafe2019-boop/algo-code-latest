@@ -179,7 +179,7 @@ export function StrategyBuilder() {
   // Initial validation
   useEffect(() => {
     validateStrategy(strategy);
-  }, []);
+  }, [validateStrategy, strategy]);
 
   // Push to history
   const pushToHistory = (newStrat: StrategyIdeDefinition) => {

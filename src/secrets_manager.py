@@ -78,7 +78,12 @@ class SecretsManager:
             )
             allow_withdraw = False
 
-        cid = credential_id or f"cred-{uuid.uuid4().hex[:8]}"
+        if not credential_id:
+            existing = db.safe_query("SELECT credential_id FROM broker_credentials WHERE provider_id = ? LIMIT 1", (provider_id,))
+            cid = existing[0]["credential_id"] if existing else f"cred-{uuid.uuid4().hex[:8]}"
+        else:
+            cid = credential_id
+
         now_iso = datetime.now(timezone.utc).isoformat()
         enc_api_key = self.encrypt_secret(api_key)
         enc_secret = self.encrypt_secret(secret_key)
@@ -151,7 +156,7 @@ class SecretsManager:
     def get_decrypted_credential(self, provider_id: str) -> Optional[Tuple[str, str]]:
         """Returns (api_key, secret_key) decrypted for execution worker only."""
         rows = db.safe_query(
-            "SELECT encrypted_api_key, encrypted_secret_key FROM broker_credentials WHERE provider_id = ? AND status = 'CONNECTED' LIMIT 1",
+            "SELECT encrypted_api_key, encrypted_secret_key FROM broker_credentials WHERE provider_id = ? AND status = 'CONNECTED' ORDER BY (encrypted_api_key != '') DESC, rotated_at DESC, created_at DESC LIMIT 1",
             (provider_id,),
         )
         if not rows:

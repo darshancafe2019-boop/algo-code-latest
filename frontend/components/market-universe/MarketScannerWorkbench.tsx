@@ -15,6 +15,7 @@ import {
   AlertTriangle
 } from "lucide-react";
 import { MarketInstrument, SavedScanner } from "@/types/market-universe";
+import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
 
 interface MarketScannerWorkbenchProps {
   onSelectInstrument: (inst: MarketInstrument) => void;
@@ -176,6 +177,9 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <WatchlistStarButton instrument={inst} size="sm" />
+                    </div>
                     <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
                       {sym}
                     </span>

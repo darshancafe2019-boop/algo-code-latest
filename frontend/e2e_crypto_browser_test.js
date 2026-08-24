@@ -1,7 +1,7 @@
 /**
  * Google Chrome Real Browser E2E Test Suite for Crypto Derivatives
  * =================================================================
- * Runs against live Next.js frontend (http://localhost:3000)
+ * Runs against live Next.js frontend (http://localhost:3100)
  * Verifies:
  * - /crypto (Crypto Hub Overview)
  * - /crypto/futures (Crypto Futures Terminal)
@@ -45,18 +45,18 @@ async function runTest() {
   });
 
   const routesToTest = [
-    { url: "http://localhost:3000/", name: "Home / Terminal" },
-    { url: "http://localhost:3000/crypto", name: "Crypto Derivatives Hub" },
-    { url: "http://localhost:3000/crypto/futures", name: "Crypto Futures Terminal" },
-    { url: "http://localhost:3000/crypto/options", name: "Crypto Options Studio" },
-    { url: "http://localhost:3000/crypto/options-chain", name: "Crypto Option Chain" },
-    { url: "http://localhost:3000/dashboard", name: "Dashboard" },
-    { url: "http://localhost:3000/backtest", name: "Backtest Lab" },
-    { url: "http://localhost:3000/scanner", name: "Scanner" },
-    { url: "http://localhost:3000/pnl", name: "P&L Analytics" },
-    { url: "http://localhost:3000/orderbook", name: "Orderbook Depth" },
-    { url: "http://localhost:3000/providers", name: "Providers" },
-    { url: "http://localhost:3000/system-health", name: "System Health" },
+    { url: "http://localhost:3100/", name: "Home / Terminal" },
+    { url: "http://localhost:3100/crypto", name: "Crypto Derivatives Hub" },
+    { url: "http://localhost:3100/crypto/futures", name: "Crypto Futures Terminal" },
+    { url: "http://localhost:3100/crypto/options", name: "Crypto Options Studio" },
+    { url: "http://localhost:3100/crypto/options-chain", name: "Crypto Option Chain" },
+    { url: "http://localhost:3100/dashboard", name: "Dashboard" },
+    { url: "http://localhost:3100/backtest", name: "Backtest Lab" },
+    { url: "http://localhost:3100/scanner", name: "Scanner" },
+    { url: "http://localhost:3100/pnl", name: "P&L Analytics" },
+    { url: "http://localhost:3100/orderbook", name: "Orderbook Depth" },
+    { url: "http://localhost:3100/providers", name: "Providers" },
+    { url: "http://localhost:3100/system-health", name: "System Health" },
   ];
 
   let passedRoutes = 0;

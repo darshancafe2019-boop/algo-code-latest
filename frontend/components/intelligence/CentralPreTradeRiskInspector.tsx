@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { formatNumber, formatPrice, formatPercent } from "@/lib/formatters";
 
+import { useGlobalData } from "@/context/GlobalDataContext";
+
 interface CentralPreTradeRiskInspectorProps {
   totalEquity?: number;
   allocatedCapital?: number;
@@ -29,24 +31,26 @@ interface CentralPreTradeRiskInspectorProps {
   maxPositionsCount?: number;
 }
 
-export function CentralPreTradeRiskInspector({
-  totalEquity = 10450.0,
-  allocatedCapital = 2800.0,
-  availableMargin = 7650.0,
-  dailyDrawdownPct = 0.42,
-  maxDailyLossPct = 3.0,
-  riskPerTradePct = 1.0,
-  riskRewardRatio = 2.45,
-  openPositionsCount = 2,
-  maxPositionsCount = 5,
-}: CentralPreTradeRiskInspectorProps) {
+export function CentralPreTradeRiskInspector(props: CentralPreTradeRiskInspectorProps) {
+  const { portfolioSnapshot, riskSummary, positions } = useGlobalData();
+
+  const totalEquity = props.totalEquity ?? portfolioSnapshot?.equity ?? 50000.0;
+  const allocatedCapital = props.allocatedCapital ?? portfolioSnapshot?.startingBalance ?? 50000.0;
+  const availableMargin = props.availableMargin ?? portfolioSnapshot?.availableCapital ?? 50000.0;
+  const dailyDrawdownPct = props.dailyDrawdownPct ?? portfolioSnapshot?.currentDrawdownPct ?? 0.35;
+  const maxDailyLossPct = props.maxDailyLossPct ?? 3.0;
+  const riskPerTradePct = props.riskPerTradePct ?? 1.5;
+  const riskRewardRatio = props.riskRewardRatio ?? portfolioSnapshot?.riskRewardRatio ?? 2.0;
+  const openPositionsCount = props.openPositionsCount ?? positions.length ?? 0;
+  const maxPositionsCount = props.maxPositionsCount ?? 5;
+
   const isApproved = dailyDrawdownPct < maxDailyLossPct && openPositionsCount < maxPositionsCount;
 
   const riskGates = [
     { label: "Daily Drawdown Limit", current: `${dailyDrawdownPct.toFixed(2)}%`, limit: `< ${maxDailyLossPct}%`, passed: true },
-    { label: "Per-Trade Risk Cap", current: `${riskPerTradePct.toFixed(1)}% ($104.50)`, limit: "1.0% Equity", passed: true },
+    { label: "Per-Trade Risk Cap", current: `${riskPerTradePct.toFixed(1)}% ($${(totalEquity * (riskPerTradePct / 100)).toFixed(2)})`, limit: "1.5% Equity", passed: true },
     { label: "Max Open Positions", current: `${openPositionsCount} Active`, limit: `< ${maxPositionsCount} Max`, passed: true },
-    { label: "Margin Utilization", current: "26.8%", limit: "< 60.0%", passed: true },
+    { label: "Margin Utilization", current: `${totalEquity > 0 ? ((totalEquity - availableMargin) / totalEquity * 100).toFixed(1) : 0.0}%`, limit: "< 60.0%", passed: true },
     { label: "R:R Ratio Threshold", current: `1 : ${riskRewardRatio.toFixed(2)}`, limit: "> 1 : 1.50", passed: true },
     { label: "Correlated Exposure", current: "0.18 (Low)", limit: "< 0.65", passed: true },
     { label: "Broker Connectivity", current: "Connected (14.5ms)", limit: "Ping < 200ms", passed: true },

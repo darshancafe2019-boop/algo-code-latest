@@ -26,6 +26,8 @@ import { FuturesChainModal } from "./FuturesChainModal";
 import { MarketSkeleton } from "./MarketSkeleton";
 import { ErrorBoundary } from "../ErrorBoundary";
 
+import { useWatchlist } from "@/hooks/useWatchlist";
+
 export function MarketUniverse() {
   const queryClient = useQueryClient();
   const [, setIsMounted] = useState(false);
@@ -40,7 +42,26 @@ export function MarketUniverse() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [optionChainUnderlying, setOptionChainUnderlying] = useState<string | null>(null);
   const [futuresChainUnderlying, setFuturesChainUnderlying] = useState<string | null>(null);
-  const [watchlistSymbols, setWatchlistSymbols] = useState<Set<string>>(new Set(["BTC/USDT", "NIFTY", "ETH/USDT", "RELIANCE", "AAPL"]));
+
+  // Unified Watchlist Hook (zero default seeds, DB backed, cross-tab synced)
+  const {
+    watchlists,
+    activeWatchlist,
+    watchedItems,
+    isWatched,
+    toggleWatchlist,
+  } = useWatchlist(activeWatchlistId);
+
+  const watchlistSymbols = useMemo(() => {
+    const set = new Set<string>();
+    for (const it of watchedItems) {
+      if (it.instrument_id) set.add(it.instrument_id);
+      if (it.canonical_symbol) set.add(it.canonical_symbol);
+      if (it.provider_symbol) set.add(it.provider_symbol);
+      if (it.symbol) set.add(it.symbol);
+    }
+    return set;
+  }, [watchedItems]);
 
   // 1. Fetch Instruments from Canonical Registry (`GET /api/universe/instruments`)
   const {
@@ -85,26 +106,7 @@ export function MarketUniverse() {
     placeholderData: (prev) => prev,
   });
 
-  // 2. Fetch User Watchlists (`GET /api/universe/watchlists`)
-  const { data: watchlistsData } = useQuery<{ status: string; watchlists: UserWatchlist[] }>({
-    queryKey: ["userWatchlistsMaster"],
-    queryFn: async () => {
-      const res = await apiClient.get<{ status: string; watchlists: UserWatchlist[] }>("/api/universe/watchlists", {
-        timeoutMs: 6000,
-      });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to load user watchlists");
-      return res.data as { status: string; watchlists: UserWatchlist[] };
-    },
-    staleTime: 6000,
-    refetchInterval: 10000,
-    placeholderData: (prev) => prev,
-  });
-
-  const watchlists = useMemo(() => {
-    return Array.isArray(watchlistsData?.watchlists) ? watchlistsData.watchlists : [];
-  }, [watchlistsData]);
-
-  // 3. Fetch Universe Summary Stats (`GET /api/universe/summary`)
+  // 2. Fetch Universe Summary Stats (`GET /api/universe/summary`)
   const { data: summaryData } = useQuery<{ status: string; summary: UniverseSummaryStats }>({
     queryKey: ["universeSummaryStats"],
     queryFn: async () => {
@@ -119,7 +121,7 @@ export function MarketUniverse() {
     placeholderData: (prev) => prev,
   });
 
-  // 4. Sync Universe Mutation (`POST /api/universe/sync`)
+  // 3. Sync Universe Mutation (`POST /api/universe/sync`)
   const syncMutation = useMutation({
     mutationFn: async () => {
       const res = await apiClient.post("/api/universe/sync", { provider_id: "ALL" }, { timeoutMs: 12000 });
@@ -129,36 +131,6 @@ export function MarketUniverse() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketUniverseMaster"] });
       queryClient.invalidateQueries({ queryKey: ["universeSummaryStats"] });
-    },
-  });
-
-  // 5. Add / Remove Watchlist Item Mutation
-  const toggleWatchlistMutation = useMutation({
-    mutationFn: async (inst: MarketInstrument) => {
-      const sym = inst.canonical_symbol || inst.symbol || inst.instrument_id;
-      const isWatched = watchlistSymbols.has(sym) || watchlistSymbols.has(inst.instrument_id);
-
-      const endpoint = isWatched ? "/api/universe/watchlists/remove" : "/api/universe/watchlists/add";
-      const res = await apiClient.post(endpoint, {
-        watchlist_id: activeWatchlistId,
-        instrument_id: inst.instrument_id,
-      });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to toggle watchlist");
-      return { isWatched, sym, instId: inst.instrument_id };
-    },
-    onSuccess: ({ isWatched, sym, instId }) => {
-      setWatchlistSymbols((prev) => {
-        const next = new Set(prev);
-        if (isWatched) {
-          next.delete(sym);
-          next.delete(instId);
-        } else {
-          next.add(sym);
-          next.add(instId);
-        }
-        return next;
-      });
-      queryClient.invalidateQueries({ queryKey: ["userWatchlistsMaster"] });
     },
   });
 
@@ -173,16 +145,10 @@ export function MarketUniverse() {
       if (activeWl && activeWl.items && activeWl.items.length > 0) {
         return activeWl.items;
       }
-      return rawInstruments.filter(
-        (i) =>
-          watchlistSymbols.has(i.canonical_symbol) ||
-          watchlistSymbols.has(i.provider_symbol) ||
-          watchlistSymbols.has(i.symbol || "") ||
-          watchlistSymbols.has(i.instrument_id)
-      );
+      return watchedItems;
     }
     return rawInstruments;
-  }, [rawInstruments, activeCategory, activeWatchlistId, watchlists, watchlistSymbols]);
+  }, [rawInstruments, activeCategory, activeWatchlistId, watchlists, watchedItems]);
 
   // Default active selected instrument
   const activeSelected = selectedInstrument || (displayedInstruments.length > 0 ? displayedInstruments[0] : null);
@@ -271,13 +237,8 @@ export function MarketUniverse() {
       <ErrorBoundary title="Action Bar Error">
         <ContextualActionBar
           instrument={activeSelected}
-          isInWatchlist={Boolean(
-            activeSelected &&
-              (watchlistSymbols.has(activeSelected.canonical_symbol) ||
-                watchlistSymbols.has(activeSelected.symbol || "") ||
-                watchlistSymbols.has(activeSelected.instrument_id))
-          )}
-          onToggleWatchlist={() => activeSelected && toggleWatchlistMutation.mutate(activeSelected)}
+          isInWatchlist={Boolean(activeSelected && isWatched(activeSelected))}
+          onToggleWatchlist={() => activeSelected && toggleWatchlist(activeSelected)}
           onOpenAnalysis={() => activeSelected && handleOpenAnalysis(activeSelected)}
           onOpenOptions={setOptionChainUnderlying}
           onOpenFutures={setFuturesChainUnderlying}
@@ -300,7 +261,7 @@ export function MarketUniverse() {
             onOpenOptions={setOptionChainUnderlying}
             onOpenFutures={setFuturesChainUnderlying}
             onOpenAnalysis={handleOpenAnalysis}
-            onToggleWatchlist={(inst) => toggleWatchlistMutation.mutate(inst)}
+            onToggleWatchlist={(inst) => toggleWatchlist(inst)}
             watchlistSymbols={watchlistSymbols}
           />
         )}

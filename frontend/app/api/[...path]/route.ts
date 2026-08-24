@@ -4,6 +4,8 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
+const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "changeme-set-a-strong-random-secret-here";
 
 /**
  * In-Memory Next.js BFF Last-Known-Good Ticker & Market Snapshot Cache
@@ -99,6 +101,53 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
 
   const requestId = req.headers.get("x-request-id") || `bff_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = performance.now();
+
+  // ── Market Data Gateway proxy: /api/market/* -> http://127.0.0.1:5051 ──────
+  if (subPath.startsWith("market/") || subPath === "market") {
+    const gatewayPath = subPath.replace(/^market\/?/, "");
+    const gatewayTarget = `${GATEWAY_URL}/${gatewayPath}${url.search}`;
+    try {
+      const resp = await fetch(gatewayTarget, {
+        method: req.method,
+        headers: {
+          "X-Gateway-Secret": GATEWAY_SECRET,
+          "Content-Type": "application/json",
+          "X-Request-Id": requestId,
+        },
+        body: req.method !== "GET" && req.method !== "HEAD" ? await req.text() : undefined,
+        signal: AbortSignal.timeout(8000),
+        cache: "no-store",
+      });
+      const data = await resp.text();
+      return new NextResponse(data, {
+        status: resp.status,
+        headers: {
+          "Content-Type": resp.headers.get("Content-Type") || "application/json",
+          "X-Request-Id": requestId,
+          "X-Gateway-Proxied": "true",
+        },
+      });
+    } catch (err: any) {
+      return NextResponse.json(
+        {
+          ok: false,
+          success: false,
+          status: "degraded",
+          providers: [],
+          quotes: {},
+          error: {
+            code: "MARKET_GATEWAY_UNAVAILABLE",
+            message: "Market data gateway is starting or temporarily unavailable",
+            details: err.message,
+            retryable: true,
+          },
+          requestId,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 503, headers: { "X-Request-Id": requestId, "Retry-After": "5" } }
+      );
+    }
+  }
 
   // Special case: /api/health* probes
   if (subPath.startsWith("health")) {

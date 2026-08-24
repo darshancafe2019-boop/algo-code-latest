@@ -40,21 +40,25 @@ class BackupManager:
         encrypted_file = self.backup_dir / f"{backup_id}.enc"
         meta_file = self.backup_dir / f"{backup_id}.json"
 
-        # Flush WAL and verify index integrity before snapshot
+        # Flush WAL and safely snapshot using SQLite online backup API
         db_path = Path(config.DB_PATH)
         if not db_path.exists():
             raise FileNotFoundError(f"Database file not found at {db_path}")
 
+        temp_backup = self.backup_dir / f"{backup_id}_temp.db"
         try:
-            conn = sqlite3.connect(str(db_path))
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            conn.execute("REINDEX")
-            conn.close()
+            src_conn = sqlite3.connect(str(db_path), timeout=3.0)
+            dst_conn = sqlite3.connect(str(temp_backup))
+            src_conn.backup(dst_conn)
+            dst_conn.close()
+            src_conn.close()
+            with open(temp_backup, "rb") as f:
+                raw_bytes = f.read()
+            if temp_backup.exists():
+                temp_backup.unlink()
         except Exception:
-            pass
-
-        with open(db_path, "rb") as f:
-            raw_bytes = f.read()
+            with open(db_path, "rb") as f:
+                raw_bytes = f.read()
 
         raw_checksum = hashlib.sha256(raw_bytes).hexdigest()
         raw_size = len(raw_bytes)

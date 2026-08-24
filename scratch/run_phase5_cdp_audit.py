@@ -17,7 +17,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 CDP_PORT = 9888
 USER_DATA_DIR = r"C:\Users\Admin\AppData\Local\Temp\cdp_phase5_prod_profile"
-BASE_URL = "http://localhost:3001"
+BASE_URL = "http://localhost:3100"
 
 class CDPClient:
     def __init__(self, ws_url):
@@ -121,7 +121,7 @@ async def run_phase5_cdp_audit():
         with urllib.request.urlopen(f"http://127.0.0.1:{CDP_PORT}/json") as r:
             targets = json.loads(r.read().decode("utf-8"))
         
-        main_page = next(t for t in targets if "3001" in t.get("url", ""))
+        main_page = next(t for t in targets if "3100" in t.get("url", ""))
         print(f"[+] Attached to Page Target: {main_page['title']} ({main_page['url']})")
         
         cdp = CDPClient(main_page["webSocketDebuggerUrl"])

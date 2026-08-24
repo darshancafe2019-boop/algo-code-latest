@@ -3,10 +3,8 @@
  */
 
 export type ThemeId =
-  | "jarvis-core"
-  | "ultron-core"
-  | "midnight-emerald"
   | "obsidian-blue"
+  | "midnight-emerald"
   | "graphite-violet"
   | "light-professional"
   | "high-contrast"
@@ -78,96 +76,10 @@ export interface AppearanceConfig {
 }
 
 // ----------------------------------------------------------------------
-// Built-in Themes Definitions (JARVIS CORE, ULTRON CORE, & Classics)
+// Built-in Institutional Themes Definitions
 // ----------------------------------------------------------------------
 
 export const BUILTIN_THEMES: Record<Exclude<ThemeId, "custom">, AppearanceConfig> = {
-  "jarvis-core": {
-    themeId: "jarvis-core",
-    name: "JARVIS CORE (AI Intelligence)",
-    colorMode: "dark",
-    colors: {
-      pageBg: "#060B13",
-      surface: "#0B1528",
-      elevated: "#0F1D36",
-      border: "#1D355E",
-      borderSubtle: "#122442",
-      textPrimary: "#F0F6FC",
-      textSecondary: "#9DB2CE",
-      textMuted: "#5F7597",
-      accent: "#00E5FF",
-      profit: "#00F2A9",
-      loss: "#FF4757",
-      warning: "#FFB800",
-      info: "#38BDF8",
-      live: "#00F2A9",
-      paper: "#38BDF8",
-      halted: "#FF4757",
-      neutral: "#5F7597",
-    },
-    typography: {
-      interfaceFont: "Inter",
-      numericFont: "JetBrains Mono",
-      fontScale: "standard",
-      fontWeight: "medium",
-      density: "comfortable",
-    },
-    chart: {
-      background: "#060B13",
-      gridColor: "#13233E",
-      gridOpacity: 0.35,
-      candleUp: "#00F2A9",
-      candleDown: "#FF4757",
-      lineThickness: 2,
-      borderRadius: 14,
-      reducedMotion: false,
-    },
-    version: 2,
-  },
-
-  "ultron-core": {
-    themeId: "ultron-core",
-    name: "ULTRON CORE (Tactical Execution)",
-    colorMode: "dark",
-    colors: {
-      pageBg: "#08080A",
-      surface: "#111114",
-      elevated: "#18181D",
-      border: "#2E2E38",
-      borderSubtle: "#1E1E26",
-      textPrimary: "#FAFAFA",
-      textSecondary: "#A1A1AA",
-      textMuted: "#71717A",
-      accent: "#FF1E44",
-      profit: "#00E676",
-      loss: "#FF1744",
-      warning: "#FFC107",
-      info: "#00B0FF",
-      live: "#00E676",
-      paper: "#00B0FF",
-      halted: "#FF1744",
-      neutral: "#71717A",
-    },
-    typography: {
-      interfaceFont: "Inter",
-      numericFont: "JetBrains Mono",
-      fontScale: "standard",
-      fontWeight: "medium",
-      density: "comfortable",
-    },
-    chart: {
-      background: "#08080A",
-      gridColor: "#24242E",
-      gridOpacity: 0.4,
-      candleUp: "#00E676",
-      candleDown: "#FF1744",
-      lineThickness: 2,
-      borderRadius: 12,
-      reducedMotion: false,
-    },
-    version: 2,
-  },
-
   "midnight-emerald": {
     themeId: "midnight-emerald",
     name: "Midnight Emerald",
@@ -384,7 +296,7 @@ export const BUILTIN_THEMES: Record<Exclude<ThemeId, "custom">, AppearanceConfig
   },
 };
 
-export const DEFAULT_APPEARANCE_CONFIG: AppearanceConfig = BUILTIN_THEMES["jarvis-core"];
+export const DEFAULT_APPEARANCE_CONFIG: AppearanceConfig = BUILTIN_THEMES["obsidian-blue"];
 
 // ----------------------------------------------------------------------
 // Typography Family Stacks

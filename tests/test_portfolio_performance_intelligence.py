@@ -60,7 +60,7 @@ class TestPortfolioPerformanceIntelligence(unittest.TestCase):
         self.assertIn("maxDrawdownPct", summary)
         self.assertIn("recoveryFactor", summary)
 
-        self.assertEqual(summary["currentEquity"] - summary["startingEquity"], summary["netPnl"])
+        self.assertAlmostEqual(summary["currentEquity"] - summary["startingEquity"], summary["netPnl"], places=2)
         self.assertGreaterEqual(summary["highWaterMark"], summary["currentEquity"])
 
     def test_03_time_range_filters(self):

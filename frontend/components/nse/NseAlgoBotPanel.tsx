@@ -134,7 +134,7 @@ export function NseAlgoBotPanel() {
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 1. Live AI & Quant Signal Gauge */}
+        {/* 1. Live Quant & Rule Signal Gauge */}
         <div className="p-5 bg-slate-900/60 border border-slate-800 rounded-xl flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">

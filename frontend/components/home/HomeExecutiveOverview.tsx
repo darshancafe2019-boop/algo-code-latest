@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -10,23 +10,12 @@ import {
   Layers,
   Shield,
   Bot,
-  Bell,
   Activity,
-  ArrowUpRight,
-  ArrowDownRight,
   ChevronRight,
-  Play,
-  Pause,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
   Send,
-  Zap,
-  Globe,
-  Radio,
   ExternalLink,
 } from "lucide-react";
-import { formatNumber, formatPrice, formatPercent } from "@/lib/formatters";
+import { formatPrice } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
 
@@ -69,34 +58,6 @@ export function HomeExecutiveOverview() {
       if (!res.ok) return [];
       const data = res.data;
       return (data?.trades || data?.data || []).slice(0, 5);
-    },
-    staleTime: 5000,
-    refetchInterval: 8000,
-    placeholderData: (prev) => prev,
-  });
-
-  // 4. Fetch Recent Important Alerts
-  const { data: alertsData } = useQuery({
-    queryKey: ["homeRecentAlerts"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/alerts?limit=5", { timeoutMs: 5000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return (data?.alerts || data?.data || []).slice(0, 5);
-    },
-    staleTime: 5000,
-    refetchInterval: 8000,
-    placeholderData: (prev) => prev,
-  });
-
-  // 5. Fetch Key Market Pulse Instruments (Top 5 major symbols)
-  const { data: marketPulseData } = useQuery({
-    queryKey: ["homeMarketPulse"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/universe/instruments?limit=5", { timeoutMs: 5000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return (data?.instruments || data?.assets || data?.data || []).slice(0, 5);
     },
     staleTime: 5000,
     refetchInterval: 8000,
@@ -364,117 +325,7 @@ export function HomeExecutiveOverview() {
           </div>
         </div>
       </div>
-
-      {/* 4. Bottom Grid: Important Alerts & Compact Market Pulse */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        {/* Card C: Recent Important Alerts Preview */}
-        <div className="p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-xl flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
-            <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-[var(--theme-warning)]" />
-              <h3 className="text-sm font-bold tracking-tight">Important System & Risk Alerts</h3>
-            </div>
-            <button
-              onClick={() => router.push("/alerts")}
-              className="text-xs font-semibold text-[var(--theme-accent)] hover:underline flex items-center gap-1"
-            >
-              <span>View All Alerts</span>
-              <ExternalLink className="h-3 w-3" />
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            {(!alertsData || alertsData.length === 0) ? (
-              <div className="p-6 text-center text-xs text-[var(--theme-profit)] bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border-subtle)] flex items-center justify-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>All systems normal. Zero critical alerts.</span>
-              </div>
-            ) : (
-              alertsData.map((alert: any, idx: number) => {
-                const isWarn = (alert.severity || alert.level || "").toUpperCase().includes("WARN") || (alert.severity || alert.level || "").toUpperCase().includes("ERROR");
-                return (
-                  <div
-                    key={alert.id || idx}
-                    onClick={() => router.push("/alerts")}
-                    className="p-3 rounded-xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-border)] transition flex items-start gap-3 cursor-pointer"
-                  >
-                    <div className="mt-0.5">
-                      {isWarn ? (
-                        <AlertTriangle className="h-4 w-4 text-[var(--theme-warning)] shrink-0" />
-                      ) : (
-                        <CheckCircle2 className="h-4 w-4 text-[var(--theme-profit)] shrink-0" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs font-bold text-[var(--theme-text-primary)] truncate">
-                        {alert.message || alert.title || "Risk limit verification completed."}
-                      </div>
-                      <div className="text-[11px] text-[var(--theme-text-secondary)] font-mono mt-0.5">
-                        {alert.bot_name || alert.source || "System"} • {alert.timestamp || "Recent"}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        {/* Card D: Compact Market Pulse (Top 5 Major Symbols) */}
-        <div className="p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-xl flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
-            <div className="flex items-center gap-2">
-              <Globe className="h-4 w-4 text-[var(--theme-accent)]" />
-              <h3 className="text-sm font-bold tracking-tight">Market Pulse (Major Instruments)</h3>
-            </div>
-            <button
-              onClick={() => router.push("/charts")}
-              className="text-xs font-semibold text-[var(--theme-accent)] hover:underline flex items-center gap-1"
-            >
-              <span>Explore All Markets</span>
-              <ExternalLink className="h-3 w-3" />
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            {(!marketPulseData || marketPulseData.length === 0) ? (
-              <div className="p-6 text-center text-xs text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border-subtle)]">
-                Syncing market data pulse...
-              </div>
-            ) : (
-              marketPulseData.map((item: any, idx: number) => {
-                const price = Number(item.last_price || item.price || item.close || 65000);
-                const changePct = Number(item.change_24h || item.change_pct || 0.5);
-                const isPos = changePct >= 0;
-                return (
-                  <div
-                    key={item.symbol || idx}
-                    onClick={() => router.push(`/charts`)}
-                    className="p-3 rounded-xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-border)] transition flex items-center justify-between gap-3 cursor-pointer font-sans"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <span className="font-bold text-xs text-[var(--theme-text-primary)]">{item.provider_symbol || item.symbol}</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] font-mono">
-                        {item.asset_class || item.exchange || "Crypto"}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-3 font-mono">
-                      <span className="text-xs font-bold tabular-nums text-[var(--theme-text-primary)]">
-                        ${formatPrice(price, "", 2)}
-                      </span>
-                      <span className={`text-[11px] font-bold flex items-center gap-0.5 ${isPos ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-                        {isPos ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-                        {isPos ? "+" : ""}{changePct.toFixed(2)}%
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
+

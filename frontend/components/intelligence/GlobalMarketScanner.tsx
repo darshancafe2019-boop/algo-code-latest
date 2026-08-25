@@ -45,7 +45,7 @@ export function GlobalMarketScanner() {
         symbol,
         direction: "BUY",
         quantity: symbol.includes("BANK") ? 15 : (symbol.includes("NIFTY") ? 50 : 0.01),
-        strategy: "AI_ENSEMBLE_PRO",
+        strategy: "QUANT_CONFLUENCE_PRO",
       });
       if (!res.ok) throw new Error(res.error?.message || "Failed to launch paper bot");
       return res.data;
@@ -70,7 +70,7 @@ export function GlobalMarketScanner() {
           </div>
           <div>
             <h3 className="text-sm font-bold text-[var(--theme-text-primary)] font-sans">
-              Tier 2 Global Market Intelligence Scanner
+              Tier 2 Global Market Confluence Scanner
             </h3>
             <p className="text-[11px] text-[var(--theme-text-secondary)] font-sans">
               Autonomous Bar-by-Bar Multi-Asset Evaluation (1m - 1h Completed Bars)
@@ -121,8 +121,8 @@ export function GlobalMarketScanner() {
               <th className="py-2 px-3">Instrument</th>
               <th className="py-2 px-3">Exchange</th>
               <th className="py-2 px-3">Feed Status</th>
-              <th className="py-2 px-3">AI Signal</th>
-              <th className="py-2 px-3">Confidence</th>
+              <th className="py-2 px-3">Rule Signal</th>
+              <th className="py-2 px-3">Confluence</th>
               <th className="py-2 px-3">Expected Return</th>
               <th className="py-2 px-3">Risk/Reward</th>
               <th className="py-2 px-3">Regime</th>

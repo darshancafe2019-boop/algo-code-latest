@@ -2,7 +2,31 @@ const puppeteer = require("puppeteer-core");
 const fs = require("fs");
 const path = require("path");
 
-const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+function getBrowserPath() {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+  const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+
+  const candidates = [
+    path.join(programFiles, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFilesX86, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFiles, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(programFilesX86, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(localAppData, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(localAppData, "Microsoft\\Edge\\Application\\msedge.exe"),
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+  ];
+
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return "chrome";
+}
+
+const CHROME_PATH = getBrowserPath();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function runPositionsE2ETests() {

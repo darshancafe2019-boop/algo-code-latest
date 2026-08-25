@@ -56,7 +56,7 @@ export function GlobalIntelligenceCommandBar({
   executionMode = "PAPER",
   symbol = "BTC/USDT",
   exchange = "Binance Futures",
-  strategyName = "LightGBM + XGBoost AI Multi-Model Ensemble",
+  strategyName = "Deterministic Multi-Timeframe Confluence Engine",
   timeframe = "15m Primary",
   lastUpdatedText = "Live Feed Active",
   isRefreshing = false,
@@ -212,7 +212,7 @@ export function GlobalIntelligenceCommandBar({
                 ? "bg-rose-600 text-white border-rose-500 animate-pulse"
                 : "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30"
             }`}
-            title="Emergency Halt: Blocks all orders and pauses AI bots"
+            title="Emergency Halt: Blocks all orders and pauses trading bots"
           >
             <AlertTriangle className="h-3.5 w-3.5" />
             <span>{isHalted ? "SYSTEM HALTED" : "EMERGENCY HALT"}</span>

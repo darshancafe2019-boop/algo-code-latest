@@ -441,8 +441,9 @@ class OrderExecutionService:
         price: Optional[float] = None,
         stop_loss: Optional[float] = None,
         take_profit: Optional[float] = None,
-        bot_id: str = "ai-paper-bot",
-        strategy: str = "AI_ENSEMBLE_PRO",
+        bot_id: str = "quant-paper-bot",
+        strategy: str = "QUANT_CONFLUENCE_PRO",
+        confidence_score: float = 0.85,
         mode: str = "PAPER"
     ) -> Dict[str, Any]:
         """Routes and executes an order with automatic price resolution and fallback."""
@@ -459,7 +460,7 @@ class OrderExecutionService:
             price=eff_price,
             stop_loss=eff_sl,
             take_profit=eff_tp,
-            confidence_score=0.85,
+            confidence_score=confidence_score,
             account_balance=50000.0,
             is_live=(mode == "LIVE"),
         )

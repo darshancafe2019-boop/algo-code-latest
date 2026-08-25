@@ -367,7 +367,7 @@ export function StrategyRuleCanvas({
             <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
               Natural Language Strategy Generator
               <span className="text-[10px] px-2 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-                AI Rule Compiler
+                Rule Compiler
               </span>
             </h3>
           </div>

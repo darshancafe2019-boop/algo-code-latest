@@ -59,14 +59,18 @@ class AlertEngine:
         source: str,
         entity_id: str = "",
         error_code: str = "",
-        condition_type: str = ""
+        condition_type: str = "",
+        event_type: str = ""
     ) -> str:
-        """Generates deterministic alert fingerprint for deduplication."""
+        """Generates deterministic SHA-256 backed alert fingerprint for collision-free deduplication."""
+        import hashlib
         c = (category or "SYSTEM").upper().strip()
         s = (source or "System").strip()
         e = (entity_id or "fleet").strip()
-        code = (error_code or condition_type or "EVENT").upper().strip()
-        return f"{c}:{s}:{e}:{code}"
+        code = (error_code or condition_type or event_type or "EVENT").upper().strip()
+        raw = f"{c}:{s}:{e}:{code}"
+        h = hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+        return f"{c[:12]}:{s[:12]}:{e[:24]}:{h}"
 
     def calculate_impact_score(
         self,
@@ -117,55 +121,95 @@ class AlertEngine:
     ) -> Dict[str, Any]:
         """
         Ingests an event into the incident correlation pipeline.
-        Deduplicates against active incidents, groups alert storms, records to SQLite,
-        and triggers notification policies.
+        Deduplicates against active incidents within a 5-minute time window,
+        groups alert storms, suppresses routine INFO lifecycle noise, and records to SQLite.
         """
         severity = severity.upper()
         category = category.upper()
         now_utc = datetime.now(timezone.utc)
         now_iso = now_utc.isoformat()
+        now_ts = now_utc.timestamp()
 
-        # Enforce Rule 3 & 4: Routine user lifecycle events must NOT become WARNINGS!
-        routine_keywords = ["started", "stopped", "paused", "resumed", "execution resumed", "execution paused"]
+        # ROUTINE LIFECYCLE EVENT FILTER:
+        # Normal INFO/NOTICE operations (Bot started, stopped, paused, parameters saved, etc.)
+        # must NOT create operational incidents in the incidents table.
+        routine_keywords = ["started", "stopped", "paused", "resumed", "execution resumed", "execution paused", "parameters updated", "backtest"]
         msg_lower = message.lower()
-        if category == "BOT" or "bot control" in source.lower():
-            if any(k in msg_lower for k in routine_keywords) and "failed" not in msg_lower and "crash" not in msg_lower and "stalled" not in msg_lower:
-                if severity == "WARNING":
-                    severity = SEVERITY_INFO
+        is_routine = any(k in msg_lower for k in routine_keywords) and "failed" not in msg_lower and "crash" not in msg_lower and "stalled" not in msg_lower and "error" not in msg_lower
+
+        if (severity in [SEVERITY_INFO, SEVERITY_NOTICE] or is_routine) and not is_test:
+            if severity not in [SEVERITY_WARNING, SEVERITY_ERROR, SEVERITY_CRITICAL]:
+                # Record to bot_event_audit only, bypassing incidents table
+                try:
+                    db.log_bot_event(
+                        bot_instance_id=bot_id or "SYSTEM",
+                        bot_instance_name=f"Bot {bot_id}" if bot_id else "System",
+                        event_type="LIFECYCLE_EVENT",
+                        severity=severity,
+                        status="SUCCESS",
+                        message=message,
+                        symbol=symbol
+                    )
+                except Exception:
+                    pass
+                return {
+                    "incident_id": None,
+                    "action": "AUDIT_LOGGED_ROUTINE",
+                    "severity": severity,
+                    "message": message
+                }
+
+        # Deterministic entity resolution (prevent cross-bot collisions)
+        resolved_entity = bot_id or symbol or order_id or position_id or source
 
         fingerprint = self.generate_fingerprint(
             category=category,
             source=source,
-            entity_id=bot_id or symbol or order_id or source,
-            error_code=error_code or title
+            entity_id=resolved_entity,
+            error_code=error_code or title,
+            event_type=title
         )
 
         with self._lock:
-            # 1. Check for Active Incident with same Fingerprint
+            # 1. Check for Active Incident with same Fingerprint within 5-minute aggregation window
             active_incidents = db.safe_query(
                 """
                 SELECT * FROM incidents 
                 WHERE fingerprint = ? AND status IN ('NEW', 'ACKNOWLEDGED', 'INVESTIGATING')
-                ORDER BY created_at DESC LIMIT 1
+                ORDER BY last_seen_at DESC LIMIT 1
                 """,
                 (fingerprint,)
             )
 
+            # Check if active incident is within 300s (5m) window
+            is_within_window = False
+            existing = None
+            if active_incidents:
+                existing = active_incidents[0]
+                last_seen_str = existing.get("last_seen_at") or existing.get("created_at") or ""
+                if last_seen_str:
+                    try:
+                        last_seen_dt = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+                        if last_seen_dt.tzinfo is None:
+                            last_seen_dt = last_seen_dt.replace(tzinfo=timezone.utc)
+                        is_within_window = (now_utc - last_seen_dt).total_seconds() <= 300.0
+                    except Exception:
+                        is_within_window = True
+                else:
+                    is_within_window = True
+
             alert_id = f"ALT-{now_utc.strftime('%Y%m%d%H%M%S')}-{uuid.uuid4().hex[:6]}"
             meta_json = json.dumps(metadata) if metadata else "{}"
 
-            # Alert Storm Detection
-            now_ts = now_utc.timestamp()
+            # Alert Storm Detection (sliding 60s window)
             if fingerprint not in self._storm_cache:
                 self._storm_cache[fingerprint] = []
             self._storm_cache[fingerprint].append(now_ts)
-            # Retain last 60 seconds of timestamps
             self._storm_cache[fingerprint] = [t for t in self._storm_cache[fingerprint] if (now_ts - t) <= 60.0]
             is_storm = len(self._storm_cache[fingerprint]) >= 20
 
-            if active_incidents:
+            if existing and is_within_window:
                 # 2A. Update Existing Incident (Occurrence Increment & Last Seen Refresh)
-                existing = active_incidents[0]
                 inc_id = existing["incident_id"]
                 new_count = int(existing.get("occurrence_count") or 1) + 1
 
@@ -173,46 +217,50 @@ class AlertEngine:
                 if is_storm and "ALERT STORM" not in new_title:
                     new_title = f"[ALERT STORM] {new_title}"
 
+                # Severity update: Escalate if higher priority incoming, otherwise preserve existing
+                severity_rank = {SEVERITY_INFO: 1, SEVERITY_NOTICE: 2, SEVERITY_WARNING: 3, SEVERITY_ERROR: 4, SEVERITY_CRITICAL: 5}
+                existing_sev = (existing.get("severity") or SEVERITY_INFO).upper()
+                new_sev = severity if severity_rank.get(severity, 1) > severity_rank.get(existing_sev, 1) else existing_sev
+
                 db.safe_execute(
                     """
                     UPDATE incidents SET 
                         occurrence_count = ?,
                         last_seen_at = ?,
                         title = ?,
-                        severity = CASE 
-                            WHEN ? = 'CRITICAL' THEN 'CRITICAL'
-                            WHEN ? = 'ERROR' AND severity != 'CRITICAL' THEN 'ERROR'
-                            ELSE severity 
-                        END
+                        summary = ?,
+                        severity = ?
                     WHERE incident_id = ?
                     """,
-                    (new_count, now_iso, new_title, severity, severity, inc_id)
+                    (new_count, now_iso, new_title, message, new_sev, inc_id)
                 )
 
-                # Record granular child alert
-                db.safe_execute(
-                    """
-                    INSERT INTO alerts (
-                        alert_id, incident_id, event_id, correlation_id, fingerprint,
-                        severity, status, category, source, title, message,
-                        technical_details, bot_id, symbol, order_id, position_id,
-                        timestamp_utc, is_test, created_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        alert_id, inc_id, event_id or "", correlation_id or "", fingerprint,
-                        severity, STATUS_NEW, category, source, title, message,
-                        technical_details, bot_id, symbol, order_id, position_id,
-                        now_iso, 1 if is_test else 0, now_iso
+                # Rate-limit child alerts in SQLite: only insert first 5, then every 50th occurrence
+                should_insert_child_alert = (new_count <= 5) or (new_count % 50 == 0)
+                if should_insert_child_alert:
+                    db.safe_execute(
+                        """
+                        INSERT INTO alerts (
+                            alert_id, incident_id, event_id, correlation_id, fingerprint,
+                            severity, status, category, source, title, message,
+                            technical_details, bot_id, symbol, order_id, position_id,
+                            timestamp_utc, is_test, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            alert_id, inc_id, event_id or "", correlation_id or "", fingerprint,
+                            new_sev, STATUS_NEW, category, source, title, message,
+                            technical_details, bot_id, symbol, order_id, position_id,
+                            now_iso, 1 if is_test else 0, now_iso
+                        )
                     )
-                )
 
                 return {
                     "incident_id": inc_id,
                     "alert_id": alert_id,
                     "action": "DEDUP_INCREMENT",
                     "occurrence_count": new_count,
-                    "severity": severity,
+                    "severity": new_sev,
                     "fingerprint": fingerprint
                 }
 

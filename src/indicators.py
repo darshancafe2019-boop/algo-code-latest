@@ -428,6 +428,11 @@ def calculate_rsi(df: pd.DataFrame, length: int = 14, source: str = 'close', col
 
     rs = avg_gain / avg_loss.replace(0.0, np.nan)
     rsi = 100.0 - (100.0 / (1.0 + rs))
+    # Handle pure gain (RSI 100) and pure loss (RSI 0) edge cases
+    zero_loss_mask = (avg_loss == 0.0) & (avg_gain > 0.0)
+    rsi = rsi.mask(zero_loss_mask, 100.0)
+    zero_gain_mask = (avg_gain == 0.0) & (avg_loss > 0.0)
+    rsi = rsi.mask(zero_gain_mask, 0.0)
 
     target_col = col_name or 'rsi'
     df[target_col] = rsi

@@ -143,7 +143,7 @@ export function PrimaryDecisionHero({
           <div>
             <div className="flex items-center gap-2.5 flex-wrap">
               <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--theme-text-muted)]">
-                PRIMARY DECISION ENGINE
+                DETERMINISTIC DECISION ENGINE
               </span>
               <span className={`text-[10px] font-mono font-extrabold px-2 py-0.5 rounded-full ${theme.statusColor}`}>
                 {theme.statusBadge}
@@ -189,7 +189,7 @@ export function PrimaryDecisionHero({
           <div className="flex items-center justify-between text-xs">
             <span className="text-[var(--theme-text-secondary)] font-bold flex items-center gap-1.5">
               <Gauge className="h-4 w-4 text-[var(--theme-accent)]" />
-              CONFIDENCE SCORE
+              RULE CONFLUENCE SCORE
             </span>
             <div className="flex items-center gap-1.5 font-bold">
               <span className={`text-sm tabular-nums ${confidencePassed ? "text-[var(--theme-profit)]" : "text-[var(--theme-warning)]"}`}>

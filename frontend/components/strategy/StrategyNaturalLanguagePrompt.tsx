@@ -160,7 +160,7 @@ export function StrategyNaturalLanguagePrompt({ onApplyRules }: StrategyNaturalL
       }
 
       setPreviewResult({
-        name: isShort ? "AI Momentum Breakdown Strategy" : "AI Trend Confluence Strategy",
+        name: isShort ? "Momentum Breakdown Strategy" : "Trend Confluence Strategy",
         description: promptText,
         direction,
         rules: parsedRules,
@@ -196,7 +196,7 @@ export function StrategyNaturalLanguagePrompt({ onApplyRules }: StrategyNaturalL
             <h4 className="text-xs font-bold text-white flex items-center gap-2">
               Natural Language Strategy Generator
               <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
-                AI Rule Assistant
+                Rule Parser
               </span>
             </h4>
             <p className="text-[11px] text-slate-400">

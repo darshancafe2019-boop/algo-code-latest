@@ -196,7 +196,7 @@ export function TopCommandBar({
                 QUANT<span className="text-[var(--theme-accent)]">.OS</span>
               </span>
               <span className="text-[8px] tracking-widest text-[var(--theme-text-muted)] uppercase block font-mono">
-                AI COMMAND CENTER
+                QUANT COMMAND CENTER
               </span>
             </div>
           </div>

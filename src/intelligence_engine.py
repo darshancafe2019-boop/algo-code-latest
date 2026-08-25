@@ -103,6 +103,10 @@ class IntelligenceEngine:
             "version": "2.4.1"
         }
 
+    def get_decision_snapshot(self, symbol: Optional[str] = None, bot_id: Optional[str] = None, is_test: bool = True) -> Dict[str, Any]:
+        """Convenience method to retrieve authoritative deterministic decision snapshot."""
+        return self.evaluate_bot_decision(bot_id=bot_id, is_test=is_test)
+
     def evaluate_multi_timeframe_matrix(self, symbol: str) -> Dict[str, Any]:
         """
         Evaluates 6 timeframes (1m, 5m, 15m, 1h, 4h, 1d) using live candle calculations.

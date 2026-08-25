@@ -2,7 +2,31 @@ const puppeteer = require("puppeteer-core");
 const fs = require("fs");
 const path = require("path");
 
-const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+function getBrowserPath() {
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const programFiles = process.env["ProgramFiles"] || "C:\\Program Files";
+  const programFilesX86 = process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)";
+
+  const candidates = [
+    path.join(programFiles, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFilesX86, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(programFiles, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(programFilesX86, "Microsoft\\Edge\\Application\\msedge.exe"),
+    path.join(localAppData, "Google\\Chrome\\Application\\chrome.exe"),
+    path.join(localAppData, "Microsoft\\Edge\\Application\\msedge.exe"),
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/usr/bin/google-chrome",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+  ];
+
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return "chrome";
+}
+
+const CHROME_PATH = getBrowserPath();
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function runIntelligenceE2ETests() {
@@ -30,8 +54,8 @@ async function runIntelligenceE2ETests() {
     // 1. ULTRAWIDE & FULL DESKTOP VIEWPORT TEST (1920 x 1080)
     console.log("\n[TEST 1] Testing Ultrawide 1920x1080 Viewport (Verifying No Empty Right Space)...");
     await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1 });
-    await page.goto("http://localhost:3100/intelligence", { waitUntil: "networkidle2", timeout: 25000 });
-    await delay(1500);
+    await page.goto("http://localhost:3100/intelligence", { waitUntil: "domcontentloaded", timeout: 25000 });
+    await delay(2500);
 
     // Verify Title & Global Command Bar
     const titleText = await page.$eval("h1", (el) => el.innerText);
@@ -41,9 +65,13 @@ async function runIntelligenceE2ETests() {
     const heroTitle = await page.$eval("h2", (el) => el.innerText);
     console.log(`  ✓ Detected Primary Decision State: "${heroTitle}"`);
 
-    // Verify Multi-Timeframe Heatmap (6 timeframes)
-    const tfCards = await page.$$("div.grid > div.p-3\\.5.rounded-xl.border");
-    console.log(`  ✓ Detected Multi-Timeframe Regime Heatmap cards (${tfCards.length} cards detected)`);
+    // Verify Multi-Timeframe Heatmap is completely removed (0 matches)
+    const pageText = await page.evaluate(() => document.body.innerText);
+    const hasHeatmap = pageText.includes("MULTI-TIMEFRAME REGIME HEATMAP");
+    if (hasHeatmap) {
+      throw new Error("FAIL: MULTI-TIMEFRAME REGIME HEATMAP text is still present in DOM!");
+    }
+    console.log("  ✓ Verified Multi-Timeframe Regime Heatmap is completely removed from DOM");
 
     // Save 1920px Screenshot
     const shot1920 = path.join(screenshotDir, "intelligence_1920px.png");
@@ -54,14 +82,6 @@ async function runIntelligenceE2ETests() {
     console.log("\n[TEST 2] Testing Standard Desktop 1440x900 Viewport...");
     await page.setViewport({ width: 1440, height: 900, deviceScaleFactor: 2 });
     await delay(1000);
-
-    // Click a timeframe card to expand quantitative deep dive
-    const firstTf = await page.$("div.grid > div.p-3\\.5.rounded-xl.border");
-    if (firstTf) {
-      await firstTf.click();
-      await delay(600);
-      console.log("  ✓ Expanded Quantitative Timeframe Deep Dive Drawer");
-    }
 
     const shot1440 = path.join(screenshotDir, "intelligence_1440px.png");
     await page.screenshot({ path: shot1440, fullPage: false });

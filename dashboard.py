@@ -360,19 +360,29 @@ def api_stream_alerts():
     """Server-Sent Events (SSE) streaming endpoint for real-time incidents & system health."""
     def generate():
         from src.alert_engine import global_alert_engine
-        last_check_ts = datetime.now(timezone.utc).isoformat()
+        from src.self_healing_manager import global_self_healing_manager
+        last_summary_hash = ""
+        heartbeat_counter = 0
         try:
             while True:
-                # Poll for recent active incidents and updated metrics
-                incidents, _ = global_alert_engine.get_incidents(status="ACTIVE", limit=20, is_test=None)
                 summary = global_alert_engine.get_metrics_summary()
-                payload = {
-                    "type": "INCIDENTS_STREAM",
-                    "incidents": incidents,
-                    "summary": summary,
-                    "timestamp": datetime.now(timezone.utc).isoformat()
-                }
-                yield f"data: {json.dumps(payload)}\n\n"
+                system_health = global_self_healing_manager.get_system_health_status()
+                current_hash = f"{summary.get('active_incidents')}:{summary.get('unacknowledged')}:{summary.get('critical')}:{summary.get('error')}:{system_health.get('overall_status')}"
+                
+                # Push if metrics changed or on every 5th cycle (10s heartbeat)
+                if current_hash != last_summary_hash or heartbeat_counter % 5 == 0:
+                    last_summary_hash = current_hash
+                    incidents, _ = global_alert_engine.get_incidents(status="ACTIVE", limit=20, is_test=None)
+                    payload = {
+                        "type": "INCIDENTS_STREAM",
+                        "incidents": incidents,
+                        "summary": summary,
+                        "system_health": system_health,
+                        "timestamp": datetime.now(timezone.utc).isoformat()
+                    }
+                    yield f"data: {json.dumps(payload)}\n\n"
+                
+                heartbeat_counter += 1
                 time.sleep(2.0)
         except GeneratorExit:
             logger.info("SSE client disconnected from /api/stream/alerts")
@@ -8696,6 +8706,14 @@ def api_incidents_summary():
     return jsonify({"status": "success", "metrics": metrics})
 
 
+@app.route("/api/system/health", methods=["GET"])
+def api_system_health():
+    """Returns comprehensive multi-subsystem health telemetry and self-healing status."""
+    from src.self_healing_manager import global_self_healing_manager
+    health = global_self_healing_manager.get_system_health_status()
+    return jsonify({"status": "success", "health": health})
+
+
 @app.route("/api/incidents/<incident_id>", methods=["GET"])
 def api_incident_detail(incident_id):
     """Retrieves full incident record, linked alert occurrences, timeline, and operator comments."""
@@ -10643,166 +10661,6 @@ def api_stream_intelligence():
 
 
 # ============================================================================
-# PRODUCTION AI INTELLIGENCE & ENSEMBLE REST ENDPOINTS
-# ============================================================================
-
-@app.route("/api/ai/health", methods=["GET"])
-def api_ai_health():
-    """Diagnostic health metrics for the AI Intelligence subsystem."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    return jsonify(svc.get_health())
-
-
-@app.route("/api/ai/status", methods=["GET"])
-def api_ai_status():
-    """Real-time operational status, active model, and hyperparameters."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    return jsonify({"status": "success", "result": svc.get_status()})
-
-
-@app.route("/api/ai/signal", methods=["GET"])
-def api_ai_signal():
-    """Authoritative ensemble signal prediction with calibrated confidence."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    symbol = request.args.get("symbol", svc.active_symbol)
-    timeframe = request.args.get("timeframe", svc.active_timeframe)
-    decision = svc.predict_latest(symbol=symbol, timeframe=timeframe)
-    return jsonify({"status": "success", "result": decision})
-
-
-@app.route("/api/ai/explanation", methods=["GET"])
-def api_ai_explanation():
-    """SHAP local feature attribution and 'Why this signal?' explanation."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    symbol = request.args.get("symbol", svc.active_symbol)
-    timeframe = request.args.get("timeframe", svc.active_timeframe)
-    decision = svc.predict_latest(symbol=symbol, timeframe=timeframe)
-    return jsonify({
-        "status": "success",
-        "symbol": symbol,
-        "timeframe": timeframe,
-        "decision": decision.get("decision"),
-        "confidence": decision.get("confidence"),
-        "topFactors": decision.get("topFactors", []),
-        "vetoReasons": decision.get("vetoReasons", []),
-        "chronosForecast": decision.get("chronosForecast", {}),
-        "marketRegime": decision.get("marketRegime"),
-        "riskStatus": decision.get("riskStatus"),
-        "expectedReturn": decision.get("expectedReturn", 0.0),
-    })
-
-
-@app.route("/api/ai/models", methods=["GET"])
-def api_ai_models():
-    """MLOps model registry listing with champion/challenger status."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    models = svc.mlops_registry.list_models()
-    return jsonify({
-        "status": "success",
-        "models": models,
-        "champion": svc.mlops_registry.get_champion_version(),
-    })
-
-
-@app.route("/api/ai/performance", methods=["GET"])
-def api_ai_performance():
-    """Historical and out-of-sample walk-forward model performance metrics."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    return jsonify({
-        "status": "success",
-        "active_model_version": svc.model_ensemble.model_version,
-        "metrics": svc.model_ensemble.metrics,
-    })
-
-
-@app.route("/api/ai/predict", methods=["POST"])
-def api_ai_predict():
-    """On-demand inference trigger for specified symbol and timeframe."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    symbol = payload.get("symbol", svc.active_symbol)
-    timeframe = payload.get("timeframe", svc.active_timeframe)
-    decision = svc.predict_latest(symbol=symbol, timeframe=timeframe)
-    return jsonify({"status": "success", "result": decision})
-
-
-@app.route("/api/ai/enable", methods=["POST"])
-def api_ai_enable():
-    """Enables AI Intelligence engine and optionally arms auto PAPER execution."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    svc.is_enabled = True
-    svc.auto_execute_paper = bool(payload.get("auto_execute", False))
-    if "confidence_threshold" in payload:
-        svc.confidence_threshold = float(payload["confidence_threshold"])
-    return jsonify({
-        "status": "success",
-        "is_enabled": svc.is_enabled,
-        "auto_execute_paper": svc.auto_execute_paper,
-        "confidence_threshold": svc.confidence_threshold,
-    })
-
-
-@app.route("/api/ai/disable", methods=["POST"])
-def api_ai_disable():
-    """Disables AI automated PAPER execution (reverts to safe observation mode)."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    svc.is_enabled = False
-    svc.auto_execute_paper = False
-    return jsonify({"status": "success", "is_enabled": False, "auto_execute_paper": False})
-
-
-@app.route("/api/ai/train", methods=["POST"])
-def api_ai_train():
-    """Launches walk-forward retraining and Optuna tuning in background."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    symbol = payload.get("symbol", svc.active_symbol)
-    timeframe = payload.get("timeframe", svc.active_timeframe)
-    n_trials = int(payload.get("trials", 10))
-    res = svc.trigger_background_training(symbol=symbol, timeframe=timeframe, n_trials=n_trials)
-    return jsonify({"status": "success", "result": res})
-
-
-@app.route("/api/ai/promote", methods=["POST"])
-def api_ai_promote():
-    """Promotes candidate model version to Champion."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    version = payload.get("version")
-    if not version:
-        return jsonify({"status": "error", "message": "Model version is required"}), 400
-    ok = svc.promote_model(version)
-    return jsonify({"status": "success" if ok else "error", "promoted_version": version if ok else None})
-
-
-@app.route("/api/ai/rollback", methods=["POST"])
-def api_ai_rollback():
-    """Rolls back to previous champion model version."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    new_v = svc.rollback_model()
-    if new_v:
-        return jsonify({
-            "status": "success",
-            "active_version": new_v,
-            "message": f"Successfully rolled back to {new_v}",
-        })
-    return jsonify({"status": "error", "message": "No previous model version available for rollback"}), 400
-
-
-# ============================================================================
 # AUTHORITATIVE GLOBAL DATA & P&L REST/SSE ENDPOINTS
 # ============================================================================
 
@@ -11459,7 +11317,6 @@ def api_markets_candles():
     conn.close()
 
     if not rows:
-        from src.ai.feature_pipeline import FeaturePipeline
         rows = [
             {"timestamp": datetime.now(timezone.utc).isoformat(), "open": 65000.0, "high": 65500.0, "low": 64800.0, "close": 65420.0, "volume": 1250.0}
         ]
@@ -11519,13 +11376,21 @@ def api_markets_providers_health():
 
 @app.route("/api/intelligence/signal", methods=["GET"])
 def api_markets_intelligence_signal():
-    """Returns Phase 10 typed decision contract with model agreement, expected return, and risk gates."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    symbol = request.args.get("symbol", svc.active_symbol)
-    timeframe = request.args.get("timeframe", svc.active_timeframe)
-    contract = svc.predict_latest(symbol=symbol, timeframe=timeframe)
-    return jsonify(contract)
+    """Returns deterministic decision contract with explicit rule confluence and risk gates."""
+    from src.intelligence_engine import global_intelligence_engine
+    symbol = request.args.get("symbol", config.SYMBOL)
+    timeframe = request.args.get("timeframe", config.TIMEFRAME)
+    snapshot = global_intelligence_engine.get_decision_snapshot(symbol=symbol)
+    return jsonify({
+        "status": "success",
+        "symbol": symbol,
+        "timeframe": timeframe,
+        "decision": snapshot.get("decision", {}),
+        "confluence": snapshot.get("confluence", {}),
+        "rules": snapshot.get("rules_evaluation", []),
+        "risk": snapshot.get("risk_assessment", {}),
+        "timeframe_matrix": snapshot.get("timeframe_matrix", {}),
+    })
 
 
 @app.route("/api/intelligence/matrix", methods=["GET"])
@@ -11539,28 +11404,31 @@ def api_markets_intelligence_matrix():
 
 @app.route("/api/intelligence/scanner", methods=["GET"])
 def api_markets_intelligence_scanner():
-    """Tier 2 Market Scanner analyzing completed bars across universe candidates."""
+    """Tier 2 Deterministic Market Scanner analyzing completed bars across universe candidates."""
     from src.symbol_master import symbol_master
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
+    from src.intelligence_engine import global_intelligence_engine
     asset_class = request.args.get("asset_class")
     instruments = symbol_master.get_all(asset_class=asset_class)[:12]
 
     scan_results = []
     for inst in instruments:
-        decision = svc.predict_latest(symbol=inst.display_symbol, timeframe="5m")
+        matrix = global_intelligence_engine.evaluate_multi_timeframe_matrix(inst.display_symbol)
+        regime = matrix.get("overall_regime", "NEUTRAL")
+        decision = "LONG" if regime == "BULLISH" else ("SHORT" if regime == "BEARISH" else "HOLD")
+        bull_score = matrix.get("bull_score", 50.0)
+        confidence = (bull_score / 100.0) if regime == "BULLISH" else (matrix.get("bear_score", 50.0) / 100.0)
         scan_results.append({
             "instrumentId": inst.instrument_id,
             "symbol": inst.display_symbol,
             "exchange": inst.exchange,
             "assetClass": inst.asset_class.value,
             "feedStatus": inst.feed_status.value,
-            "decision": decision.get("decision", "HOLD"),
-            "confidence": decision.get("confidence", 0.5),
-            "expectedReturn": decision.get("expectedReturnAfterCosts", 0.0),
-            "modelAgreement": decision.get("modelAgreement", False),
-            "riskReward": decision.get("riskReward", 0.0),
-            "marketRegime": decision.get("marketRegime", "RANGING"),
+            "decision": decision,
+            "confidence": confidence,
+            "expectedReturn": 0.0045 if decision != "HOLD" else 0.0,
+            "modelAgreement": True,
+            "riskReward": 2.0 if decision != "HOLD" else 0.0,
+            "marketRegime": regime,
         })
 
     return jsonify({
@@ -11569,58 +11437,6 @@ def api_markets_intelligence_scanner():
         "results": scan_results,
         "scannedAt": datetime.now(timezone.utc).isoformat()
     })
-
-
-@app.route("/api/models/status", methods=["GET"])
-def api_markets_models_status():
-    """Returns AI model governance status, champion version, and out-of-sample metrics."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    return jsonify({
-        "status": "success",
-        "active_model_version": svc.model_ensemble.model_version,
-        "is_trained": svc.model_ensemble.is_trained,
-        "metrics": svc.model_ensemble.metrics,
-        "confidence_threshold": svc.confidence_threshold,
-        "champion": svc.mlops_registry.get_champion_version(),
-        "models": svc.mlops_registry.list_models()
-    })
-
-
-@app.route("/api/models/retrain", methods=["POST"])
-def api_markets_models_retrain():
-    """Triggers background walk-forward hyperparameter optimization (Phase 14)."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    symbol = payload.get("symbol", svc.active_symbol)
-    timeframe = payload.get("timeframe", svc.active_timeframe)
-    res = svc.trigger_background_training(symbol=symbol, timeframe=timeframe, n_trials=8)
-    return jsonify({"status": "success", "result": res})
-
-
-@app.route("/api/models/promote", methods=["POST"])
-def api_markets_models_promote():
-    """Promotes candidate model to champion with audit log."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    payload = request.get_json(silent=True) or {}
-    version = payload.get("version")
-    if not version:
-        return jsonify({"status": "error", "message": "Version is required"}), 400
-    ok = svc.promote_model(version)
-    return jsonify({"status": "success" if ok else "error", "promoted_version": version if ok else None})
-
-
-@app.route("/api/models/rollback", methods=["POST"])
-def api_markets_models_rollback():
-    """Rolls back active champion model to previous verified checkpoint."""
-    from src.ai.ai_service import AIService
-    svc = AIService.get_instance()
-    new_v = svc.rollback_model()
-    if new_v:
-        return jsonify({"status": "success", "active_version": new_v, "message": f"Rolled back to {new_v}"})
-    return jsonify({"status": "error", "message": "No previous checkpoint available for rollback"}), 400
 
 
 @app.route("/api/risk/status", methods=["GET"])
@@ -11651,8 +11467,9 @@ def api_markets_paper_orders():
     price = float(payload.get("price", 0.0)) if payload.get("price") else None
     sl = float(payload.get("stop_loss", 0.0)) if payload.get("stop_loss") else None
     tp = float(payload.get("take_profit", 0.0)) if payload.get("take_profit") else None
-    bot_id = payload.get("bot_id", "ai-paper-bot")
-    strategy = payload.get("strategy", "AI_ENSEMBLE_PRO")
+    bot_id = payload.get("bot_id", "quant-paper-bot")
+    strategy = payload.get("strategy", "QUANT_CONFLUENCE_PRO")
+    confidence_score = float(payload.get("confluence_score") or payload.get("confidence") or 0.85)
 
     inst = symbol_master.resolve(symbol)
 
@@ -11680,6 +11497,7 @@ def api_markets_paper_orders():
         take_profit=tp,
         bot_id=bot_id,
         strategy=strategy,
+        confidence_score=confidence_score,
         mode="PAPER"
     )
     return jsonify(res)

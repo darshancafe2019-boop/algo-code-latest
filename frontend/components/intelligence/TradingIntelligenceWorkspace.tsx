@@ -2,11 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { IntelligenceSnapshot, AIDecisionSignal, AIStatusResponse } from "@/types/intelligence";
+import { IntelligenceSnapshot } from "@/types/intelligence";
 import { GlobalIntelligenceCommandBar } from "./GlobalIntelligenceCommandBar";
-import { AIMLopsControlCard } from "./AIMLopsControlCard";
 import { PrimaryDecisionHero } from "./PrimaryDecisionHero";
-import { MultiTimeframeRegimeMatrix } from "./MultiTimeframeRegimeMatrix";
 import { CentralPreTradeRiskInspector } from "./CentralPreTradeRiskInspector";
 import { ProviderSystemHealthCard } from "./ProviderSystemHealthCard";
 import { WhyNoTradeDiagnostic } from "./WhyNoTradeDiagnostic";
@@ -23,7 +21,7 @@ export function TradingIntelligenceWorkspace({
   botId = "bot-1",
 }: TradingIntelligenceWorkspaceProps) {
   const { activeSymbol, activeTimeframe } = useActiveBot();
-  const { portfolioSnapshot, riskSummary, positions } = useGlobalData();
+  const { portfolioSnapshot, positions } = useGlobalData();
   const [liveSnapshot, setLiveSnapshot] = useState<IntelligenceSnapshot | null>(null);
   const [showWhyNoTradeModal, setShowWhyNoTradeModal] = useState(false);
 
@@ -40,31 +38,6 @@ export function TradingIntelligenceWorkspace({
     staleTime: 4000,
     refetchInterval: 6000,
     placeholderData: (prev) => prev,
-  });
-
-  // 1b. Fetch AI Ensemble Signal & Status
-  const { data: aiSignalData, refetch: refetchAISignal } = useQuery({
-    queryKey: ["aiSignal", activeSymbol, activeTimeframe],
-    queryFn: async () => {
-      const res = await apiClient.get<any>(`/api/ai/signal?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}&timeframe=${encodeURIComponent(activeTimeframe || "5m")}`, {
-        timeoutMs: 5000,
-      });
-      if (!res.ok) return null;
-      return res.data?.result as AIDecisionSignal;
-    },
-    staleTime: 4000,
-    refetchInterval: 5000,
-  });
-
-  const { data: aiStatusData } = useQuery({
-    queryKey: ["aiStatus"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/ai/status", { timeoutMs: 5000 });
-      if (!res.ok) return null;
-      return res.data?.result as AIStatusResponse;
-    },
-    staleTime: 6000,
-    refetchInterval: 8000,
   });
 
   // 2. Real-time SSE Stream Listener for Sub-Second Updates
@@ -99,12 +72,11 @@ export function TradingIntelligenceWorkspace({
       <GlobalIntelligenceCommandBar
         symbol={activeSymbol || "BTC/USDT"}
         exchange="Binance Futures / NSE India / Global"
-        strategyName="LightGBM + XGBoost AI Multi-Model Ensemble"
+        strategyName="Deterministic Multi-Timeframe Confluence Engine"
         timeframe={activeTimeframe || "5m Primary"}
         isRefreshing={isFetching}
         onRefresh={() => {
           refetch();
-          refetchAISignal();
         }}
         feedLatencyMs={14.5}
         marketStatus="MARKET OPEN 24/7"
@@ -113,29 +85,13 @@ export function TradingIntelligenceWorkspace({
 
       {/* 2. Responsive 12-Column Intelligence Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4 items-start">
-        {/* Left Column (8 / 12 Cols on XL Displays): AI MLOps Card, Decision Hero, Heatmap, Confluence */}
+        {/* Left Column (8 / 12 Cols on XL Displays): Decision Hero & Confluence */}
         <div className="xl:col-span-8 space-y-4 min-w-0">
-          {/* AI MLOps Model Ensemble Control Card */}
-          <AIMLopsControlCard
-            aiSignal={aiSignalData || null}
-            aiStatus={aiStatusData || null}
-            onRefresh={() => {
-              refetch();
-              refetchAISignal();
-            }}
-          />
-
-          {/* Primary Decision Hero */}
+          {/* Primary Deterministic Decision Hero */}
           <PrimaryDecisionHero
             snapshot={snapshot}
             onWhyNoTradeClick={() => setShowWhyNoTradeModal(true)}
             onExplainClick={() => setShowWhyNoTradeModal(true)}
-          />
-
-          {/* Multi-Timeframe Regime Heatmap */}
-          <MultiTimeframeRegimeMatrix
-            matrixData={snapshot?.timeframe_matrix}
-            symbol={activeSymbol || "BTC/USDT"}
           />
         </div>
 

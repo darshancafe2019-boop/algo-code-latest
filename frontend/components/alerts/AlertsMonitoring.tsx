@@ -37,7 +37,7 @@ export function AlertsMonitoring() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
-  // 1. Fetch Authoritative Incident Metrics Summary (Polling 4s)
+  // 1. Fetch Authoritative Incident Metrics Summary (Adaptive Polling)
   const { 
     data: summaryData, 
     isLoading: isSummaryLoading, 
@@ -49,12 +49,24 @@ export function AlertsMonitoring() {
       if (!res.ok) throw new Error("Failed to fetch incident summary metrics");
       return res.json();
     },
-    refetchInterval: 4000,
-    staleTime: 2000,
+    refetchInterval: isStreaming ? false : 10000,
+    staleTime: 5000,
     retry: false
   });
 
-  // 2. Fetch Server-Side Filtered Incidents List (Polling 4s)
+  // 2. Fetch System Health & Safe Self-Healing Telemetry
+  const { data: systemHealthData } = useQuery({
+    queryKey: ["systemHealthStatus"],
+    queryFn: async () => {
+      const res = await fetch("/api/system/health");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    refetchInterval: isStreaming ? false : 15000,
+    staleTime: 10000
+  });
+
+  // 3. Fetch Server-Side Filtered Incidents List (Adaptive Polling)
   const { 
     data: listData, 
     isLoading: isListLoading, 
@@ -76,14 +88,16 @@ export function AlertsMonitoring() {
       if (!res.ok) throw new Error(`Failed to fetch incidents (HTTP ${res.status})`);
       return res.json();
     },
-    refetchInterval: 4000,
-    staleTime: 2000,
+    refetchInterval: isStreaming ? false : 10000,
+    staleTime: 5000,
     retry: false
   });
 
-  // 3. Real-Time SSE Stream Connection for Zero-Latency Incident Updates
+  // 4. Real-Time SSE Stream Connection for Zero-Latency Incident Updates (Debounced)
   useEffect(() => {
     let eventSource: EventSource | null = null;
+    let debounceTimer: NodeJS.Timeout | null = null;
+
     try {
       eventSource = new EventSource("/api/stream/alerts");
       eventSource.onopen = () => {
@@ -93,8 +107,19 @@ export function AlertsMonitoring() {
         try {
           const payload = JSON.parse(event.data);
           if (payload.type === "INCIDENTS_STREAM") {
-            queryClient.invalidateQueries({ queryKey: ["incidentsSummary"] });
-            queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
+            if (payload.summary) {
+              queryClient.setQueryData(["incidentsSummary"], { status: "success", metrics: payload.summary });
+            }
+            if (payload.system_health) {
+              queryClient.setQueryData(["systemHealthStatus"], { status: "success", health: payload.system_health });
+            }
+            // Debounce list invalidation by 3 seconds
+            if (!debounceTimer) {
+              debounceTimer = setTimeout(() => {
+                queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
+                debounceTimer = null;
+              }, 3000);
+            }
           }
         } catch (e) {}
       };
@@ -106,6 +131,7 @@ export function AlertsMonitoring() {
     }
 
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       if (eventSource) {
         eventSource.close();
       }
@@ -289,7 +315,7 @@ export function AlertsMonitoring() {
       />
 
       {/* 3. Live Subsystem Health Observability Bar */}
-      <LiveOperationsBar />
+      <LiveOperationsBar health={systemHealthData?.health} />
 
       {/* 4. Multi-Criteria Filter Toolbar */}
       <AlertFiltersToolbar

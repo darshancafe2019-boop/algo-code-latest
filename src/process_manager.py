@@ -290,7 +290,7 @@ class BotProcessManager:
                 logger.warning(f"Could not update bot_instances status for {self.bot_id}: {dbe}")
 
             log_audit_event(action="BOT_START", user="Trader", details={"bot_id": self.bot_id, "pid": self.process.pid})
-            log_notification("INFO", "Bot Control", f"Bot {self.bot_id} started (PID {self.process.pid}).")
+            log_notification("INFO", "Bot Control", f"Bot {self.bot_id} started (PID {self.process.pid}).", bot_id=self.bot_id)
             
             try:
                 from src.telegram_service import global_telegram_service
@@ -318,7 +318,7 @@ class BotProcessManager:
             self.status_state = BOT_STATE_ERROR
             self.last_error = str(e)
             logger.error(f"Failed to start bot process {self.bot_id}: {e}")
-            log_notification("ERROR", "Bot Control", f"Failed to start bot {self.bot_id}: {e}")
+            log_notification("ERROR", "Bot Control", f"Failed to start bot {self.bot_id}: {e}", bot_id=self.bot_id)
             try:
                 from src.telegram_service import global_telegram_service
                 global_telegram_service.send_bot_alert(
@@ -332,7 +332,9 @@ class BotProcessManager:
             return {"status": "error", "message": str(e), "state": BOT_STATE_ERROR}
 
     def stop_bot(self) -> Dict[str, Any]:
-        """Stop the live runner process cleanly."""
+        """Stop the live runner process cleanly with strict idempotency."""
+        if not self.is_running() and self.status_state == BOT_STATE_STOPPED:
+            return {"status": "already_stopped", "message": f"Bot '{self.bot_id}' is already stopped.", "state": BOT_STATE_STOPPED}
         self.status_state = BOT_STATE_STOPPING
         try:
             if self.process:
@@ -480,7 +482,7 @@ class BotProcessManager:
             pass
 
         log_audit_event(action="BOT_RESUME", user="Trader", details={"bot_id": self.bot_id})
-        log_notification("INFO", "Bot Control", f"Bot {self.bot_id} execution resumed.")
+        log_notification("INFO", "Bot Control", f"Bot {self.bot_id} execution resumed.", bot_id=self.bot_id)
 
         try:
             from src.telegram_service import global_telegram_service
@@ -973,13 +975,12 @@ class MultiBotManager:
 
 
 class BotWatchdog(threading.Thread):
-    """Background watchdog thread that detects stalled bot instances and attempts automatic self-recovery."""
+    """Background watchdog thread that detects stalled bot instances and delegates to SelfHealingManager."""
     def __init__(self, check_interval_sec: int = 30, stall_threshold_sec: int = 900):
         super().__init__(daemon=True, name="BotWatchdogThread")
         self.check_interval = check_interval_sec
         self.stall_threshold = stall_threshold_sec
         self._running = True
-        self._last_recovery_time: Dict[str, float] = {}
 
     def run(self):
         logger.info("BotWatchdog thread started.")
@@ -992,6 +993,7 @@ class BotWatchdog(threading.Thread):
 
     def _check_stalled_bots(self):
         from src.db import get_connection, log_bot_activity
+        from src.self_healing_manager import global_self_healing_manager
         try:
             conn = get_connection()
             cursor = conn.cursor()
@@ -1000,7 +1002,6 @@ class BotWatchdog(threading.Thread):
             conn.close()
 
             now_utc = datetime.now(timezone.utc)
-            now_ts = time.time()
             
             for r in rows:
                 bot_id = r['id']
@@ -1025,44 +1026,32 @@ class BotWatchdog(threading.Thread):
                 effective_threshold = self.stall_threshold if self.stall_threshold != 900 else dynamic_stall_threshold
 
                 if seconds_ago > effective_threshold:
-                    # Enforce cooldown of 120 seconds between auto-recovery attempts per bot
-                    last_rec = self._last_recovery_time.get(bot_id, 0)
-                    if now_ts - last_rec < 120:
-                        continue
-                    self._last_recovery_time[bot_id] = now_ts
+                    def _recovery_cb():
+                        multi_bot_manager.stop_bot(bot_id)
+                        time.sleep(0.5)
+                        return multi_bot_manager.start_bot(bot_id)
 
-                    msg = f"Watchdog detected stall — attempting automatic restart for '{b_name}' ({bot_id}, {seconds_ago}s inactive)."
-                    logger.warning(msg)
-                    log_bot_activity(bot_id, "STALLED_RECOVERY", "Watchdog detected stall — attempting automatic restart", {"seconds_ago": seconds_ago})
-                    log_notification("WARNING", "Watchdog Recovery", msg)
-
-                    # Update status in DB
-                    try:
-                        conn2 = get_connection()
-                        conn2.execute("UPDATE bot_instances SET status = 'STALLED' WHERE id = ?", (bot_id,))
-                        conn2.commit()
-                        conn2.close()
-                    except Exception:
-                        pass
-
-                    # Attempt restart
-                    multi_bot_manager.stop_bot(bot_id)
-                    time.sleep(0.5)
-                    start_res = multi_bot_manager.start_bot(bot_id)
-
-                    if start_res.get("status") in ["success", "already_running"]:
-                        log_bot_activity(bot_id, "RESTART_SUCCESS", f"Watchdog auto-recovered bot instance '{b_name}'. Process PID: {start_res.get('pid')}")
-                        logger.info(f"Watchdog auto-recovery succeeded for '{b_name}' ({bot_id}).")
+                    def _on_exhausted_cb():
                         try:
-                            from src.telegram_alert import TelegramAlert
-                            TelegramAlert().send_message(f"🔄 <b>Watchdog Auto-Recovery</b>\nBot <code>{b_name}</code> was stalled and was automatically restarted successfully.")
+                            conn2 = get_connection()
+                            conn2.execute("UPDATE bot_instances SET status = 'ERROR', last_error = 'Auto-recovery exhausted. Manual restart required.' WHERE id = ?", (bot_id,))
+                            conn2.commit()
+                            conn2.close()
                         except Exception:
                             pass
-                    else:
-                        fail_msg = f"Watchdog auto-recovery failed for bot '{b_name}' ({bot_id}): {start_res.get('message')}"
-                        logger.error(fail_msg)
-                        log_bot_activity(bot_id, "RESTART_FAILED", fail_msg)
-                        log_notification("ERROR", "Watchdog Alert", f"CRITICAL: Watchdog failed to auto-recover stalled bot {bot_id}: {start_res.get('message')}. Manual intervention required.")
+
+                    recovery_res = global_self_healing_manager.execute_safe_recovery(
+                        entity_id=bot_id,
+                        entity_type="BOT",
+                        failure_reason=f"Stalled for {seconds_ago}s (> {effective_threshold}s threshold)",
+                        recovery_callback=_recovery_cb,
+                        on_exhausted_callback=_on_exhausted_cb
+                    )
+                    
+                    if recovery_res.get("status") == "success":
+                        log_bot_activity(bot_id, "RESTART_SUCCESS", f"Watchdog auto-recovered bot instance '{b_name}'.")
+                    elif recovery_res.get("status") == "exhausted":
+                        log_bot_activity(bot_id, "RESTART_EXHAUSTED", f"Auto-recovery exhausted for '{b_name}'. Bot marked ERROR.")
         except Exception as e:
             logger.error(f"Watchdog check failed: {e}")
 

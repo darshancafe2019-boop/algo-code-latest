@@ -47,6 +47,7 @@ Thumbs.db
 .zip
 .artifacts/
 .chrome_dev_audit/
+scratch/
 
 # Python cache & build files
 __pycache__/

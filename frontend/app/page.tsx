@@ -26,7 +26,6 @@ import { CryptoOptionChainTerminal } from "@/components/crypto/CryptoOptionChain
 import { OrderExecutionCenter } from "@/components/order-execution/OrderExecutionCenter";
 import { EcoPositionsView } from "@/components/positions/EcoPositionsView";
 import { OptionStrategyBuilder } from "@/components/crypto/OptionStrategyBuilder";
-import { TradingIntelligenceWorkspace } from "@/components/intelligence/TradingIntelligenceWorkspace";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function MainApp() {
@@ -39,13 +38,6 @@ function MainApp() {
         {activeTab === "home" && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
-          </ErrorBoundary>
-        )}
-
-        {/* 0.1 Trading Intelligence Operating System */}
-        {activeTab === "intelligence" && (
-          <ErrorBoundary title="Trading Intelligence Failed">
-            <TradingIntelligenceWorkspace />
           </ErrorBoundary>
         )}
 

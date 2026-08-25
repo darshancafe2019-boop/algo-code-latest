@@ -224,3 +224,155 @@ export interface MarketContextData {
   data_quality: "EXCELLENT" | "DEGRADED" | "STALE" | "DISCONNECTED";
   last_updated: string;
 }
+
+// -------------------------------------------------------------
+// 6-STEP BOT WIZARD CONFIGURATION DATA MODEL & UTILITIES
+// -------------------------------------------------------------
+
+export type WizardAssetClass =
+  | "STOCKS"
+  | "INDEX"
+  | "FUTURES"
+  | "OPTIONS"
+  | "CRYPTO"
+  | "CRYPTO_OPTIONS"
+  | "COMMODITIES"
+  | "FOREX"
+  | "ETF";
+
+export interface IndicatorParamConfig {
+  [key: string]: number | string | boolean;
+}
+
+export interface IndicatorConfigItem {
+  id: string;
+  name: string;
+  category: "Trend" | "Momentum" | "Volume" | "Volatility" | "Support/Resistance" | "Derivatives";
+  timeframe: string;
+  params: IndicatorParamConfig;
+}
+
+export interface StrategyRuleItem {
+  id: string;
+  leftIndicatorId: string;
+  operator: ">" | "<" | ">=" | "<=" | "==" | "!=" | "CROSSES_ABOVE" | "CROSSES_BELOW";
+  rightType: "INDICATOR" | "VALUE" | "THRESHOLD";
+  rightIndicatorId?: string;
+  rightValue?: number | string;
+  isMandatory: boolean;
+  timeframe?: string;
+}
+
+export interface StrategyRuleGroup {
+  logicalOperator: "AND" | "OR";
+  rules: StrategyRuleItem[];
+}
+
+export interface BotConfiguration {
+  identity: {
+    name: string;
+    description: string;
+    groupName: string;
+    environment: BotExecutionMode;
+  };
+  capital: {
+    totalCapital: number;
+    allocatedCapital: number;
+    currency: string;
+  };
+  market: {
+    assetClass: WizardAssetClass;
+    exchange: string;
+    symbol: string;
+    stockName?: string;
+    indexName?: string;
+    commodityName?: string;
+    forexPair?: string;
+    etfSymbol?: string;
+    timeframe: string;
+    additionalTimeframes: string[];
+  };
+  derivatives: {
+    callPremiumMin: number | null;
+    callPremiumMax: number | null;
+    putPremiumMin: number | null;
+    putPremiumMax: number | null;
+    futurePremiumMin: number | null;
+    futurePremiumMax: number | null;
+    indexPremiumMin: number | null;
+    indexPremiumMax: number | null;
+    optionSide: "CALL" | "PUT" | "BOTH";
+    expiry: string;
+    strikeMode: "ATM" | "ITM" | "OTM" | "CUSTOM";
+    strikeOffset: number;
+  };
+  cryptoOptions: {
+    exchange: string;
+    underlying: string;
+    optionType: "CALL" | "PUT" | "BOTH";
+    expiry: string;
+    strike: string;
+    premiumMin: number | null;
+    premiumMax: number | null;
+  };
+  strategy: {
+    templateName: string;
+    indicators: IndicatorConfigItem[];
+    ruleTree: StrategyRuleGroup;
+    confluenceThresholdPct: number;
+  };
+  risk: {
+    stopLossPct: number;
+    takeProfitPct: number;
+    trailingStopEnabled: boolean;
+    trailingStopPct: number;
+    activationProfitPct: number;
+    riskPerTradePct: number;
+    maxDailyDrawdownPct: number;
+    maxOpenPositions: number;
+  };
+  execution: {
+    brokerId: string;
+    accountId: string;
+    leverage: number;
+    executionMode: "MANUAL" | "AUTOMATIC";
+    orderType: "MARKET" | "LIMIT" | "STOP" | "STOP-LIMIT";
+    maxSlippagePct: number;
+  };
+}
+
+// -------------------------------------------------------------
+// DETERMINISTIC CALCULATION HELPERS
+// -------------------------------------------------------------
+
+export function calculateRemainingCapital(total: number, allocated: number): number {
+  if (isNaN(total) || isNaN(allocated)) return 0;
+  return Math.max(0, Math.round((total - allocated) * 100) / 100);
+}
+
+export function calculateAllocationPct(total: number, allocated: number): number {
+  if (!total || total <= 0 || isNaN(allocated) || allocated <= 0) return 0;
+  const pct = (allocated / total) * 100;
+  return Math.min(100, Math.max(0, Math.round(pct * 10) / 10));
+}
+
+export function calculateRiskAmount(allocated: number, riskPct: number): number {
+  if (isNaN(allocated) || isNaN(riskPct) || allocated <= 0 || riskPct <= 0) return 0;
+  return Math.round((allocated * (riskPct / 100)) * 100) / 100;
+}
+
+export function calculateRiskRewardRatio(stopLossPct: number, takeProfitPct: number): string {
+  if (isNaN(stopLossPct) || isNaN(takeProfitPct) || stopLossPct <= 0) return "1 : 2.0";
+  const ratio = takeProfitPct / stopLossPct;
+  if (!isFinite(ratio) || ratio <= 0) return "1 : 2.0";
+  return `1 : ${ratio.toFixed(2)}`;
+}
+
+export function formatCurrency(amount: number, currency: string = "INR"): string {
+  const symbol = currency === "INR" || currency === "₹" ? "₹" : currency === "USDT" ? "USDT " : "$";
+  if (currency === "INR" || currency === "₹") {
+    return `${symbol}${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  }
+  return `${symbol}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+}
+

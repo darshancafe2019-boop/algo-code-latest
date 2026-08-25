@@ -19,7 +19,6 @@ if (!fs.existsSync(ARTIFACTS_DIR)) {
 // Master Tab Inventory from Project Navigation
 const NAVIGATION_TABS = [
   { id: "home", label: "HOME", path: "/", selector: 'a[href="/"], button[data-tab="home"]' },
-  { id: "intelligence", label: "INTELLIGENCE", path: "/intelligence", selector: 'a[href="/intelligence"]' },
   { id: "markets", label: "MARKETS", path: "/charts", selector: 'a[href="/charts"]' },
   { id: "watchlist", label: "WATCHLIST", path: "/watchlists", selector: 'a[href="/watchlists"]' },
   { id: "scanner", label: "SCANNER", path: "/scanner", selector: 'a[href="/scanner"]' },
@@ -236,7 +235,7 @@ async function runMasterTabAudit() {
     } catch (e) {}
 
     // Test Mobile Bottom Bar Tabs
-    const mobileTabs = ["/", "/intelligence", "/charts", "/bots", "/positions"];
+    const mobileTabs = ["/", "/charts", "/bots", "/positions", "/risk"];
     for (const mPath of mobileTabs) {
       const mLink = await mobilePage.$(`nav a[href="${mPath}"], footer a[href="${mPath}"]`);
       if (mLink) {

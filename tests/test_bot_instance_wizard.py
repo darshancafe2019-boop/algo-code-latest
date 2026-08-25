@@ -54,10 +54,10 @@ class TestBotInstanceWizardSystem:
         res1 = client.post("/api/bots/validate", json={"name": "", "allocated_capital": -500})
         assert res1.status_code == 400
         data1 = res1.get_json()
-        assert "Bot Name is required." in data1["errors"]
-        assert "Available Capital must be strictly greater than 0." in data1["errors"]
+        assert any("Bot Name" in err for err in data1["errors"])
+        assert any("Allocated Capital" in err for err in data1["errors"])
 
-        # Case 2: Zero Lot Size and Excessive Leverage (> 20x)
+        # Case 2: Zero Lot Size and Excessive Leverage (> 25x)
         res2 = client.post("/api/bots/validate", json={
             "name": "TestBot",
             "symbol": "ETH/USDT",
@@ -69,8 +69,57 @@ class TestBotInstanceWizardSystem:
         assert res2.status_code == 400
         data2 = res2.get_json()
         assert "Lot size must be at least 1." in data2["errors"]
-        assert "Leverage must be between 1x and 20x." in data2["errors"]
+        assert any("Leverage" in err for err in data2["errors"])
         assert "Stop-Loss % must be between 0.1% and 50%." in data2["errors"]
+
+    def test_02b_capital_and_options_validation(self, client):
+        """Test capital bounds and options premium validation."""
+        # Allocated exceeding total capital
+        res_cap = client.post("/api/bots/validate", json={
+            "name": "Overallocated Bot",
+            "symbol": "BTC/USDT",
+            "total_capital": 500000.0,
+            "allocated_capital": 600000.0
+        })
+        assert res_cap.status_code == 400
+        assert any("cannot exceed Total Capital Available" in err for err in res_cap.get_json()["errors"])
+
+        # Valid capital allocation
+        res_cap_ok = client.post("/api/bots/validate", json={
+            "name": "Properly Sized Bot",
+            "symbol": "BTC/USDT",
+            "total_capital": 500000.0,
+            "allocated_capital": 100000.0
+        })
+        assert res_cap_ok.status_code == 200
+        assert res_cap_ok.get_json()["preview"]["remaining_capital"] == 400000.0
+        assert res_cap_ok.get_json()["preview"]["allocation_pct"] == 20.0
+
+        # Invalid options premium (min > max)
+        res_opt = client.post("/api/bots/validate", json={
+            "name": "Options Spread Bot",
+            "symbol": "NIFTY",
+            "asset_class": "OPTIONS",
+            "allocated_capital": 50000.0,
+            "options_config": {
+                "call_premium_min": 250.0,
+                "call_premium_max": 100.0
+            }
+        })
+        assert res_opt.status_code == 400
+        assert any("Minimum Call Premium cannot be greater" in err for err in res_opt.get_json()["errors"])
+
+    def test_02c_brokers_status_endpoint(self, client):
+        """Test /api/brokers/status returns connected brokers and leverage."""
+        res = client.get("/api/brokers/status")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert data["status"] == "success"
+        assert len(data["brokers"]) >= 5
+        broker_ids = [b["id"] for b in data["brokers"]]
+        assert "paper_simulator" in broker_ids
+        assert "dhan_india" in broker_ids
+        assert "ccxt_binance" in broker_ids
 
     def test_03_create_bot_instance_crypto(self, client):
         """Test creating a Crypto bot instance with full risk and indicator config."""

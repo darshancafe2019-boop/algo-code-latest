@@ -25,11 +25,13 @@ import {
   Radio,
   Sparkles,
   Paintbrush,
+  BrainCircuit,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { executeCommand } from "@/lib/commandClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
+import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 
 interface TickerData {
   symbol: string;
@@ -60,6 +62,7 @@ export function Navbar({
   const [activateSuccess, setActivateSuccess] = useState(false);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
 
+  const [isMarketAnalystOpen, setIsMarketAnalystOpen] = useState(false);
   const [ticker, setTicker] = useState<TickerData>({
     symbol: activeSymbol || "BTC/USDT",
     last: 65420.0,
@@ -300,6 +303,19 @@ export function Navbar({
 
         {/* Right Top Action Buttons */}
         <div className="flex items-center gap-2">
+          {/* Market Analyst Copilot Quick Trigger */}
+          <button
+            onClick={() => setIsMarketAnalystOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition shadow-sm"
+            title="Open Read-Only GPT Market Analyst Copilot"
+          >
+            <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Market Analyst</span>
+            <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+              GPT
+            </span>
+          </button>
+
           {/* Command Palette Quick Trigger */}
           <button
             onClick={() => onOpenCommandPalette?.()}
@@ -401,6 +417,15 @@ export function Navbar({
           );
         })}
       </nav>
+
+      {/* Market Analyst Copilot Modal/Drawer */}
+      <MarketAnalystDrawer
+        isOpen={isMarketAnalystOpen}
+        onClose={() => setIsMarketAnalystOpen(false)}
+        symbol={ticker?.symbol || activeSymbol || "BTC/USDT"}
+        assetClass="crypto"
+        exchange="binance"
+      />
     </header>
   );
 }

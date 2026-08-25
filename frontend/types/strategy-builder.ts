@@ -154,15 +154,3 @@ export interface StrategyPaletteItem {
   badge?: string;
   iconName?: string;
 }
-
-export interface NaturalLanguagePromptResult {
-  strategyName: string;
-  description: string;
-  direction: StrategyDirection;
-  symbol: string;
-  timeframe: RuleTimeframe;
-  entry_rules: VisualRule[];
-  confirmation_rules: VisualRule[];
-  risk: Partial<StrategyRiskConfig>;
-  raw_prompt: string;
-}

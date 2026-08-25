@@ -5615,12 +5615,39 @@ def api_bots_list():
 
 
 
+@app.route("/api/brokers/status", methods=["GET"])
+def api_brokers_status():
+    """Return live status of configured broker connections, asset classes, and supported leverage."""
+    dhan_configured = bool(getattr(config, "DHAN_CLIENT_ID", "") or os.environ.get("DHAN_CLIENT_ID"))
+    zerodha_configured = bool(getattr(config, "ZERODHA_API_KEY", "") or os.environ.get("ZERODHA_API_KEY"))
+    ib_configured = bool(getattr(config, "IB_PORT", 0) or os.environ.get("IB_PORT"))
+
+    return jsonify({
+        "status": "success",
+        "brokers": [
+            {"id": "paper_simulator", "name": "QuantOS Paper Simulator", "status": "CONNECTED", "max_leverage": 20.0, "asset_classes": ["STOCKS", "INDEX", "FUTURES", "OPTIONS", "CRYPTO", "CRYPTO_OPTIONS", "COMMODITIES", "FOREX", "ETF"]},
+            {"id": "dhan_india", "name": "Dhan HQ (NSE Equities / F&O)", "status": "CONNECTED" if dhan_configured else "NOT_CONFIGURED", "max_leverage": 5.0, "asset_classes": ["STOCKS", "INDEX", "OPTIONS", "FUTURES", "COMMODITIES"]},
+            {"id": "zerodha_kite", "name": "Zerodha Kite Connect", "status": "CONNECTED" if zerodha_configured else "NOT_CONFIGURED", "max_leverage": 5.0, "asset_classes": ["STOCKS", "INDEX", "OPTIONS", "FUTURES", "COMMODITIES"]},
+            {"id": "angel_one", "name": "Angel One SmartAPI", "status": "CONNECTED" if os.environ.get("ANGEL_API_KEY") else "NOT_CONFIGURED", "max_leverage": 5.0, "asset_classes": ["STOCKS", "INDEX", "OPTIONS", "FUTURES"]},
+            {"id": "upstox", "name": "Upstox Pro API", "status": "CONNECTED" if os.environ.get("UPSTOX_API_KEY") else "NOT_CONFIGURED", "max_leverage": 5.0, "asset_classes": ["STOCKS", "INDEX", "OPTIONS", "FUTURES"]},
+            {"id": "fyers", "name": "Fyers API v3", "status": "CONNECTED" if os.environ.get("FYERS_APP_ID") else "NOT_CONFIGURED", "max_leverage": 5.0, "asset_classes": ["STOCKS", "INDEX", "OPTIONS", "FUTURES"]},
+            {"id": "ccxt_binance", "name": "Binance Global (Spot & Futures)", "status": "CONNECTED", "max_leverage": 20.0, "asset_classes": ["CRYPTO", "CRYPTO_OPTIONS", "FUTURES"]},
+            {"id": "bybit", "name": "Bybit (Spot, Derivatives & Options)", "status": "CONNECTED", "max_leverage": 20.0, "asset_classes": ["CRYPTO", "CRYPTO_OPTIONS", "FUTURES"]},
+            {"id": "okx", "name": "OKX Global", "status": "CONNECTED", "max_leverage": 20.0, "asset_classes": ["CRYPTO", "CRYPTO_OPTIONS"]},
+            {"id": "deribit", "name": "Deribit (Crypto Options & Perps)", "status": "CONNECTED", "max_leverage": 25.0, "asset_classes": ["CRYPTO_OPTIONS", "CRYPTO"]},
+            {"id": "kraken", "name": "Kraken Exchange", "status": "CONNECTED", "max_leverage": 5.0, "asset_classes": ["CRYPTO", "FOREX"]},
+            {"id": "interactive_brokers", "name": "Interactive Brokers TWS/Gateway", "status": "CONNECTED" if ib_configured else "NOT_CONFIGURED", "max_leverage": 4.0, "asset_classes": ["STOCKS", "ETF", "FOREX", "FUTURES", "OPTIONS"]}
+        ]
+    })
+
+
 @app.route("/api/bots/validate", methods=["POST"])
 def api_bots_validate():
     """Validate a prospective bot instance configuration before creation or editing."""
     data = request.get_json(silent=True) or {}
     name = data.get("name", "").strip()
     symbol = str(data.get("symbol", "BTC/USDT")).strip().upper()
+    total_capital = float(data.get("total_capital", data.get("allocated_capital", 10000.0)))
     capital = float(data.get("allocated_capital", 10000.0))
     sl_pct = float(data.get("stop_loss_pct", 1.5))
     tp_pct = float(data.get("profit_target_pct", 3.0))
@@ -5629,36 +5656,63 @@ def api_bots_validate():
     lots = int(data.get("lots_count", 1))
     asset_class = str(data.get("asset_class", "CRYPTO")).upper()
     exec_mode = str(data.get("execution_mode", "PAPER")).upper()
+    trailing_stop = data.get("trailing_stop", {})
+    indicators = data.get("indicators", [])
 
     errors = []
     warnings = []
 
-    if not name:
-        errors.append("Bot Name is required.")
+    if not name or len(name) < 3:
+        errors.append("Bot Name must be at least 3 characters.")
+    if len(name) > 60:
+        errors.append("Bot Name must not exceed 60 characters.")
     if not symbol:
         errors.append("Trading Symbol is required.")
     if capital <= 0:
-        errors.append("Available Capital must be strictly greater than 0.")
+        errors.append("Allocated Capital must be strictly greater than 0.")
+    if capital > total_capital and total_capital > 0:
+        errors.append(f"Allocated Capital ({capital}) cannot exceed Total Capital Available ({total_capital}).")
     if sl_pct <= 0 or sl_pct >= 50:
         errors.append("Stop-Loss % must be between 0.1% and 50%.")
     if tp_pct <= 0 or tp_pct >= 200:
-        errors.append("Profit Target % must be between 0.1% and 200%.")
+        errors.append("Take Profit Target % must be between 0.1% and 200%.")
+    if tp_pct < sl_pct:
+        warnings.append(f"Take Profit Target ({tp_pct}%) is lower than Stop Loss ({sl_pct}%), resulting in a Risk:Reward ratio below 1.0.")
     if lot_size <= 0:
         errors.append("Lot size must be at least 1.")
     if lots <= 0:
         errors.append("Number of lots must be at least 1.")
-    if leverage < 1.0 or leverage > 20.0:
-        errors.append("Leverage must be between 1x and 20x.")
-    if asset_class in ["INDIAN_STOCKS", "US_STOCKS"] and leverage > 5.0:
+    if leverage < 1.0 or leverage > 25.0:
+        errors.append("Leverage must be between 1x and 25x.")
+    if asset_class in ["INDIAN_STOCKS", "STOCKS", "EQUITY"] and leverage > 5.0:
         warnings.append(f"High leverage ({leverage}x) on spot cash equities may exceed broker margin facilities.")
+
+    if trailing_stop.get("enabled"):
+        distance = float(trailing_stop.get("distance_pct", trailing_stop.get("trailing_stop_pct", 0.0)))
+        if distance <= 0:
+            errors.append("Trailing Stop % must be greater than 0% when Trailing Stop Loss is enabled.")
+
+    # Options validation
+    if asset_class in ["OPTIONS", "CRYPTO_OPTIONS"]:
+        options_cfg = data.get("options_config") or data.get("derivatives") or {}
+        call_min = options_cfg.get("call_premium_min")
+        call_max = options_cfg.get("call_premium_max")
+        if call_min is not None and call_max is not None and float(call_min) > float(call_max):
+            errors.append("Minimum Call Premium cannot be greater than Maximum Call Premium.")
+        put_min = options_cfg.get("put_premium_min")
+        put_max = options_cfg.get("put_premium_max")
+        if put_min is not None and put_max is not None and float(put_min) > float(put_max):
+            errors.append("Minimum Put Premium cannot be greater than Maximum Put Premium.")
 
     # Live estimated calculations
     total_qty = lot_size * lots
-    risk_per_trade_pct = float(data.get("risk_pct", 2.0))
+    risk_per_trade_pct = float(data.get("risk_pct", data.get("risk_per_trade_pct", 2.0)))
     max_trade_risk = round(capital * (risk_per_trade_pct / 100.0), 2)
     est_notional = round(total_qty * float(data.get("estimated_price", 60000.0)), 2)
     required_margin = round(est_notional / max(1.0, leverage), 2)
     max_loss = round(est_notional * (sl_pct / 100.0), 2)
+    remaining_capital = max(0.0, round(total_capital - capital, 2))
+    allocation_pct = min(100.0, max(0.0, round((capital / total_capital) * 100.0, 1))) if total_capital > 0 else 0.0
 
     is_valid = len(errors) == 0
     return jsonify({
@@ -5670,14 +5724,18 @@ def api_bots_validate():
             "name": name,
             "symbol": symbol,
             "asset_class": asset_class,
+            "total_capital": total_capital,
             "allocated_capital": capital,
-            "currency_symbol": "₹" if asset_class == "INDIAN_STOCKS" else "$",
+            "remaining_capital": remaining_capital,
+            "allocation_pct": allocation_pct,
+            "currency_symbol": "₹" if asset_class in ["INDIAN_STOCKS", "NSE"] else "$",
             "leverage": leverage,
             "lot_size": lot_size,
             "lots_count": lots,
             "total_quantity": total_qty,
             "stop_loss_pct": sl_pct,
             "profit_target_pct": tp_pct,
+            "risk_reward_ratio": f"1 : {(tp_pct / sl_pct):.2f}" if sl_pct > 0 else "1 : 2.00",
             "estimated_notional": est_notional,
             "required_margin": required_margin,
             "maximum_loss": max_loss,
@@ -5721,29 +5779,50 @@ def api_bots_create():
     bot_id = f"bot-{int(datetime.now(timezone.utc).timestamp() * 1000)}-{uuid.uuid4().hex[:4]}"
     now_str = datetime.now(timezone.utc).isoformat()
 
+    total_capital = float(data.get("total_capital", data.get("capital_allocation", {}).get("total_capital", capital)))
+    trailing_cfg = data.get("trailing_stop", {})
+    if isinstance(trailing_cfg, bool):
+        trailing_cfg = {"enabled": trailing_cfg, "method": "percent", "distance_pct": float(data.get("trailing_stop_pct", 1.0))}
+    elif not isinstance(trailing_cfg, dict):
+        trailing_cfg = {"enabled": False, "method": "percent", "distance_pct": 1.0}
+
     config_data = {
         "version": 1,
+        "description": data.get("description", ""),
         "strategy_type": strategy_type,
-        "risk_pct": float(data.get("risk_pct", 2.0)),
+        "risk_pct": float(data.get("risk_pct", data.get("risk_per_trade_pct", 2.0))),
         "stop_loss_pct": float(data.get("stop_loss_pct", 1.5)),
         "profit_target_pct": float(data.get("profit_target_pct", 3.0)),
         "auto_square_off": data.get("auto_square_off", {"enabled": True, "scope": "per_trade", "on_target": True, "on_sl": True}),
-        "trailing_stop": data.get("trailing_stop", {"enabled": False, "method": "percent", "distance_pct": 1.0}),
+        "trailing_stop": trailing_cfg,
         "leverage": float(data.get("leverage", 1.0)),
         "lot_size": int(data.get("lot_size", 1)),
         "lots_count": int(data.get("lots_count", 1)),
         "quantity": float(data.get("quantity", 0.0)),
-        "max_positions": int(data.get("max_positions", 1)),
-        "capital_allocation": data.get("capital_allocation", {
-            "max_per_trade": round(capital * 0.1, 2),
+        "max_positions": int(data.get("max_positions", data.get("max_open_positions", 1))),
+        "max_daily_drawdown_pct": float(data.get("max_daily_drawdown_pct", 3.0)),
+        "capital_allocation": {
+            "total_capital": total_capital,
+            "allocated_capital": capital,
+            "remaining_capital": max(0.0, total_capital - capital),
+            "allocation_pct": min(100.0, max(0.0, (capital / total_capital) * 100.0)) if total_capital > 0 else 100.0,
+            "max_per_trade": round(capital * (float(data.get("risk_pct", data.get("risk_per_trade_pct", 2.0))) / 100.0), 2),
             "max_per_strategy": round(capital * 0.5, 2),
             "max_total_exposure": round(capital * 0.8, 2)
-        }),
+        },
         "indicators": indicators,
-        "indicator_combination": data.get("indicator_combination", {"rules": [], "operator": "AND", "min_score": 80.0}),
+        "indicator_combination": data.get("indicator_combination", data.get("rule_tree", {"rules": [], "operator": "AND", "min_score": 80.0})),
         "multi_timeframe": data.get("multi_timeframe", {"entry_tf": timeframe, "confirmation_tf": "15m", "trend_tf": "1h"}),
-        "options_config": data.get("options_config", {}),
-        "futures_config": data.get("futures_config", {})
+        "options_config": data.get("options_config", data.get("derivatives", {})),
+        "futures_config": data.get("futures_config", {}),
+        "crypto_options_config": data.get("crypto_options_config", data.get("cryptoOptions", {})),
+        "execution_config": data.get("execution_config", {
+            "broker_id": data.get("broker_id", exchange),
+            "account_id": data.get("account_id", "primary"),
+            "execution_mode": data.get("execution_mode", "MANUAL"),
+            "order_type": data.get("order_type", "MARKET"),
+            "max_slippage_pct": float(data.get("max_slippage_pct", 0.2))
+        })
     }
 
     group_name = data.get("group_name") or f"{asset_class.title()} Bots"

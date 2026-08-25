@@ -139,7 +139,6 @@ async function runTestSuite() {
 
   const testRoutes = [
     "/",
-    "/intelligence",
     "/charts",
     "/bots",
     "/positions",
@@ -202,7 +201,7 @@ async function runTestSuite() {
       await new Promise((r) => setTimeout(r, 1000));
       await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_320.png") });
     } else if (vp.width === 390) {
-      await page.goto(`${BASE_URL}/intelligence`, { waitUntil: "domcontentloaded" });
+      await page.goto(`${BASE_URL}/charts`, { waitUntil: "domcontentloaded" });
       await new Promise((r) => setTimeout(r, 1000));
       await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_390.png") });
     } else if (vp.width === 768) {

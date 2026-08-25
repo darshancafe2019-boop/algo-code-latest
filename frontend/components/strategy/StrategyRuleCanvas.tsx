@@ -2,569 +2,877 @@
 
 import React, { useState } from "react";
 import {
-  Sparkles,
-  Zap,
+  Layers,
+  CheckCircle2,
+  AlertCircle,
   Plus,
   Trash2,
-  Code,
-  Copy,
+  Edit2,
   ChevronDown,
   ChevronUp,
+  MoveUp,
+  MoveDown,
+  Sliders,
+  Check,
+  X,
+  Clock,
+  ArrowRight,
+  TrendingUp,
+  Activity,
+  Zap,
+  ShieldCheck,
+  Search
 } from "lucide-react";
 import {
   StrategyIdeDefinition,
   StrategyIdeRule,
   RuleTimeframe,
-  RuleOperator,
+  StrategyDirection,
 } from "@/types/strategy-ide";
+import { RuleTargetStage } from "./StrategyBuildLibrary";
 
 interface StrategyRuleCanvasProps {
   strategy: StrategyIdeDefinition;
   onUpdateStrategy: (fields: Partial<StrategyIdeDefinition>) => void;
-  onUpdateRule: (
-    groupKey: "setup" | "confirmation" | "trigger",
-    ruleId: string,
-    updated: Partial<StrategyIdeRule>
-  ) => void;
-  onDeleteRule: (groupKey: "setup" | "confirmation" | "trigger", ruleId: string) => void;
-  onAddRule: (groupKey: "setup" | "confirmation" | "trigger") => void;
-  compiledExpression: string;
+  onSelectRuleToEdit?: (rule: StrategyIdeRule, stage: RuleTargetStage) => void;
 }
 
-const TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
-
-const OPERATORS: { value: RuleOperator; label: string }[] = [
-  { value: ">", label: "> (Greater Than)" },
-  { value: "<", label: "< (Less Than)" },
-  { value: ">=", label: ">= (Greater or Equal)" },
-  { value: "<=", label: "<= (Less or Equal)" },
-  { value: "==", label: "== (Equal)" },
-  { value: "!=", label: "!= (Not Equal)" },
-  { value: "crosses_above", label: "Crosses Above ↑" },
-  { value: "crosses_below", label: "Crosses Below ↓" },
-  { value: "in_range", label: "In Range" },
+const SUPPORTED_OPERATORS = [
+  { value: ">", label: "Greater Than (>)" },
+  { value: "<", label: "Less Than (<)" },
+  { value: ">=", label: "Greater or Equal (>=)" },
+  { value: "<=", label: "Less or Equal (<=)" },
+  { value: "==", label: "Equals (==)" },
+  { value: "crosses_above", label: "Crosses Above" },
+  { value: "crosses_below", label: "Crosses Below" },
+  { value: "rising", label: "Rising" },
+  { value: "falling", label: "Falling" },
 ];
 
-function RuleGroupSection({
-  title,
-  badgeText,
-  badgeColor,
-  groupKey,
-  description,
+const POPULAR_INDICATORS = [
+  { id: "close", label: "Close Price", defaultOp: ">", defaultRight: "ema_200", defaultRightLabel: "EMA 200" },
+  { id: "ema_9", label: "EMA 9", defaultOp: "crosses_above", defaultRight: "ema_21", defaultRightLabel: "EMA 21" },
+  { id: "ema_21", label: "EMA 21", defaultOp: ">", defaultRight: "ema_50", defaultRightLabel: "EMA 50" },
+  { id: "ema_50", label: "EMA 50", defaultOp: ">", defaultRight: "ema_200", defaultRightLabel: "EMA 200" },
+  { id: "ema_200", label: "EMA 200", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
+  { id: "rsi_14", label: "RSI (14)", defaultOp: ">", defaultRight: "55", defaultRightLabel: "55.0" },
+  { id: "macd_line", label: "MACD Line", defaultOp: "crosses_above", defaultRight: "macd_signal", defaultRightLabel: "MACD Signal" },
+  { id: "vwap", label: "VWAP (Session)", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
+  { id: "volume", label: "Volume", defaultOp: ">", defaultRight: "volume_ma_20", defaultRightLabel: "20-bar Avg Volume" },
+  { id: "atr_14", label: "ATR (14)", defaultOp: ">", defaultRight: "10.0", defaultRightLabel: "10.0" },
+  { id: "supertrend", label: "Supertrend (10, 3)", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
+  { id: "adx_14", label: "ADX (14)", defaultOp: ">", defaultRight: "25", defaultRightLabel: "25.0" },
+];
+
+const ALL_TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+
+export function StrategyRuleCanvas({
   strategy,
   onUpdateStrategy,
-  onUpdateRule,
-  onDeleteRule,
-  onAddRule,
-}: {
-  title: string;
-  badgeText: string;
-  badgeColor: string;
-  groupKey: "setup" | "confirmation" | "trigger";
-  description: string;
-  strategy: StrategyIdeDefinition;
-  onUpdateStrategy: (fields: Partial<StrategyIdeDefinition>) => void;
-  onUpdateRule: (
-    groupKey: "setup" | "confirmation" | "trigger",
-    ruleId: string,
-    updated: Partial<StrategyIdeRule>
-  ) => void;
-  onDeleteRule: (groupKey: "setup" | "confirmation" | "trigger", ruleId: string) => void;
-  onAddRule: (groupKey: "setup" | "confirmation" | "trigger") => void;
-}) {
-  const group = strategy.entry[groupKey];
-  const rules = group?.rules || [];
+}: StrategyRuleCanvasProps) {
+  // Collapsible Stages State
+  const [isSetupOpen, setIsSetupOpen] = useState(true);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(true);
+  const [isTriggerOpen, setIsTriggerOpen] = useState(true);
+
+  // Edit Rule Slide-over Drawer State
+  const [editingRule, setEditingRule] = useState<{
+    rule: StrategyIdeRule;
+    stage: RuleTargetStage;
+  } | null>(null);
+
+  // Add Rule Modal State
+  const [addRuleModalStage, setAddRuleModalStage] = useState<RuleTargetStage | null>(null);
+  const [addRuleSearch, setAddRuleSearch] = useState("");
+  const [selectedIndForAdd, setSelectedIndForAdd] = useState(POPULAR_INDICATORS[0]);
+  const [addRuleOp, setAddRuleOp] = useState(">");
+  const [addRuleRight, setAddRuleRight] = useState("50");
+  const [addRuleTimeframe, setAddRuleTimeframe] = useState<RuleTimeframe>(strategy.base_timeframe || "15m");
+
+  const setupRules = strategy.entry?.setup?.rules || [];
+  const confirmRules = strategy.entry?.confirmation?.rules || [];
+  const triggerRules = strategy.entry?.trigger?.rules || [];
+  const totalRules = setupRules.length + confirmRules.length + triggerRules.length;
+
+  // Handlers for modifying rules
+  const handleUpdateRuleInStage = (stage: RuleTargetStage, updatedRule: StrategyIdeRule) => {
+    const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
+    const currentRules = strategy.entry[stageKey]?.rules || [];
+    const newRules = currentRules.map((r) => (r.id === updatedRule.id ? updatedRule : r));
+
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          rules: newRules,
+        },
+      },
+    });
+  };
+
+  const handleDeleteRule = (stage: RuleTargetStage, ruleId: string) => {
+    const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
+    const currentRules = strategy.entry[stageKey]?.rules || [];
+    const newRules = currentRules.filter((r) => r.id !== ruleId);
+
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          rules: newRules,
+        },
+      },
+    });
+    if (editingRule?.rule.id === ruleId) {
+      setEditingRule(null);
+    }
+  };
+
+  const handleMoveRule = (
+    fromStage: RuleTargetStage,
+    toStage: RuleTargetStage,
+    rule: StrategyIdeRule
+  ) => {
+    if (fromStage === toStage) return;
+    const fromKey = fromStage === "setup" ? "setup" : fromStage === "confirmation" ? "confirmation" : "trigger";
+    const toKey = toStage === "setup" ? "setup" : toStage === "confirmation" ? "confirmation" : "trigger";
+
+    const filteredFrom = (strategy.entry[fromKey]?.rules || []).filter((r) => r.id !== rule.id);
+    const addedTo = [...(strategy.entry[toKey]?.rules || []), rule];
+
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [fromKey]: { ...strategy.entry[fromKey], rules: filteredFrom },
+        [toKey]: { ...strategy.entry[toKey], rules: addedTo },
+      },
+    });
+  };
+
+  const handleApplyAddRule = () => {
+    if (!addRuleModalStage) return;
+    const stageKey = addRuleModalStage === "setup" ? "setup" : addRuleModalStage === "confirmation" ? "confirmation" : "trigger";
+    const newRule: StrategyIdeRule = {
+      id: `rule-${addRuleModalStage}-${Date.now()}`,
+      timeframe: addRuleTimeframe,
+      left: selectedIndForAdd.id,
+      leftLabel: selectedIndForAdd.label,
+      op: addRuleOp,
+      right: addRuleRight,
+      rightLabel: addRuleRight,
+      category: "TREND",
+      enabled: true,
+      description: `${selectedIndForAdd.label} ${addRuleOp} ${addRuleRight}`,
+    };
+
+    const currentRules = strategy.entry[stageKey]?.rules || [];
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          rules: [...currentRules, newRule],
+        },
+      },
+    });
+    setAddRuleModalStage(null);
+  };
 
   return (
-    <div className="p-3 sm:p-4 rounded-2xl bg-[#070D14] border border-[#172234] space-y-3 shadow-md">
-      {/* Group Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#131E2E] pb-2.5">
+    <div className="flex-1 space-y-4 font-sans select-none text-xs">
+      
+      {/* 1. Simple Strategy Summary Bar */}
+      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-3.5 shadow-xl flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${badgeColor}`}>
-            {badgeText}
+          <span className="font-mono font-bold text-white text-xs">{strategy.symbol}</span>
+          <span className="text-[#607D6E]">•</span>
+          <span className="font-mono text-cyan-400 font-bold">{strategy.base_timeframe}</span>
+          <span className="text-[#607D6E]">•</span>
+          <span className={`font-bold uppercase ${strategy.direction === "LONG" ? "text-[#55C98A]" : "text-red-400"}`}>
+            {strategy.direction}
           </span>
-          <h4 className="text-xs sm:text-sm font-bold text-slate-100">{title}</h4>
-          <span className="text-[11px] text-slate-500 hidden sm:inline">• {description}</span>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* AND / OR toggle */}
-          <div className="flex items-center bg-[#0B131E] border border-[#1E293B] rounded-lg p-0.5 text-[10px] font-bold">
-            <button
-              onClick={() => {
-                const updatedEntry = { ...strategy.entry };
-                updatedEntry[groupKey].conjunction = "AND";
-                onUpdateStrategy({ entry: updatedEntry });
-              }}
-              className={`px-2 py-0.5 rounded ${
-                group?.conjunction === "AND" ? "bg-cyan-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              ALL (AND)
-            </button>
-            <button
-              onClick={() => {
-                const updatedEntry = { ...strategy.entry };
-                updatedEntry[groupKey].conjunction = "OR";
-                onUpdateStrategy({ entry: updatedEntry });
-              }}
-              className={`px-2 py-0.5 rounded ${
-                group?.conjunction === "OR" ? "bg-amber-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
-              }`}
-            >
-              ANY (OR)
-            </button>
+        <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#8BA596]">SETUP:</span>
+            <span className="text-white font-bold">{setupRules.length}</span>
           </div>
-
-          <button
-            onClick={() => onAddRule(groupKey)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#111C2E] hover:bg-[#18263E] text-cyan-300 border border-cyan-800/60 text-xs font-semibold transition-all"
-          >
-            <Plus className="h-3 w-3" />
-            <span>Add Condition</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#8BA596]">CONFIRM:</span>
+            <span className="text-white font-bold">{confirmRules.length}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[#8BA596]">TRIGGER:</span>
+            <span className="text-white font-bold">{triggerRules.length}</span>
+          </div>
+          <div className="border-l border-[#142B21] pl-3 flex items-center gap-1.5">
+            <span className="text-[#55C98A] font-bold">{totalRules} TOTAL RULES</span>
+          </div>
         </div>
       </div>
 
-      {/* Rule Items */}
-      <div className="space-y-2">
-        {rules.map((r) => (
-          <div
-            key={r.id}
-            className={`p-2.5 rounded-xl border transition-all ${
-              r.enabled
-                ? "bg-[#0B131E] border-[#1E293B] hover:border-slate-600"
-                : "bg-[#0B131E]/40 border-slate-800 opacity-60"
-            }`}
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-              {/* Timeframe Select */}
-              <div className="flex items-center gap-1 bg-[#070D14] border border-[#1E293B] rounded-lg px-2 py-1">
-                <span className="text-[10px] text-slate-500 font-bold">TF:</span>
-                <select
-                  value={r.timeframe}
-                  onChange={(e) =>
-                    onUpdateRule(groupKey, r.id, { timeframe: e.target.value as RuleTimeframe })
-                  }
-                  className="bg-transparent font-mono text-cyan-400 font-bold focus:outline-none cursor-pointer text-xs"
+      {/* STAGE 1: SETUP */}
+      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsSetupOpen(!isSetupOpen)}>
+            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
+              1
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">1. SETUP</h3>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
+                  {setupRules.length} rules
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8BA596]">What market condition must exist before looking for a trade?</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[#0C1713] border border-[#1A3127] rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateStrategy({
+                    entry: {
+                      ...strategy.entry,
+                      setup: { ...strategy.entry.setup, conjunction: "AND" },
+                    },
+                  })
+                }
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  strategy.entry?.setup?.conjunction === "AND"
+                    ? "bg-[#123C2A] text-[#55C98A]"
+                    : "text-[#8BA596]"
+                }`}
+              >
+                ALL
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateStrategy({
+                    entry: {
+                      ...strategy.entry,
+                      setup: { ...strategy.entry.setup, conjunction: "OR" },
+                    },
+                  })
+                }
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  strategy.entry?.setup?.conjunction === "OR"
+                    ? "bg-[#123C2A] text-[#55C98A]"
+                    : "text-[#8BA596]"
+                }`}
+              >
+                ANY
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAddRuleModalStage("setup");
+                setSelectedIndForAdd(POPULAR_INDICATORS[0]);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Add Rule</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsSetupOpen(!isSetupOpen)}
+              className="text-[#8BA596] hover:text-white p-1"
+            >
+              {isSetupOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {isSetupOpen && (
+          <div className="space-y-2 pt-1 animate-fadeIn">
+            {setupRules.length === 0 ? (
+              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
+                <p className="font-medium">No setup rules configured</p>
+                <p className="text-[10px] mt-0.5">e.g., 1H Close &gt; EMA 200 or Price &gt; VWAP</p>
+              </div>
+            ) : (
+              setupRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  onClick={() => setEditingRule({ rule, stage: "setup" })}
+                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
                 >
-                  {TIMEFRAMES.map((tf) => (
-                    <option key={tf} value={tf} className="bg-[#0B131E]">
-                      {tf.toUpperCase()}
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
+                      {rule.timeframe}
+                    </span>
+                    <span className="font-mono text-white font-bold text-xs">
+                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
+                      Required ✓
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveRule("setup", "confirmation", rule)}
+                      title="Move to Confirmation stage"
+                      className="p-1 text-[#607D6E] hover:text-white"
+                    >
+                      <MoveDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRule({ rule, stage: "setup" })}
+                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRule("setup", rule.id)}
+                      className="p-1 text-[#607D6E] hover:text-red-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* STAGE 2: CONFIRMATION */}
+      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsConfirmOpen(!isConfirmOpen)}>
+            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
+              2
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">2. CONFIRM</h3>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
+                  {confirmRules.length} rules
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8BA596]">What confirms the setup is strong enough?</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="flex items-center bg-[#0C1713] border border-[#1A3127] rounded-lg p-0.5">
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateStrategy({
+                    entry: {
+                      ...strategy.entry,
+                      confirmation: { ...strategy.entry.confirmation, conjunction: "AND" },
+                    },
+                  })
+                }
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  strategy.entry?.confirmation?.conjunction === "AND"
+                    ? "bg-[#123C2A] text-[#55C98A]"
+                    : "text-[#8BA596]"
+                }`}
+              >
+                ALL
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  onUpdateStrategy({
+                    entry: {
+                      ...strategy.entry,
+                      confirmation: { ...strategy.entry.confirmation, conjunction: "OR" },
+                    },
+                  })
+                }
+                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                  strategy.entry?.confirmation?.conjunction === "OR"
+                    ? "bg-[#123C2A] text-[#55C98A]"
+                    : "text-[#8BA596]"
+                }`}
+              >
+                ANY
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAddRuleModalStage("confirmation");
+                setSelectedIndForAdd(POPULAR_INDICATORS[5]); // RSI
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Add Rule</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsConfirmOpen(!isConfirmOpen)}
+              className="text-[#8BA596] hover:text-white p-1"
+            >
+              {isConfirmOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {isConfirmOpen && (
+          <div className="space-y-2 pt-1 animate-fadeIn">
+            {confirmRules.length === 0 ? (
+              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
+                <p className="font-medium">No confirmation rules configured</p>
+                <p className="text-[10px] mt-0.5">e.g., RSI(14) &gt; 55 or Volume &gt; 20-bar MA</p>
+              </div>
+            ) : (
+              confirmRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  onClick={() => setEditingRule({ rule, stage: "confirmation" })}
+                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
+                      {rule.timeframe}
+                    </span>
+                    <span className="font-mono text-white font-bold text-xs">
+                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
+                      Required ✓
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveRule("confirmation", "setup", rule)}
+                      title="Move up to Setup stage"
+                      className="p-1 text-[#607D6E] hover:text-white"
+                    >
+                      <MoveUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveRule("confirmation", "trigger", rule)}
+                      title="Move down to Trigger stage"
+                      className="p-1 text-[#607D6E] hover:text-white"
+                    >
+                      <MoveDown className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRule({ rule, stage: "confirmation" })}
+                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRule("confirmation", rule.id)}
+                      className="p-1 text-[#607D6E] hover:text-red-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* STAGE 3: TRIGGER */}
+      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsTriggerOpen(!isTriggerOpen)}>
+            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
+              3
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-black text-white uppercase tracking-wider">3. TRIGGER</h3>
+                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
+                  {triggerRules.length} rules
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8BA596]">What exact event triggers the entry?</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAddRuleModalStage("trigger");
+                setSelectedIndForAdd(POPULAR_INDICATORS[1]); // EMA 9
+              }}
+              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
+            >
+              <Plus className="h-3 w-3" />
+              <span>Add Rule</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsTriggerOpen(!isTriggerOpen)}
+              className="text-[#8BA596] hover:text-white p-1"
+            >
+              {isTriggerOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
+        </div>
+
+        {isTriggerOpen && (
+          <div className="space-y-2 pt-1 animate-fadeIn">
+            {triggerRules.length === 0 ? (
+              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
+                <p className="font-medium">No trigger rules configured</p>
+                <p className="text-[10px] mt-0.5">e.g., EMA 9 crosses above EMA 21</p>
+              </div>
+            ) : (
+              triggerRules.map((rule) => (
+                <div
+                  key={rule.id}
+                  onClick={() => setEditingRule({ rule, stage: "trigger" })}
+                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
+                      {rule.timeframe}
+                    </span>
+                    <span className="font-mono text-white font-bold text-xs">
+                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
+                      Trigger ✓
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleMoveRule("trigger", "confirmation", rule)}
+                      title="Move up to Confirmation stage"
+                      className="p-1 text-[#607D6E] hover:text-white"
+                    >
+                      <MoveUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingRule({ rule, stage: "trigger" })}
+                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteRule("trigger", rule.id)}
+                      className="p-1 text-[#607D6E] hover:text-red-400"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* SLIDE-OVER RULE EDITOR DRAWER */}
+      {editingRule && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-end animate-fadeIn">
+          <div className="bg-[#09110E] border-l border-[#1F392D] w-full max-w-md h-full p-6 flex flex-col justify-between shadow-2xl overflow-y-auto custom-scrollbar">
+            
+            <div className="space-y-5">
+              <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
+                <div>
+                  <span className="text-[10px] text-[#55C98A] font-bold uppercase tracking-wider">Configure Condition</span>
+                  <h3 className="text-sm font-black text-white mt-0.5">Edit Strategy Rule</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingRule(null)}
+                  className="p-1.5 rounded-lg text-[#8BA596] hover:text-white bg-[#0C1713]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Indicator / Left Operand */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-[#8BA596] font-semibold">Left Operand (Indicator / Metric)</label>
+                <input
+                  type="text"
+                  value={editingRule.rule.leftLabel || editingRule.rule.left}
+                  onChange={(e) =>
+                    setEditingRule({
+                      ...editingRule,
+                      rule: { ...editingRule.rule, left: e.target.value, leftLabel: e.target.value },
+                    })
+                  }
+                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                />
+              </div>
+
+              {/* Operator */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-[#8BA596] font-semibold">Comparison Operator</label>
+                <select
+                  value={editingRule.rule.op}
+                  onChange={(e) =>
+                    setEditingRule({
+                      ...editingRule,
+                      rule: { ...editingRule.rule, op: e.target.value },
+                    })
+                  }
+                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                >
+                  {SUPPORTED_OPERATORS.map((op) => (
+                    <option key={op.value} value={op.value}>
+                      {op.label}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Left Operand */}
-              <input
-                type="text"
-                value={r.left}
-                onChange={(e) => onUpdateRule(groupKey, r.id, { left: e.target.value, leftLabel: e.target.value })}
-                placeholder="Indicator / Price..."
-                className="px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1E293B] text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-400 min-w-[110px] flex-1 max-w-[160px]"
-              />
-
-              {/* Operator */}
-              <select
-                value={r.op}
-                onChange={(e) => onUpdateRule(groupKey, r.id, { op: e.target.value })}
-                className="px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1E293B] text-amber-300 font-bold focus:outline-none focus:border-cyan-400 text-xs cursor-pointer"
-              >
-                {OPERATORS.map((op) => (
-                  <option key={op.value} value={op.value} className="bg-[#0B131E]">
-                    {op.label}
-                  </option>
-                ))}
-              </select>
-
               {/* Right Operand */}
-              <input
-                type="text"
-                value={r.right}
-                onChange={(e) => onUpdateRule(groupKey, r.id, { right: e.target.value, rightLabel: e.target.value })}
-                placeholder="Threshold / Benchmark..."
-                className="px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1E293B] text-slate-100 font-mono text-xs focus:outline-none focus:border-cyan-400 min-w-[110px] flex-1 max-w-[160px]"
-              />
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-[#8BA596] font-semibold">Right Operand (Indicator / Threshold)</label>
+                <input
+                  type="text"
+                  value={editingRule.rule.rightLabel || editingRule.rule.right}
+                  onChange={(e) =>
+                    setEditingRule({
+                      ...editingRule,
+                      rule: { ...editingRule.rule, right: e.target.value, rightLabel: e.target.value },
+                    })
+                  }
+                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                />
+              </div>
 
-              {/* Actions: Enable / Delete */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => onUpdateRule(groupKey, r.id, { enabled: !r.enabled })}
-                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                    r.enabled
-                      ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                      : "bg-slate-800 text-slate-400"
-                  }`}
-                >
-                  {r.enabled ? "ACTIVE" : "MUTED"}
-                </button>
-                <button
-                  onClick={() => onDeleteRule(groupKey, r.id)}
-                  className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition-colors"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+              {/* Timeframe */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-[#8BA596] font-semibold">Evaluation Timeframe</label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {ALL_TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() =>
+                        setEditingRule({
+                          ...editingRule,
+                          rule: { ...editingRule.rule, timeframe: tf },
+                        })
+                      }
+                      className={`py-1.5 rounded-lg text-xs font-mono font-bold ${
+                        editingRule.rule.timeframe === tf
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Move to Stage */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] text-[#8BA596] font-semibold">Assigned Stage</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(["setup", "confirmation", "trigger"] as RuleTargetStage[]).map((stg) => (
+                    <button
+                      key={stg}
+                      type="button"
+                      onClick={() => {
+                        if (editingRule.stage !== stg) {
+                          handleMoveRule(editingRule.stage, stg, editingRule.rule);
+                          setEditingRule({ ...editingRule, stage: stg });
+                        }
+                      }}
+                      className={`py-1.5 rounded-lg text-xs font-bold capitalize ${
+                        editingRule.stage === stg
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                      }`}
+                    >
+                      {stg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+            {/* Drawer Actions */}
+            <div className="border-t border-[#142B21] pt-4 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => handleDeleteRule(editingRule.stage, editingRule.rule.id)}
+                className="px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-400 font-bold transition-all flex items-center gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleUpdateRuleInStage(editingRule.stage, editingRule.rule);
+                  setEditingRule(null);
+                }}
+                className="px-6 py-2 rounded-xl bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1.5 shadow-md"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Apply Changes</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* FAST ADD RULE MODAL */}
+      {addRuleModalStage && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4 animate-scaleUp">
+            
+            <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
+              <div>
+                <span className="text-[10px] text-[#55C98A] font-bold uppercase tracking-wider">
+                  Add Rule to {addRuleModalStage.toUpperCase()}
+                </span>
+                <h3 className="text-sm font-black text-white mt-0.5">Quick Condition Builder</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddRuleModalStage(null)}
+                className="p-1.5 rounded-lg text-[#8BA596] hover:text-white bg-[#0C1713]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Indicator Quick Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-[#8BA596] font-semibold">Select Indicator</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar">
+                {POPULAR_INDICATORS.map((ind) => (
+                  <button
+                    key={ind.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedIndForAdd(ind);
+                      setAddRuleOp(ind.defaultOp);
+                      setAddRuleRight(ind.defaultRight);
+                    }}
+                    className={`p-2 rounded-xl text-left border transition-all ${
+                      selectedIndForAdd.id === ind.id
+                        ? "bg-[#123C2A] text-white border-[#39B978]"
+                        : "bg-[#060D0A] text-[#8BA596] border-[#1A3127] hover:text-white"
+                    }`}
+                  >
+                    <span className="font-bold text-xs">{ind.label}</span>
+                  </button>
+                ))}
               </div>
             </div>
-          </div>
-        ))}
 
-        {rules.length === 0 && (
-          <div className="p-3 text-center rounded-xl border border-dashed border-slate-800 text-slate-500 text-xs">
-            No conditions in {title}. Click &quot;+ Add Condition&quot; or select from Library.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+            {/* Condition Expression */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#8BA596]">Indicator</label>
+                <div className="p-2 bg-[#060D0A] border border-[#1A3127] rounded-xl font-mono text-white font-bold truncate">
+                  {selectedIndForAdd.label}
+                </div>
+              </div>
 
-export function StrategyRuleCanvas({
-  strategy,
-  onUpdateStrategy,
-  onUpdateRule,
-  onDeleteRule,
-  onAddRule,
-  compiledExpression,
-}: StrategyRuleCanvasProps) {
-  const [nlPrompt, setNlPrompt] = useState("");
-  const [isNlOpen, setIsNlOpen] = useState(false);
-  const [copiedExpr, setCopiedExpr] = useState(false);
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#8BA596]">Operator</label>
+                <select
+                  value={addRuleOp}
+                  onChange={(e) => setAddRuleOp(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2 text-xs text-white font-bold focus:outline-none"
+                >
+                  {SUPPORTED_OPERATORS.map((op) => (
+                    <option key={op.value} value={op.value}>
+                      {op.value}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-  const handleCopyExpression = () => {
-    navigator.clipboard.writeText(compiledExpression);
-    setCopiedExpr(true);
-    setTimeout(() => setCopiedExpr(false), 2000);
-  };
-
-  const handleNlGenerate = () => {
-    if (!nlPrompt.trim()) return;
-    const text = nlPrompt.toLowerCase();
-    const isShort = text.includes("short") || text.includes("sell") || text.includes("bearish");
-    const direction = isShort ? "SHORT" : "LONG";
-
-    const setupRules: StrategyIdeRule[] = [];
-    const confirmRules: StrategyIdeRule[] = [];
-    const triggerRules: StrategyIdeRule[] = [];
-
-    // Macro Setup Check
-    if (text.includes("ema 200") || text.includes("ema200")) {
-      setupRules.push({
-        id: `nl-setup-${Date.now()}-1`,
-        timeframe: text.includes("1h") ? "1h" : "15m",
-        left: "close",
-        leftLabel: "Close Price",
-        op: isShort ? "<" : ">",
-        right: "ema_200",
-        rightLabel: "EMA 200",
-        category: "TREND",
-        enabled: true,
-        description: "Macro Baseline Trend Filter",
-      });
-    }
-
-    if (text.includes("vwap")) {
-      setupRules.push({
-        id: `nl-setup-${Date.now()}-2`,
-        timeframe: "15m",
-        left: "close",
-        leftLabel: "Close Price",
-        op: isShort ? "<" : ">",
-        right: "vwap",
-        rightLabel: "Session VWAP",
-        category: "PRICE",
-        enabled: true,
-        description: "Session VWAP Regime Filter",
-      });
-    }
-
-    // Confirmation Check
-    if (text.includes("rsi")) {
-      confirmRules.push({
-        id: `nl-conf-${Date.now()}-1`,
-        timeframe: "15m",
-        left: "rsi_14",
-        leftLabel: "RSI (14)",
-        op: isShort ? "<" : ">",
-        right: isShort ? "45" : "50",
-        rightLabel: isShort ? "45.0" : "50.0",
-        category: "MOMENTUM",
-        enabled: true,
-        description: "Momentum Threshold Filter",
-      });
-    }
-
-    // Trigger Check
-    if (text.includes("ema 9") || text.includes("ema 21") || text.includes("cross")) {
-      triggerRules.push({
-        id: `nl-trig-${Date.now()}-1`,
-        timeframe: "15m",
-        left: "ema_9",
-        leftLabel: "EMA 9",
-        op: isShort ? "crosses_below" : "crosses_above",
-        right: "ema_21",
-        rightLabel: "EMA 21",
-        category: "TREND",
-        enabled: true,
-        description: "Fast EMA Momentum Trigger",
-      });
-    } else if (text.includes("bollinger") || text.includes("lower band")) {
-      triggerRules.push({
-        id: `nl-trig-${Date.now()}-2`,
-        timeframe: "15m",
-        left: "close",
-        leftLabel: "Close",
-        op: "<=",
-        right: "bb_lower",
-        rightLabel: "Bollinger Lower Band",
-        category: "VOLATILITY",
-        enabled: true,
-        description: "Band Contact Breakout Trigger",
-      });
-    } else {
-      triggerRules.push({
-        id: `nl-trig-${Date.now()}-3`,
-        timeframe: "15m",
-        left: "ema_9",
-        leftLabel: "EMA 9",
-        op: isShort ? "crosses_below" : "crosses_above",
-        right: "ema_21",
-        rightLabel: "EMA 21",
-        category: "TREND",
-        enabled: true,
-        description: "Trend Momentum Timing Trigger",
-      });
-    }
-
-    onUpdateStrategy({
-      name: nlPrompt.slice(0, 45) + (nlPrompt.length > 45 ? "..." : ""),
-      description: nlPrompt,
-      direction: direction as any,
-      entry: {
-        setup: { conjunction: "AND", rules: setupRules.length ? setupRules : strategy.entry.setup.rules },
-        confirmation: { conjunction: "AND", rules: confirmRules.length ? confirmRules : strategy.entry.confirmation.rules },
-        trigger: { conjunction: "AND", rules: triggerRules },
-      },
-    });
-
-    setIsNlOpen(false);
-    setNlPrompt("");
-  };
-
-  return (
-    <div className="flex-1 bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3 sm:p-4 space-y-4 shadow-2xl flex flex-col">
-      {/* Natural Language Strategy Assistant Accordion */}
-      <div className="rounded-2xl bg-gradient-to-r from-[#0E1B2D] to-[#122238] border border-cyan-900/60 p-3 sm:p-3.5 shadow-md">
-        <div
-          onClick={() => setIsNlOpen(!isNlOpen)}
-          className="flex items-center justify-between cursor-pointer"
-        >
-          <div className="flex items-center gap-2">
-            <div className="p-1 rounded-md bg-cyan-950 text-cyan-400 border border-cyan-800">
-              <Sparkles className="h-3.5 w-3.5" />
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#8BA596]">Threshold / Right</label>
+                <input
+                  type="text"
+                  value={addRuleRight}
+                  onChange={(e) => setAddRuleRight(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
+                />
+              </div>
             </div>
-            <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
-              Natural Language Strategy Generator
-              <span className="text-[10px] px-2 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-                Rule Compiler
-              </span>
-            </h3>
-          </div>
-          <button className="text-slate-400 hover:text-slate-200">
-            {isNlOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
-        </div>
 
-        {isNlOpen && (
-          <div className="mt-3 space-y-2.5 pt-2 border-t border-[#1C2C42]">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={nlPrompt}
-                onChange={(e) => setNlPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleNlGenerate()}
-                placeholder="e.g., Buy BTC when 1H Close is above EMA 200, 15M EMA 9 crosses above EMA 21, and 15M RSI is above 50..."
-                className="flex-1 px-3 py-2 rounded-xl bg-[#070D14] border border-[#1E293B] text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400"
-              />
+            {/* Timeframe */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-[#8BA596] font-semibold">Timeframe</label>
+              <div className="grid grid-cols-8 gap-1">
+                {ALL_TIMEFRAMES.map((tf) => (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => setAddRuleTimeframe(tf)}
+                    className={`py-1 rounded text-xs font-mono font-bold ${
+                      addRuleTimeframe === tf
+                        ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
+                        : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-[#142B21] pt-3 flex justify-end gap-2">
               <button
-                onClick={handleNlGenerate}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold shadow-md shadow-cyan-900/30 transition-all flex items-center gap-1.5"
+                type="button"
+                onClick={() => setAddRuleModalStage(null)}
+                className="px-4 py-2 rounded-xl bg-[#0C1713] text-[#8BA596] hover:text-white font-bold"
               >
-                <Zap className="h-3.5 w-3.5" />
-                <span>Compile to AST</span>
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleApplyAddRule}
+                className="px-6 py-2 rounded-xl bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1.5 shadow-md"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>Add Rule</span>
               </button>
             </div>
-            <div className="flex flex-wrap gap-1.5 text-[10px] text-slate-400">
-              <span className="font-semibold text-slate-500">Quick Samples:</span>
-              <button
-                onClick={() =>
-                  setNlPrompt(
-                    "Buy BTC when 1H Close is above EMA 200, 15M EMA 9 crosses above EMA 21, and 15M RSI is above 50"
-                  )
-                }
-                className="hover:text-cyan-300 underline"
-              >
-                Trend Confluence (EMA200 + EMA9/21 + RSI)
-              </button>
-              <span className="text-slate-600">•</span>
-              <button
-                onClick={() =>
-                  setNlPrompt(
-                    "Buy ETH when 15M Close touches Bollinger Lower Band, RSI < 35 oversold, and price below VWAP"
-                  )
-                }
-                className="hover:text-cyan-300 underline"
-              >
-                Mean Reversion (BB Lower + RSI &lt; 35 + VWAP)
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Live Compiled Expression Banner */}
-      <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#070D14] border border-[#172234] text-xs font-mono">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-          <Code className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
-          <span className="text-slate-400 font-bold shrink-0">AST DSL:</span>
-          <span className="text-slate-200 whitespace-nowrap">{compiledExpression}</span>
-        </div>
-        <button
-          onClick={handleCopyExpression}
-          className="ml-2 px-2 py-0.5 rounded bg-[#111C2E] hover:bg-[#18263E] text-slate-300 text-[10px] font-semibold border border-slate-700 flex items-center gap-1 shrink-0"
-        >
-          <Copy className="h-3 w-3" />
-          <span>{copiedExpr ? "Copied!" : "Copy"}</span>
-        </button>
-      </div>
-
-      {/* Structured Rule Canvas: Setup, Confirmation, Trigger */}
-      <div className="space-y-3.5 flex-1">
-        {/* 1. Macro Setup */}
-        <RuleGroupSection
-          title="Macro Regime / Setup Filter"
-          badgeText="Tier 1: Setup"
-          badgeColor="bg-blue-950 text-blue-400 border border-blue-800"
-          groupKey="setup"
-          description="Macro trend direction (e.g. 1H Close > EMA 200, VWAP)"
-          strategy={strategy}
-          onUpdateStrategy={onUpdateStrategy}
-          onUpdateRule={onUpdateRule}
-          onDeleteRule={onDeleteRule}
-          onAddRule={onAddRule}
-        />
-
-        {/* 2. Confirmation */}
-        <RuleGroupSection
-          title="Momentum & Volume Confirmation"
-          badgeText="Tier 2: Confirm"
-          badgeColor="bg-amber-950 text-amber-400 border border-amber-800"
-          groupKey="confirmation"
-          description="Momentum filter (e.g. 15M RSI > 50, MACD > Signal)"
-          strategy={strategy}
-          onUpdateStrategy={onUpdateStrategy}
-          onUpdateRule={onUpdateRule}
-          onDeleteRule={onDeleteRule}
-          onAddRule={onAddRule}
-        />
-
-        {/* 3. Execution Trigger */}
-        <RuleGroupSection
-          title="Timing Execution Trigger"
-          badgeText="Tier 3: Trigger"
-          badgeColor="bg-emerald-950 text-emerald-400 border border-emerald-800"
-          groupKey="trigger"
-          description="Immediate entry catalyst (e.g. EMA 9 crosses above EMA 21)"
-          strategy={strategy}
-          onUpdateStrategy={onUpdateStrategy}
-          onUpdateRule={onUpdateRule}
-          onDeleteRule={onDeleteRule}
-          onAddRule={onAddRule}
-        />
-      </div>
-
-      {/* 4. Exit Rules & Target Brackets */}
-      <div className="p-3 sm:p-4 rounded-2xl bg-[#070D14] border border-[#172234] space-y-3 shadow-md">
-        <div className="flex items-center justify-between border-b border-[#131E2E] pb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-rose-950 text-rose-400 border border-rose-800">
-              Exit Brackets
-            </span>
-            <h4 className="text-xs sm:text-sm font-bold text-slate-100">
-              Stop Loss & Take Profit Target Controls
-            </h4>
           </div>
         </div>
+      )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          {/* Stop Loss Type */}
-          <div className="p-2.5 rounded-xl bg-[#0B131E] border border-[#1E293B] space-y-1">
-            <label className="text-[10px] text-slate-400 font-bold uppercase">Stop Loss Model</label>
-            <select
-              value={strategy.exit.stop_loss_type}
-              onChange={(e) =>
-                onUpdateStrategy({
-                  exit: { ...strategy.exit, stop_loss_type: e.target.value as any },
-                })
-              }
-              className="w-full bg-[#070D14] border border-[#1E293B] rounded-lg px-2 py-1 text-slate-200 font-bold focus:outline-none"
-            >
-              <option value="ATR">ATR Multiplier</option>
-              <option value="PERCENT">Fixed Percentage (%)</option>
-              <option value="FIXED_PRICE">Fixed Price ($)</option>
-            </select>
-          </div>
-
-          {/* Stop Loss Value */}
-          <div className="p-2.5 rounded-xl bg-[#0B131E] border border-[#1E293B] space-y-1">
-            <label className="text-[10px] text-slate-400 font-bold uppercase">Stop Loss Distance</label>
-            <div className="flex items-center gap-1 bg-[#070D14] border border-[#1E293B] rounded-lg px-2 py-1">
-              <input
-                type="number"
-                step="0.1"
-                value={strategy.exit.stop_loss_value}
-                onChange={(e) =>
-                  onUpdateStrategy({
-                    exit: { ...strategy.exit, stop_loss_value: parseFloat(e.target.value) || 0 },
-                  })
-                }
-                className="w-full bg-transparent text-rose-400 font-mono font-bold focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-500 font-mono">
-                {strategy.exit.stop_loss_type === "ATR" ? "x ATR" : "%"}
-              </span>
-            </div>
-          </div>
-
-          {/* Take Profit Target */}
-          <div className="p-2.5 rounded-xl bg-[#0B131E] border border-[#1E293B] space-y-1">
-            <label className="text-[10px] text-slate-400 font-bold uppercase">Take Profit Target</label>
-            <div className="flex items-center gap-1 bg-[#070D14] border border-[#1E293B] rounded-lg px-2 py-1">
-              <input
-                type="number"
-                step="0.1"
-                value={strategy.exit.take_profit_value}
-                onChange={(e) =>
-                  onUpdateStrategy({
-                    exit: { ...strategy.exit, take_profit_value: parseFloat(e.target.value) || 0 },
-                  })
-                }
-                className="w-full bg-transparent text-emerald-400 font-mono font-bold focus:outline-none"
-              />
-              <span className="text-[10px] text-slate-500 font-mono">R:R Ratio</span>
-            </div>
-          </div>
-
-          {/* Multi-Target Scale Out */}
-          <div className="p-2.5 rounded-xl bg-[#0B131E] border border-[#1E293B] space-y-1">
-            <label className="text-[10px] text-slate-400 font-bold uppercase">Multi-Target Scaling</label>
-            <div className="text-[11px] font-mono text-cyan-300 pt-0.5">
-              TP1 (1.0R): 50% | TP2 (2.0R): 50%
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

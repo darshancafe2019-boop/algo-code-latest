@@ -77,18 +77,6 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
     () => [
       // 1. Pages
       {
-        id: "page-intelligence",
-        category: "PAGE",
-        title: "Trading Intelligence Operating System",
-        subtitle: "Primary decision hero, multi-timeframe heatmap, confluence scorecard, AST rule tree",
-        icon: Brain,
-        action: () => {
-          if (onNavigateTab) onNavigateTab("intelligence");
-          router.push("/intelligence");
-          onClose();
-        },
-      },
-      {
         id: "page-dashboard",
         category: "PAGE",
         title: "Trading Dashboard",

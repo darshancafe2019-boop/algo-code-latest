@@ -65,7 +65,6 @@ export function LeftNavigationSidebar({
       groupName: "OVERVIEW",
       items: [
         { id: "home", label: "HOME", path: "/", icon: LayoutDashboard },
-        { id: "intelligence", label: "DECISION ENGINE", path: "/intelligence", icon: Brain, badge: "RULES" },
         { id: "markets", label: "MARKETS", path: "/charts", icon: LineChart },
         { id: "watchlist", label: "WATCHLIST", path: "/watchlists", icon: Globe },
         { id: "scanner", label: "SCANNER", path: "/scanner", icon: Radar, shortcut: "⌘S" },
@@ -121,7 +120,6 @@ export function LeftNavigationSidebar({
   // Quick Mobile Bottom Bar Items
   const mobileBarItems = [
     { id: "home", label: "Home", path: "/", icon: LayoutDashboard },
-    { id: "intelligence", label: "Decisions", path: "/intelligence", icon: Brain },
     { id: "markets", label: "Markets", path: "/charts", icon: LineChart },
     { id: "bots", label: "Bots", path: "/bots", icon: Bot },
     { id: "positions", label: "Positions", path: "/positions", icon: CheckCircle2 },

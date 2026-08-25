@@ -131,7 +131,6 @@ async function runEverestSuite() {
 
   const testRoutes = [
     "/",
-    "/intelligence",
     "/charts",
     "/bots",
     "/positions",

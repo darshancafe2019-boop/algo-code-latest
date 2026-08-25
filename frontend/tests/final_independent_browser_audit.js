@@ -16,7 +16,6 @@ fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
 
 const NAVIGATION_TABS = [
   { id: "home", label: "HOME", path: "/" },
-  { id: "intelligence", label: "INTELLIGENCE", path: "/intelligence" },
   { id: "charts", label: "MARKETS", path: "/charts" },
   { id: "watchlist", label: "WATCHLIST", path: "/watchlists" },
   { id: "scanner", label: "SCANNER", path: "/scanner" },
@@ -185,36 +184,26 @@ async function runFinalAudit() {
     }
 
     // -------------------------------------------------------------------------
-    // 2. INTELLIGENCE WORKSPACE FORENSIC VERIFICATION
+    // 2. DASHBOARD FORENSIC VERIFICATION
     // -------------------------------------------------------------------------
-    console.log("\n--- STAGE 2: Forensic Intelligence Workspace Verification (/intelligence) ---");
-    await page.goto(`${BASE_URL}/intelligence`, { waitUntil: "networkidle2", timeout: 20000 });
+    console.log("\n--- STAGE 2: Forensic Dashboard Verification (/dashboard) ---");
+    await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "networkidle2", timeout: 20000 });
     await new Promise((r) => setTimeout(r, 1500));
 
-    const intelProof = await page.evaluate(() => {
+    const dashProof = await page.evaluate(() => {
       const text = document.body.innerText;
-
-      const multiTimeframeMatches = (text.match(/Multi-Timeframe Regime Heatmap/gi) || []).length;
-      const oldTimeframeMatrixMatches = (text.match(/Multi-Timeframe Regime Matrix/gi) || []).length;
-
-      const emptyContainers = Array.from(document.querySelectorAll("div")).filter(
-        (el) => el.children.length === 0 && el.innerText.trim() === "" && el.className.includes("grid")
-      ).length;
-
       return {
-        canonicalTimeframeHeatmapCount: multiTimeframeMatches,
-        duplicateTimeframeMatrixCount: oldTimeframeMatrixMatches,
-        emptyContainersCount: emptyContainers,
+        hasDashboard: text.includes("Dashboard") || text.includes("Portfolio") || text.includes("Market"),
       };
     });
 
-    console.log("Intelligence Page Metrics:", intelProof);
-    await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_intelligence_desktop.png"), fullPage: true });
+    console.log("Dashboard Page Metrics:", dashProof);
+    await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_dashboard_desktop.png"), fullPage: true });
 
     // -------------------------------------------------------------------------
-    // 3. BOT CONTROL & EMBEDDED INTELLIGENCE PANEL VERIFICATION (/bots)
+    // 3. BOT CONTROL TAB VERIFICATION (/bots)
     // -------------------------------------------------------------------------
-    console.log("\n--- STAGE 3: Bot Control Tab & Embedded Panel Verification (/bots) ---");
+    console.log("\n--- STAGE 3: Bot Control Tab & Fleet Verification (/bots) ---");
     await page.goto(`${BASE_URL}/bots`, { waitUntil: "networkidle2", timeout: 20000 });
     await new Promise((r) => setTimeout(r, 1500));
 
@@ -222,14 +211,10 @@ async function runFinalAudit() {
       const text = document.body.innerText;
       const hasBotTable = text.includes("Bot Fleet Directory") || text.includes("Bot Instances") || text.includes("Alpha BTC Scalper");
       const hasMetrics = text.includes("Fleet Capital") || text.includes("Running Bots") || text.includes("Win Rate");
-      const hasDuplicateConfluence = text.includes("Confluence Factor Scorecard");
-      const hasDuplicateMatrix = text.includes("Multi-Timeframe Regime Matrix");
 
       return {
         hasBotTable,
         hasMetrics,
-        hasDuplicateConfluence,
-        hasDuplicateMatrix,
       };
     });
 
@@ -242,7 +227,7 @@ async function runFinalAudit() {
     console.log("\n--- STAGE 4: Multi-Viewport Responsive Validation ---");
     for (const vp of VIEWPORTS) {
       await page.setViewport({ width: vp.width, height: vp.height });
-      await page.goto(`${BASE_URL}/intelligence`, { waitUntil: "domcontentloaded", timeout: 15000 });
+      await page.goto(`${BASE_URL}/dashboard`, { waitUntil: "domcontentloaded", timeout: 15000 });
       await new Promise((r) => setTimeout(r, 800));
 
       const hasHorizontalScroll = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);

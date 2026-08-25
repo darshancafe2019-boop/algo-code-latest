@@ -19,8 +19,10 @@ import {
   WifiOff,
   AlertTriangle,
   Lock,
+  BrainCircuit,
 } from "lucide-react";
 import { EcoBadge } from "@/components/eco/EcoBadge";
+import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 
 interface TopCommandBarProps {
   onOpenSearch?: () => void;
@@ -38,6 +40,7 @@ export function TopCommandBar({
   const [showKillSwitchModal, setShowKillSwitchModal] = useState(false);
   const [confirmWord, setConfirmWord] = useState("");
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
+  const [isMarketAnalystOpen, setIsMarketAnalystOpen] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsBrowserOnline(true);
@@ -356,10 +359,25 @@ export function TopCommandBar({
             <span className="hidden xl:inline">{isKillSwitchActive ? "RESUME" : "HALT"}</span>
           </button>
 
+          {/* Market Analyst Copilot Quick Trigger */}
+          <button
+            onClick={() => setIsMarketAnalystOpen(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-300 transition-all shadow-sm"
+            title="Open Read-Only GPT Market Analyst Copilot"
+          >
+            <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="hidden sm:inline text-xs font-semibold">Analyst</span>
+            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">
+              GPT
+            </span>
+          </button>
+
           {/* Appearance & Themes Palette Button */}
           <button
+            id="open-appearance-btn"
+            data-testid="appearance-trigger"
             onClick={openAppearanceDrawer}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-all shadow-sm"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-all shadow-sm cursor-pointer"
             title="Open Theme & Appearance Editor"
           >
             <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
@@ -545,6 +563,15 @@ export function TopCommandBar({
           </div>
         </div>
       )}
+
+      {/* Market Analyst Copilot Drawer */}
+      <MarketAnalystDrawer
+        isOpen={isMarketAnalystOpen}
+        onClose={() => setIsMarketAnalystOpen(false)}
+        symbol={activeSymbol || "BTC/USDT"}
+        assetClass="crypto"
+        exchange="binance"
+      />
     </>
   );
 }

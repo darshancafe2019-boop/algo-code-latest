@@ -1194,12 +1194,15 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         bias = 0  # +1 Bull, -1 Bear, 0 Neutral
         reason = "Neutral"
+        val = None
+        formatted_val = "—"
 
         # Match indicator ID
         if ind_key in ["ema_9", "ema_20", "ema_50", "ema_200", "ema"]:
             length = int(ind_cfg.get("parameters", {}).get("length", 20 if ind_key == "ema_20" else (9 if ind_key == "ema_9" else (50 if ind_key == "ema_50" else 200))))
             ema_col = f"ema_{length}"
             val = float(latest.get(ema_col, latest.get('ema_20', latest['close'])))
+            formatted_val = f"{val:,.2f}"
             if latest['close'] > val:
                 bias = 1
                 reason = f"Price > {ema_col.upper()} ({val:.2f})"
@@ -1209,6 +1212,7 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "sma":
             val = float(latest.get('sma_20', latest['close']))
+            formatted_val = f"{val:,.2f}"
             if latest['close'] > val:
                 bias = 1
                 reason = f"Price > SMA 20 ({val:.2f})"
@@ -1218,6 +1222,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "rsi":
             r_val = float(latest.get('rsi', 50.0))
+            val = r_val
+            formatted_val = f"{r_val:.1f}"
             params = ind_cfg.get("parameters") or ind_cfg
             os_lvl = float(params.get('oversold', 30.0))
             ob_lvl = float(params.get('overbought', 70.0))
@@ -1238,6 +1244,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
             hist = float(latest.get('macd_hist', 0.0))
             line = float(latest.get('macd_line', 0.0))
             sig = float(latest.get('macd_signal', 0.0))
+            val = hist
+            formatted_val = f"{hist:+.2f}"
             if hist > 0 and line > sig:
                 bias = 1
                 reason = "MACD Hist > 0 & Line > Signal"
@@ -1247,6 +1255,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "adx":
             adx_val = float(latest.get('adx', 20.0))
+            val = adx_val
+            formatted_val = f"{adx_val:.1f}"
             pdi = float(latest.get('pos_di', 20.0))
             ndi = float(latest.get('neg_di', 20.0))
             params = ind_cfg.get("parameters") or ind_cfg
@@ -1259,7 +1269,10 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
                 reason = f"ADX({adx_val:.1f}) >= {thresh} & -DI > +DI"
 
         elif ind_key == "supertrend":
+            st_val = float(latest.get('supertrend_val', latest['close']))
             st_dir = float(latest.get('supertrend_dir', 1))
+            val = st_val
+            formatted_val = f"{st_val:,.2f}"
             if st_dir == 1:
                 bias = 1
                 reason = "Supertrend Bullish"
@@ -1269,6 +1282,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "vwap":
             vwap_val = float(latest.get('vwap', latest['close']))
+            val = vwap_val
+            formatted_val = f"{vwap_val:,.2f}"
             if latest['close'] > vwap_val:
                 bias = 1
                 reason = "Price > VWAP"
@@ -1279,6 +1294,9 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key == "bollinger":
             ub = float(latest.get('bollinger_ub', latest['close']))
             lb = float(latest.get('bollinger_lb', latest['close']))
+            mb = float(latest.get('bollinger_mb', (ub + lb) / 2.0))
+            val = mb
+            formatted_val = f"[{lb:,.0f} - {ub:,.0f}]"
             if latest['close'] <= lb:
                 bias = 1
                 reason = "Price <= Lower Bollinger Band"
@@ -1289,12 +1307,18 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key in ["volume", "volume_profile"]:
             vol = float(latest.get('volume', 100.0))
             vol_sma = float(df['volume'].rolling(20).mean().iloc[-1] if len(df) >= 20 else vol)
+            ratio = (vol / vol_sma) if vol_sma > 0 else 1.0
+            val = ratio
+            formatted_val = f"{ratio:.2f}x"
             if vol > vol_sma * 1.2:
                 bias = 1 if latest['close'] > df['open'].iloc[-1] else -1
                 reason = "Volume > 1.2x 20-period Volume SMA"
 
         elif ind_key == "parabolic_sar":
             psar_dir = int(latest.get('psar_dir', 1))
+            psar_val = float(latest.get('psar', latest['close']))
+            val = psar_val
+            formatted_val = f"{psar_val:,.2f}"
             if psar_dir == 1:
                 bias = 1
                 reason = "Parabolic SAR Bullish"
@@ -1304,6 +1328,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "anchored_vwap":
             avwap_val = float(latest.get('anchored_vwap', latest['close']))
+            val = avwap_val
+            formatted_val = f"{avwap_val:,.2f}"
             if latest['close'] > avwap_val:
                 bias = 1
                 reason = "Price > Anchored VWAP"
@@ -1313,6 +1339,7 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "rsi_divergence":
             div_val = str(latest.get('rsi_divergence', 'None'))
+            formatted_val = div_val
             if div_val == "Bullish Divergence":
                 bias = 1
                 reason = "RSI Bullish Divergence"
@@ -1323,6 +1350,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key == "stoch_rsi":
             k_val = float(latest.get('stoch_rsi_k', 50.0))
             d_val = float(latest.get('stoch_rsi_d', 50.0))
+            val = k_val
+            formatted_val = f"{k_val:.1f} / {d_val:.1f}"
             if k_val < 20 and k_val > d_val:
                 bias = 1
                 reason = "Stoch RSI Oversold Cross Up"
@@ -1333,6 +1362,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key == "stochastic":
             k_val = float(latest.get('stoch_k', 50.0))
             d_val = float(latest.get('stoch_d', 50.0))
+            val = k_val
+            formatted_val = f"{k_val:.1f} / {d_val:.1f}"
             if k_val < 20:
                 bias = 1
                 reason = "Stochastic Oversold"
@@ -1342,6 +1373,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "mfi":
             mfi_val = float(latest.get('mfi', 50.0))
+            val = mfi_val
+            formatted_val = f"{mfi_val:.1f}"
             if mfi_val <= 20:
                 bias = 1
                 reason = "MFI Oversold <= 20"
@@ -1351,6 +1384,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "cmf":
             cmf_val = float(latest.get('cmf', 0.0))
+            val = cmf_val
+            formatted_val = f"{cmf_val:+.3f}"
             if cmf_val > 0.05:
                 bias = 1
                 reason = "CMF Inflow > +0.05"
@@ -1360,6 +1395,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
 
         elif ind_key == "pivot":
             p = float(latest.get('pivot_point', latest['close']))
+            val = p
+            formatted_val = f"{p:,.2f}"
             if latest['close'] > p:
                 bias = 1
                 reason = "Price > Pivot Point"
@@ -1370,6 +1407,8 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key == "support_resistance":
             sup = float(latest.get('support_level', latest['close'] * 0.98))
             res = float(latest.get('resistance_level', latest['close'] * 1.02))
+            val = sup
+            formatted_val = f"S:{sup:,.0f} R:{res:,.0f}"
             if abs(latest['close'] - sup) / latest['close'] < 0.005:
                 bias = 1
                 reason = "Price near Support level"
@@ -1380,12 +1419,22 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
         elif ind_key == "breakout_levels":
             bh = float(latest.get('breakout_high', latest['close'] * 1.01))
             bl = float(latest.get('breakout_low', latest['close'] * 0.99))
+            val = bh
+            formatted_val = f"H:{bh:,.0f} L:{bl:,.0f}"
             if latest['close'] > bh:
                 bias = 1
                 reason = "High Breakout Triggered"
             elif latest['close'] < bl:
                 bias = -1
                 reason = "Low Breakout Triggered"
+
+        if val is None:
+            raw = latest.get(ind_key, latest.get('close', 0.0))
+            if isinstance(raw, (int, float)) and not np.isnan(raw):
+                val = float(raw)
+                formatted_val = f"{val:,.2f}" if abs(val) >= 100 else f"{val:.2f}"
+            else:
+                formatted_val = str(raw)
 
         # Apply Long/Short direction flags
         if bias == 1 and not long_enabled:
@@ -1408,7 +1457,9 @@ def evaluate_profile_confluence(df: pd.DataFrame, profile_config: Optional[Dict[
             "bias": bias,
             "bias_label": "BULLISH" if bias == 1 else ("BEARISH" if bias == -1 else "NEUTRAL"),
             "weight": w,
-            "reason": reason
+            "reason": reason,
+            "current_value": val,
+            "formatted_value": formatted_val
         }
 
     total_w = max(total_weight, 1.0)

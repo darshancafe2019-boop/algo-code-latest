@@ -53,25 +53,36 @@ export function formatNumber(
   });
 }
 
+export function getDynamicDecimals(num: number, explicitDecimals?: number): number {
+  if (explicitDecimals !== undefined && explicitDecimals !== null) return explicitDecimals;
+  const abs = Math.abs(num);
+  if (abs === 0) return 2;
+  if (abs < 0.0001) return 8; // e.g. 0.00001150 (PEPE, SHIB)
+  if (abs < 0.01) return 6;   // e.g. 0.001234
+  if (abs < 1.0) return 4;    // e.g. 0.1234
+  return 2;                   // e.g. 78,872.50
+}
+
 export function formatPrice(
   value: unknown,
   currency: string = "$",
-  decimals: number = 2,
+  decimals?: number,
   fallback: string = "N/A"
 ): string {
   const num = toNumeric(value);
   if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
+  const resolvedDecimals = getDynamicDecimals(cleanNum, decimals);
   return `${currency}${cleanNum.toLocaleString(undefined, {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
+    minimumFractionDigits: resolvedDecimals,
+    maximumFractionDigits: resolvedDecimals,
   })}`;
 }
 
 export function formatMoney(
   value: unknown,
   currency: string = "$",
-  decimals: number = 2,
+  decimals?: number,
   fallback: string = "N/A"
 ): string {
   return formatPrice(value, currency, decimals, fallback);
@@ -80,10 +91,39 @@ export function formatMoney(
 export function formatCurrency(
   value: unknown,
   currency: string = "$",
-  decimals: number = 2,
+  decimals?: number,
   fallback: string = "N/A"
 ): string {
   return formatPrice(value, currency, decimals, fallback);
+}
+
+export function formatVolume(
+  value: unknown,
+  currency: string = "$",
+  fallback: string = "—"
+): string {
+  const num = toNumeric(value);
+  if (num === null || num === 0) return fallback;
+  const cleanNum = normalizeZero(num);
+  const abs = Math.abs(cleanNum);
+  const sign = cleanNum < 0 ? "-" : "";
+
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}M`;
+  }
+  if (abs >= 1_000) {
+    const val = abs / 1_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}K`;
+  }
+  return `${sign}${currency}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 export function formatCompactMoney(
@@ -91,22 +131,7 @@ export function formatCompactMoney(
   currency: string = "$",
   fallback: string = "N/A"
 ): string {
-  const num = toNumeric(value);
-  if (num === null) return fallback;
-  const cleanNum = normalizeZero(num);
-  const abs = Math.abs(cleanNum);
-  const sign = cleanNum < 0 ? "-" : "";
-
-  if (abs >= 1_000_000_000) {
-    return `${sign}${currency}${(abs / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (abs >= 1_000_000) {
-    return `${sign}${currency}${(abs / 1_000_000).toFixed(2)}M`;
-  }
-  if (abs >= 1_000) {
-    return `${sign}${currency}${(abs / 1_000).toFixed(1)}K`;
-  }
-  return `${sign}${currency}${abs.toFixed(2)}`;
+  return formatVolume(value, currency, fallback);
 }
 
 export function formatPercent(

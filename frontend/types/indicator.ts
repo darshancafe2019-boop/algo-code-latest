@@ -37,16 +37,36 @@ export interface IndicatorConfigItem {
   parameters: Record<string, any>;
   parameter_schema?: ParameterSchemaField[];
   current_value?: number | string | null;
+  formatted_value?: string;
   previous_value?: number | string | null;
   delta?: number | null;
   signal?: "BUY" | "SELL" | "NEUTRAL" | "HOLD";
+  current_signal?: string;
+  current_reason?: string;
+  signal_contribution?: number;
   signal_mode?: string;
   status: IndicatorStatus;
+  bars_count?: number;
   last_updated_ms?: number;
   calculation_latency_ms?: number;
   effective_source: "BOT OVERRIDE" | "BOT PROFILE" | "GLOBAL DEFAULT";
   repainting_type?: RepaintingClassification;
   is_favorite?: boolean;
+  favorite?: boolean;
+}
+
+export interface MarketSummaryData {
+  decision: "LONG" | "SHORT" | "HOLD";
+  bull_score: number;
+  bear_score: number;
+  confluence_pct: number;
+  regime: string;
+  volatility: string;
+  bias: string;
+  threshold_long: number;
+  threshold_short: number;
+  contributing_factors?: string[];
+  opposing_factors?: string[];
 }
 
 export interface IndicatorProfile {

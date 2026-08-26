@@ -64,7 +64,7 @@ export function HomeExecutiveOverview() {
     placeholderData: (prev) => prev,
   });
 
-  const balance = portfolioSnapshot?.equity ?? Number(statusData?.health?.balance ?? 50000.0);
+  const balance = portfolioSnapshot?.equity ?? (statusData?.health?.balance !== undefined ? Number(statusData.health.balance) : 0.0);
   const todaysPnl = portfolioSnapshot?.dailyPnl ?? (statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0);
   const isProfit = todaysPnl >= 0;
   const todaysPnlPct = balance > 0 ? (todaysPnl / balance) * 100 : null;

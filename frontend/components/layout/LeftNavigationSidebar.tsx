@@ -65,7 +65,7 @@ export function LeftNavigationSidebar({
       groupName: "OVERVIEW",
       items: [
         { id: "home", label: "HOME", path: "/", icon: LayoutDashboard },
-        { id: "markets", label: "MARKETS", path: "/charts", icon: LineChart },
+        { id: "markets", label: "MARKETS", path: "/markets", icon: LineChart },
         { id: "scanner", label: "SCANNER", path: "/scanner", icon: Radar, shortcut: "⌘S" },
       ],
     },

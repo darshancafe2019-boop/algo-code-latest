@@ -108,7 +108,7 @@ export function TopCommandBar({
   const isFeedLive = healthData?.feed_health?.is_feed_live !== false;
   const tradingMode = globalTradingMode || statusData?.trading_mode || "PAPER";
   const todaysPnl = portfolioSnapshot?.dailyPnl ?? (statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0);
-  const totalEquity = portfolioSnapshot?.equity ?? Number(statusData?.health?.balance ?? 50000.0);
+  const totalEquity = portfolioSnapshot?.equity ?? (statusData?.health?.balance !== undefined ? Number(statusData.health.balance) : 0.0);
   const isProfit = todaysPnl >= 0;
 
   // Operating Mode Calculation: ONLINE, DEGRADED, OFFLINE

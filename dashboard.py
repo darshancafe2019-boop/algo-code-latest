@@ -1589,6 +1589,17 @@ def api_indicators_list():
             timeframe = timeframe or "15m"
 
     configs = db.get_bot_effective_indicator_configs(bot_id, symbol, timeframe)
+    market_summary = {
+        "decision": "HOLD",
+        "bull_score": 0.0,
+        "bear_score": 0.0,
+        "confluence_pct": 0.0,
+        "regime": "UNKNOWN",
+        "volatility": "NORMAL",
+        "bias": "NEUTRAL",
+        "contributing_factors": [],
+        "opposing_factors": []
+    }
     
     # Calculate real-time signals using live data and bot's effective configuration
     try:
@@ -1601,30 +1612,64 @@ def api_indicators_list():
         eval_res = evaluate_profile_confluence(df, {"config": cfg_map, "signal_threshold_long": 75.0, "signal_threshold_short": 75.0})
         ind_evals = eval_res.get("indicators", {})
 
+        contrib_factors = []
+        opposing_factors = []
+
         for c in configs:
             iid = c["indicator_id"]
+            c["timeframe"] = timeframe
+            c["bars_count"] = len(df) if df is not None and not df.empty else 0
             if iid in ind_evals:
                 ev = ind_evals[iid]
                 c["current_signal"] = ev.get("bias_label", "NEUTRAL")
                 c["current_reason"] = ev.get("reason", "Evaluated")
                 c["signal_contribution"] = ev.get("contribution", 0)
+                c["current_value"] = ev.get("current_value")
+                c["formatted_value"] = ev.get("formatted_value", "—")
+                c["status"] = "HEALTHY"
+                if c.get("enabled", True):
+                    if ev.get("bias") == 1:
+                        contrib_factors.append(f"{c.get('name', iid)}: {ev.get('reason')}")
+                    elif ev.get("bias") == -1:
+                        opposing_factors.append(f"{c.get('name', iid)}: {ev.get('reason')}")
             else:
                 c["current_signal"] = "NEUTRAL"
                 c["current_reason"] = "Ready"
                 c["signal_contribution"] = 0
+                c["current_value"] = None
+                c["formatted_value"] = "—"
+                c["status"] = "HEALTHY"
+
+        market_summary = {
+            "decision": eval_res.get("decision", "HOLD"),
+            "bull_score": eval_res.get("bull_score", 0.0),
+            "bear_score": eval_res.get("bear_score", 0.0),
+            "confluence_pct": eval_res.get("confluence_pct", 0.0),
+            "regime": eval_res.get("regime", "BALANCED"),
+            "volatility": eval_res.get("volatility", "NORMAL"),
+            "bias": eval_res.get("bias", "NEUTRAL"),
+            "threshold_long": eval_res.get("threshold_long", 75.0),
+            "threshold_short": eval_res.get("threshold_short", 75.0),
+            "contributing_factors": contrib_factors,
+            "opposing_factors": opposing_factors
+        }
     except Exception as exc:
         logger.warning(f"Failed to calculate live indicator values for API: {exc}")
         for c in configs:
             c["current_signal"] = "NEUTRAL"
             c["current_reason"] = "Live data pending"
             c["signal_contribution"] = 0
+            c["current_value"] = None
+            c["formatted_value"] = "—"
+            c["status"] = "INITIALIZING"
 
     return jsonify({
         "status": "success",
         "bot_id": bot_id,
         "symbol": symbol,
         "timeframe": timeframe,
-        "indicators": configs
+        "indicators": configs,
+        "market_summary": market_summary
     })
 
 

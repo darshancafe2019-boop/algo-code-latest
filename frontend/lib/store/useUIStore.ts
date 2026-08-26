@@ -13,6 +13,7 @@ interface UIState {
   chartType: "candles" | "line" | "area";
   activeIndicators: string[];
   quickOrderSide: "BUY" | "SELL";
+  interfaceMode: "SIMPLE" | "ADVANCED";
   
   setActiveWorkspace: (workspace: string) => void;
   setActiveSymbol: (symbol: string) => void;
@@ -24,6 +25,8 @@ interface UIState {
   setChartType: (type: "candles" | "line" | "area") => void;
   toggleIndicator: (indicatorId: string) => void;
   setQuickOrderSide: (side: "BUY" | "SELL") => void;
+  setInterfaceMode: (mode: "SIMPLE" | "ADVANCED") => void;
+  toggleInterfaceMode: () => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -37,6 +40,7 @@ export const useUIStore = create<UIState>((set) => ({
   chartType: "candles",
   activeIndicators: ["EMA_20", "RSI_14", "VOLUME_PROFILE"],
   quickOrderSide: "BUY",
+  interfaceMode: "SIMPLE",
 
   setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
   setActiveSymbol: (symbol) => set({ activeSymbol: symbol.toUpperCase().trim() }),
@@ -53,4 +57,9 @@ export const useUIStore = create<UIState>((set) => ({
         : [...state.activeIndicators, indicatorId],
     })),
   setQuickOrderSide: (side) => set({ quickOrderSide: side }),
+  setInterfaceMode: (interfaceMode) => set({ interfaceMode }),
+  toggleInterfaceMode: () =>
+    set((state) => ({
+      interfaceMode: state.interfaceMode === "SIMPLE" ? "ADVANCED" : "SIMPLE",
+    })),
 }));

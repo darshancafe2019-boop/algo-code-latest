@@ -1,10 +1,11 @@
 /**
- * Centralized, Audited Financial Number Formatting Utilities
+ * Centralized, Audited Financial Number Formatting Utilities for Quant.OS
  * 
  * Rules:
  * - Valid number -> formatted according to locale / precision
  * - Numeric string -> safely converted to float and formatted
  * - null / undefined / NaN / Infinity -> returns "N/A" (or custom fallback)
+ * - Negative Zero Normalization: numbers with abs(val) < 0.0001 format strictly as $0.00 (never -$0.00)
  * - Never fabricates $0.00 or 0% when data is missing or undefined
  */
 
@@ -34,6 +35,10 @@ export function toNumeric(value: unknown): number | null {
   return null;
 }
 
+export function normalizeZero(value: number, epsilon: number = 0.0001): number {
+  return Math.abs(value) < epsilon ? 0 : value;
+}
+
 export function formatNumber(
   value: unknown,
   decimals: number = 2,
@@ -41,7 +46,8 @@ export function formatNumber(
 ): string {
   const num = toNumeric(value);
   if (num === null) return fallback;
-  return num.toLocaleString(undefined, {
+  const cleanNum = normalizeZero(num);
+  return cleanNum.toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
@@ -55,10 +61,20 @@ export function formatPrice(
 ): string {
   const num = toNumeric(value);
   if (num === null) return fallback;
-  return `${currency}${num.toLocaleString(undefined, {
+  const cleanNum = normalizeZero(num);
+  return `${currency}${cleanNum.toLocaleString(undefined, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   })}`;
+}
+
+export function formatMoney(
+  value: unknown,
+  currency: string = "$",
+  decimals: number = 2,
+  fallback: string = "N/A"
+): string {
+  return formatPrice(value, currency, decimals, fallback);
 }
 
 export function formatCurrency(
@@ -70,6 +86,29 @@ export function formatCurrency(
   return formatPrice(value, currency, decimals, fallback);
 }
 
+export function formatCompactMoney(
+  value: unknown,
+  currency: string = "$",
+  fallback: string = "N/A"
+): string {
+  const num = toNumeric(value);
+  if (num === null) return fallback;
+  const cleanNum = normalizeZero(num);
+  const abs = Math.abs(cleanNum);
+  const sign = cleanNum < 0 ? "-" : "";
+
+  if (abs >= 1_000_000_000) {
+    return `${sign}${currency}${(abs / 1_000_000_000).toFixed(2)}B`;
+  }
+  if (abs >= 1_000_000) {
+    return `${sign}${currency}${(abs / 1_000_000).toFixed(2)}M`;
+  }
+  if (abs >= 1_000) {
+    return `${sign}${currency}${(abs / 1_000).toFixed(1)}K`;
+  }
+  return `${sign}${currency}${abs.toFixed(2)}`;
+}
+
 export function formatPercent(
   value: unknown,
   decimals: number = 2,
@@ -78,8 +117,9 @@ export function formatPercent(
 ): string {
   const num = toNumeric(value);
   if (num === null) return fallback;
-  const sign = includeSign && num > 0 ? "+" : "";
-  return `${sign}${num.toFixed(decimals)}%`;
+  const cleanNum = normalizeZero(num);
+  const sign = includeSign && cleanNum > 0 ? "+" : "";
+  return `${sign}${cleanNum.toFixed(decimals)}%`;
 }
 
 export function formatPnL(
@@ -105,11 +145,12 @@ export function formatPnL(
     };
   }
 
-  const isPositive = num > 0;
-  const isNegative = num < 0;
-  const isZero = num === 0;
+  const cleanNum = normalizeZero(num);
+  const isPositive = cleanNum > 0;
+  const isNegative = cleanNum < 0;
+  const isZero = cleanNum === 0;
   const sign = isPositive ? "+" : isNegative ? "-" : "";
-  const absNum = Math.abs(num);
+  const absNum = Math.abs(cleanNum);
 
   return {
     formatted: `${sign}${currency}${absNum.toLocaleString(undefined, {

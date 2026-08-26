@@ -21,6 +21,8 @@ import {
   Lock,
   BrainCircuit,
 } from "lucide-react";
+import Link from "next/link";
+import { formatMoney, formatPnL } from "@/lib/formatters";
 import { EcoBadge } from "@/components/eco/EcoBadge";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 
@@ -170,6 +172,8 @@ export function TopCommandBar({
     },
   });
 
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
   return (
     <>
       {/* Offline / Degraded Safe Banner */}
@@ -263,7 +267,7 @@ export function TopCommandBar({
           </button>
         </div>
 
-        {/* Right: Account Capital, P&L, Mode, and Tool Toggles */}
+        {/* Right: Quick Action Buttons & Emergency Halt */}
         <div className="flex items-center gap-2.5 font-mono text-xs">
           {/* Quick Order Trigger */}
           <button
@@ -292,34 +296,6 @@ export function TopCommandBar({
             <span>+ BOT</span>
           </button>
 
-          {/* Quick Start All Bots */}
-          <button
-            type="button"
-            onClick={async () => {
-              await apiClient.post("/api/bots/start-all", {});
-              queryClient.invalidateQueries({ queryKey: ["botsList"] });
-              queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-            }}
-            className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold transition-all shadow-sm active:scale-98"
-            title="Start All Eligible Bot Workers"
-          >
-            <span className="text-[10px]">▶ START ALL</span>
-          </button>
-
-          {/* Quick Pause All Bots */}
-          <button
-            type="button"
-            onClick={async () => {
-              await apiClient.post("/api/bots/pause-all", {});
-              queryClient.invalidateQueries({ queryKey: ["botsList"] });
-              queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-            }}
-            className="hidden xl:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold transition-all shadow-sm active:scale-98"
-            title="Pause All Running Bots"
-          >
-            <span className="text-[10px]">⏸ PAUSE ALL</span>
-          </button>
-
           {/* Trading Mode (Paper / Live) Toggle Trigger */}
           <button
             type="button"
@@ -332,20 +308,24 @@ export function TopCommandBar({
             </EcoBadge>
           </button>
 
-          {/* Account Equity & Today's Net P&L */}
-          <div className="hidden sm:flex flex-col items-end pr-2 border-r border-[var(--theme-border-subtle)]">
+          {/* Account Equity & Today's Net P&L (Click opens P&L Center) */}
+          <Link
+            href="/pnl"
+            className="hidden sm:flex flex-col items-end pr-2 border-r border-[var(--theme-border-subtle)] hover:opacity-80 transition-opacity cursor-pointer"
+            title="View P&L & Portfolio Performance Center"
+          >
             <span className="text-[9px] text-[var(--theme-text-muted)] uppercase tracking-wider">EQUITY / TODAY</span>
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-bold text-[var(--theme-text-primary)]">
-                ${totalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatMoney(totalEquity, "$")}
               </span>
               <span className={`text-xs font-extrabold ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-                {isProfit ? `+$${todaysPnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `-$${Math.abs(todaysPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+                {formatPnL(todaysPnl, "$").formatted}
               </span>
             </div>
-          </div>
+          </Link>
 
-          {/* Emergency Kill Switch Button */}
+          {/* Emergency Kill Switch Button (ALWAYS VISIBLE) */}
           <button
             onClick={() => setShowKillSwitchModal(true)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
@@ -359,30 +339,72 @@ export function TopCommandBar({
             <span className="hidden xl:inline">{isKillSwitchActive ? "RESUME" : "HALT"}</span>
           </button>
 
-          {/* Market Analyst Copilot Quick Trigger */}
-          <button
-            onClick={() => setIsMarketAnalystOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/20 hover:bg-emerald-950/40 text-emerald-300 transition-all shadow-sm"
-            title="Open Read-Only GPT Market Analyst Copilot"
-          >
-            <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
-            <span className="hidden sm:inline text-xs font-semibold">Analyst</span>
-            <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-emerald-900/60 text-emerald-300 border border-emerald-500/30">
-              GPT
-            </span>
-          </button>
+          {/* Secondary Actions: More Dropdown Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+              className="flex items-center justify-center min-w-[36px] min-h-[36px] p-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-all shadow-sm cursor-pointer"
+              title="More Actions & Tools"
+            >
+              <span className="text-xs font-bold tracking-widest leading-none">•••</span>
+            </button>
 
-          {/* Appearance & Themes Palette Button */}
-          <button
-            id="open-appearance-btn"
-            data-testid="appearance-trigger"
-            onClick={openAppearanceDrawer}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition-all shadow-sm cursor-pointer"
-            title="Open Theme & Appearance Editor"
-          >
-            <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
-            <span className="hidden sm:inline text-xs font-semibold">{currentThemeConfig.name.split(" ")[0]}</span>
-          </button>
+            {isMoreMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 z-50 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-2 shadow-2xl w-56 flex flex-col gap-1 text-xs">
+                {/* Start All Bots */}
+                <button
+                  onClick={async () => {
+                    await apiClient.post("/api/bots/start-all", {});
+                    queryClient.invalidateQueries({ queryKey: ["botsList"] });
+                    queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-emerald-400 hover:bg-emerald-500/10 font-semibold transition-colors text-left"
+                >
+                  <span>▶</span>
+                  <span>Start All Bots</span>
+                </button>
+
+                {/* Pause All Bots */}
+                <button
+                  onClick={async () => {
+                    await apiClient.post("/api/bots/pause-all", {});
+                    queryClient.invalidateQueries({ queryKey: ["botsList"] });
+                    queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-amber-400 hover:bg-amber-500/10 font-semibold transition-colors text-left"
+                >
+                  <span>⏸</span>
+                  <span>Pause All Bots</span>
+                </button>
+
+                {/* Market Analyst Copilot */}
+                <button
+                  onClick={() => {
+                    setIsMarketAnalystOpen(true);
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-emerald-300 hover:bg-emerald-500/10 font-semibold transition-colors text-left border-t border-[var(--theme-border-subtle)]"
+                >
+                  <BrainCircuit className="h-4 w-4 text-emerald-400" />
+                  <span>Market Analyst Copilot</span>
+                </button>
+
+                {/* Theme Editor */}
+                <button
+                  onClick={() => {
+                    openAppearanceDrawer();
+                    setIsMoreMenuOpen(false);
+                  }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-elevated)] font-semibold transition-colors text-left border-t border-[var(--theme-border-subtle)]"
+                >
+                  <Paintbrush className="h-4 w-4 text-[var(--theme-accent)]" />
+                  <span>Themes & Appearance</span>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 

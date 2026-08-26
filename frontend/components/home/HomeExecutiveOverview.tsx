@@ -15,7 +15,7 @@ import {
   Send,
   ExternalLink,
 } from "lucide-react";
-import { formatPrice } from "@/lib/formatters";
+import { formatPrice, formatMoney, formatPnL, formatPercent } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
 
@@ -129,7 +129,7 @@ export function HomeExecutiveOverview() {
             <DollarSign className="h-4 w-4 text-[var(--theme-accent)] group-hover:scale-110 transition" />
           </div>
           <div className="mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-[var(--theme-text-primary)]">
-            ${formatPrice(balance, "", 2)}
+            {formatMoney(balance, "$")}
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
             <span>Available Capital</span>
@@ -153,15 +153,15 @@ export function HomeExecutiveOverview() {
             )}
           </div>
           <div className={`mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-            {isProfit && todaysPnl > 0 ? "+" : todaysPnl < 0 ? "-" : ""}${formatPrice(Math.abs(todaysPnl), "", 2)}
+            {formatPnL(todaysPnl, "$").formatted}
             <span className="text-xs font-semibold ml-1.5 opacity-90">
               {todaysPnlPct !== null && !isNaN(todaysPnlPct)
-                ? `(${todaysPnlPct > 0 ? "+" : ""}${todaysPnlPct.toFixed(2)}%)`
+                ? `(${formatPercent(todaysPnlPct, 2, true)})`
                 : "(N/A)"}
             </span>
           </div>
           <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
-            <span>Target: $1,000 / day</span>
+            <span>Authoritative P&L</span>
             <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
               Analytics <ChevronRight className="h-3 w-3" />
             </span>

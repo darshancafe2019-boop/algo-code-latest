@@ -337,3 +337,98 @@ export interface FuturesRiskItem {
   stop_loss: number;
   max_loss: number;
 }
+
+// =============================================================================
+// AUTHORITATIVE RISK CENTER & TRADING PERMISSION SCHEMA
+// =============================================================================
+
+export type TradingPermissionStatus =
+  | "READY"
+  | "CAUTION"
+  | "BLOCKED"
+  | "EMERGENCY_HALT"
+  | "UNAVAILABLE";
+
+export type RiskActionType =
+  | "NAVIGATE_PNL"
+  | "NAVIGATE_POSITIONS"
+  | "NAVIGATE_LIMITS"
+  | "RECONNECT"
+  | "DISENGAGE_HALT";
+
+export interface RiskGateResult {
+  id: string;
+  name: string;
+  category: "SYSTEM" | "MARKET" | "ACCOUNT" | "POSITION" | "EXECUTION";
+  status: "PASS" | "WARN" | "BLOCK";
+  currentValue: string | number;
+  limitValue: string | number;
+  description: string;
+  isCritical: boolean;
+  suggestedAction?: {
+    label: string;
+    actionType: RiskActionType;
+    route?: string;
+  };
+}
+
+export interface TradingPermission {
+  status: TradingPermissionStatus;
+  canTrade: boolean;
+  primaryReason: string;
+  primaryBlocker?: RiskGateResult;
+  failedGates: RiskGateResult[];
+  warnings: RiskGateResult[];
+  allGates: RiskGateResult[];
+  passedCount: number;
+  totalCount: number;
+  evaluatedAt: string;
+}
+
+export interface CanonicalRiskSnapshot {
+  timestamp: string;
+  permission: TradingPermission;
+  capital: {
+    accountEquity: number;
+    availableCash: number;
+    marginUsed: number;
+    allocatedCapital: number;
+  };
+  exposure: {
+    grossExposure: number;
+    netExposure: number;
+    effectiveLeverage: number;
+    maxAllowedLeverage: number;
+  };
+  margin: {
+    marginUsed: number;
+    availableMargin: number;
+    marginUtilizationPct: number;
+    maxMarginLimitPct: number;
+  };
+  dailyRisk: {
+    dailyLossAmount: number;
+    dailyDrawdownPct: number;
+    maxDailyLossPct: number;
+    remainingBufferPct: number;
+  };
+  tradeRisk: {
+    maxRiskPerTradePct: number;
+    maxRiskAmount: number;
+  };
+  concentration: {
+    topAsset: string;
+    topAssetPct: number;
+    maxConcentrationPct: number;
+  };
+  correlation: {
+    averageCorrelation: number;
+    maxCorrelationLimit: number;
+  };
+  brokerHealth: {
+    status: "CONNECTED" | "DEGRADED" | "DISCONNECTED" | "UNKNOWN";
+    latencyMs: number;
+    feedStatus: "LIVE" | "DELAYED" | "STALE" | "UNAVAILABLE";
+  };
+}
+

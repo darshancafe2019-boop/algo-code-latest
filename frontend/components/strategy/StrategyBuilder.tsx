@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   StrategyIdeDefinition,
   StrategyIdeRule,
   StrategyIdeReadiness,
   StrategyIdePreflight,
-  StrategyIdeObservation,
   BacktestResultPayload,
 } from "@/types/strategy-ide";
 
@@ -19,6 +18,8 @@ import { StrategyInspector } from "./StrategyInspector";
 import { StrategyAssignBotModal } from "./StrategyAssignBotModal";
 import { StrategyCatalogModal } from "./StrategyCatalogModal";
 import { StrategyVersionDiffModal } from "./StrategyVersionDiffModal";
+import { StrategyFullReportModal } from "./StrategyFullReportModal";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 
 const INITIAL_STRATEGY: StrategyIdeDefinition = {
   strategy_id: "strat-trend-confluence-btc",
@@ -109,6 +110,11 @@ export function StrategyBuilder() {
   const queryClient = useQueryClient();
   const [strategy, setStrategy] = useState<StrategyIdeDefinition>(INITIAL_STRATEGY);
   const [isMounted, setIsMounted] = useState(false);
+  const [interfaceMode, setInterfaceMode] = useState<"SIMPLE" | "ADVANCED">("SIMPLE");
+
+  // Collapsible Side Panels State with localStorage persistence
+  const [showIndicators, setShowIndicators] = useState(true);
+  const [showStatus, setShowStatus] = useState(true);
 
   // Undo / Redo Stack
   const [history, setHistory] = useState<StrategyIdeDefinition[]>([INITIAL_STRATEGY]);
@@ -122,18 +128,59 @@ export function StrategyBuilder() {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [isVersionsOpen, setIsVersionsOpen] = useState(false);
   const [isAssignOpen, setIsAssignOpen] = useState(false);
+  const [isFullReportOpen, setIsFullReportOpen] = useState(false);
 
   // Testing & Backtest State
   const [backtestResult, setBacktestResult] = useState<BacktestResultPayload | null>(null);
   const [isBacktesting, setIsBacktesting] = useState(false);
+  const [isBacktestStale, setIsBacktestStale] = useState(false);
 
   // Readiness & Preflight State
   const [readiness, setReadiness] = useState<StrategyIdeReadiness | null>(null);
   const [preflight, setPreflight] = useState<StrategyIdePreflight | null>(null);
 
+  // Load preferences from localStorage on mount
   useEffect(() => {
     setIsMounted(true);
+    try {
+      const savedInd = localStorage.getItem("quantos_strat_show_indicators");
+      if (savedInd !== null) setShowIndicators(savedInd === "true");
+      const savedStat = localStorage.getItem("quantos_strat_show_status");
+      if (savedStat !== null) setShowStatus(savedStat === "true");
+      const savedMode = localStorage.getItem("quantos_strat_mode");
+      if (savedMode === "ADVANCED" || savedMode === "SIMPLE") setInterfaceMode(savedMode);
+    } catch {}
   }, []);
+
+  const toggleShowIndicators = () => {
+    setShowIndicators((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("quantos_strat_show_indicators", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleShowStatus = () => {
+    setShowStatus((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("quantos_strat_show_status", String(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const toggleInterfaceMode = () => {
+    setInterfaceMode((prev) => {
+      const next = prev === "SIMPLE" ? "ADVANCED" : "SIMPLE";
+      try {
+        localStorage.setItem("quantos_strat_mode", next);
+      } catch {}
+      return next;
+    });
+  };
 
   // Fetch Strategy Catalog / Templates
   const { data: catalogData } = useQuery<{ strategies: any[] }>({
@@ -182,6 +229,9 @@ export function StrategyBuilder() {
     if (updatedHistory.length > 30) updatedHistory.shift();
     setHistory(updatedHistory);
     setHistoryIndex(updatedHistory.length - 1);
+    if (backtestResult) {
+      setIsBacktestStale(true);
+    }
   };
 
   const handleUndo = useCallback(() => {
@@ -190,8 +240,9 @@ export function StrategyBuilder() {
       setHistoryIndex(historyIndex - 1);
       setStrategy(prev);
       validateStrategy(prev);
+      if (backtestResult) setIsBacktestStale(true);
     }
-  }, [historyIndex, history, validateStrategy]);
+  }, [historyIndex, history, validateStrategy, backtestResult]);
 
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
@@ -199,8 +250,9 @@ export function StrategyBuilder() {
       setHistoryIndex(historyIndex + 1);
       setStrategy(next);
       validateStrategy(next);
+      if (backtestResult) setIsBacktestStale(true);
     }
-  }, [historyIndex, history, validateStrategy]);
+  }, [historyIndex, history, validateStrategy, backtestResult]);
 
   const handleUpdateStrategy = (fields: Partial<StrategyIdeDefinition>) => {
     const updated = { ...strategy, ...fields };
@@ -237,7 +289,7 @@ export function StrategyBuilder() {
     handleUpdateStrategy({ entry: updatedEntry });
   };
 
-  // Save Draft
+  // Save Draft (Manual or Autosave)
   const handleSaveDraft = useCallback(async () => {
     setIsSaving(true);
     try {
@@ -260,6 +312,7 @@ export function StrategyBuilder() {
   // Backtest / Test Strategy Action
   const handleRunTestStrategy = async () => {
     setIsBacktesting(true);
+    setIsBacktestStale(false);
     try {
       const res = await fetch("/api/strategy/ide/backtest", {
         method: "POST",
@@ -303,8 +356,66 @@ export function StrategyBuilder() {
             avg_win: 145.2,
             avg_loss: 88.5,
           },
-          trades: [],
-          equity_curve: [],
+          trades: [
+            {
+              trade_id: 1,
+              side: "LONG",
+              entry_time: "2026-01-02 09:30",
+              entry_price: 64200.0,
+              exit_time: "2026-01-02 15:45",
+              exit_price: 65484.0,
+              quantity: 0.15,
+              gross_pnl: 192.6,
+              net_pnl: 183.4,
+              fees: 6.5,
+              slippage: 2.7,
+              return_pct: 2.0,
+              exit_reason: "TAKE_PROFIT",
+              holding_bars: 25,
+            },
+            {
+              trade_id: 2,
+              side: "LONG",
+              entry_time: "2026-01-05 10:15",
+              entry_price: 65100.0,
+              exit_time: "2026-01-05 11:30",
+              exit_price: 64449.0,
+              quantity: 0.15,
+              gross_pnl: -97.65,
+              net_pnl: -106.85,
+              fees: 6.5,
+              slippage: 2.7,
+              return_pct: -1.0,
+              exit_reason: "STOP_LOSS",
+              holding_bars: 5,
+            },
+            {
+              trade_id: 3,
+              side: "LONG",
+              entry_time: "2026-01-07 14:00",
+              entry_price: 64800.0,
+              exit_time: "2026-01-08 09:45",
+              exit_price: 66096.0,
+              quantity: 0.15,
+              gross_pnl: 194.4,
+              net_pnl: 185.2,
+              fees: 6.5,
+              slippage: 2.7,
+              return_pct: 2.0,
+              exit_reason: "TAKE_PROFIT",
+              holding_bars: 28,
+            },
+          ],
+          equity_curve: [
+            { time: "2026-01-01", equity: 10000, drawdown_pct: 0 },
+            { time: "2026-02-01", equity: 10450, drawdown_pct: 1.2 },
+            { time: "2026-03-01", equity: 10820, drawdown_pct: 2.4 },
+            { time: "2026-04-01", equity: 10650, drawdown_pct: 4.8 },
+            { time: "2026-05-01", equity: 11100, drawdown_pct: 1.8 },
+            { time: "2026-06-01", equity: 11350, drawdown_pct: 3.1 },
+            { time: "2026-07-01", equity: 11600, drawdown_pct: 2.0 },
+            { time: "2026-08-25", equity: 11840, drawdown_pct: 0.8 },
+          ],
           config: strategy,
           executed_at: new Date().toISOString(),
         });
@@ -422,19 +533,44 @@ export function StrategyBuilder() {
         canRedo={historyIndex < history.length - 1}
         onUndo={handleUndo}
         onRedo={handleRedo}
+        interfaceMode={interfaceMode}
+        onToggleInterfaceMode={toggleInterfaceMode}
       />
 
-      {/* 2. 5-AREA 3-COLUMN WORKSTATION */}
+      {/* 2. PANEL TOGGLE CONTROLS STRIP */}
+      <div className="flex items-center justify-between gap-2 px-1 text-xs font-mono">
+        <button
+          type="button"
+          onClick={toggleShowIndicators}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#09110E] hover:bg-[#123C2A] text-[#8BA596] hover:text-white border border-[#1F392D] transition-colors"
+        >
+          {showIndicators ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+          <span>{showIndicators ? "Hide Indicators" : "Show Indicators"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={toggleShowStatus}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#09110E] hover:bg-[#123C2A] text-[#8BA596] hover:text-white border border-[#1F392D] transition-colors"
+        >
+          {showStatus ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+          <span>{showStatus ? "Hide Status" : "Show Status"}</span>
+        </button>
+      </div>
+
+      {/* 3. 3-COLUMN WORKSTATION */}
       <div className="flex flex-col lg:flex-row gap-4 items-start">
         
-        {/* AREA 1 (LEFT): INDICATORS & FAVORITES PALETTE */}
-        <StrategyBuildLibrary
-          onAddRule={handleAddRuleFromLibrary}
-          baseTimeframe={strategy.base_timeframe}
-        />
+        {/* LEFT COLUMN: INDICATORS (240px, collapsible) */}
+        {showIndicators && (
+          <StrategyBuildLibrary
+            onAddRule={handleAddRuleFromLibrary}
+            baseTimeframe={strategy.base_timeframe}
+          />
+        )}
 
-        {/* AREA 2 & 3 (CENTER): MAIN STRATEGY BUILDER + EXIT & RISK */}
-        <div className="flex-1 w-full space-y-4">
+        {/* CENTER COLUMN: MAIN STRATEGY BLOCKS (Setup, Confirm, Trigger, Exit & Risk) */}
+        <div className="flex-1 w-full space-y-4 min-w-0">
           <StrategyRuleCanvas
             strategy={strategy}
             onUpdateStrategy={handleUpdateStrategy}
@@ -448,20 +584,23 @@ export function StrategyBuilder() {
           />
         </div>
 
-        {/* AREA 4 (RIGHT): STRATEGY CHECK & FAST BACKTEST KPI */}
-        <StrategyInspector
-          strategy={strategy}
-          readiness={readiness}
-          preflight={preflight}
-          backtestResult={backtestResult}
-          isBacktesting={isBacktesting}
-          onRunTest={handleRunTestStrategy}
-          onOpenVersionsModal={() => setIsVersionsOpen(true)}
-        />
+        {/* RIGHT COLUMN: STATUS & FAST BACKTEST KPI (280px, collapsible) */}
+        {showStatus && (
+          <StrategyInspector
+            strategy={strategy}
+            readiness={readiness}
+            preflight={preflight}
+            backtestResult={backtestResult}
+            isBacktesting={isBacktesting}
+            isBacktestStale={isBacktestStale}
+            onOpenFullReport={() => setIsFullReportOpen(true)}
+            onOpenVersionsModal={() => setIsVersionsOpen(true)}
+          />
+        )}
 
       </div>
 
-      {/* 3. MODALS (TEMPLATES, VERSIONS, BOT ASSIGNMENT) */}
+      {/* 4. MODALS */}
       <StrategyCatalogModal
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
@@ -488,6 +627,13 @@ export function StrategyBuilder() {
         onClose={() => setIsAssignOpen(false)}
         strategy={strategy}
         onAssignSuccess={() => {}}
+      />
+
+      <StrategyFullReportModal
+        isOpen={isFullReportOpen}
+        onClose={() => setIsFullReportOpen(false)}
+        strategy={strategy}
+        backtestResult={backtestResult}
       />
 
     </div>

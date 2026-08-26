@@ -12,7 +12,7 @@ import {
   ChevronUp,
   MoveUp,
   MoveDown,
-  Sliders,
+  ArrowRightLeft,
   Check,
   X,
   Clock,
@@ -20,24 +20,22 @@ import {
   TrendingUp,
   Activity,
   Zap,
-  ShieldCheck,
-  Search
+  Sliders,
 } from "lucide-react";
 import {
   StrategyIdeDefinition,
   StrategyIdeRule,
   RuleTimeframe,
-  StrategyDirection,
 } from "@/types/strategy-ide";
 import { RuleTargetStage } from "./StrategyBuildLibrary";
 
 interface StrategyRuleCanvasProps {
   strategy: StrategyIdeDefinition;
   onUpdateStrategy: (fields: Partial<StrategyIdeDefinition>) => void;
-  onSelectRuleToEdit?: (rule: StrategyIdeRule, stage: RuleTargetStage) => void;
+  onOpenAddModalForStage?: (stage: RuleTargetStage) => void;
 }
 
-const SUPPORTED_OPERATORS = [
+const SUPPORTED_CONDITIONS = [
   { value: ">", label: "Greater Than (>)" },
   { value: "<", label: "Less Than (<)" },
   { value: ">=", label: "Greater or Equal (>=)" },
@@ -45,57 +43,35 @@ const SUPPORTED_OPERATORS = [
   { value: "==", label: "Equals (==)" },
   { value: "crosses_above", label: "Crosses Above" },
   { value: "crosses_below", label: "Crosses Below" },
-  { value: "rising", label: "Rising" },
-  { value: "falling", label: "Falling" },
 ];
 
-const POPULAR_INDICATORS = [
-  { id: "close", label: "Close Price", defaultOp: ">", defaultRight: "ema_200", defaultRightLabel: "EMA 200" },
-  { id: "ema_9", label: "EMA 9", defaultOp: "crosses_above", defaultRight: "ema_21", defaultRightLabel: "EMA 21" },
-  { id: "ema_21", label: "EMA 21", defaultOp: ">", defaultRight: "ema_50", defaultRightLabel: "EMA 50" },
-  { id: "ema_50", label: "EMA 50", defaultOp: ">", defaultRight: "ema_200", defaultRightLabel: "EMA 200" },
-  { id: "ema_200", label: "EMA 200", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
-  { id: "rsi_14", label: "RSI (14)", defaultOp: ">", defaultRight: "55", defaultRightLabel: "55.0" },
-  { id: "macd_line", label: "MACD Line", defaultOp: "crosses_above", defaultRight: "macd_signal", defaultRightLabel: "MACD Signal" },
-  { id: "vwap", label: "VWAP (Session)", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
-  { id: "volume", label: "Volume", defaultOp: ">", defaultRight: "volume_ma_20", defaultRightLabel: "20-bar Avg Volume" },
-  { id: "atr_14", label: "ATR (14)", defaultOp: ">", defaultRight: "10.0", defaultRightLabel: "10.0" },
-  { id: "supertrend", label: "Supertrend (10, 3)", defaultOp: "<", defaultRight: "close", defaultRightLabel: "Close Price" },
-  { id: "adx_14", label: "ADX (14)", defaultOp: ">", defaultRight: "25", defaultRightLabel: "25.0" },
-];
-
-const ALL_TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+const TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
 
 export function StrategyRuleCanvas({
   strategy,
   onUpdateStrategy,
+  onOpenAddModalForStage,
 }: StrategyRuleCanvasProps) {
-  // Collapsible Stages State
-  const [isSetupOpen, setIsSetupOpen] = useState(true);
-  const [isConfirmOpen, setIsConfirmOpen] = useState(true);
-  const [isTriggerOpen, setIsTriggerOpen] = useState(true);
-
-  // Edit Rule Slide-over Drawer State
+  // Editing Rule Drawer State
   const [editingRule, setEditingRule] = useState<{
     rule: StrategyIdeRule;
     stage: RuleTargetStage;
   } | null>(null);
 
-  // Add Rule Modal State
-  const [addRuleModalStage, setAddRuleModalStage] = useState<RuleTargetStage | null>(null);
-  const [addRuleSearch, setAddRuleSearch] = useState("");
-  const [selectedIndForAdd, setSelectedIndForAdd] = useState(POPULAR_INDICATORS[0]);
-  const [addRuleOp, setAddRuleOp] = useState(">");
-  const [addRuleRight, setAddRuleRight] = useState("50");
-  const [addRuleTimeframe, setAddRuleTimeframe] = useState<RuleTimeframe>(strategy.base_timeframe || "15m");
+  // Quick Add Rule Modal directly inside canvas
+  const [quickAddStage, setQuickAddStage] = useState<RuleTargetStage | null>(null);
+  const [quickIndicator, setQuickIndicator] = useState("RSI (14)");
+  const [quickLeftKey, setQuickLeftKey] = useState("rsi_14");
+  const [quickOp, setQuickOp] = useState(">");
+  const [quickRight, setQuickRight] = useState("55");
+  const [quickTf, setQuickTf] = useState<RuleTimeframe>(strategy.base_timeframe || "15m");
 
   const setupRules = strategy.entry?.setup?.rules || [];
   const confirmRules = strategy.entry?.confirmation?.rules || [];
   const triggerRules = strategy.entry?.trigger?.rules || [];
-  const totalRules = setupRules.length + confirmRules.length + triggerRules.length;
 
-  // Handlers for modifying rules
-  const handleUpdateRuleInStage = (stage: RuleTargetStage, updatedRule: StrategyIdeRule) => {
+  // Update rule within stage
+  const handleSaveEditedRule = (updatedRule: StrategyIdeRule, stage: RuleTargetStage) => {
     const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
     const currentRules = strategy.entry[stageKey]?.rules || [];
     const newRules = currentRules.map((r) => (r.id === updatedRule.id ? updatedRule : r));
@@ -109,8 +85,10 @@ export function StrategyRuleCanvas({
         },
       },
     });
+    setEditingRule(null);
   };
 
+  // Delete rule from stage
   const handleDeleteRule = (stage: RuleTargetStage, ruleId: string) => {
     const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
     const currentRules = strategy.entry[stageKey]?.rules || [];
@@ -130,11 +108,8 @@ export function StrategyRuleCanvas({
     }
   };
 
-  const handleMoveRule = (
-    fromStage: RuleTargetStage,
-    toStage: RuleTargetStage,
-    rule: StrategyIdeRule
-  ) => {
+  // Move rule between stages (Setup ↔ Confirm ↔ Trigger)
+  const handleMoveStage = (fromStage: RuleTargetStage, toStage: RuleTargetStage, rule: StrategyIdeRule) => {
     if (fromStage === toStage) return;
     const fromKey = fromStage === "setup" ? "setup" : fromStage === "confirmation" ? "confirmation" : "trigger";
     const toKey = toStage === "setup" ? "setup" : toStage === "confirmation" ? "confirmation" : "trigger";
@@ -151,488 +126,395 @@ export function StrategyRuleCanvas({
     });
   };
 
-  const handleApplyAddRule = () => {
-    if (!addRuleModalStage) return;
-    const stageKey = addRuleModalStage === "setup" ? "setup" : addRuleModalStage === "confirmation" ? "confirmation" : "trigger";
-    const newRule: StrategyIdeRule = {
-      id: `rule-${addRuleModalStage}-${Date.now()}`,
-      timeframe: addRuleTimeframe,
-      left: selectedIndForAdd.id,
-      leftLabel: selectedIndForAdd.label,
-      op: addRuleOp,
-      right: addRuleRight,
-      rightLabel: addRuleRight,
-      category: "TREND",
-      enabled: true,
-      description: `${selectedIndForAdd.label} ${addRuleOp} ${addRuleRight}`,
-    };
+  // Reorder within stage
+  const handleReorder = (stage: RuleTargetStage, index: number, direction: "UP" | "DOWN") => {
+    const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
+    const current = [...(strategy.entry[stageKey]?.rules || [])];
+    const targetIndex = direction === "UP" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= current.length) return;
 
-    const currentRules = strategy.entry[stageKey]?.rules || [];
+    const temp = current[index];
+    current[index] = current[targetIndex];
+    current[targetIndex] = temp;
+
     onUpdateStrategy({
       entry: {
         ...strategy.entry,
         [stageKey]: {
           ...strategy.entry[stageKey],
-          rules: [...currentRules, newRule],
+          rules: current,
         },
       },
     });
-    setAddRuleModalStage(null);
   };
 
-  return (
-    <div className="flex-1 space-y-4 font-sans select-none text-xs">
-      
-      {/* 1. Simple Strategy Summary Bar */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-3.5 shadow-xl flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <span className="font-mono font-bold text-white text-xs">{strategy.symbol}</span>
-          <span className="text-[#607D6E]">•</span>
-          <span className="font-mono text-cyan-400 font-bold">{strategy.base_timeframe}</span>
-          <span className="text-[#607D6E]">•</span>
-          <span className={`font-bold uppercase ${strategy.direction === "LONG" ? "text-[#55C98A]" : "text-red-400"}`}>
-            {strategy.direction}
+  // Toggle Conjunction ALL/ANY
+  const handleToggleConjunction = (stage: RuleTargetStage) => {
+    const stageKey = stage === "setup" ? "setup" : stage === "confirmation" ? "confirmation" : "trigger";
+    const currentConj = strategy.entry[stageKey]?.conjunction || "AND";
+    const nextConj = currentConj === "AND" ? "OR" : "AND";
+
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          conjunction: nextConj,
+        },
+      },
+    });
+  };
+
+  // Submit Quick Add Rule
+  const handleQuickAddSubmit = () => {
+    if (!quickAddStage) return;
+    const stageKey = quickAddStage === "setup" ? "setup" : quickAddStage === "confirmation" ? "confirmation" : "trigger";
+
+    const newRule: StrategyIdeRule = {
+      id: `rule-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timeframe: quickTf,
+      left: quickLeftKey,
+      leftLabel: quickIndicator,
+      op: quickOp,
+      right: quickRight,
+      rightLabel: quickRight,
+      category: "TREND",
+      enabled: true,
+      description: `${quickTf} ${quickIndicator} ${quickOp} ${quickRight}`,
+    };
+
+    onUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          rules: [...(strategy.entry[stageKey]?.rules || []), newRule],
+        },
+      },
+    });
+    setQuickAddStage(null);
+  };
+
+  // Render a Single Clean Rule Row
+  const renderRuleRow = (rule: StrategyIdeRule, stage: RuleTargetStage, index: number, totalInStage: number) => {
+    return (
+      <div
+        key={rule.id}
+        className="group bg-[#060D0A] hover:bg-[#0C1713] border border-[#14271F] hover:border-[#1F392D] rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 transition-all"
+      >
+        {/* Left: Timeframe Pill + Formula */}
+        <div className="flex items-center gap-2.5">
+          <span className="px-2 py-0.5 rounded-md bg-[#123C2A] text-[#55C98A] font-mono text-[11px] font-bold border border-[#39B978]/30">
+            {rule.timeframe || "15m"}
+          </span>
+
+          <div className="flex items-center gap-1.5 text-xs font-mono">
+            <span className="font-bold text-white">{rule.leftLabel || rule.left}</span>
+            <span className="text-[#55C98A] font-bold">{rule.op}</span>
+            <span className="text-white font-bold">{rule.rightLabel || rule.right}</span>
+          </div>
+
+          <span className="text-[10px] text-[#607D6E] font-mono hidden sm:inline">
+            Required ✓
           </span>
         </div>
 
-        <div className="flex items-center gap-4 text-xs font-mono">
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#8BA596]">SETUP:</span>
-            <span className="text-white font-bold">{setupRules.length}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#8BA596]">CONFIRM:</span>
-            <span className="text-white font-bold">{confirmRules.length}</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-[#8BA596]">TRIGGER:</span>
-            <span className="text-white font-bold">{triggerRules.length}</span>
-          </div>
-          <div className="border-l border-[#142B21] pl-3 flex items-center gap-1.5">
-            <span className="text-[#55C98A] font-bold">{totalRules} TOTAL RULES</span>
-          </div>
-        </div>
-      </div>
-
-      {/* STAGE 1: SETUP */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsSetupOpen(!isSetupOpen)}>
-            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
-              1
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-black text-white uppercase tracking-wider">1. SETUP</h3>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
-                  {setupRules.length} rules
-                </span>
-              </div>
-              <p className="text-[11px] text-[#8BA596]">What market condition must exist before looking for a trade?</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-[#0C1713] border border-[#1A3127] rounded-lg p-0.5">
+        {/* Right: Stage Mover, Reorder & Actions */}
+        <div className="flex items-center gap-1">
+          {/* Move to another stage selector */}
+          <div className="flex items-center bg-[#09110E] p-0.5 rounded-lg border border-[#1A3127] text-[10px] font-mono">
+            {stage !== "setup" && (
               <button
                 type="button"
-                onClick={() =>
-                  onUpdateStrategy({
-                    entry: {
-                      ...strategy.entry,
-                      setup: { ...strategy.entry.setup, conjunction: "AND" },
-                    },
-                  })
-                }
-                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  strategy.entry?.setup?.conjunction === "AND"
-                    ? "bg-[#123C2A] text-[#55C98A]"
-                    : "text-[#8BA596]"
-                }`}
+                onClick={() => handleMoveStage(stage, "setup", rule)}
+                className="px-1.5 py-0.5 text-[#8BA596] hover:text-white hover:bg-[#123C2A] rounded transition-colors"
+                title="Move to Setup stage"
               >
-                ALL
+                → Setup
               </button>
+            )}
+            {stage !== "confirmation" && (
               <button
                 type="button"
-                onClick={() =>
-                  onUpdateStrategy({
-                    entry: {
-                      ...strategy.entry,
-                      setup: { ...strategy.entry.setup, conjunction: "OR" },
-                    },
-                  })
-                }
-                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  strategy.entry?.setup?.conjunction === "OR"
-                    ? "bg-[#123C2A] text-[#55C98A]"
-                    : "text-[#8BA596]"
-                }`}
+                onClick={() => handleMoveStage(stage, "confirmation", rule)}
+                className="px-1.5 py-0.5 text-[#8BA596] hover:text-white hover:bg-[#123C2A] rounded transition-colors"
+                title="Move to Confirm stage"
               >
-                ANY
+                → Confirm
               </button>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAddRuleModalStage("setup");
-                setSelectedIndForAdd(POPULAR_INDICATORS[0]);
-              }}
-              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
-            >
-              <Plus className="h-3 w-3" />
-              <span>Add Rule</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsSetupOpen(!isSetupOpen)}
-              className="text-[#8BA596] hover:text-white p-1"
-            >
-              {isSetupOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-
-        {isSetupOpen && (
-          <div className="space-y-2 pt-1 animate-fadeIn">
-            {setupRules.length === 0 ? (
-              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
-                <p className="font-medium">No setup rules configured</p>
-                <p className="text-[10px] mt-0.5">e.g., 1H Close &gt; EMA 200 or Price &gt; VWAP</p>
-              </div>
-            ) : (
-              setupRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  onClick={() => setEditingRule({ rule, stage: "setup" })}
-                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
-                      {rule.timeframe}
-                    </span>
-                    <span className="font-mono text-white font-bold text-xs">
-                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
-                      Required ✓
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveRule("setup", "confirmation", rule)}
-                      title="Move to Confirmation stage"
-                      className="p-1 text-[#607D6E] hover:text-white"
-                    >
-                      <MoveDown className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingRule({ rule, stage: "setup" })}
-                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRule("setup", rule.id)}
-                      className="p-1 text-[#607D6E] hover:text-red-400"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
+            )}
+            {stage !== "trigger" && (
+              <button
+                type="button"
+                onClick={() => handleMoveStage(stage, "trigger", rule)}
+                className="px-1.5 py-0.5 text-[#8BA596] hover:text-white hover:bg-[#123C2A] rounded transition-colors"
+                title="Move to Trigger stage"
+              >
+                → Trigger
+              </button>
             )}
           </div>
-        )}
-      </div>
 
-      {/* STAGE 2: CONFIRMATION */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsConfirmOpen(!isConfirmOpen)}>
-            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
-              2
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-black text-white uppercase tracking-wider">2. CONFIRM</h3>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
-                  {confirmRules.length} rules
-                </span>
-              </div>
-              <p className="text-[11px] text-[#8BA596]">What confirms the setup is strong enough?</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-[#0C1713] border border-[#1A3127] rounded-lg p-0.5">
+          {/* Reorder Buttons */}
+          {totalInStage > 1 && (
+            <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                onClick={() =>
-                  onUpdateStrategy({
-                    entry: {
-                      ...strategy.entry,
-                      confirmation: { ...strategy.entry.confirmation, conjunction: "AND" },
-                    },
-                  })
-                }
-                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  strategy.entry?.confirmation?.conjunction === "AND"
-                    ? "bg-[#123C2A] text-[#55C98A]"
-                    : "text-[#8BA596]"
-                }`}
+                onClick={() => handleReorder(stage, index, "UP")}
+                disabled={index === 0}
+                className={`p-1 rounded ${index === 0 ? "text-[#243E30]" : "text-[#8BA596] hover:text-white hover:bg-[#123C2A]"}`}
+                title="Move Up"
               >
-                ALL
+                <MoveUp className="h-3 w-3" />
               </button>
               <button
                 type="button"
-                onClick={() =>
-                  onUpdateStrategy({
-                    entry: {
-                      ...strategy.entry,
-                      confirmation: { ...strategy.entry.confirmation, conjunction: "OR" },
-                    },
-                  })
-                }
-                className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                  strategy.entry?.confirmation?.conjunction === "OR"
-                    ? "bg-[#123C2A] text-[#55C98A]"
-                    : "text-[#8BA596]"
-                }`}
+                onClick={() => handleReorder(stage, index, "DOWN")}
+                disabled={index === totalInStage - 1}
+                className={`p-1 rounded ${index === totalInStage - 1 ? "text-[#243E30]" : "text-[#8BA596] hover:text-white hover:bg-[#123C2A]"}`}
+                title="Move Down"
               >
-                ANY
+                <MoveDown className="h-3 w-3" />
               </button>
             </div>
+          )}
 
-            <button
-              type="button"
-              onClick={() => {
-                setAddRuleModalStage("confirmation");
-                setSelectedIndForAdd(POPULAR_INDICATORS[5]); // RSI
-              }}
-              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
-            >
-              <Plus className="h-3 w-3" />
-              <span>Add Rule</span>
-            </button>
+          {/* [Edit] Button */}
+          <button
+            type="button"
+            onClick={() => setEditingRule({ rule, stage })}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white border border-[#1A3127] font-mono text-[11px] font-bold transition-colors"
+          >
+            <Edit2 className="h-3 w-3" />
+            <span>Edit</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setIsConfirmOpen(!isConfirmOpen)}
-              className="text-[#8BA596] hover:text-white p-1"
-            >
-              {isConfirmOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </div>
+          {/* [Delete] Button */}
+          <button
+            type="button"
+            onClick={() => handleDeleteRule(stage, rule.id)}
+            className="p-1 rounded-lg text-[#607D6E] hover:text-red-400 hover:bg-red-950/30 transition-colors"
+            title="Delete rule"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
         </div>
-
-        {isConfirmOpen && (
-          <div className="space-y-2 pt-1 animate-fadeIn">
-            {confirmRules.length === 0 ? (
-              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
-                <p className="font-medium">No confirmation rules configured</p>
-                <p className="text-[10px] mt-0.5">e.g., RSI(14) &gt; 55 or Volume &gt; 20-bar MA</p>
-              </div>
-            ) : (
-              confirmRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  onClick={() => setEditingRule({ rule, stage: "confirmation" })}
-                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
-                      {rule.timeframe}
-                    </span>
-                    <span className="font-mono text-white font-bold text-xs">
-                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
-                      Required ✓
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveRule("confirmation", "setup", rule)}
-                      title="Move up to Setup stage"
-                      className="p-1 text-[#607D6E] hover:text-white"
-                    >
-                      <MoveUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveRule("confirmation", "trigger", rule)}
-                      title="Move down to Trigger stage"
-                      className="p-1 text-[#607D6E] hover:text-white"
-                    >
-                      <MoveDown className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingRule({ rule, stage: "confirmation" })}
-                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRule("confirmation", rule.id)}
-                      className="p-1 text-[#607D6E] hover:text-red-400"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
+    );
+  };
 
-      {/* STAGE 3: TRIGGER */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 cursor-pointer" onClick={() => setIsTriggerOpen(!isTriggerOpen)}>
-            <div className="h-6 w-6 rounded-lg bg-[#123C2A] text-[#55C98A] flex items-center justify-center font-mono font-bold text-xs">
-              3
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-xs font-black text-white uppercase tracking-wider">3. TRIGGER</h3>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
-                  {triggerRules.length} rules
-                </span>
-              </div>
-              <p className="text-[11px] text-[#8BA596]">What exact event triggers the entry?</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setAddRuleModalStage("trigger");
-                setSelectedIndForAdd(POPULAR_INDICATORS[1]); // EMA 9
-              }}
-              className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
-            >
-              <Plus className="h-3 w-3" />
-              <span>Add Rule</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsTriggerOpen(!isTriggerOpen)}
-              className="text-[#8BA596] hover:text-white p-1"
-            >
-              {isTriggerOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
-
-        {isTriggerOpen && (
-          <div className="space-y-2 pt-1 animate-fadeIn">
-            {triggerRules.length === 0 ? (
-              <div className="p-4 rounded-xl bg-[#060D0A] border border-dashed border-[#1A3127] text-center text-[#607D6E]">
-                <p className="font-medium">No trigger rules configured</p>
-                <p className="text-[10px] mt-0.5">e.g., EMA 9 crosses above EMA 21</p>
-              </div>
-            ) : (
-              triggerRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  onClick={() => setEditingRule({ rule, stage: "trigger" })}
-                  className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-3 flex items-center justify-between transition-all cursor-pointer group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="px-2 py-0.5 rounded bg-[#060D0A] text-cyan-400 font-mono font-bold text-xs border border-[#14271F]">
-                      {rule.timeframe}
-                    </span>
-                    <span className="font-mono text-white font-bold text-xs">
-                      {rule.leftLabel || rule.left} {rule.op} {rule.rightLabel || rule.right}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#142B21] text-[#55C98A] font-bold border border-[#275841]">
-                      Trigger ✓
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleMoveRule("trigger", "confirmation", rule)}
-                      title="Move up to Confirmation stage"
-                      className="p-1 text-[#607D6E] hover:text-white"
-                    >
-                      <MoveUp className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingRule({ rule, stage: "trigger" })}
-                      className="p-1 text-[#8BA596] hover:text-[#55C98A]"
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteRule("trigger", rule.id)}
-                      className="p-1 text-[#607D6E] hover:text-red-400"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* SLIDE-OVER RULE EDITOR DRAWER */}
-      {editingRule && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex justify-end animate-fadeIn">
-          <div className="bg-[#09110E] border-l border-[#1F392D] w-full max-w-md h-full p-6 flex flex-col justify-between shadow-2xl overflow-y-auto custom-scrollbar">
-            
-            <div className="space-y-5">
-              <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
-                <div>
-                  <span className="text-[10px] text-[#55C98A] font-bold uppercase tracking-wider">Configure Condition</span>
-                  <h3 className="text-sm font-black text-white mt-0.5">Edit Strategy Rule</h3>
-                </div>
+  return (
+    <div className="space-y-4 font-sans select-none text-xs">
+      
+      {/* 1. SETUP BLOCK */}
+      <section className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+        {/* Header & Helper */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#142B21] pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-md bg-[#123C2A] text-[#55C98A] font-black text-xs font-mono">
+                1
+              </span>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">SETUP</h3>
+              {setupRules.length > 1 && (
                 <button
                   type="button"
-                  onClick={() => setEditingRule(null)}
-                  className="p-1.5 rounded-lg text-[#8BA596] hover:text-white bg-[#0C1713]"
+                  onClick={() => handleToggleConjunction("setup")}
+                  className="text-[10px] px-2 py-0.5 rounded bg-[#0C1713] border border-[#1A3127] text-[#55C98A] font-mono font-bold hover:bg-[#14271F] transition-colors"
+                  title="Toggle ALL / ANY condition evaluation"
                 >
-                  <X className="h-4 w-4" />
+                  {strategy.entry?.setup?.conjunction === "OR" ? "ANY (OR)" : "ALL (AND)"}
                 </button>
-              </div>
+              )}
+            </div>
+            <p className="text-xs text-[#8BA596] mt-0.5">
+              What market condition must exist before looking for a trade?
+            </p>
+          </div>
 
-              {/* Indicator / Left Operand */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Left Operand (Indicator / Metric)</label>
+          <button
+            type="button"
+            onClick={() => setQuickAddStage("setup")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-xs transition-all border border-[#39B978]/30 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>+ Add Rule</span>
+          </button>
+        </div>
+
+        {/* Rules List or Empty State */}
+        <div className="space-y-2">
+          {setupRules.length === 0 ? (
+            <div className="p-5 text-center bg-[#060D0A] border border-dashed border-[#14271F] rounded-xl space-y-2">
+              <p className="text-xs font-bold text-white">No Setup Rules</p>
+              <p className="text-[11px] text-[#8BA596]">
+                Add the market condition required before a trade can be considered (e.g. 1H Close &gt; EMA 200).
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuickAddStage("setup")}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-[#123C2A] text-[#55C98A] font-mono font-bold text-xs hover:bg-[#1B4D36] transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                <span>+ Add First Rule</span>
+              </button>
+            </div>
+          ) : (
+            setupRules.map((rule, idx) => renderRuleRow(rule, "setup", idx, setupRules.length))
+          )}
+        </div>
+      </section>
+
+      {/* 2. CONFIRM BLOCK */}
+      <section className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+        {/* Header & Helper */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#142B21] pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-md bg-[#123C2A] text-[#55C98A] font-black text-xs font-mono">
+                2
+              </span>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">CONFIRM</h3>
+              {confirmRules.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleToggleConjunction("confirmation")}
+                  className="text-[10px] px-2 py-0.5 rounded bg-[#0C1713] border border-[#1A3127] text-[#55C98A] font-mono font-bold hover:bg-[#14271F] transition-colors"
+                  title="Toggle ALL / ANY condition evaluation"
+                >
+                  {strategy.entry?.confirmation?.conjunction === "OR" ? "ANY (OR)" : "ALL (AND)"}
+                </button>
+              )}
+            </div>
+            <p className="text-xs text-[#8BA596] mt-0.5">
+              What confirms the setup is strong enough? (e.g. 15m RSI &gt; 55)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setQuickAddStage("confirmation")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-xs transition-all border border-[#39B978]/30 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>+ Add Rule</span>
+          </button>
+        </div>
+
+        {/* Rules List or Empty State */}
+        <div className="space-y-2">
+          {confirmRules.length === 0 ? (
+            <div className="p-5 text-center bg-[#060D0A] border border-dashed border-[#14271F] rounded-xl space-y-2">
+              <p className="text-xs font-bold text-white">No Confirmation Rules (Optional)</p>
+              <p className="text-[11px] text-[#8BA596]">
+                Add momentum or volume filters to prevent false breakouts.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuickAddStage("confirmation")}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-[#123C2A] text-[#55C98A] font-mono font-bold text-xs hover:bg-[#1B4D36] transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                <span>+ Add Confirmation</span>
+              </button>
+            </div>
+          ) : (
+            confirmRules.map((rule, idx) => renderRuleRow(rule, "confirmation", idx, confirmRules.length))
+          )}
+        </div>
+      </section>
+
+      {/* 3. TRIGGER BLOCK */}
+      <section className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+        {/* Header & Helper */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#142B21] pb-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center justify-center w-5 h-5 rounded-md bg-[#123C2A] text-[#55C98A] font-black text-xs font-mono">
+                3
+              </span>
+              <h3 className="text-sm font-black text-white uppercase tracking-wider">TRIGGER</h3>
+            </div>
+            <p className="text-xs text-[#8BA596] mt-0.5">
+              What exact event triggers entry? (e.g. 15m EMA 9 crosses above EMA 21)
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setQuickAddStage("trigger")}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-xs transition-all border border-[#39B978]/30 shadow-sm"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            <span>+ Add Rule</span>
+          </button>
+        </div>
+
+        {/* Rules List or Empty State */}
+        <div className="space-y-2">
+          {triggerRules.length === 0 ? (
+            <div className="p-5 text-center bg-[#060D0A] border border-dashed border-[#14271F] rounded-xl space-y-2">
+              <p className="text-xs font-bold text-white">No Trigger Rules</p>
+              <p className="text-[11px] text-[#8BA596]">
+                Add the timing event that triggers immediate order entry.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuickAddStage("trigger")}
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-lg bg-[#123C2A] text-[#55C98A] font-mono font-bold text-xs hover:bg-[#1B4D36] transition-colors"
+              >
+                <Plus className="h-3 w-3" />
+                <span>+ Add Trigger Rule</span>
+              </button>
+            </div>
+          ) : (
+            triggerRules.map((rule, idx) => renderRuleRow(rule, "trigger", idx, triggerRules.length))
+          )}
+        </div>
+      </section>
+
+      {/* 4. SLIDE-OUT EDIT RULE DRAWER / MODAL */}
+      {editingRule && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans select-none animate-fadeIn">
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-2xl w-full max-w-md space-y-4">
+            
+            <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#123C2A] text-[#55C98A]">
+                  <Edit2 className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase">EDIT RULE</h3>
+                  <span className="text-[10px] text-[#8BA596] font-mono capitalize">
+                    {editingRule.stage === "confirmation" ? "Confirm" : editingRule.stage} Stage
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setEditingRule(null)} className="text-[#8BA596] hover:text-white">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 font-mono text-xs">
+              {/* Left Indicator */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Indicator / Source</span>
                 <input
                   type="text"
                   value={editingRule.rule.leftLabel || editingRule.rule.left}
                   onChange={(e) =>
                     setEditingRule({
                       ...editingRule,
-                      rule: { ...editingRule.rule, left: e.target.value, leftLabel: e.target.value },
+                      rule: { ...editingRule.rule, leftLabel: e.target.value, left: e.target.value },
                     })
                   }
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
                 />
               </div>
 
-              {/* Operator */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Comparison Operator</label>
+              {/* Condition */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Condition</span>
                 <select
                   value={editingRule.rule.op}
                   onChange={(e) =>
@@ -641,37 +523,37 @@ export function StrategyRuleCanvas({
                       rule: { ...editingRule.rule, op: e.target.value },
                     })
                   }
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A] cursor-pointer"
                 >
-                  {SUPPORTED_OPERATORS.map((op) => (
-                    <option key={op.value} value={op.value}>
-                      {op.label}
+                  {SUPPORTED_CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value} className="bg-[#09110E] text-white">
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* Right Operand */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Right Operand (Indicator / Threshold)</label>
+              {/* Target / Value */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Compare Value / Target</span>
                 <input
                   type="text"
                   value={editingRule.rule.rightLabel || editingRule.rule.right}
                   onChange={(e) =>
                     setEditingRule({
                       ...editingRule,
-                      rule: { ...editingRule.rule, right: e.target.value, rightLabel: e.target.value },
+                      rule: { ...editingRule.rule, rightLabel: e.target.value, right: e.target.value },
                     })
                   }
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
                 />
               </div>
 
               {/* Timeframe */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Evaluation Timeframe</label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {ALL_TIMEFRAMES.map((tf) => (
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Timeframe</span>
+                <div className="grid grid-cols-4 gap-1">
+                  {TIMEFRAMES.map((tf) => (
                     <button
                       key={tf}
                       type="button"
@@ -681,10 +563,10 @@ export function StrategyRuleCanvas({
                           rule: { ...editingRule.rule, timeframe: tf },
                         })
                       }
-                      className={`py-1.5 rounded-lg text-xs font-mono font-bold ${
+                      className={`py-1 rounded text-[11px] font-bold transition-all ${
                         editingRule.rule.timeframe === tf
-                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                          : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
                       }`}
                     >
                       {tf}
@@ -692,180 +574,155 @@ export function StrategyRuleCanvas({
                   ))}
                 </div>
               </div>
-
-              {/* Move to Stage */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Assigned Stage</label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(["setup", "confirmation", "trigger"] as RuleTargetStage[]).map((stg) => (
-                    <button
-                      key={stg}
-                      type="button"
-                      onClick={() => {
-                        if (editingRule.stage !== stg) {
-                          handleMoveRule(editingRule.stage, stg, editingRule.rule);
-                          setEditingRule({ ...editingRule, stage: stg });
-                        }
-                      }}
-                      className={`py-1.5 rounded-lg text-xs font-bold capitalize ${
-                        editingRule.stage === stg
-                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                          : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
-                      }`}
-                    >
-                      {stg}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
             </div>
 
-            {/* Drawer Actions */}
-            <div className="border-t border-[#142B21] pt-4 flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between pt-3 border-t border-[#142B21]">
               <button
                 type="button"
                 onClick={() => handleDeleteRule(editingRule.stage, editingRule.rule.id)}
-                className="px-4 py-2 rounded-xl bg-red-950/60 hover:bg-red-900 text-red-400 font-bold transition-all flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl bg-red-950/40 hover:bg-red-950/70 text-red-400 font-mono font-bold text-xs transition-colors border border-red-500/30"
               >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete</span>
+                Delete Rule
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  handleUpdateRuleInStage(editingRule.stage, editingRule.rule);
-                  setEditingRule(null);
-                }}
-                className="px-6 py-2 rounded-xl bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1.5 shadow-md"
-              >
-                <Check className="h-3.5 w-3.5" />
-                <span>Apply Changes</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingRule(null)}
+                  className="px-3 py-1.5 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-mono font-bold text-xs transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveEditedRule(editingRule.rule, editingRule.stage)}
+                  className="px-4 py-1.5 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-xs transition-all shadow-sm"
+                >
+                  Apply Changes
+                </button>
+              </div>
             </div>
 
           </div>
         </div>
       )}
 
-      {/* FAST ADD RULE MODAL */}
-      {addRuleModalStage && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 max-w-lg w-full shadow-2xl space-y-4 animate-scaleUp">
+      {/* 5. INLINE QUICK ADD RULE MODAL */}
+      {quickAddStage && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans select-none animate-fadeIn">
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-2xl w-full max-w-md space-y-4">
             
             <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
-              <div>
-                <span className="text-[10px] text-[#55C98A] font-bold uppercase tracking-wider">
-                  Add Rule to {addRuleModalStage.toUpperCase()}
-                </span>
-                <h3 className="text-sm font-black text-white mt-0.5">Quick Condition Builder</h3>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#123C2A] text-[#55C98A]">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase">
+                    ADD {quickAddStage === "confirmation" ? "CONFIRM" : quickAddStage.toUpperCase()} RULE
+                  </h3>
+                  <span className="text-[10px] text-[#8BA596] font-mono">Create custom condition</span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setAddRuleModalStage(null)}
-                className="p-1.5 rounded-lg text-[#8BA596] hover:text-white bg-[#0C1713]"
-              >
+              <button onClick={() => setQuickAddStage(null)} className="text-[#8BA596] hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Indicator Quick Selector */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] text-[#8BA596] font-semibold">Select Indicator</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto custom-scrollbar">
-                {POPULAR_INDICATORS.map((ind) => (
-                  <button
-                    key={ind.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedIndForAdd(ind);
-                      setAddRuleOp(ind.defaultOp);
-                      setAddRuleRight(ind.defaultRight);
-                    }}
-                    className={`p-2 rounded-xl text-left border transition-all ${
-                      selectedIndForAdd.id === ind.id
-                        ? "bg-[#123C2A] text-white border-[#39B978]"
-                        : "bg-[#060D0A] text-[#8BA596] border-[#1A3127] hover:text-white"
-                    }`}
-                  >
-                    <span className="font-bold text-xs">{ind.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Condition Expression */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-3 font-mono text-xs">
               <div className="space-y-1">
-                <label className="text-[10px] text-[#8BA596]">Indicator</label>
-                <div className="p-2 bg-[#060D0A] border border-[#1A3127] rounded-xl font-mono text-white font-bold truncate">
-                  {selectedIndForAdd.label}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] text-[#8BA596]">Operator</label>
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Indicator</span>
                 <select
-                  value={addRuleOp}
-                  onChange={(e) => setAddRuleOp(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2 text-xs text-white font-bold focus:outline-none"
+                  value={quickLeftKey}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setQuickLeftKey(val);
+                    if (val === "close") setQuickIndicator("Close Price");
+                    else if (val === "ema_9") setQuickIndicator("EMA 9");
+                    else if (val === "ema_21") setQuickIndicator("EMA 21");
+                    else if (val === "ema_50") setQuickIndicator("EMA 50");
+                    else if (val === "ema_200") setQuickIndicator("EMA 200");
+                    else if (val === "rsi_14") setQuickIndicator("RSI (14)");
+                    else if (val === "macd_line") setQuickIndicator("MACD Line");
+                    else if (val === "vwap") setQuickIndicator("VWAP");
+                    else if (val === "volume") setQuickIndicator("Volume");
+                    else if (val === "supertrend") setQuickIndicator("Supertrend");
+                  }}
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A] cursor-pointer"
                 >
-                  {SUPPORTED_OPERATORS.map((op) => (
-                    <option key={op.value} value={op.value}>
-                      {op.value}
+                  <option value="rsi_14" className="bg-[#09110E] text-white">RSI (14)</option>
+                  <option value="close" className="bg-[#09110E] text-white">Close Price</option>
+                  <option value="ema_9" className="bg-[#09110E] text-white">EMA 9</option>
+                  <option value="ema_21" className="bg-[#09110E] text-white">EMA 21</option>
+                  <option value="ema_50" className="bg-[#09110E] text-white">EMA 50</option>
+                  <option value="ema_200" className="bg-[#09110E] text-white">EMA 200</option>
+                  <option value="macd_line" className="bg-[#09110E] text-white">MACD Line</option>
+                  <option value="vwap" className="bg-[#09110E] text-white">VWAP (Session)</option>
+                  <option value="volume" className="bg-[#09110E] text-white">Volume</option>
+                  <option value="supertrend" className="bg-[#09110E] text-white">Supertrend</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Condition</span>
+                <select
+                  value={quickOp}
+                  onChange={(e) => setQuickOp(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A] cursor-pointer"
+                >
+                  {SUPPORTED_CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value} className="bg-[#09110E] text-white">
+                      {c.label}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-[#8BA596]">Threshold / Right</label>
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Compare Value / Target</span>
                 <input
                   type="text"
-                  value={addRuleRight}
-                  onChange={(e) => setAddRuleRight(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
+                  value={quickRight}
+                  onChange={(e) => setQuickRight(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
                 />
               </div>
-            </div>
 
-            {/* Timeframe */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] text-[#8BA596] font-semibold">Timeframe</label>
-              <div className="grid grid-cols-8 gap-1">
-                {ALL_TIMEFRAMES.map((tf) => (
-                  <button
-                    key={tf}
-                    type="button"
-                    onClick={() => setAddRuleTimeframe(tf)}
-                    className={`py-1 rounded text-xs font-mono font-bold ${
-                      addRuleTimeframe === tf
-                        ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                        : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Timeframe</span>
+                <div className="grid grid-cols-4 gap-1">
+                  {TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() => setQuickTf(tf)}
+                      className={`py-1 rounded text-[11px] font-bold transition-all ${
+                        quickTf === tf
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="border-t border-[#142B21] pt-3 flex justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#142B21]">
               <button
                 type="button"
-                onClick={() => setAddRuleModalStage(null)}
-                className="px-4 py-2 rounded-xl bg-[#0C1713] text-[#8BA596] hover:text-white font-bold"
+                onClick={() => setQuickAddStage(null)}
+                className="px-4 py-2 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-mono font-bold text-xs transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleApplyAddRule}
-                className="px-6 py-2 rounded-xl bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1.5 shadow-md"
+                onClick={handleQuickAddSubmit}
+                className="px-5 py-2 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-xs transition-all shadow-sm"
               >
-                <Plus className="h-3.5 w-3.5" />
-                <span>Add Rule</span>
+                Add Rule
               </button>
             </div>
 

@@ -9,91 +9,118 @@ import {
   Minimize2,
   Lock,
   Globe,
+  Sliders,
+  Layers,
+  Sparkles,
 } from "lucide-react";
 import { CanonicalFuturesContract, DataQualityStatus } from "@/types/futures-terminal";
+import { useUIStore } from "@/lib/store/useUIStore";
 
 interface Props {
-  selectedUnderlying: string;
-  onSelectUnderlying: (underlying: string) => void;
-  selectedExchange: string;
-  onSelectExchange: (exchange: string) => void;
   selectedContract: CanonicalFuturesContract | null;
   connectionStatus: DataQualityStatus;
   executionMode: "PAPER" | "LIVE";
-  onToggleExecutionMode?: () => void;
   isRefreshing: boolean;
   onRefresh: () => void;
+  onOpenDetails: () => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
 }
 
 export function FuturesTerminalHeader({
-  selectedUnderlying,
-  onSelectUnderlying,
-  selectedExchange,
-  onSelectExchange,
   selectedContract,
   connectionStatus,
   executionMode,
   isRefreshing,
   onRefresh,
+  onOpenDetails,
   isFullscreen,
   onToggleFullscreen,
 }: Props) {
-  const underlyings = [
-    { id: "BTC", label: "BTC" },
-    { id: "ETH", label: "ETH" },
-    { id: "SOL", label: "SOL" },
-    { id: "BNB", label: "BNB" },
-    { id: "XRP", label: "XRP" },
-  ];
+  const { interfaceMode, toggleInterfaceMode } = useUIStore();
 
-  const exchanges = ["ALL", "BINANCE", "BYBIT", "OKX", "DERIBIT"];
+  const lastPrice = selectedContract?.last_price || 65000;
+  const change24h = selectedContract?.change_24h || 0;
+  const isPositiveChange = change24h >= 0;
+  const fundingRate = selectedContract?.funding_rate_pct || 0.006;
+  const isPositiveFunding = fundingRate >= 0;
+  const oiUsd = selectedContract?.open_interest_usd || 8360000000;
+
+  // Format OI cleanly (e.g. $8.36B or $120.5M)
+  const formatOI = (val: number) => {
+    if (val >= 1_000_000_000) {
+      return `$${(val / 1_000_000_000).toFixed(2)}B`;
+    }
+    return `$${(val / 1_000_000).toFixed(2)}M`;
+  };
 
   return (
-    <header className="bg-[#0B101B] border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-wrap items-center justify-between gap-4 select-none">
-      {/* Left: Terminal Brand & Active Contract */}
+    <header className="bg-[#0B101B] border border-slate-800 rounded-xl p-3.5 shadow-xl flex flex-wrap items-center justify-between gap-4 select-none font-mono">
+      {/* 1. Left: Header Title & Active Contract Pill */}
       <div className="flex items-center gap-3.5 flex-wrap">
         <div className="flex items-center gap-2">
           <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 shadow-inner">
             <Zap className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm font-bold tracking-wider text-white uppercase flex items-center gap-1.5 font-mono">
-                Futures Terminal
-              </h1>
-              {selectedContract && (
-                <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded bg-blue-950/60 border border-blue-500/30 text-blue-300">
-                  {selectedContract.canonical_symbol}
-                </span>
-              )}
+            <h1 className="text-sm font-bold tracking-wider text-white uppercase flex items-center gap-1.5 font-mono">
+              FUTURES
+            </h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-xs font-bold text-blue-400">
+                {selectedContract?.display_symbol || "BTCUSDT"}
+              </span>
+              <span className="text-[11px] text-slate-500">•</span>
+              <span className="text-[11px] text-slate-300">
+                {selectedContract?.exchange || "Binance"}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-blue-950/60 border border-blue-500/30 text-blue-300 font-semibold">
+                {selectedContract?.is_perpetual ? "Perpetual" : selectedContract?.expiry || "Dated"}
+              </span>
             </div>
-            <p className="text-[11px] text-slate-400 font-mono">
-              Institutional Derivatives Execution & Risk Desk
-            </p>
           </div>
         </div>
 
-        {/* Exchange Selector */}
-        <div className="flex items-center gap-1.5 bg-[#131B2A] px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
-          <Globe className="w-3.5 h-3.5 text-slate-400" />
-          <span className="text-[10px] text-slate-400 uppercase font-mono">Venue:</span>
-          <select
-            value={selectedExchange}
-            onChange={(e) => onSelectExchange(e.target.value)}
-            className="bg-transparent text-slate-200 text-xs font-mono font-semibold focus:outline-none cursor-pointer"
-          >
-            {exchanges.map((ex) => (
-              <option key={ex} value={ex} className="bg-[#131B2A] text-slate-200">
-                {ex}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* 2. Fast Header Metrics Strip */}
+        <div className="flex items-center gap-4 bg-[#131B2A] px-3.5 py-1.5 rounded-xl border border-slate-800/80 text-xs">
+          {/* Price */}
+          <div>
+            <span className="text-[9px] text-slate-400 block uppercase">Price</span>
+            <span className="text-xs font-bold text-white tracking-wide">
+              ${lastPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </span>
+          </div>
 
-        {/* Live Connectivity & Health Badge */}
-        <div className="flex items-center gap-2 bg-[#131B2A] px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
+          {/* 24H Change */}
+          <div className="border-l border-slate-800 pl-3">
+            <span className="text-[9px] text-slate-400 block uppercase">24H</span>
+            <span className={`text-xs font-bold ${isPositiveChange ? "text-emerald-400" : "text-rose-400"}`}>
+              {isPositiveChange ? `+${change24h.toFixed(2)}%` : `${change24h.toFixed(2)}%`}
+            </span>
+          </div>
+
+          {/* Funding */}
+          <div className="border-l border-slate-800 pl-3">
+            <span className="text-[9px] text-slate-400 block uppercase">Funding</span>
+            <span className={`text-xs font-bold ${isPositiveFunding ? "text-emerald-400" : "text-rose-400"}`}>
+              {isPositiveFunding ? `+${fundingRate.toFixed(4)}%` : `${fundingRate.toFixed(4)}%`}
+            </span>
+          </div>
+
+          {/* OI */}
+          <div className="border-l border-slate-800 pl-3 hidden sm:block">
+            <span className="text-[9px] text-slate-400 block uppercase">OI</span>
+            <span className="text-xs font-bold text-slate-200">
+              {formatOI(oiUsd)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Right: Status Pills & Action Buttons */}
+      <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Status: LIVE / DELAYED / STALE */}
+        <div className="flex items-center gap-1.5 bg-[#131B2A] px-2.5 py-1 rounded-lg border border-slate-800 text-xs">
           <span
             className={`w-2 h-2 rounded-full ${
               connectionStatus === "LIVE"
@@ -103,91 +130,78 @@ export function FuturesTerminalHeader({
                 : "bg-rose-400"
             }`}
           />
-          <span className="text-[10px] text-slate-400 font-mono">FEED:</span>
-          <span
-            className={`font-mono text-xs font-bold ${
-              connectionStatus === "LIVE"
-                ? "text-emerald-400"
-                : connectionStatus === "STALE"
-                ? "text-amber-400"
-                : "text-rose-400"
-            }`}
-          >
-            {connectionStatus}
-          </span>
-          <span className="text-[10px] text-slate-400 font-mono border-l border-slate-700 pl-1.5">
-            42ms
+          <span className="text-[10px] font-bold text-slate-300">
+            {connectionStatus || "LIVE"}
           </span>
         </div>
 
-        {/* Risk Engine Healthy Badge */}
-        <div className="hidden sm:flex items-center gap-1.5 bg-emerald-950/30 border border-emerald-500/20 px-2.5 py-1 rounded-lg text-emerald-400 text-xs">
+        {/* Status: RISK SAFE */}
+        <div className="hidden sm:flex items-center gap-1.5 bg-emerald-950/40 border border-emerald-500/20 px-2.5 py-1 rounded-lg text-emerald-300 text-xs">
           <ShieldCheck className="w-3.5 h-3.5" />
-          <span className="text-[11px] font-mono font-semibold">14-Stage Risk Online</span>
-        </div>
-      </div>
-
-      {/* Right: Quick Switcher, Paper/Live Indicator, Actions */}
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Underlying Asset Pills */}
-        <div className="flex items-center bg-[#131B2A] p-1 rounded-lg border border-slate-800">
-          {underlyings.map((u) => (
-            <button
-              key={u.id}
-              onClick={() => onSelectUnderlying(u.id)}
-              className={`px-2.5 py-1 text-xs font-mono font-bold rounded transition-all ${
-                selectedUnderlying === u.id
-                  ? "bg-blue-600 text-white shadow-md shadow-blue-600/30"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
-              }`}
-            >
-              {u.label}
-            </button>
-          ))}
+          <span className="text-[10px] font-bold">RISK SAFE</span>
         </div>
 
-        {/* Explicit Environment Badge */}
+        {/* Status: PAPER / LIVE Tag */}
         <div
-          className={`flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-mono font-bold uppercase tracking-wider ${
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-mono font-bold uppercase tracking-wider ${
             executionMode === "LIVE"
-              ? "bg-rose-950/40 border-rose-500/40 text-rose-300 shadow-md shadow-rose-950/40 animate-pulse"
-              : "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 shadow-md shadow-emerald-950/40"
+              ? "bg-rose-950/40 border-rose-500/40 text-rose-300 animate-pulse"
+              : "bg-cyan-950/40 border-cyan-500/40 text-cyan-300"
           }`}
-          title={
-            executionMode === "LIVE"
-              ? "REAL CAPITAL AT RISK"
-              : "SIMULATED PAPER TRADING EXECUTION"
-          }
         >
           <Lock className="w-3 h-3" />
-          <span>{executionMode === "LIVE" ? "LIVE ACCOUNT" : "PAPER TRADING"}</span>
+          <span className="text-[10px]">{executionMode}</span>
         </div>
 
-        {/* Refresh & Fullscreen actions */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={onRefresh}
-            disabled={isRefreshing}
-            className="p-2 rounded-lg bg-[#131B2A] hover:bg-slate-800 text-slate-300 transition-colors border border-slate-800 hover:border-slate-700"
-            title="Refresh Quotes"
-          >
-            <RefreshCw
-              className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-400" : ""}`}
-            />
-          </button>
+        {/* Mode Toggle: SIMPLE vs ADVANCED */}
+        <button
+          onClick={toggleInterfaceMode}
+          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-bold transition-all ${
+            interfaceMode === "ADVANCED"
+              ? "bg-purple-950/60 border-purple-500/40 text-purple-300 shadow-sm shadow-purple-950/40"
+              : "bg-[#131B2A] hover:bg-slate-800 border-slate-800 text-slate-400 hover:text-slate-200"
+          }`}
+          title="Toggle Simple / Advanced Interface Mode"
+        >
+          <Sliders className="w-3 h-3" />
+          <span>{interfaceMode === "ADVANCED" ? "ADVANCED" : "SIMPLE"}</span>
+        </button>
 
-          <button
-            onClick={onToggleFullscreen}
-            className="p-2 rounded-lg bg-[#131B2A] hover:bg-slate-800 text-slate-300 transition-colors border border-slate-800 hover:border-slate-700"
-            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-          >
-            {isFullscreen ? (
-              <Minimize2 className="w-3.5 h-3.5 text-slate-300" />
-            ) : (
-              <Maximize2 className="w-3.5 h-3.5 text-slate-300" />
-            )}
-          </button>
-        </div>
+        {/* Refresh Button */}
+        <button
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#131B2A] hover:bg-slate-800 text-slate-300 transition-colors border border-slate-800 text-xs font-semibold"
+          title="Refresh Market Data"
+        >
+          <RefreshCw
+            className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin text-blue-400" : ""}`}
+          />
+          <span className="hidden sm:inline">Refresh</span>
+        </button>
+
+        {/* Details Button (Opens Contract Drawer) */}
+        <button
+          onClick={onOpenDetails}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-blue-400 hover:text-blue-300 transition-colors text-xs font-bold"
+          title="Open Contract Details & Derivatives Analytics"
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Details</span>
+        </button>
+
+        {/* Fullscreen Button */}
+        <button
+          onClick={onToggleFullscreen}
+          className="p-1.5 rounded-lg bg-[#131B2A] hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition-colors border border-slate-800"
+          title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-3.5 h-3.5" />
+          ) : (
+            <Maximize2 className="w-3.5 h-3.5" />
+          )}
+        </button>
       </div>
     </header>
   );

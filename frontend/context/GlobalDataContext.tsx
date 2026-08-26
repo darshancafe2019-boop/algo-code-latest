@@ -33,7 +33,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
   const [tradingMode, setTradingMode] = useState<"PAPER" | "LIVE">("PAPER");
   const [liveSseSnapshot, setLiveSseSnapshot] = useState<PortfolioSnapshot | null>(null);
 
-  // 1. Authoritative Portfolio Snapshot Query
+  // 1. Authoritative Portfolio Snapshot Query (Single Financial Source of Truth)
   const {
     data: restSnapshot,
     isLoading: isSnapshotLoading,
@@ -184,6 +184,10 @@ export function useGlobalData(): GlobalDataContextValue {
 
 export function usePortfolioSnapshot(): PortfolioSnapshot | null {
   return useGlobalData().portfolioSnapshot;
+}
+
+export function useTradingMode(): "PAPER" | "LIVE" {
+  return useGlobalData().tradingMode;
 }
 
 export function useAuthoritativePositions(): PositionItem[] {

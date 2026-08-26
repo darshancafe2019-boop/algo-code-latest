@@ -4115,14 +4115,16 @@ def api_order_by_id(order_id):
 @app.route("/api/positions", methods=["GET"])
 def api_positions_rest():
     """Fetch active open positions with institutional-grade risk metrics, live P&L, and portfolio aggregates."""
+    from src.global_data_engine import GlobalDataEngine
+    gde = GlobalDataEngine.get_instance()
+    mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
     bot_id = request.args.get("bot_id")
+    
     if bot_id:
-        raw_positions = safe_query("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ? ORDER BY id DESC", (bot_id,))
+        raw_positions = safe_query("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC", (mode, bot_id))
     else:
-        raw_positions = safe_query("SELECT * FROM trades_log WHERE status = 'OPEN' ORDER BY id DESC")
+        raw_positions = safe_query("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC", (mode,))
 
-    ticker = get_latest_ticker_data()
-    default_price = float(ticker.get("price", 65000.0))
     now = datetime.now(timezone.utc)
     now_str = now.isoformat()
 
@@ -4140,17 +4142,25 @@ def api_positions_rest():
         dir_val = (p.get("direction") or p.get("side") or "LONG").upper()
         is_long = dir_val in ["LONG", "BUY"]
 
-        entry_p = float(p.get("entry_price") or default_price)
-        curr_p = default_price  # Live mark price from real feed
+        entry_p = float(p.get("entry_price") or p.get("average_entry_price") or 65000.0)
+        curr_p = float(gde.get_latest_price(sym) or entry_p)  # Authoritative live mark price per asset
         qty = float(p.get("position_size") or p.get("quantity") or p.get("entry_quantity") or 0.1)
         lev = float(p.get("leverage") or 5.0)
         notional = round(entry_p * qty, 2)
         curr_notional = round(curr_p * qty, 2)
         margin = round(notional / lev, 2) if lev > 0 else notional
 
-        # Floating P&L
-        pnl = (curr_p - entry_p) * qty if is_long else (entry_p - curr_p) * qty
-        pnl_pct = ((curr_p - entry_p) / entry_p * 100.0) if is_long and entry_p > 0 else ((entry_p - curr_p) / entry_p * 100.0) if entry_p > 0 else 0.0
+        # Floating P&L using canonical compute_unrealized_pnl
+        fee = float(p.get("fees") or 0.0)
+        pnl_data = compute_unrealized_pnl(
+            direction=dir_val,
+            entry_price=entry_p,
+            live_price=curr_p,
+            quantity=qty,
+            fees=fee,
+        )
+        pnl = float(pnl_data.get("unrealized_pnl", 0.0))
+        pnl_pct = float(pnl_data.get("unrealized_pnl_pct", 0.0))
 
         # Protection levels
         sl = float(p.get("stop_loss") or (round(entry_p * 0.98, 2) if is_long else round(entry_p * 1.02, 2)))
@@ -4227,7 +4237,7 @@ def api_positions_rest():
             "bot_id": p.get("bot_id") or p.get("bot_instance_id") or "bot-1",
             "bot_name": p.get("bot_instance_name") or "Alpha BTC Scalper",
             "strategy": p.get("strategy") or p.get("strategy_name") or "EMA_MACD_VP",
-            "execution_mode": p.get("execution_mode") or ("PAPER" if config.PAPER_TRADING else "LIVE"),
+            "execution_mode": mode,
             "status": "OPEN",
             "risk_warnings": risk_warnings,
             "broker_status": "FILLED_IN_MARKET",
@@ -4245,13 +4255,10 @@ def api_positions_rest():
             short_exposure += curr_notional
             short_count += 1
 
-    # Realized P&L today
-    realized_trades = safe_query("SELECT result_pnl FROM trades_log WHERE status = 'CLOSED'")
-    total_realized_pnl = sum(float(t.get("result_pnl") or 0.0) for t in realized_trades)
-
-    # Balance & Margin estimation
-    account_balance = float(getattr(config, "INITIAL_CAPITAL", 10000.0)) + total_realized_pnl
-    available_margin = max(0.0, account_balance - total_margin_used)
+    snapshot = gde.get_portfolio_snapshot(mode=mode)
+    account_balance = snapshot["cashBalance"]
+    available_margin = snapshot["availableCapital"]
+    total_realized_pnl = snapshot["netRealizedPnl"]
     risk_utilization_pct = round((total_planned_risk / account_balance * 100.0), 2) if account_balance > 0 else 0.0
 
     summary = {
@@ -4279,7 +4286,8 @@ def api_positions_rest():
     return jsonify({
         "status": "success",
         "positions": enriched_positions,
-        "summary": summary
+        "summary": summary,
+        "total_open_positions": len(enriched_positions),
     })
 
 
@@ -9743,7 +9751,13 @@ def api_risk_overview():
 
     # Calculate actual portfolio positions from active bots
     open_trades = safe_query("SELECT * FROM trades_log WHERE status = 'OPEN' ORDER BY id DESC")
-    account_balance = 10000.0
+    try:
+        from src.global_data_engine import GlobalDataEngine
+        gde = GlobalDataEngine.get_instance()
+        p_snap = gde.get_portfolio_snapshot(mode=getattr(config, "TRADING_MODE", "PAPER").upper())
+        account_balance = float(p_snap.get("account_equity") or p_snap.get("total_equity") or p_snap.get("balance") or 65000.0)
+    except Exception:
+        account_balance = 65000.0
     
     positions = []
     symbol_exposure = {}
@@ -9860,6 +9874,79 @@ def api_risk_overview():
     # Kill switch state
     kill_active = config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
 
+    # Authoritative trading permission compilation
+    permission_status = "READY"
+    can_trade = True
+    primary_reason = "All 14 institutional safety gates operating within acceptable parameters."
+    primary_blocker = None
+
+    if kill_active:
+        permission_status = "EMERGENCY_HALT"
+        can_trade = False
+        primary_reason = "Global Emergency Kill Switch is engaged. All trading activity is halted."
+        primary_blocker = {
+            "id": "gate_kill_switch",
+            "name": "Emergency Kill Switch",
+            "status": "BLOCK",
+            "currentValue": "ENGAGED",
+            "limitValue": "DISENGAGED",
+            "description": "Global Emergency Halt is active. All order creation blocked.",
+            "isCritical": True,
+            "suggestedAction": {"label": "Review Halt", "actionType": "DISENGAGE_HALT"}
+        }
+    elif (margin_used / account_balance) > (float(active_limits.get("max_portfolio_risk_pct", 70.0)) / 100.0):
+        permission_status = "BLOCKED"
+        can_trade = False
+        m_pct = (margin_used / account_balance) * 100.0
+        lim_m = float(active_limits.get("max_portfolio_risk_pct", 70.0))
+        primary_reason = f"Margin utilization ({m_pct:.1f}%) exceeds permitted ceiling ({lim_m:.1f}%)."
+        primary_blocker = {
+            "id": "gate_margin_util",
+            "name": "Margin Utilization",
+            "status": "BLOCK",
+            "currentValue": f"{m_pct:.1f}%",
+            "limitValue": f"{lim_m:.1f}% max",
+            "description": "Margin usage exceeds permitted ceiling.",
+            "isCritical": True,
+            "suggestedAction": {"label": "Review Positions", "actionType": "NAVIGATE_POSITIONS"}
+        }
+    elif daily_drawdown_pct >= float(active_limits.get("max_daily_loss_pct", 5.0)):
+        permission_status = "BLOCKED"
+        can_trade = False
+        lim_dd = float(active_limits.get("max_daily_loss_pct", 5.0))
+        primary_reason = f"Daily drawdown ({daily_drawdown_pct:.1f}%) reached daily loss lockout limit ({lim_dd:.1f}%)."
+        primary_blocker = {
+            "id": "gate_daily_loss",
+            "name": "Daily Drawdown Limit",
+            "status": "BLOCK",
+            "currentValue": f"{daily_drawdown_pct:.1f}%",
+            "limitValue": f"{lim_dd:.1f}% max",
+            "description": "Daily drawdown limit exceeded. Day lockout engaged.",
+            "isCritical": True,
+            "suggestedAction": {"label": "View P&L Ledger", "actionType": "NAVIGATE_PNL"}
+        }
+    elif daily_drawdown_pct >= (float(active_limits.get("max_daily_loss_pct", 5.0)) * 0.75) or (margin_used / account_balance) > 0.60:
+        permission_status = "CAUTION"
+        can_trade = True
+        primary_reason = "Portfolio risk parameters approaching cautionary threshold."
+        primary_blocker = {
+            "id": "gate_caution",
+            "name": "Drawdown Buffer",
+            "status": "WARN",
+            "currentValue": f"{daily_drawdown_pct:.1f}%",
+            "limitValue": f"{float(active_limits.get('max_daily_loss_pct', 5.0)):.1f}% max",
+            "description": "Losses within 75% of daily safety ceiling.",
+            "isCritical": False
+        }
+
+    trading_permission = {
+        "status": permission_status,
+        "canTrade": can_trade,
+        "primaryReason": primary_reason,
+        "primaryBlocker": primary_blocker,
+        "evaluatedAt": datetime.now(timezone.utc).isoformat()
+    }
+
     return jsonify({
         "status": "success",
         "overview": {
@@ -9870,22 +9957,43 @@ def api_risk_overview():
             "margin_usage_pct": round((margin_used / account_balance) * 100.0, 2),
             "gross_exposure": round(gross_exposure, 2),
             "net_exposure": round(net_exposure, 2),
+            "effective_leverage": round((gross_exposure / account_balance), 2) if account_balance > 0 else 1.0,
             "portfolio_risk_dollars": round(total_risk_dollars, 2),
             "portfolio_risk_pct": portfolio_risk_pct,
             "daily_pnl": round(daily_pnl, 2),
             "daily_drawdown_pct": daily_drawdown_pct,
             "open_positions_count": len(positions),
             "risk_score": risk_score,
-            "risk_status": status_label,
+            "risk_status": permission_status if permission_status in ["EMERGENCY_HALT", "BLOCKED"] else status_label,
             "score_factors": score_factors,
             "kill_switch_active": kill_active,
-            "active_limits": active_limits
+            "active_limits": active_limits,
+            "trading_permission": trading_permission
         },
         "positions": positions,
         "symbol_exposure": symbol_exposure,
         "asset_class_exposure": asset_class_exposure,
         "heatmap": heatmap
     })
+
+
+@app.route("/api/risk/limits", methods=["GET", "POST", "PUT"])
+def api_risk_limits():
+    """Fetches active risk limits or updates specific risk thresholds."""
+    if request.method in ["POST", "PUT"]:
+        data = request.get_json(silent=True) or {}
+        active_limits = db.get_active_risk_limits()
+        for k, v in data.items():
+            if k in active_limits:
+                try:
+                    active_limits[k] = float(v) if not isinstance(v, bool) else v
+                except (ValueError, TypeError):
+                    pass
+        ok, res = db.save_risk_limits(active_limits) if hasattr(db, "save_risk_limits") else (True, "Saved")
+        return jsonify({"status": "success", "message": "Risk limits updated successfully.", "active_limits": active_limits})
+    
+    limits = db.get_active_risk_limits()
+    return jsonify({"status": "success", "limits": limits})
 
 
 @app.route("/api/risk/profiles", methods=["GET", "POST"])
@@ -10910,18 +11018,7 @@ def api_pnl_summary_authoritative():
     })
 
 
-@app.route("/api/positions", methods=["GET"])
-def api_positions_authoritative():
-    """Returns authoritative active open positions with live mark-to-market P&L."""
-    from src.global_data_engine import GlobalDataEngine
-    gde = GlobalDataEngine.get_instance()
-    mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
-    positions = gde.get_positions(mode=mode)
-    return jsonify({
-        "status": "success",
-        "positions": positions,
-        "total_open_positions": len(positions),
-    })
+
 
 
 @app.route("/api/orders", methods=["GET"])

@@ -66,35 +66,38 @@ export function LeftNavigationSidebar({
       items: [
         { id: "home", label: "HOME", path: "/", icon: LayoutDashboard },
         { id: "markets", label: "MARKETS", path: "/charts", icon: LineChart },
-        { id: "watchlist", label: "WATCHLIST", path: "/watchlists", icon: Globe },
         { id: "scanner", label: "SCANNER", path: "/scanner", icon: Radar, shortcut: "⌘S" },
       ],
     },
     {
-      groupName: "EXECUTION & DERIVATIVES",
+      groupName: "TRADING",
       items: [
         { id: "bots", label: "BOTS", path: "/bots", icon: Bot, badge: "LIVE" },
         { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
-        { id: "options", label: "OPTIONS", path: "/options", icon: Zap },
         { id: "futures", label: "FUTURES", path: "/crypto/futures", icon: TrendingUp },
+        { id: "options", label: "OPTIONS", path: "/options", icon: Zap },
       ],
     },
     {
-      groupName: "RISK & LEDGER",
+      groupName: "PORTFOLIO",
+      items: [
+        { id: "positions", label: "POSITIONS", path: "/positions", icon: CheckCircle2, shortcut: "⌘P" },
+        { id: "orders", label: "ORDERS", path: "/orders", icon: Send, shortcut: "⌘O" },
+        { id: "pnl", label: "P&L", path: "/pnl", icon: DollarSign },
+      ],
+    },
+    {
+      groupName: "RISK & RECORDS",
       items: [
         { id: "risk", label: "RISK", path: "/risk", icon: Shield, shortcut: "⌘R" },
-        { id: "orders", label: "ORDERS", path: "/orders", icon: Send, shortcut: "⌘O" },
-        { id: "positions", label: "POSITIONS", path: "/positions", icon: CheckCircle2, shortcut: "⌘P" },
-        { id: "pnl", label: "P&L", path: "/pnl", icon: DollarSign },
-        { id: "trade-journal", label: "TRADE JOURNAL", path: "/trade-journal", icon: BookOpen },
+        { id: "trade-journal", label: "JOURNAL", path: "/trade-journal", icon: BookOpen },
         { id: "alerts", label: "ALERTS", path: "/alerts", icon: Bell },
-        { id: "logs", label: "AUDIT LOGS", path: "/logs", icon: History },
       ],
     },
     {
-      groupName: "INFRASTRUCTURE",
+      groupName: "MORE",
       items: [
-        { id: "command-center", label: "COMMAND CENTER", path: "/dashboard", icon: Terminal },
+        { id: "logs", label: "AUDIT LOGS", path: "/logs", icon: History },
         { id: "system-health", label: "SYSTEM HEALTH", path: "/system-health", icon: Activity },
         { id: "providers", label: "PROVIDERS", path: "/providers", icon: Cpu },
         { id: "settings", label: "SETTINGS", path: "/settings", icon: Sliders },

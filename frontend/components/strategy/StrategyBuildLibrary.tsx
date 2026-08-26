@@ -12,8 +12,12 @@ import {
   Shield,
   Layers,
   ChevronRight,
+  ChevronDown,
   Sparkles,
-  Check
+  Check,
+  X,
+  Sliders,
+  Clock,
 } from "lucide-react";
 import { StrategyIdeRule, RuleTimeframe } from "@/types/strategy-ide";
 
@@ -22,65 +26,70 @@ export type RuleTargetStage = "setup" | "confirmation" | "trigger";
 export interface IndicatorDefinition {
   id: string;
   name: string;
-  category: "FAVORITES" | "TREND" | "MOMENTUM" | "VOLUME" | "VOLATILITY" | "STRUCTURE";
+  category: "TREND" | "MOMENTUM" | "VOLUME" | "VOLATILITY" | "STRUCTURE";
   description: string;
   leftKey: string;
   leftLabel: string;
   defaultOp: string;
   defaultRight: string;
   defaultRightLabel: string;
+  defaultLength?: number;
   defaultTimeframe: RuleTimeframe;
 }
 
 const INDICATOR_CATALOG: IndicatorDefinition[] = [
   // Trend
   {
-    id: "ema_cross",
-    name: "EMA Crossover (9 / 21)",
+    id: "ema_9",
+    name: "EMA 9",
     category: "TREND",
-    description: "Fast momentum & trend alignment trigger",
+    description: "Fast momentum & timing line",
     leftKey: "ema_9",
     leftLabel: "EMA 9",
     defaultOp: "crosses_above",
     defaultRight: "ema_21",
     defaultRightLabel: "EMA 21",
+    defaultLength: 9,
+    defaultTimeframe: "15m",
+  },
+  {
+    id: "ema_21",
+    name: "EMA 21",
+    category: "TREND",
+    description: "Short-term trend baseline",
+    leftKey: "close",
+    leftLabel: "Close",
+    defaultOp: ">",
+    defaultRight: "ema_21",
+    defaultRightLabel: "EMA 21",
+    defaultLength: 21,
     defaultTimeframe: "15m",
   },
   {
     id: "ema_50",
     name: "EMA 50",
     category: "TREND",
-    description: "Medium-term trend direction filter",
+    description: "Medium-term trend filter",
     leftKey: "close",
     leftLabel: "Close",
     defaultOp: ">",
     defaultRight: "ema_50",
     defaultRightLabel: "EMA 50",
+    defaultLength: 50,
     defaultTimeframe: "15m",
   },
   {
     id: "ema_200",
-    name: "EMA 200 Macro",
+    name: "EMA 200",
     category: "TREND",
-    description: "Macro bull/bear institutional baseline",
+    description: "Macro bull/bear institutional filter",
     leftKey: "close",
     leftLabel: "1H Close",
     defaultOp: ">",
     defaultRight: "ema_200",
     defaultRightLabel: "1H EMA 200",
+    defaultLength: 200,
     defaultTimeframe: "1h",
-  },
-  {
-    id: "supertrend",
-    name: "Supertrend",
-    category: "TREND",
-    description: "Adaptive ATR-based trend direction",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "supertrend",
-    defaultRightLabel: "Supertrend (10, 3)",
-    defaultTimeframe: "15m",
   },
   {
     id: "sma_200",
@@ -92,13 +101,27 @@ const INDICATOR_CATALOG: IndicatorDefinition[] = [
     defaultOp: ">",
     defaultRight: "sma_200",
     defaultRightLabel: "SMA 200",
+    defaultLength: 200,
     defaultTimeframe: "1d",
+  },
+  {
+    id: "supertrend",
+    name: "Supertrend",
+    category: "TREND",
+    description: "Adaptive ATR-based trend direction",
+    leftKey: "close",
+    leftLabel: "Close",
+    defaultOp: ">",
+    defaultRight: "supertrend",
+    defaultRightLabel: "Supertrend (10, 3)",
+    defaultLength: 10,
+    defaultTimeframe: "15m",
   },
 
   // Momentum
   {
     id: "rsi_14",
-    name: "RSI (14)",
+    name: "RSI",
     category: "MOMENTUM",
     description: "Relative Strength Index momentum",
     leftKey: "rsi_14",
@@ -106,366 +129,506 @@ const INDICATOR_CATALOG: IndicatorDefinition[] = [
     defaultOp: ">",
     defaultRight: "55",
     defaultRightLabel: "55.0",
+    defaultLength: 14,
     defaultTimeframe: "15m",
   },
   {
-    id: "macd_cross",
-    name: "MACD Signal Cross",
+    id: "macd",
+    name: "MACD",
     category: "MOMENTUM",
-    description: "MACD line crossing 9-period signal line",
+    description: "Moving Average Convergence Divergence",
     leftKey: "macd_line",
     leftLabel: "MACD Line",
     defaultOp: "crosses_above",
     defaultRight: "macd_signal",
     defaultRightLabel: "MACD Signal",
+    defaultLength: 12,
     defaultTimeframe: "15m",
   },
   {
-    id: "adx_trend",
-    name: "ADX Trend Strength",
+    id: "adx_14",
+    name: "ADX",
     category: "MOMENTUM",
-    description: "Directional strength filter (> 25)",
+    description: "Directional trend strength filter",
     leftKey: "adx_14",
     leftLabel: "ADX (14)",
     defaultOp: ">",
     defaultRight: "25",
     defaultRightLabel: "25.0",
+    defaultLength: 14,
+    defaultTimeframe: "15m",
+  },
+  {
+    id: "stoch",
+    name: "Stochastic",
+    category: "MOMENTUM",
+    description: "Overbought / Oversold oscillator",
+    leftKey: "stoch_k",
+    leftLabel: "Stoch %K",
+    defaultOp: "<",
+    defaultRight: "20",
+    defaultRightLabel: "20.0",
+    defaultLength: 14,
     defaultTimeframe: "15m",
   },
 
   // Volume
   {
-    id: "session_vwap",
-    name: "VWAP (Session)",
+    id: "vwap",
+    name: "VWAP",
     category: "VOLUME",
-    description: "Volume-weighted average benchmark",
+    description: "Volume-Weighted Average Price",
     leftKey: "close",
     leftLabel: "Close",
     defaultOp: ">",
     defaultRight: "vwap",
-    defaultRightLabel: "VWAP",
+    defaultRightLabel: "VWAP (Session)",
     defaultTimeframe: "15m",
   },
   {
     id: "volume_surge",
-    name: "Volume Surge (1.5x)",
+    name: "Volume Surge",
     category: "VOLUME",
-    description: "Current volume exceeding 20-bar MA",
+    description: "Current volume exceeding 20-bar average",
     leftKey: "volume",
     leftLabel: "Volume",
     defaultOp: ">",
     defaultRight: "volume_ma_20",
-    defaultRightLabel: "1.5x Vol MA",
+    defaultRightLabel: "20-bar Avg Volume",
     defaultTimeframe: "15m",
-  },
-  {
-    id: "vp_poc",
-    name: "Volume Profile POC",
-    category: "VOLUME",
-    description: "Point of Control high volume node",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "vp_poc",
-    defaultRightLabel: "VP POC",
-    defaultTimeframe: "1h",
   },
 
   // Volatility
   {
-    id: "atr_filter",
-    name: "ATR (14)",
+    id: "atr_14",
+    name: "ATR",
     category: "VOLATILITY",
-    description: "Average True Range volatility sizing",
+    description: "Average True Range expansion filter",
     leftKey: "atr_14",
     leftLabel: "ATR (14)",
     defaultOp: ">",
     defaultRight: "atr_ma_20",
-    defaultRightLabel: "ATR Baseline",
+    defaultRightLabel: "20-bar Avg ATR",
+    defaultLength: 14,
     defaultTimeframe: "15m",
   },
   {
-    id: "bollinger_upper",
+    id: "bollinger",
     name: "Bollinger Bands",
     category: "VOLATILITY",
-    description: "2-standard deviation envelope",
+    description: "Statistical standard deviation bands",
     leftKey: "close",
     leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "bb_upper",
-    defaultRightLabel: "BB Upper Band",
+    defaultOp: "<",
+    defaultRight: "bb_lower",
+    defaultRightLabel: "Lower Band (20, 2)",
+    defaultLength: 20,
     defaultTimeframe: "15m",
   },
 
-  // Structure & Price Action
+  // Structure
   {
-    id: "prev_high_break",
-    name: "Previous High Breakout",
+    id: "swing_break",
+    name: "Swing Breakout",
     category: "STRUCTURE",
-    description: "Price exceeding prior period peak",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: "crosses_above",
-    defaultRight: "prev_high",
-    defaultRightLabel: "Prior Period High",
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "support_bounce",
-    name: "Support / Resistance",
-    category: "STRUCTURE",
-    description: "Key horizontal pivot level rebound",
+    description: "Break of 20-bar swing high / low",
     leftKey: "close",
     leftLabel: "Close",
     defaultOp: ">",
-    defaultRight: "pivot_s1",
-    defaultRightLabel: "Pivot Support",
-    defaultTimeframe: "1h",
+    defaultRight: "swing_high_20",
+    defaultRightLabel: "20-bar Swing High",
+    defaultTimeframe: "15m",
+  },
+  {
+    id: "bos",
+    name: "Break of Structure",
+    category: "STRUCTURE",
+    description: "Market structure change confirmation",
+    leftKey: "bos_bullish",
+    leftLabel: "BOS Bullish",
+    defaultOp: "==",
+    defaultRight: "1",
+    defaultRightLabel: "Confirmed (1)",
+    defaultTimeframe: "15m",
   },
 ];
 
-interface StrategyBuildLibraryProps {
+const CATEGORIES = [
+  { id: "ALL", label: "All Indicators" },
+  { id: "FAVORITES", label: "★ Favorites" },
+  { id: "TREND", label: "Trend" },
+  { id: "MOMENTUM", label: "Momentum" },
+  { id: "VOLUME", label: "Volume" },
+  { id: "VOLATILITY", label: "Volatility" },
+  { id: "STRUCTURE", label: "Structure" },
+];
+
+const CONDITIONS = [
+  { value: ">", label: "Greater Than (>)" },
+  { value: "<", label: "Less Than (<)" },
+  { value: ">=", label: "Greater or Equal (>=)" },
+  { value: "<=", label: "Less or Equal (<=)" },
+  { value: "==", label: "Equals (==)" },
+  { value: "crosses_above", label: "Crosses Above" },
+  { value: "crosses_below", label: "Crosses Below" },
+];
+
+const TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
+
+interface Props {
   onAddRule: (target: RuleTargetStage, rule: StrategyIdeRule) => void;
   baseTimeframe: RuleTimeframe;
 }
 
-export function StrategyBuildLibrary({ onAddRule, baseTimeframe }: StrategyBuildLibraryProps) {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [favorites, setFavorites] = useState<string[]>(["ema_cross", "rsi_14", "session_vwap", "volume_surge"]);
-  const [activePromptIndicator, setActivePromptIndicator] = useState<IndicatorDefinition | null>(null);
+export function StrategyBuildLibrary({ onAddRule, baseTimeframe }: Props) {
+  const [search, setSearch] = useState("");
+  const [activeCategory, setActiveCategory] = useState<string>("ALL");
+  const [favorites, setFavorites] = useState<string[]>(["ema_50", "rsi_14", "vwap", "volume_surge"]);
 
-  // Load / Save Favorites from localStorage
+  // Add Rule Drawer / Modal State
+  const [addModalIndicator, setAddModalIndicator] = useState<IndicatorDefinition | null>(null);
+  const [addLength, setAddLength] = useState<number>(14);
+  const [addCondition, setAddCondition] = useState<string>(">");
+  const [addValue, setAddValue] = useState<string>("55");
+  const [addTimeframe, setAddTimeframe] = useState<RuleTimeframe>(baseTimeframe || "15m");
+  const [addTargetStage, setAddTargetStage] = useState<RuleTargetStage>("setup");
+  const [addRequired, setAddRequired] = useState<boolean>(true);
+
+  // Load favorites from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("quant_fav_indicators");
+      const saved = localStorage.getItem("quantos_strategy_favorites");
       if (saved) {
         setFavorites(JSON.parse(saved));
       }
-    } catch {
-      // Ignore fallback
-    }
+    } catch {}
   }, []);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setFavorites((prev) => {
-      const updated = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
+      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
       try {
-        localStorage.setItem("quant_fav_indicators", JSON.stringify(updated));
-      } catch {
-        // Fallback
-      }
-      return updated;
+        localStorage.setItem("quantos_strategy_favorites", JSON.stringify(next));
+      } catch {}
+      return next;
     });
   };
 
-  const handleSelectTarget = (target: RuleTargetStage) => {
-    if (!activePromptIndicator) return;
-    const rule: StrategyIdeRule = {
-      id: `rule-${target}-${Date.now()}`,
-      timeframe: activePromptIndicator.defaultTimeframe || baseTimeframe,
-      left: activePromptIndicator.leftKey,
-      leftLabel: activePromptIndicator.leftLabel,
-      op: activePromptIndicator.defaultOp,
-      right: activePromptIndicator.defaultRight,
-      rightLabel: activePromptIndicator.defaultRightLabel,
-      category: activePromptIndicator.category as any,
+  // Open Unified Add Rule Modal
+  const handleOpenAddModal = (ind: IndicatorDefinition) => {
+    setAddModalIndicator(ind);
+    setAddLength(ind.defaultLength || 14);
+    setAddCondition(ind.defaultOp);
+    setAddValue(ind.defaultRight);
+    setAddTimeframe(ind.defaultTimeframe || baseTimeframe || "15m");
+    setAddTargetStage("setup");
+    setAddRequired(true);
+  };
+
+  // Submit Add Rule
+  const handleSubmitAddRule = () => {
+    if (!addModalIndicator) return;
+
+    const newRule: StrategyIdeRule = {
+      id: `rule-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timeframe: addTimeframe,
+      left: addModalIndicator.leftKey,
+      leftLabel: addModalIndicator.leftLabel,
+      op: addCondition,
+      right: addValue,
+      rightLabel: addValue,
+      category: addModalIndicator.category,
       enabled: true,
-      description: activePromptIndicator.description,
+      description: `${addTimeframe} ${addModalIndicator.name} ${addCondition} ${addValue}`,
     };
-    onAddRule(target, rule);
-    setActivePromptIndicator(null);
+
+    onAddRule(addTargetStage, newRule);
+    setAddModalIndicator(null);
   };
 
-  const filteredCatalog = useMemo(() => {
-    return INDICATOR_CATALOG.filter((item) => {
-      const matchesSearch =
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.leftKey.toLowerCase().includes(searchQuery.toLowerCase());
-      if (!matchesSearch) return false;
+  // Filtered indicators
+  const displayedIndicators = useMemo(() => {
+    let list = INDICATOR_CATALOG;
 
-      if (selectedCategory === "FAVORITES") return favorites.includes(item.id);
-      if (selectedCategory === "ALL") return true;
-      return item.category === selectedCategory;
-    });
-  }, [searchQuery, selectedCategory, favorites]);
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (i) =>
+          i.name.toLowerCase().includes(q) ||
+          i.description.toLowerCase().includes(q) ||
+          i.category.toLowerCase().includes(q)
+      );
+    }
 
-  const CATEGORIES = [
-    { id: "ALL", label: "All" },
-    { id: "FAVORITES", label: `★ Favorites (${favorites.length})` },
-    { id: "TREND", label: "Trend" },
-    { id: "MOMENTUM", label: "Momentum" },
-    { id: "VOLUME", label: "Volume" },
-    { id: "VOLATILITY", label: "Volatility" },
-    { id: "STRUCTURE", label: "Structure" },
-  ];
+    if (activeCategory === "FAVORITES") {
+      list = list.filter((i) => favorites.includes(i.id));
+    } else if (activeCategory !== "ALL") {
+      list = list.filter((i) => i.category === activeCategory);
+    }
+
+    // Sort: Favorites first when in ALL view
+    if (activeCategory === "ALL" && !search.trim()) {
+      return [...list].sort((a, b) => {
+        const aFav = favorites.includes(a.id) ? 1 : 0;
+        const bFav = favorites.includes(b.id) ? 1 : 0;
+        return bFav - aFav;
+      });
+    }
+
+    return list;
+  }, [search, activeCategory, favorites]);
 
   return (
-    <aside className="w-full lg:w-72 bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 flex flex-col gap-3 shadow-xl text-xs font-sans select-none">
+    <aside className="w-full lg:w-60 bg-[#09110E] border border-[#1F392D] rounded-2xl p-3.5 flex flex-col gap-3 shadow-xl text-xs font-sans select-none shrink-0">
       
-      {/* Header & Search */}
+      {/* 1. Panel Header & Search Bar */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-black text-white uppercase tracking-wider flex items-center gap-1.5">
-            <Activity className="h-3.5 w-3.5 text-[#55C98A]" />
-            <span>Indicator Catalog</span>
+        <div className="flex items-center justify-between border-b border-[#142B21] pb-2">
+          <div className="flex items-center gap-1.5">
+            <Sliders className="h-4 w-4 text-[#55C98A]" />
+            <h3 className="text-xs font-black text-white uppercase tracking-wider">Indicators</h3>
+          </div>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
+            {displayedIndicators.length}
           </span>
-          <span className="text-[10px] text-[#607D6E] font-mono">{INDICATOR_CATALOG.length} items</span>
         </div>
 
-        <div className="relative">
-          <Search className="h-3.5 w-3.5 text-[#607D6E] absolute left-2.5 top-2.5" />
+        {/* Search */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#060D0A] border border-[#14271F] rounded-xl text-xs">
+          <Search className="h-3.5 w-3.5 text-[#8BA596] shrink-0" />
           <input
             type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Search indicators..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-[#607D6E] focus:outline-none focus:border-[#55C98A] transition-all"
+            className="bg-transparent text-white focus:outline-none w-full text-xs placeholder-[#4E6B5C]"
           />
+          {search && (
+            <button onClick={() => setSearch("")} className="text-[#607D6E] hover:text-white">
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Category Pills */}
-      <div className="flex flex-wrap gap-1 border-b border-[#142B21] pb-2.5">
-        {CATEGORIES.map((cat) => {
-          const isSelected = selectedCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
-                isSelected
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                  : "text-[#8BA596] hover:text-white hover:bg-[#0C1713]"
-              }`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
+      {/* 2. Category Filters Pills */}
+      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1 text-[11px] font-mono">
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.id}
+            type="button"
+            onClick={() => setActiveCategory(cat.id)}
+            className={`px-2 py-0.5 rounded-lg whitespace-nowrap transition-all ${
+              activeCategory === cat.id
+                ? "bg-[#123C2A] text-[#55C98A] font-bold border border-[#39B978]/40"
+                : "text-[#8BA596] hover:text-white hover:bg-[#0C1713]"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
       </div>
 
-      {/* Indicator List */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-1.5 max-h-[580px] pr-1">
-        {filteredCatalog.length === 0 ? (
-          <div className="text-center py-8 text-[#607D6E] space-y-1">
-            <p className="font-semibold">No indicators found</p>
-            <p className="text-[10px]">Try adjusting your search or category</p>
+      {/* 3. Indicators List */}
+      <div className="space-y-1.5 max-h-[640px] overflow-y-auto pr-0.5 scrollbar-thin">
+        {displayedIndicators.length === 0 ? (
+          <div className="py-8 text-center text-[#607D6E] text-xs font-mono">
+            No matching indicators found.
           </div>
         ) : (
-          filteredCatalog.map((item) => {
-            const isFav = favorites.includes(item.id);
+          displayedIndicators.map((ind) => {
+            const isFav = favorites.includes(ind.id);
             return (
               <div
-                key={item.id}
-                className="bg-[#0C1713] hover:bg-[#10221A] border border-[#1A3127] hover:border-[#275841] rounded-xl p-2.5 transition-all space-y-1.5 group"
+                key={ind.id}
+                className="group bg-[#060D0A] hover:bg-[#0C1713] border border-[#14271F] hover:border-[#1F392D] rounded-xl p-2.5 transition-all flex items-center justify-between gap-2"
               >
-                <div className="flex items-start justify-between gap-1.5">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-white text-xs">{item.name}</span>
-                      <span className="text-[9px] px-1 py-0.2 rounded bg-[#060D0A] text-[#607D6E] font-mono">
-                        {item.defaultTimeframe}
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-[#8BA596] mt-0.5 leading-snug">{item.description}</p>
-                  </div>
-
+                <div className="flex items-start gap-2 flex-1 min-w-0">
+                  {/* Star Favorite Button */}
                   <button
                     type="button"
-                    onClick={(e) => toggleFavorite(item.id, e)}
-                    className={`p-1 rounded transition-colors ${
-                      isFav ? "text-yellow-400" : "text-[#42584C] hover:text-[#8BA596]"
+                    onClick={(e) => toggleFavorite(ind.id, e)}
+                    className={`mt-0.5 transition-colors ${
+                      isFav ? "text-amber-400" : "text-[#243E30] group-hover:text-[#4B705B]"
                     }`}
                     title={isFav ? "Remove from Favorites" : "Add to Favorites"}
                   >
-                    <Star className={`h-3.5 w-3.5 ${isFav ? "fill-current" : ""}`} />
+                    <Star className="h-3.5 w-3.5 fill-current" />
                   </button>
+
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-white text-xs truncate">{ind.name}</span>
+                    </div>
+                    <p className="text-[10px] text-[#8BA596] truncate">{ind.description}</p>
+                  </div>
                 </div>
 
-                {/* Single Primary Action: + Add Button */}
-                <div className="flex items-center justify-between pt-1 border-t border-[#14271F]">
-                  <span className="text-[10px] text-[#607D6E] font-mono">
-                    {item.leftKey} {item.defaultOp} {item.defaultRight}
-                  </span>
-
-                  <button
-                    type="button"
-                    onClick={() => setActivePromptIndicator(item)}
-                    className="px-2.5 py-1 rounded-lg bg-[#123C2A] hover:bg-[#194E37] text-[#55C98A] hover:text-white font-bold transition-all flex items-center gap-1 shadow-sm"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>Add</span>
-                  </button>
-                </div>
+                {/* [+ Add] Button */}
+                <button
+                  type="button"
+                  onClick={() => handleOpenAddModal(ind)}
+                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-[11px] transition-colors border border-[#39B978]/30 shrink-0"
+                  title="Add rule to strategy"
+                >
+                  <Plus className="h-3 w-3" />
+                  <span>Add</span>
+                </button>
               </div>
             );
           })
         )}
       </div>
 
-      {/* Target Stage Modal Prompt (Setup vs Confirmation vs Trigger) */}
-      {activePromptIndicator && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 max-w-sm w-full shadow-2xl space-y-4 animate-scaleUp">
-            <div>
-              <span className="text-[10px] text-[#55C98A] font-bold uppercase tracking-wider">Add to Strategy</span>
-              <h3 className="text-sm font-bold text-white mt-0.5">{activePromptIndicator.name}</h3>
-              <p className="text-xs text-[#8BA596] font-mono mt-1">
-                {activePromptIndicator.leftLabel} {activePromptIndicator.defaultOp} {activePromptIndicator.defaultRightLabel} ({activePromptIndicator.defaultTimeframe})
-              </p>
+      {/* 4. UNIFIED ADD RULE MODAL / DRAWER */}
+      {addModalIndicator && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans select-none animate-fadeIn">
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-2xl w-full max-w-md space-y-4">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-[#123C2A] text-[#55C98A]">
+                  <Plus className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-white uppercase">ADD RULE</h3>
+                  <span className="text-[10px] text-[#8BA596] font-mono">{addModalIndicator.name}</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setAddModalIndicator(null)}
+                className="text-[#8BA596] hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-[11px] text-[#8BA596] font-semibold">Select Destination Stage:</label>
+            {/* Parameter Fields */}
+            <div className="space-y-3 font-mono text-xs">
               
-              <button
-                type="button"
-                onClick={() => handleSelectTarget("setup")}
-                className="w-full p-3 rounded-xl bg-[#0C1713] hover:bg-[#123C2A] border border-[#1A3127] hover:border-[#39B978] text-left transition-all flex items-center justify-between group"
-              >
-                <div>
-                  <span className="font-bold text-white group-hover:text-[#55C98A] text-xs">1. Setup</span>
-                  <p className="text-[10px] text-[#8BA596]">Market condition filter before looking for a trade</p>
+              {/* Target Stage (Use In: Setup / Confirm / Trigger) */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Use In Stage</span>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(["setup", "confirmation", "trigger"] as RuleTargetStage[]).map((stage) => (
+                    <button
+                      key={stage}
+                      type="button"
+                      onClick={() => setAddTargetStage(stage)}
+                      className={`py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${
+                        addTargetStage === stage
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
+                      }`}
+                    >
+                      {stage === "confirmation" ? "Confirm" : stage}
+                    </button>
+                  ))}
                 </div>
-                <ChevronRight className="h-4 w-4 text-[#607D6E] group-hover:text-[#55C98A]" />
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={() => handleSelectTarget("confirmation")}
-                className="w-full p-3 rounded-xl bg-[#0C1713] hover:bg-[#123C2A] border border-[#1A3127] hover:border-[#39B978] text-left transition-all flex items-center justify-between group"
-              >
-                <div>
-                  <span className="font-bold text-white group-hover:text-[#55C98A] text-xs">2. Confirmation</span>
-                  <p className="text-[10px] text-[#8BA596]">Momentum & volume filter confirming setup strength</p>
+              {/* Indicator Length & Source (if applicable) */}
+              {addModalIndicator.defaultLength && (
+                <div className="space-y-1">
+                  <span className="text-[11px] text-[#8BA596] uppercase font-bold">Length / Period</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={500}
+                    value={addLength}
+                    onChange={(e) => setAddLength(parseInt(e.target.value) || 14)}
+                    className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  />
                 </div>
-                <ChevronRight className="h-4 w-4 text-[#607D6E] group-hover:text-[#55C98A]" />
-              </button>
+              )}
 
+              {/* Condition Dropdown */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Condition</span>
+                <select
+                  value={addCondition}
+                  onChange={(e) => setAddCondition(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A] cursor-pointer"
+                >
+                  {CONDITIONS.map((c) => (
+                    <option key={c.value} value={c.value} className="bg-[#09110E] text-white">
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Target Value */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Compare Value / Target</span>
+                <input
+                  type="text"
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                />
+              </div>
+
+              {/* Timeframe */}
+              <div className="space-y-1">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Timeframe</span>
+                <div className="grid grid-cols-4 gap-1">
+                  {TIMEFRAMES.map((tf) => (
+                    <button
+                      key={tf}
+                      type="button"
+                      onClick={() => setAddTimeframe(tf)}
+                      className={`py-1 rounded text-[11px] font-bold transition-all ${
+                        addTimeframe === tf
+                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
+                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
+                      }`}
+                    >
+                      {tf}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Required Toggle */}
+              <div className="flex items-center justify-between pt-1 border-t border-[#142B21]">
+                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Required Rule</span>
+                <button
+                  type="button"
+                  onClick={() => setAddRequired(!addRequired)}
+                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    addRequired
+                      ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
+                      : "bg-[#060D0A] text-[#607D6E] border border-[#14271F]"
+                  }`}
+                >
+                  {addRequired ? "ON" : "OFF"}
+                </button>
+              </div>
+
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#142B21]">
               <button
                 type="button"
-                onClick={() => handleSelectTarget("trigger")}
-                className="w-full p-3 rounded-xl bg-[#0C1713] hover:bg-[#123C2A] border border-[#1A3127] hover:border-[#39B978] text-left transition-all flex items-center justify-between group"
+                onClick={() => setAddModalIndicator(null)}
+                className="px-4 py-2 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-bold font-mono text-xs transition-colors"
               >
-                <div>
-                  <span className="font-bold text-white group-hover:text-[#55C98A] text-xs">3. Trigger</span>
-                  <p className="text-[10px] text-[#8BA596]">Exact price/indicator crossover timing event</p>
-                </div>
-                <ChevronRight className="h-4 w-4 text-[#607D6E] group-hover:text-[#55C98A]" />
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmitAddRule}
+                className="px-5 py-2 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-bold font-mono text-xs transition-all shadow-sm flex items-center gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                <span>Add Rule</span>
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setActivePromptIndicator(null)}
-              className="w-full py-2 rounded-xl bg-[#0C1713] text-[#8BA596] hover:text-white font-bold transition-colors"
-            >
-              Cancel
-            </button>
           </div>
         </div>
       )}

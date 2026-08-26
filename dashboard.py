@@ -4152,7 +4152,7 @@ def api_positions_rest():
 
         # Floating P&L using canonical compute_unrealized_pnl
         fee = float(p.get("fees") or 0.0)
-        pnl_data = compute_unrealized_pnl(
+        pnl_data = pnl_engine.compute_unrealized_pnl(
             direction=dir_val,
             entry_price=entry_p,
             live_price=curr_p,

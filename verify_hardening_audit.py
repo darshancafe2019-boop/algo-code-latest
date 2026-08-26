@@ -144,10 +144,11 @@ def run_audit():
     config_json = json.dumps({"risk_pct": 0.02, "indicators": selected_indicators})
 
     print(f"Creating test bot instance '{test_name}' ({test_bot_id}) with indicators: {selected_indicators}...")
+    now_iso = datetime.now(timezone.utc).isoformat()
     conn = db.get_connection()
     conn.execute(
-        "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, config_json) VALUES (?, ?, ?, ?, ?, ?, 'STOPPED', ?, ?)",
-        (test_bot_id, test_name, "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, datetime.now(timezone.utc).isoformat(), config_json)
+        "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at, config_json) VALUES (?, ?, ?, ?, ?, ?, 'STOPPED', ?, ?, ?)",
+        (test_bot_id, test_name, "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, now_iso, now_iso, config_json)
     )
     conn.commit()
     conn.close()

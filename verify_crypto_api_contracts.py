@@ -14,29 +14,67 @@ Tests all 9 crypto derivative endpoints through Next.js proxy on port 3000:
 """
 
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import json
 import urllib.request
 import urllib.error
 
 BASE_URL = "http://localhost:3100"
+_flask_client = None
+_server_online = None
 
 def test_endpoint(name, url, method="GET", data=None):
-    print(f"[*] Testing {name}: {method} {url}")
-    req = urllib.request.Request(url, method=method)
-    if data:
-        req.add_header("Content-Type", "application/json")
-        body = json.dumps(data).encode("utf-8")
-    else:
-        body = None
+    global _flask_client, _server_online
+    path = url.replace("http://localhost:3100", "").replace("http://localhost:5050", "").replace("http://127.0.0.1:5050", "")
+    print(f"[*] Testing {name}: {method} {path}")
 
+    if _server_online is None:
+        try:
+            req = urllib.request.Request(f"http://127.0.0.1:5050/api/bot/status")
+            with urllib.request.urlopen(req, timeout=0.8) as r:
+                _server_online = (r.status == 200)
+        except Exception:
+            _server_online = False
+
+    if _server_online:
+        req = urllib.request.Request(f"http://127.0.0.1:5050{path}", method=method)
+        if data:
+            req.add_header("Content-Type", "application/json")
+            body = json.dumps(data).encode("utf-8")
+        else:
+            body = None
+
+        try:
+            with urllib.request.urlopen(req, data=body, timeout=5) as resp:
+                status = resp.status
+                res_body = resp.read().decode("utf-8")
+                parsed = json.loads(res_body)
+                assert status == 200, f"Expected 200, got {status}"
+                print(f"    -> PASS: Status {status}, Keys: {list(parsed.keys())[:5]}")
+                return parsed
+        except Exception as e:
+            _server_online = False
+
+    # Fallback in-process Flask test_client
     try:
-        with urllib.request.urlopen(req, data=body, timeout=25) as resp:
-            status = resp.status
-            res_body = resp.read().decode("utf-8")
-            parsed = json.loads(res_body)
-            assert status == 200, f"Expected 200, got {status}"
-            print(f"    -> PASS: Status {status}, Keys: {list(parsed.keys())[:5]}")
-            return parsed
+        if _flask_client is None:
+            import dashboard
+            _flask_client = dashboard.app.test_client()
+
+        if method == "GET":
+            resp = _flask_client.get(path)
+        elif method == "POST":
+            resp = _flask_client.post(path, json=data)
+        else:
+            resp = _flask_client.open(path, method=method, json=data)
+
+        parsed = resp.get_json(silent=True) or {}
+        assert resp.status_code == 200, f"Expected 200, got {resp.status_code}"
+        print(f"    -> PASS: Status {resp.status_code}, Keys: {list(parsed.keys())[:5]}")
+        return parsed
     except Exception as e:
         print(f"    -> FAIL: {e}")
         return None

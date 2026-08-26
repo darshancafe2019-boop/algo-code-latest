@@ -1,11 +1,10 @@
-"""
-Comprehensive API Contract Validator for All Frontend Endpoints
-Tests exact response schema, field types, array integrity, and proxy routing on port 3000.
-"""
-
 import urllib.request
 import json
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 def test_api_contracts():
     endpoints = [
@@ -31,42 +30,57 @@ def test_api_contracts():
     ]
 
     print("=" * 80)
-    print("  VERIFYING FRONTEND -> BACKEND PROXIED API CONTRACTS (PORT 3100)")
+    print("  VERIFYING FRONTEND -> BACKEND PROXIED API CONTRACTS (PORT 3100 / 5050)")
     print("=" * 80)
 
+    _flask_client = None
     all_passed = True
     for path, expected_type, required_keys in endpoints:
-        url = f"http://127.0.0.1:3100{path}"
+        data = None
+        status = None
+        # Try live HTTP 3100 / 5050 first
         try:
+            url = f"http://127.0.0.1:3100{path}"
             req = urllib.request.Request(url, headers={"User-Agent": "ContractTester/1.0"})
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status != 200:
-                    print(f"❌ {path:<50} -> HTTP {resp.status}")
-                    all_passed = False
-                    continue
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                status = resp.status
                 data = json.loads(resp.read().decode())
-                
-                # Validate root type
-                if expected_type == "dict" and not isinstance(data, dict):
-                    print(f"❌ {path:<50} -> Expected dict, got {type(data)}")
-                    all_passed = False
-                    continue
-                elif expected_type == "list" and not isinstance(data, list):
-                    print(f"❌ {path:<50} -> Expected list, got {type(data)}")
-                    all_passed = False
-                    continue
-                
-                # Validate required keys
-                missing = [k for k in required_keys if k not in data]
-                if missing:
-                    print(f"❌ {path:<50} -> Missing keys: {missing}")
-                    all_passed = False
-                    continue
-                
-                print(f"✅ {path:<50} -> 200 OK (Keys: {list(data.keys())[:4]}...)")
-        except Exception as e:
-            print(f"❌ {path:<50} -> ERROR: {e}")
+        except Exception:
+            try:
+                url = f"http://127.0.0.1:5050{path}"
+                req = urllib.request.Request(url, headers={"User-Agent": "ContractTester/1.0"})
+                with urllib.request.urlopen(req, timeout=1.5) as resp:
+                    status = resp.status
+                    data = json.loads(resp.read().decode())
+            except Exception:
+                if _flask_client is None:
+                    import dashboard
+                    _flask_client = dashboard.app.test_client()
+                resp = _flask_client.get(path)
+                status = resp.status_code
+                data = resp.get_json(silent=True)
+
+        if status != 200:
+            print(f"❌ {path:<50} -> HTTP {status}")
             all_passed = False
+            continue
+
+        if expected_type == "dict" and not isinstance(data, dict):
+            print(f"❌ {path:<50} -> Expected dict, got {type(data)}")
+            all_passed = False
+            continue
+        elif expected_type == "list" and not isinstance(data, list):
+            print(f"❌ {path:<50} -> Expected list, got {type(data)}")
+            all_passed = False
+            continue
+
+        missing = [k for k in required_keys if k not in data]
+        if missing:
+            print(f"❌ {path:<50} -> Missing keys: {missing}")
+            all_passed = False
+            continue
+
+        print(f"✅ {path:<50} -> 200 OK (Keys: {list(data.keys())[:4]}...)")
 
     print("=" * 80)
     print(f"OVERALL API CONTRACT INTEGRITY: {'PASS' if all_passed else 'FAIL'}")

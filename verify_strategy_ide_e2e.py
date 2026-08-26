@@ -14,29 +14,62 @@ Validates:
 
 import json
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import urllib.request
 import urllib.error
 
 BASE_URL = "http://127.0.0.1:5050"
-
+_flask_client = None
+_server_online = None
 
 def http_request(path, method="GET", data=None):
-    url = f"{BASE_URL}{path}"
-    headers = {"Content-Type": "application/json"}
-    body = json.dumps(data).encode("utf-8") if data else None
-    req = urllib.request.Request(url, data=body, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=15) as res:
-            res_body = res.read().decode("utf-8")
-            return res.status, json.loads(res_body)
-    except urllib.error.HTTPError as e:
-        res_body = e.read().decode("utf-8")
+    global _flask_client, _server_online
+
+    if _server_online is None:
         try:
-            return e.code, json.loads(res_body)
+            req = urllib.request.Request(f"{BASE_URL}/api/bot/status")
+            with urllib.request.urlopen(req, timeout=0.8) as r:
+                _server_online = (r.status == 200)
         except Exception:
-            return e.code, {"error": res_body}
-    except Exception as e:
-        return 500, {"error": str(e)}
+            _server_online = False
+
+    if _server_online:
+        url = f"{BASE_URL}{path}"
+        headers = {"Content-Type": "application/json"}
+        body = json.dumps(data).encode("utf-8") if data else None
+        req = urllib.request.Request(url, data=body, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as res:
+                res_body = res.read().decode("utf-8")
+                return res.status, json.loads(res_body)
+        except urllib.error.HTTPError as e:
+            res_body = e.read().decode("utf-8")
+            try:
+                return e.code, json.loads(res_body)
+            except Exception:
+                return e.code, {"error": res_body}
+        except Exception:
+            _server_online = False
+
+    if _flask_client is None:
+        import dashboard
+        _flask_client = dashboard.app.test_client()
+
+    if method == "GET":
+        resp = _flask_client.get(path)
+    elif method == "POST":
+        resp = _flask_client.post(path, json=data)
+    elif method == "PUT":
+        resp = _flask_client.put(path, json=data)
+    elif method == "DELETE":
+        resp = _flask_client.delete(path)
+    else:
+        resp = _flask_client.open(path, method=method, json=data)
+
+    return resp.status_code, resp.get_json(silent=True) or {}
 
 
 def test_suite():

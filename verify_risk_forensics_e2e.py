@@ -14,6 +14,10 @@ Tests:
 import json
 import sqlite3
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import time
 import urllib.request
 import urllib.error
@@ -21,26 +25,55 @@ import urllib.error
 from src import config, db
 
 BASE_URL = "http://127.0.0.1:5050"
-
+_flask_client = None
+_server_online = None
 
 def http_req(endpoint: str, method: str = "GET", body: dict = None) -> tuple[int, dict]:
-    url = f"{BASE_URL}{endpoint}"
-    data = json.dumps(body).encode("utf-8") if body else None
-    headers = {"Content-Type": "application/json"} if body else {}
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=10.0) as resp:
-            content = resp.read().decode("utf-8")
-            return resp.status, json.loads(content) if content else {}
-    except urllib.error.HTTPError as e:
-        content = e.read().decode("utf-8")
+    global _flask_client, _server_online
+
+    if _server_online is None:
         try:
-            return e.code, json.loads(content)
+            req = urllib.request.Request(f"{BASE_URL}/api/bot/status")
+            with urllib.request.urlopen(req, timeout=0.8) as r:
+                _server_online = (r.status == 200)
         except Exception:
-            return e.code, {"error": content}
-    except Exception as e:
-        print(f"HTTP Request failed to {url}: {e}")
-        return 500, {"error": str(e)}
+            _server_online = False
+
+    if _server_online:
+        url = f"{BASE_URL}{endpoint}"
+        data = json.dumps(body).encode("utf-8") if body else None
+        headers = {"Content-Type": "application/json"} if body else {}
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=3.0) as resp:
+                content = resp.read().decode("utf-8")
+                return resp.status, json.loads(content) if content else {}
+        except urllib.error.HTTPError as e:
+            content = e.read().decode("utf-8")
+            try:
+                return e.code, json.loads(content)
+            except Exception:
+                return e.code, {"error": content}
+        except Exception:
+            _server_online = False
+
+    # In-process test client
+    if _flask_client is None:
+        import dashboard
+        _flask_client = dashboard.app.test_client()
+
+    if method == "GET":
+        resp = _flask_client.get(endpoint)
+    elif method == "POST":
+        resp = _flask_client.post(endpoint, json=body)
+    elif method == "PUT":
+        resp = _flask_client.put(endpoint, json=body)
+    elif method == "DELETE":
+        resp = _flask_client.delete(endpoint)
+    else:
+        resp = _flask_client.open(endpoint, method=method, json=body)
+
+    return resp.status_code, resp.get_json(silent=True) or {}
 
 
 def test_1_immutable_risk_decisions_ledger():
@@ -160,6 +193,7 @@ def test_6_acknowledgements_notes_and_overrides():
 
 
 def test_7_risk_analytics_and_export():
+    global _flask_client
     print("\n--- TEST 7: Risk Analytics KPIs and CSV/JSON Export ---")
     status1, res1 = http_req("/api/risk/analytics")
     assert status1 == 200
@@ -169,13 +203,23 @@ def test_7_risk_analytics_and_export():
     assert len(a["top_blocking_gates"]) > 0
 
     # Test CSV export endpoint
-    url = f"{BASE_URL}/api/risk/export?format=csv"
-    req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=5.0) as resp:
-        assert resp.status == 200
-        csv_text = resp.read().decode("utf-8")
-        assert "Risk Event ID" in csv_text
-        assert "RISK-20260820-10942" in csv_text
+    csv_text = ""
+    try:
+        url = f"{BASE_URL}/api/risk/export?format=csv"
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            assert resp.status == 200
+            csv_text = resp.read().decode("utf-8")
+    except Exception:
+        if _flask_client is None:
+            import dashboard
+            _flask_client = dashboard.app.test_client()
+        resp = _flask_client.get("/api/risk/export?format=csv")
+        assert resp.status_code == 200
+        csv_text = resp.data.decode("utf-8")
+
+    assert "Risk Event ID" in csv_text
+    assert "RISK-20260820-10942" in csv_text
 
     print(f"✅ Risk Analytics & CSV Export verified: {a['total_events']} events analyzed, CSV stream validated.")
 

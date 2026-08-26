@@ -14,6 +14,10 @@ Tests all core criteria:
 import json
 import sqlite3
 import sys
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 import time
 import urllib.request
 import urllib.error
@@ -23,21 +27,49 @@ from src import config, db
 from src.market_universe import MarketUniverseManager
 
 BASE_URL = "http://127.0.0.1:5050"
-
+_flask_client = None
+_server_online = None
 
 def http_req(endpoint: str, method: str = "GET", body: dict = None) -> tuple[int, dict]:
-    url = f"{BASE_URL}{endpoint}"
-    data = json.dumps(body).encode("utf-8") if body else None
-    headers = {"Content-Type": "application/json"} if body else {}
-    req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    try:
-        with urllib.request.urlopen(req, timeout=10.0) as resp:
-            return resp.status, json.loads(resp.read().decode("utf-8"))
-    except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read().decode("utf-8"))
-    except Exception as e:
-        print(f"HTTP Request failed to {url}: {e}")
-        return 500, {"error": str(e)}
+    global _flask_client, _server_online
+
+    if _server_online is None:
+        try:
+            req = urllib.request.Request(f"{BASE_URL}/api/bot/status")
+            with urllib.request.urlopen(req, timeout=0.8) as r:
+                _server_online = (r.status == 200)
+        except Exception:
+            _server_online = False
+
+    if _server_online:
+        url = f"{BASE_URL}{endpoint}"
+        data = json.dumps(body).encode("utf-8") if body else None
+        headers = {"Content-Type": "application/json"} if body else {}
+        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                return resp.status, json.loads(resp.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            return e.code, json.loads(e.read().decode("utf-8"))
+        except Exception:
+            _server_online = False
+
+    if _flask_client is None:
+        import dashboard
+        _flask_client = dashboard.app.test_client()
+
+    if method == "GET":
+        resp = _flask_client.get(endpoint)
+    elif method == "POST":
+        resp = _flask_client.post(endpoint, json=body)
+    elif method == "PUT":
+        resp = _flask_client.put(endpoint, json=body)
+    elif method == "DELETE":
+        resp = _flask_client.delete(endpoint)
+    else:
+        resp = _flask_client.open(endpoint, method=method, json=body)
+
+    return resp.status_code, resp.get_json(silent=True) or {}
 
 
 def test_1_canonical_instrument_master():

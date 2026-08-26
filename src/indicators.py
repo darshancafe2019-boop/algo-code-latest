@@ -1546,6 +1546,12 @@ def generate_indicators(df: pd.DataFrame, timeframe: Optional[str] = None, use_c
     df = detect_rsi_divergence(df)
     df = calculate_volume_profile(df, timeframe=timeframe)
 
+    # Standardize canonical indicator aliases for rule evaluators
+    df['ema_fast'] = df.get('ema_9', df['close'])
+    df['ema_slow'] = df.get('ema_20', df['close'])
+    df['rsi_14'] = df.get('rsi', 50.0)
+    df['vwap'] = df.get('anchored_vwap', df['close'])
+
     if cache_key is not None:
         with _indicator_cache_lock:
             if len(_indicator_cache) > 200:

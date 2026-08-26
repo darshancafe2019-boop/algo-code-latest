@@ -178,8 +178,12 @@ class BotProcessManager:
 
         # Canonical Instrument Resolution Gate
         symbol = bot_info.get("symbol", "")
+        asset_class = (bot_info.get("asset_class") or "").upper()
         from src.instrument_resolver import global_instrument_resolver
-        res = global_instrument_resolver.resolve(symbol)
+        if asset_class in ["CRYPTO_OPTIONS", "OPTIONS"]:
+            res = global_instrument_resolver.resolve_for_bot(symbol, execution_mode=mode, asset_class=asset_class)
+        else:
+            res = global_instrument_resolver.resolve(symbol)
         if not res.is_valid:
             return {
                 "valid": False,

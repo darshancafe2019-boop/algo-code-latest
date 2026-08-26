@@ -121,6 +121,7 @@ class InstrumentResolver:
             "reason": "'BTC-OPTIONS' is a generic asset category, not an executable contract symbol.",
             "candidates": ["BTC-260327-70000-C", "BTC-260327-65000-P"],
             "action": "Select a specific options contract with expiry, strike, and call/put designation, or configure an options provider.",
+            "underlying_symbol": "BTC/USDT",
         },
         "ETH-OPTIONS": {
             "asset_class": AssetClass.CRYPTO,
@@ -128,6 +129,15 @@ class InstrumentResolver:
             "reason": "'ETH-OPTIONS' is a category alias and cannot be sent to an exchange adapter.",
             "candidates": ["ETH-260327-3500-C", "ETH-260327-3000-P"],
             "action": "Select a valid dated options contract from the options chain.",
+            "underlying_symbol": "ETH/USDT",
+        },
+        "SOL-OPTIONS": {
+            "asset_class": AssetClass.CRYPTO,
+            "instrument_type": InstrumentType.OPTION,
+            "reason": "'SOL-OPTIONS' is a category alias and cannot be sent to an exchange adapter.",
+            "candidates": ["SOL-260327-150-C", "SOL-260327-130-P"],
+            "action": "Select a valid dated options contract from the options chain.",
+            "underlying_symbol": "SOL/USDT",
         },
         "CRYPTO-OPTIONS": {
             "asset_class": AssetClass.CRYPTO,
@@ -135,6 +145,7 @@ class InstrumentResolver:
             "reason": "'CRYPTO-OPTIONS' is a high-level universe category.",
             "candidates": [],
             "action": "Select a specific underlying and strike.",
+            "underlying_symbol": "BTC/USDT",
         },
         "BTC-FUTURES": {
             "asset_class": AssetClass.CRYPTO,
@@ -142,6 +153,7 @@ class InstrumentResolver:
             "reason": "'BTC-FUTURES' is a category descriptor. For perpetual futures, use 'BTC/USDT:USDT' or 'BTC-PERP'.",
             "candidates": ["BTC/USDT:USDT", "BTC/USD:BTC"],
             "action": "Select BTC/USDT:USDT for USDT-M Perpetual.",
+            "underlying_symbol": "BTC/USDT:USDT",
         },
         "ETH-FUTURES": {
             "asset_class": AssetClass.CRYPTO,
@@ -149,6 +161,7 @@ class InstrumentResolver:
             "reason": "'ETH-FUTURES' is a category descriptor.",
             "candidates": ["ETH/USDT:USDT"],
             "action": "Select ETH/USDT:USDT for Perpetual Futures.",
+            "underlying_symbol": "ETH/USDT:USDT",
         },
         "NIFTY-OPTIONS": {
             "asset_class": AssetClass.INDIAN_STOCKS,
@@ -156,6 +169,7 @@ class InstrumentResolver:
             "reason": "'NIFTY-OPTIONS' is an Indian index category.",
             "candidates": ["NIFTY26MAR24000CE", "NIFTY26MAR24000PE"],
             "action": "Select a specific weekly/monthly strike contract from NSE options chain.",
+            "underlying_symbol": "NIFTY",
         },
         "BANKNIFTY-OPTIONS": {
             "asset_class": AssetClass.INDIAN_STOCKS,
@@ -163,6 +177,15 @@ class InstrumentResolver:
             "reason": "'BANKNIFTY-OPTIONS' is an Indian index category.",
             "candidates": ["BANKNIFTY26MAR51000CE", "BANKNIFTY26MAR51000PE"],
             "action": "Select an active BANKNIFTY strike contract.",
+            "underlying_symbol": "BANKNIFTY",
+        },
+        "FINNIFTY-OPTIONS": {
+            "asset_class": AssetClass.INDIAN_STOCKS,
+            "instrument_type": InstrumentType.OPTION,
+            "reason": "'FINNIFTY-OPTIONS' is an Indian index category.",
+            "candidates": ["FINNIFTY26MAR23000CE", "FINNIFTY26MAR23000PE"],
+            "action": "Select an active FINNIFTY strike contract.",
+            "underlying_symbol": "FINNIFTY",
         },
     }
 
@@ -501,6 +524,42 @@ class InstrumentResolver:
         """Returns all canonical instruments formatted as dicts."""
         return [inst.to_dict() for inst in cls._CANONICAL_REGISTRY.values()]
 
+    @classmethod
+    def get_underlying_symbol(cls, query: str) -> str:
+        """Returns the executable underlying symbol for any symbol or category."""
+        clean = (query or "").strip().upper()
+        if clean in cls.CATEGORY_LABELS and "underlying_symbol" in cls.CATEGORY_LABELS[clean]:
+            return cls.CATEGORY_LABELS[clean]["underlying_symbol"]
+        return query
+
+    @classmethod
+    def resolve_for_bot(
+        cls,
+        query: str,
+        execution_mode: str = "PAPER",
+        asset_class: Optional[str] = None
+    ) -> ResolutionResult:
+        """
+        Resolves symbol for bot execution and data feeds.
+        If query is a category alias (e.g. ETH-OPTIONS, BTC-OPTIONS) used in bot configuration,
+        resolves to the underlying executable instrument (e.g. ETH/USDT, BTC/USDT) for data feeds.
+        """
+        res = cls.resolve(query, asset_class=asset_class)
+        if res.is_valid:
+            return res
+        clean = (query or "").strip().upper()
+        if clean in cls.CATEGORY_LABELS:
+            underlying = cls.CATEGORY_LABELS[clean].get("underlying_symbol")
+            if underlying:
+                underlying_res = cls.resolve(underlying)
+                if underlying_res.is_valid:
+                    return underlying_res
+        return res
+
+    def resolve_bot(self, query: str, execution_mode: str = "PAPER", asset_class: Optional[str] = None) -> ResolutionResult:
+        return self.__class__.resolve_for_bot(query, execution_mode=execution_mode, asset_class=asset_class)
+
 
 # Global shared resolver instance
 global_instrument_resolver = InstrumentResolver()
+

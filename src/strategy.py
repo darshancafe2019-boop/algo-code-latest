@@ -145,7 +145,8 @@ class Strategy:
             reason = ""
 
             if "ema" in ind_id:
-                period = int(params.get("period", 20))
+                default_p = 9 if "fast" in ind_id else (20 if "slow" in ind_id else 20)
+                period = int(params.get("period", default_p))
                 src_field = str(params.get("source", "close")).lower()
                 if src_field not in df.columns:
                     src_field = "close"
@@ -278,6 +279,19 @@ class Strategy:
                     reason = f"Close ({close_val:.1f}) >= BB({period},{std_dev}σ) Upper ({bb_upper:.1f})"
                 else:
                     reason = f"BB({period},{std_dev}σ) within bands"
+
+            elif "vwap" in ind_id:
+                vwap_val = float(df.get('anchored_vwap', df.get('vwap', df['close'])).iloc[idx])
+                if pd.isna(vwap_val): vwap_val = close_val
+                weight = 1.2
+                if close_val > vwap_val:
+                    bias = 1
+                    reason = f"Price ({close_val:.1f}) > VWAP ({vwap_val:.1f})"
+                elif close_val < vwap_val:
+                    bias = -1
+                    reason = f"Price ({close_val:.1f}) < VWAP ({vwap_val:.1f})"
+                else:
+                    reason = f"Price ({close_val:.1f}) at VWAP ({vwap_val:.1f})"
 
             elif "session_vp" in ind_id or "fixed_vp" in ind_id or "vp" in ind_id or "volume" in ind_id:
                 va_pct = float(params.get("value_area_pct", 70.0))

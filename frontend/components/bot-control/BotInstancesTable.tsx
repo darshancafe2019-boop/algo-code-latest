@@ -280,10 +280,27 @@ export function BotInstancesTable({
                     </span>
                   </td>
                   <td className="p-3 text-center font-mono text-[10px]">
-                    <div className="flex items-center justify-center gap-1 text-[var(--theme-profit)]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--theme-profit)] animate-pulse" />
-                      <span>{isRunning ? "HEALTHY" : "OFFLINE"}</span>
-                    </div>
+                    {isRunning ? (
+                      <div className="flex items-center justify-center gap-1 text-[var(--theme-profit)]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--theme-profit)] animate-pulse" />
+                        <span>HEALTHY</span>
+                      </div>
+                    ) : isPaused ? (
+                      <div className="flex items-center justify-center gap-1 text-amber-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        <span>PAUSED</span>
+                      </div>
+                    ) : isError ? (
+                      <div className="flex items-center justify-center gap-1 text-[var(--theme-loss)]" title={bot.last_error || "Bot Execution Error"}>
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--theme-loss)] animate-pulse" />
+                        <span>ERROR</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1 text-[var(--theme-text-muted)]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                        <span>STOPPED</span>
+                      </div>
+                    )}
                   </td>
                   <td className="p-3 text-center">
                     <div className="flex items-center justify-center gap-1.5">

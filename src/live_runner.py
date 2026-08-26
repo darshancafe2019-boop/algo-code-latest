@@ -116,7 +116,9 @@ class LiveRunner:
         self.provider_manager = global_provider_manager
         self.error_ledger = global_error_ledger
 
-        res = self.instrument_resolver.resolve(self.symbol)
+        exec_mode = b.get("execution_mode") or "PAPER" if row else "PAPER"
+        asset_class = b.get("asset_class") or "CRYPTO" if row else "CRYPTO"
+        res = self.instrument_resolver.resolve_for_bot(self.symbol, execution_mode=exec_mode, asset_class=asset_class)
         if not res.is_valid:
             self.is_preflight_failed = True
             self.preflight_error = f"INSTRUMENT_PREFLIGHT_FAILED: {res.reason} (Code: {res.error_code}). Suggested: {res.suggested_action}"
@@ -125,7 +127,8 @@ class LiveRunner:
             self.is_preflight_failed = False
             self.preflight_error = ""
             self.canonical_instrument = res.instrument
-            logger.info("[%s] Pre-flight instrument resolved: %s (%s via %s)", self.bot_id, res.instrument.canonical_symbol, res.instrument.instrument_type.value, res.instrument.provider)
+            self.feed_symbol = res.instrument.canonical_symbol
+            logger.info("[%s] Pre-flight instrument resolved: %s (feed: %s, %s via %s)", self.bot_id, self.symbol, self.feed_symbol, res.instrument.instrument_type.value, res.instrument.provider)
 
         log_bot_event(
             event_type="BOT_START",
@@ -195,8 +198,9 @@ class LiveRunner:
                 context.signal = "LONG"
                 context.decision = "LONG"
 
-            logger.info("Fetching recent candles for %s (%s) [Bot: %s] via ProviderManager...", self.symbol, self.timeframe, self.bot_id)
-            df, _ = self.provider_manager.fetch_ohlcv_safe(self.symbol, self.timeframe, limit=1000)
+            feed_sym = getattr(self, "feed_symbol", None) or self.symbol
+            logger.info("Fetching recent candles for %s (feed: %s, %s) [Bot: %s] via ProviderManager...", self.symbol, feed_sym, self.timeframe, self.bot_id)
+            df, _ = self.provider_manager.fetch_ohlcv_safe(feed_sym, self.timeframe, limit=1000)
 
             if df.empty or len(df) < 200:
                 logger.error("Fetched insufficient historical candles for indicator calculation.")

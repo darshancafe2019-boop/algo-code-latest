@@ -6122,7 +6122,9 @@ def api_bot_signal_debugger(bot_id):
             calculate_emas, calculate_rsi, calculate_macd,
             calculate_bollinger_bands, calculate_atr, calculate_adx
         )
-        raw_candles = fetcher.exchange.fetch_ohlcv(symbol, timeframe, limit=60)
+        from src.instrument_resolver import InstrumentResolver
+        fetcher_sym = InstrumentResolver.get_underlying_symbol(symbol)
+        raw_candles = fetcher.exchange.fetch_ohlcv(fetcher_sym, timeframe, limit=60)
         df = pd.DataFrame(raw_candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
         df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
         

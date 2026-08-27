@@ -80,6 +80,7 @@ export interface BotInstanceExtended {
   created_at?: string;
   updated_at?: string;
   last_heartbeat?: string;
+  last_error?: string;
   template_id?: string;
   group_name?: string;
   config?: Record<string, any>;

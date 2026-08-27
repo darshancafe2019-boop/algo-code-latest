@@ -250,11 +250,20 @@ class CandleEngine:
 
         df_work = df.copy()
         if not pd.api.types.is_datetime64_any_dtype(df_work["timestamp"]):
-            df_work["timestamp"] = pd.to_datetime(df_work["timestamp"], utc=True)
+            if pd.api.types.is_numeric_dtype(df_work["timestamp"]):
+                unit = "ms" if df_work["timestamp"].iloc[0] > 1e11 else "s"
+                df_work["timestamp"] = pd.to_datetime(df_work["timestamp"], unit=unit, utc=True)
+            else:
+                df_work["timestamp"] = pd.to_datetime(df_work["timestamp"], utc=True)
+        else:
+            if df_work["timestamp"].dt.tz is None:
+                df_work["timestamp"] = df_work["timestamp"].dt.tz_localize("UTC")
+            else:
+                df_work["timestamp"] = df_work["timestamp"].dt.tz_convert("UTC")
 
         df_work = df_work.sort_values("timestamp").drop_duplicates(subset=["timestamp"])
 
-        ts_sec = df_work["timestamp"].astype("int64") // 10**9
+        ts_sec = (df_work["timestamp"] - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().astype("int64")
         bucket = (ts_sec // target_seconds) * target_seconds
         df_work["bucket"] = pd.to_datetime(bucket, unit="s", utc=True)
 
@@ -269,7 +278,8 @@ class CandleEngine:
         resampled.rename(columns={"bucket": "timestamp"}, inplace=True)
 
         now_ts = datetime.now(timezone.utc).timestamp()
-        resampled["is_closed"] = (resampled["timestamp"].astype("int64") // 10**9 + target_seconds) <= now_ts
+        res_ts_sec = (resampled["timestamp"] - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().astype("int64")
+        resampled["is_closed"] = (res_ts_sec + target_seconds) <= now_ts
 
         if closed_only:
             resampled = resampled[resampled["is_closed"] == True].copy()
@@ -305,13 +315,20 @@ class CandleEngine:
                 df["timestamp"] = pd.to_datetime(df["timestamp"], unit=unit, utc=True)
             else:
                 df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        else:
+            if df["timestamp"].dt.tz is None:
+                df["timestamp"] = df["timestamp"].dt.tz_localize("UTC")
+            else:
+                df["timestamp"] = df["timestamp"].dt.tz_convert("UTC")
 
         df = df.sort_values("timestamp").drop_duplicates(subset=["timestamp"]).reset_index(drop=True)
 
         now_ts = datetime.now(timezone.utc).timestamp()
-        df = df[df["timestamp"].astype("int64") // 10**9 <= (now_ts + 3600)].reset_index(drop=True)
+        ts_sec = (df["timestamp"] - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().astype("int64")
+        df = df[ts_sec <= (now_ts + 3600)].reset_index(drop=True)
 
-        df["is_closed"] = (df["timestamp"].astype("int64") // 10**9 + timeframe_seconds) <= now_ts
+        ts_sec = (df["timestamp"] - pd.Timestamp("1970-01-01", tz="UTC")).dt.total_seconds().astype("int64")
+        df["is_closed"] = (ts_sec + timeframe_seconds) <= now_ts
 
         return df
 

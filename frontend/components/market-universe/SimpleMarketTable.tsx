@@ -54,7 +54,7 @@ export function SimpleMarketTable({
     } catch {}
   }, []);
 
-  const toggleCol = (k: keyof typeof defaultCols) => {
+  const toggleCol = (k: keyof typeof DEFAULT_COLS) => {
     const updated = { ...visibleCols, [k]: !visibleCols[k] };
     setVisibleCols(updated);
     try {

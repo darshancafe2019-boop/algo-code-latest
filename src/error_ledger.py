@@ -20,12 +20,18 @@ from typing import Any, Dict, List, Optional, Tuple
 logger = logging.getLogger("ErrorLedger")
 
 
+class DataValidationError(ValueError):
+    """Raised when critical trading/market parameters are None or invalid."""
+    pass
+
+
 class ErrorCategory(str, enum.Enum):
     INSTRUMENT_RESOLUTION = "INSTRUMENT_RESOLUTION"
     PROVIDER_CONNECTIVITY = "PROVIDER_CONNECTIVITY"
     PROVIDER_RATE_LIMIT = "PROVIDER_RATE_LIMIT"
     PROVIDER_AUTH = "PROVIDER_AUTH"
     MARKET_DATA = "MARKET_DATA"
+    DATA_INTEGRITY = "DATA_INTEGRITY"
     ORDER_EXECUTION = "ORDER_EXECUTION"
     RISK_ENGINE = "RISK_ENGINE"
     DATABASE = "DATABASE"
@@ -191,7 +197,18 @@ class ErrorLedger:
             rec_action = "Verify API key permissions and IP whitelisting in your exchange dashboard."
             return error_code, category, severity, is_retryable, plain_exp, root_cause, rec_action
 
-        # 6. Generic Default Fallback
+        # 6. Data Validation / Missing Numeric Price or Balance Error
+        if isinstance(exc, DataValidationError) or "DataValidationError" in exc_name or "NoneType" in msg or "missing price" in msg.lower():
+            error_code = "DATA_VALIDATION_FAILED"
+            category = ErrorCategory.DATA_INTEGRITY
+            severity = ErrorSeverity.ERROR
+            is_retryable = False
+            plain_exp = "Required numeric value (price, size, or balance) was missing or null. Trade execution and P&L calculation were safely blocked to protect portfolio integrity."
+            root_cause = f"Null or missing financial parameter: {msg[:140]}"
+            rec_action = "Verify live market feed connectivity and database position records."
+            return error_code, category, severity, is_retryable, plain_exp, root_cause, rec_action
+
+        # 7. Generic Default Fallback
         error_code = "RUNNER_EXECUTION_ERROR"
         category = ErrorCategory.INTERNAL
         severity = ErrorSeverity.ERROR

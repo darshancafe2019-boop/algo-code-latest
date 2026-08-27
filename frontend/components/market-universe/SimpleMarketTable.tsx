@@ -25,6 +25,15 @@ interface SimpleMarketTableProps {
   onCloseColumnSettings?: () => void;
 }
 
+const DEFAULT_COLS = {
+  symbol: true,
+  price: true,
+  change: true,
+  volume: true,
+  trend: true,
+  status: true,
+};
+
 export function SimpleMarketTable({
   instruments = [],
   selectedInstrument,
@@ -34,23 +43,14 @@ export function SimpleMarketTable({
   showColumnSettings = false,
   onCloseColumnSettings,
 }: SimpleMarketTableProps) {
-  const defaultCols = {
-    symbol: true,
-    price: true,
-    change: true,
-    volume: true,
-    trend: true,
-    status: true,
-  };
-
-  const [visibleCols, setVisibleCols] = useState(defaultCols);
+  const [visibleCols, setVisibleCols] = useState(DEFAULT_COLS);
   const [sortField, setSortField] = useState<string>("volume_24h");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
 
   useEffect(() => {
     try {
       const saved = localStorage.getItem("markets_table_cols_v3");
-      if (saved) setVisibleCols({ ...defaultCols, ...JSON.parse(saved) });
+      if (saved) setVisibleCols({ ...DEFAULT_COLS, ...JSON.parse(saved) });
     } catch {}
   }, []);
 

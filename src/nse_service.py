@@ -373,13 +373,13 @@ class NseService:
                 "error": str(e)
             }
 
-    # 8. ALGORITHMIC BOT SIGNAL GENERATOR
+    # 8. ALGORITHMIC BOT SIGNAL GENERATOR (DETERMINISTIC SETUP SCORE)
     def generate_nse_bot_signals(self, symbol: str = "NIFTY") -> Dict[str, Any]:
         """
-        Generates multi-factor algorithmic trading signals based on:
-        1. PCR Sentiment (Extreme Oversold < 0.75 = Bullish, Extreme Overbought > 1.35 = Bearish)
-        2. Max Pain Deviation
-        3. OI Build-up Quadrant Alignment
+        Generates deterministic rule-based options setup scores (no black-box AI):
+        1. PCR Sentiment (> 1.25 Bullish, < 0.80 Bearish)
+        2. Max Pain Gravity (Spot vs Max Pain)
+        3. OI Build-up Alignment
         4. FII / DII Institutional Flow
         """
         chain = self.get_option_chain_analytics(symbol, strike_count=10)
@@ -395,54 +395,77 @@ class NseService:
             except Exception:
                 pass
 
-        # Calculate strategy signal
+        # Deterministic Condition Checks
+        conditions = []
         score = 0
-        signals = []
 
-        # PCR Factor
+        # 1. PCR Condition
         if pcr > 1.25:
-            score += 2
-            signals.append("High PCR indicates aggressive Put writing / Strong Bullish Support")
+            score += 1
+            conditions.append({"name": "PCR Trend", "status": "PASS", "rule": "PCR > 1.25 (Bullish Put Writing)", "value": f"{pcr:.2f}"})
         elif pcr < 0.80:
-            score -= 2
-            signals.append("Low PCR indicates heavy Call writing / Bearish Resistance")
+            score -= 1
+            conditions.append({"name": "PCR Trend", "status": "PASS", "rule": "PCR < 0.80 (Bearish Call Writing)", "value": f"{pcr:.2f}"})
         else:
-            signals.append("Neutral PCR in consolidation range")
+            conditions.append({"name": "PCR Trend", "status": "WAIT", "rule": "Neutral Range (0.80 - 1.25)", "value": f"{pcr:.2f}"})
 
-        # Max Pain Factor
+        # 2. Max Pain Pin Condition
         if spot < max_pain * 0.995:
             score += 1
-            signals.append(f"Spot below Max Pain (₹{max_pain:.0f}) indicating upward gravity towards expiry")
+            conditions.append({"name": "Max Pain Pin", "status": "PASS", "rule": f"Spot < Max Pain (₹{max_pain:.0f})", "value": f"₹{spot:.0f}"})
         elif spot > max_pain * 1.005:
             score -= 1
-            signals.append(f"Spot above Max Pain (₹{max_pain:.0f}) indicating downward pin towards expiry")
+            conditions.append({"name": "Max Pain Pin", "status": "PASS", "rule": f"Spot > Max Pain (₹{max_pain:.0f})", "value": f"₹{spot:.0f}"})
+        else:
+            conditions.append({"name": "Max Pain Pin", "status": "WAIT", "rule": "At Max Pain Strike", "value": f"₹{spot:.0f}"})
 
-        # FII Factor
+        # 3. FII Cash Flow Condition
         if fii_net > 500:
             score += 1
-            signals.append(f"Positive FII Net Cash Flow (+₹{fii_net:.0f} Cr) supports Long bias")
+            conditions.append({"name": "FII Flow", "status": "PASS", "rule": "Net Inflow > +₹500 Cr", "value": f"+₹{fii_net:.0f} Cr"})
         elif fii_net < -500:
             score -= 1
-            signals.append(f"Negative FII Net Cash Outflow (-₹{abs(fii_net):.0f} Cr) adds downward pressure")
+            conditions.append({"name": "FII Flow", "status": "PASS", "rule": "Net Outflow < -₹500 Cr", "value": f"-₹{abs(fii_net):.0f} Cr"})
+        else:
+            conditions.append({"name": "FII Flow", "status": "WAIT", "rule": "Neutral Institutional Flow", "value": f"₹{fii_net:.0f} Cr"})
+
+        # 4. Strike Range Alignment Condition
+        strikes = chain.get("strikes", [])
+        total_call_oi = chain.get("total_call_oi", 1)
+        total_put_oi = chain.get("total_put_oi", 1)
+        if total_put_oi > total_call_oi:
+            score += 1
+            conditions.append({"name": "Total OI Balance", "status": "PASS", "rule": "Put OI > Call OI", "value": f"{total_put_oi:,.0f} vs {total_call_oi:,.0f}"})
+        else:
+            conditions.append({"name": "Total OI Balance", "status": "WAIT", "rule": "Call OI >= Put OI", "value": f"{total_call_oi:,.0f} vs {total_put_oi:,.0f}"})
+
+        passed_count = sum(1 for c in conditions if c["status"] == "PASS")
+        total_count = len(conditions)
 
         decision = "STRONG_BUY" if score >= 3 else ("BUY" if score >= 1 else ("STRONG_SELL" if score <= -3 else ("SELL" if score <= -1 else "HOLD")))
-        confidence = min(0.95, max(0.55, 0.50 + abs(score) * 0.12))
+        confidence = round(min(0.95, max(0.50, 0.50 + (passed_count / total_count) * 0.45)), 2)
 
         return {
             "status": "success",
             "symbol": symbol,
             "decision": decision,
-            "confidence": round(confidence, 2),
-            "score": score,
+            "confidence": confidence,
+            "reasons": [f"{c['name']}: {c['rule']} ({c['value']})" for c in conditions if c["status"] == "PASS"],
+            "setup_score": {
+                "score": score,
+                "passed_count": passed_count,
+                "total_count": total_count,
+                "summary": f"{passed_count} / {total_count} Conditions Passed",
+                "conditions": conditions,
+            },
             "spot_price": spot,
             "max_pain": max_pain,
             "pcr": pcr,
-            "reasons": signals,
             "recommended_strategy": "BULL_CALL_SPREAD" if score > 1 else ("BEAR_PUT_SPREAD" if score < -1 else "IRON_CONDOR"),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
-    # 9. TRADE EXECUTION ROUTER
+    # 9. TRADE EXECUTION ROUTER (CENTRALIZED VIA ORDER EXECUTION SERVICE)
     def execute_nse_order(
         self,
         symbol: str,
@@ -459,34 +482,43 @@ class NseService:
         quote_res = self.get_quote(symbol)
         curr_price = limit_price or float(quote_res.get("data", {}).get("LastTradedPrice", 100.0))
 
-        client_order_id = f"NSE_{int(time.time()*1000)}_{symbol.replace(' ', '_')}"
+        is_live = mode.upper() == "LIVE"
 
-        trade_record = {
-            "client_order_id": client_order_id,
-            "symbol": symbol,
-            "direction": direction.upper(),
-            "quantity": quantity,
-            "price": curr_price,
-            "order_type": order_type,
-            "stop_loss": stop_loss,
-            "take_profit": take_profit,
-            "bot_id": bot_id,
-            "strategy": strategy,
-            "execution_mode": mode.upper(),
-            "status": "FILLED",
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-        }
+        # Route through central authoritative order execution service
+        res_dict = self.exec_service.route_order(
+            symbol=symbol,
+            direction=direction.upper(),
+            quantity=quantity,
+            price=curr_price,
+            stop_loss=stop_loss or 0.0,
+            take_profit=take_profit or 0.0,
+            bot_id=bot_id,
+            strategy=strategy,
+            confidence_score=0.85,
+            mode=mode.upper(),
+        )
 
-        logger.info("Executed NSE order %s: %s %s units @ INR %.2f (Mode: %s)", client_order_id, direction, quantity, curr_price, mode)
+        if not res_dict.get("success"):
+            logger.warning("NSE order routing rejected: %s", res_dict.get("reason"))
+            return {
+                "status": "error",
+                "message": res_dict.get("reason", "Order execution blocked"),
+                "symbol": symbol,
+                "direction": direction,
+                "quantity": quantity,
+                "mode": mode,
+            }
 
+        order_res = res_dict.get("order", {})
         return {
             "status": "success",
-            "order_id": client_order_id,
+            "order_id": str(order_res.get("order_id")),
+            "trade_id": order_res.get("trade_id"),
             "symbol": symbol,
             "direction": direction,
             "quantity": quantity,
-            "fill_price": curr_price,
+            "fill_price": float(order_res.get("average_price") or curr_price),
             "mode": mode,
-            "message": f"Order for {quantity} {symbol} filled @ INR {curr_price:.2f} [{mode}]",
-            "trade": trade_record,
+            "message": f"Order for {quantity} {symbol} filled @ INR {float(order_res.get('average_price') or curr_price):.2f} [{mode}]",
+            "trade": order_res,
         }

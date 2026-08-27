@@ -180,9 +180,14 @@ class OrderExecutionService:
         if existing_orders:
             return False, f"DUPLICATE_ORDER_ATTEMPT: Signal {idem_key} already processed"
 
-        # 6. ExposureCheck
-        if amount > config.MAX_POSITION_SIZE:
-            return False, f"EXCEEDS_MAX_POSITION_SIZE: Requested {amount} > max {config.MAX_POSITION_SIZE}"
+        # 6. ExposureCheck (Dynamic Multi-Asset Lot Sizing Aware)
+        from src.instrument_resolver import global_instrument_resolver
+        res_inst = global_instrument_resolver.resolve(symbol)
+        lot_sz = res_inst.instrument.lot_size if res_inst.is_valid and res_inst.instrument else 1.0
+        max_allowed_qty = max(config.MAX_POSITION_SIZE, lot_sz * 20.0)
+
+        if amount > max_allowed_qty:
+            return False, f"EXCEEDS_MAX_POSITION_SIZE: Requested {amount} > max {max_allowed_qty}"
         if order_cost > config.MAX_ORDER_VALUE:
             return False, f"EXCEEDS_MAX_ORDER_VALUE: Requested ${order_cost:,.2f} > max ${config.MAX_ORDER_VALUE:,.2f}"
 
@@ -464,11 +469,19 @@ class OrderExecutionService:
             account_balance=50000.0,
             is_live=(mode == "LIVE"),
         )
+        notional = round(quantity * eff_price, 2)
         return {
             "status": "success" if success else "error",
             "success": success,
             "reason": reason,
+            "order_id": str(order_dict.get("order_id") or ""),
+            "trade_id": order_dict.get("trade_id"),
+            "fill_price": float(order_dict.get("average_price") or eff_price),
+            "price": eff_price,
+            "notional_value": notional,
+            "required_margin": notional,
             "order": order_dict,
+            "trade": order_dict,
             "symbol": symbol,
             "direction": direction,
             "quantity": quantity,

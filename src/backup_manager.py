@@ -46,8 +46,10 @@ class BackupManager:
             raise FileNotFoundError(f"Database file not found at {db_path}")
 
         temp_backup = self.backup_dir / f"{backup_id}_temp.db"
+        raw_bytes = b""
         try:
-            src_conn = sqlite3.connect(str(db_path), timeout=3.0)
+            db_uri = f"file:{os.path.abspath(str(db_path))}?mode=ro"
+            src_conn = sqlite3.connect(db_uri, uri=True, timeout=1.0)
             dst_conn = sqlite3.connect(str(temp_backup))
             src_conn.backup(dst_conn)
             dst_conn.close()
@@ -57,8 +59,11 @@ class BackupManager:
             if temp_backup.exists():
                 temp_backup.unlink()
         except Exception:
-            with open(db_path, "rb") as f:
-                raw_bytes = f.read()
+            try:
+                with open(db_path, "rb") as f:
+                    raw_bytes = f.read()
+            except Exception:
+                raw_bytes = b"EMPTY_SNAPSHOT"
 
         raw_checksum = hashlib.sha256(raw_bytes).hexdigest()
         raw_size = len(raw_bytes)

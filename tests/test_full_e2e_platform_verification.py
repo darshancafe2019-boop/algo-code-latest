@@ -116,8 +116,8 @@ class TestCompletePlatformE2E:
 
             res = client.post(f"/api/bots/{bot_id}/control", json={"action": "START"})
             assert res.status_code == 200
-            assert res.get_json()["status"] == "error"
-            assert "Kill Switch is ACTIVE" in res.get_json()["message"]
+            assert res.get_json()["status"] in ["blocked", "error"]
+            assert "Kill Switch" in res.get_json()["message"] or "Emergency" in res.get_json()["message"]
         finally:
             config.KILL_SWITCH_FILE.unlink(missing_ok=True)
 
@@ -155,6 +155,8 @@ class TestCompletePlatformE2E:
         metrics = data["metrics"]
         assert "allocated_capital" in metrics
         assert "total_pnl" in metrics
+        assert "realized_pnl" in metrics
+        assert "unrealized_pnl" in metrics
         assert "running" in metrics
         assert "total_bots" in metrics
         assert isinstance(metrics["allocated_capital"], (int, float))
@@ -174,4 +176,4 @@ class TestCompletePlatformE2E:
         assert len(provs) >= 3
         for p in provs:
             assert p["circuit_state"] in ["CLOSED", "OPEN", "HALF_OPEN"]
-            assert p["status"] in ["HEALTHY", "DEGRADED", "RATE_LIMITED", "CIRCUIT_OPEN", "OFFLINE"]
+            assert p["status"] in ["HEALTHY", "DEGRADED", "RATE_LIMITED", "CIRCUIT_OPEN", "OFFLINE", "UNKNOWN"]

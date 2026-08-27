@@ -45,6 +45,8 @@ class ProviderStatus(str, enum.Enum):
     RATE_LIMITED = "RATE_LIMITED"
     CIRCUIT_OPEN = "CIRCUIT_OPEN"
     OFFLINE = "OFFLINE"
+    UNKNOWN = "UNKNOWN"
+    DISABLED = "DISABLED"
     NOT_CONFIGURED = "NOT_CONFIGURED"
 
 
@@ -113,10 +115,12 @@ class ProviderAdapter:
     @property
     def status(self) -> ProviderStatus:
         now = time.time()
-        if now < self.rate_limited_until:
-            return ProviderStatus.RATE_LIMITED
         if self.circuit.state == CircuitState.OPEN:
             return ProviderStatus.CIRCUIT_OPEN
+        if self.request_count == 0 and self.last_success_time is None:
+            return ProviderStatus.UNKNOWN
+        if now < self.rate_limited_until:
+            return ProviderStatus.RATE_LIMITED
         if self.error_count > 0 and self.request_count > 0:
             err_rate = (self.error_count / self.request_count) * 100.0
             if err_rate > 20.0:

@@ -472,24 +472,27 @@ class InstrumentResolver:
         asset_class: Optional[str],
         provider: Optional[str],
     ) -> ResolutionResult:
-        """Handles structured option contract strings."""
-        parts = query.split("-")
+        """Handles structured option contract strings for Crypto and Indian NSE options."""
+        clean_q = query.strip().upper().replace("NSE:", "").replace("NFO:", "")
+        
+        # 1. Crypto Option Format (e.g. BTC-260327-70000-C)
+        parts = clean_q.split("-")
         if len(parts) == 4 and parts[0] in ["BTC", "ETH"]:
             underlying, expiry, strike_str, opt_type_letter = parts
             try:
                 strike_val = float(strike_str)
                 opt_type = "CALL" if opt_type_letter.upper() == "C" else "PUT"
                 inst = CanonicalInstrument(
-                    instrument_id=f"DERIBIT:{query}:OPTION",
+                    instrument_id=f"DERIBIT:{clean_q}:OPTION",
                     asset_class=AssetClass.CRYPTO,
                     instrument_type=InstrumentType.OPTION,
                     provider="deribit_options",
                     exchange="DERIBIT",
                     base_asset=underlying,
                     quote_asset="USD",
-                    canonical_symbol=query,
-                    provider_symbol=query,
-                    exchange_symbol=query,
+                    canonical_symbol=clean_q,
+                    provider_symbol=clean_q,
+                    exchange_symbol=clean_q,
                     expiry=f"20{expiry[:2]}-{expiry[2:4]}-{expiry[4:]}",
                     strike=strike_val,
                     option_type=opt_type,
@@ -509,14 +512,78 @@ class InstrumentResolver:
                     error_code="SUCCESS",
                 )
             except Exception as e:
-                logger.error("Option parsing error: %s", e)
+                logger.error("Crypto option parsing error: %s", e)
+
+        # 2. NSE Indian Options Format (e.g. "NIFTY 24400 CE", "NIFTY-24400-CE", "NSE:NIFTY-26AUG27-24400-CE", "BANKNIFTY 51000 PE")
+        import re
+        # Pattern 1: Space or hyphen separated (e.g. NIFTY 24400 CE, BANKNIFTY-51000-PE, NIFTY 27AUG26 24400 CE)
+        nse_match = re.match(r"^([A-Z]+)[-_ ]+(?:([0-9]{1,2}[A-Z]{3}[0-9]{2,4})[-_ ]+)?([0-9]+(?:\.[0-9]+)?)[-_ ]*(CE|PE|CALL|PUT)$", clean_q)
+        if nse_match:
+            underlying, expiry_str, strike_str, opt_type_raw = nse_match.groups()
+            try:
+                strike_val = float(strike_str)
+                opt_type = "CALL" if opt_type_raw in ["CE", "CALL"] else "PUT"
+                
+                # Dynamic lot size mapping
+                lot_size = 50.0
+                if "BANK" in underlying:
+                    lot_size = 15.0
+                elif "FINNIFTY" in underlying:
+                    lot_size = 25.0
+                elif "MIDCP" in underlying:
+                    lot_size = 75.0
+                elif "SENSEX" in underlying:
+                    lot_size = 10.0
+                elif "RELIANCE" in underlying:
+                    lot_size = 250.0
+                elif "TCS" in underlying:
+                    lot_size = 175.0
+                elif "INFY" in underlying:
+                    lot_size = 400.0
+                elif "HDFC" in underlying:
+                    lot_size = 550.0
+
+                canonical_sym = f"{underlying} {int(strike_val) if strike_val.is_integer() else strike_val} {opt_type_raw}"
+                inst_id = f"NSE:{underlying}:{expiry_str or 'NEAR'}:{int(strike_val) if strike_val.is_integer() else strike_val}:{opt_type_raw}"
+
+                inst = CanonicalInstrument(
+                    instrument_id=inst_id,
+                    asset_class=AssetClass.INDIAN_STOCKS,
+                    instrument_type=InstrumentType.OPTION,
+                    provider="nse_options",
+                    exchange="NSE",
+                    base_asset=underlying,
+                    quote_asset="INR",
+                    canonical_symbol=canonical_sym,
+                    provider_symbol=canonical_sym,
+                    exchange_symbol=canonical_sym,
+                    expiry=expiry_str or "",
+                    strike=strike_val,
+                    option_type=opt_type,
+                    tick_size=0.05,
+                    quantity_step=lot_size,
+                    lot_size=lot_size,
+                    tradable=True,
+                    data_supported=True,
+                    execution_supported=True,
+                    settlement_asset="INR",
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.RESOLVED,
+                    query=query,
+                    instrument=inst,
+                    reason="NSE options contract resolved successfully.",
+                    error_code="SUCCESS",
+                )
+            except Exception as e:
+                logger.error("NSE option parsing error: %s", e)
 
         return ResolutionResult(
             status=ResolutionStatus.UNSUPPORTED,
             query=query,
             reason=f"Option contract '{query}' could not be parsed into a valid provider contract.",
             error_code="OPTION_PARSING_FAILED",
-            suggested_action="Use standard format: BTC-YYMMDD-STRIKE-C (e.g. BTC-260327-70000-C).",
+            suggested_action="Use standard format: 'NIFTY 24400 CE' or 'BTC-YYMMDD-STRIKE-C'.",
         )
 
     @classmethod

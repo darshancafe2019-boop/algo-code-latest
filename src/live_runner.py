@@ -222,13 +222,39 @@ class LiveRunner:
             active_trade = get_active_trade(self.bot_id)
             context.open_trade = active_trade
             if active_trade:
-                trade_id = active_trade['id']
-                direction = active_trade['direction']
-                entry_price = active_trade['entry_price']
-                sl_price = active_trade['stop_loss']
-                tp_price = active_trade['take_profit']
-                size = active_trade['position_size']
-                logger.info("[%s] Active trade found in DB (ID: %s, %s, Entry: %.2f, SL: %.2f, TP: %.2f)", self.bot_id, trade_id, direction, entry_price, sl_price, tp_price)
+                from src.error_ledger import DataValidationError
+                trade_id = active_trade.get('id')
+                direction = str(active_trade.get('direction') or 'LONG').upper()
+                raw_entry = active_trade.get('entry_price')
+                raw_sl = active_trade.get('stop_loss')
+                raw_tp = active_trade.get('take_profit')
+                raw_size = active_trade.get('position_size')
+
+                # Strict Null Validation
+                if raw_entry is None or raw_size is None:
+                    raise DataValidationError(f"Active trade #{trade_id} missing entry_price ({raw_entry}) or position_size ({raw_size})")
+
+                try:
+                    entry_price = float(raw_entry)
+                    size = float(raw_size)
+                except (ValueError, TypeError) as num_err:
+                    raise DataValidationError(f"Active trade #{trade_id} invalid numeric format: {num_err}")
+
+                if entry_price <= 0 or size <= 0:
+                    raise DataValidationError(f"Active trade #{trade_id} non-positive values (entry: {entry_price}, size: {size})")
+
+                sl_price = float(raw_sl) if raw_sl is not None and float(raw_sl) > 0 else None
+                tp_price = float(raw_tp) if raw_tp is not None and float(raw_tp) > 0 else None
+
+                logger.info(
+                    "[%s] Active trade found in DB (ID: %s, %s, Entry: %.2f, SL: %s, TP: %s)",
+                    self.bot_id,
+                    trade_id,
+                    direction,
+                    entry_price,
+                    f"{sl_price:.2f}" if sl_price is not None else "None",
+                    f"{tp_price:.2f}" if tp_price is not None else "None",
+                )
 
                 exit_triggered = False
                 exit_price = 0.0
@@ -236,23 +262,23 @@ class LiveRunner:
                 exit_reason = ""
 
                 if direction == "LONG":
-                    if low_price <= sl_price:
+                    if sl_price is not None and low_price <= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "STOP LOSS"
-                    elif high_price >= tp_price:
+                    elif tp_price is not None and high_price >= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "TAKE PROFIT"
                 elif direction == "SHORT":
-                    if high_price >= sl_price:
+                    if sl_price is not None and high_price >= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (entry_price - exit_price) * size
                         exit_reason = "STOP LOSS"
-                    elif low_price <= tp_price:
+                    elif tp_price is not None and low_price <= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (entry_price - exit_price) * size

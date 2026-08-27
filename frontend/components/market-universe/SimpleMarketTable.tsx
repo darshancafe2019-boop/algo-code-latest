@@ -91,12 +91,12 @@ export function SimpleMarketTable({
           </div>
 
           <div className="flex items-center gap-4 text-xs font-mono">
-            {Object.keys(defaultCols).map((k) => (
+            {(Object.keys(DEFAULT_COLS) as Array<keyof typeof DEFAULT_COLS>).map((k) => (
               <label key={k} className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
                 <input
                   type="checkbox"
-                  checked={visibleCols[k as keyof typeof defaultCols]}
-                  onChange={() => toggleCol(k as keyof typeof defaultCols)}
+                  checked={Boolean(visibleCols[k])}
+                  onChange={() => toggleCol(k)}
                   className="accent-cyan-400 rounded"
                 />
                 <span className="capitalize">{k}</span>

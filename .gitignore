@@ -12,7 +12,7 @@ data/
 backup/
 
 # Logs & locks
-logs/
+/logs/
 *.log
 *.lock
 quantos_supervisor.lock

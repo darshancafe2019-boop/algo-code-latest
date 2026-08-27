@@ -5919,6 +5919,9 @@ def api_bots_emergency_halt():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+_bot_command_idempotency_cache: Dict[str, Dict[str, Any]] = {}
+_bot_command_idempotency_lock = threading.Lock()
+
 @app.route("/api/bots/command", methods=["POST"])
 def api_bot_command_idempotent():
     """
@@ -5934,12 +5937,25 @@ def api_bot_command_idempotent():
     if not bot_id or not action:
         return jsonify({"status": "error", "message": "Missing required fields 'bot_id' or 'action'."}), 400
 
+    with _bot_command_idempotency_lock:
+        if command_id in _bot_command_idempotency_cache:
+            cached_res = _bot_command_idempotency_cache[command_id]
+            return jsonify({
+                "status": "already_executed",
+                "message": f"Command '{command_id}' was already executed.",
+                "command_id": command_id,
+                "previous_result": cached_res
+            })
+
     from src.bot_runtime_service import global_bot_runtime_service
     res = global_bot_runtime_service.execute_bot_action(
         bot_id=bot_id,
         action=action,
         requested_by=requested_by
     )
+
+    with _bot_command_idempotency_lock:
+        _bot_command_idempotency_cache[command_id] = res
 
     audit.log_audit_event(
         action=f"BOT_COMMAND_{action}",

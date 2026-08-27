@@ -396,9 +396,11 @@ class BotRuntimeService:
             "profit_factor": pf,
             "w_l_be": f"{wins_count}/{losses_count}/{be_count}",
             "allocated_capital": round(fleet_capital_allocated, 2),
+            "total_capital": max(100000.0, round(fleet_capital_allocated, 2)),
             "capital_used": round(fleet_exposure, 2),
             "current_exposure": round(fleet_exposure, 2),
             "available_capital": max(0.0, round(fleet_capital_allocated - fleet_exposure, 2)),
+            "profit_factor_display": f"{pf:.2f}" if pf else "0.00",
             "emergency_halt_active": getattr(config, "GLOBAL_KILL_SWITCH", False) or config.KILL_SWITCH_FILE.exists(),
             "last_updated": datetime.now(timezone.utc).isoformat()
         }

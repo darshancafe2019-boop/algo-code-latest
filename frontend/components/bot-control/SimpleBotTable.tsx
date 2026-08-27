@@ -47,6 +47,7 @@ interface SimpleBotTableProps {
   isLoading: boolean;
   onSelectBot: (bot: BotRowItem) => void;
   onBotAction: (botId: string, action: string) => void;
+  onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
   onCreateBot: () => void;
   selectedMarket: string;
 }
@@ -56,10 +57,12 @@ export function SimpleBotTable({
   isLoading,
   onSelectBot,
   onBotAction,
+  onToggleMode,
   onCreateBot,
   selectedMarket,
 }: SimpleBotTableProps) {
   const [loadingActionBotId, setLoadingActionBotId] = useState<string | null>(null);
+  const [togglingModeBotId, setTogglingModeBotId] = useState<string | null>(null);
 
   const handleAction = async (e: React.MouseEvent, botId: string, action: string) => {
     e.stopPropagation();
@@ -68,6 +71,18 @@ export function SimpleBotTable({
       await onBotAction(botId, action);
     } finally {
       setLoadingActionBotId(null);
+    }
+  };
+
+  const handleToggleModeClick = async (e: React.MouseEvent, botId: string, currentMode: string) => {
+    e.stopPropagation();
+    if (!onToggleMode) return;
+    const targetMode = (currentMode || "").toUpperCase() === "LIVE" ? "PAPER" : "LIVE";
+    setTogglingModeBotId(botId);
+    try {
+      await onToggleMode(botId, targetMode);
+    } finally {
+      setTogglingModeBotId(null);
     }
   };
 
@@ -106,6 +121,7 @@ export function SimpleBotTable({
             <tr>
               <th className="py-3 px-4 font-semibold">BOT</th>
               <th className="py-3 px-4 font-semibold">MARKET</th>
+              <th className="py-3 px-4 font-semibold text-center">MODE</th>
               <th className="py-3 px-4 font-semibold">STATUS</th>
               <th className="py-3 px-4 font-semibold">POSITION</th>
               <th className="py-3 px-4 font-semibold text-right">TODAY P&L</th>
@@ -121,6 +137,8 @@ export function SimpleBotTable({
               const isStopped = state === "STOPPED" || state === "DRAFT";
               const isError = state === "ERROR";
               const isRecovering = state === "RECOVERING";
+              const isLive = (bot.execution_mode || "").toUpperCase() === "LIVE";
+              const isTogglingMode = togglingModeBotId === bot.id;
 
               const pos = bot.position || { has_position: false, direction: "FLAT", size: 0 };
               const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
@@ -148,11 +166,28 @@ export function SimpleBotTable({
                   <td className="py-3 px-4">
                     <div className="font-bold text-slate-200 text-xs">{bot.symbol}</div>
                     <div className="text-[10px] text-slate-500 font-sans">
-                      {bot.timeframe} • {bot.execution_mode}
+                      {bot.timeframe}
                     </div>
                   </td>
 
-                  {/* 3. STATUS */}
+                  {/* 3. MODE (Interactive Live / Paper Switch) */}
+                  <td className="py-3 px-4 text-center">
+                    <button
+                      onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
+                      disabled={isTogglingMode}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all border shadow-sm ${
+                        isLive
+                          ? "bg-rose-950/90 text-rose-300 border-rose-600/80 hover:bg-rose-900/90 hover:border-rose-400"
+                          : "bg-cyan-950/90 text-cyan-300 border-cyan-600/80 hover:bg-cyan-900/90 hover:border-cyan-400"
+                      }`}
+                      title={isLive ? "Currently executing LIVE orders. Click to switch to PAPER simulation." : "Currently in PAPER mode. Click to take LIVE (real order execution)."}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-rose-400 animate-pulse" : "bg-cyan-400"}`} />
+                      <span>{isTogglingMode ? "SWITCHING..." : isLive ? "LIVE" : "PAPER"}</span>
+                    </button>
+                  </td>
+
+                  {/* 4. STATUS */}
                   <td className="py-3 px-4">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-black ${
@@ -171,7 +206,7 @@ export function SimpleBotTable({
                     </span>
                   </td>
 
-                  {/* 4. POSITION */}
+                  {/* 5. POSITION */}
                   <td className="py-3 px-4">
                     {pos.has_position ? (
                       <div>
@@ -191,7 +226,7 @@ export function SimpleBotTable({
                     )}
                   </td>
 
-                  {/* 5. TODAY P&L */}
+                  {/* 6. TODAY P&L */}
                   <td className="py-3 px-4 text-right">
                     <div
                       className={`font-black text-xs ${
@@ -205,7 +240,7 @@ export function SimpleBotTable({
                     </div>
                   </td>
 
-                  {/* 6. HEALTH */}
+                  {/* 7. HEALTH */}
                   <td className="py-3 px-4 text-center">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -220,7 +255,7 @@ export function SimpleBotTable({
                     </span>
                   </td>
 
-                  {/* 7. CONTEXTUAL ACTION */}
+                  {/* 8. CONTEXTUAL ACTION */}
                   <td className="py-3 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5">
                       {isStopped && (

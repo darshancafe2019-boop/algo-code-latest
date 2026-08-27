@@ -9,6 +9,7 @@ interface SimpleBotDetailsDrawerProps {
   bot: BotRowItem | null;
   onClose: () => void;
   onBotAction: (botId: string, action: string) => Promise<void>;
+  onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => Promise<void> | void;
   onRefresh: () => void;
 }
 
@@ -17,10 +18,12 @@ export function SimpleBotDetailsDrawer({
   bot,
   onClose,
   onBotAction,
+  onToggleMode,
   onRefresh,
 }: SimpleBotDetailsDrawerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isActing, setIsActing] = useState(false);
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
   if (!isOpen || !bot) return null;
@@ -30,6 +33,7 @@ export function SimpleBotDetailsDrawer({
   const isPaused = state === "PAUSED";
   const isStopped = state === "STOPPED" || state === "DRAFT";
   const isError = state === "ERROR";
+  const isLive = (bot.execution_mode || "").toUpperCase() === "LIVE";
 
   const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
   const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
@@ -46,6 +50,21 @@ export function SimpleBotDetailsDrawer({
       setActionFeedback(`Error: ${err.message || "Failed action"}`);
     } finally {
       setIsActing(false);
+    }
+  };
+
+  const handleModeSwitch = async (targetMode: "LIVE" | "PAPER") => {
+    if (!onToggleMode) return;
+    setIsSwitchingMode(true);
+    setActionFeedback(null);
+    try {
+      await onToggleMode(bot.id, targetMode);
+      setActionFeedback(`Bot successfully switched to ${targetMode} execution mode.`);
+      onRefresh();
+    } catch (err: any) {
+      setActionFeedback(`Error: ${err.message || "Failed to switch mode"}`);
+    } finally {
+      setIsSwitchingMode(false);
     }
   };
 
@@ -69,9 +88,18 @@ export function SimpleBotDetailsDrawer({
               >
                 {state}
               </span>
-              <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 text-[10px] font-bold">
-                {bot.execution_mode}
-              </span>
+              <button
+                onClick={() => handleModeSwitch(isLive ? "PAPER" : "LIVE")}
+                disabled={isSwitchingMode}
+                className={`px-2.5 py-0.5 rounded text-[10px] font-bold border transition ${
+                  isLive
+                    ? "bg-rose-500/20 text-rose-300 border-rose-500/50 hover:bg-rose-500/30"
+                    : "bg-cyan-500/20 text-cyan-300 border-cyan-500/50 hover:bg-cyan-500/30"
+                }`}
+                title="Click to toggle execution mode"
+              >
+                {isSwitchingMode ? "Switching..." : isLive ? "🔴 LIVE MODE" : "🔵 PAPER MODE"}
+              </button>
               <span className="text-slate-400 text-xs">{bot.symbol} • {bot.timeframe}</span>
             </div>
             <h3 className="text-base font-extrabold text-white uppercase tracking-wider truncate max-w-md">
@@ -93,7 +121,49 @@ export function SimpleBotDetailsDrawer({
           </div>
         )}
 
-        {/* 1. Next Action Spotlight */}
+        {/* 1. Execution Mode Switcher Card */}
+        <div className={`p-4 rounded-xl border space-y-2.5 ${isLive ? "bg-rose-950/20 border-rose-500/40" : "bg-slate-900/90 border-slate-800"}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] text-slate-400 font-bold uppercase block">Execution Environment</span>
+              <p className="text-white text-xs font-bold font-sans">
+                {isLive ? "⚡ LIVE REAL CAPITAL EXECUTION" : "🛡️ PAPER SIMULATION (RISK-FREE)"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => handleModeSwitch("PAPER")}
+                disabled={isSwitchingMode}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${
+                  !isLive
+                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/30"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Paper
+              </button>
+              <button
+                onClick={() => handleModeSwitch("LIVE")}
+                disabled={isSwitchingMode}
+                className={`px-3 py-1.5 rounded-lg font-bold text-xs transition ${
+                  isLive
+                    ? "bg-rose-600 text-white shadow-md shadow-rose-600/30 animate-pulse"
+                    : "text-slate-400 hover:text-rose-400"
+                }`}
+              >
+                Go Live
+              </button>
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-400 font-sans">
+            {isLive
+              ? "Live orders will be dispatched directly to your exchange/broker API with the 14-point risk guard active."
+              : "Orders are simulated in paper trading memory without risking real account balance."}
+          </p>
+        </div>
+
+        {/* 2. Next Action Spotlight */}
         <div className="p-4 bg-slate-900/90 border border-slate-800 rounded-xl space-y-1.5">
           <span className="text-[10px] text-slate-400 font-bold uppercase block">Next Planned Action</span>
           <p className="text-white text-xs leading-relaxed font-sans font-medium">

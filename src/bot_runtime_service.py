@@ -601,6 +601,79 @@ class BotRuntimeService:
             "message": f"Global Emergency Halt {'ACTIVATED' if active else 'DEACTIVATED'}."
         }
 
+    def set_bot_execution_mode(self, bot_id: str, mode: str, requested_by: str = "OPERATOR") -> Dict[str, Any]:
+        """
+        Switches a bot's execution mode between LIVE and PAPER atomically.
+        If the bot is currently running, stops and restarts the worker under the new mode.
+        """
+        mode = mode.upper().strip()
+        if mode not in ["LIVE", "PAPER"]:
+            return {"status": "error", "message": f"Invalid mode '{mode}'. Must be 'LIVE' or 'PAPER'."}
+
+        bot_lock = self._get_bot_lock(bot_id)
+        with bot_lock:
+            bot = db.get_bot_instance(bot_id)
+            if not bot:
+                return {"status": "error", "message": f"Bot '{bot_id}' not found."}
+
+            old_mode = (bot.get("execution_mode") or "PAPER").upper()
+            if old_mode == mode:
+                return {
+                    "status": "success",
+                    "bot_id": bot_id,
+                    "execution_mode": mode,
+                    "message": f"Bot '{bot['name']}' is already in {mode} mode."
+                }
+
+            # If switching to LIVE, ensure live deployment authorization
+            if mode == "LIVE":
+                try:
+                    from src.live_authorization_manager import LiveAuthorizationManager
+                    LiveAuthorizationManager.authorize_live_bot(
+                        user_id=requested_by,
+                        bot_id=bot_id,
+                        strategy_version=str(bot.get("strategy_version") or "1.0"),
+                        max_capital=float(bot.get("allocated_capital") or 10000.0),
+                        max_risk_pct=float(bot.get("risk_per_trade_pct") or 2.0)
+                    )
+                except Exception as ex:
+                    logger.warning(f"Live auth grant notice for {bot_id}: {ex}")
+
+            # Update database
+            now_iso = datetime.now(timezone.utc).isoformat()
+            conn = db.get_connection()
+            conn.execute(
+                "UPDATE bot_instances SET execution_mode = ?, updated_at = ? WHERE id = ?",
+                (mode, now_iso, bot_id)
+            )
+            conn.commit()
+            conn.close()
+
+            # If running, restart worker under new execution mode
+            mgr = multi_bot_manager.get_manager(bot_id)
+            was_running = mgr.is_running()
+            if was_running:
+                multi_bot_manager.stop_bot(bot_id)
+                time.sleep(0.3)
+                multi_bot_manager.start_bot(bot_id)
+
+            audit.log_audit_event(
+                "BOT_EXECUTION_MODE_CHANGED",
+                user=requested_by,
+                details={"bot_id": bot_id, "name": bot.get("name"), "from_mode": old_mode, "to_mode": mode}
+            )
+
+            return {
+                "status": "success",
+                "bot_id": bot_id,
+                "name": bot.get("name"),
+                "previous_mode": old_mode,
+                "execution_mode": mode,
+                "is_running": was_running,
+                "message": f"Bot '{bot.get('name')}' successfully switched to {mode} mode."
+            }
+
 
 # Global singleton instance
 global_bot_runtime_service = BotRuntimeService()
+

@@ -5982,6 +5982,46 @@ def api_bot_instance_control(bot_id):
     return jsonify(res)
 
 
+@app.route("/api/bots/<bot_id>/mode", methods=["POST", "PUT"])
+def api_bot_set_mode(bot_id):
+    """Set execution mode of a bot (LIVE or PAPER)."""
+    data = request.get_json(silent=True) or {}
+    mode = (data.get("mode") or data.get("execution_mode") or "PAPER").upper()
+    requested_by = data.get("requested_by") or "OPERATOR"
+
+    from src.bot_runtime_service import global_bot_runtime_service
+    res = global_bot_runtime_service.set_bot_execution_mode(
+        bot_id=bot_id,
+        mode=mode,
+        requested_by=requested_by
+    )
+    status_code = 200 if res.get("status") == "success" else 400
+    return jsonify(res), status_code
+
+
+@app.route("/api/bots/<bot_id>/toggle-mode", methods=["POST"])
+def api_bot_toggle_mode(bot_id):
+    """Toggle execution mode between LIVE and PAPER for a bot."""
+    bot = db.get_bot_instance(bot_id)
+    if not bot:
+        return jsonify({"status": "error", "message": f"Bot '{bot_id}' not found."}), 404
+
+    current_mode = (bot.get("execution_mode") or "PAPER").upper()
+    target_mode = "LIVE" if current_mode == "PAPER" else "PAPER"
+    data = request.get_json(silent=True) or {}
+    requested_by = data.get("requested_by") or "OPERATOR"
+
+    from src.bot_runtime_service import global_bot_runtime_service
+    res = global_bot_runtime_service.set_bot_execution_mode(
+        bot_id=bot_id,
+        mode=target_mode,
+        requested_by=requested_by
+    )
+    status_code = 200 if res.get("status") == "success" else 400
+    return jsonify(res), status_code
+
+
+
 @app.route("/api/bots/<bot_id>/signal-debugger", methods=["GET"])
 def api_bot_signal_debugger(bot_id):
     """

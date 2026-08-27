@@ -158,6 +158,19 @@ export function BotControlTab() {
     queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
+  // Toggle Bot Execution Mode (LIVE vs PAPER)
+  const handleToggleBotMode = async (botId: string, targetMode?: "LIVE" | "PAPER") => {
+    const res = await apiClient.post<any>(`/api/bots/${botId}/mode`, {
+      mode: targetMode,
+      requested_by: "TRADER_UI",
+    });
+    if (!res.ok) {
+      throw new Error(res.error?.message || "Failed to switch bot execution mode");
+    }
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+  };
+
   const handleSelectBot = (bot: BotRowItem) => {
     setSelectedBot(bot);
     setIsDetailsDrawerOpen(true);
@@ -197,6 +210,7 @@ export function BotControlTab() {
         isLoading={isLoading}
         onSelectBot={handleSelectBot}
         onBotAction={handleBotAction}
+        onToggleMode={handleToggleBotMode}
         onCreateBot={() => setIsCreateModalOpen(true)}
         selectedMarket={selectedMarket}
       />
@@ -207,6 +221,7 @@ export function BotControlTab() {
         bot={selectedBot}
         onClose={() => setIsDetailsDrawerOpen(false)}
         onBotAction={handleBotAction}
+        onToggleMode={handleToggleBotMode}
         onRefresh={refetch}
       />
 

@@ -28,6 +28,7 @@ interface BotInstancesTableProps {
   onToggleSelectAll: () => void;
   onOpenBotDrawer: (bot: BotInstanceExtended) => void;
   onBotAction: (botId: string, action: "START" | "PAUSE" | "RESUME" | "STOP" | "RESTART") => void;
+  onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
   onDuplicateBot: (botId: string) => void;
   onDeleteBot: (botId: string) => void;
   onEditBot: (botId: string) => void;
@@ -41,6 +42,7 @@ export function BotInstancesTable({
   onToggleSelectAll,
   onOpenBotDrawer,
   onBotAction,
+  onToggleMode,
   onDuplicateBot,
   onDeleteBot,
   onEditBot,
@@ -238,13 +240,17 @@ export function BotInstancesTable({
                   </td>
                   <td className="p-3 text-center">{renderStatusBadge(bot.status)}</td>
                   <td className="p-3 text-center">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
-                      (bot.execution_mode || "").toUpperCase() === "LIVE"
-                        ? "bg-rose-950 text-rose-300 border-rose-800"
-                        : "bg-cyan-950 text-cyan-300 border-cyan-800"
-                    }`}>
-                      {bot.execution_mode || "PAPER"}
-                    </span>
+                    <button
+                      onClick={() => onToggleMode && onToggleMode(bot.id, (bot.execution_mode || "").toUpperCase() === "LIVE" ? "PAPER" : "LIVE")}
+                      className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold border transition-all ${
+                        (bot.execution_mode || "").toUpperCase() === "LIVE"
+                          ? "bg-rose-950 text-rose-300 border-rose-800 hover:bg-rose-900"
+                          : "bg-cyan-950 text-cyan-300 border-cyan-800 hover:bg-cyan-900"
+                      }`}
+                      title={(bot.execution_mode || "").toUpperCase() === "LIVE" ? "Live Real Execution Active. Click to switch to Paper." : "Paper Simulation Active. Click to take Live."}
+                    >
+                      {(bot.execution_mode || "PAPER").toUpperCase() === "LIVE" ? "🔴 LIVE" : "🔵 PAPER"}
+                    </button>
                   </td>
                   <td className="p-3 font-mono">
                     <div className="font-bold text-[var(--theme-accent)]">{bot.symbol}</div>

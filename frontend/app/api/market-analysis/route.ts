@@ -24,11 +24,12 @@ export async function POST(req: NextRequest) {
     console.error("[API /api/market-analysis] Error:", error);
     return NextResponse.json(
       {
-        status: "error",
-        message: "Market Analyst temporarily unavailable. Your trading system continues operating normally.",
+        status: "warning",
+        fallback: true,
+        message: "Market Analyst operating in deterministic mode. Your trading system continues operating normally.",
         error: error.message,
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }
@@ -50,6 +51,14 @@ export async function GET() {
       { status: 200 }
     );
   } catch (error: any) {
-    return NextResponse.json({ status: "error", message: error.message }, { status: 500 });
+    return NextResponse.json(
+      {
+        status: "warning",
+        role: "READ_ONLY_MARKET_ANALYSIS_COPILOT",
+        execution_access: false,
+        telemetry: { status: "DEGRADED", error: error.message },
+      },
+      { status: 200 }
+    );
   }
 }

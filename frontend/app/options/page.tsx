@@ -10,6 +10,10 @@ import { SimpleOptionChainTable, OptionalColumn } from "@/components/options/Sim
 import { SimpleOptionOrderTicket } from "@/components/options/SimpleOptionOrderTicket";
 import { OptionsPositionsOrdersDock } from "@/components/options/OptionsPositionsOrdersDock";
 import { OptionsAdvancedDrawers } from "@/components/options/OptionsAdvancedDrawers";
+import { OptionsControlCenter } from "@/components/options/OptionsControlCenter";
+import { MultiLegStrategyBuilder } from "@/components/options/MultiLegStrategyBuilder";
+
+import { MultiMarketOptionsWorkstation } from "@/components/options/MultiMarketOptionsWorkstation";
 
 import {
   RefreshCw,
@@ -21,6 +25,8 @@ import {
   Zap,
   Sliders,
   Compass,
+  Layers,
+  Cpu,
 } from "lucide-react";
 
 const SUPPORTED_UNDERLYINGS = [
@@ -34,6 +40,9 @@ const SUPPORTED_UNDERLYINGS = [
 
 export default function OptionsPage() {
   const { tradingMode, riskSummary, isLive } = useGlobalData();
+
+  // Primary Options View Tab: "workstation" | "control-center" | "chain-ladder" | "multi-leg-builder"
+  const [activeViewTab, setActiveViewTab] = useState<"workstation" | "control-center" | "chain-ladder" | "multi-leg-builder">("workstation");
 
   // 1. Primary Underlyings & Expiry State
   const [selectedUnderlying, setSelectedUnderlying] = useState("NIFTY");
@@ -286,42 +295,124 @@ export default function OptionsPage() {
         </div>
 
         {/* ========================================================================= */}
-        {/* 2. MAIN SPLIT WORKSPACE: OPTION CHAIN + NEW ORDER TICKET                  */}
+        {/* VIEW NAVIGATION TABS: WORKSTATION | CONTROL CENTER | CHAIN | BUILDER      */}
         {/* ========================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-          {/* Left Column: Simple Option Chain (65% on Desktop) */}
-          <div className="lg:col-span-8 h-full">
-            <SimpleOptionChainTable
-              strikes={strikes}
-              spotPrice={spotPrice}
-              selectedStrike={selectedStrike}
-              selectedOptionType={selectedOptionType}
-              onSelectOption={handleSelectOption}
-              visibleColumns={visibleColumns}
-              onToggleColumn={toggleColumn}
-              currencySymbol="₹"
-              isLoading={isChainLoading}
-            />
-          </div>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-[#0B132B] border border-slate-800 rounded-2xl">
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <button
+              onClick={() => setActiveViewTab("workstation")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
+                activeViewTab === "workstation"
+                  ? "bg-gradient-to-r from-cyan-500 to-indigo-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-extrabold"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span>Multi-Market Options Workstation (24 Strategies)</span>
+            </button>
 
-          {/* Right Column: Simple Order Ticket (35% on Desktop) */}
-          <div className="lg:col-span-4 h-full">
-            <SimpleOptionOrderTicket
-              underlying={selectedUnderlying}
-              expiry={currentExpiry}
-              strike={selectedStrike}
-              optionType={selectedOptionType}
-              premium={selectedPremium}
-              details={selectedDetails}
-              currencySymbol="₹"
-            />
+            <button
+              onClick={() => setActiveViewTab("control-center")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
+                activeViewTab === "control-center"
+                  ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/20 font-extrabold"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Cpu className="w-4 h-4" />
+              <span>Autonomous Engine</span>
+            </button>
+
+            <button
+              onClick={() => setActiveViewTab("chain-ladder")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
+                activeViewTab === "chain-ladder"
+                  ? "bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-extrabold"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <BarChart2 className="w-4 h-4" />
+              <span>Option Chain Ladder</span>
+            </button>
+
+            <button
+              onClick={() => setActiveViewTab("multi-leg-builder")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition ${
+                activeViewTab === "multi-leg-builder"
+                  ? "bg-cyan-500 text-slate-950 shadow-lg shadow-cyan-500/20 font-extrabold"
+                  : "text-slate-400 hover:text-white hover:bg-slate-900"
+              }`}
+            >
+              <Layers className="w-4 h-4" />
+              <span>Custom Leg Builder</span>
+            </button>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* 3. BOTTOM POSITIONS / ORDERS DOCK                                        */}
+        {/* VIEW 0: MULTI-MARKET OPTIONS WORKSTATION (24 PDF STRATEGIES)              */}
         {/* ========================================================================= */}
-        <OptionsPositionsOrdersDock />
+        {activeViewTab === "workstation" && (
+          <MultiMarketOptionsWorkstation />
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 1: OPTIONS CONTROL CENTER (AUTONOMOUS STRATEGY ENGINE)               */}
+        {/* ========================================================================= */}
+        {activeViewTab === "control-center" && (
+          <OptionsControlCenter
+            underlying={selectedUnderlying}
+            spotPrice={spotPrice}
+            pcr={pcr}
+            maxPain={maxPain}
+            availableExpiries={availableExpiries}
+            chainData={chainData}
+          />
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 2: OPTION CHAIN TABLE + ORDER TICKET                                 */}
+        {/* ========================================================================= */}
+        {activeViewTab === "chain-ladder" && (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div className="lg:col-span-8 h-full">
+              <SimpleOptionChainTable
+                strikes={strikes}
+                spotPrice={spotPrice}
+                selectedStrike={selectedStrike}
+                selectedOptionType={selectedOptionType}
+                onSelectOption={handleSelectOption}
+                visibleColumns={visibleColumns}
+                onToggleColumn={toggleColumn}
+                currencySymbol="₹"
+                isLoading={isChainLoading}
+              />
+            </div>
+            <div className="lg:col-span-4 h-full">
+              <SimpleOptionOrderTicket
+                underlying={selectedUnderlying}
+                expiry={currentExpiry}
+                strike={selectedStrike}
+                optionType={selectedOptionType}
+                premium={selectedPremium}
+                details={selectedDetails}
+                currencySymbol="₹"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW 3: MULTI-LEG STRATEGY BUILDER                                        */}
+        {/* ========================================================================= */}
+        {activeViewTab === "multi-leg-builder" && (
+          <MultiLegStrategyBuilder
+            spotPrice={spotPrice}
+            atmStrike={Math.round(spotPrice / 100) * 100}
+            selectedExpiry={currentExpiry}
+            currency="₹"
+          />
+        )}
 
         {/* ========================================================================= */}
         {/* 4. ADVANCED DRAWERS (ON DEMAND)                                          */}

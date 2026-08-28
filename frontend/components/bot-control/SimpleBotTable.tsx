@@ -1,7 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import { Play, Pause, Square, AlertTriangle, RotateCcw, Plus, ArrowRight, Activity, ShieldCheck, ShieldAlert } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Play,
+  Pause,
+  Square,
+  AlertTriangle,
+  RotateCcw,
+  Plus,
+  Activity,
+  MoreVertical,
+  Trash2,
+  Eye,
+  Check,
+  Minus,
+} from "lucide-react";
 
 export interface BotRowItem {
   id: string;
@@ -46,10 +59,14 @@ interface SimpleBotTableProps {
   bots: BotRowItem[];
   isLoading: boolean;
   onSelectBot: (bot: BotRowItem) => void;
-  onBotAction: (botId: string, action: string) => void;
+  onBotAction: (botId: string, action: string) => Promise<void> | void;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
+  onDeleteBot: (bot: BotRowItem) => void;
   onCreateBot: () => void;
   selectedMarket: string;
+  selectedBotIds: string[];
+  onToggleSelectBot: (botId: string) => void;
+  onToggleSelectAll: () => void;
 }
 
 export function SimpleBotTable({
@@ -58,17 +75,41 @@ export function SimpleBotTable({
   onSelectBot,
   onBotAction,
   onToggleMode,
+  onDeleteBot,
   onCreateBot,
   selectedMarket,
+  selectedBotIds,
+  onToggleSelectBot,
+  onToggleSelectAll,
 }: SimpleBotTableProps) {
   const [loadingActionBotId, setLoadingActionBotId] = useState<string | null>(null);
   const [togglingModeBotId, setTogglingModeBotId] = useState<string | null>(null);
+  const [activeMenuBotId, setActiveMenuBotId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setActiveMenuBotId(null);
+      }
+    }
+    if (activeMenuBotId) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [activeMenuBotId]);
 
   const handleAction = async (e: React.MouseEvent, botId: string, action: string) => {
     e.stopPropagation();
+    setActiveMenuBotId(null);
     setLoadingActionBotId(botId);
     try {
       await onBotAction(botId, action);
+    } catch {
+      // Handled and displayed via parent notification banner
     } finally {
       setLoadingActionBotId(null);
     }
@@ -85,7 +126,24 @@ export function SimpleBotTable({
       setTogglingModeBotId(null);
     }
   };
+  const handleDeleteClick = (e: React.MouseEvent, bot: BotRowItem) => {
+    e.stopPropagation();
+    setActiveMenuBotId(null);
+    onDeleteBot(bot);
+  };
 
+  const handleDetailsClick = (e: React.MouseEvent, bot: BotRowItem) => {
+    e.stopPropagation();
+    setActiveMenuBotId(null);
+    onSelectBot(bot);
+  };
+
+  const allFilteredSelected =
+    bots.length > 0 && bots.every((b) => selectedBotIds.includes(b.id));
+  const someFilteredSelected =
+    bots.some((b) => selectedBotIds.includes(b.id)) && !allFilteredSelected;
+
+>>>>>>> 06985bc (feat: Implement Multi-Market Options Strategy Workstation with 24 strategies, premium selection engine, and capability adapters)
   if (isLoading && bots.length === 0) {
     return (
       <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs shadow-xl">
@@ -114,11 +172,29 @@ export function SimpleBotTable({
   }
 
   return (
-    <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl font-mono text-xs">
-      <div className="overflow-x-auto">
+    <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl overflow-visible backdrop-blur-md shadow-xl font-mono text-xs">
+      <div className="overflow-x-auto rounded-2xl">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800 text-[11px]">
+          <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800 text-[11px] select-none">
             <tr>
+              {/* Checkbox Column */}
+              <th className="py-3 px-3 w-10 text-center">
+                <button
+                  type="button"
+                  onClick={onToggleSelectAll}
+                  className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                    allFilteredSelected
+                      ? "bg-cyan-500 border-cyan-400 text-slate-950"
+                      : someFilteredSelected
+                      ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
+                      : "border-slate-700 bg-slate-800/80 hover:border-slate-500 text-transparent"
+                  }`}
+                  title={allFilteredSelected ? "Deselect All" : "Select All"}
+                >
+                  {allFilteredSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                  {someFilteredSelected && <Minus className="w-3 h-3 stroke-[3]" />}
+                </button>
+              </th>
               <th className="py-3 px-4 font-semibold">BOT</th>
               <th className="py-3 px-4 font-semibold">MARKET</th>
               <th className="py-3 px-4 font-semibold text-center">MODE</th>
@@ -126,12 +202,12 @@ export function SimpleBotTable({
               <th className="py-3 px-4 font-semibold">POSITION</th>
               <th className="py-3 px-4 font-semibold text-right">TODAY P&L</th>
               <th className="py-3 px-4 font-semibold text-center">HEALTH</th>
-              <th className="py-3 px-4 font-semibold text-right">ACTION</th>
+              <th className="py-3 px-4 font-semibold text-right w-20">ACTIONS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/40 font-mono">
             {bots.map((bot) => {
-              const state = bot.status || bot.state || "STOPPED";
+              const state = (bot.status || bot.state || "STOPPED").toUpperCase();
               const isRunning = state === "RUNNING";
               const isPaused = state === "PAUSED";
               const isStopped = state === "STOPPED" || state === "DRAFT";
@@ -145,13 +221,39 @@ export function SimpleBotTable({
               const isPnlPositive = pnl >= 0;
 
               const isActionLoading = loadingActionBotId === bot.id;
+              const isSelected = selectedBotIds.includes(bot.id);
+              const isMenuOpen = activeMenuBotId === bot.id;
 
               return (
                 <tr
                   key={bot.id}
                   onClick={() => onSelectBot(bot)}
-                  className="hover:bg-slate-800/30 transition cursor-pointer group"
+                  className={`transition cursor-pointer group ${
+                    isSelected
+                      ? "bg-cyan-500/10 hover:bg-cyan-500/15"
+                      : "hover:bg-slate-800/30"
+                  }`}
                 >
+                  {/* Checkbox */}
+                  <td
+                    className="py-3 px-3 text-center"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onToggleSelectBot(bot.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      className={`w-4 h-4 rounded border flex items-center justify-center transition mx-auto ${
+                        isSelected
+                          ? "bg-cyan-500 border-cyan-400 text-slate-950"
+                          : "border-slate-700 bg-slate-800/60 group-hover:border-slate-500 text-transparent"
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                    </button>
+                  </td>
+
                   {/* 1. BOT */}
                   <td className="py-3 px-4">
                     <div className="font-extrabold text-white group-hover:text-cyan-300 transition text-xs">
@@ -255,83 +357,152 @@ export function SimpleBotTable({
                     </span>
                   </td>
 
-                  {/* 8. CONTEXTUAL ACTION */}
-                  <td className="py-3 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      {isStopped && (
-                        <button
-                          onClick={(e) => handleAction(e, bot.id, "START")}
-                          disabled={isActionLoading}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/20 border border-emerald-500/40 hover:bg-emerald-500/30 text-emerald-300 font-bold text-[11px] transition flex items-center gap-1 disabled:opacity-50"
+                  {/* 7. COMPACT CONSOLIDATED KEBAB ACTION */}
+                  <td className="py-3 px-4 text-right relative">
+                    <div className="inline-flex items-center justify-end relative">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setActiveMenuBotId(isMenuOpen ? null : bot.id);
+                        }}
+                        disabled={isActionLoading}
+                        className={`p-1.5 rounded-lg border transition flex items-center justify-center ${
+                          isMenuOpen
+                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-500/10"
+                            : "bg-slate-900/80 border-slate-700/80 text-slate-400 hover:text-white hover:border-slate-500"
+                        } disabled:opacity-50`}
+                        title="Bot Actions"
+                      >
+                        {isActionLoading ? (
+                          <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <MoreVertical className="w-4 h-4" />
+                        )}
+                      </button>
+
+                      {/* Dropdown Menu Popup */}
+                      {isMenuOpen && (
+                        <div
+                          ref={menuRef}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 top-full mt-1 z-40 w-44 bg-[#0B132B] border border-slate-700 rounded-xl shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100"
                         >
-                          <Play className="w-3 h-3 fill-current" />
-                          <span>Start</span>
-                        </button>
-                      )}
+                          {/* Contextual Execution Controls */}
+                          {isStopped && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleAction(e, bot.id, "START")}
+                              className="w-full px-3 py-2 text-emerald-400 hover:bg-emerald-500/15 flex items-center gap-2 font-bold transition"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-current" />
+                              <span>Start Bot</span>
+                            </button>
+                          )}
 
-                      {isRunning && (
-                        <>
+                          {isRunning && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAction(e, bot.id, "PAUSE")}
+                                className="w-full px-3 py-2 text-amber-400 hover:bg-amber-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <Pause className="w-3.5 h-3.5 fill-current" />
+                                <span>Pause Bot</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAction(e, bot.id, "STOP")}
+                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <Square className="w-3.5 h-3.5 fill-current" />
+                                <span>Stop Bot</span>
+                              </button>
+                            </>
+                          )}
+
+                          {isPaused && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAction(e, bot.id, "RESUME")}
+                                className="w-full px-3 py-2 text-cyan-300 hover:bg-cyan-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <Play className="w-3.5 h-3.5 fill-current" />
+                                <span>Resume Bot</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAction(e, bot.id, "STOP")}
+                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <Square className="w-3.5 h-3.5 fill-current" />
+                                <span>Stop Bot</span>
+                              </button>
+                            </>
+                          )}
+
+                          {isError && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={(e) => handleDetailsClick(e, bot)}
+                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Review Incident</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleAction(e, bot.id, "START")}
+                                className="w-full px-3 py-2 text-cyan-300 hover:bg-cyan-500/15 flex items-center gap-2 font-bold transition"
+                              >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                                <span>Retry / Start</span>
+                              </button>
+                            </>
+                          )}
+
+                          {isRecovering && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleAction(e, bot.id, "STOP")}
+                              className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                            >
+                              <Square className="w-3.5 h-3.5 fill-current" />
+                              <span>Stop Bot</span>
+                            </button>
+                          )}
+
+                          {/* View Details Option (available on all except error which has Review) */}
+                          {!isError && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDetailsClick(e, bot)}
+                              className="w-full px-3 py-2 text-slate-300 hover:bg-slate-800 flex items-center gap-2 font-medium transition"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              <span>View Details</span>
+                            </button>
+                          )}
+
+                          {/* Divider */}
+                          <div className="h-px bg-slate-800 my-1" />
+
+                          {/* Delete / Force Delete Bot Option (available on ALL bot states) */}
                           <button
-                            onClick={(e) => handleAction(e, bot.id, "PAUSE")}
-                            disabled={isActionLoading}
-                            className="px-2 py-1 rounded-lg bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold text-[11px] transition flex items-center gap-1 disabled:opacity-50"
-                            title="Pause Strategy"
+                            type="button"
+                            onClick={(e) => handleDeleteClick(e, bot)}
+                            className={`w-full px-3 py-2 flex items-center gap-2 font-bold transition ${
+                              isError || isRecovering
+                                ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/25 hover:text-rose-300"
+                                : "text-rose-400 hover:bg-rose-500/20 hover:text-rose-300"
+                            }`}
                           >
-                            <Pause className="w-3 h-3 fill-current" />
-                            <span>Pause</span>
+                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <span>{isError || isRecovering ? "Force Delete Bot" : "Delete Bot"}</span>
                           </button>
-
-                          <button
-                            onClick={(e) => handleAction(e, bot.id, "STOP")}
-                            disabled={isActionLoading}
-                            className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-rose-400 text-rose-400 font-bold text-[11px] transition flex items-center gap-1 disabled:opacity-50"
-                            title="Stop Bot"
-                          >
-                            <Square className="w-3 h-3 fill-current" />
-                            <span>Stop</span>
-                          </button>
-                        </>
-                      )}
-
-                      {isPaused && (
-                        <>
-                          <button
-                            onClick={(e) => handleAction(e, bot.id, "RESUME")}
-                            disabled={isActionLoading}
-                            className="px-2.5 py-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 font-bold text-[11px] transition flex items-center gap-1 disabled:opacity-50"
-                          >
-                            <Play className="w-3 h-3 fill-current" />
-                            <span>Resume</span>
-                          </button>
-
-                          <button
-                            onClick={(e) => handleAction(e, bot.id, "STOP")}
-                            disabled={isActionLoading}
-                            className="px-2 py-1 rounded-lg bg-slate-900 border border-slate-700 hover:border-rose-400 text-rose-400 font-bold text-[11px] transition flex items-center gap-1 disabled:opacity-50"
-                          >
-                            <Square className="w-3 h-3 fill-current" />
-                            <span>Stop</span>
-                          </button>
-                        </>
-                      )}
-
-                      {isError && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onSelectBot(bot);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-rose-500/20 border border-rose-500/50 hover:bg-rose-500/30 text-rose-300 font-bold text-[11px] transition flex items-center gap-1"
-                        >
-                          <AlertTriangle className="w-3 h-3" />
-                          <span>Review</span>
-                        </button>
-                      )}
-
-                      {isRecovering && (
-                        <span className="text-[10px] text-cyan-400 font-bold animate-pulse">
-                          Recovering...
-                        </span>
+                        </div>
                       )}
                     </div>
                   </td>

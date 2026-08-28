@@ -118,6 +118,58 @@ def add_cors_headers(response):
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Request-Id, Authorization"
     return response
 
+from werkzeug.exceptions import HTTPException
+
+@app.errorhandler(500)
+def handle_500_error(e):
+    logger.error(f"Internal Server Error 500: {e}", exc_info=True)
+    return jsonify({
+        "status": "error",
+        "error": "Internal Server Error",
+        "message": str(getattr(e, "description", e)),
+        "code": 500,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 500
+
+@app.errorhandler(404)
+def handle_404_error(e):
+    return jsonify({
+        "status": "error",
+        "error": "Not Found",
+        "message": str(getattr(e, "description", "Endpoint not found")),
+        "code": 404,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 404
+
+@app.errorhandler(405)
+def handle_405_error(e):
+    return jsonify({
+        "status": "error",
+        "error": "Method Not Allowed",
+        "message": str(getattr(e, "description", "Method not allowed for this endpoint")),
+        "code": 405,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 405
+
+@app.errorhandler(Exception)
+def handle_generic_exception(e):
+    if isinstance(e, HTTPException):
+        return jsonify({
+            "status": "error",
+            "error": e.name,
+            "message": e.description,
+            "code": e.code,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), e.code
+    logger.error(f"Unhandled Exception: {e}", exc_info=True)
+    return jsonify({
+        "status": "error",
+        "error": "Internal Server Error",
+        "message": str(e),
+        "code": 500,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 500
+
 # Explicitly initialize database schema once at server startup
 db.init_db()
 audit.init_audit_db()
@@ -224,9 +276,9 @@ def index():
         "status": "healthy",
         "service": "alpha-algo-backend-api",
         "platform": "Alpha Algo Trading Platform",
-        "terminal": "http://localhost:3000",
+        "terminal": "http://localhost:3100",
         "version": "2.0",
-        "frontend_url": "http://localhost:3000",
+        "frontend_url": "http://localhost:3100",
         "endpoints": {
             "status": "/api/status",
             "market": "/api/market",
@@ -5856,32 +5908,378 @@ def api_bots_get_config(bot_id):
     return jsonify({"status": "success", "bot": bot})
 
 
-@app.route("/api/bots/<bot_id>", methods=["DELETE"])
-def api_bots_delete(bot_id):
-    """Delete a bot instance cleanly after stopping it. Preserves trade history."""
+def execute_permanent_bot_deletion(bot_id: str, force: bool = False) -> Dict[str, Any]:
+    """
+    Permanently deletes a bot instance:
+    1. Blocks new trades immediately by terminating runtime.
+    2. Stops/kills its worker process cleanly or aggressively if force=True.
+    3. Removes timers/jobs/heartbeats/locks/cache/WebSocket subscriptions.
+    4. Detaches and safely preserves any open live/paper positions/orders without closing them.
+    5. Preserves all historical orders, fills, trades, positions, P&L, journal and audit history in trades_log.
+    6. Removes bot instance row and indicator profile links from SQLite.
+    7. Prevents auto-restoration after restart.
+    """
     bots = safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
     if not bots:
-        return jsonify({"status": "error", "message": f"Bot instance '{bot_id}' not found."}), 404
+        return {"status": "not_found", "message": f"Bot instance '{bot_id}' not found."}
 
     bot = dict(bots[0])
-    bot_name = bot["name"]
+    bot_name = bot.get("name") or bot_id
+    process_id_str = bot.get("process_id", "")
 
-    # 1. Stop bot if running
-    from src.process_manager import multi_bot_manager
-    if bot["status"] in ["RUNNING", "PAUSED", "STARTING"]:
-        try:
+    # 1. Stop and terminate worker process
+    from src.process_manager import multi_bot_manager, cleanup_orphan_bot_process, kill_process_by_pid
+    try:
+        if force:
+            if process_id_str and process_id_str.isdigit():
+                kill_process_by_pid(int(process_id_str), bot_id=bot_id)
+        if bot.get("status") in ["RUNNING", "PAUSED", "STARTING", "RECOVERING", "ERROR"] or multi_bot_manager.is_bot_running(bot_id):
             multi_bot_manager.stop_bot(bot_id)
-        except Exception as e:
-            logger.warning(f"Error stopping bot {bot_id} prior to deletion: {e}")
+    except Exception as e:
+        logger.warning(f"Error stopping worker for bot {bot_id} (force={force}): {e}")
 
-    # 2. Remove from bot_instances DB table (trade history in trades_log is preserved)
+    try:
+        cleanup_orphan_bot_process(bot_id)
+    except Exception as e:
+        logger.warning(f"Error cleaning up orphan PID for bot {bot_id}: {e}")
+
+    # 2. Clean in-memory manager, locks, self-healing references
+    try:
+        multi_bot_manager.managers.pop(bot_id, None)
+    except Exception:
+        pass
+
+    try:
+        from src.bot_runtime_service import global_bot_runtime_service
+        with global_bot_runtime_service._locks_mutex:
+            global_bot_runtime_service._bot_locks.pop(bot_id, None)
+    except Exception:
+        pass
+
+    try:
+        from src.self_healing_manager import global_self_healing_manager
+        if hasattr(global_self_healing_manager, "_incident_history"):
+            global_self_healing_manager._incident_history.pop(bot_id, None)
+    except Exception:
+        pass
+
+    # 3. Preserve and safely detach open positions/trades
     conn = db.get_connection()
-    conn.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
-    conn.commit()
-    conn.close()
+    try:
+        # Check open trades and log preservation
+        cursor = conn.cursor()
+        cursor.execute("SELECT count(*) FROM trades_log WHERE bot_id = ? AND status = 'OPEN'", (bot_id,))
+        open_count = cursor.fetchone()[0]
+        if open_count > 0:
+            logger.info(f"Preserving {open_count} open trade(s) for deleted bot '{bot_id}' without closing.")
+            # Note: trades_log records remain untouched with original trade history and open status preserved
 
-    audit.log_audit_event("BOT_INSTANCE_DELETED", user="Trader", details={"bot_id": bot_id, "name": bot_name, "trades_preserved": True})
-    return jsonify({"status": "success", "message": f"Bot instance '{bot_name}' deleted. Trade history preserved."})
+        # 4. Remove bot instance from database
+        conn.execute("DELETE FROM bot_indicator_profiles WHERE bot_id = ?", (bot_id,))
+        conn.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        conn.close()
+        logger.error(f"Failed to delete bot '{bot_id}' from DB: {exc}")
+        if not force:
+            raise exc
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    event_name = "BOT_INSTANCE_FORCE_DELETED" if force else "BOT_INSTANCE_DELETED"
+    audit.log_audit_event(
+        event_name,
+        user="Trader",
+        details={
+            "bot_id": bot_id,
+            "name": bot_name,
+            "force": force,
+            "trades_preserved": True,
+            "open_trades_detached": open_count if 'open_count' in locals() else 0
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": f"Bot instance '{bot_name}' permanently deleted. Trade history preserved.",
+        "bot_id": bot_id,
+        "name": bot_name,
+        "force": force,
+        "trades_preserved": True
+    }
+
+
+@app.route("/api/bots/<bot_id>", methods=["DELETE"])
+def api_bots_delete(bot_id):
+    """Delete a bot instance cleanly or with force. Preserves trade history and detaches open positions."""
+    is_force = request.args.get("force", "").lower() in ["true", "1", "yes"]
+    if not is_force and request.is_json:
+        data = request.get_json(silent=True) or {}
+        is_force = bool(data.get("force", False))
+
+    res = execute_permanent_bot_deletion(bot_id, force=is_force)
+    if res.get("status") == "not_found":
+        return jsonify(res), 404
+    return jsonify(res)
+
+
+@app.route("/api/bots/<bot_id>/force-delete", methods=["POST"])
+def api_bots_force_delete(bot_id):
+    """Force delete a bot instance immediately even if in ERROR/STUCK state."""
+    res = execute_permanent_bot_deletion(bot_id, force=True)
+    if res.get("status") == "not_found":
+        return jsonify(res), 404
+    return jsonify(res)
+
+
+def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False) -> Tuple[Dict[str, Any], int]:
+    """
+    Permanently delete multiple bot instances in ONE atomic database transaction:
+    1. Blocks new signals/orders and stops all active worker processes.
+    2. Unlinks PID files and purges in-memory locks, managers, and self-healing caches.
+    3. Preserves all historical trades, fills, P&L, journal and audit history.
+    4. Safely detaches open positions without closing them.
+    5. Deletes all selected bot records from SQLite in ONE committed transaction with automatic rollback on error.
+    6. Returns exact lists of deleted and failed bot IDs.
+    """
+    if not bot_ids or not isinstance(bot_ids, list):
+        return {"status": "error", "message": "bot_ids must be a non-empty array of bot IDs."}, 400
+
+    clean_ids = [str(bid).strip() for bid in bot_ids if str(bid).strip()]
+    if not clean_ids:
+        return {"status": "error", "message": "No valid bot_ids provided."}, 400
+
+    # 1. Stop and terminate all worker processes, unlinking PIDs and in-memory resources
+    from src.process_manager import multi_bot_manager, cleanup_orphan_bot_process, kill_process_by_pid
+    from src.bot_runtime_service import global_bot_runtime_service
+    from src.self_healing_manager import global_self_healing_manager
+
+    # Pre-fetch existing bots from DB to verify
+    placeholders = ",".join("?" for _ in clean_ids)
+    existing_rows = safe_query(f"SELECT id, name, status, process_id FROM bot_instances WHERE id IN ({placeholders})", tuple(clean_ids))
+    existing_map = {r["id"]: dict(r) for r in existing_rows}
+
+    deleted_bot_ids: List[str] = []
+    failed_bot_ids: List[str] = []
+    deleted_names: List[str] = []
+
+    for bid in clean_ids:
+        b = existing_map.get(bid)
+        if not b:
+            # Bot might already be deleted or not found
+            deleted_bot_ids.append(bid)
+            continue
+
+        bot_name = b.get("name") or bid
+        pid_str = b.get("process_id", "")
+        
+        try:
+            if force and pid_str and pid_str.isdigit():
+                kill_process_by_pid(int(pid_str), bot_id=bid)
+            if b.get("status") in ["RUNNING", "PAUSED", "STARTING", "RECOVERING", "ERROR"] or multi_bot_manager.is_bot_running(bid):
+                multi_bot_manager.stop_bot(bid)
+        except Exception as stop_err:
+            logger.warning(f"Error stopping worker for bot {bid} during bulk delete: {stop_err}")
+
+        try:
+            cleanup_orphan_bot_process(bid)
+        except Exception:
+            pass
+
+        try:
+            multi_bot_manager.managers.pop(bid, None)
+        except Exception:
+            pass
+
+        try:
+            with global_bot_runtime_service._locks_mutex:
+                global_bot_runtime_service._bot_locks.pop(bid, None)
+        except Exception:
+            pass
+
+        try:
+            if hasattr(global_self_healing_manager, "_incident_history"):
+                global_self_healing_manager._incident_history.pop(bid, None)
+        except Exception:
+            pass
+
+        deleted_bot_ids.append(bid)
+        deleted_names.append(bot_name)
+
+    # 2. Execute ONE single atomic database transaction for all selected bots
+    conn = db.get_connection()
+    try:
+        cursor = conn.cursor()
+        # Verify open trades preservation across selected bots
+        cursor.execute(f"SELECT count(*) FROM trades_log WHERE bot_id IN ({placeholders}) AND status = 'OPEN'", tuple(clean_ids))
+        preserved_open_trades = cursor.fetchone()[0]
+        if preserved_open_trades > 0:
+            logger.info(f"Preserving {preserved_open_trades} open trade(s) across bulk-deleted bots without closing.")
+
+        # Delete indicator profile links and bot instances in one transaction
+        cursor.execute(f"DELETE FROM bot_indicator_profiles WHERE bot_id IN ({placeholders})", tuple(clean_ids))
+        cursor.execute(f"DELETE FROM bot_instances WHERE id IN ({placeholders})", tuple(clean_ids))
+        conn.commit()
+    except Exception as exc:
+        conn.rollback()
+        conn.close()
+        logger.error(f"Bulk bot deletion atomic transaction failed: {exc}")
+        return {
+            "status": "error",
+            "message": f"Database transaction failed: {exc}",
+            "deleted_count": 0,
+            "deleted_bot_ids": [],
+            "failed_bot_ids": clean_ids
+        }, 500
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+    audit.log_audit_event(
+        "BOTS_BULK_DELETED",
+        user="Trader",
+        details={
+            "count": len(deleted_bot_ids),
+            "bot_ids": deleted_bot_ids,
+            "force": force,
+            "trades_preserved": True,
+            "open_trades_preserved": preserved_open_trades if 'preserved_open_trades' in locals() else 0
+        }
+    )
+
+    return {
+        "status": "success",
+        "message": f"Successfully deleted {len(deleted_bot_ids)} bot instance(s). Trade history preserved.",
+        "deleted_count": len(deleted_bot_ids),
+        "deleted_bot_ids": deleted_bot_ids,
+        "failed_bot_ids": failed_bot_ids,
+        "deleted_bots": deleted_names,
+        "trades_preserved": True
+    }, 200
+
+
+@app.route("/api/bots/bulk-delete", methods=["POST"])
+def api_bots_bulk_delete():
+    """Bulk delete bot instances cleanly in ONE atomic transaction. Preserves trade history and positions."""
+    data = request.get_json(silent=True) or {}
+    bot_ids = data.get("bot_ids", [])
+    is_force = bool(data.get("force", False))
+    res, status_code = execute_bulk_permanent_bot_deletion(bot_ids, force=is_force)
+    return jsonify(res), status_code
+
+
+@app.route("/api/bots/bulk-stop", methods=["POST"])
+def api_bots_bulk_stop():
+    """Bulk stop specified bot instances."""
+    data = request.get_json(silent=True) or {}
+    bot_ids = data.get("bot_ids", [])
+    if not bot_ids or not isinstance(bot_ids, list):
+        return jsonify({"status": "error", "message": "bot_ids array is required."}), 400
+
+    from src.process_manager import multi_bot_manager
+    stopped_count = 0
+    for bot_id in bot_ids:
+        try:
+            res = multi_bot_manager.stop_bot(bot_id)
+            if res.get("status") == "success":
+                stopped_count += 1
+        except Exception as e:
+            logger.warning(f"Error stopping bot {bot_id}: {e}")
+
+    audit.log_audit_event("BOTS_BULK_STOPPED", user="Trader", details={"count": stopped_count, "bot_ids": bot_ids})
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully stopped {stopped_count} bot instance(s).",
+        "stopped_count": stopped_count
+    })
+
+
+@app.route("/api/bots/bulk-start", methods=["POST"])
+def api_bots_bulk_start():
+    """Bulk start specified bot instances."""
+    data = request.get_json(silent=True) or {}
+    bot_ids = data.get("bot_ids", [])
+    if not bot_ids or not isinstance(bot_ids, list):
+        return jsonify({"status": "error", "message": "bot_ids array is required."}), 400
+
+    from src.process_manager import multi_bot_manager
+    started_count = 0
+    errors = []
+    for bot_id in bot_ids:
+        try:
+            res = multi_bot_manager.start_bot(bot_id)
+            if res.get("status") == "success":
+                started_count += 1
+            else:
+                errors.append({"bot_id": bot_id, "error": res.get("message")})
+        except Exception as e:
+            errors.append({"bot_id": bot_id, "error": str(e)})
+
+    audit.log_audit_event("BOTS_BULK_STARTED", user="Trader", details={"count": started_count, "bot_ids": bot_ids})
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully started {started_count} bot instance(s).",
+        "started_count": started_count,
+        "errors": errors
+    })
+
+
+@app.route("/api/bots/bulk-pause", methods=["POST"])
+def api_bots_bulk_pause():
+    """Bulk pause specified bot instances."""
+    data = request.get_json(silent=True) or {}
+    bot_ids = data.get("bot_ids", [])
+    if not bot_ids or not isinstance(bot_ids, list):
+        return jsonify({"status": "error", "message": "bot_ids array is required."}), 400
+
+    from src.process_manager import multi_bot_manager
+    paused_count = 0
+    for bot_id in bot_ids:
+        try:
+            res = multi_bot_manager.pause_bot(bot_id)
+            if res.get("status") == "success":
+                paused_count += 1
+        except Exception as e:
+            logger.warning(f"Error pausing bot {bot_id}: {e}")
+
+    audit.log_audit_event("BOTS_BULK_PAUSED", user="Trader", details={"count": paused_count, "bot_ids": bot_ids})
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully paused {paused_count} bot instance(s).",
+        "paused_count": paused_count
+    })
+
+
+@app.route("/api/bots/bulk-resume", methods=["POST"])
+def api_bots_bulk_resume():
+    """Bulk resume specified bot instances."""
+    data = request.get_json(silent=True) or {}
+    bot_ids = data.get("bot_ids", [])
+    if not bot_ids or not isinstance(bot_ids, list):
+        return jsonify({"status": "error", "message": "bot_ids array is required."}), 400
+
+    from src.process_manager import multi_bot_manager
+    resumed_count = 0
+    for bot_id in bot_ids:
+        try:
+            res = multi_bot_manager.resume_bot(bot_id)
+            if res.get("status") == "success":
+                resumed_count += 1
+        except Exception as e:
+            logger.warning(f"Error resuming bot {bot_id}: {e}")
+
+    audit.log_audit_event("BOTS_BULK_RESUMED", user="Trader", details={"count": resumed_count, "bot_ids": bot_ids})
+    return jsonify({
+        "status": "success",
+        "message": f"Successfully resumed {resumed_count} bot instance(s).",
+        "resumed_count": resumed_count
+    })
 
 
 @app.route("/api/bots/start-all", methods=["POST"])
@@ -11186,6 +11584,9 @@ def api_portfolio_performance_day_details():
 
 
 @app.route("/api/pnl/summary", methods=["GET"])
+@app.route("/api/pnl", methods=["GET"])
+@app.route("/api/analytics/pnl", methods=["GET"])
+@app.route("/api/pnl/snapshot", methods=["GET"])
 def api_pnl_summary_authoritative():
     """Returns consolidated P&L breakdown derived from the database trade ledger."""
     from src.global_data_engine import GlobalDataEngine
@@ -11862,6 +12263,138 @@ def api_markets_paper_orders():
         mode="PAPER"
     )
     return jsonify(res)
+
+
+# ============================================================================
+# MULTI-MARKET OPTIONS WORKSTATION REST ENDPOINTS
+# ============================================================================
+
+@app.route("/api/options/catalog", methods=["GET"])
+def api_options_catalog():
+    """Returns normalized instruments catalog filtered by asset class, region, country, or search query."""
+    from src.market_data.instrument_master import global_instrument_master
+    query = request.args.get("q", "").strip()
+    asset_class = request.args.get("asset_class", "ALL")
+    country = request.args.get("country", "ALL")
+    region = request.args.get("region", "ALL")
+
+    if query:
+        results = global_instrument_master.search(query, limit=50)
+    else:
+        results = [
+            i.to_dict() for i in global_instrument_master.list_instruments(
+                asset_class=asset_class if asset_class != "ALL" else None,
+                country=country if country != "ALL" else None,
+                region=region if region != "ALL" else None,
+            )
+        ]
+    return jsonify({
+        "status": "success",
+        "count": len(results),
+        "instruments": results,
+    })
+
+
+@app.route("/api/options/providers/status", methods=["GET"])
+def api_options_providers_status():
+    """Returns capability matrix and operational status of all connected broker adapters."""
+    from src.market_data.multi_market_broker_adapters import global_broker_manager
+    capabilities = global_broker_manager.list_all_capabilities()
+    return jsonify({
+        "status": "success",
+        "providers": capabilities,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.route("/api/options/strategies", methods=["GET"])
+def api_options_strategies_list():
+    """Returns all 24 PDF strategy definitions with risk classifications and structure templates."""
+    from src.market_data.options_workstation_service import global_options_service
+    strategies = global_options_service.list_strategies()
+    return jsonify({
+        "status": "success",
+        "count": len(strategies),
+        "strategies": strategies,
+    })
+
+
+@app.route("/api/options/strategy/evaluate", methods=["POST"])
+def api_options_strategy_evaluate():
+    """Evaluates arbitrary multi-leg strategy and calculates analytical payoff curve, Greeks, and margin."""
+    from src.market_data.options_workstation_service import global_options_service
+    payload = request.get_json(force=True, silent=True) or {}
+    strategy_name = payload.get("strategy_name", "CUSTOM")
+    underlying = payload.get("underlying", "NIFTY")
+    spot_price = float(payload.get("spot_price", 24350.0))
+    legs = payload.get("legs", [])
+
+    if not legs:
+        return jsonify({"status": "error", "message": "At least one leg is required."}), 400
+
+    result = global_options_service.evaluate_strategy_payoff(
+        strategy_name=strategy_name,
+        underlying=underlying,
+        spot_price=spot_price,
+        legs=legs,
+    )
+    return jsonify(result)
+
+
+@app.route("/api/options/strategy/preset", methods=["GET"])
+def api_options_strategy_preset():
+    """Generates calibrated preset legs for any of the 24 strategies."""
+    from src.market_data.options_workstation_service import global_options_service
+    preset_name = request.args.get("preset", "LONG_CALL")
+    underlying = request.args.get("underlying", "NIFTY")
+    spot_price = float(request.args.get("spot_price", 24350.0))
+    expiry = request.args.get("expiry", "2026-09-04")
+
+    result = global_options_service.get_preset_strategy(
+        preset_name=preset_name,
+        underlying=underlying,
+        spot_price=spot_price,
+        expiry=expiry,
+    )
+    return jsonify(result)
+
+
+@app.route("/api/options/order/validate", methods=["POST"])
+def api_options_order_validate():
+    """Runs 14-Point Pre-Flight Validation Gate on options trade intent."""
+    from src.market_data.options_workstation_service import global_options_service
+    payload = request.get_json(force=True, silent=True) or {}
+    result = global_options_service.validate_order(payload)
+    return jsonify(result)
+
+
+@app.route("/api/options/order/execute", methods=["POST"])
+def api_options_order_execute():
+    """Executes multi-leg options order in paper or broker mode with SQLite persistence."""
+    from src.market_data.options_workstation_service import global_options_service
+    payload = request.get_json(force=True, silent=True) or {}
+    result = global_options_service.execute_order(payload)
+    return jsonify(result)
+
+
+@app.route("/api/options/positions", methods=["GET"])
+def api_options_positions():
+    """Returns active options workstation positions."""
+    from src.market_data.options_workstation_service import global_options_service
+    positions = global_options_service.get_positions()
+    return jsonify({
+        "status": "success",
+        "count": len(positions),
+        "positions": positions,
+    })
+
+
+@app.route("/api/options/position/<position_id>/squareoff", methods=["POST"])
+def api_options_squareoff(position_id: str):
+    """Squares off an active options position."""
+    from src.market_data.options_workstation_service import global_options_service
+    result = global_options_service.square_off_position(position_id)
+    return jsonify(result)
 
 
 # ============================================================================

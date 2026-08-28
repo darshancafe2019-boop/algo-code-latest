@@ -189,15 +189,24 @@ export interface UserWatchlist {
 }
 
 export interface GlobalMarketSession {
-  market_id: string;
-  name: string;
-  country: string;
-  timezone: string;
-  local_time: string;
+  market_id?: string;
+  exchange?: string;
+  name?: string;
+  market_name?: string;
+  country?: string;
+  timezone?: string;
+  local_time?: string;
+  current_local_time?: string;
+  open_time?: string;
+  close_time?: string;
+  trading_days?: string;
   status: "OPEN" | "PRE_MARKET" | "POST_MARKET" | "CLOSED" | string;
-  status_label: string;
-  hours: string;
-  badge_color: "emerald" | "amber" | "slate" | string;
+  sub_status?: string;
+  status_label?: string;
+  hours?: string;
+  badge_color?: "emerald" | "amber" | "slate" | string;
+  asset_classes?: string[];
+  is_open_for_trading?: boolean;
 }
 
 export interface TopMoversResponse {

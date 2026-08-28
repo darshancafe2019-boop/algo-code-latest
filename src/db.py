@@ -610,6 +610,29 @@ def init_db(force: bool = False) -> None:
                 except Exception:
                     pass
 
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS positions (
+                        id TEXT PRIMARY KEY,
+                        bot_id TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        direction TEXT NOT NULL DEFAULT 'LONG',
+                        quantity REAL NOT NULL DEFAULT 0.0,
+                        entry_price REAL NOT NULL DEFAULT 0.0,
+                        current_price REAL NOT NULL DEFAULT 0.0,
+                        stop_loss REAL,
+                        take_profit REAL,
+                        unrealized_pnl REAL NOT NULL DEFAULT 0.0,
+                        realized_pnl REAL NOT NULL DEFAULT 0.0,
+                        status TEXT NOT NULL DEFAULT 'OPEN',
+                        asset_class TEXT DEFAULT 'Crypto',
+                        execution_mode TEXT DEFAULT 'PAPER',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """
+                )
+
                 # Dynamic column migrations for telegram_logs
                 try:
                     cursor.execute("PRAGMA table_info(telegram_logs)")
@@ -2587,51 +2610,59 @@ def seed_bot_templates_if_needed() -> None:
 
 
 def seed_demo_data_if_needed() -> None:
-    """Seed demo bot instances and realistic sample trades if database is newly initialized."""
+    """Seed demo bot instances only on initial fresh system bootstrap; never recreates deleted bots."""
     seed_indicator_configs_if_needed()
     seed_market_universe_if_needed()
     seed_bot_templates_if_needed()
     conn = get_connection()
     cursor = conn.cursor()
     
-    # Seed default bot instances
-    cursor.execute("SELECT COUNT(*) as count FROM bot_instances")
-    if cursor.fetchone()["count"] == 0:
-        now_str = datetime.now(timezone.utc).isoformat()
-        bot1_config = {
-            "risk_pct": 0.02,
-            "indicators": [
-                {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 20}},
-                {"id": "macd", "name": "MACD (Moving Average Convergence Divergence)", "params": {"fast": 12, "slow": 26, "signal": 9}},
-                {"id": "vp", "name": "Visible Range Volume Profile", "params": {"bins": 50}}
-            ]
-        }
-        bot2_config = {
-            "risk_pct": 0.015,
-            "indicators": [
-                {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 9}},
-                {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
-                {"id": "adx", "name": "Average Directional Index (ADX)", "params": {"period": 14}}
-            ]
-        }
-        bot3_config = {
-            "risk_pct": 0.025,
-            "indicators": [
-                {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
-                {"id": "momentum", "name": "Momentum", "params": {"period": 10}},
-                {"id": "bollinger", "name": "Bollinger Bands", "params": {"period": 20, "stdDev": 2.0}}
-            ]
-        }
-        bots = [
-            ("bot-1", "Alpha BTC Scalper", "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot1_config)),
-            ("bot-2", "Trend Breakout Pro", "BTC/USDT", "EMA9_RSI", "15m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot2_config)),
-            ("bot-3", "Altcoin Momentum", "ETH/USDT", "RSI_MEAN_REVERSION", "1h", 15000.0, "STOPPED", now_str, now_str, json.dumps(bot3_config)),
-        ]
-        cursor.executemany(
-            "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            bots
-        )
+    # Check if initial bootstrap was ever executed
+    cursor.execute("SELECT value FROM telegram_settings WHERE key = 'initial_bot_bootstrap_done'")
+    bootstrapped_row = cursor.fetchone()
+    is_bootstrapped = bool(bootstrapped_row and bootstrapped_row["value"] == "true")
 
+    # Seed default bot instances ONLY if table is empty AND bootstrap was never run
+    if not is_bootstrapped:
+        cursor.execute("SELECT COUNT(*) as count FROM bot_instances")
+        if cursor.fetchone()["count"] == 0:
+            now_str = datetime.now(timezone.utc).isoformat()
+            bot1_config = {
+                "risk_pct": 0.02,
+                "indicators": [
+                    {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 20}},
+                    {"id": "macd", "name": "MACD (Moving Average Convergence Divergence)", "params": {"fast": 12, "slow": 26, "signal": 9}},
+                    {"id": "vp", "name": "Visible Range Volume Profile", "params": {"bins": 50}}
+                ]
+            }
+            bot2_config = {
+                "risk_pct": 0.015,
+                "indicators": [
+                    {"id": "ema", "name": "EMA (Exponential Moving Average)", "params": {"period": 9}},
+                    {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
+                    {"id": "adx", "name": "Average Directional Index (ADX)", "params": {"period": 14}}
+                ]
+            }
+            bot3_config = {
+                "risk_pct": 0.025,
+                "indicators": [
+                    {"id": "rsi", "name": "RSI (Relative Strength Index)", "params": {"period": 14}},
+                    {"id": "momentum", "name": "Momentum", "params": {"period": 10}},
+                    {"id": "bollinger", "name": "Bollinger Bands", "params": {"period": 20, "stdDev": 2.0}}
+                ]
+            }
+            bots = [
+                ("bot-1", "Alpha BTC Scalper", "BTC/USDT", "EMA_MACD_VP", "5m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot1_config)),
+                ("bot-2", "Trend Breakout Pro", "BTC/USDT", "EMA9_RSI", "15m", 10000.0, "RUNNING", now_str, now_str, json.dumps(bot2_config)),
+                ("bot-3", "Altcoin Momentum", "ETH/USDT", "RSI_MEAN_REVERSION", "1h", 15000.0, "STOPPED", now_str, now_str, json.dumps(bot3_config)),
+            ]
+            cursor.executemany(
+                "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at, config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                bots
+            )
+        # Mark bootstrap as permanently executed so deleted bots never get recreated
+        now_dt = datetime.now(timezone.utc).isoformat()
+        cursor.execute("INSERT OR REPLACE INTO telegram_settings (key, value, updated_at) VALUES ('initial_bot_bootstrap_done', 'true', ?)", (now_dt,))
         conn.commit()
 
     # Seed default Indicator Profiles if empty
@@ -4322,8 +4353,8 @@ def compute_bot_health(
             age_seconds = 999999
 
     if status == "RUNNING":
-        if age_seconds is None or age_seconds > max_interval_sec:
-            reasons.append(f"Evaluation Stalled: Last cycle was {age_seconds if age_seconds is not None else 'N/A'}s ago (expected <{max_interval_sec}s)")
+        if age_seconds is not None and age_seconds > max_interval_sec:
+            reasons.append(f"Evaluation Stalled: Last cycle was {age_seconds}s ago (expected <{max_interval_sec}s)")
 
     # 3. Decision Reasoning Check
     last_logged_price = None
@@ -4348,17 +4379,28 @@ def compute_bot_health(
     elif isinstance(live_market_price, (int, float)) and symbol in ["BTC/USDT", "BTCUSDT"]:
         target_live_price = float(live_market_price)
 
-    if status == "RUNNING":
-        if not dec_row and not last_checked_str:
-            reasons.append("Reasoning Missing: Zero decision logs recorded for this bot")
-        elif dec_row:
+    if status == "RUNNING" and is_alive:
+        if dec_row:
             dec_time_str = dec_row.get("timestamp")
+            started_at_str = bot.get("started_at") or bot.get("resumed_at")
             if dec_time_str:
                 try:
                     dec_dt = datetime.fromisoformat(dec_time_str.replace("Z", "+00:00"))
                     if dec_dt.tzinfo is None:
                         dec_dt = dec_dt.replace(tzinfo=timezone.utc)
-                    dec_age = int((now_utc - dec_dt).total_seconds())
+                    
+                    # If the decision log is from before current run start and current run is within max_interval_sec, ignore
+                    if started_at_str:
+                        start_dt = datetime.fromisoformat(started_at_str.replace("Z", "+00:00"))
+                        if start_dt.tzinfo is None:
+                            start_dt = start_dt.replace(tzinfo=timezone.utc)
+                        if dec_dt < start_dt and (now_utc - start_dt).total_seconds() < max_interval_sec:
+                            dec_age = 0
+                        else:
+                            dec_age = int((now_utc - dec_dt).total_seconds())
+                    else:
+                        dec_age = int((now_utc - dec_dt).total_seconds())
+
                     if dec_age > max_interval_sec:
                         reasons.append(f"Reasoning Stale: Last reasoning update was {dec_age}s ago")
                 except Exception:

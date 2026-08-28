@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import {
-  Star,
   ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   ArrowUpRight,
   ArrowDownRight,
   Minus,
@@ -19,8 +20,8 @@ interface SimpleMarketTableProps {
   instruments: MarketInstrument[];
   selectedInstrument: MarketInstrument | null;
   onSelectInstrument: (inst: MarketInstrument) => void;
-  onToggleWatchlist: (inst: MarketInstrument) => void;
-  watchlistSymbols: Set<string>;
+  onToggleWatchlist?: (inst: MarketInstrument) => void;
+  watchlistSymbols?: Set<string>;
   showColumnSettings?: boolean;
   onCloseColumnSettings?: () => void;
 }
@@ -33,6 +34,8 @@ const DEFAULT_COLS = {
   trend: true,
   status: true,
 };
+
+type SortableValue = string | number | boolean | undefined | null;
 
 export function SimpleMarketTable({
   instruments = [],
@@ -51,7 +54,7 @@ export function SimpleMarketTable({
     try {
       const saved = localStorage.getItem("markets_table_cols_v3");
       if (saved) setVisibleCols({ ...DEFAULT_COLS, ...JSON.parse(saved) });
-    } catch {}
+    } catch { }
   }, []);
 
   const toggleCol = (k: keyof typeof DEFAULT_COLS) => {
@@ -59,7 +62,7 @@ export function SimpleMarketTable({
     setVisibleCols(updated);
     try {
       localStorage.setItem("markets_table_cols_v3", JSON.stringify(updated));
-    } catch {}
+    } catch { }
   };
 
   const handleSort = (field: string) => {
@@ -71,14 +74,45 @@ export function SimpleMarketTable({
     }
   };
 
-  const sortedInstruments = [...instruments].sort((a: any, b: any) => {
-    const valA = a[sortField] !== undefined ? a[sortField] : 0;
-    const valB = b[sortField] !== undefined ? b[sortField] : 0;
-    if (typeof valA === "string") {
+  // Safe typed sort comparator across numbers, strings, and booleans without 'any'
+  const sortedInstruments = [...instruments].sort((a, b) => {
+    const rowA = a as unknown as Record<string, SortableValue>;
+    const rowB = b as unknown as Record<string, SortableValue>;
+    const valA = rowA[sortField] ?? 0;
+    const valB = rowB[sortField] ?? 0;
+    if (typeof valA === "string" && typeof valB === "string") {
       return sortAsc ? valA.localeCompare(valB) : valB.localeCompare(valA);
     }
-    return sortAsc ? valA - valB : valB - valA;
+    const numA = typeof valA === "number" ? valA : (typeof valA === "boolean" ? (valA ? 1 : 0) : 0);
+    const numB = typeof valB === "number" ? valB : (typeof valB === "boolean" ? (valB ? 1 : 0) : 0);
+    return sortAsc ? numA - numB : numB - numA;
   });
+
+  // Dynamically compute real visible column count (1 star column + visible toggled columns)
+  const visibleColumnCount = 1 + Object.values(visibleCols).filter(Boolean).length;
+
+  const renderSortHeader = (label: string, field: string, align: "left" | "right" | "center" = "left") => {
+    const isSorted = sortField === field;
+    return (
+      <div
+        className={`flex items-center gap-1.5 cursor-pointer select-none transition-colors group/header ${
+          align === "right" ? "justify-end" : align === "center" ? "justify-center" : "justify-start"
+        } ${isSorted ? "text-cyan-300 font-bold" : "hover:text-cyan-300 text-slate-400"}`}
+        onClick={() => handleSort(field)}
+      >
+        <span>{label}</span>
+        {isSorted ? (
+          sortAsc ? (
+            <ArrowUp className="h-3 w-3 text-cyan-400 shrink-0" />
+          ) : (
+            <ArrowDown className="h-3 w-3 text-cyan-400 shrink-0" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-40 group-hover/header:opacity-100 shrink-0" />
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-3 font-sans select-none">
@@ -123,63 +157,33 @@ export function SimpleMarketTable({
               <tr>
                 <th className="py-3 px-3 w-8"></th>
                 {visibleCols.symbol && (
-                  <th
-                    className="py-3 px-3 cursor-pointer hover:text-cyan-300 font-sans"
-                    onClick={() => handleSort("canonical_symbol")}
-                  >
-                    <div className="flex items-center gap-1">
-                      <span>Instrument</span>
-                      <ArrowUpDown className="h-3 w-3" />
-                    </div>
+                  <th className="py-3 px-3 font-sans">
+                    {renderSortHeader("Instrument", "canonical_symbol", "left")}
                   </th>
                 )}
                 {visibleCols.price && (
-                  <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-cyan-300 font-sans"
-                    onClick={() => handleSort("last_price")}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Price</span>
-                      <ArrowUpDown className="h-3 w-3" />
-                    </div>
+                  <th className="py-3 px-3 text-right font-sans">
+                    {renderSortHeader("Price", "last_price", "right")}
                   </th>
                 )}
                 {visibleCols.change && (
-                  <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-cyan-300 font-sans"
-                    onClick={() => handleSort("change_24h")}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>24H</span>
-                      <ArrowUpDown className="h-3 w-3" />
-                    </div>
+                  <th className="py-3 px-3 text-right font-sans">
+                    {renderSortHeader("24H", "change_24h", "right")}
                   </th>
                 )}
                 {visibleCols.volume && (
-                  <th
-                    className="py-3 px-3 text-right cursor-pointer hover:text-cyan-300 font-sans"
-                    onClick={() => handleSort("volume_24h")}
-                  >
-                    <div className="flex items-center justify-end gap-1">
-                      <span>Volume</span>
-                      <ArrowUpDown className="h-3 w-3" />
-                    </div>
+                  <th className="py-3 px-3 text-right font-sans">
+                    {renderSortHeader("Volume", "volume_24h", "right")}
                   </th>
                 )}
                 {visibleCols.trend && (
-                  <th
-                    className="py-3 px-3 text-center cursor-pointer hover:text-cyan-300 font-sans"
-                    onClick={() => handleSort("directional_bias")}
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <span>Trend</span>
-                      <ArrowUpDown className="h-3 w-3" />
-                    </div>
+                  <th className="py-3 px-3 text-center font-sans">
+                    {renderSortHeader("Trend", "directional_bias", "center")}
                   </th>
                 )}
                 {visibleCols.status && (
                   <th className="py-3 px-3 text-center font-sans">
-                    <span>Status</span>
+                    <span className="text-slate-400">Status</span>
                   </th>
                 )}
               </tr>
@@ -187,15 +191,30 @@ export function SimpleMarketTable({
             <tbody className="divide-y divide-[#1E293B] text-slate-200">
               {sortedInstruments.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-xs text-slate-500 font-sans">
+                  <td colSpan={visibleColumnCount} className="py-12 text-center text-xs text-slate-500 font-sans">
                     No instruments match the active search or category filter.
                   </td>
                 </tr>
               ) : (
                 sortedInstruments.map((inst, idx) => {
                   const sym = inst.canonical_symbol || inst.provider_symbol || inst.symbol || "UNKNOWN";
-                  const isWatched = watchlistSymbols.has(sym) || watchlistSymbols.has(inst.instrument_id);
-                  const isPositive = (inst.change_24h || 0) >= 0;
+                  const isWatched = watchlistSymbols
+                    ? Boolean(watchlistSymbols.has(sym) || (inst.instrument_id && watchlistSymbols.has(inst.instrument_id)))
+                    : false;
+
+                  // Bug #1 Fix: Read real data_status & data_age_ms from MarketInstrument
+                  const rawStatus = (inst.data_status || "LIVE").toUpperCase();
+                  const isStale =
+                    rawStatus === "STALE" ||
+                    rawStatus === "DISCONNECTED" ||
+                    rawStatus === "DEGRADED" ||
+                    Boolean((inst as unknown as { is_stale?: boolean })?.is_stale) ||
+                    (inst.data_age_ms !== undefined && inst.data_age_ms > 5000);
+                  const statusLabel = rawStatus === "DISCONNECTED" ? "OFFLINE" : (isStale ? "STALE" : "LIVE");
+
+                  // Bug #2 Fix: Only derive bias if real change data exists; missing change defaults to NEUTRAL (never guess)
+                  const hasChange = inst.change_24h !== undefined && inst.change_24h !== null && !isNaN(Number(inst.change_24h));
+                  const isPositive = hasChange ? Number(inst.change_24h) >= 0 : null;
                   const currSymbol = inst.currency === "INR" ? "₹" : "$";
                   const isSelected = selectedInstrument?.instrument_id === inst.instrument_id;
 
@@ -204,9 +223,11 @@ export function SimpleMarketTable({
                   const volumeStr = formatVolume(inst.volume_24h, currSymbol, "—");
 
                   // Trend / Bias
-                  const bias = inst.directional_bias || (isPositive ? "BULLISH" : "NEUTRAL");
-                  const isBull = bias.toUpperCase().includes("BULL");
-                  const isBear = bias.toUpperCase().includes("BEAR");
+                  const rawBias = inst.directional_bias
+                    ? inst.directional_bias.toUpperCase()
+                    : (hasChange ? (isPositive ? "BULLISH" : "BEARISH") : "NEUTRAL");
+                  const isBull = rawBias.includes("BULL");
+                  const isBear = rawBias.includes("BEAR");
 
                   return (
                     <tr
@@ -215,6 +236,8 @@ export function SimpleMarketTable({
                       className={`transition-colors cursor-pointer group ${
                         isSelected
                           ? "bg-[#0F2238] border-l-2 border-cyan-400"
+                          : isWatched
+                          ? "bg-[#0C1929]/70 hover:bg-[#141E33]/80 border-l-2 border-amber-400/40"
                           : "hover:bg-[#141E33]/70"
                       }`}
                     >
@@ -230,7 +253,7 @@ export function SimpleMarketTable({
                             <span className="font-bold text-white group-hover:text-cyan-400 transition-colors">
                               {sym}
                             </span>
-                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 uppercase">
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 uppercase">
                               {inst.exchange || "GLOBAL"}
                             </span>
                           </div>
@@ -250,9 +273,10 @@ export function SimpleMarketTable({
                       {/* 24H Change */}
                       {visibleCols.change && (
                         <td className="py-3 px-3 text-right font-bold font-mono">
-                          {inst.change_24h !== undefined ? (
+                          {hasChange ? (
                             <span className={isPositive ? "text-emerald-400" : "text-red-400"}>
-                              {isPositive ? "+" : ""}{inst.change_24h.toFixed(2)}%
+                              {isPositive ? "+" : ""}
+                              {Number(inst.change_24h).toFixed(2)}%
                             </span>
                           ) : (
                             <span className="text-slate-500">—</span>
@@ -291,13 +315,20 @@ export function SimpleMarketTable({
                         </td>
                       )}
 
-                      {/* Status */}
+                      {/* Status — reflects real freshness from MarketInstrument */}
                       {visibleCols.status && (
                         <td className="py-3 px-3 text-center">
-                          <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>LIVE</span>
-                          </span>
+                          {isStale ? (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-amber-400 font-semibold">
+                              <AlertTriangle className="w-3 h-3 text-amber-400" />
+                              <span>{statusLabel}</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[11px] font-mono text-emerald-400 font-semibold">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                              <span>LIVE</span>
+                            </span>
+                          )}
                         </td>
                       )}
                     </tr>

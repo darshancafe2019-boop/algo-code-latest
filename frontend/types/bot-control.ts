@@ -110,6 +110,7 @@ export interface BotInstanceExtended {
     exit_reason: string;
     timestamp: string;
   };
+  last_error?: string | null;
 }
 
 export interface BotMetricsSummary {

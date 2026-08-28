@@ -1,13 +1,17 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SimpleFleetSummaryHeader } from "./SimpleFleetSummaryHeader";
 import { SimpleBotFilterBar } from "./SimpleBotFilterBar";
 import { SimpleBotTable, BotRowItem } from "./SimpleBotTable";
 import { SimpleBotDetailsDrawer } from "./SimpleBotDetailsDrawer";
 import { BulkStartConfirmationModal } from "./BulkStartConfirmationModal";
 import { CreateBotWizardModal } from "./CreateBotWizardModal";
+import { DeleteBotModal } from "./DeleteBotModal";
+import { BulkDeleteBotsModal } from "./BulkDeleteBotsModal";
+import { MultiBotBulkActionBar } from "./MultiBotBulkActionBar";
+import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 
 export function BotControlTab() {
@@ -25,11 +29,24 @@ export function BotControlTab() {
   const [envFilter, setEnvFilter] = useState("ALL");
   const [environment, setEnvironment] = useState<"PAPER" | "LIVE">("PAPER");
 
+  // Selection State
+  const [selectedBotIds, setSelectedBotIds] = useState<string[]>([]);
+
   // Modal / Drawer State
   const [selectedBot, setSelectedBot] = useState<BotRowItem | null>(null);
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [isBulkStartModalOpen, setIsBulkStartModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Delete Modals State
+  const [botToDelete, setBotToDelete] = useState<BotRowItem | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isBulkDeleteModalOpen, setIsBulkDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Feedback Banners
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   // 1. Authoritative Fleet & Bots Query (`GET /api/bots`)
   const {
@@ -121,39 +138,220 @@ export function BotControlTab() {
     });
   }, [rawBots, selectedMarket, statusFilter, envFilter, search]);
 
-  // Execute Individual Bot Action
+  // Clean up selectedBotIds if bots were deleted
+  useEffect(() => {
+    const validIds = new Set(rawBots.map((b) => b.id));
+    setSelectedBotIds((prev) => prev.filter((id) => validIds.has(id)));
+  }, [rawBots]);
+
+  // Selection Handlers
+  const handleToggleSelectBot = (botId: string) => {
+    setSelectedBotIds((prev) =>
+      prev.includes(botId) ? prev.filter((id) => id !== botId) : [...prev, botId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const filteredIds = filteredBots.map((b) => b.id);
+    const allSelected =
+      filteredIds.length > 0 && filteredIds.every((id) => selectedBotIds.includes(id));
+
+    if (allSelected) {
+      // Deselect all visible
+      setSelectedBotIds((prev) => prev.filter((id) => !filteredIds.includes(id)));
+    } else {
+      // Select all visible
+      setSelectedBotIds((prev) => Array.from(new Set([...prev, ...filteredIds])));
+    }
+  };
+
+  const handleClearSelection = () => {
+    setSelectedBotIds([]);
+  };
+
+  // Execute Individual Bot Action (START, PAUSE, RESUME, STOP)
   const handleBotAction = async (botId: string, action: string) => {
+    setActionError(null);
+    setActionSuccess(null);
     const res = await apiClient.post<any>(`/api/bots/${botId}/control`, { action });
     if (!res.ok) {
-      throw new Error(res.error?.message || `Failed to execute ${action}`);
+      const msg = res.error?.message || `Failed to execute ${action} on bot ${botId}`;
+      setActionError(msg);
+      throw new Error(msg);
     }
     await refetch();
     queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
-  // Bulk Start Eligible
+  // Open Single Delete Modal
+  const handleOpenDeleteModal = (bot: BotRowItem) => {
+    setBotToDelete(bot);
+    setIsDeleteModalOpen(true);
+  };
+
+  // Confirm Single Delete
+  const handleConfirmSingleDelete = async (botId: string, force: boolean = false) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setIsDeleting(true);
+    try {
+      const endpoint = force ? `/api/bots/${botId}/force-delete` : `/api/bots/${botId}`;
+      const res = force
+        ? await apiClient.post<any>(endpoint, {})
+        : await apiClient.delete<any>(endpoint);
+      if (!res.ok) {
+        throw new Error(res.error?.message || `Failed to delete bot ${botId}`);
+      }
+
+      // Clear selection if this bot was selected
+      setSelectedBotIds((prev) => prev.filter((id) => id !== botId));
+
+      // Close details drawer if the deleted bot was open
+      if (selectedBot?.id === botId) {
+        setIsDetailsDrawerOpen(false);
+        setSelectedBot(null);
+      }
+
+      setActionSuccess(res.data?.message || `Bot '${botToDelete?.name || botId}' permanently deleted. Trade history preserved.`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } catch (err: any) {
+      const msg = err.message || `Failed to delete bot ${botId}`;
+      setActionError(msg);
+      throw err;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Confirm Bulk Delete
+  const handleConfirmBulkDelete = async (botIds: string[]) => {
+    setActionError(null);
+    setActionSuccess(null);
+    setIsDeleting(true);
+    try {
+      const res = await apiClient.post<any>("/api/bots/bulk-delete", { bot_ids: botIds });
+      if (!res.ok) {
+        throw new Error(res.error?.message || "Failed to bulk delete bots");
+      }
+
+      // Immediately clear selection and close modal
+      setSelectedBotIds([]);
+      setIsBulkDeleteModalOpen(false);
+
+      if (selectedBot && botIds.includes(selectedBot.id)) {
+        setIsDetailsDrawerOpen(false);
+        setSelectedBot(null);
+      }
+
+      const count = res.data?.deleted_count || botIds.length;
+      setActionSuccess(`Successfully deleted ${count} bot(s). Trade history preserved.`);
+      
+      // Force immediate cache eviction and refetch
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      await refetch();
+    } catch (err: any) {
+      const msg = err.message || "Failed to bulk delete bots";
+      setActionError(msg);
+      throw err;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  // Bulk Stop Selected
+  const handleBulkStop = async () => {
+    if (selectedBotIds.length === 0) return;
+    setActionError(null);
+    setActionSuccess(null);
+    const res = await apiClient.post<any>("/api/bots/bulk-stop", { bot_ids: selectedBotIds });
+    if (!res.ok) {
+      setActionError(res.error?.message || "Failed to stop selected bots");
+      return;
+    }
+    setActionSuccess(res.data?.message || `Stopped ${res.data?.stopped_count || selectedBotIds.length} bot(s).`);
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+  };
+
+  // Bulk Start Selected
+  const handleBulkStart = async () => {
+    if (selectedBotIds.length === 0) return;
+    setActionError(null);
+    setActionSuccess(null);
+    const res = await apiClient.post<any>("/api/bots/bulk-start", { bot_ids: selectedBotIds });
+    if (!res.ok) {
+      setActionError(res.error?.message || "Failed to start selected bots");
+      return;
+    }
+    setActionSuccess(res.data?.message || `Started ${res.data?.started_count || selectedBotIds.length} bot(s).`);
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+  };
+
+  // Bulk Pause Selected
+  const handleBulkPause = async () => {
+    if (selectedBotIds.length === 0) return;
+    setActionError(null);
+    setActionSuccess(null);
+    const res = await apiClient.post<any>("/api/bots/bulk-pause", { bot_ids: selectedBotIds });
+    if (!res.ok) {
+      setActionError(res.error?.message || "Failed to pause selected bots");
+      return;
+    }
+    setActionSuccess(res.data?.message || `Paused ${res.data?.paused_count || selectedBotIds.length} bot(s).`);
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+  };
+
+  // Bulk Resume Selected
+  const handleBulkResume = async () => {
+    if (selectedBotIds.length === 0) return;
+    setActionError(null);
+    setActionSuccess(null);
+    const res = await apiClient.post<any>("/api/bots/bulk-resume", { bot_ids: selectedBotIds });
+    if (!res.ok) {
+      setActionError(res.error?.message || "Failed to resume selected bots");
+      return;
+    }
+    setActionSuccess(res.data?.message || `Resumed ${res.data?.resumed_count || selectedBotIds.length} bot(s).`);
+    await refetch();
+    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+  };
+
+  // Bulk Start Eligible (Header button)
   const handleConfirmBulkStart = async () => {
+    setActionError(null);
+    setActionSuccess(null);
     const res = await apiClient.post<any>("/api/bots/start-all", {
       market_filter: selectedMarket === "ALL" ? null : selectedMarket,
       environment: envFilter === "ALL" ? null : envFilter,
     });
     if (!res.ok) {
-      throw new Error(res.error?.message || "Failed bulk start");
+      const msg = res.error?.message || "Failed bulk start";
+      setActionError(msg);
+      throw new Error(msg);
     }
+    setActionSuccess("Bulk start triggered for eligible bots.");
     await refetch();
     queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Toggle Emergency Halt
   const handleToggleEmergencyHalt = async () => {
+    setActionError(null);
+    setActionSuccess(null);
     const targetState = !metrics.emergency_halt_active;
     const res = await apiClient.post<any>("/api/bots/emergency-halt", {
       active: targetState,
       reason: targetState ? "Emergency Halt Triggered by User" : "Emergency Halt Released",
     });
     if (!res.ok) {
-      throw new Error(res.error?.message || "Failed to toggle Emergency Halt");
+      const msg = res.error?.message || "Failed to toggle Emergency Halt";
+      setActionError(msg);
+      throw new Error(msg);
     }
+    setActionSuccess(targetState ? "🔴 Emergency Halt Activated across fleet." : "🟢 Emergency Halt Released.");
     await refetch();
     queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
@@ -176,10 +374,15 @@ export function BotControlTab() {
     setIsDetailsDrawerOpen(true);
   };
 
+  const selectedBotsList = useMemo(() => {
+    const idSet = new Set(selectedBotIds);
+    return rawBots.filter((b) => idSet.has(b.id));
+  }, [rawBots, selectedBotIds]);
+
   if (!isMounted) return null;
 
   return (
-    <div className="space-y-4 max-w-[1400px] mx-auto min-w-0 font-sans">
+    <div className="space-y-4 max-w-[1400px] mx-auto min-w-0 font-sans pb-24">
       {/* 1. Top Summary Header & Essential Metric Cards */}
       <SimpleFleetSummaryHeader
         metrics={metrics}
@@ -189,6 +392,45 @@ export function BotControlTab() {
         onStartEligible={() => setIsBulkStartModalOpen(true)}
         onToggleEmergencyHalt={handleToggleEmergencyHalt}
       />
+
+      {/* Feedback Alert Banners */}
+      {actionError && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+          <div className="flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold uppercase tracking-wide text-amber-400">Action Notice: </span>
+              <span className="font-sans leading-relaxed">{actionError}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setActionError(null)}
+            className="text-amber-400 hover:text-white p-1 rounded hover:bg-amber-500/20 transition-colors shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+          <div className="flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold uppercase tracking-wide text-emerald-400">Success: </span>
+              <span className="font-sans leading-relaxed">{actionSuccess}</span>
+            </div>
+          </div>
+          <button
+            onClick={() => setActionSuccess(null)}
+            className="text-emerald-400 hover:text-white p-1 rounded hover:bg-emerald-500/20 transition-colors shrink-0"
+            title="Dismiss"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* 2. Search, Market Tabs, and Filter Controls */}
       <SimpleBotFilterBar
@@ -204,28 +446,63 @@ export function BotControlTab() {
         totalCount={rawBots.length}
       />
 
-      {/* 3. Authoritative 7-Column Bot Table */}
+      {/* 3. Authoritative Bot Table with Consolidated Kebab Actions & Checkboxes */}
       <SimpleBotTable
         bots={filteredBots}
         isLoading={isLoading}
         onSelectBot={handleSelectBot}
         onBotAction={handleBotAction}
-        onToggleMode={handleToggleBotMode}
+        onDeleteBot={handleOpenDeleteModal}
         onCreateBot={() => setIsCreateModalOpen(true)}
         selectedMarket={selectedMarket}
+        selectedBotIds={selectedBotIds}
+        onToggleSelectBot={handleToggleSelectBot}
+        onToggleSelectAll={handleToggleSelectAll}
       />
 
-      {/* 4. Slide-Out Details Drawer */}
+      {/* 4. Multi-Bot Floating Bulk Action Bar */}
+      <MultiBotBulkActionBar
+        selectedCount={selectedBotIds.length}
+        onClearSelection={handleClearSelection}
+        onBulkStart={handleBulkStart}
+        onBulkPause={handleBulkPause}
+        onBulkResume={handleBulkResume}
+        onBulkStop={handleBulkStop}
+        onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+      />
+
+      {/* 5. Slide-Out Details Drawer */}
       <SimpleBotDetailsDrawer
         isOpen={isDetailsDrawerOpen}
         bot={selectedBot}
         onClose={() => setIsDetailsDrawerOpen(false)}
         onBotAction={handleBotAction}
-        onToggleMode={handleToggleBotMode}
+        onDeleteBot={handleOpenDeleteModal}
         onRefresh={refetch}
       />
 
-      {/* 5. Bulk Start Confirmation Modal */}
+      {/* 6. Single Bot Delete Confirmation Modal */}
+      <DeleteBotModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => {
+          setIsDeleteModalOpen(false);
+          setBotToDelete(null);
+        }}
+        bot={botToDelete}
+        onConfirmDelete={handleConfirmSingleDelete}
+        isDeleting={isDeleting}
+      />
+
+      {/* 7. Bulk Delete Confirmation Modal */}
+      <BulkDeleteBotsModal
+        isOpen={isBulkDeleteModalOpen}
+        onClose={() => setIsBulkDeleteModalOpen(false)}
+        selectedBots={selectedBotsList}
+        onConfirmBulkDelete={handleConfirmBulkDelete}
+        isDeleting={isDeleting}
+      />
+
+      {/* 8. Bulk Start Confirmation Modal */}
       <BulkStartConfirmationModal
         isOpen={isBulkStartModalOpen}
         onClose={() => setIsBulkStartModalOpen(false)}
@@ -233,7 +510,7 @@ export function BotControlTab() {
         onConfirmStart={handleConfirmBulkStart}
       />
 
-      {/* 6. Create Bot Wizard Modal */}
+      {/* 9. Create Bot Wizard Modal */}
       <CreateBotWizardModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

@@ -752,6 +752,11 @@ class MultiBotManager:
             self._update_db_status(bot_id, BOT_STATE_ERROR, error=res.get("message"))
         return res
 
+    def is_bot_running(self, bot_id: str = "bot-1") -> bool:
+        """Check if the given bot instance process is currently running."""
+        mgr = self.get_manager(bot_id)
+        return mgr.is_running()
+
     def stop_bot(self, bot_id: str = "bot-1") -> Dict[str, Any]:
         mgr = self.get_manager(bot_id)
         res = mgr.stop_bot()
@@ -1030,6 +1035,8 @@ class BotWatchdog(threading.Thread):
                 effective_threshold = self.stall_threshold if self.stall_threshold != 900 else dynamic_stall_threshold
 
                 if seconds_ago > effective_threshold:
+                    log_bot_activity(bot_id, "STALLED_RECOVERY", f"Watchdog detected stall — attempting automatic restart for '{b_name}'.")
+
                     def _recovery_cb():
                         multi_bot_manager.stop_bot(bot_id)
                         time.sleep(0.5)

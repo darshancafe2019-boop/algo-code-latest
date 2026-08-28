@@ -596,9 +596,12 @@ def get_active_trade(bot_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         conn = db.get_connection()
         cursor = conn.cursor()
         if bot_id:
-            cursor.execute("SELECT * FROM trades_log WHERE status = 'OPEN' AND bot_id = ? ORDER BY id DESC LIMIT 1", (bot_id,))
+            cursor.execute(
+                "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING') AND (bot_id = ? OR bot_instance_id = ?) ORDER BY id DESC LIMIT 1",
+                (bot_id, bot_id)
+            )
         else:
-            cursor.execute("SELECT * FROM trades_log WHERE status = 'OPEN' ORDER BY id DESC LIMIT 1")
+            cursor.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING') ORDER BY id DESC LIMIT 1")
         row = cursor.fetchone()
         conn.close()
         return dict(row) if row else None

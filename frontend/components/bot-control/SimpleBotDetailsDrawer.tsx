@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders } from "lucide-react";
+import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2 } from "lucide-react";
 import { BotRowItem } from "./SimpleBotTable";
 
 interface SimpleBotDetailsDrawerProps {
@@ -10,6 +10,7 @@ interface SimpleBotDetailsDrawerProps {
   onClose: () => void;
   onBotAction: (botId: string, action: string) => Promise<void>;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => Promise<void> | void;
+  onDeleteBot?: (bot: BotRowItem) => void;
   onRefresh: () => void;
 }
 
@@ -19,6 +20,7 @@ export function SimpleBotDetailsDrawer({
   onClose,
   onBotAction,
   onToggleMode,
+  onDeleteBot,
   onRefresh,
 }: SimpleBotDetailsDrawerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -65,6 +67,12 @@ export function SimpleBotDetailsDrawer({
       setActionFeedback(`Error: ${err.message || "Failed to switch mode"}`);
     } finally {
       setIsSwitchingMode(false);
+    }
+  };
+
+  const handleDelete = () => {
+    if (onDeleteBot && bot) {
+      onDeleteBot(bot);
     }
   };
 
@@ -172,88 +180,90 @@ export function SimpleBotDetailsDrawer({
         </div>
 
         {/* 2. Key Metrics Grid */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl space-y-1">
-            <span className="text-[10px] text-slate-400 uppercase">Today P&L</span>
-            <div className={`text-base font-black ${isPnlPositive ? "text-emerald-400" : "text-rose-400"}`}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <span className="text-[10px] text-slate-400 block mb-1">Today P&L</span>
+            <span className={`text-sm font-extrabold ${isPnlPositive ? "text-emerald-400" : "text-rose-400"}`}>
               {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <span className="text-[10px] text-slate-500 font-sans block">
-              Realized: ${bot.pnl?.realized.toFixed(2) || "0.00"}
             </span>
           </div>
 
-          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl space-y-1">
-            <span className="text-[10px] text-slate-400 uppercase">Open Position</span>
-            <div className="text-base font-black text-white">
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <span className="text-[10px] text-slate-400 block mb-1">Position</span>
+            <span className="text-sm font-extrabold text-white">
               {pos.has_position ? `${pos.direction} ${pos.size}` : "FLAT"}
-            </div>
-            <span className="text-[10px] text-slate-500 font-sans block">
-              {pos.has_position ? `@ $${pos.entry_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "No open risk"}
+            </span>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <span className="text-[10px] text-slate-400 block mb-1">Allocated Capital</span>
+            <span className="text-sm font-extrabold text-white">
+              ${(bot.allocated_capital || 0).toLocaleString("en-US")}
+            </span>
+          </div>
+
+          <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
+            <span className="text-[10px] text-slate-400 block mb-1">Health</span>
+            <span className={`text-sm font-extrabold ${bot.health === "HEALTHY" ? "text-emerald-400" : "text-amber-400"}`}>
+              {bot.health || "HEALTHY"}
             </span>
           </div>
         </div>
 
-        {/* 3. Strategy & Risk Matrix */}
-        <div className="p-4 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2.5">
-          <span className="text-[10px] text-slate-400 font-bold uppercase block">Strategy & Risk Profile</span>
-
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Strategy:</span>
-            <span className="text-white font-bold">{bot.strategy}</span>
+        {/* 3. Live Strategy Logic & Indicators */}
+        <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
+          <div className="flex items-center justify-between border-b border-slate-800/80 pb-2">
+            <span className="font-bold text-white text-xs">Strategy: {bot.strategy}</span>
+            <span className="text-slate-400 text-[10px]">Version: {bot.strategy_version || "1.0"}</span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Allocated Capital:</span>
-            <span className="text-cyan-400 font-bold">${bot.allocated_capital.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Pre-Trade Risk Gate:</span>
-            <span className="text-emerald-400 font-bold flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>PASS (14 Checks Armed)</span>
-            </span>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <span className="text-slate-400">Worker Status:</span>
-            <span className="text-emerald-400 font-bold">{bot.health || "HEALTHY"}</span>
-          </div>
-
-          {bot.last_error && (
-            <div className="pt-2 border-t border-slate-800">
-              <span className="text-rose-400 font-bold block mb-0.5">Last Error:</span>
-              <p className="text-slate-300 text-[11px] font-sans bg-rose-950/20 p-2 rounded border border-rose-500/30">
-                {bot.last_error}
-              </p>
+          <div className="space-y-2">
+            <span className="text-[10px] text-slate-400 font-bold uppercase block">Active Indicators</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {Array.isArray(bot.indicators) && bot.indicators.length > 0 ? (
+                bot.indicators.map((ind: any, i: number) => (
+                  <div key={i} className="p-2 bg-slate-950/60 border border-slate-800/60 rounded-lg flex items-center justify-between">
+                    <span className="text-slate-300 font-bold">{ind.name || ind.type || `Indicator ${i+1}`}</span>
+                    <span className="text-cyan-300 font-mono text-[10px]">{ind.status || "ACTIVE"}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-slate-500 text-xs italic">Default indicator pipeline active (EMA + MACD + VP)</div>
+              )}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* 4. Collapsible Advanced Details */}
+        {/* 4. Advanced Technical Specs (Collapsible) */}
         <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/40">
           <button
             onClick={() => setShowAdvanced(!showAdvanced)}
-            className="w-full p-3 flex items-center justify-between text-left text-slate-400 hover:text-white transition font-sans text-xs"
+            className="w-full p-3 bg-slate-900/80 hover:bg-slate-800/80 transition flex items-center justify-between text-slate-300 font-bold"
           >
-            <span>Show Technical Details (Worker, Heartbeat & Config)</span>
+            <div className="flex items-center gap-2">
+              <Sliders className="w-4 h-4 text-cyan-400" />
+              <span>Technical Diagnostics & Metadata</span>
+            </div>
             {showAdvanced ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
 
           {showAdvanced && (
-            <div className="p-3 bg-slate-950 border-t border-slate-800 space-y-2 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Bot ID:</span>
-                <span className="text-slate-300 font-mono">{bot.id}</span>
+            <div className="p-4 border-t border-slate-800 space-y-2.5 font-mono text-[11px]">
+              <div className="flex justify-between py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Bot Instance ID:</span>
+                <span className="text-white font-bold">{bot.id}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Last Heartbeat:</span>
-                <span className="text-slate-300">{bot.last_heartbeat || "Live / Continuous"}</span>
+              <div className="flex justify-between py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Asset Class:</span>
+                <span className="text-slate-200">{bot.asset_class}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-slate-500">Strategy Version:</span>
-                <span className="text-slate-300">v{bot.strategy_version || "1.0"}</span>
+              <div className="flex justify-between py-1 border-b border-slate-800/50">
+                <span className="text-slate-400">Last Heartbeat:</span>
+                <span className="text-slate-200">{bot.last_heartbeat || "Live Syncing"}</span>
+              </div>
+              <div className="flex justify-between py-1">
+                <span className="text-slate-400">Last State Update:</span>
+                <span className="text-slate-200">{bot.updated_at ? new Date(bot.updated_at).toLocaleTimeString() : "Just now"}</span>
               </div>
 
               {bot.config && Object.keys(bot.config).length > 0 && (
@@ -269,70 +279,84 @@ export function SimpleBotDetailsDrawer({
         </div>
 
         {/* 5. Footer Contextual Actions */}
-        <div className="grid grid-cols-2 gap-3 pt-2 mt-auto">
-          {isStopped && (
-            <button
-              onClick={() => handleAction("START")}
-              disabled={isActing}
-              className="col-span-2 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-            >
-              <Play className="w-4 h-4 fill-current" />
-              <span>Start Bot</span>
-            </button>
-          )}
-
-          {isRunning && (
-            <>
+        <div className="space-y-2 pt-2 mt-auto">
+          <div className="grid grid-cols-2 gap-3">
+            {isStopped && (
               <button
-                onClick={() => handleAction("PAUSE")}
+                onClick={() => handleAction("START")}
                 disabled={isActing}
-                className="py-2.5 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Pause className="w-4 h-4 fill-current" />
-                <span>Pause</span>
-              </button>
-
-              <button
-                onClick={() => handleAction("STOP")}
-                disabled={isActing}
-                className="py-2.5 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Square className="w-4 h-4 fill-current" />
-                <span>Stop</span>
-              </button>
-            </>
-          )}
-
-          {isPaused && (
-            <>
-              <button
-                onClick={() => handleAction("RESUME")}
-                disabled={isActing}
-                className="py-2.5 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="col-span-2 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
                 <Play className="w-4 h-4 fill-current" />
-                <span>Resume</span>
+                <span>Start Bot</span>
               </button>
+            )}
 
+            {isRunning && (
+              <>
+                <button
+                  onClick={() => handleAction("PAUSE")}
+                  disabled={isActing}
+                  className="py-2.5 px-4 rounded-xl bg-amber-500/20 border border-amber-500/40 hover:bg-amber-500/30 text-amber-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Pause className="w-4 h-4 fill-current" />
+                  <span>Pause</span>
+                </button>
+
+                <button
+                  onClick={() => handleAction("STOP")}
+                  disabled={isActing}
+                  className="py-2.5 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                  <span>Stop</span>
+                </button>
+              </>
+            )}
+
+            {isPaused && (
+              <>
+                <button
+                  onClick={() => handleAction("RESUME")}
+                  disabled={isActing}
+                  className="py-2.5 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Resume</span>
+                </button>
+
+                <button
+                  onClick={() => handleAction("STOP")}
+                  disabled={isActing}
+                  className="py-2.5 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                  <span>Stop</span>
+                </button>
+              </>
+            )}
+
+            {isError && (
               <button
-                onClick={() => handleAction("STOP")}
+                onClick={() => handleAction("RETRY")}
                 disabled={isActing}
-                className="py-2.5 px-4 rounded-xl bg-rose-500/20 border border-rose-500/40 hover:bg-rose-500/30 text-rose-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="col-span-2 py-2.5 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                <Square className="w-4 h-4 fill-current" />
-                <span>Stop</span>
+                <RotateCcw className="w-4 h-4" />
+                <span>Retry Recovery</span>
               </button>
-            </>
-          )}
+            )}
+          </div>
 
-          {isError && (
+          {/* Delete Bot Button in Drawer */}
+          {onDeleteBot && (
             <button
-              onClick={() => handleAction("RETRY")}
+              onClick={handleDelete}
               disabled={isActing}
-              className="col-span-2 py-2.5 px-4 rounded-xl bg-cyan-500/20 border border-cyan-500/40 hover:bg-cyan-500/30 text-cyan-300 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+              className="w-full py-2 px-4 rounded-xl bg-rose-950/40 border border-rose-800/60 hover:bg-rose-900/60 text-rose-400 font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50 text-xs"
             >
-              <RotateCcw className="w-4 h-4" />
-              <span>Retry Recovery</span>
+              <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+              <span>Delete Bot Instance</span>
             </button>
           )}
         </div>

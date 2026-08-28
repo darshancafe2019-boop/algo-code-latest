@@ -175,7 +175,7 @@ class OptionChainSnapshot:
 
 @dataclass
 class InstrumentMetadata:
-    """Static and Dynamic Instrument Master Specifications."""
+    """Static and Dynamic Instrument Master Specifications across Indian, Global, and Crypto Markets."""
     symbol: str
     display_name: str
     description: str
@@ -183,11 +183,24 @@ class InstrumentMetadata:
     exchange: str
     region: str
     provider_id: str
+    country: str = "Global"
+    security_type: str = "STOCK"
     lot_size: int = 1
+    contract_multiplier: float = 1.0
     tick_size: float = 0.05
+    min_quantity: float = 1.0
+    quantity_step: float = 1.0
     is_active: bool = True
+    is_tradable: bool = True
+    is_derivative: bool = False
     base_currency: str = "USD"
     quote_currency: str = "USD"
+    settlement_currency: str = "USD"
+    exercise_style: str = "EUROPEAN"  # "EUROPEAN" | "AMERICAN"
+    settlement_style: str = "CASH"    # "CASH" | "PHYSICAL"
+    linear_or_inverse: str = "LINEAR" # "LINEAR" | "INVERSE"
+    trading_timezone: str = "UTC"
+    market_session: str = "REGULAR"
     has_options: bool = False
     has_futures: bool = False
 

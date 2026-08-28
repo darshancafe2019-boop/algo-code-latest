@@ -143,7 +143,6 @@ export function SimpleBotTable({
   const someFilteredSelected =
     bots.some((b) => selectedBotIds.includes(b.id)) && !allFilteredSelected;
 
->>>>>>> 06985bc (feat: Implement Multi-Market Options Strategy Workstation with 24 strategies, premium selection engine, and capability adapters)
   if (isLoading && bots.length === 0) {
     return (
       <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs shadow-xl">

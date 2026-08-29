@@ -62,9 +62,9 @@ async function runOAuthSuite() {
   console.log("\n[TEST 2] GET /api/upstox/login Initiation Flow:");
   process.env.UPSTOX_API_KEY = process.env.UPSTOX_API_KEY || "3cdebdbd-fd83-4a2d-a28d-aab8fe1090be";
   process.env.UPSTOX_API_SECRET = process.env.UPSTOX_API_SECRET || "cml9l8bms7";
-  process.env.UPSTOX_REDIRECT_URI = "http://localhost:3000/api/upstox/callback";
+  process.env.UPSTOX_REDIRECT_URI = "http://localhost:3100/api/upstox/callback";
 
-  const loginReq = new Request("http://localhost:3000/api/upstox/login");
+  const loginReq = new Request("http://localhost:3100/api/upstox/login");
   const loginRes = await loginHandler(loginReq);
 
   const redirectLocation = loginRes.headers.get("location") || "";
@@ -92,7 +92,7 @@ async function runOAuthSuite() {
 
   if (
     loginRes.status === 307 &&
-    redirectUriParam === "http://localhost:3000/api/upstox/callback" &&
+    redirectUriParam === "http://localhost:3100/api/upstox/callback" &&
     cookieMatches &&
     stateParam &&
     stateParam.length >= 32
@@ -108,7 +108,7 @@ async function runOAuthSuite() {
   // TEST 3: Callback Diagnostics - Upstox Error Return
   // ─────────────────────────────────────────────────────────────────────────────
   console.log("\n[TEST 3] Callback Diagnostics: User Declined / Error Returned:");
-  const errReq = new Request("http://localhost:3000/api/upstox/callback?error=access_denied&error_description=User+denied+access", {
+  const errReq = new Request("http://localhost:3100/api/upstox/callback?error=access_denied&error_description=User+denied+access", {
     headers: { Accept: "application/json" }
   });
   const errRes = await callbackHandler(errReq);
@@ -128,7 +128,7 @@ async function runOAuthSuite() {
   // TEST 4: Callback Diagnostics - Missing Code
   // ─────────────────────────────────────────────────────────────────────────────
   console.log("\n[TEST 4] Callback Diagnostics: Missing Authorization Code:");
-  const missingCodeReq = new Request(`http://localhost:3000/api/upstox/callback?state=${stateParam}`, {
+  const missingCodeReq = new Request(`http://localhost:3100/api/upstox/callback?state=${stateParam}`, {
     headers: { Accept: "application/json" }
   });
   const missingCodeRes = await callbackHandler(missingCodeReq);
@@ -147,7 +147,7 @@ async function runOAuthSuite() {
   // TEST 5: Callback Diagnostics - Missing State Cookie
   // ─────────────────────────────────────────────────────────────────────────────
   console.log("\n[TEST 5] Callback Diagnostics: Missing State Cookie:");
-  const missingCookieReq = new Request(`http://localhost:3000/api/upstox/callback?code=test_code&state=${stateParam}`, {
+  const missingCookieReq = new Request(`http://localhost:3100/api/upstox/callback?code=test_code&state=${stateParam}`, {
     headers: { Accept: "application/json" }
   });
   const missingCookieRes = await callbackHandler(missingCookieReq);
@@ -166,7 +166,7 @@ async function runOAuthSuite() {
   // TEST 6: Callback Diagnostics - State Mismatch (CSRF Attack)
   // ─────────────────────────────────────────────────────────────────────────────
   console.log("\n[TEST 6] Callback Diagnostics: State Mismatch (CSRF Detection):");
-  const mismatchReq = new Request(`http://localhost:3000/api/upstox/callback?code=test_code&state=attackers_fake_state`, {
+  const mismatchReq = new Request(`http://localhost:3100/api/upstox/callback?code=test_code&state=attackers_fake_state`, {
     headers: {
       Accept: "application/json",
       Cookie: `upstox_oauth_state=${stateParam}`
@@ -188,7 +188,7 @@ async function runOAuthSuite() {
   // TEST 7: Callback Diagnostics - Upstox Token Exchange Handling
   // ─────────────────────────────────────────────────────────────────────────────
   console.log("\n[TEST 7] Callback Diagnostics: Upstox Token Exchange Handling:");
-  const validStateReq = new Request(`http://localhost:3000/api/upstox/callback?code=synthetic_auth_code_123&state=${stateParam}`, {
+  const validStateReq = new Request(`http://localhost:3100/api/upstox/callback?code=synthetic_auth_code_123&state=${stateParam}`, {
     headers: {
       Accept: "application/json",
       Cookie: `upstox_oauth_state=${stateParam}`

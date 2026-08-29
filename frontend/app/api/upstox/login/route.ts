@@ -15,7 +15,7 @@ const UPSTOX_AUTH_DIALOG_URL = "https://api.upstox.com/v2/login/authorization/di
 export async function GET(req: NextRequest) {
   try {
     const urlObj = new URL(req.url);
-    const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3000";
+    const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3100";
 
     const apiKey = (
       process.env.UPSTOX_API_KEY ||

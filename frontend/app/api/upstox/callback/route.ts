@@ -18,7 +18,7 @@ const BACKEND_INTERNAL_URL =
 export async function GET(req: NextRequest) {
   const urlObj = new URL(req.url);
   const searchParams = req.nextUrl?.searchParams || urlObj.searchParams;
-  const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3000";
+  const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3100";
 
   const code = searchParams.get("code")?.trim();
   const state = searchParams.get("state")?.trim();

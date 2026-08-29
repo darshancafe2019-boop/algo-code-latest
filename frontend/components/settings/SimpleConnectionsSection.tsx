@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UpstoxConnectionCard } from "./UpstoxConnectionCard";
+import { BinanceConnectionCard } from "./BinanceConnectionCard";
 
 interface BrokerCredential {
   credential_id: string;
@@ -211,8 +212,9 @@ export function SimpleConnectionsSection() {
         </div>
       </div>
 
-      {/* Upstox Dedicated OAuth Connection Card */}
-      <div className="pt-2">
+      {/* Dedicated Exchange & Broker Connection Cards */}
+      <div className="space-y-4 pt-2">
+        <BinanceConnectionCard />
         <UpstoxConnectionCard />
       </div>
 

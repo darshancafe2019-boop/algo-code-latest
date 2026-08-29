@@ -17,6 +17,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface SecurityTelemetry {
   security_status: string;
@@ -318,7 +319,7 @@ export function SimpleSecuritySection({ telemetry, onRefresh }: SimpleSecuritySe
                         {s.user_agent || "Authenticated Client Session"}
                       </div>
                       <div className="text-[11px] text-slate-500 font-sans mt-0.5">
-                        IP: {s.ip_address} • Last Active: {s.last_active ? new Date(s.last_active).toLocaleTimeString() : "Recent"}
+                        IP: {s.ip_address} • Last Active: {s.last_active ? <HydratedTimestamp timestamp={s.last_active} /> : "Recent"}
                       </div>
                     </div>
                   </div>

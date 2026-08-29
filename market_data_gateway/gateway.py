@@ -28,6 +28,7 @@ from aiohttp import web
 
 from market_data_gateway.adapters.base import NormalizedQuote, ProviderHealth
 from market_data_gateway.adapters.binance_ws import BinanceWSAdapter
+from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
@@ -54,6 +55,7 @@ class MarketDataGateway:
         # Initialize adapters
         self.adapters = {
             "binance_ws": BinanceWSAdapter(),
+            "upstox_ws": UpstoxWSAdapter(),
             "angelone": AngelOneAdapter(),
             "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
             # Stub adapters for providers that need credentials

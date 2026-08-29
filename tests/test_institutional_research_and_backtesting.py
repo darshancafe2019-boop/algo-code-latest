@@ -9,10 +9,13 @@ Validates:
 """
 
 import math
-import pytest
+import sys
+import unittest
+from pathlib import Path
 import numpy as np
 import pandas as pd
 from typing import Dict, Any, List
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src import config, indicators
 from src.backtester import calculate_performance_metrics
@@ -116,5 +119,19 @@ def test_zero_lookahead_bias_in_indicator_series():
     ind_100 = indicators.generate_indicators(df)
     rsi_at_50 = ind_100["rsi"].iloc[49]
 
-    # Indicator at bar 50 must match exactly whether bar 51-100 exists or not
     assert math.isclose(last_rsi_50, rsi_at_50, abs_tol=1e-5)
+
+
+class TestInstitutionalResearchAndBacktesting(unittest.TestCase):
+    def test_confidence_threshold_gate(self):
+        test_confidence_threshold_gate()
+
+    def test_performance_metrics_calculation(self):
+        test_performance_metrics_calculation()
+
+    def test_zero_lookahead_bias(self):
+        test_zero_lookahead_bias_in_indicator_series()
+
+
+if __name__ == "__main__":
+    unittest.main()

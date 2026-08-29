@@ -19,6 +19,7 @@ import {
 import { TerminalPositionsPanel } from "@/components/terminal/TerminalPositionsPanel";
 import { EcoTable, EcoTableHead, EcoTableHeadCell, EcoTableBody, EcoTableRow, EcoTableCell } from "@/components/eco/EcoTable";
 import { EcoBadge } from "@/components/eco/EcoBadge";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface BottomActivityDockProps {
   isOpen: boolean;
@@ -183,7 +184,7 @@ export function BottomActivityDock({ isOpen, onToggle }: BottomActivityDockProps
                           </EcoBadge>
                         </EcoTableCell>
                         <EcoTableCell align="right" className="text-[var(--theme-text-muted)] text-[10px]">
-                          {t.timestamp ? new Date(t.timestamp).toLocaleTimeString() : "Just now"}
+                          {t.timestamp ? <HydratedTimestamp timestamp={t.timestamp} /> : "Just now"}
                         </EcoTableCell>
                       </EcoTableRow>
                     );

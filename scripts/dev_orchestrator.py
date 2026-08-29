@@ -431,9 +431,17 @@ class ServiceSupervisor:
         frontend_env["MARKET_GATEWAY_URL"] = f"http://127.0.0.1:{GATEWAY_PORT}"
         frontend_env["PORT"] = str(FRONTEND_PORT)
         
-        next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / "next.cmd"
-        if sys.platform == "win32" and next_cmd_bin.exists():
-            frontend_cmd = [str(next_cmd_bin), "dev", "-p", str(FRONTEND_PORT)]
+        # Clean stale production build cache if booting in dev mode to prevent chunk 404 mismatches
+        next_build_id = FRONTEND_DIR / ".next" / "BUILD_ID"
+        if next_build_id.exists():
+            try:
+                import shutil
+                shutil.rmtree(FRONTEND_DIR / ".next", ignore_errors=True)
+            except Exception:
+                pass
+
+        if sys.platform == "win32":
+            frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
         else:
             next_bin = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
             if next_bin.exists():

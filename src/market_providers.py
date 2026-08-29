@@ -623,6 +623,17 @@ class NSEMarketProvider(BaseMarketProvider):
         self.status_code = "CONNECTED"
         return instruments
 
+    def get_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        from src.upstox_service import global_upstox_service
+        quotes = global_upstox_service.fetch_market_quotes(symbols)
+        self.last_quote_at = datetime.now(timezone.utc).isoformat()
+        return quotes
+
+    def get_historical(self, symbol: str, timeframe: str = "15m", limit: int = 100) -> List[Dict[str, Any]]:
+        from src.upstox_service import global_upstox_service
+        df = global_upstox_service.fetch_historical_candles(symbol, timeframe=timeframe, limit=limit)
+        return df.to_dict(orient="records")
+
 
 # =============================================================
 # 2. BSE MARKET PROVIDER (Equities & SENSEX 30)

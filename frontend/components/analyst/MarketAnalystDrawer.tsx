@@ -23,6 +23,7 @@ import {
   Zap,
 } from "lucide-react";
 import { MarketAnalysisResult, AnalysisMode } from "@/lib/openai/schemas";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface MarketAnalystDrawerProps {
   isOpen: boolean;
@@ -615,7 +616,7 @@ export function MarketAnalystDrawer({
                       </div>
                       <p className="text-xs text-slate-300 mt-1">{ref.title}</p>
                       <span className="text-[10px] font-mono text-slate-500 block mt-1">
-                        Accessed: {new Date(ref.accessedAt).toLocaleTimeString()}
+                        Accessed: <HydratedTimestamp timestamp={ref.accessedAt} />
                       </span>
                     </div>
                     {ref.url && (

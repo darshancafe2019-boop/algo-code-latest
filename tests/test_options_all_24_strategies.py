@@ -92,5 +92,22 @@ def test_iron_condor_payoff_math():
     assert len(res["breakevens"]) == 2
 
 
+import unittest
+
+class TestAll24OptionStrategies(unittest.TestCase):
+    def test_strategy_metadata_count(self):
+        test_strategy_metadata_count()
+
+    def test_all_24_strategies_evaluation(self):
+        for strategy in ALL_24_STRATEGIES_METADATA:
+            test_all_24_strategies_evaluation(strategy)
+
+    def test_bull_call_spread_payoff_math(self):
+        test_bull_call_spread_payoff_math()
+
+    def test_iron_condor_payoff_math(self):
+        test_iron_condor_payoff_math()
+
+
 if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    unittest.main()

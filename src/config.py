@@ -24,6 +24,16 @@ BINANCE_TESTNET_SECRET_KEY = os.getenv("BINANCE_TESTNET_SECRET_KEY", "")
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "") or BINANCE_TESTNET_API_KEY
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "") or BINANCE_TESTNET_SECRET_KEY
 
+# Indian Market & Upstox Integration
+UPSTOX_CLIENT_ID = os.getenv("UPSTOX_CLIENT_ID", "")
+UPSTOX_CLIENT_SECRET = os.getenv("UPSTOX_CLIENT_SECRET", "")
+UPSTOX_REDIRECT_URI = os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
+UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
+ENABLE_INDIA_MARKET = os.getenv("ENABLE_INDIA_MARKET", "true").lower() == "true"
+ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
+ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "true").lower() == "true"
+INDIA_BROKER = os.getenv("INDIA_BROKER", "UPSTOX")
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_COMMANDS_ENABLED = os.getenv("TELEGRAM_COMMANDS_ENABLED", "false").lower() == "true"

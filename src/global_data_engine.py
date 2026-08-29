@@ -41,10 +41,19 @@ def _resolve_timezone(tz_name: Optional[str]):
 
 
 def _get_db():
-    """Acquires connection to primary SQLite database with timeout."""
-    conn = sqlite3.connect(str(config.DB_PATH), timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Acquires connection to primary SQLite database with 30s busy timeout and WAL mode."""
+    try:
+        return db.get_connection()
+    except Exception:
+        conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL;")
+            conn.execute("PRAGMA busy_timeout=30000;")
+            conn.execute("PRAGMA synchronous=NORMAL;")
+        except Exception:
+            pass
+        conn.row_factory = sqlite3.Row
+        return conn
 
 
 def _decimal_round(val: float, places: int = 2) -> float:
@@ -136,48 +145,55 @@ class GlobalDataEngine:
         week_start_iso = (now_dt - timedelta(days=7)).isoformat()
         month_start_iso = (now_dt - timedelta(days=30)).isoformat()
 
-        conn = _get_db()
-        cursor = conn.cursor()
+        closed_trades = []
+        open_positions = []
+        open_orders = []
+        bots = []
+        try:
+            conn = _get_db()
+            cursor = conn.cursor()
 
-        # 1. Fetch Closed Trades for Mode
-        cursor.execute(
-            """
-            SELECT * FROM trades_log 
-            WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')
-            ORDER BY timestamp ASC
-            """,
-            (trading_mode,),
-        )
-        closed_trades = [dict(r) for r in cursor.fetchall()]
+            # 1. Fetch Closed Trades for Mode
+            cursor.execute(
+                """
+                SELECT * FROM trades_log 
+                WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')
+                ORDER BY timestamp ASC
+                """,
+                (trading_mode,),
+            )
+            closed_trades = [dict(r) for r in cursor.fetchall()]
 
-        # 2. Fetch Active Open Positions for Mode
-        cursor.execute(
-            """
-            SELECT * FROM trades_log 
-            WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
-            ORDER BY timestamp DESC
-            """,
-            (trading_mode,),
-        )
-        open_positions = [dict(r) for r in cursor.fetchall()]
+            # 2. Fetch Active Open Positions for Mode
+            cursor.execute(
+                """
+                SELECT * FROM trades_log 
+                WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
+                ORDER BY timestamp DESC
+                """,
+                (trading_mode,),
+            )
+            open_positions = [dict(r) for r in cursor.fetchall()]
 
-        # 3. Fetch Open Orders
-        cursor.execute(
-            """
-            SELECT * FROM trades_log 
-            WHERE execution_mode = ? AND status IN ('PENDING', 'SUBMITTED', 'OPEN')
-            """,
-            (trading_mode,),
-        )
-        open_orders = [dict(r) for r in cursor.fetchall()]
+            # 3. Fetch Open Orders
+            cursor.execute(
+                """
+                SELECT * FROM trades_log 
+                WHERE execution_mode = ? AND status IN ('PENDING', 'SUBMITTED', 'OPEN')
+                """,
+                (trading_mode,),
+            )
+            open_orders = [dict(r) for r in cursor.fetchall()]
 
-        # 4. Fetch Bot Allocations & Starting Capital
-        cursor.execute(
-            "SELECT allocated_capital, current_equity FROM bot_instances WHERE execution_mode = ?",
-            (trading_mode,),
-        )
-        bots = cursor.fetchall()
-        conn.close()
+            # 4. Fetch Bot Allocations & Starting Capital
+            cursor.execute(
+                "SELECT allocated_capital, current_equity FROM bot_instances WHERE execution_mode = ?",
+                (trading_mode,),
+            )
+            bots = cursor.fetchall()
+            conn.close()
+        except Exception as e:
+            logger.warning("Error reading portfolio database state: %s", e)
 
         total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
         starting_balance = 50000.0 if is_paper else max(10000.0, total_allocated)
@@ -314,18 +330,22 @@ class GlobalDataEngine:
     def get_positions(self, mode: str = "PAPER") -> List[Dict[str, Any]]:
         """Returns active open positions with live mark prices and real-time P&L."""
         trading_mode = str(mode or "PAPER").upper()
-        conn = _get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT * FROM trades_log 
-            WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
-            ORDER BY timestamp DESC
-            """,
-            (trading_mode,),
-        )
-        rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
+        rows = []
+        try:
+            conn = _get_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM trades_log 
+                WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
+                ORDER BY timestamp DESC
+                """,
+                (trading_mode,),
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+        except Exception as e:
+            logger.warning("Error fetching positions from database: %s", e)
 
         positions = []
         for r in rows:
@@ -347,20 +367,21 @@ class GlobalDataEngine:
             )
 
             positions.append({
-                "id": str(r.get("id")),
+                "id": f"POS-{r.get('id')}",
+                "trade_id": r.get("id"),
                 "symbol": sym,
                 "direction": direction,
-                "quantity": qty,
                 "entry_price": entry_p,
-                "current_price": live_p,
-                "stop_loss": sl,
-                "take_profit": tp,
+                "mark_price": live_p,
+                "quantity": qty,
+                "notional_value": round(entry_p * qty, 2),
                 "unrealized_pnl": pnl_data.get("unrealized_pnl", 0.0),
                 "unrealized_pnl_pct": pnl_data.get("unrealized_pnl_pct", 0.0),
-                "notional_value": round(entry_p * qty, 2),
+                "stop_loss": sl if sl > 0 else None,
+                "take_profit": tp if tp > 0 else None,
                 "status": "OPEN",
-                "opened_at": r.get("entry_timestamp") or r.get("timestamp") or r.get("created_at"),
-                "bot_id": r.get("bot_id") or "ai-ensemble-engine",
+                "created_at": r.get("timestamp") or r.get("created_at"),
+                "bot_id": r.get("bot_id") or "master-paper-bot",
                 "execution_mode": trading_mode,
             })
 
@@ -369,18 +390,22 @@ class GlobalDataEngine:
     def get_orders(self, mode: str = "PAPER", limit: int = 100) -> List[Dict[str, Any]]:
         """Returns unified orders ledger."""
         trading_mode = str(mode or "PAPER").upper()
-        conn = _get_db()
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            SELECT * FROM trades_log 
-            WHERE execution_mode = ?
-            ORDER BY id DESC LIMIT ?
-            """,
-            (trading_mode, limit),
-        )
-        rows = [dict(r) for r in cursor.fetchall()]
-        conn.close()
+        rows = []
+        try:
+            conn = _get_db()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT * FROM trades_log 
+                WHERE execution_mode = ?
+                ORDER BY id DESC LIMIT ?
+                """,
+                (trading_mode, limit),
+            )
+            rows = [dict(r) for r in cursor.fetchall()]
+            conn.close()
+        except Exception as e:
+            logger.warning("Error fetching orders from database: %s", e)
 
         orders = []
         for r in rows:
@@ -450,83 +475,70 @@ class GlobalDataEngine:
             except Exception:
                 end_cutoff = None
 
-        conn = _get_db()
-        cursor = conn.cursor()
-
-        # 2. Build Query Filters for Trades
-        query = "SELECT * FROM trades_log WHERE execution_mode = ?"
-        params: List[Any] = [trading_mode]
-
-        if bot_id and bot_id.upper() != "ALL":
-            query += " AND (bot_id = ? OR bot_instance_id = ?)"
-            params.extend([bot_id, bot_id])
-        if strategy_id and strategy_id.upper() != "ALL":
-            query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
-            params.extend([strategy_id, strategy_id, strategy_id])
-        if symbol and symbol.upper() != "ALL":
-            query += " AND (symbol = ? OR canonical_symbol = ?)"
-            params.extend([symbol, symbol])
-        if asset_class and asset_class.upper() != "ALL":
-            query += " AND asset_class = ?"
-            params.append(asset_class)
-
-        query += " ORDER BY id ASC"
-        cursor.execute(query, tuple(params))
-        raw_trades = [dict(r) for r in cursor.fetchall()]
-
-        # 3. Filter Trades by Date Range
-        filtered_trades = []
-        for t in raw_trades:
-            ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at") or ""
-            if not ts_str:
-                filtered_trades.append(t)
-                continue
-            try:
-                t_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
-                if t_dt.tzinfo is None:
-                    t_dt = t_dt.replace(tzinfo=timezone.utc)
-                if start_cutoff and t_dt < start_cutoff:
-                    continue
-                if end_cutoff and t_dt > end_cutoff:
-                    continue
-                filtered_trades.append(t)
-            except Exception:
-                filtered_trades.append(t)
-
-        # 4. Fetch Bot Allocation for Starting Balance
-        cursor.execute(
-            "SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?",
-            (trading_mode,),
-        )
-        bots = cursor.fetchall()
-        total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
-        base_equity = 50000.0 if trading_mode == "PAPER" else max(10000.0, total_allocated)
-
-        # 5. Fetch Events (Audit Log & Bot Activity)
+        raw_trades = []
+        base_equity = 50000.0 if trading_mode == "PAPER" else 10000.0
         events: List[Dict[str, Any]] = []
-        try:
-            cursor.execute(
-                """
-                SELECT id, timestamp, event_type, message, severity, details 
-                FROM audit_log 
-                ORDER BY id DESC LIMIT 50
-                """
-            )
-            audit_rows = [dict(r) for r in cursor.fetchall()]
-            for a in audit_rows:
-                events.append({
-                    "id": f"EVT-{a.get('id')}",
-                    "timestamp": a.get("timestamp") or now_iso,
-                    "type": a.get("event_type") or "AUDIT",
-                    "title": a.get("event_type", "").replace("_", " ").title(),
-                    "description": a.get("message") or "",
-                    "severity": str(a.get("severity") or "INFO").upper(),
-                    "details": a.get("details") or "",
-                })
-        except Exception:
-            pass
 
-        conn.close()
+        try:
+            conn = _get_db()
+            cursor = conn.cursor()
+
+            # 2. Build Query Filters for Trades
+            query = "SELECT * FROM trades_log WHERE execution_mode = ?"
+            params: List[Any] = [trading_mode]
+
+            if bot_id and bot_id.upper() != "ALL":
+                query += " AND (bot_id = ? OR bot_instance_id = ?)"
+                params.extend([bot_id, bot_id])
+            if strategy_id and strategy_id.upper() != "ALL":
+                query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
+                params.extend([strategy_id, strategy_id, strategy_id])
+            if symbol and symbol.upper() != "ALL":
+                query += " AND (symbol = ? OR canonical_symbol = ?)"
+                params.extend([symbol, symbol])
+            if asset_class and asset_class.upper() != "ALL":
+                query += " AND asset_class = ?"
+                params.append(asset_class)
+
+            query += " ORDER BY id ASC"
+            cursor.execute(query, tuple(params))
+            raw_trades = [dict(r) for r in cursor.fetchall()]
+
+            # 4. Fetch Bot Allocation for Starting Balance
+            cursor.execute(
+                "SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?",
+                (trading_mode,),
+            )
+            bots = cursor.fetchall()
+            total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
+            base_equity = 50000.0 if trading_mode == "PAPER" else max(10000.0, total_allocated)
+
+            # 5. Fetch Events (Audit Log & Bot Activity)
+            try:
+                cursor.execute(
+                    """
+                    SELECT id, timestamp, event_type, message, severity, details 
+                    FROM audit_log 
+                    ORDER BY id DESC LIMIT 50
+                    """
+                )
+                audit_rows = [dict(r) for r in cursor.fetchall()]
+                for a in audit_rows:
+                    events.append({
+                        "id": f"EVT-{a.get('id')}",
+                        "timestamp": a.get("timestamp") or now_iso,
+                        "type": a.get("event_type") or "AUDIT",
+                        "title": a.get("event_type", "").replace("_", " ").title(),
+                        "description": a.get("message") or "",
+                        "severity": str(a.get("severity") or "INFO").upper(),
+                        "details": a.get("details") or "",
+                    })
+            except Exception:
+                pass
+
+            conn.close()
+        except Exception as e:
+            logger.warning("Error reading equity curve database state: %s", e)
 
         # 6. Generate Baseline Points for Time Range
         num_baseline_pts = 6
@@ -884,46 +896,52 @@ class GlobalDataEngine:
             except Exception:
                 end_cutoff = None
 
-        conn = _get_db()
-        cursor = conn.cursor()
+        raw_trades = []
+        cash_flows = []
+        base_equity = 50000.0 if trading_mode == "PAPER" else 10000.0
 
-        # 2. Fetch Closed Trades for Mode
-        query = "SELECT * FROM trades_log WHERE execution_mode = ?"
-        params: List[Any] = [trading_mode]
-
-        if bot_id and bot_id.upper() != "ALL":
-            query += " AND (bot_id = ? OR bot_instance_id = ?)"
-            params.extend([bot_id, bot_id])
-        if strategy_id and strategy_id.upper() != "ALL":
-            query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
-            params.extend([strategy_id, strategy_id, strategy_id])
-        if symbol and symbol.upper() != "ALL":
-            query += " AND (symbol = ? OR canonical_symbol = ?)"
-            params.extend([symbol, symbol])
-        if asset_class and asset_class.upper() != "ALL":
-            query += " AND asset_class = ?"
-            params.append(asset_class)
-
-        query += " ORDER BY id ASC"
-        cursor.execute(query, tuple(params))
-        raw_trades = [dict(r) for r in cursor.fetchall()]
-
-        # Fetch external cash flows (Deposits / Withdrawals) if table exists
-        cash_flows: List[Dict[str, Any]] = []
         try:
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='account_cash_flows'")
-            if cursor.fetchone():
-                cursor.execute("SELECT * FROM account_cash_flows WHERE mode = ? ORDER BY timestamp ASC", (trading_mode,))
-                cash_flows = [dict(r) for r in cursor.fetchall()]
-        except Exception:
-            pass
+            conn = _get_db()
+            cursor = conn.cursor()
 
-        # Fetch Base Capital
-        cursor.execute("SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?", (trading_mode,))
-        bots = cursor.fetchall()
-        total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
-        base_equity = 50000.0 if trading_mode == "PAPER" else max(10000.0, total_allocated)
-        conn.close()
+            # 2. Fetch Closed Trades for Mode
+            query = "SELECT * FROM trades_log WHERE execution_mode = ?"
+            params: List[Any] = [trading_mode]
+
+            if bot_id and bot_id.upper() != "ALL":
+                query += " AND (bot_id = ? OR bot_instance_id = ?)"
+                params.extend([bot_id, bot_id])
+            if strategy_id and strategy_id.upper() != "ALL":
+                query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
+                params.extend([strategy_id, strategy_id, strategy_id])
+            if symbol and symbol.upper() != "ALL":
+                query += " AND (symbol = ? OR canonical_symbol = ?)"
+                params.extend([symbol, symbol])
+            if asset_class and asset_class.upper() != "ALL":
+                query += " AND asset_class = ?"
+                params.append(asset_class)
+
+            query += " ORDER BY id ASC"
+            cursor.execute(query, tuple(params))
+            raw_trades = [dict(r) for r in cursor.fetchall()]
+
+            # Fetch external cash flows (Deposits / Withdrawals) if table exists
+            try:
+                cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='account_cash_flows'")
+                if cursor.fetchone():
+                    cursor.execute("SELECT * FROM account_cash_flows WHERE mode = ? ORDER BY timestamp ASC", (trading_mode,))
+                    cash_flows = [dict(r) for r in cursor.fetchall()]
+            except Exception:
+                pass
+
+            # Fetch Base Capital
+            cursor.execute("SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?", (trading_mode,))
+            bots = cursor.fetchall()
+            total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
+            base_equity = 50000.0 if trading_mode == "PAPER" else max(10000.0, total_allocated)
+            conn.close()
+        except Exception as e:
+            logger.warning("Error reading profitability database state: %s", e)
 
         # 3. Bin Trades & Cash Flows into Date Buckets (Timezone-Aware)
         # Key helper for aggregation:
@@ -1377,86 +1395,91 @@ class GlobalDataEngine:
         target_tz = _resolve_timezone(tz_name)
         now_utc = datetime.now(timezone.utc)
 
-        conn = _get_db()
-        cursor = conn.cursor()
+        all_trades = []
+        events = []
+        signals = []
 
-        # Fetch Trades on this date
-        query = "SELECT * FROM trades_log WHERE execution_mode = ?"
-        params: List[Any] = [trading_mode]
+        try:
+            conn = _get_db()
+            cursor = conn.cursor()
 
-        if bot_id and bot_id.upper() != "ALL":
-            query += " AND (bot_id = ? OR bot_instance_id = ?)"
-            params.extend([bot_id, bot_id])
-        if strategy_id and strategy_id.upper() != "ALL":
-            query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
-            params.extend([strategy_id, strategy_id, strategy_id])
-        if symbol and symbol.upper() != "ALL":
-            query += " AND (symbol = ? OR canonical_symbol = ?)"
-            params.extend([symbol, symbol])
+            # Fetch Trades on this date
+            query = "SELECT * FROM trades_log WHERE execution_mode = ?"
+            params: List[Any] = [trading_mode]
 
-        query += " ORDER BY id ASC"
-        cursor.execute(query, tuple(params))
-        all_trades = [dict(r) for r in cursor.fetchall()]
+            if bot_id and bot_id.upper() != "ALL":
+                query += " AND (bot_id = ? OR bot_instance_id = ?)"
+                params.extend([bot_id, bot_id])
+            if strategy_id and strategy_id.upper() != "ALL":
+                query += " AND (strategy = ? OR strategy_name = ? OR strategy_id = ?)"
+                params.extend([strategy_id, strategy_id, strategy_id])
+            if symbol and symbol.upper() != "ALL":
+                query += " AND (symbol = ? OR canonical_symbol = ?)"
+                params.extend([symbol, symbol])
 
-        matching_trades = []
-        for t in all_trades:
-            ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at") or ""
+            query += " ORDER BY id ASC"
+            cursor.execute(query, tuple(params))
+            all_trades = [dict(r) for r in cursor.fetchall()]
+
+            matching_trades = []
+            for t in all_trades:
+                ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at") or ""
+                try:
+                    dt_t = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).astimezone(target_tz)
+                    if dt_t.strftime("%Y-%m-%d") == date_str:
+                        matching_trades.append(t)
+                except Exception:
+                    pass
+
+            # Fetch Audit Log Events on this date
             try:
-                dt_t = datetime.fromisoformat(ts_str.replace("Z", "+00:00")).astimezone(target_tz)
-                if dt_t.strftime("%Y-%m-%d") == date_str:
-                    matching_trades.append(t)
+                cursor.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100")
+                for a in cursor.fetchall():
+                    a_dict = dict(a)
+                    a_ts = a_dict.get("timestamp") or ""
+                    try:
+                        a_dt = datetime.fromisoformat(a_ts.replace("Z", "+00:00")).astimezone(target_tz)
+                        if a_dt.strftime("%Y-%m-%d") == date_str:
+                            events.append({
+                                "id": f"EVT-{a_dict.get('id')}",
+                                "timestamp": a_ts,
+                                "type": a_dict.get("event_type", "AUDIT"),
+                                "message": a_dict.get("message", ""),
+                                "severity": str(a_dict.get("severity", "INFO")).upper(),
+                                "details": a_dict.get("details", ""),
+                            })
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
-        # Fetch Audit Log Events on this date
-        events = []
-        try:
-            cursor.execute("SELECT * FROM audit_log ORDER BY id DESC LIMIT 100")
-            for a in cursor.fetchall():
-                a_dict = dict(a)
-                a_ts = a_dict.get("timestamp") or ""
-                try:
-                    a_dt = datetime.fromisoformat(a_ts.replace("Z", "+00:00")).astimezone(target_tz)
-                    if a_dt.strftime("%Y-%m-%d") == date_str:
-                        events.append({
-                            "id": f"EVT-{a_dict.get('id')}",
-                            "timestamp": a_ts,
-                            "type": a_dict.get("event_type", "AUDIT"),
-                            "message": a_dict.get("message", ""),
-                            "severity": str(a_dict.get("severity", "INFO")).upper(),
-                            "details": a_dict.get("details", ""),
-                        })
-                except Exception:
-                    pass
-        except Exception:
-            pass
+            # Fetch Signals on this date
+            try:
+                cursor.execute("SELECT * FROM signals_log ORDER BY id DESC LIMIT 100")
+                for s in cursor.fetchall():
+                    s_dict = dict(s)
+                    s_ts = s_dict.get("timestamp") or ""
+                    try:
+                        s_dt = datetime.fromisoformat(s_ts.replace("Z", "+00:00")).astimezone(target_tz)
+                        if s_dt.strftime("%Y-%m-%d") == date_str:
+                            signals.append({
+                                "id": s_dict.get("id"),
+                                "timestamp": s_ts,
+                                "symbol": s_dict.get("symbol", "BTC/USDT"),
+                                "signal_type": s_dict.get("signal_type", "HOLD"),
+                                "price": float(s_dict.get("price") or 0.0),
+                                "confidence": float(s_dict.get("confidence_score") or 0.0),
+                                "is_blocked": bool(s_dict.get("is_blocked")),
+                                "reason": s_dict.get("reason", ""),
+                            })
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
-        # Fetch Signals on this date
-        signals = []
-        try:
-            cursor.execute("SELECT * FROM signals_log ORDER BY id DESC LIMIT 100")
-            for s in cursor.fetchall():
-                s_dict = dict(s)
-                s_ts = s_dict.get("timestamp") or ""
-                try:
-                    s_dt = datetime.fromisoformat(s_ts.replace("Z", "+00:00")).astimezone(target_tz)
-                    if s_dt.strftime("%Y-%m-%d") == date_str:
-                        signals.append({
-                            "id": s_dict.get("id"),
-                            "timestamp": s_ts,
-                            "symbol": s_dict.get("symbol", "BTC/USDT"),
-                            "signal_type": s_dict.get("signal_type", "HOLD"),
-                            "price": float(s_dict.get("price") or 0.0),
-                            "confidence": float(s_dict.get("confidence_score") or 0.0),
-                            "is_blocked": bool(s_dict.get("is_blocked")),
-                            "reason": s_dict.get("reason", ""),
-                        })
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        conn.close()
+            conn.close()
+        except Exception as e:
+            logger.warning("Error reading day details database state: %s", e)
 
         # Format Trades
         formatted_trades = []

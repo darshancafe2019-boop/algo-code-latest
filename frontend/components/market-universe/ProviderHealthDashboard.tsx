@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Server
 } from "lucide-react";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface ProviderHealthDashboardProps {
   onSyncCompleted?: () => void;
@@ -165,7 +166,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
                 {/* Footer sync action */}
                 <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between">
                   <span className="text-[10px] text-slate-500">
-                    {p.last_sync ? `Sync: ${new Date(p.last_sync).toLocaleTimeString()}` : "Sync: OK"}
+                    {p.last_sync ? <>Sync: <HydratedTimestamp timestamp={p.last_sync} /></> : "Sync: OK"}
                   </span>
                   <button
                     onClick={() => handleSyncProvider(p.provider_id)}

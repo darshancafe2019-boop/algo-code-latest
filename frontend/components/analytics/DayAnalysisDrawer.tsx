@@ -23,6 +23,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { DayAnalysisDetail, DayTradeDetail } from "@/types/pnl-analytics";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 import { apiClient } from "@/lib/apiClient";
 import { formatPrice, formatPercent, formatPnL } from "@/lib/formatters";
 import Link from "next/link";
@@ -326,7 +327,7 @@ export function DayAnalysisDrawer({
                         <Clock className="w-3.5 h-3.5 text-cyan-400" />
                         <div>
                           <div className="text-white font-semibold">{step.symbol}</div>
-                          <div className="text-[10px] text-slate-400">{step.time ? new Date(step.time).toLocaleTimeString() : `Step ${idx + 1}`}</div>
+                          <div className="text-[10px] text-slate-400">{step.time ? <HydratedTimestamp timestamp={step.time} /> : `Step ${idx + 1}`}</div>
                         </div>
                       </div>
                       <div className="text-right">
@@ -374,7 +375,7 @@ export function DayAnalysisDrawer({
                       </div>
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      {new Date(sig.timestamp).toLocaleTimeString()}
+                      <HydratedTimestamp timestamp={sig.timestamp} />
                     </div>
                   </div>
                 ))
@@ -394,7 +395,7 @@ export function DayAnalysisDrawer({
                   <div key={evt.id} className="bg-[#0B111E] border border-[#1E293B] rounded-lg p-3 space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-white">{evt.type}</span>
-                      <span className="text-[10px] text-slate-400">{new Date(evt.timestamp).toLocaleTimeString()}</span>
+                      <span className="text-[10px] text-slate-400"><HydratedTimestamp timestamp={evt.timestamp} /></span>
                     </div>
                     <div className="text-[11px] text-slate-300">{evt.message}</div>
                   </div>

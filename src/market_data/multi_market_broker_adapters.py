@@ -387,9 +387,11 @@ class BinanceOptionsAdapter(BrokerAdapter):
 class MultiMarketBrokerManager:
     """Registry and query manager for all connected broker adapters."""
     def __init__(self):
+        from src.upstox_broker_adapter import global_upstox_broker_adapter
         self._adapters: Dict[str, BrokerAdapter] = {
             "paper": PaperMultiMarketAdapter(),
-            "indian_nse": ExistingIndianBrokerAdapter(),
+            "upstox": global_upstox_broker_adapter,
+            "indian_nse": global_upstox_broker_adapter,
             "global_ibkr": GlobalBrokerAdapter(),
             "binance_options": BinanceOptionsAdapter(),
         }

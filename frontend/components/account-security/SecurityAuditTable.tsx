@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { History, Shield, Search, User, Globe, Clock, Terminal } from "lucide-react";
 import { SecurityAuditLog } from "@/types/account-security";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface SecurityAuditTableProps {
   logs: SecurityAuditLog[];
@@ -21,22 +22,6 @@ export function SecurityAuditTable({ logs }: SecurityAuditTableProps) {
       String(log.id).includes(q)
     );
   });
-
-  const formatTimestamp = (ts: string) => {
-    try {
-      const d = new Date(ts);
-      return d.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-        hour12: false,
-      });
-    } catch {
-      return ts;
-    }
-  };
 
   const getActionBadge = (action: string) => {
     const act = action.toUpperCase();
@@ -111,7 +96,7 @@ export function SecurityAuditTable({ logs }: SecurityAuditTableProps) {
                 <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-4 font-mono text-slate-400 font-medium">#{log.id}</td>
                   <td className="py-3 px-4 font-mono text-slate-300 whitespace-nowrap">
-                    {formatTimestamp(log.timestamp)}
+                    <HydratedTimestamp timestamp={log.timestamp} formatType="datetime" />
                   </td>
                   <td className="py-3 px-4 whitespace-nowrap">{getActionBadge(log.action)}</td>
                   <td className="py-3 px-4 text-slate-300 font-medium">{log.user}</td>

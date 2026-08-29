@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2 } from "lucide-react";
 import { BotRowItem } from "./SimpleBotTable";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface SimpleBotDetailsDrawerProps {
   isOpen: boolean;
@@ -263,7 +264,7 @@ export function SimpleBotDetailsDrawer({
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-slate-400">Last State Update:</span>
-                <span className="text-slate-200">{bot.updated_at ? new Date(bot.updated_at).toLocaleTimeString() : "Just now"}</span>
+                <span className="text-slate-200">{bot.updated_at ? <HydratedTimestamp timestamp={bot.updated_at} /> : "Just now"}</span>
               </div>
 
               {bot.config && Object.keys(bot.config).length > 0 && (

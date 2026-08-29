@@ -1,5 +1,8 @@
-# Env file containing credentials
+# Env files containing credentials
 .env
+.env*
+.env.local
+.env.*.local
 
 # SQLite databases
 *.db

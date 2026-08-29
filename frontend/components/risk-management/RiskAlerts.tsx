@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { AlertTriangle, Bell, Info, ShieldAlert, Shield, RefreshCw } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { RiskEvent } from "@/types/risk";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 export function RiskAlerts() {
   const [filterSeverity, setFilterSeverity] = useState<string>("ALL");
@@ -84,7 +85,7 @@ export function RiskAlerts() {
                 </div>
               </div>
               <span className="text-[10px] text-slate-500 whitespace-nowrap">
-                {new Date(evt.timestamp).toLocaleTimeString()}
+                <HydratedTimestamp timestamp={evt.timestamp} />
               </span>
             </div>
           ))

@@ -9,9 +9,13 @@ Tests:
 5. GlobalDataEngine position and P&L uniformity across snapshots
 """
 
-import pytest
+import sys
+import unittest
 import math
+from pathlib import Path
 from datetime import datetime, timezone
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.instrument_resolver import (
     InstrumentResolver,
     global_instrument_resolver,
@@ -27,7 +31,7 @@ from src.trade_ledger import trade_ledger
 from src import config, db
 
 
-class TestInstrumentResolverOptions:
+class TestInstrumentResolverOptions(unittest.TestCase):
     """Verifies canonical instrument resolution and dynamic lot sizing."""
 
     def test_nifty_option_resolution(self):
@@ -70,12 +74,11 @@ class TestInstrumentResolverOptions:
         assert res.instrument.lot_size == 1.0
 
 
-class TestOptionChainMath:
+class TestOptionChainMath(unittest.TestCase):
     """Verifies deterministic PCR, Max Pain, and Greeks calculation."""
 
-    @pytest.fixture
-    def sample_strikes(self):
-        return [
+    def setUp(self):
+        self.sample_strikes = [
             {
                 "strike": 24000.0,
                 "ce": {"ltp": 450.0, "open_interest": 100000, "volume": 50000, "iv": 14.5},
@@ -98,8 +101,8 @@ class TestOptionChainMath:
             },
         ]
 
-    def test_pcr_calculation(self, sample_strikes):
-        pcr = OptionChainEngine.calculate_pcr(sample_strikes)
+    def test_pcr_calculation(self):
+        pcr = OptionChainEngine.calculate_pcr(self.sample_strikes)
         total_call_oi = 100000 + 80000 + 120000 + 90000  # 390,000
         total_put_oi = 40000 + 60000 + 150000 + 70000   # 320,000
         expected_pcr_oi = round(total_put_oi / total_call_oi, 3)
@@ -107,8 +110,8 @@ class TestOptionChainMath:
         assert pcr["total_put_oi"] == total_put_oi
         assert pcr["pcr_oi"] == expected_pcr_oi
 
-    def test_max_pain_calculation(self, sample_strikes):
-        max_pain = OptionChainEngine.calculate_max_pain(sample_strikes)
+    def test_max_pain_calculation(self):
+        max_pain = OptionChainEngine.calculate_max_pain(self.sample_strikes)
         assert max_pain in [24000.0, 24200.0, 24400.0, 24600.0]
 
     def test_black_scholes_greeks(self):
@@ -128,7 +131,7 @@ class TestOptionChainMath:
         assert greeks["iv"] == 15.0
 
 
-class TestNseServiceSignalsAndExecution:
+class TestNseServiceSignalsAndExecution(unittest.TestCase):
     """Verifies deterministic setup score and order routing."""
 
     def test_deterministic_setup_score(self):
@@ -163,7 +166,7 @@ class TestNseServiceSignalsAndExecution:
         assert "order_id" in res
 
 
-class TestGlobalDataEnginePortfolioSnapshot:
+class TestGlobalDataEnginePortfolioSnapshot(unittest.TestCase):
     """Verifies single source of truth for portfolio snapshot, equity, and positions."""
 
     def test_portfolio_snapshot_integrity(self):
@@ -176,3 +179,7 @@ class TestGlobalDataEnginePortfolioSnapshot:
         assert "availableCapital" in snap
         assert "marginUsed" in snap
         assert snap["equity"] == round(snap["cashBalance"] + snap["unrealizedPnl"], 2)
+
+
+if __name__ == "__main__":
+    unittest.main()

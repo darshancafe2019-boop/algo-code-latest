@@ -8,6 +8,8 @@ import { NseCandleTerminal } from "@/components/nse/NseCandleTerminal";
 import { NseOptionChainTerminal } from "@/components/nse/NseOptionChainTerminal";
 import { NseComprehensiveIntelligence } from "@/components/nse/NseComprehensiveIntelligence";
 import { NseDerivativesHub } from "@/components/nse/NseDerivativesHub";
+import { UpstoxMarketDataPanel } from "@/components/upstox/UpstoxMarketDataPanel";
+import { UpstoxDevTestPanel } from "@/components/upstox/UpstoxDevTestPanel";
 import { Sparkles } from "lucide-react";
 
 export default function NseTerminalPage() {
@@ -33,6 +35,12 @@ export default function NseTerminalPage() {
 
         {/* 1. Market Overview Strip */}
         <NseMarketStrip />
+
+        {/* Upstox Authoritative Live Feed Monitor & Test Bench */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <UpstoxMarketDataPanel />
+          <UpstoxDevTestPanel />
+        </div>
 
         {/* 2. Automated Algorithmic Trading Bot Hub */}
         <NseAlgoBotPanel />

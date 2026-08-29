@@ -57,14 +57,14 @@ def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: flo
 
 def get_connection() -> sqlite3.Connection:
     """
-    Create and return an optimized SQLite connection with 30s timeout and busy_timeout=10000ms.
+    Create and return an optimized SQLite connection with 30s timeout and busy_timeout=30000ms.
     Does NOT change journal_mode on every connect to avoid exclusive lock contention.
     """
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
-        conn.execute("PRAGMA busy_timeout=10000;")
+        conn.execute("PRAGMA busy_timeout=30000;")
         conn.execute("PRAGMA foreign_keys=ON;")
     except Exception:
         pass
@@ -2445,6 +2445,154 @@ def init_db(force: bool = False) -> None:
                     """
                 )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_sec_alerts_status ON security_alerts(status, severity)")
+
+                # ============================================================================
+                # MULTI-MARKET OPTIONS WORKSTATION & STATISTICAL PAIRS TRADING TABLES
+                # ============================================================================
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS options_strategy_instances (
+                        instance_id TEXT PRIMARY KEY,
+                        strategy_id TEXT NOT NULL,
+                        strategy_name TEXT NOT NULL,
+                        underlying TEXT NOT NULL,
+                        exchange TEXT NOT NULL DEFAULT 'NSE',
+                        broker_id TEXT NOT NULL DEFAULT 'paper',
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        lots INTEGER NOT NULL DEFAULT 1,
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        net_debit_credit REAL DEFAULT 0.0,
+                        required_margin REAL DEFAULT 0.0,
+                        max_profit TEXT DEFAULT 'UNLIMITED',
+                        max_loss TEXT DEFAULT 'UNDEFINED',
+                        breakevens TEXT DEFAULT '[]',
+                        legs_json TEXT NOT NULL DEFAULT '[]',
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_inst_status ON options_strategy_instances(status, created_at DESC)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_inst_und ON options_strategy_instances(underlying)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS options_orders (
+                        order_id TEXT PRIMARY KEY,
+                        instance_id TEXT NOT NULL,
+                        underlying TEXT NOT NULL,
+                        broker_id TEXT NOT NULL DEFAULT 'paper',
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        status TEXT NOT NULL DEFAULT 'FILLED',
+                        legs_count INTEGER DEFAULT 1,
+                        net_fill_cash_flow REAL DEFAULT 0.0,
+                        raw_payload TEXT DEFAULT '{}',
+                        executed_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_orders_inst ON options_orders(instance_id)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS options_positions (
+                        position_id TEXT PRIMARY KEY,
+                        strategy_name TEXT NOT NULL,
+                        underlying TEXT NOT NULL,
+                        direction TEXT NOT NULL DEFAULT 'NEUTRAL',
+                        quantity REAL NOT NULL DEFAULT 1.0,
+                        entry_price REAL NOT NULL DEFAULT 0.0,
+                        current_price REAL NOT NULL DEFAULT 0.0,
+                        unrealized_pnl REAL NOT NULL DEFAULT 0.0,
+                        status TEXT NOT NULL DEFAULT 'OPEN',
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        legs_json TEXT NOT NULL DEFAULT '[]',
+                        opened_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_pos_status ON options_positions(status)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS pairs_strategy_instances (
+                        pair_instance_id TEXT PRIMARY KEY,
+                        pair_id TEXT NOT NULL,
+                        symbol_a TEXT NOT NULL,
+                        symbol_b TEXT NOT NULL,
+                        market TEXT NOT NULL DEFAULT 'India',
+                        direction TEXT NOT NULL DEFAULT 'NEUTRAL_FLAT',
+                        mode TEXT NOT NULL DEFAULT 'PAPER',
+                        status TEXT NOT NULL DEFAULT 'ACTIVE',
+                        hedge_ratio REAL NOT NULL DEFAULT 1.0,
+                        entry_zscore REAL DEFAULT 0.0,
+                        exit_zscore REAL DEFAULT 0.0,
+                        allocated_capital REAL DEFAULT 10000.0,
+                        quantity_a REAL DEFAULT 100.0,
+                        quantity_b REAL DEFAULT 100.0,
+                        live_pnl REAL DEFAULT 0.0,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_pairs_inst_status ON pairs_strategy_instances(status, created_at DESC)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS pairs_discovery_cache (
+                        pair_id TEXT PRIMARY KEY,
+                        symbol_a TEXT NOT NULL,
+                        symbol_b TEXT NOT NULL,
+                        market TEXT NOT NULL,
+                        asset_class TEXT NOT NULL,
+                        correlation REAL DEFAULT 0.0,
+                        hedge_ratio REAL DEFAULT 1.0,
+                        adf_pvalue REAL DEFAULT 1.0,
+                        coint_pvalue REAL DEFAULT 1.0,
+                        half_life REAL DEFAULT 30.0,
+                        composite_score REAL DEFAULT 0.0,
+                        analysis_json TEXT DEFAULT '{}',
+                        scanned_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_pairs_cache_market ON pairs_discovery_cache(market, composite_score DESC)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS multileg_orders (
+                        order_id TEXT PRIMARY KEY,
+                        strategy_type TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        legs_json TEXT NOT NULL DEFAULT '[]',
+                        net_price REAL DEFAULT 0.0,
+                        status TEXT NOT NULL DEFAULT 'FILLED',
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        broker TEXT NOT NULL DEFAULT 'paper',
+                        filled_at TEXT,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_multileg_orders_status ON multileg_orders(status, created_at DESC)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS options_audit_log (
+                        audit_id TEXT PRIMARY KEY,
+                        event_type TEXT NOT NULL,
+                        target_id TEXT NOT NULL,
+                        user_id TEXT NOT NULL DEFAULT 'OPERATOR',
+                        action_name TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'SUCCESS',
+                        details_json TEXT NOT NULL DEFAULT '{}',
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_audit_ts ON options_audit_log(created_at DESC)")
 
                 cursor.execute("UPDATE bot_instances SET group_name = 'Crypto Scalping Bots' WHERE group_name IS NULL OR group_name = ''")
 
@@ -7413,19 +7561,29 @@ def get_instruments_master(
 
     if asset_class and asset_class.upper() != "ALL":
         ac_up = asset_class.upper()
-        if ac_up in ["STOCK", "STOCKS"]:
-            conditions.append("asset_class IN ('Stock', 'INDIAN_STOCKS', 'GLOBAL_STOCKS')")
+        if ac_up in ["STOCK", "STOCKS", "EQUITIES", "EQUITY"]:
+            conditions.append("(asset_class IN ('Stock', 'Indian Equities', 'Global Equities', 'EQUITY', 'INDIAN_STOCKS', 'GLOBAL_STOCKS') OR instrument_type = 'EQUITY' OR instrument_type = 'CASH')")
+        elif ac_up in ["FUNDS", "FUND", "ETF", "ETFS"]:
+            conditions.append("(asset_class IN ('Funds', 'FUND', 'ETF', 'ETFs') OR instrument_type IN ('FUND', 'ETF'))")
+        elif ac_up in ["FUTURES", "FUTURE"]:
+            conditions.append("(asset_class IN ('Futures', 'FUTURES') OR instrument_type IN ('FUTURE', 'PERPETUAL'))")
+        elif ac_up in ["OPTIONS", "OPTION"]:
+            conditions.append("(asset_class IN ('Options', 'OPTIONS') OR instrument_type = 'OPTION')")
         elif ac_up in ["CRYPTO", "CRYPTOCURRENCY"]:
-            conditions.append("asset_class IN ('Crypto', 'CRYPTO')")
+            conditions.append("(asset_class IN ('Crypto', 'CRYPTO') OR exchange = 'BINANCE')")
         elif ac_up in ["FOREX", "FX", "CURRENCY"]:
-            conditions.append("asset_class IN ('Forex', 'FOREX')")
+            conditions.append("(asset_class IN ('Forex', 'FOREX') OR exchange = 'OANDA')")
         elif ac_up in ["INDICES", "INDEX"]:
-            conditions.append("asset_class IN ('Indices', 'INDIAN_INDICES', 'GLOBAL_INDICES')")
+            conditions.append("(asset_class IN ('Indices', 'INDEX', 'INDIAN_INDICES', 'GLOBAL_INDICES') OR instrument_type = 'REFERENCE_INDEX')")
+        elif ac_up in ["BONDS", "BOND", "TREASURY"]:
+            conditions.append("(asset_class IN ('Bonds', 'BOND') OR instrument_type = 'BOND')")
+        elif ac_up in ["ECONOMY", "MACRO", "ECONOMIC_SERIES"]:
+            conditions.append("(asset_class IN ('Economy', 'ECONOMIC_SERIES') OR instrument_type = 'ECONOMIC_SERIES')")
         elif ac_up in ["COMMODITIES", "COMMODITY"]:
             conditions.append("asset_class IN ('Commodities', 'COMMODITIES')")
         else:
-            conditions.append("(asset_class = ? OR asset_class = ?)")
-            params.extend([asset_class, asset_class.upper()])
+            conditions.append("(asset_class = ? OR asset_class = ? OR instrument_type = ?)")
+            params.extend([asset_class, asset_class.upper(), asset_class.upper()])
 
     if exchange and exchange.upper() != "ALL":
         conditions.append("exchange = ?")

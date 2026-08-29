@@ -30,6 +30,7 @@ import {
   ErrorSeverity,
   IncidentStatus,
 } from "@/types/reliability";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface SystemReliabilityCenterProps {
   initialIncidents?: SystemIncident[];
@@ -438,7 +439,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
                         </span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap text-[10px] text-slate-400">
-                        {inc.last_seen ? new Date(inc.last_seen).toLocaleTimeString() : inc.timestamp}
+                        {inc.last_seen ? <HydratedTimestamp timestamp={inc.last_seen} /> : (inc.timestamp || "--:--:--")}
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span

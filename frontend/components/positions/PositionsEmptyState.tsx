@@ -15,6 +15,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface PositionsEmptyStateProps {
   executionMode: "PAPER" | "LIVE";
@@ -74,7 +75,7 @@ export function PositionsEmptyState({
           </span>
         </div>
         <span className="text-[10px] text-[var(--theme-text-muted)] hidden sm:inline">
-          {lastScanTime ? `Last scan: ${new Date(lastScanTime).toLocaleTimeString()}` : "Continuous Scan Active"}
+          {lastScanTime ? <>Last scan: <HydratedTimestamp timestamp={lastScanTime} /></> : "Continuous Scan Active"}
         </span>
       </div>
 

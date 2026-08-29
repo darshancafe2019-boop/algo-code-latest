@@ -21,6 +21,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { CanonicalRiskSnapshot, RiskGateResult } from "@/types/risk";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface RiskSectionOverviewProps {
   snapshot: CanonicalRiskSnapshot;
@@ -154,7 +155,7 @@ export function RiskSectionOverview({
               </h3>
             </div>
             <span className="text-[10px] font-mono text-[var(--theme-text-muted)]">
-              Evaluation: {new Date(permission.evaluatedAt).toLocaleTimeString()}
+              Evaluation: <HydratedTimestamp timestamp={permission.evaluatedAt} />
             </span>
           </div>
 

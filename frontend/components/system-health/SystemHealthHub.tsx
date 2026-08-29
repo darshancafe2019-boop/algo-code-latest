@@ -21,6 +21,7 @@ import {
   Sliders
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface SubsystemInfo {
   status: "HEALTHY" | "WARNING" | "ERROR" | "DISCONNECTED" | "NOT_CONFIGURED" | "ARMED" | "HALTED" | "READY" | "RUNNING" | "IDLE" | "PROTECTED";
@@ -209,7 +210,7 @@ export function SystemHealthHub() {
                   <div className="text-slate-400 flex items-center gap-1 text-right justify-end">
                     <Clock className="h-3 w-3 text-slate-500" />
                     <span className="text-[10px] text-slate-400">
-                      {subData.last_updated ? new Date(subData.last_updated).toLocaleTimeString() : "Live"}
+                      {subData.last_updated ? <HydratedTimestamp timestamp={subData.last_updated} /> : "Live"}
                     </span>
                   </div>
                 </div>

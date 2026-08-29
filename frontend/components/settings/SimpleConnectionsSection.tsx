@@ -14,6 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { UpstoxConnectionCard } from "./UpstoxConnectionCard";
 
 interface BrokerCredential {
   credential_id: string;
@@ -184,11 +185,11 @@ export function SimpleConnectionsSection() {
         {/* Indian / Institutional Broker */}
         <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl space-y-1.5">
           <div className="flex items-center justify-between text-slate-400 text-[11px] font-sans">
-            <span>Domestic Broker (Dhan / Kite)</span>
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Domestic Broker (Upstox / NSE)</span>
+            <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
           </div>
           <div className="text-sm font-bold text-white font-mono">
-            Connected ✓
+            OAuth2 Enabled
           </div>
           <div className="text-[10px] text-slate-500 font-sans">
             NSE / BSE Derivatives Ready
@@ -208,6 +209,11 @@ export function SimpleConnectionsSection() {
             Deduplicated Alert Dispatch Armed
           </div>
         </div>
+      </div>
+
+      {/* Upstox Dedicated OAuth Connection Card */}
+      <div className="pt-2">
+        <UpstoxConnectionCard />
       </div>
 
       {/* Manage Connections Modal */}

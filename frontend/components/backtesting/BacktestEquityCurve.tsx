@@ -33,7 +33,7 @@ export function BacktestEquityCurve({ metrics, config }: BacktestEquityCurveProp
       const dipFactor = Math.sin(progress * Math.PI) * (maxDD / 100) * initial * 0.7;
       const linearGrowth = (final - initial) * progress;
       const equity = Math.max(initial * 0.8, initial + linearGrowth - (i > 2 && i < 5 ? dipFactor : 0));
-      const dd = i > 2 && i < 5 ? Math.min(maxDD, (dipFactor / initial) * 100) : Math.random() * (maxDD * 0.2);
+      const dd = i > 2 && i < 5 ? Math.min(maxDD, (dipFactor / initial) * 100) : (((i * 37) % 100) / 100) * (maxDD * 0.2);
 
       points.push({
         milestone: `Checkpoint #${i + 1}`,

@@ -11,6 +11,10 @@ from datetime import datetime, timezone, timedelta
 from typing import Dict, List
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from market_data_gateway.adapters.base import (
     BaseProviderAdapter,
     NormalizedQuote,

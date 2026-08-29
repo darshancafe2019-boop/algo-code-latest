@@ -38,14 +38,16 @@ interface SimpleMarketsHeaderProps {
 
 const CATEGORIES = [
   { id: "ALL", label: "All" },
-  { id: "WATCHLISTS", label: "Watchlist ★" },
-  { id: "CRYPTO", label: "Crypto" },
   { id: "STOCKS", label: "Stocks" },
-  { id: "INDICES", label: "Indices" },
+  { id: "FUNDS", label: "Funds" },
   { id: "FUTURES", label: "Futures" },
-  { id: "OPTIONS", label: "Options" },
   { id: "FOREX", label: "Forex" },
-  { id: "COMMODITIES", label: "Commodities" },
+  { id: "CRYPTO", label: "Crypto" },
+  { id: "INDICES", label: "Indices" },
+  { id: "BONDS", label: "Bonds" },
+  { id: "ECONOMY", label: "Economy" },
+  { id: "OPTIONS", label: "Options" },
+  { id: "WATCHLISTS", label: "Watchlist ★" },
 ];
 
 export function SimpleMarketsHeader({

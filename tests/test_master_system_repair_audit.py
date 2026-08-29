@@ -26,6 +26,10 @@ Tests and verifies all 34 critical operational pillars of the Algo Bot platform:
 22. Diagnostics & System Health Telemetry
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import time
 import json
 import unittest

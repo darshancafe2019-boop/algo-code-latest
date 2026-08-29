@@ -19,14 +19,14 @@ logger = logging.getLogger("MDGateway.Failover")
 # Primary -> Fallback -> Last-resort
 FAILOVER_CHAINS: Dict[str, List[str]] = {
     "CRYPTO": ["binance_ws", "yahoo_fallback"],
-    "INDIAN_EQUITIES": ["angelone", "yahoo_fallback"],
-    "INDIAN_INDICES": ["angelone", "yahoo_fallback"],
+    "INDIAN_EQUITIES": ["upstox_ws", "angelone", "yahoo_fallback"],
+    "INDIAN_INDICES": ["upstox_ws", "angelone", "yahoo_fallback"],
     "GLOBAL_EQUITIES": ["twelve_data", "polygon", "yahoo_fallback"],
     "GLOBAL_INDICES": ["twelve_data", "yahoo_fallback"],
     "FOREX": ["twelve_data", "yahoo_fallback"],
     "COMMODITIES": ["twelve_data", "yahoo_fallback"],
-    "FUTURES": ["binance_ws", "databento", "yahoo_fallback"],
-    "OPTIONS": ["angelone", "twelve_data"],
+    "FUTURES": ["upstox_ws", "binance_ws", "databento", "yahoo_fallback"],
+    "OPTIONS": ["upstox_ws", "angelone", "twelve_data"],
 }
 
 # Asset class assignment per symbol prefix/pattern (simplified)

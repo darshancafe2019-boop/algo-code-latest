@@ -22,6 +22,7 @@ import {
   Zap,
   ShieldAlert
 } from "lucide-react";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface AlertsIncidentTableProps {
   incidents: IncidentItem[];
@@ -122,21 +123,6 @@ export function AlertsIncidentTable({
         {status}
       </span>
     );
-  };
-
-  const formatTimestamp = (ts: string) => {
-    try {
-      const d = new Date(ts);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString("en-US", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false
-        });
-      }
-    } catch (e) {}
-    return ts;
   };
 
   if (isLoading) {
@@ -290,7 +276,7 @@ export function AlertsIncidentTable({
                   <td className="py-3 px-3 font-mono text-[11px] text-slate-400">
                     <div className="flex items-center gap-1">
                       <Clock className="w-3 h-3 text-slate-500" />
-                      {formatTimestamp(incident.last_seen_at)}
+                      <HydratedTimestamp timestamp={incident.last_seen_at} />
                     </div>
                   </td>
 

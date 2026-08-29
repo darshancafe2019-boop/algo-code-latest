@@ -45,6 +45,7 @@ import {
 } from "@/lib/trading/strategies/base/StrategyTypes";
 import { AnalyzedMarketState } from "@/lib/trading/engine/MarketStateAnalyzer";
 import { StrategySelectionResult } from "@/lib/trading/engine/StrategySelector";
+import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 
 interface OptionsControlCenterProps {
   underlying: string;
@@ -522,7 +523,7 @@ export function OptionsControlCenter({
                   <div className="text-right">
                     <div className="text-[10px] text-slate-500 uppercase">Last Run</div>
                     <div className="text-slate-300">
-                      {entry.lastRunTime ? new Date(entry.lastRunTime).toLocaleTimeString() : "Never"}
+                      {entry.lastRunTime ? <HydratedTimestamp timestamp={entry.lastRunTime} /> : "Never"}
                     </div>
                   </div>
                 </div>

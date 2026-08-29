@@ -11,6 +11,10 @@ import sqlite3
 import json
 from decimal import Decimal
 from datetime import datetime, timezone, timedelta
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import dashboard
 from src import config, db
 from src.global_data_engine import GlobalDataEngine

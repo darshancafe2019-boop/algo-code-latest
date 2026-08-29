@@ -291,6 +291,40 @@ class OptionsPlaceholderAdapter(ProviderAdapter):
         )
 
 
+class UpstoxMarketAdapter(ProviderAdapter):
+    """Authoritative Upstox API V3 adapter for Indian Equities, Indices, and F&O."""
+
+    def __init__(self):
+        super().__init__("upstox", "Upstox V3 Market Data Engine")
+
+    def supports_instrument(self, instrument: CanonicalInstrument) -> bool:
+        return (
+            instrument.asset_class in [AssetClass.INDIAN_STOCKS, AssetClass.EQUITY]
+            or instrument.exchange == "NSE"
+            or instrument.provider in ["upstox", "upstox_ws", "zerodha"]
+        )
+
+    def fetch_ohlcv(self, instrument: CanonicalInstrument, timeframe: str, limit: int = 500) -> pd.DataFrame:
+        from src.upstox_service import global_upstox_service
+        t0 = time.time()
+        self.request_count += 1
+        try:
+            df = global_upstox_service.fetch_historical_candles(instrument.canonical_symbol, timeframe=timeframe, limit=limit)
+            elapsed_ms = (time.time() - t0) * 1000.0
+            self.latencies.append(elapsed_ms)
+            if len(self.latencies) > 100:
+                self.latencies.pop(0)
+
+            self.circuit.record_success()
+            self.last_success_time = datetime.now(timezone.utc).strftime("%H:%M:%S")
+            return df
+        except Exception as e:
+            self.error_count += 1
+            self.circuit.record_failure()
+            logger.error("Upstox Market Data fetch error for %s: %s", instrument.canonical_symbol, e)
+            raise e
+
+
 class ProviderManager:
     """
     Central Provider Router that enforces capability validation, circuit breakers,
@@ -301,15 +335,25 @@ class ProviderManager:
         self.spot_adapter = BinanceSpotAdapter()
         self.futures_adapter = BinanceFuturesAdapter()
         self.options_adapter = OptionsPlaceholderAdapter()
+        self.upstox_adapter = UpstoxMarketAdapter()
         self._adapters: Dict[str, ProviderAdapter] = {
             "binance_spot": self.spot_adapter,
             "binance_futures": self.futures_adapter,
             "deribit_options": self.options_adapter,
             "options_gateway": self.options_adapter,
+            "upstox": self.upstox_adapter,
+            "upstox_ws": self.upstox_adapter,
+            "zerodha": self.upstox_adapter,
         }
 
     def route_instrument(self, instrument: CanonicalInstrument) -> ProviderAdapter:
         """Determines the authoritative adapter based on asset class and instrument type."""
+        if (
+            instrument.asset_class in [AssetClass.INDIAN_STOCKS, AssetClass.EQUITY]
+            or instrument.exchange == "NSE"
+            or instrument.provider in ["upstox", "upstox_ws", "zerodha"]
+        ):
+            return self.upstox_adapter
         if instrument.instrument_type == InstrumentType.OPTION:
             return self.options_adapter
         if instrument.instrument_type == InstrumentType.PERPETUAL:

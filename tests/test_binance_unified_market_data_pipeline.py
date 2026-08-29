@@ -12,9 +12,12 @@ Tests:
 8. Single Financial Source of Truth Reconciled with Global Data Engine
 """
 
-import pytest
+import sys
+import unittest
 import time
+from pathlib import Path
 from datetime import datetime, timezone
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.binance_market_data_service import (
     BinanceMarketDataService,
@@ -29,7 +32,7 @@ from src.execution_service import order_execution_service
 from src import config, db
 
 
-class TestBinanceMarketDataService:
+class TestBinanceMarketDataService(unittest.TestCase):
     """Verifies official Binance market data integration and normalization."""
 
     def test_binance_spot_and_futures_ticker_discovery(self):
@@ -120,7 +123,7 @@ class TestBinanceMarketDataService:
         assert "depth_imbalance_pct" in ob
 
 
-class TestBinanceWsManager:
+class TestBinanceWsManager(unittest.TestCase):
     """Verifies shared WebSocket multiplexing and subscription deduplication."""
 
     def test_subscription_deduplication(self):
@@ -146,7 +149,7 @@ class TestBinanceWsManager:
         assert price > 0
 
 
-class TestCrossPagePriceAndFinancialConsistency:
+class TestCrossPagePriceAndFinancialConsistency(unittest.TestCase):
     """Verifies that all pages share the exact same market snapshot and portfolio values."""
 
     def test_atomic_market_snapshot_consistency(self):
@@ -182,3 +185,7 @@ class TestCrossPagePriceAndFinancialConsistency:
         assert order_res.get("execution_mode") in ["PAPER", "TEST"]
         # Verify no external live broker ID was created
         assert "live_broker_id" not in order_res
+
+
+if __name__ == "__main__":
+    unittest.main()

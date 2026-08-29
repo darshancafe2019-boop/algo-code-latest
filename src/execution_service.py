@@ -40,10 +40,26 @@ def _execute_statement(sql: str, params: tuple = ()) -> bool:
         return False
 
 
+def _is_indian_symbol(symbol: str) -> bool:
+    clean = symbol.strip().upper()
+    from src.upstox_service import UPSTOX_INSTRUMENT_MAP
+    return (
+        clean in UPSTOX_INSTRUMENT_MAP
+        or "NSE" in clean
+        or "|" in clean
+        or clean.endswith("CE")
+        or clean.endswith("PE")
+    )
+
+
 class PaperExecutionAdapter:
     """Simulated Paper Execution Adapter maintaining identical order contract as Live."""
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
+        if _is_indian_symbol(symbol):
+            from src.upstox_broker_adapter import global_upstox_broker_adapter
+            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+
         sim_order_id = f"PAPER_ORD_{uuid.uuid4().hex[:10]}"
         return {
             "success": True,
@@ -88,6 +104,10 @@ class LiveExecutionAdapter:
     """Live Execution Adapter requiring strict server-side arming and 14-point validation."""
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
+        if _is_indian_symbol(symbol):
+            from src.upstox_broker_adapter import global_upstox_broker_adapter
+            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+
         from src.execution import ExecutionEngine
         from src.data_fetcher import get_testnet_fetcher
 

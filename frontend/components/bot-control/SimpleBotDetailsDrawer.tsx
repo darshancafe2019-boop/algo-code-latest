@@ -184,7 +184,7 @@ export function SimpleBotDetailsDrawer({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-sans">
-              '{bot.symbol}' is a generic asset category. Select an active dated strike contract from the live chain before starting this bot.
+              &apos;{bot.symbol}&apos; is a generic asset category. Select an active dated strike contract from the live chain before starting this bot.
             </p>
             <button
               onClick={() => setIsOptionsModalOpen(true)}

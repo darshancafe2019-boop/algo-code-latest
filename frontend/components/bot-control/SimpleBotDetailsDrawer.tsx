@@ -1,9 +1,8 @@
-"use client";
-
 import React, { useState } from "react";
-import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2 } from "lucide-react";
+import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2, Layers, Sparkles } from "lucide-react";
 import { BotRowItem } from "./SimpleBotTable";
 import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
+import { OptionsContractSelectorModal, SelectedOptionsContract } from "@/components/options/OptionsContractSelectorModal";
 
 interface SimpleBotDetailsDrawerProps {
   isOpen: boolean;
@@ -28,6 +27,8 @@ export function SimpleBotDetailsDrawer({
   const [isActing, setIsActing] = useState(false);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+  const [isUpdatingContract, setIsUpdatingContract] = useState(false);
 
   if (!isOpen || !bot) return null;
 
@@ -41,6 +42,46 @@ export function SimpleBotDetailsDrawer({
   const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
   const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
   const isPnlPositive = pnl >= 0;
+
+  const isGenericOptionsCategory =
+    ["BTC-OPTIONS", "ETH-OPTIONS", "SOL-OPTIONS", "NIFTY-OPTIONS", "BANKNIFTY-OPTIONS", "FINNIFTY-OPTIONS", "OPTIONS", "CRYPTO-OPTIONS"].includes((bot.symbol || "").toUpperCase()) ||
+    (((bot.asset_class || "").toUpperCase() === "CRYPTO_OPTIONS" || (bot.asset_class || "").toUpperCase() === "OPTIONS") &&
+      !bot.symbol.includes("-C") && !bot.symbol.includes("-P") && !bot.symbol.includes("CE") && !bot.symbol.includes("PE"));
+
+  const isOptionsAsset = (bot.asset_class || "").toUpperCase() === "CRYPTO_OPTIONS" || (bot.asset_class || "").toUpperCase() === "OPTIONS" || isGenericOptionsCategory;
+
+  const handleContractAssigned = async (contract: SelectedOptionsContract) => {
+    setIsUpdatingContract(true);
+    setActionFeedback(null);
+    try {
+      const res = await fetch(`/api/bot/${bot.id}/update-contract`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: contract.symbol,
+          display_symbol: contract.display_symbol,
+          contract_id: contract.contract_id,
+          underlying: contract.underlying,
+          provider: contract.provider,
+          expiry: contract.expiry,
+          strike: contract.strike,
+          option_type: contract.option_type,
+          asset_class: contract.asset_class,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.status === "success") {
+        setActionFeedback(`Options contract updated to ${contract.symbol} (${contract.contract_id}) successfully!`);
+        onRefresh();
+      } else {
+        setActionFeedback(`Failed to assign contract: ${data.message || data.error_code}`);
+      }
+    } catch (err: any) {
+      setActionFeedback(`Error updating contract: ${err.message}`);
+    } finally {
+      setIsUpdatingContract(false);
+    }
+  };
 
   const handleAction = async (action: string) => {
     setIsActing(true);
@@ -127,6 +168,32 @@ export function SimpleBotDetailsDrawer({
         {actionFeedback && (
           <div className="p-2.5 bg-slate-900 border border-slate-700 rounded-xl text-cyan-400 text-xs">
             {actionFeedback}
+          </div>
+        )}
+
+        {/* Options Contract Setup Banner if Generic Category */}
+        {isGenericOptionsCategory && (
+          <div className="p-4 rounded-xl bg-purple-950/30 border border-purple-500/40 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-purple-300 font-bold">
+                <Layers className="w-4 h-4 text-purple-400" />
+                <span>Options Contract Required</span>
+              </div>
+              <span className="px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase">
+                Generic Symbol
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 font-sans">
+              '{bot.symbol}' is a generic asset category. Select an active dated strike contract from the live chain before starting this bot.
+            </p>
+            <button
+              onClick={() => setIsOptionsModalOpen(true)}
+              disabled={isUpdatingContract}
+              className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>{isUpdatingContract ? "Updating..." : "Select Options Contract from Live Chain"}</span>
+            </button>
           </div>
         )}
 
@@ -283,14 +350,25 @@ export function SimpleBotDetailsDrawer({
         <div className="space-y-2 pt-2 mt-auto">
           <div className="grid grid-cols-2 gap-3">
             {isStopped && (
-              <button
-                onClick={() => handleAction("START")}
-                disabled={isActing}
-                className="col-span-2 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition flex items-center justify-center gap-1.5 disabled:opacity-50"
-              >
-                <Play className="w-4 h-4 fill-current" />
-                <span>Start Bot</span>
-              </button>
+              isGenericOptionsCategory ? (
+                <button
+                  onClick={() => setIsOptionsModalOpen(true)}
+                  disabled={isActing}
+                  className="col-span-2 py-2.5 px-4 rounded-xl bg-purple-600/30 border border-purple-500/60 hover:bg-purple-600/40 text-purple-200 font-extrabold transition flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(168,85,247,0.2)] disabled:opacity-50"
+                >
+                  <Layers className="w-4 h-4 text-purple-400" />
+                  <span>Select Options Contract to Start</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleAction("START")}
+                  disabled={isActing}
+                  className="col-span-2 py-2.5 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>Start Bot</span>
+                </button>
+              )
             )}
 
             {isRunning && (
@@ -362,6 +440,16 @@ export function SimpleBotDetailsDrawer({
           )}
         </div>
       </div>
+
+      {/* Options Contract Selector Modal */}
+      <OptionsContractSelectorModal
+        isOpen={isOptionsModalOpen}
+        onClose={() => setIsOptionsModalOpen(false)}
+        onSelectContract={handleContractAssigned}
+        initialUnderlying={bot.symbol}
+        initialAssetClass={isOptionsAsset ? "CRYPTO_OPTIONS" : undefined}
+        botName={bot.name}
+      />
     </div>
   );
 }

@@ -88,11 +88,11 @@ const POPULAR_INSTRUMENTS: Record<WizardAssetClass, { symbol: string; name: stri
     { symbol: "TSLA", name: "Tesla Inc.", exchange: "NASDAQ" },
   ],
   OPTIONS: [
-    { symbol: "NIFTY", name: "Nifty 50 Weekly / Monthly Options", exchange: "NFO" },
-    { symbol: "BANKNIFTY", name: "Bank Nifty Options Chain", exchange: "NFO" },
-    { symbol: "FINNIFTY", name: "Fin Nifty Options Chain", exchange: "NFO" },
-    { symbol: "RELIANCE", name: "Reliance Stock Options", exchange: "NFO" },
-    { symbol: "HDFCBANK", name: "HDFC Bank Stock Options", exchange: "NFO" },
+    { symbol: "NIFTY 24400 CE", name: "Nifty 24,400 Weekly CALL", exchange: "NSE" },
+    { symbol: "NIFTY 24400 PE", name: "Nifty 24,400 Weekly PUT", exchange: "NSE" },
+    { symbol: "BANKNIFTY 51000 CE", name: "Bank Nifty 51,000 Weekly CALL", exchange: "NSE" },
+    { symbol: "FINNIFTY 23000 CE", name: "Fin Nifty 23,000 CALL", exchange: "NSE" },
+    { symbol: "RELIANCE 3000 CE", name: "Reliance 3,000 Monthly CALL", exchange: "NSE" },
   ],
   FUTURES: [
     { symbol: "NIFTY-FUT", name: "Nifty 50 Index Futures", exchange: "NFO" },
@@ -110,10 +110,10 @@ const POPULAR_INSTRUMENTS: Record<WizardAssetClass, { symbol: string; name: stri
     { symbol: "LINK/USDT", name: "Chainlink / Tether Spot", exchange: "BINANCE" },
   ],
   CRYPTO_OPTIONS: [
-    { symbol: "BTC-OPTIONS", name: "Bitcoin Options Chain", exchange: "DERIBIT" },
-    { symbol: "ETH-OPTIONS", name: "Ethereum Options Chain", exchange: "DERIBIT" },
-    { symbol: "SOL-OPTIONS", name: "Solana Options Chain", exchange: "DERIBIT" },
-    { symbol: "BTC-BINANCE-OPT", name: "Binance BTC European Options", exchange: "BINANCE" },
+    { symbol: "BTC-260925-70000-C", name: "Bitcoin 70,000 CALL (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "BTC-260925-65000-P", name: "Bitcoin 65,000 PUT (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "ETH-260925-3500-C", name: "Ethereum 3,500 CALL (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "SOL-260925-150-C", name: "Solana 150 CALL (Sep 2026)", exchange: "BINANCE" },
   ],
   COMMODITIES: [
     { symbol: "GOLD", name: "Gold Standard Futures / Options", exchange: "MCX" },

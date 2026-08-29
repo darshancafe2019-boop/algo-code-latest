@@ -7,6 +7,8 @@ are rejected with structured validation errors instead of being routed to exchan
 
 import enum
 import logging
+import os
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -664,22 +666,67 @@ class InstrumentResolver:
     ) -> ResolutionResult:
         """Handles structured option contract strings for Crypto and Indian NSE options."""
         clean_q = query.strip().upper().replace("NSE:", "").replace("NFO:", "")
+        now_date = datetime.now(timezone.utc).date()
         
-        # 1. Crypto Option Format (e.g. BTC-260327-70000-C)
+        # 1. Crypto Option Format (e.g. BTC-260327-70000-C or BTC-260925-70000-P)
         parts = clean_q.split("-")
-        if len(parts) == 4 and parts[0] in ["BTC", "ETH"]:
+        if len(parts) == 4 and parts[0] in ["BTC", "ETH", "SOL"]:
             underlying, expiry, strike_str, opt_type_letter = parts
             try:
                 strike_val = float(strike_str)
-                opt_type = "CALL" if opt_type_letter.upper() == "C" else "PUT"
+                if strike_val <= 0:
+                    return ResolutionResult(
+                        status=ResolutionStatus.UNSUPPORTED,
+                        query=query,
+                        reason=f"Strike price {strike_str} is invalid. Options strike must be greater than zero.",
+                        error_code="INVALID_STRIKE_PRICE",
+                        suggested_action="Select a positive strike price from the options chain.",
+                    )
+
+                # Validate Expiry Date (Format: YYMMDD -> 20YY-MM-DD)
+                if len(expiry) == 6 and expiry.isdigit():
+                    exp_year = 2000 + int(expiry[:2])
+                    exp_month = int(expiry[2:4])
+                    exp_day = int(expiry[4:])
+                    try:
+                        exp_date = datetime(exp_year, exp_month, exp_day, tzinfo=timezone.utc).date()
+                        if exp_date < now_date:
+                            return ResolutionResult(
+                                status=ResolutionStatus.UNSUPPORTED,
+                                query=query,
+                                reason=f"Options contract '{query}' has already expired on {exp_date.isoformat()}.",
+                                error_code="EXPIRED_OPTIONS_CONTRACT",
+                                suggested_action="Select an active, future-dated contract from the options chain.",
+                            )
+                    except ValueError:
+                        pass
+
+                opt_type = "CALL" if opt_type_letter.upper() in ["C", "CALL", "CE"] else "PUT"
+                
+                # Check for explicit provider configuration
+                opt_provider = (provider or "binance_options").lower()
+                if "deribit" in opt_provider:
+                    has_deribit = bool(os.getenv("DERIBIT_API_KEY") or os.getenv("DERIBIT_CLIENT_ID"))
+                    if not has_deribit and not bool(os.getenv("UPSTOX_API_KEY") or os.getenv("BINANCE_API_KEY")):
+                        return ResolutionResult(
+                            status=ResolutionStatus.UNSUPPORTED,
+                            query=query,
+                            reason="Options provider 'DERIBIT' is not configured. Connect an options provider before starting this bot.",
+                            error_code="OPTIONS_PROVIDER_NOT_CONFIGURED",
+                            suggested_action="Configure your options broker in Settings.",
+                        )
+
+                selected_provider = "binance_options" if "binance" in opt_provider or not os.getenv("DERIBIT_API_KEY") else "deribit_options"
+                selected_exchange = "BINANCE" if selected_provider == "binance_options" else "DERIBIT"
+
                 inst = CanonicalInstrument(
-                    instrument_id=f"DERIBIT:{clean_q}:OPTION",
+                    instrument_id=f"{selected_exchange}:{clean_q}:OPTION",
                     asset_class=AssetClass.CRYPTO,
                     instrument_type=InstrumentType.OPTION,
-                    provider="deribit_options",
-                    exchange="DERIBIT",
+                    provider=selected_provider,
+                    exchange=selected_exchange,
                     base_asset=underlying,
-                    quote_asset="USD",
+                    quote_asset="USDT" if selected_provider == "binance_options" else "USD",
                     canonical_symbol=clean_q,
                     provider_symbol=clean_q,
                     exchange_symbol=clean_q,
@@ -692,7 +739,7 @@ class InstrumentResolver:
                     tradable=True,
                     data_supported=True,
                     execution_supported=True,
-                    settlement_asset="BTC" if underlying == "BTC" else "ETH",
+                    settlement_asset="USDT" if selected_provider == "binance_options" else underlying,
                 )
                 return ResolutionResult(
                     status=ResolutionStatus.RESOLVED,
@@ -704,16 +751,41 @@ class InstrumentResolver:
             except Exception as e:
                 logger.error("Crypto option parsing error: %s", e)
 
-        # 2. NSE Indian Options Format (e.g. "NIFTY 24400 CE", "NIFTY-24400-CE", "NSE:NIFTY-26AUG27-24400-CE", "BANKNIFTY 51000 PE")
+        # 2. NSE Indian Options Format (e.g. "NIFTY 24400 CE", "NIFTY26MAR24000CE", "NIFTY-26AUG27-24400-CE", "BANKNIFTY 51000 PE")
         import re
-        # Pattern 1: Space or hyphen separated (e.g. NIFTY 24400 CE, BANKNIFTY-51000-PE, NIFTY 27AUG26 24400 CE)
-        nse_match = re.match(r"^([A-Z]+)[-_ ]+(?:([0-9]{1,2}[A-Z]{3}[0-9]{2,4})[-_ ]+)?([0-9]+(?:\.[0-9]+)?)[-_ ]*(CE|PE|CALL|PUT)$", clean_q)
+        # Pattern 1: Space or hyphen or compact separated
+        nse_match = re.match(r"^([A-Z]+)[-_ ]*(?:([0-9]{1,2}[A-Z]{3}[0-9]{2,4})[-_ ]*)?([0-9]+(?:\.[0-9]+)?)[-_ ]*(CE|PE|CALL|PUT)$", clean_q)
         if nse_match:
             underlying, expiry_str, strike_str, opt_type_raw = nse_match.groups()
             try:
                 strike_val = float(strike_str)
+                if strike_val <= 0:
+                    return ResolutionResult(
+                        status=ResolutionStatus.UNSUPPORTED,
+                        query=query,
+                        reason=f"Strike price {strike_str} is invalid. Options strike must be greater than zero.",
+                        error_code="INVALID_STRIKE_PRICE",
+                        suggested_action="Select a positive strike price from the options chain.",
+                    )
+
                 opt_type = "CALL" if opt_type_raw in ["CE", "CALL"] else "PUT"
                 
+                # Check Expiry if present (e.g. 26AUG23)
+                if expiry_str:
+                    try:
+                        # Attempt DDMMMYY parse
+                        exp_dt = datetime.strptime(expiry_str, "%d%b%y" if len(expiry_str) <= 7 else "%d%b%Y")
+                        if exp_dt.date() < now_date:
+                            return ResolutionResult(
+                                status=ResolutionStatus.UNSUPPORTED,
+                                query=query,
+                                reason=f"Indian NSE option contract '{query}' has already expired on {exp_dt.date().isoformat()}.",
+                                error_code="EXPIRED_OPTIONS_CONTRACT",
+                                suggested_action="Select a valid near-month or weekly contract from the option chain.",
+                            )
+                    except Exception:
+                        pass
+
                 # Dynamic lot size mapping
                 lot_size = 50.0
                 if "BANK" in underlying:
@@ -740,7 +812,7 @@ class InstrumentResolver:
                     instrument_id=inst_id,
                     asset_class=AssetClass.INDIAN_STOCKS,
                     instrument_type=InstrumentType.OPTION,
-                    provider="nse_options",
+                    provider="upstox_options",
                     exchange="NSE",
                     base_asset=underlying,
                     quote_asset="INR",

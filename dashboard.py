@@ -13242,10 +13242,83 @@ def api_upstox_backend_disconnect():
     logger.info("Upstox disconnected from backend algo engine.")
     return jsonify({
         "status": "success",
-        "connected": false if hasattr(bool, 'false') else False,
+        "connected": False,
         "broker": "UPSTOX",
         "message": "Upstox disconnected successfully."
     })
+
+
+@app.route("/api/bot/<bot_id>/update-contract", methods=["POST"])
+def api_bot_update_contract(bot_id):
+    """Updates an existing bot with a newly selected and validated options contract."""
+    payload = request.get_json(silent=True) or {}
+    symbol = (payload.get("symbol") or "").strip().upper()
+    if not symbol:
+        return jsonify({"status": "error", "message": "Symbol is required."}), 400
+
+    from src.instrument_resolver import global_instrument_resolver
+    asset_class = payload.get("asset_class", "CRYPTO_OPTIONS")
+    provider = payload.get("provider")
+
+    # Check if category label
+    if symbol in global_instrument_resolver.CATEGORY_LABELS:
+        return jsonify({
+            "status": "error",
+            "error_code": "INSTRUMENT_CATEGORY_NOT_EXECUTABLE",
+            "message": f"'{symbol}' is a generic category, not an executable contract."
+        }), 400
+
+    res = global_instrument_resolver.resolve(symbol, asset_class=asset_class, provider=provider)
+    if not res.is_valid:
+        return jsonify({
+            "status": "error",
+            "error_code": res.error_code,
+            "message": f"Contract resolution failed: {res.reason}"
+        }), 400
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    contract_id = payload.get("contract_id") or (res.instrument.instrument_id if res.instrument else symbol)
+    underlying = payload.get("underlying") or (res.instrument.base_asset if res.instrument else "BTC")
+
+    try:
+        curr = db.safe_query("SELECT config_json FROM bot_instances WHERE id = ?", (bot_id,))
+        curr_cfg = {}
+        if curr and curr[0].get("config_json"):
+            try:
+                curr_cfg = json.loads(curr[0]["config_json"])
+            except Exception:
+                pass
+
+        curr_cfg["options_contract"] = {
+            "symbol": symbol,
+            "contract_id": contract_id,
+            "underlying": underlying,
+            "provider": provider,
+            "expiry": payload.get("expiry"),
+            "strike": payload.get("strike"),
+            "option_type": payload.get("option_type"),
+            "updated_at": now_iso,
+        }
+
+        db.safe_execute(
+            """
+            UPDATE bot_instances
+            SET symbol = ?, asset_class = ?, config_json = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (symbol, asset_class, json.dumps(curr_cfg), now_iso, bot_id)
+        )
+        return jsonify({
+            "status": "success",
+            "message": f"Bot '{bot_id}' contract updated to '{symbol}' successfully.",
+            "bot_id": bot_id,
+            "symbol": symbol,
+            "contract_id": contract_id,
+            "underlying": underlying
+        })
+    except Exception as e:
+        logger.error(f"Failed to update contract for bot {bot_id}: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 # ============================================================================

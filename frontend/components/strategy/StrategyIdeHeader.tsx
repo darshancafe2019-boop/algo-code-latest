@@ -70,7 +70,7 @@ const POPULAR_SYMBOLS: Record<StrategyMarketType, string[]> = {
   crypto: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT", "PEPE/USDT"],
   equity: ["RELIANCE", "TCS", "HDFCBANK", "INFY", "AAPL", "MSFT", "NVDA", "TSLA"],
   futures: ["BTC-PERP", "ETH-PERP", "SOL-PERP", "NIFTY-FUT", "BANKNIFTY-FUT", "ES-FUT"],
-  options: ["NIFTY", "BANKNIFTY", "FINNIFTY", "BTC-OPTIONS", "ETH-OPTIONS"],
+  options: ["NIFTY 24400 CE", "BANKNIFTY 51000 CE", "FINNIFTY 23000 CE", "BTC-260925-70000-C", "ETH-260925-3500-C"],
   commodity: ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS"],
   forex: ["EUR/USD", "GBP/USD", "USD/JPY", "USD/INR"],
 };

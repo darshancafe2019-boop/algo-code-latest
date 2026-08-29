@@ -85,21 +85,20 @@ def test_03_strategy_evaluation_no_signal_is_not_error():
 def test_04_bot_lifecycle_start_heartbeat_stop_restart():
     """Verify full bot lifecycle for BTC Q / ETH-OPTIONS bot."""
     bot_id = "test-eth-options-lifecycle-bot"
-    existing = db.safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
-    if not existing:
-        now_str = datetime.now(timezone.utc).isoformat()
-        db.safe_execute(
-            """
-            INSERT INTO bot_instances (
-                id, name, symbol, asset_class, timeframe, strategy, execution_mode,
-                allocated_capital, status, last_error, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                bot_id, "Test ETH Options Lifecycle Bot", "ETH-OPTIONS", "CRYPTO_OPTIONS",
-                "5m", "OPTIONS", "PAPER", 10000.0, "STOPPED", "", now_str, now_str
-            )
+    now_str = datetime.now(timezone.utc).isoformat()
+    db.safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+    db.safe_execute(
+        """
+        INSERT INTO bot_instances (
+            id, name, symbol, asset_class, timeframe, strategy, execution_mode,
+            allocated_capital, status, last_error, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            bot_id, "Test ETH Options Lifecycle Bot", "ETH-260925-3500-C", "CRYPTO_OPTIONS",
+            "5m", "OPTIONS", "PAPER", 10000.0, "STOPPED", "", now_str, now_str
         )
+    )
 
     mgr = multi_bot_manager.get_manager(bot_id)
 

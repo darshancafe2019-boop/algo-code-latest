@@ -40,6 +40,7 @@ import {
   calculateRiskRewardRatio,
   formatCurrency,
 } from "@/types/bot-control";
+import { OptionsContractSelectorModal, SelectedOptionsContract } from "@/components/options/OptionsContractSelectorModal";
 
 interface Props {
   botId?: string;
@@ -76,10 +77,11 @@ const POPULAR_INSTRUMENTS: Record<WizardAssetClass, { symbol: string; name: stri
     { symbol: "MSFT", name: "Microsoft Corporation", exchange: "NASDAQ" },
   ],
   OPTIONS: [
-    { symbol: "NIFTY", name: "Nifty 50 Weekly / Monthly Options", exchange: "NFO" },
-    { symbol: "BANKNIFTY", name: "Bank Nifty Options Chain", exchange: "NFO" },
-    { symbol: "FINNIFTY", name: "Fin Nifty Options Chain", exchange: "NFO" },
-    { symbol: "RELIANCE", name: "Reliance Stock Options", exchange: "NFO" },
+    { symbol: "NIFTY 24400 CE", name: "Nifty 24,400 Weekly CALL", exchange: "NSE" },
+    { symbol: "NIFTY 24400 PE", name: "Nifty 24,400 Weekly PUT", exchange: "NSE" },
+    { symbol: "BANKNIFTY 51000 CE", name: "Bank Nifty 51,000 Weekly CALL", exchange: "NSE" },
+    { symbol: "FINNIFTY 23000 CE", name: "Fin Nifty 23,000 CALL", exchange: "NSE" },
+    { symbol: "RELIANCE 3000 CE", name: "Reliance 3,000 Monthly CALL", exchange: "NSE" },
   ],
   FUTURES: [
     { symbol: "NIFTY-FUT", name: "Nifty 50 Index Futures", exchange: "NFO" },
@@ -94,9 +96,10 @@ const POPULAR_INSTRUMENTS: Record<WizardAssetClass, { symbol: string; name: stri
     { symbol: "PEPE/USDT", name: "Pepe / Tether Spot", exchange: "BINANCE" },
   ],
   CRYPTO_OPTIONS: [
-    { symbol: "BTC-OPTIONS", name: "Bitcoin Options Chain", exchange: "DERIBIT" },
-    { symbol: "ETH-OPTIONS", name: "Ethereum Options Chain", exchange: "DERIBIT" },
-    { symbol: "SOL-OPTIONS", name: "Solana Options Chain", exchange: "DERIBIT" },
+    { symbol: "BTC-260925-70000-C", name: "Bitcoin 70,000 CALL (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "BTC-260925-65000-P", name: "Bitcoin 65,000 PUT (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "ETH-260925-3500-C", name: "Ethereum 3,500 CALL (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "SOL-260925-150-C", name: "Solana 150 CALL (Sep 2026)", exchange: "BINANCE" },
   ],
   COMMODITIES: [
     { symbol: "GOLD", name: "Gold Standard Futures / Options", exchange: "MCX" },
@@ -177,6 +180,15 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const [putNoLimit, setPutNoLimit] = useState(false);
   const [optionExpiry, setOptionExpiry] = useState("Nearest Weekly");
   const [strikeOffset, setStrikeOffset] = useState<number>(0);
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+
+  const handleContractSelected = (contract: SelectedOptionsContract) => {
+    setSymbol(contract.symbol);
+    setExchange(contract.exchange);
+    setOptionExpiry(contract.expiry);
+    setOptionSide(contract.option_type === "CALL" ? "CALL" : "PUT");
+    setStrikeOffset(contract.strike);
+  };
 
   // Crypto Options
   const [cryptoOptExchange, setCryptoOptExchange] = useState("deribit");
@@ -568,6 +580,32 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               })}
             </div>
 
+            {/* Options Live Chain Trigger */}
+            {(assetClass === "OPTIONS" || assetClass === "CRYPTO_OPTIONS") && (
+              <div className="p-4 bg-[#0B182B]/90 border border-purple-500/40 rounded-xl flex flex-wrap items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Layers className="h-4 w-4 text-purple-400" />
+                    <span className="text-xs font-bold text-white uppercase">Options Contract Chain & Strike Picker</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
+                      LIVE CHAIN
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 font-sans">
+                    Selected contract: <strong className="text-cyan-400 font-mono">{symbol}</strong> ({exchange})
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsOptionsModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow-md shadow-purple-500/30 flex items-center gap-1.5 shrink-0"
+                >
+                  <Zap className="h-3.5 w-3.5" />
+                  <span>Launch Options Chain</span>
+                </button>
+              </div>
+            )}
+
             <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-white uppercase">Select Trading Instrument ({assetClass})</span>
@@ -956,6 +994,16 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         </div>
 
       </div>
+
+      {/* Options Contract Selector Modal */}
+      <OptionsContractSelectorModal
+        isOpen={isOptionsModalOpen}
+        onClose={() => setIsOptionsModalOpen(false)}
+        onSelectContract={handleContractSelected}
+        initialUnderlying={symbol}
+        initialAssetClass={assetClass === "OPTIONS" ? "OPTIONS" : "CRYPTO_OPTIONS"}
+        botName={name}
+      />
     </div>
   );
 }

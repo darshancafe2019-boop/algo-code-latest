@@ -180,10 +180,16 @@ class BotProcessManager:
         symbol = bot_info.get("symbol", "")
         asset_class = (bot_info.get("asset_class") or "").upper()
         from src.instrument_resolver import global_instrument_resolver
-        if asset_class in ["CRYPTO_OPTIONS", "OPTIONS"]:
-            res = global_instrument_resolver.resolve_for_bot(symbol, execution_mode=mode, asset_class=asset_class)
-        else:
-            res = global_instrument_resolver.resolve(symbol)
+
+        # Direct Category Label Check (e.g. BTC-OPTIONS cannot be started directly)
+        clean_sym = symbol.strip().upper()
+        if clean_sym in global_instrument_resolver.CATEGORY_LABELS:
+            return {
+                "valid": False,
+                "reason": f"Cannot start bot: Symbol '{clean_sym}' is a generic category, not an executable contract. Please select a specific dated contract from the Options Contract Selector (Code: INSTRUMENT_CATEGORY_NOT_EXECUTABLE)."
+            }
+
+        res = global_instrument_resolver.resolve(symbol, asset_class=asset_class)
         if not res.is_valid:
             return {
                 "valid": False,

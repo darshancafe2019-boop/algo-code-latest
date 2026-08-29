@@ -138,6 +138,18 @@ class UpstoxWSAdapter(BaseProviderAdapter):
 
     # ─── Subscription Management ─────────────────────────────────────────────
 
+    @property
+    def is_connected(self) -> bool:
+        if not self._ws:
+            return False
+        if hasattr(self._ws, "open"):
+            return bool(self._ws.open)
+        if hasattr(self._ws, "closed"):
+            return not self._ws.closed
+        if hasattr(self._ws, "close_code"):
+            return self._ws.close_code is None
+        return True
+
     async def subscribe(self, symbols: List[str]) -> None:
         for s in symbols:
             clean = s.strip().upper()
@@ -150,7 +162,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             if global_upstox_service.is_authenticated and not self._ws_task:
                 self._ws_task = asyncio.create_task(self._ws_loop(), name="UpstoxWSLoop")
 
-            if self._ws and not self._ws.closed:
+            if self.is_connected:
                 await self._send_subscription()
 
     async def unsubscribe(self, symbols: List[str]) -> None:
@@ -162,7 +174,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 self._subscribed_keys.discard(ik)
 
     async def _send_subscription(self) -> None:
-        if not self._ws or self._ws.closed or not self._subscribed_keys:
+        if not self.is_connected or not self._subscribed_keys:
             return
         payload = {
             "guid": f"quantos_sub_{int(time.time())}",

@@ -16,7 +16,7 @@ export function getUpstoxCredentials(): UpstoxCredentials {
     apiKey: (process.env.UPSTOX_API_KEY || process.env.UPSTOX_CLIENT_ID || "").trim(),
     apiSecret: (process.env.UPSTOX_API_SECRET || process.env.UPSTOX_CLIENT_SECRET || "").trim(),
     accessToken: (process.env.UPSTOX_ACCESS_TOKEN || "").trim(),
-    redirectUri: (process.env.UPSTOX_REDIRECT_URI || "http://localhost:3100/api/upstox/callback").trim(),
+    redirectUri: (process.env.UPSTOX_REDIRECT_URI || "/api/upstox/callback").trim(),
     analyticsToken: (process.env.UPSTOX_ANALYTICS_TOKEN || "").trim(),
     tradingEnabled: process.env.UPSTOX_TRADING_ENABLED === "true",
     paperMode: process.env.UPSTOX_PAPER_MODE !== "false",

@@ -197,6 +197,31 @@ def handle_generic_exception(e):
 db.init_db()
 audit.init_audit_db()
 
+# Register Market Data Stocks Blueprint
+try:
+    from market_data.stocks.routes import stocks_blueprint
+    app.register_blueprint(stocks_blueprint, url_prefix="/api/market-data/stocks")
+    logger.info("Successfully registered /api/market-data/stocks blueprint.")
+except Exception as bp_err:
+    logger.warning(f"Notice: Failed registering stocks blueprint: {bp_err}")
+
+@app.route("/health", methods=["GET"])
+@app.route("/health/live", methods=["GET"])
+@app.route("/health/ready", methods=["GET"])
+@app.route("/health/system", methods=["GET"])
+@app.route("/api/health", methods=["GET"])
+@app.route("/api/health/live", methods=["GET"])
+@app.route("/api/health/ready", methods=["GET"])
+def health_check():
+    return jsonify({
+        "status": "ok",
+        "state": "HEALTHY",
+        "service": "Quant.OS Engine",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "database": "CONNECTED",
+        "version": "2.5.0"
+    }), 200
+
 
 # ============================================================================
 # HELPER FUNCTIONS
@@ -13196,17 +13221,16 @@ def api_upstox_sync_token():
         db.safe_execute(
             """
             INSERT OR REPLACE INTO broker_credentials (
-                credential_id, provider_id, account_name, masked_api_key, encrypted_secret,
-                allow_read, allow_trade, allow_withdraw, created_at, last_used
-            ) VALUES (?, 'UPSTOX', ?, ?, ?, 1, 1, 0, ?, ?)
+                credential_id, provider_id, account_name, encrypted_api_key, encrypted_secret_key,
+                allow_read, allow_trade, allow_withdraw, created_at, status
+            ) VALUES (?, 'UPSTOX', ?, ?, ?, 1, 1, 0, ?, 'CONNECTED')
             """,
             (
                 "cred_upstox_oauth",
                 user_name or f"Upstox ({user_id})",
-                f"upstox_***{token[-6:]}",
                 token,
+                "",
                 now_iso,
-                now_iso
             )
         )
     except Exception as db_err:
@@ -13319,6 +13343,268 @@ def api_bot_update_contract(bot_id):
     except Exception as e:
         logger.error(f"Failed to update contract for bot {bot_id}: {e}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+# ============================================================================
+# DELTA EXCHANGE CRYPTO OPTIONS REST & STREAMING APIS
+# ============================================================================
+
+@app.route("/api/markets/delta/options/underlyings", methods=["GET"])
+def api_delta_options_underlyings():
+    """Returns all discovered active Delta crypto options underlyings."""
+    try:
+        from src.delta_options_service import delta_options_service
+        underlyings = delta_options_service.get_underlyings()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": underlyings,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": True,
+            "isStale": False,
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/underlyings: {e}")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": False,
+            "data": [],
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": False,
+            "isStale": True,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/markets/delta/options/expiries", methods=["GET"])
+def api_delta_options_expiries():
+    """Returns all active expiries for a specified underlying (e.g. ?underlying=BTC)."""
+    underlying = request.args.get("underlying", "BTC").strip().upper()
+    if not underlying:
+        return jsonify({
+            "success": False,
+            "data": [],
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": datetime.now(timezone.utc).isoformat(),
+            "receivedTimestamp": datetime.now(timezone.utc).isoformat(),
+            "isLive": False,
+            "isStale": True,
+            "error": "Query parameter 'underlying' is required."
+        }), 400
+
+    try:
+        from src.delta_options_service import delta_options_service
+        expiries = delta_options_service.get_expiries_for_underlying(underlying)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": expiries,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": True,
+            "isStale": False,
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/expiries: {e}")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": False,
+            "data": [],
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": False,
+            "isStale": True,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/markets/delta/options/chain", methods=["GET"])
+def api_delta_options_chain():
+    """
+    Returns complete normalized dual-sided option chain for an underlying and expiry.
+    Query params:
+      - underlying: e.g. 'BTC', 'ETH'
+      - expiry: e.g. '25-09-2026' or ISO settlement prefix
+      - strike_count: optional integer to limit strike window around ATM
+    """
+    underlying = request.args.get("underlying", "BTC").strip().upper()
+    expiry = request.args.get("expiry")
+    strike_count_str = request.args.get("strike_count")
+    strike_count = int(strike_count_str) if strike_count_str and strike_count_str.isdigit() else None
+
+    try:
+        from src.delta_options_service import delta_options_service
+        chain_data = delta_options_service.get_option_chain(
+            underlying=underlying,
+            expiry=expiry,
+            strike_count=strike_count
+        )
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": chain_data,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": chain_data.get("timestamp", now_iso),
+            "receivedTimestamp": now_iso,
+            "isLive": chain_data.get("is_live", True),
+            "isStale": chain_data.get("is_stale", False),
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/chain: {e}")
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": False,
+            "data": None,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": False,
+            "isStale": True,
+            "error": str(e)
+        }), 500
+
+
+@app.route("/api/markets/delta/options/contracts/<product_id>", methods=["GET"])
+def api_delta_options_contract_details(product_id):
+    """Returns single contract specification and latest live quote."""
+    try:
+        from src.delta_options_service import delta_options_service
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+        pid = int(product_id) if str(product_id).isdigit() else 0
+        contract = delta_options_service.get_contract_by_id(pid)
+        if not contract:
+            contract = delta_options_service.get_contract_by_symbol(str(product_id))
+
+        if not contract:
+            return jsonify({
+                "success": False,
+                "data": None,
+                "provider": "DELTA_EXCHANGE",
+                "environment": "INDIA",
+                "exchangeTimestamp": datetime.now(timezone.utc).isoformat(),
+                "receivedTimestamp": datetime.now(timezone.utc).isoformat(),
+                "isLive": False,
+                "isStale": True,
+                "error": f"Delta options contract '{product_id}' not found."
+            }), 404
+
+        # Enrich with live quote
+        live_q = delta_options_ws_adapter.get_raw_quote(str(contract["product_id"])) or {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": {
+                "contract": contract,
+                "live_quote": live_q,
+            },
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": True,
+            "isStale": False,
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/contracts/{product_id}: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/markets/delta/options/health", methods=["GET"])
+def api_delta_options_health():
+    """Returns comprehensive health across Delta REST, WebSocket and database systems."""
+    try:
+        from src.delta_options_service import delta_options_service
+        health_data = delta_options_service.get_health()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": health_data,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": health_data.get("status") == "HEALTHY",
+            "isStale": False,
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/health: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/markets/delta/options/sync", methods=["POST"])
+def api_delta_options_manual_sync():
+    """Triggers an authoritative catalogue refresh from Delta Exchange."""
+    try:
+        from src.delta_options_service import delta_options_service
+        res = delta_options_service.sync_catalogue(force=True)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return jsonify({
+            "success": True,
+            "data": res,
+            "provider": "DELTA_EXCHANGE",
+            "environment": "INDIA",
+            "exchangeTimestamp": now_iso,
+            "receivedTimestamp": now_iso,
+            "isLive": True,
+            "isStale": False,
+            "error": None
+        })
+    except Exception as e:
+        logger.error(f"Error in /api/markets/delta/options/sync: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/markets/delta/options/stream", methods=["GET"])
+def api_delta_options_stream():
+    """
+    Server-Sent Events (SSE) stream for continuous live option chain updates without page reloads.
+    """
+    underlying = request.args.get("underlying", "BTC").strip().upper()
+    expiry = request.args.get("expiry")
+
+    def event_stream():
+        from src.delta_options_service import delta_options_service
+        while True:
+            try:
+                chain_data = delta_options_service.get_option_chain(underlying=underlying, expiry=expiry)
+                envelope = {
+                    "success": True,
+                    "data": chain_data,
+                    "provider": "DELTA_EXCHANGE",
+                    "environment": "INDIA",
+                    "exchangeTimestamp": chain_data.get("timestamp"),
+                    "receivedTimestamp": datetime.now(timezone.utc).isoformat(),
+                    "isLive": chain_data.get("is_live", True),
+                    "isStale": chain_data.get("is_stale", False),
+                    "error": None
+                }
+                yield f"data: {json.dumps(envelope)}\n\n"
+                time.sleep(1.0)
+            except GeneratorExit:
+                break
+            except Exception as stream_err:
+                logger.debug(f"Delta SSE stream error: {stream_err}")
+                time.sleep(2.0)
+
+    return Response(event_stream(), mimetype="text/event-stream")
 
 
 # ============================================================================

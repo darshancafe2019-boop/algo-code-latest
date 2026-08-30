@@ -25,21 +25,23 @@ import { QuickTradePanel } from "@/components/terminal/QuickTradePanel";
 import { MarketHealthTelemetry } from "./MarketHealthTelemetry";
 import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric } from "@/lib/formatters";
 import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
+import { apiClient } from "@/lib/apiClient";
 
 export function TradingViewMarketWorkspace() {
   const { activeSymbol, setActiveSymbol, activeTimeframe, setActiveTimeframe } = useActiveBot();
 
-  const [selectedAssetClass, setSelectedAssetClass] = useState("ALL");
+  const [activeCategory, setActiveCategory] = useState<string>("ALL");
+  const [activeSubTab, setActiveSubTab] = useState<"overview" | "options" | "futures" | "depth" | "signals">("overview");
   const [selectedExpiry, setSelectedExpiry] = useState<string>("");
-  const [activeSubTab, setActiveSubTab] = useState<"overview" | "options" | "futures" | "depth">("overview");
 
-  // 1. Fetch Instruments Master
-  const { data: universeData } = useQuery({
-    queryKey: ["workspaceUniverse", selectedAssetClass],
+  // 1. Fetch Universe Instruments
+  const { data: universeData, isLoading: isLoadingUniverse } = useQuery({
+    queryKey: ["workspaceUniverse"],
     queryFn: async () => {
-      const res = await fetch(`/api/instruments/master?asset_class=${selectedAssetClass}`);
-      if (!res.ok) throw new Error("Failed to load instruments");
-      return res.json();
+      const res = await apiClient.get<any>("/api/market/instruments?limit=250", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) throw new Error("Failed to load instruments");
+      return res.data;
     },
   });
 
@@ -47,22 +49,27 @@ export function TradingViewMarketWorkspace() {
   const { data: quoteData } = useQuery({
     queryKey: ["workspaceQuote", activeSymbol],
     queryFn: async () => {
-      const res = await fetch(`/api/market/quote?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}`);
-      if (!res.ok) throw new Error("Failed to load quote");
-      return res.json();
+      const res = await apiClient.get<any>(`/api/market/quote?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}`, { timeoutMs: 5000 });
+      if (!res.ok || !res.data) throw new Error("Failed to load quote");
+      return res.data;
     },
-    refetchInterval: 3000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 3000),
   });
 
   // 3. Fetch Expiries for active symbol
   const { data: expiriesData } = useQuery({
     queryKey: ["workspaceExpiries", activeSymbol],
     queryFn: async () => {
-      const res = await fetch(`/api/options/expiries?underlying=${encodeURIComponent(activeSymbol || "BTC")}`);
-      if (!res.ok) return { expiries: [] };
-      return res.json();
+      const res = await apiClient.get<any>(`/api/options/expiries?underlying=${encodeURIComponent(activeSymbol || "BTC")}`, { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return { expiries: [] };
+      return res.data;
     },
   });
+
+  const normalizedExpiries = React.useMemo(() => {
+    const raw = Array.isArray(expiriesData?.expiries) ? expiriesData.expiries : [];
+    return normalizeExpiriesList(raw, activeSymbol || "BTC");
+  }, [expiriesData?.expiries, activeSymbol]);
 
   // 4. Fetch Option Chain Snapshot
   const { data: optionsData } = useQuery({
@@ -72,11 +79,11 @@ export function TradingViewMarketWorkspace() {
         underlying: activeSymbol || "BTC",
       });
       if (selectedExpiry) params.append("expiry", selectedExpiry);
-      const res = await fetch(`/api/options/analytics?${params.toString()}`);
-      if (!res.ok) return null;
-      return res.json();
+      const res = await apiClient.get<any>(`/api/options/analytics?${params.toString()}`, { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
-    refetchInterval: 5000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 5000),
     enabled: activeSubTab === "options",
   });
 
@@ -128,9 +135,9 @@ export function TradingViewMarketWorkspace() {
             {assetClasses.map((ac) => (
               <button
                 key={ac.id}
-                onClick={() => setSelectedAssetClass(ac.id)}
+                onClick={() => setActiveCategory(ac.id)}
                 className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
-                  selectedAssetClass === ac.id
+                  activeCategory === ac.id
                     ? "bg-cyan-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
                 }`}
@@ -157,17 +164,17 @@ export function TradingViewMarketWorkspace() {
           </div>
 
           {/* Dynamic Expiry Selector if available */}
-          {expiries.length > 0 && (
+          {normalizedExpiries.length > 0 && (
             <div className="flex items-center gap-1.5 text-xs font-mono">
               <span className="text-slate-500 hidden sm:inline">EXPIRY:</span>
               <select
-                value={selectedExpiry || expiries[0]}
+                value={selectedExpiry || normalizedExpiries[0]?.value || ""}
                 onChange={(e) => setSelectedExpiry(e.target.value)}
                 className="px-2.5 py-1.5 bg-[#080C14] border border-[#1E293B] rounded-xl text-xs font-mono text-purple-300 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
-                {expiries.map((exp: string) => (
-                  <option key={exp} value={exp} className="bg-[#080C14] text-white">
-                    {exp}
+                {normalizedExpiries.map((opt) => (
+                  <option key={opt.key} value={opt.value} className="bg-[#080C14] text-white">
+                    {opt.label}
                   </option>
                 ))}
               </select>
@@ -288,7 +295,7 @@ export function TradingViewMarketWorkspace() {
                     {activeSymbol} Option Analytics & Max Pain
                   </h3>
                   <p className="text-xs text-slate-400">
-                    PCR, Max Pain strike, and open interest concentration for expiry {selectedExpiry || expiries[0]}.
+                    PCR, Max Pain strike, and open interest concentration for expiry {selectedExpiry || normalizedExpiries[0]?.label || "—"}.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 font-mono text-xs">

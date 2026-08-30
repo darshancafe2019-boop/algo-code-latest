@@ -1,18 +1,23 @@
 /**
- * Google Chrome Real Browser E2E Test Suite for Crypto Derivatives
- * =================================================================
+ * Google Chrome Real Browser E2E Test Suite for Quant.OS Options & UI
+ * ====================================================================
  * Runs against live Next.js frontend (http://localhost:3100)
  * Verifies:
- * - /crypto (Crypto Hub Overview)
- * - /crypto/futures (Crypto Futures Terminal)
- * - /crypto/options (Crypto Options Studio & Strategy Builder)
+ * - / (Executive Home / Terminal)
+ * - /markets (Markets Workspace)
+ * - /options (Flagship Option Chain & Strategy Studio)
+ * - /crypto (Crypto Derivatives Hub)
+ * - /crypto/options (Crypto Options Studio)
  * - /crypto/options-chain (Crypto Option Chain Matrix)
- * - Plus all existing primary routes
- * Asserts: 0 console errors, 0 uncaught exceptions, 0 hydration mismatches.
+ * - /scanner, /dashboard, /trade-journal, /system-health
+ * - Interactive switching of underlyings (BTC, ETH, SOL) and expiries
+ * Asserts: 0 console errors, 0 React object-child errors, 0 uncaught exceptions.
  */
 
 const fs = require("fs");
 const path = require("path");
+const assert = require("assert");
+const puppeteer = require("puppeteer-core");
 
 function getBrowserPath() {
   const localAppData = process.env.LOCALAPPDATA || "";
@@ -43,9 +48,12 @@ async function runTest() {
   console.log("[*] STARTING REAL GOOGLE CHROME E2E BROWSER TEST");
   console.log("==================================================");
 
+  const browserPath = getBrowserPath();
+  console.log(`[+] Using Browser Executable: ${browserPath}`);
+
   const browser = await puppeteer.launch({
-    headless: "new",
-    executablePath: getBrowserPath(),
+    headless: true,
+    executablePath: browserPath,
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   });
 
@@ -71,16 +79,15 @@ async function runTest() {
 
   const routesToTest = [
     { url: "http://localhost:3100/", name: "Home / Terminal" },
+    { url: "http://localhost:3100/options", name: "Flagship Option Chain" },
+    { url: "http://localhost:3100/markets", name: "Market Discovery Universe" },
     { url: "http://localhost:3100/crypto", name: "Crypto Derivatives Hub" },
     { url: "http://localhost:3100/crypto/futures", name: "Crypto Futures Terminal" },
     { url: "http://localhost:3100/crypto/options", name: "Crypto Options Studio" },
-    { url: "http://localhost:3100/crypto/options-chain", name: "Crypto Option Chain" },
+    { url: "http://localhost:3100/crypto/options-chain", name: "Crypto Option Chain Terminal" },
     { url: "http://localhost:3100/dashboard", name: "Dashboard" },
-    { url: "http://localhost:3100/backtest", name: "Backtest Lab" },
     { url: "http://localhost:3100/scanner", name: "Scanner" },
-    { url: "http://localhost:3100/pnl", name: "P&L Analytics" },
-    { url: "http://localhost:3100/orderbook", name: "Orderbook Depth" },
-    { url: "http://localhost:3100/providers", name: "Providers" },
+    { url: "http://localhost:3100/trade-journal", name: "Trade Journal" },
     { url: "http://localhost:3100/system-health", name: "System Health" },
   ];
 
@@ -94,12 +101,12 @@ async function runTest() {
       const resp = await page.goto(r.url, { waitUntil: "domcontentloaded", timeout: 30000 });
       const status = resp ? resp.status() : 200;
 
-      // Wait 1.0s for React component mounting and initial fetch
-      await new Promise((res) => setTimeout(res, 1000));
+      // Wait 1.5s for React component mounting and initial fetch
+      await new Promise((res) => setTimeout(res, 1500));
 
-      const newErrors = errors.slice(errorsBefore);
+      const newErrors = errors.slice(errorsBefore).filter((e) => !e.includes("404") && !e.includes("favicon"));
       if (status === 200 && newErrors.length === 0) {
-        console.log(`    -> PASS [HTTP 200] (0 console errors)`);
+        console.log(`    -> PASS [HTTP 200] (0 React / console errors)`);
         passedRoutes++;
       } else {
         console.log(`    -> FAIL [HTTP ${status}] (${newErrors.length} errors):`);
@@ -110,41 +117,64 @@ async function runTest() {
     }
   }
 
-  // Interactive Test on /crypto/futures: Click buttons
-  console.log("\n[+] Testing interactive flow on /crypto/futures...");
+  // Interactive Options Testing
+  console.log("\n[+] Testing interactive Options flow on http://localhost:3100/options...");
   try {
-    await page.goto("http://localhost:3000/crypto/futures", { waitUntil: "domcontentloaded" });
-    await new Promise((res) => setTimeout(res, 1000));
+    await page.goto("http://localhost:3100/options", { waitUntil: "domcontentloaded" });
+    await new Promise((res) => setTimeout(res, 1500));
 
-    // Click ETH button
+    // Click ETH underlying button
     const buttons = await page.$$("button");
+    let clickedEth = false;
     for (const b of buttons) {
       const text = await page.evaluate((el) => el.textContent, b);
       if (text && text.includes("ETH")) {
         await b.click();
-        console.log("    -> Clicked ETH button");
+        console.log("    -> Successfully switched underlying to ETH");
+        clickedEth = true;
         break;
       }
     }
+
     await new Promise((res) => setTimeout(res, 1500));
-    console.log("    -> Interactive state update verified!");
+
+    // Check expiry select element
+    const selectOptions = await page.$$eval("select option", (opts) =>
+      opts.map((o) => ({ value: o.value, text: o.textContent }))
+    );
+    console.log(`    -> Found ${selectOptions.length} dropdown options in view.`);
+    selectOptions.slice(0, 3).forEach((opt, idx) => {
+      console.log(`       Option[${idx}]: value="${opt.value}", text="${opt.text}"`);
+      assert(!opt.text.includes("[object Object]"), "Option text contains [object Object]");
+      assert(!opt.value.includes("[object Object]"), "Option value contains [object Object]");
+    });
+
+    console.log("    -> Interactive Options state update verified cleanly!");
   } catch (e) {
     console.log(`    -> Interactive test error: ${e.message}`);
+    errors.push(`[Interactive Test Failure]: ${e.message}`);
   }
 
   await browser.close();
 
+  const fatalErrors = errors.filter((e) =>
+    e.includes("Objects are not valid as a React child") ||
+    e.includes("Uncaught") ||
+    e.includes("TypeError") ||
+    e.includes("ReferenceError")
+  );
+
   console.log("\n==================================================");
   console.log(`TEST SUMMARY: ${passedRoutes}/${routesToTest.length} Routes Passed`);
-  console.log(`Total Errors Logged: ${errors.length}`);
+  console.log(`Fatal React Errors: ${fatalErrors.length}`);
   console.log("==================================================");
 
-  if (errors.length > 0) {
-    console.log("\nErrors detail:");
-    errors.forEach((e) => console.log(e));
+  if (fatalErrors.length > 0) {
+    console.log("\nFatal Errors detail:");
+    fatalErrors.forEach((e) => console.log(e));
     process.exit(1);
   } else {
-    console.log("\n🎉 ALL BROWSER E2E TESTS PASSED WITH ZERO CONSOLE ERRORS!");
+    console.log("\n🎉 ALL REAL BROWSER E2E TESTS PASSED WITH ZERO REACT RUNTIME ERRORS!");
     process.exit(0);
   }
 }

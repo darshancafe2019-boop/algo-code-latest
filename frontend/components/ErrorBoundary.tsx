@@ -33,6 +33,11 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     if (this.state.hasError) {
+      const err = this.state.error as any;
+      const errorMessage = typeof err === "object" && err !== null
+        ? (typeof err.message === "string" ? err.message : JSON.stringify(err))
+        : (typeof err === "string" ? err : "An unexpected error occurred in this module.");
+
       return (
         <div className="rounded-xl border border-red-500/30 bg-red-950/20 p-5 backdrop-blur-md text-red-200 my-3">
           <div className="flex items-center gap-3 mb-2">
@@ -42,7 +47,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </h3>
           </div>
           <p className="text-xs text-red-400/80 mb-3 font-mono">
-            {this.state.error?.message || "An unexpected error occurred in this module."}
+            {errorMessage}
           </p>
           <button
             onClick={this.handleRetry}

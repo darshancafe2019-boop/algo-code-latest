@@ -596,9 +596,19 @@ class InstrumentResolver:
                 inst = cls._CANONICAL_REGISTRY[canonical_key]
                 return cls._validate_instrument_context(inst, clean_query, asset_class, instrument_type, provider)
 
-        # 4. Check option patterns (e.g. BTC-260327-70000-C)
-        if "-C" in clean_query or "-P" in clean_query or "CE" in clean_query or "PE" in clean_query:
-            return cls._resolve_options_contract(clean_query, asset_class, provider)
+        # 4. Check option patterns (e.g. C-BTC-78000-300826, BTC-260327-70000-C, NIFTY 24000 CE, or product ID)
+        if (
+            clean_query.startswith(("C-", "P-"))
+            or "-C" in clean_query
+            or "-P" in clean_query
+            or "CE" in clean_query
+            or "PE" in clean_query
+            or clean_query.isdigit()
+            or (asset_class and str(asset_class).upper() in ("CRYPTO_OPTIONS", "OPTIONS"))
+        ):
+            res_opt = cls._resolve_options_contract(clean_query, asset_class, provider)
+            if res_opt.status != ResolutionStatus.NOT_FOUND:
+                return res_opt
 
         # 5. Check if query is ambiguous (e.g. "BTC")
         if clean_query == "BTC":
@@ -664,13 +674,132 @@ class InstrumentResolver:
         asset_class: Optional[str],
         provider: Optional[str],
     ) -> ResolutionResult:
-        """Handles structured option contract strings for Crypto and Indian NSE options."""
-        clean_q = query.strip().upper().replace("NSE:", "").replace("NFO:", "")
+        """Handles structured option contract strings for Delta Exchange, Crypto and Indian NSE options."""
+        clean_q = query.strip().upper().replace("NSE:", "").replace("NFO:", "").replace("DELTA:", "")
         now_date = datetime.now(timezone.utc).date()
-        
-        # 1. Crypto Option Format (e.g. BTC-260327-70000-C or BTC-260925-70000-P)
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        # 0. Check Delta Exchange Database Registry by product_id or exact symbol
+        try:
+            from src import db
+            delta_contract = None
+            if clean_q.isdigit():
+                delta_contract = db.get_delta_contract_by_id(int(clean_q))
+            if not delta_contract:
+                delta_contract = db.get_delta_contract_by_symbol(clean_q)
+
+            if delta_contract:
+                settle_time = delta_contract.get("settlement_time", "")
+                if settle_time:
+                    clean_ts = settle_time.replace("Z", "+00:00")
+                    settle_dt = datetime.fromisoformat(clean_ts)
+                    if settle_dt.tzinfo is None:
+                        settle_dt = settle_dt.replace(tzinfo=timezone.utc)
+                    if settle_dt < datetime.now(timezone.utc):
+                        return ResolutionResult(
+                            status=ResolutionStatus.UNSUPPORTED,
+                            query=query,
+                            reason=f"Delta options contract '{delta_contract['symbol']}' has expired on {settle_time}.",
+                            error_code="EXPIRED_OPTIONS_CONTRACT",
+                            suggested_action="Select an active future-dated contract from Delta options chain.",
+                        )
+
+                opt_type = "CALL" if delta_contract.get("contract_type") == "call_options" else "PUT"
+                inst = CanonicalInstrument(
+                    instrument_id=f"DELTA:{delta_contract['symbol']}:OPTION",
+                    asset_class=AssetClass.CRYPTO,
+                    instrument_type=InstrumentType.OPTION,
+                    provider="delta_options",
+                    exchange="DELTA",
+                    base_asset=delta_contract.get("underlying_symbol", "BTC"),
+                    quote_asset=delta_contract.get("quoting_asset", "USD"),
+                    canonical_symbol=delta_contract["symbol"],
+                    provider_symbol=delta_contract["symbol"],
+                    exchange_symbol=delta_contract["symbol"],
+                    expiry=delta_contract.get("settlement_time"),
+                    strike=float(delta_contract.get("strike_price", 0.0)),
+                    option_type=opt_type,
+                    tick_size=float(delta_contract.get("tick_size", 0.1)),
+                    quantity_step=0.001,
+                    lot_size=1.0,
+                    tradable=True,
+                    data_supported=True,
+                    execution_supported=True,
+                    settlement_asset=delta_contract.get("settling_asset", "USD"),
+                    metadata={
+                        "product_id": delta_contract["product_id"],
+                        "contract_value": delta_contract.get("contract_value", "0.001"),
+                        "trading_status": delta_contract.get("trading_status", "operational"),
+                    }
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.RESOLVED,
+                    query=query,
+                    instrument=inst,
+                    reason="Delta Exchange option contract resolved successfully.",
+                    error_code="SUCCESS",
+                )
+        except Exception as d_err:
+            logger.debug(f"Delta DB contract lookup notice: {d_err}")
+
+        # 1. Delta Exchange Options Format (e.g. C-BTC-78000-300826 or P-ETH-3500-250926)
         parts = clean_q.split("-")
-        if len(parts) == 4 and parts[0] in ["BTC", "ETH", "SOL"]:
+        if len(parts) == 4 and parts[0] in ["C", "P"] and parts[1] in ["BTC", "ETH", "SOL", "XAUT"]:
+            opt_letter, underlying, strike_str, expiry_ddmmyy = parts
+            try:
+                strike_val = float(strike_str)
+                opt_type = "CALL" if opt_letter == "C" else "PUT"
+                if len(expiry_ddmmyy) == 6 and expiry_ddmmyy.isdigit():
+                    exp_day = int(expiry_ddmmyy[:2])
+                    exp_month = int(expiry_ddmmyy[2:4])
+                    exp_year = 2000 + int(expiry_ddmmyy[4:])
+                    try:
+                        exp_date = datetime(exp_year, exp_month, exp_day, tzinfo=timezone.utc).date()
+                        if exp_date < now_date:
+                            return ResolutionResult(
+                                status=ResolutionStatus.UNSUPPORTED,
+                                query=query,
+                                reason=f"Delta options contract '{query}' expired on {exp_date.isoformat()}.",
+                                error_code="EXPIRED_OPTIONS_CONTRACT",
+                                suggested_action="Select an active contract from Delta options chain.",
+                            )
+                    except ValueError:
+                        pass
+
+                inst = CanonicalInstrument(
+                    instrument_id=f"DELTA:{clean_q}:OPTION",
+                    asset_class=AssetClass.CRYPTO,
+                    instrument_type=InstrumentType.OPTION,
+                    provider="delta_options",
+                    exchange="DELTA",
+                    base_asset=underlying,
+                    quote_asset="USD",
+                    canonical_symbol=clean_q,
+                    provider_symbol=clean_q,
+                    exchange_symbol=clean_q,
+                    expiry=f"20{expiry_ddmmyy[4:]}-{expiry_ddmmyy[2:4]}-{expiry_ddmmyy[:2]}",
+                    strike=strike_val,
+                    option_type=opt_type,
+                    tick_size=0.1,
+                    quantity_step=0.001,
+                    lot_size=1.0,
+                    tradable=True,
+                    data_supported=True,
+                    execution_supported=True,
+                    settlement_asset="USD",
+                )
+                return ResolutionResult(
+                    status=ResolutionStatus.RESOLVED,
+                    query=query,
+                    instrument=inst,
+                    reason="Delta Exchange option contract resolved successfully.",
+                    error_code="SUCCESS",
+                )
+            except Exception as e:
+                logger.error(f"Delta option format parse error: {e}")
+
+        # 2. Crypto Option Format (e.g. BTC-260327-70000-C or BTC-260925-70000-P)
+        if len(parts) == 4 and parts[0] in ["BTC", "ETH", "SOL", "XAUT"]:
             underlying, expiry, strike_str, opt_type_letter = parts
             try:
                 strike_val = float(strike_str)
@@ -702,22 +831,23 @@ class InstrumentResolver:
                         pass
 
                 opt_type = "CALL" if opt_type_letter.upper() in ["C", "CALL", "CE"] else "PUT"
-                
+
                 # Check for explicit provider configuration
-                opt_provider = (provider or "binance_options").lower()
-                if "deribit" in opt_provider:
-                    has_deribit = bool(os.getenv("DERIBIT_API_KEY") or os.getenv("DERIBIT_CLIENT_ID"))
-                    if not has_deribit and not bool(os.getenv("UPSTOX_API_KEY") or os.getenv("BINANCE_API_KEY")):
+                opt_provider = (provider or "delta_options").lower()
+                if opt_provider in ["deribit", "deribit_options"]:
+                    if not os.getenv("DERIBIT_API_KEY") and not os.getenv("DERIBIT_CLIENT_ID"):
                         return ResolutionResult(
                             status=ResolutionStatus.UNSUPPORTED,
                             query=query,
-                            reason="Options provider 'DERIBIT' is not configured. Connect an options provider before starting this bot.",
+                            reason="Deribit options provider is not configured. Missing API credentials.",
                             error_code="OPTIONS_PROVIDER_NOT_CONFIGURED",
-                            suggested_action="Configure your options broker in Settings.",
+                            suggested_action="Configure DERIBIT_API_KEY or use Delta Exchange options.",
                         )
-
-                selected_provider = "binance_options" if "binance" in opt_provider or not os.getenv("DERIBIT_API_KEY") else "deribit_options"
-                selected_exchange = "BINANCE" if selected_provider == "binance_options" else "DERIBIT"
+                    selected_provider = "deribit_options"
+                    selected_exchange = "DERIBIT"
+                else:
+                    selected_provider = "delta_options"
+                    selected_exchange = "DELTA"
 
                 inst = CanonicalInstrument(
                     instrument_id=f"{selected_exchange}:{clean_q}:OPTION",
@@ -726,20 +856,20 @@ class InstrumentResolver:
                     provider=selected_provider,
                     exchange=selected_exchange,
                     base_asset=underlying,
-                    quote_asset="USDT" if selected_provider == "binance_options" else "USD",
+                    quote_asset="USD",
                     canonical_symbol=clean_q,
                     provider_symbol=clean_q,
                     exchange_symbol=clean_q,
                     expiry=f"20{expiry[:2]}-{expiry[2:4]}-{expiry[4:]}",
                     strike=strike_val,
                     option_type=opt_type,
-                    tick_size=0.0005,
-                    quantity_step=0.1,
+                    tick_size=0.1,
+                    quantity_step=0.001,
                     lot_size=1.0,
                     tradable=True,
                     data_supported=True,
                     execution_supported=True,
-                    settlement_asset="USDT" if selected_provider == "binance_options" else underlying,
+                    settlement_asset="USD",
                 )
                 return ResolutionResult(
                     status=ResolutionStatus.RESOLVED,

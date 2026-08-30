@@ -24,6 +24,7 @@ import { ProviderHealthDashboard } from "./ProviderHealthDashboard";
 import { MarketSkeleton } from "./MarketSkeleton";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { StocksUniverseView } from "@/src/features/markets/stocks";
 import {
   X,
   TrendingUp,
@@ -407,64 +408,51 @@ export function MarketUniverse() {
         </div>
       )}
 
-      {activeCategory === "STOCKS" && (
-        <div className="p-3 bg-[#0B132B] border border-slate-800 rounded-xl flex flex-wrap items-center gap-2 text-xs font-mono">
-          <span className="text-slate-400 font-bold uppercase">Exchange:</span>
-          {(["ALL", "NSE", "BSE", "NASDAQ", "NYSE"] as const).map((ex) => (
-            <button
-              key={ex}
-              onClick={() => setStocksExchangeFilter(ex)}
-              className={`px-2.5 py-1 rounded-lg font-bold transition border ${
-                stocksExchangeFilter === ex
-                  ? "bg-cyan-600 text-white border-cyan-400 shadow-sm"
-                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
-              }`}
-            >
-              {ex}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* 4. Main Market Content Area: Dynamic Table (Left) + Right-Side Inspector */}
-      <ErrorBoundary title="Market Table Error">
-        {isLoading && !universeData ? (
-          <MarketSkeleton />
-        ) : error && !universeData ? (
-          <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl text-xs text-rose-300 font-mono">
-            <span>Failed to load market universe: {(error as Error).message}</span>
-          </div>
-        ) : (
-          <div className="flex flex-col lg:flex-row items-start gap-3.5 w-full">
-            {/* Left: Dynamic Smart Market Table */}
-            <div className="w-full min-w-0 flex-1">
-              <SimpleMarketTable
-                instruments={displayedInstruments}
-                selectedInstrument={activeSelected}
-                onSelectInstrument={handleRowSelect}
-                onToggleWatchlist={(inst) => toggleWatchlist(inst)}
-                watchlistSymbols={watchlistSymbols}
-                activeCategory={activeCategory}
-                density={density}
-                showColumnSettings={showColumnSettings}
-                onCloseColumnSettings={() => setShowColumnSettings(false)}
-              />
+      {activeCategory === "STOCKS" ? (
+        <ErrorBoundary title="Stocks Universe Error">
+          <StocksUniverseView />
+        </ErrorBoundary>
+      ) : (
+        /* 4. Main Market Content Area: Dynamic Table (Left) + Right-Side Inspector */
+        <ErrorBoundary title="Market Table Error">
+          {isLoading && !universeData ? (
+            <MarketSkeleton />
+          ) : error && !universeData ? (
+            <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl text-xs text-rose-300 font-mono">
+              <span>Failed to load market universe: {(error as Error).message}</span>
             </div>
+          ) : (
+            <div className="flex flex-col lg:flex-row items-start gap-3.5 w-full">
+              {/* Left: Dynamic Smart Market Table */}
+              <div className="w-full min-w-0 flex-1">
+                <SimpleMarketTable
+                  instruments={displayedInstruments}
+                  selectedInstrument={activeSelected}
+                  onSelectInstrument={handleRowSelect}
+                  onToggleWatchlist={(inst) => toggleWatchlist(inst)}
+                  watchlistSymbols={watchlistSymbols}
+                  activeCategory={activeCategory}
+                  density={density}
+                  showColumnSettings={showColumnSettings}
+                  onCloseColumnSettings={() => setShowColumnSettings(false)}
+                />
+              </div>
 
-            {/* Right: Responsive Instrument Inspector */}
-            {isInspectorOpen && activeSelected && (
-              <InstrumentInspector
-                instrument={activeSelected}
-                onClose={() => setIsInspectorOpen(false)}
-                isInWatchlist={Boolean(isWatched(activeSelected))}
-                onToggleWatchlist={() => toggleWatchlist(activeSelected)}
-                onOpenOptions={setOptionChainUnderlying}
-                onOpenFutures={setFuturesChainUnderlying}
-              />
-            )}
-          </div>
-        )}
-      </ErrorBoundary>
+              {/* Right: Responsive Instrument Inspector */}
+              {isInspectorOpen && activeSelected && (
+                <InstrumentInspector
+                  instrument={activeSelected}
+                  onClose={() => setIsInspectorOpen(false)}
+                  isInWatchlist={Boolean(isWatched(activeSelected))}
+                  onToggleWatchlist={() => toggleWatchlist(activeSelected)}
+                  onOpenOptions={setOptionChainUnderlying}
+                  onOpenFutures={setFuturesChainUnderlying}
+                />
+              )}
+            </div>
+          )}
+        </ErrorBoundary>
+      )}
 
       {/* --------------------------------------------------------------------- */}
       {/* On-Demand Modals & Drawers */}

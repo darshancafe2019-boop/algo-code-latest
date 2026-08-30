@@ -16,6 +16,8 @@ export const metadata: Metadata = {
   manifest: "/manifest.json",
 };
 
+import { BackendAvailabilityBanner } from "@/components/common/BackendAvailabilityBanner";
+
 export default function RootLayout({
   children,
 }: {
@@ -54,32 +56,42 @@ export default function RootLayout({
                       r.classList.add('light');
                     } else {
                       r.classList.remove('light');
-                      r.classList.add('dark');
                     }
                   }
                 }
               } catch (e) {}
-            `,
-          }}
-        />
-        {/* Unregister obsolete service workers and purge legacy caches to guarantee zero asset interception */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for (var i = 0; i < registrations.length; i++) {
-                    registrations[i].unregister();
+
+              // Auto-unregister stale service workers and purge outdated HTTP caches
+              try {
+                if (typeof window !== 'undefined') {
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                      for (var i = 0; i < regs.length; i++) regs[i].unregister();
+                    }).catch(function() {});
                   }
-                }).catch(function() {});
-                if ('caches' in window) {
-                  caches.keys().then(function(keys) {
-                    for (var i = 0; i < keys.length; i++) {
-                      caches.delete(keys[i]);
+                  if ('caches' in window) {
+                    caches.keys().then(function(names) {
+                      for (var i = 0; i < names.length; i++) caches.delete(names[i]);
+                    }).catch(function() {});
+                  }
+                  // Auto-recover from stale Webpack chunk / Fast Refresh hash mismatches after server restarts
+                  window.addEventListener('error', function(e) {
+                    if (e && e.message && (
+                      e.message.indexOf("Cannot read properties of undefined (reading 'call')") !== -1 ||
+                      e.message.indexOf("Loading chunk") !== -1 ||
+                      e.message.indexOf("ChunkLoadError") !== -1
+                    )) {
+                      var reloadKey = 'quantos_chunk_recover_ts';
+                      var lastReload = sessionStorage.getItem(reloadKey);
+                      var now = Date.now();
+                      if (!lastReload || (now - Number(lastReload)) > 5000) {
+                        sessionStorage.setItem(reloadKey, String(now));
+                        window.location.reload();
+                      }
                     }
-                  }).catch(function() {});
+                  });
                 }
-              }
+              } catch (e) {}
             `,
           }}
         />
@@ -91,6 +103,7 @@ export default function RootLayout({
               <GlobalLayoutProvider>
                 <MarketGatewayProvider>
                   <GlobalDataProvider>
+                    <BackendAvailabilityBanner />
                     {children}
                   </GlobalDataProvider>
                 </MarketGatewayProvider>

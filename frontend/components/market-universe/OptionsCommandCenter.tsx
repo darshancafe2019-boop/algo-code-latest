@@ -12,8 +12,12 @@ import {
   Clock,
   Sparkles,
   Percent,
+  Calendar,
+  ChevronRight,
+  RefreshCw,
 } from "lucide-react";
 import { OptionChainData } from "@/types/market-universe";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 interface OptionsCommandCenterProps {
   underlyingSymbol: string;
@@ -67,7 +71,10 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
 
   const spot = chainData?.spot_price || 24350.0;
   const atmStrike = chainData?.atm_strike || 24350;
-  const expiries = chainData?.available_expiries || ["2026-08-27", "2026-09-03", "2026-09-24"];
+  const normalizedExpiries = React.useMemo(() => {
+    const rawExpiries = chainData?.available_expiries || ["2026-08-27", "2026-09-03", "2026-09-24"];
+    return normalizeExpiriesList(rawExpiries, symbol);
+  }, [chainData?.available_expiries, symbol]);
 
   return (
     <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
@@ -107,9 +114,9 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
             onChange={(e) => setSelectedExpiry(e.target.value)}
             className="bg-[#07110D] border border-[#1B3328] rounded-xl px-3 py-1 text-white font-bold focus:outline-none focus:border-[#55C98A]"
           >
-            {expiries.map((exp) => (
-              <option key={exp} value={exp}>
-                Exp: {exp}
+            {normalizedExpiries.map((opt) => (
+              <option key={opt.key} value={opt.value}>
+                Exp: {opt.label}
               </option>
             ))}
           </select>

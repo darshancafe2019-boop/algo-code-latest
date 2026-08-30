@@ -1,4 +1,4 @@
-import puppeteer from "./node_modules/puppeteer-core/lib/esm/puppeteer/puppeteer.js";
+import puppeteer from "puppeteer-core";
 import path from "path";
 import fs from "fs";
 

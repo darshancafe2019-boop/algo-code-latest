@@ -9,7 +9,7 @@ import {
   NUMERIC_FONT_MAP,
   FONT_SCALE_MAP,
   DENSITY_MAP,
-} from "../lib/themeTokens.js";
+} from "../lib/themeTokens.ts";
 
 console.log("===============================================================");
 console.log("🚀 RUNNING MASTER APPEARANCE & DESIGN SYSTEM SUITE (QUANT.OS)");

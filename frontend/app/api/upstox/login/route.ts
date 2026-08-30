@@ -14,8 +14,9 @@ const UPSTOX_AUTH_DIALOG_URL = "https://api.upstox.com/v2/login/authorization/di
  */
 export async function GET(req: NextRequest) {
   try {
-    const urlObj = new URL(req.url);
-    const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3100";
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "127.0.0.1:3100";
+    const proto = req.headers.get("x-forwarded-proto") || "http";
+    const origin = req.nextUrl?.origin || `${proto}://${host}`;
 
     const apiKey = (
       process.env.UPSTOX_API_KEY ||

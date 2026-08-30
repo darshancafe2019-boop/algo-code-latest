@@ -25,6 +25,7 @@ import Link from "next/link";
 import { formatMoney, formatPnL } from "@/lib/formatters";
 import { EcoBadge } from "@/components/eco/EcoBadge";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
+import { useUIStore } from "@/lib/store/useUIStore";
 
 interface TopCommandBarProps {
   onOpenSearch?: () => void;
@@ -273,7 +274,7 @@ export function TopCommandBar({
           <button
             type="button"
             onClick={() => {
-              const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+              const { setOrderPlacementModalOpen, setQuickOrderSide } = useUIStore.getState();
               setQuickOrderSide("BUY");
               setOrderPlacementModalOpen(true);
             }}
@@ -287,7 +288,7 @@ export function TopCommandBar({
           <button
             type="button"
             onClick={() => {
-              const { setCreateBotModalOpen } = require("@/lib/store/useUIStore").useUIStore.getState();
+              const { setCreateBotModalOpen } = useUIStore.getState();
               setCreateBotModalOpen(true);
             }}
             className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--theme-accent)]/15 hover:bg-[var(--theme-accent)]/25 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30 font-bold transition-all shadow-sm active:scale-98"

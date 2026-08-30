@@ -15,13 +15,15 @@ import {
   Compass,
   Sliders,
 } from "lucide-react";
+import { RawExpiryItem } from "@/types/option-chain";
+import { normalizeExpiriesList, formatDaysToExpiryLabel } from "@/lib/expiry-utils";
 
 interface OptionsCommandHeaderProps {
   underlying: string;
   onChangeUnderlying: (u: string) => void;
   selectedExpiry: string;
   onChangeExpiry: (exp: string) => void;
-  availableExpiries: string[];
+  availableExpiries: RawExpiryItem[];
   spotPrice: number;
   spotChange24h?: number;
   strikeRange: number;
@@ -52,12 +54,13 @@ export function OptionsCommandHeader({
   onRefresh,
 }: OptionsCommandHeaderProps) {
   const underlyingsList = [
+    { id: "BTC", name: "BTC / USD (Delta)", category: "Crypto", currency: "$" },
+    { id: "ETH", name: "ETH / USD (Delta)", category: "Crypto", currency: "$" },
+    { id: "XAUT", name: "XAUT / USD (Delta)", category: "Crypto", currency: "$" },
     { id: "NIFTY", name: "NIFTY 50", category: "Index", currency: "₹" },
     { id: "BANKNIFTY", name: "BANK NIFTY", category: "Index", currency: "₹" },
     { id: "FINNIFTY", name: "FINNIFTY", category: "Index", currency: "₹" },
     { id: "SENSEX", name: "SENSEX", category: "Index", currency: "₹" },
-    { id: "BTC", name: "BTC / USDT", category: "Crypto", currency: "$" },
-    { id: "ETH", name: "ETH / USDT", category: "Crypto", currency: "$" },
     { id: "RELIANCE", name: "RELIANCE", category: "Stock", currency: "₹" },
     { id: "TCS", name: "TCS", category: "Stock", currency: "₹" },
   ];
@@ -65,9 +68,18 @@ export function OptionsCommandHeader({
   const currentObj = underlyingsList.find((u) => u.id === underlying) || underlyingsList[0];
   const isPositive = spotChange24h >= 0;
 
+  // Normalized Expiries Presentation Options
+  const normalizedExpiries = React.useMemo(() => {
+    return normalizeExpiriesList(availableExpiries, underlying);
+  }, [availableExpiries, underlying]);
+
+  const activeExpiryOpt = normalizedExpiries.find(
+    (e) => e.value === selectedExpiry || e.dateString === selectedExpiry
+  );
+
   // Calculate Days to Expiry (DTE)
-  let daysToExpiry = 0;
-  if (selectedExpiry) {
+  let daysToExpiry = typeof activeExpiryOpt?.daysToExpiry === "number" ? Math.round(activeExpiryOpt.daysToExpiry) : 0;
+  if (daysToExpiry === 0 && selectedExpiry) {
     try {
       const expDate = new Date(selectedExpiry);
       const now = new Date();
@@ -173,10 +185,10 @@ export function OptionsCommandHeader({
             onChange={(e) => onChangeExpiry(e.target.value)}
             className="bg-[#141E33] border border-slate-700 text-white rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-cyan-500 font-bold"
           >
-            {availableExpiries && availableExpiries.length > 0 ? (
-              availableExpiries.map((exp, idx) => (
-                <option key={exp} value={exp}>
-                  {exp} {idx === 0 ? "(Nearest / Weekly)" : ""}
+            {normalizedExpiries && normalizedExpiries.length > 0 ? (
+              normalizedExpiries.map((opt) => (
+                <option key={opt.key} value={opt.value}>
+                  {opt.label}
                 </option>
               ))
             ) : (

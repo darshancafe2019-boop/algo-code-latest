@@ -118,10 +118,27 @@ export function InstrumentInspector({
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
   const isPositive = changePct >= 0;
-  const assetClass = (instrument.asset_class || instrument.canonical_asset_class || "CRYPTO").toUpperCase();
+  const assetClass = (instrument.asset_class || instrument.canonical_asset_class || "").toUpperCase();
+  const instType = (instrument.instrument_type || "").toUpperCase();
   const isEconomy = assetClass === "ECONOMY";
-  const isOptions = assetClass === "OPTIONS" || assetClass === "CRYPTO_OPTIONS" || sym.includes("-C") || sym.includes("-P") || sym.includes("CE") || sym.includes("PE");
-  const isFutures = assetClass === "FUTURES" || sym.includes("FUT") || sym.includes("PERP");
+  const isOptions =
+    (assetClass === "OPTIONS" ||
+      assetClass === "OPTION" ||
+      assetClass === "CRYPTO_OPTIONS" ||
+      instType === "CALL_OPTION" ||
+      instType === "PUT_OPTION" ||
+      instType === "OPTION") &&
+    instrument.option_type !== "NONE" &&
+    instrument.strike != null &&
+    instrument.strike > 0;
+  const isFutures =
+    assetClass === "FUTURES" ||
+    assetClass === "FUTURE" ||
+    assetClass === "PERPETUAL" ||
+    instType === "FUTURE" ||
+    instType === "PERPETUAL" ||
+    sym.endsWith("_PERP") ||
+    sym.endsWith("-PERP");
 
   // Real Data Quality Status
   const dataAgeMs = instrument.data_age_ms ?? 120;
@@ -314,19 +331,30 @@ export function InstrumentInspector({
               </div>
             )}
 
-            {/* Core Metrics Grid */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* Key Market Metrics */}
+            {!isEconomy && (
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                  Market Depth &amp; Liquidity
+                </span>
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h High</span>
-                <span className="text-slate-200 font-bold">{formatPrice(instrument.high_24h, currSymbol)}</span>
+                <span className="text-slate-200 font-bold">
+                  {instrument.high_24h ? `${currSymbol}${instrument.high_24h.toLocaleString()}` : "—"}
+                </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h Low</span>
-                <span className="text-slate-200 font-bold">{formatPrice(instrument.low_24h, currSymbol)}</span>
+                <span className="text-slate-200 font-bold">
+                  {instrument.low_24h ? `${currSymbol}${instrument.low_24h.toLocaleString()}` : "—"}
+                </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
-                <span className="text-[10px] text-slate-500 uppercase block">Volume (24h)</span>
-                <span className="text-slate-200 font-bold">{formatVolume(instrument.volume_24h)}</span>
+                <span className="text-[10px] text-slate-500 uppercase block">24h Volume</span>
+                <span className="text-slate-200 font-bold">
+                  {formatQuantity(instrument.volume_24h)}
+                </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">Turnover</span>
@@ -336,7 +364,7 @@ export function InstrumentInspector({
               </div>
             </div>
 
-            {/* Derivative / Options Telemetry */}
+            {/* Derivative / Options Telemetry - Strictly Rendered Only For Actual Options */}
             {isOptions && (
               <div className="p-3 bg-purple-950/30 border border-purple-500/30 rounded-xl space-y-2.5">
                 <span className="text-[10px] font-bold text-purple-300 uppercase block">
@@ -349,28 +377,28 @@ export function InstrumentInspector({
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Type</span>
-                    <span className="text-purple-400 font-bold">{instrument.option_type || "CALL"}</span>
+                    <span className="text-purple-400 font-bold">{instrument.option_type || "—"}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Expiry</span>
-                    <span className="text-slate-200 font-bold">{instrument.expiry || "Near"}</span>
+                    <span className="text-slate-200 font-bold">{instrument.expiry || "—"}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">IV</span>
                     <span className="text-amber-400 font-bold">
-                      {instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "52.4%"}
+                      {instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "—"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Delta (Δ)</span>
                     <span className="text-cyan-400 font-bold">
-                      {instrument.delta ? instrument.delta.toFixed(2) : "0.50"}
+                      {instrument.delta != null ? instrument.delta.toFixed(2) : "—"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Open Interest</span>
                     <span className="text-slate-200 font-bold">
-                      {formatQuantity(instrument.open_interest || 14200)}
+                      {instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}
                     </span>
                   </div>
                 </div>
@@ -391,13 +419,13 @@ export function InstrumentInspector({
                   <div>
                     <span className="text-[10px] text-slate-500 block">Funding Rate</span>
                     <span className="text-emerald-400 font-bold">
-                      {instrument.funding_rate ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "+0.0100%"}
+                      {instrument.funding_rate != null ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "—"}
                     </span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Open Interest</span>
                     <span className="text-slate-200 font-bold">
-                      {formatQuantity(instrument.open_interest || 89200)}
+                      {instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}
                     </span>
                   </div>
                   <div>
@@ -407,6 +435,8 @@ export function InstrumentInspector({
                 </div>
               </div>
             )}
+          </div>
+        )}
 
             {/* Quick Navigation Action Links */}
             <div className="space-y-1.5 pt-2 border-t border-slate-800">

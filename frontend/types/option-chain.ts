@@ -36,13 +36,35 @@ export interface PCRMetrics {
   total_put_volume: number;
 }
 
+export interface BackendExpiryRecord {
+  id?: number | string;
+  underlying_symbol?: string;
+  expiry_date: string;
+  settlement_time?: string;
+  days_to_expiry?: number;
+  is_active?: boolean;
+  last_synced_at?: string;
+}
+
+export type RawExpiryItem = string | BackendExpiryRecord;
+
+export interface NormalizedExpiryOption {
+  key: string;
+  value: string;
+  label: string;
+  dateString: string;
+  daysToExpiry?: number;
+  isActive: boolean;
+  raw: RawExpiryItem;
+}
+
 export interface OptionChainData {
   status: string;
   underlying: string;
   spot_price: number;
   spot_change_24h?: number;
   selected_expiry: string;
-  available_expiries: string[];
+  available_expiries: RawExpiryItem[];
   strike_count: number;
   total_available_strikes: number;
   max_pain: number;

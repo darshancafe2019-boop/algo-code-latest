@@ -37,7 +37,9 @@ export function generateOAuthDialogUrl(origin?: string): OAuthInitResult {
     );
   }
 
-  const redirectUri = creds.redirectUri || (origin ? `${origin}/api/upstox/callback` : "http://localhost:3100/api/upstox/callback");
+  const redirectUri = creds.redirectUri && creds.redirectUri.startsWith("http")
+    ? creds.redirectUri
+    : (origin ? `${origin}/api/upstox/callback` : "/api/upstox/callback");
   const state = crypto.randomBytes(24).toString("hex");
 
   const authUrl = new URL(UPSTOX_AUTH_DIALOG_URL);
@@ -78,7 +80,9 @@ export async function exchangeAuthCodeForToken(
     );
   }
 
-  const redirectUri = creds.redirectUri || (origin ? `${origin}/api/upstox/callback` : "http://localhost:3100/api/upstox/callback");
+  const redirectUri = creds.redirectUri && creds.redirectUri.startsWith("http")
+    ? creds.redirectUri
+    : (origin ? `${origin}/api/upstox/callback` : "/api/upstox/callback");
 
   const body = new URLSearchParams({
     code: code.trim(),

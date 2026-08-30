@@ -17,6 +17,7 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 export interface SelectedOptionsContract {
   symbol: string;
@@ -31,6 +32,7 @@ export interface SelectedOptionsContract {
   asset_class: "CRYPTO_OPTIONS" | "OPTIONS";
   premium_est?: number;
   iv?: number;
+  product_id?: number;
 }
 
 interface OptionsContractSelectorModalProps {
@@ -54,14 +56,52 @@ export function OptionsContractSelectorModal({
   const [underlying, setUnderlying] = useState<string>(
     initialUnderlying.replace("-OPTIONS", "").replace("/USDT", "").toUpperCase()
   );
-  const [provider, setProvider] = useState<"BINANCE" | "UPSTOX" | "DERIBIT">(
+  const [provider, setProvider] = useState<"DELTA" | "BINANCE" | "UPSTOX" | "DERIBIT">(
     initialAssetClass === "OPTIONS" || ["NIFTY", "BANKNIFTY", "FINNIFTY", "RELIANCE"].includes(initialUnderlying)
       ? "UPSTOX"
-      : "BINANCE"
+      : "DELTA"
   );
   const [selectedSide, setSelectedSide] = useState<"CALL" | "PUT">("CALL");
-  const [selectedExpiry, setSelectedExpiry] = useState<string>("2026-09-25");
-  const [selectedStrike, setSelectedStrike] = useState<number>(70000);
+  const [selectedExpiry, setSelectedExpiry] = useState<string>("");
+  const [selectedStrike, setSelectedStrike] = useState<number>(78000);
+
+  // Fetch Delta Underlyings
+  const { data: deltaUnderlyingsResp } = useQuery({
+    queryKey: ["deltaUnderlyings"],
+    queryFn: async () => {
+      const res = await fetch("/api/markets/delta/options/underlyings");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    staleTime: 30000,
+  });
+
+  // Fetch Delta Expiries
+  const { data: deltaExpiriesResp } = useQuery({
+    queryKey: ["deltaExpiries", underlying],
+    queryFn: async () => {
+      const res = await fetch(`/api/markets/delta/options/expiries?underlying=${underlying}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: provider === "DELTA",
+    staleTime: 30000,
+  });
+
+  // Fetch Delta Live Option Chain
+  const { data: deltaChainResp } = useQuery({
+    queryKey: ["deltaChainModal", underlying, selectedExpiry],
+    queryFn: async () => {
+      const params = new URLSearchParams({ underlying });
+      if (selectedExpiry) params.append("expiry", selectedExpiry);
+      const res = await fetch(`/api/markets/delta/options/chain?${params.toString()}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: provider === "DELTA",
+    staleTime: 5000,
+    refetchInterval: 10000,
+  });
 
   // Check Provider Connection Readiness
   const { data: binanceStatus } = useQuery({
@@ -83,6 +123,7 @@ export function OptionsContractSelectorModal({
   });
 
   const isProviderConnected = useMemo(() => {
+    if (provider === "DELTA") return true; // Public market data works without keys
     if (provider === "BINANCE") return Boolean(binanceStatus?.connected || binanceStatus?.hasApiKey);
     if (provider === "UPSTOX") return Boolean(upstoxStatus?.connected);
     if (provider === "DERIBIT") return true; // Paper mode supported
@@ -91,6 +132,21 @@ export function OptionsContractSelectorModal({
 
   // Available underlyings based on provider
   const availableUnderlyings = useMemo(() => {
+    if (provider === "DELTA") {
+      const discovered = deltaUnderlyingsResp?.data;
+      if (Array.isArray(discovered) && discovered.length > 0) {
+        return discovered.map((u: any) => ({
+          id: u.symbol,
+          name: `${u.name} (Delta)`,
+          spot: u.spot_price || 78000,
+        }));
+      }
+      return [
+        { id: "BTC", name: "Bitcoin Options (Delta)", spot: 78000 },
+        { id: "ETH", name: "Ethereum Options (Delta)", spot: 3500 },
+        { id: "XAUT", name: "Tether Gold Options (Delta)", spot: 2900 },
+      ];
+    }
     if (provider === "UPSTOX") {
       return [
         { id: "NIFTY", name: "Nifty 50 Index", spot: 24450 },
@@ -104,32 +160,38 @@ export function OptionsContractSelectorModal({
       { id: "ETH", name: "Ethereum Options", spot: 3480 },
       { id: "SOL", name: "Solana Options", spot: 152 },
     ];
-  }, [provider]);
+  }, [provider, deltaUnderlyingsResp]);
 
   // Current spot reference
   const currentSpot = useMemo(() => {
-    const found = availableUnderlyings.find((u) => u.id === underlying);
-    return found ? found.spot : 64000;
-  }, [availableUnderlyings, underlying]);
-
-  // Dynamic expiries (Current and future dates)
-  const availableExpiries = useMemo(() => {
-    if (provider === "UPSTOX") {
-      return [
-        { id: "2026-09-03", label: "03 SEP 2026 (Weekly)", dte: 5 },
-        { id: "2026-09-10", label: "10 SEP 2026 (Weekly)", dte: 12 },
-        { id: "2026-09-24", label: "24 SEP 2026 (Monthly)", dte: 26 },
-        { id: "2026-10-29", label: "29 OCT 2026 (Far Monthly)", dte: 61 },
-      ];
+    if (provider === "DELTA" && deltaChainResp?.data?.spot_price) {
+      return deltaChainResp.data.spot_price;
     }
-    return [
-      { id: "2026-09-04", label: "04 SEP 2026 (Weekly)", dte: 6 },
-      { id: "2026-09-11", label: "11 SEP 2026 (Weekly)", dte: 13 },
-      { id: "2026-09-25", label: "25 SEP 2026 (Monthly)", dte: 27 },
-      { id: "2026-10-30", label: "30 OCT 2026 (Q3 Close)", dte: 62 },
-      { id: "2026-12-25", label: "25 DEC 2026 (Annual)", dte: 118 },
-    ];
-  }, [provider]);
+    const found = availableUnderlyings.find((u) => u.id === underlying);
+    return found ? found.spot : 78000;
+  }, [availableUnderlyings, underlying, provider, deltaChainResp]);
+
+  // Dynamic expiries normalized to primitive options
+  const availableExpiries = useMemo(() => {
+    let rawList: any[] = [];
+    if (provider === "DELTA") {
+      rawList = deltaExpiriesResp?.data || deltaChainResp?.data?.available_expiries || [];
+    }
+    if (Array.isArray(rawList) && rawList.length > 0) {
+      return normalizeExpiriesList(rawList, underlying);
+    }
+    const fallbackList = provider === "UPSTOX"
+      ? ["2026-09-03", "2026-09-10", "2026-09-24", "2026-10-29"]
+      : ["2026-09-04", "2026-09-11", "2026-09-25", "2026-10-30", "2026-12-25"];
+    return normalizeExpiriesList(fallbackList, underlying);
+  }, [provider, deltaExpiriesResp, deltaChainResp, underlying]);
+
+  // Set default expiry if empty
+  React.useEffect(() => {
+    if (!selectedExpiry && availableExpiries.length > 0) {
+      setSelectedExpiry(availableExpiries[0].value);
+    }
+  }, [availableExpiries, selectedExpiry]);
 
   // Auto-generate realistic strike matrix around current spot
   const strikes = useMemo(() => {
@@ -164,32 +226,51 @@ export function OptionsContractSelectorModal({
     const isCrypto = provider !== "UPSTOX";
     const optLetter = selectedSide === "CALL" ? "C" : "P";
     const optNSE = selectedSide === "CALL" ? "CE" : "PE";
-    
-    // Format: BTC-260925-70000-C
-    const yymmdd = selectedExpiry.replace("20", "").replace(/-/g, "");
-    const cryptoSymbol = `${underlying}-${yymmdd}-${selectedStrike}-${optLetter}`;
-    const nseSymbol = `${underlying} ${selectedStrike} ${optNSE}`;
 
-    const canonicalSym = isCrypto ? cryptoSymbol : nseSymbol;
-    const contractId = isCrypto
-      ? `${provider}:${cryptoSymbol}:OPTION`
-      : `NSE:${underlying}:${selectedExpiry}:${selectedStrike}:${optNSE}`;
+    let canonicalSym = "";
+    let contractId = "";
+    let selectedPid: number | undefined = undefined;
+
+    if (provider === "DELTA") {
+      // Find matching strike row in delta chain
+      const dStrikes = deltaChainResp?.data?.strikes || [];
+      const matchRow = dStrikes.find((r: any) => r.strike === selectedStrike);
+      const leg = selectedSide === "CALL" ? matchRow?.call : matchRow?.put;
+      if (leg?.symbol) {
+        canonicalSym = leg.symbol;
+        selectedPid = leg.product_id;
+      } else {
+        // Fallback to standard Delta naming: C-BTC-78000-DDMMYY
+        const ddmmyy = selectedExpiry.replace(/-/g, "").slice(0, 4) + selectedExpiry.slice(-2);
+        canonicalSym = `${optLetter}-${underlying}-${selectedStrike}-${ddmmyy}`;
+      }
+      contractId = `DELTA:${canonicalSym}:OPTION`;
+    } else if (provider === "UPSTOX") {
+      canonicalSym = `${underlying} ${selectedStrike} ${optNSE}`;
+      contractId = `NSE:${underlying}:${selectedExpiry}:${selectedStrike}:${optNSE}`;
+    } else {
+      // Format: BTC-260925-70000-C
+      const yymmdd = selectedExpiry.replace("20", "").replace(/-/g, "");
+      canonicalSym = `${underlying}-${yymmdd}-${selectedStrike}-${optLetter}`;
+      contractId = `${provider}:${canonicalSym}:OPTION`;
+    }
 
     return {
       symbol: canonicalSym,
       display_symbol: canonicalSym,
       contract_id: contractId,
       underlying: isCrypto ? `${underlying}/USDT` : underlying,
-      provider: isCrypto ? "binance_options" : "upstox_options",
-      exchange: isCrypto ? provider : "NSE",
+      provider: provider === "DELTA" ? "delta_options" : isCrypto ? "binance_options" : "upstox_options",
+      exchange: provider === "DELTA" ? "DELTA" : isCrypto ? provider : "NSE",
       expiry: selectedExpiry,
       strike: selectedStrike,
       option_type: selectedSide,
       asset_class: isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS",
       premium_est: strikes.find((s) => s.strike === selectedStrike)?.estPremium || 150,
       iv: strikes.find((s) => s.strike === selectedStrike)?.iv || 52.5,
+      product_id: selectedPid,
     };
-  }, [underlying, provider, selectedSide, selectedExpiry, selectedStrike, strikes]);
+  }, [underlying, provider, selectedSide, selectedExpiry, selectedStrike, strikes, deltaChainResp]);
 
   if (!isOpen) return null;
 
@@ -213,11 +294,11 @@ export function OptionsContractSelectorModal({
                   Options Contract Selector
                 </h3>
                 <span className="px-2 py-0.5 rounded text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 uppercase">
-                  Live Chain Resolver
+                  Delta Exchange Live
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                {botName ? `Configuring Options contract for ${botName}` : "Select a specific executable strike contract from the live chain."}
+                {botName ? `Configuring Options contract for ${botName}` : "Select a specific executable strike contract from the live Delta option chain."}
               </p>
             </div>
           </div>
@@ -258,8 +339,8 @@ export function OptionsContractSelectorModal({
             {/* Provider Picker */}
             <div className="space-y-1.5 bg-slate-900/70 p-3 rounded-xl border border-slate-800">
               <label className="text-[10px] text-slate-400 font-bold uppercase block">1. Options Provider</label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["BINANCE", "UPSTOX", "DERIBIT"] as const).map((p) => (
+              <div className="grid grid-cols-4 gap-1.5">
+                {(["DELTA", "BINANCE", "UPSTOX", "DERIBIT"] as const).map((p) => (
                   <button
                     key={p}
                     onClick={() => {
@@ -267,13 +348,13 @@ export function OptionsContractSelectorModal({
                       if (p === "UPSTOX") setUnderlying("NIFTY");
                       else setUnderlying("BTC");
                     }}
-                    className={`py-1.5 px-2 rounded-lg font-bold text-[11px] border transition ${
+                    className={`py-1.5 px-2 rounded-lg font-bold text-[10px] border transition ${
                       provider === p
                         ? "bg-purple-600 text-white border-purple-400 shadow-md shadow-purple-500/20"
                         : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
                     }`}
                   >
-                    {p === "BINANCE" ? "Binance" : p === "UPSTOX" ? "Upstox NSE" : "Deribit"}
+                    {p === "DELTA" ? "Delta" : p === "BINANCE" ? "Binance" : p === "UPSTOX" ? "Upstox" : "Deribit"}
                   </button>
                 ))}
               </div>
@@ -318,9 +399,9 @@ export function OptionsContractSelectorModal({
                 onChange={(e) => setSelectedExpiry(e.target.value)}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2 text-white font-mono text-xs focus:border-cyan-500 focus:outline-none"
               >
-                {availableExpiries.map((exp) => (
-                  <option key={exp.id} value={exp.id}>
-                    {exp.label} ({exp.dte} DTE)
+                {availableExpiries.map((opt) => (
+                  <option key={opt.key} value={opt.value}>
+                    {opt.label}
                   </option>
                 ))}
               </select>

@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, Layers, TrendingUp, TrendingDown, Clock } from "lucide-react";
 import { NormalizedOptionChainResponse } from "@/lib/upstox/types";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
+import { apiClient } from "@/lib/apiClient";
 
 const UNDERLYINGS = [
   { key: "NSE_INDEX|Nifty 50", symbol: "NIFTY", name: "Nifty 50" },
@@ -19,17 +21,21 @@ export function UpstoxOptionChainViewer() {
     queryKey: ["upstoxOptionChain", selectedUnderlying, selectedExpiry],
     queryFn: async () => {
       const expiryQuery = selectedExpiry ? `&expiry=${encodeURIComponent(selectedExpiry)}` : "";
-      const res = await fetch(`/api/upstox/options/chain?underlying=${encodeURIComponent(selectedUnderlying)}${expiryQuery}`);
-      const json = await res.json();
-      if (!res.ok) {
-        throw new Error(json.message || "Failed to fetch option chain");
+      const res = await apiClient.get<any>(`/api/upstox/options/chain?underlying=${encodeURIComponent(selectedUnderlying)}${expiryQuery}`, { timeoutMs: 6000 });
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch option chain");
       }
-      return json;
+      return res.data.data || res.data;
     },
-    refetchInterval: 15000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 6000),
+    staleTime: 4000,
+    retry: 1,
   });
 
-  const availableExpiries = data?.availableExpiries || [];
+  const normalizedExpiries = React.useMemo(() => {
+    const availableExpiries = data?.availableExpiries || [];
+    return normalizeExpiriesList(availableExpiries, selectedUnderlying);
+  }, [data?.availableExpiries, selectedUnderlying]);
   const strikes = data?.strikes || [];
   const currentExpiry = data?.expiry || selectedExpiry;
 
@@ -73,15 +79,15 @@ export function UpstoxOptionChainViewer() {
           </div>
 
           {/* Expiry Selector */}
-          {availableExpiries.length > 0 && (
+          {normalizedExpiries.length > 0 && (
             <select
               value={currentExpiry}
               onChange={(e) => setSelectedExpiry(e.target.value)}
               className="bg-slate-900 border border-slate-700 text-slate-200 rounded-xl px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-purple-500"
             >
-              {availableExpiries.map((exp) => (
-                <option key={exp} value={exp}>
-                  Expiry: {exp}
+              {normalizedExpiries.map((opt) => (
+                <option key={opt.key} value={opt.value}>
+                  Expiry: {opt.label}
                 </option>
               ))}
             </select>

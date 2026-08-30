@@ -14,6 +14,7 @@ import {
 import { useNseOptionChain } from "@/hooks/useNseData";
 import { NseOptionStrikeRow } from "@/types/nse";
 import { NseQuickOrderModal } from "./NseQuickOrderModal";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 const POPULAR_UNDERLYINGS = [
   { label: "NIFTY 50", symbol: "NIFTY", lotSize: 50 },
@@ -46,7 +47,10 @@ export function NseOptionChainTerminal() {
   const spotPrice = chainData?.spot_price || 24350.0;
   const maxPain = chainData?.max_pain_strike || spotPrice;
   const pcr = chainData?.pcr_oi || 1.0;
-  const availableExpiries = chainData?.available_expiries || [];
+  const normalizedExpiries = React.useMemo(() => {
+    const availableExpiries = chainData?.available_expiries || [];
+    return normalizeExpiriesList(availableExpiries, selectedSymbol);
+  }, [chainData?.available_expiries, selectedSymbol]);
   const strikes = chainData?.strikes || [];
 
   const handleOpenOrder = (strike: number, type: "CE" | "PE", price: number, side: "BUY" | "SELL") => {
@@ -87,13 +91,13 @@ export function NseOptionChainTerminal() {
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-400 font-sans">Expiry:</span>
             <select
-              value={selectedExpiry || (availableExpiries[0] || "")}
+              value={selectedExpiry || (normalizedExpiries[0]?.value || "")}
               onChange={(e) => setSelectedExpiry(e.target.value)}
               className="bg-slate-900 border border-slate-700 text-white font-mono text-xs px-2.5 py-1.5 rounded-lg focus:border-cyan-400 focus:outline-none"
             >
-              {availableExpiries.map((exp) => (
-                <option key={exp} value={exp}>
-                  {exp}
+              {normalizedExpiries.map((opt) => (
+                <option key={opt.key} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>

@@ -19,6 +19,9 @@ import {
 } from "lucide-react";
 import { OptionChainResponse, StrikeRow } from "@/types/crypto-derivatives";
 import { useCryptoRealtime } from "@/hooks/useCryptoRealtime";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
+import { RawExpiryItem } from "@/types/option-chain";
+import { apiClient } from "@/lib/apiClient";
 
 interface Props {
   initialUnderlying?: string;
@@ -35,27 +38,32 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
   // 1. Fetch Expiries
   const { data: expiriesData } = useQuery<{
     status: string;
-    expiries: string[];
+    expiries: RawExpiryItem[];
   }>({
-    queryKey: ["cryptoOptionExpiries", underlying],
+    queryKey: ["cryptoExpiries", underlying],
     queryFn: async () => {
-      const res = await fetch(`/api/crypto/options/expiries?underlying=${underlying}`);
-      if (!res.ok) throw new Error("Failed to fetch expiries");
-      return res.json();
+      const res = await apiClient.get<any>(`/api/crypto/options/expiries?underlying=${underlying}`, { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return { status: "success", expiries: [] };
+      return res.data;
     },
-    refetchInterval: 30000,
+    staleTime: 60000,
+    retry: 1,
   });
 
-  const availableExpiries = React.useMemo(() => {
-    return Array.isArray(expiriesData?.expiries) ? expiriesData.expiries : [];
-  }, [expiriesData?.expiries]);
+  const normalizedExpiries = React.useMemo(() => {
+    const raw = Array.isArray(expiriesData?.expiries) ? expiriesData.expiries : [];
+    return normalizeExpiriesList(raw, underlying);
+  }, [expiriesData?.expiries, underlying]);
 
   // Update selected expiry default
   React.useEffect(() => {
-    if (availableExpiries.length > 0 && !selectedExpiry) {
-      setSelectedExpiry(availableExpiries[0]);
+    if (normalizedExpiries.length > 0) {
+      const exists = normalizedExpiries.some((e) => e.value === selectedExpiry);
+      if (!selectedExpiry || !exists) {
+        setSelectedExpiry(normalizedExpiries[0].value);
+      }
     }
-  }, [availableExpiries, selectedExpiry]);
+  }, [normalizedExpiries, selectedExpiry]);
 
   // 2. Fetch Option Chain
   const { data, isLoading, error, refetch, isFetching } = useQuery<OptionChainResponse>({
@@ -67,11 +75,13 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
       });
       if (selectedExpiry) params.append("expiry", selectedExpiry);
 
-      const res = await fetch(`/api/crypto/options/chain?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch option chain");
-      return res.json();
+      const res = await apiClient.get<any>(`/api/crypto/options/chain?${params.toString()}`, { timeoutMs: 6000 });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch option chain");
+      return res.data;
     },
-    refetchInterval: 4000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 6000),
+    staleTime: 4000,
+    retry: 1,
   });
 
   const strikes = Array.isArray(data?.strikes) ? data.strikes : [];
@@ -140,11 +150,17 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
               onChange={(e) => setSelectedExpiry(e.target.value)}
               className="bg-transparent text-xs font-mono text-white focus:outline-none cursor-pointer"
             >
-              {availableExpiries.map((exp) => (
-                <option key={exp} value={exp} className="bg-[#131B2A] text-white">
-                  {exp}
+              {normalizedExpiries && normalizedExpiries.length > 0 ? (
+                normalizedExpiries.map((opt) => (
+                  <option key={opt.key} value={opt.value} className="bg-[#131B2A] text-white">
+                    {opt.label}
+                  </option>
+                ))
+              ) : (
+                <option value="" className="bg-[#131B2A] text-slate-400">
+                  Syncing Expiries...
                 </option>
-              ))}
+              )}
             </select>
           </div>
 

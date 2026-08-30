@@ -14,6 +14,7 @@ import {
   Zap,
   RefreshCw
 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 
 export interface ActiveStrategiesTabProps {
   currencySymbol?: string;
@@ -24,36 +25,37 @@ export function ActiveStrategiesTab({ currencySymbol = "₹" }: ActiveStrategies
   const [strategies, setStrategies] = useState<ActiveStrategyInstance[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    fetchActiveStrategies();
-    const timer = setInterval(fetchActiveStrategies, 5000);
-    return () => clearInterval(timer);
-  }, []);
-
   const fetchActiveStrategies = async () => {
+    if (apiClient.isOffline()) return;
     try {
-      const res = await fetch("/api/options/active-strategies");
-      if (res.ok) {
-        const data = await res.json();
-        setStrategies(data.strategies || []);
+      const res = await apiClient.get<any>("/api/options/active-strategies", { timeoutMs: 5000 });
+      if (res.ok && res.data) {
+        setStrategies(res.data.strategies || []);
       }
     } catch (err) {
-      console.error("Fetch active strategies error:", err);
+      // Safe fallback
     }
   };
 
+  useEffect(() => {
+    fetchActiveStrategies();
+    const timer = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible" && !apiClient.isOffline()) {
+        fetchActiveStrategies();
+      }
+    }, 6000);
+    return () => clearInterval(timer);
+  }, []);
+
   const handleControlAction = async (instanceId: string, action: string) => {
+    if (apiClient.isOffline()) return;
     try {
-      const res = await fetch(`/api/options/strategy/${instanceId}/control`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      const res = await apiClient.post<any>(`/api/options/strategy/${instanceId}/control`, { action });
       if (res.ok) {
         fetchActiveStrategies();
       }
     } catch (err) {
-      console.error("Control action error:", err);
+      // Safe fallback
     }
   };
 

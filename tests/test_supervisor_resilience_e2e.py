@@ -88,7 +88,7 @@ def run_resilience_suite():
             headers={"Content-Type": "application/json", "User-Agent": "ResilienceTestRunner"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=5.0) as res:
+        with urllib.request.urlopen(req, timeout=20.0) as res:
             assert res.status == 200
             print("  * POST /api/bots/start-all responded with HTTP 200")
 

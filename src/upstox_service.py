@@ -218,20 +218,100 @@ class UpstoxService:
         redirect_uri: Optional[str] = None,
     ):
         self.client_id = client_id if client_id is not None else os.getenv("UPSTOX_CLIENT_ID", "")
-        self.client_secret = client_secret if client_secret is not None else os.getenv("UPSTOX_CLIENT_SECRET", "")
-        self.access_token = access_token if access_token is not None else os.getenv("UPSTOX_ACCESS_TOKEN", "")
+        self._access_token: str = access_token.strip() if access_token is not None else (os.getenv("UPSTOX_ACCESS_TOKEN", "").strip())
         self.redirect_uri = redirect_uri if redirect_uri is not None else os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
         self._last_auth_error: Optional[str] = None
+        self._auth_status: str = "INITIAL"
+        self._circuit_breaker_open: bool = False
+        self._last_auth_error_code: Optional[str] = None
+        self._last_auth_message: str = ""
+
+    @property
+    def access_token(self) -> str:
+        return self._access_token
+
+    @access_token.setter
+    def access_token(self, value: Optional[str]) -> None:
+        self._access_token = str(value).strip() if value else ""
+        if self._access_token:
+            self._circuit_breaker_open = False
+            self._auth_status = "INITIAL"
+            self._last_auth_error = None
+            self._last_auth_error_code = None
+            self._last_auth_message = ""
+        else:
+            self._circuit_breaker_open = False
+            self._auth_status = "UNCONFIGURED"
 
     @property
     def is_configured(self) -> bool:
         """Returns whether Upstox client credentials or access token are set."""
-        return bool(self.client_id or self.access_token)
+        return bool(self.client_id or self._access_token)
 
     @property
     def is_authenticated(self) -> bool:
-        """Returns whether a non-empty access token is present."""
-        return bool(self.access_token and len(self.access_token.strip()) > 10)
+        """Returns whether a non-empty, non-circuit-broken access token is present."""
+        return bool(
+            self._access_token 
+            and len(self._access_token) > 10 
+            and not self._circuit_breaker_open
+        )
+
+    def set_access_token(self, new_token: str) -> None:
+        """Updates the access token and resets circuit breaker state."""
+        self.access_token = new_token
+
+    def validate_token(self, force: bool = False) -> Dict[str, Any]:
+        """
+        Validates the Upstox access token once with official V3 authorize endpoint.
+        Trips circuit breaker on UDAPI100050 / HTTP 401 and reports AUTH_REQUIRED.
+        """
+        if not self.access_token or len(self.access_token.strip()) <= 10:
+            self._auth_status = "UNCONFIGURED"
+            self._circuit_breaker_open = True
+            self._last_auth_message = "UPSTOX_ACCESS_TOKEN not set in environment."
+            return {
+                "valid": False,
+                "status": "UNCONFIGURED",
+                "message": self._last_auth_message,
+            }
+
+        if self._circuit_breaker_open and not force:
+            return {
+                "valid": False,
+                "status": self._auth_status,
+                "error_code": self._last_auth_error_code,
+                "message": self._last_auth_message,
+            }
+
+        auth_res = self.authorize_market_data_feed()
+        if auth_res.get("success"):
+            self._auth_status = "VALID"
+            self._circuit_breaker_open = False
+            self._last_auth_message = "Upstox V3 token is valid and active."
+            return {
+                "valid": True,
+                "status": "VALID",
+                "message": self._last_auth_message,
+            }
+        
+        # Authorization failed
+        err_code = auth_res.get("error_code") or "AUTH_REQUIRED"
+        self._auth_status = "AUTH_REQUIRED"
+        self._circuit_breaker_open = True
+        self._last_auth_error_code = err_code
+        self._last_auth_message = auth_res.get("message", "Upstox authorization failed.")
+        logger.warning(
+            "[Upstox] Access token is invalid or expired (%s). Authentication required. "
+            "Circuit breaker tripped. Reconnect Upstox via Settings -> Brokers or /api/upstox/login.",
+            err_code
+        )
+        return {
+            "valid": False,
+            "status": "AUTH_REQUIRED",
+            "error_code": err_code,
+            "message": self._last_auth_message,
+        }
 
     def resolve_instrument_key(self, symbol: str) -> Optional[str]:
         """Maps canonical symbol or ISIN to official Upstox instrument_key."""
@@ -267,6 +347,11 @@ class UpstoxService:
         api_version: str = "v2",
     ) -> Dict[str, Any]:
         """Executes authenticated REST API request to Upstox API V2/V3."""
+        if self._circuit_breaker_open and "login" not in endpoint:
+            raise RuntimeError(
+                f"Upstox API circuit breaker open ({self._auth_status}). Token expired or invalid."
+            )
+
         base = self.BASE_URL_V3 if api_version == "v3" else self.BASE_URL_V2
         url = f"{base}/{endpoint.lstrip('/')}"
         if params:
@@ -296,12 +381,23 @@ class UpstoxService:
                 body = he.read().decode("utf-8")
             except Exception:
                 pass
-            self._last_auth_error = f"HTTP {he.code}: {body or he.reason}"
-            logger.warning("Upstox HTTP error on %s: %s (Body: %s)", endpoint, he.code, body)
+            
+            # Detect expired/invalid token (HTTP 401 / UDAPI100050)
+            if he.code == 401 or "UDAPI100050" in body or "Invalid token" in body:
+                self._circuit_breaker_open = True
+                self._auth_status = "AUTH_REQUIRED"
+                self._last_auth_error_code = "UDAPI100050"
+                self._last_auth_message = "Invalid token used to access API (UDAPI100050)"
+                self._last_auth_error = "HTTP 401: UDAPI100050 Invalid token"
+            else:
+                self._last_auth_error = f"HTTP {he.code}: {body or he.reason}"
+                logger.warning("Upstox HTTP error on %s: %s (Body: %s)", endpoint, he.code, body)
+            
             raise RuntimeError(f"Upstox API HTTP {he.code}: {body or he.reason}")
         except Exception as e:
             self._last_auth_error = str(e)
-            logger.warning("Upstox request error on %s: %s", endpoint, e)
+            if not self._circuit_breaker_open:
+                logger.warning("Upstox request error on %s: %s", endpoint, e)
             raise e
 
     def authorize_market_data_feed(self) -> Dict[str, Any]:
@@ -311,10 +407,11 @@ class UpstoxService:
         Returns:
             {"status": "success", "authorized_redirect_uri": "wss://..."}
         """
-        if not self.is_authenticated:
+        if not self.access_token or len(self.access_token.strip()) <= 10:
             return {
                 "success": False,
                 "error": "UPSTOX_ACCESS_TOKEN_MISSING",
+                "error_code": "UPSTOX_ACCESS_TOKEN_MISSING",
                 "message": "Upstox access token is not set in environment or configuration.",
             }
 
@@ -322,6 +419,8 @@ class UpstoxService:
             res = self._make_request("feed/market-data-feed/authorize", method="GET", api_version="v3")
             if res.get("status") == "success" and "data" in res:
                 redirect_uri = res["data"].get("authorizedRedirectUri")
+                self._circuit_breaker_open = False
+                self._auth_status = "VALID"
                 return {
                     "success": True,
                     "authorized_redirect_uri": redirect_uri,
@@ -330,13 +429,20 @@ class UpstoxService:
             return {
                 "success": False,
                 "error": "AUTHORIZATION_FAILED",
+                "error_code": res.get("errors", [{}])[0].get("errorCode", "AUTHORIZATION_FAILED"),
                 "message": res.get("errors", [{}])[0].get("message", "Authorization failed"),
             }
         except Exception as e:
+            err_str = str(e)
+            code = "UDAPI100050" if "UDAPI100050" in err_str or "401" in err_str else "UPSTOX_AUTH_ERROR"
+            self._circuit_breaker_open = True
+            self._auth_status = "AUTH_REQUIRED"
+            self._last_auth_error_code = code
             return {
                 "success": False,
-                "error": "UPSTOX_AUTH_ERROR",
-                "message": str(e),
+                "error": "AUTH_REQUIRED" if code == "UDAPI100050" else "UPSTOX_AUTH_ERROR",
+                "error_code": code,
+                "message": "Invalid or expired access token (UDAPI100050). Please re-authenticate." if code == "UDAPI100050" else err_str,
             }
 
     def fetch_market_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:

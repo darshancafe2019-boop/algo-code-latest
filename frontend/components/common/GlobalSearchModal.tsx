@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 
 import { WatchlistStarButton } from "@/components/watchlists/WatchlistStarButton";
+import { apiClient } from "@/lib/apiClient";
+import { useUIStore } from "@/lib/store/useUIStore";
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
@@ -291,7 +293,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Open validated pre-trade order router for BUY orders",
         icon: TrendingUp,
         action: () => {
-          const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+          const { setOrderPlacementModalOpen, setQuickOrderSide } = useUIStore.getState();
           setQuickOrderSide("BUY");
           setOrderPlacementModalOpen(true);
           onClose();
@@ -304,7 +306,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Open validated pre-trade order router for SELL orders",
         icon: TrendingUp,
         action: () => {
-          const { setOrderPlacementModalOpen, setQuickOrderSide } = require("@/lib/store/useUIStore").useUIStore.getState();
+          const { setOrderPlacementModalOpen, setQuickOrderSide } = useUIStore.getState();
           setQuickOrderSide("SELL");
           setOrderPlacementModalOpen(true);
           onClose();
@@ -317,7 +319,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Deploy a new automated quantitative bot with risk controls",
         icon: PlusCircle,
         action: () => {
-          const { setCreateBotModalOpen } = require("@/lib/store/useUIStore").useUIStore.getState();
+          const { setCreateBotModalOpen } = useUIStore.getState();
           setCreateBotModalOpen(true);
           onClose();
         },
@@ -329,7 +331,6 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Safely start all eligible bot workers in parallel",
         icon: Play,
         action: async () => {
-          const { apiClient } = require("@/lib/apiClient");
           await apiClient.post("/api/bots/start-all", {});
           queryClient.invalidateQueries({ queryKey: ["botsList"] });
           queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
@@ -343,7 +344,6 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Pause evaluation cycles for all running bots",
         icon: Square,
         action: async () => {
-          const { apiClient } = require("@/lib/apiClient");
           await apiClient.post("/api/bots/pause-all", {});
           queryClient.invalidateQueries({ queryKey: ["botsList"] });
           queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
@@ -357,7 +357,6 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         subtitle: "Resume execution for all paused bot instances",
         icon: Play,
         action: async () => {
-          const { apiClient } = require("@/lib/apiClient");
           await apiClient.post("/api/bots/resume-all", {});
           queryClient.invalidateQueries({ queryKey: ["botsList"] });
           queryClient.invalidateQueries({ queryKey: ["botsSummary"] });

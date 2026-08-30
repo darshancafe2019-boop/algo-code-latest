@@ -9,6 +9,7 @@ import {
   IncidentsListResponse, 
   IncidentSummaryResponse 
 } from "@/types/alerts";
+import { apiClient } from "@/lib/apiClient";
 import { AlertsCenterHeader } from "./AlertsCenterHeader";
 import { AlertsKpiStrip } from "./AlertsKpiStrip";
 import { LiveOperationsBar } from "./LiveOperationsBar";
@@ -45,25 +46,26 @@ export function AlertsMonitoring() {
   } = useQuery<IncidentSummaryResponse>({
     queryKey: ["incidentsSummary"],
     queryFn: async () => {
-      const res = await fetch("/api/incidents/summary");
-      if (!res.ok) throw new Error("Failed to fetch incident summary metrics");
-      return res.json();
+      const res = await apiClient.get<IncidentSummaryResponse>("/api/incidents/summary", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) throw new Error("Failed to fetch incident summary metrics");
+      return res.data;
     },
-    refetchInterval: isStreaming ? false : 10000,
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 10000),
     staleTime: 5000,
-    retry: false
+    retry: 1
   });
 
   // 2. Fetch System Health & Safe Self-Healing Telemetry
   const { data: systemHealthData } = useQuery({
     queryKey: ["systemHealthStatus"],
     queryFn: async () => {
-      const res = await fetch("/api/system/health");
-      if (!res.ok) return null;
-      return res.json();
+      const res = await apiClient.get<any>("/api/system/health", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
-    refetchInterval: isStreaming ? false : 15000,
-    staleTime: 10000
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 15000),
+    staleTime: 10000,
+    retry: 1
   });
 
   // 3. Fetch Server-Side Filtered Incidents List (Adaptive Polling)
@@ -84,57 +86,44 @@ export function AlertsMonitoring() {
       if (searchQuery.trim()) params.append("search", searchQuery.trim());
       params.append("limit", "100");
 
-      const res = await fetch(`/api/incidents?${params.toString()}`);
-      if (!res.ok) throw new Error(`Failed to fetch incidents (HTTP ${res.status})`);
-      return res.json();
+      const res = await apiClient.get<IncidentsListResponse>(`/api/incidents?${params.toString()}`, { timeoutMs: 6000 });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch incidents");
+      return res.data;
     },
-    refetchInterval: isStreaming ? false : 10000,
+    refetchInterval: () => (apiClient.isOffline() || isStreaming ? false : 8000),
     staleTime: 5000,
-    retry: false
+    retry: 1
   });
 
-  // 4. Real-Time SSE Stream Connection for Zero-Latency Incident Updates (Debounced)
+  // 4. Real-Time Resilient SSE Stream Connection
   useEffect(() => {
-    let eventSource: EventSource | null = null;
     let debounceTimer: NodeJS.Timeout | null = null;
 
-    try {
-      eventSource = new EventSource("/api/stream/alerts");
-      eventSource.onopen = () => {
-        setIsStreaming(true);
-      };
-      eventSource.onmessage = (event) => {
-        try {
-          const payload = JSON.parse(event.data);
-          if (payload.type === "INCIDENTS_STREAM") {
-            if (payload.summary) {
-              queryClient.setQueryData(["incidentsSummary"], { status: "success", metrics: payload.summary });
-            }
-            if (payload.system_health) {
-              queryClient.setQueryData(["systemHealthStatus"], { status: "success", health: payload.system_health });
-            }
-            // Debounce list invalidation by 3 seconds
-            if (!debounceTimer) {
-              debounceTimer = setTimeout(() => {
-                queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
-                debounceTimer = null;
-              }, 3000);
-            }
+    const handle = apiClient.createResilientEventSource("/api/stream/alerts", {
+      key: "stream_alerts",
+      onOpen: () => setIsStreaming(true),
+      onStateChange: (state) => setIsStreaming(state === "OPEN"),
+      onMessage: (payload) => {
+        if (payload?.type === "INCIDENTS_STREAM") {
+          if (payload.summary) {
+            queryClient.setQueryData(["incidentsSummary"], { status: "success", metrics: payload.summary });
           }
-        } catch (e) {}
-      };
-      eventSource.onerror = () => {
-        setIsStreaming(false);
-      };
-    } catch (e) {
-      setIsStreaming(false);
-    }
+          if (payload.system_health) {
+            queryClient.setQueryData(["systemHealthStatus"], { status: "success", health: payload.system_health });
+          }
+          if (!debounceTimer) {
+            debounceTimer = setTimeout(() => {
+              queryClient.invalidateQueries({ queryKey: ["incidentsList"] });
+              debounceTimer = null;
+            }, 3000);
+          }
+        }
+      },
+    });
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      if (eventSource) {
-        eventSource.close();
-      }
+      handle.close();
     };
   }, [queryClient]);
 

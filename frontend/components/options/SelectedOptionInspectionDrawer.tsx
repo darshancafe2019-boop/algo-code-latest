@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { X, Shield, Zap, Send, TrendingUp, TrendingDown, Layers, Calculator } from "lucide-react";
 import { OptionContractQuote } from "@/types/option-chain";
+import { getExpiryDisplay } from "@/lib/expiry-utils";
 
 interface SelectedOptionInspectionDrawerProps {
   isOpen: boolean;
@@ -62,7 +63,7 @@ export function SelectedOptionInspectionDrawer({
                 {underlying} {currency}{strike.toLocaleString()} {isCall ? "CALL (CE)" : "PUT (PE)"}
               </h2>
               <p className="text-xs text-slate-400">
-                Expiry: {expiry} • Lot Size: {lotSize}
+                Expiry: {getExpiryDisplay(expiry)} • Lot Size: {lotSize}
               </p>
             </div>
           </div>

@@ -8,6 +8,7 @@ import {
   ActiveStrategyInstance,
 } from "@/types/options-workstation";
 import { PairAnalysisResult, PairOptionStructureResult } from "@/types/pairs-trading";
+import { apiClient } from "@/lib/apiClient";
 
 export interface NormalizedUnderlying {
   symbol: string;
@@ -284,80 +285,82 @@ export function OptionsMarketProvider({ children }: { children: React.ReactNode 
     setRiskParameters((prev) => ({ ...prev, ...params }));
   }, []);
 
-  // Fetch monitoring data
+  // Fetch monitoring data with circuit breaker & visibility throttling
   const refreshMonitoringData = useCallback(async () => {
+    if (apiClient.isOffline()) return;
     try {
       const [stratRes, posRes, riskRes] = await Promise.all([
-        fetch("/api/options/active-strategies"),
-        fetch("/api/options/positions"),
-        fetch("/api/options/risk/summary"),
+        apiClient.get<any>("/api/options/active-strategies", { timeoutMs: 5000 }),
+        apiClient.get<any>("/api/options/positions", { timeoutMs: 5000 }),
+        apiClient.get<any>("/api/options/risk/summary", { timeoutMs: 5000 }),
       ]);
-      if (stratRes.ok) {
-        const d = await stratRes.json();
-        setActiveStrategies(d.strategies || []);
+      if (stratRes.ok && stratRes.data) {
+        setActiveStrategies(stratRes.data.strategies || []);
       }
-      if (posRes.ok) {
-        const d = await posRes.json();
-        setOpenPositions(d.positions || []);
+      if (posRes.ok && posRes.data) {
+        setOpenPositions(posRes.data.positions || []);
       }
-      if (riskRes.ok) {
-        const d = await riskRes.json();
-        setRiskSummary(d.risk || null);
+      if (riskRes.ok && riskRes.data) {
+        setRiskSummary(riskRes.data.risk || null);
       }
-    } catch (err) {
-      // Quiet fail on poll
+    } catch {
+      // Safe fallback
     }
   }, []);
 
   useEffect(() => {
     refreshMonitoringData();
-    const interval = setInterval(refreshMonitoringData, 5000);
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible" && !apiClient.isOffline()) {
+        refreshMonitoringData();
+      }
+    }, 6000);
     return () => clearInterval(interval);
   }, [refreshMonitoringData]);
 
   // Execution Dispatches
   const executePaperStrategy = useCallback(async (): Promise<boolean> => {
+    if (apiClient.isOffline()) {
+      setStatusNotification({ text: "Execution blocked: Backend is currently unavailable.", type: "warn" });
+      return false;
+    }
     setStatusNotification({ text: "Submitting strategy to Paper Multi-Market Sandbox...", type: "info" });
     try {
-      const res = await fetch("/api/options/order/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          underlying: selectedUnderlying.symbol,
-          execution_mode: "PAPER",
-          broker_key: "paper",
-          strategy_name: selectedStrategyId.toUpperCase(),
-          legs: draftLegs,
-          lots: riskParameters.lots,
-        }),
+      const res = await apiClient.post<any>("/api/options/order/execute", {
+        underlying: selectedUnderlying.symbol,
+        execution_mode: "PAPER",
+        broker_key: "paper",
+        strategy_name: selectedStrategyId.toUpperCase(),
+        legs: draftLegs,
+        lots: riskParameters.lots,
       });
       if (res.ok) {
         setStatusNotification({ text: `✓ Paper Trade Executed: Strategy ${selectedStrategyId} is now active in Monitor tab.`, type: "success" });
         refreshMonitoringData();
         return true;
       }
-      setStatusNotification({ text: "Paper trade execution was rejected by order engine.", type: "warn" });
+      setStatusNotification({ text: res.error?.message || "Paper trade execution was rejected by order engine.", type: "warn" });
       return false;
-    } catch (err) {
+    } catch {
       setStatusNotification({ text: "Failed to execute paper trade.", type: "warn" });
       return false;
     }
   }, [draftLegs, refreshMonitoringData, riskParameters.lots, selectedStrategyId, selectedUnderlying.symbol]);
 
   const executeLiveStrategy = useCallback(async (): Promise<boolean> => {
+    if (apiClient.isOffline()) {
+      setStatusNotification({ text: "Live execution blocked: Backend is currently unavailable.", type: "warn" });
+      return false;
+    }
     setStatusNotification({ text: "Live order authorization required: Verifying broker credentials & risk gates...", type: "info" });
     try {
-      const res = await fetch("/api/options/order/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          underlying: selectedUnderlying.symbol,
-          execution_mode: "LIVE",
-          legs: draftLegs,
-        }),
+      const res = await apiClient.post<any>("/api/options/order/validate", {
+        underlying: selectedUnderlying.symbol,
+        execution_mode: "LIVE",
+        legs: draftLegs,
       });
-      if (res.ok) {
-        const data = await res.json();
+      if (res.ok && res.data) {
+        const data = res.data;
         if (data.can_execute) {
           setStatusNotification({ text: "✓ Live strategy order approved and routed to live broker.", type: "success" });
           return true;
@@ -367,58 +370,64 @@ export function OptionsMarketProvider({ children }: { children: React.ReactNode 
         }
       }
       return false;
-    } catch (err) {
+    } catch {
       setStatusNotification({ text: "Live execution request failed.", type: "warn" });
       return false;
     }
   }, [draftLegs, selectedUnderlying.symbol]);
 
   const controlStrategy = useCallback(async (instanceId: string, action: string): Promise<boolean> => {
+    if (apiClient.isOffline()) {
+      setStatusNotification({ text: "Action blocked: Backend is currently unavailable.", type: "warn" });
+      return false;
+    }
     try {
-      const res = await fetch(`/api/options/strategy/${instanceId}/control`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
+      const res = await apiClient.post<any>(`/api/options/strategy/${instanceId}/control`, { action });
       if (res.ok) {
         setStatusNotification({ text: `✓ Strategy action ${action} executed successfully.`, type: "success" });
         refreshMonitoringData();
         return true;
       }
       return false;
-    } catch (err) {
+    } catch {
       setStatusNotification({ text: `Failed to execute ${action}.`, type: "warn" });
       return false;
     }
   }, [refreshMonitoringData]);
 
   const squareOffPortfolio = useCallback(async (): Promise<boolean> => {
+    if (apiClient.isOffline()) {
+      setStatusNotification({ text: "Kill-switch blocked: Backend is currently unavailable.", type: "warn" });
+      return false;
+    }
     setStatusNotification({ text: "Initiating graceful Portfolio Square-Off across all open options/pairs...", type: "info" });
     try {
-      const res = await fetch("/api/options/kill-switch", { method: "POST" });
+      const res = await apiClient.post<any>("/api/options/kill-switch");
       if (res.ok) {
         setStatusNotification({ text: "✓ All open strategy positions reconciled and closed.", type: "success" });
         refreshMonitoringData();
         return true;
       }
       return false;
-    } catch (err) {
-      setStatusNotification({ text: "Portfolio square-off failed.", type: "warn" });
+    } catch {
       return false;
     }
   }, [refreshMonitoringData]);
-
   const triggerEmergencyKillSwitch = useCallback(async (): Promise<boolean> => {
+    if (apiClient.isOffline()) {
+      setStatusNotification({ text: "Emergency kill-switch blocked: Backend is currently unavailable.", type: "warn" });
+      return false;
+    }
     setStatusNotification({ text: "🚨 EMERGENCY KILL SWITCH ACTIVATED: Halting all execution and cancelling pending orders...", type: "warn" });
     try {
-      const res = await fetch("/api/options/kill-switch", { method: "POST" });
+      const res = await apiClient.post<any>("/api/options/kill-switch");
       if (res.ok) {
         setStatusNotification({ text: "🚨 System Locked: All active bots paused and orders cancelled.", type: "warn" });
         refreshMonitoringData();
         return true;
       }
       return false;
-    } catch (err) {
+    } catch {
       return false;
     }
   }, [refreshMonitoringData]);

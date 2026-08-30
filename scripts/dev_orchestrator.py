@@ -45,7 +45,7 @@ FRONTEND_PORT = 3100
 
 RESTART_BACKOFF_DELAYS = [1.0, 2.0, 4.0, 8.0, 15.0]
 STABLE_RUN_RESET_SECONDS = 30.0
-MAX_CONSECUTIVE_RESTARTS = 10
+MAX_CONSECUTIVE_RESTARTS = 5
 
 # Cross-platform execution resolution
 if sys.platform == "win32":
@@ -61,7 +61,15 @@ PYTHON_EXEC = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
 def log(tag: str, msg: str, color_code: str = "\033[94m"):
     reset = "\033[0m"
     timestamp = time.strftime("%H:%M:%S")
-    safe_msg = msg.replace("\u2713", "[OK]")
+    # Clean any unicode characters for safe Windows console output
+    safe_msg = (
+        msg.replace("\u2713", "[OK]")
+        .replace("\u25b2", "[^]")
+        .replace("\u26a0\ufe0f", "[WARN]")
+        .replace("\u26a0", "[WARN]")
+        .replace("\u274c", "[ERROR]")
+        .replace("\u2705", "[OK]")
+    )
     print(f"{color_code}[{timestamp}][{tag}]{reset} {safe_msg}", flush=True)
 
 
@@ -368,7 +376,14 @@ class ManagedService:
             if line:
                 cleaned = line.strip()
                 self.recent_logs.append(cleaned)
-                print(f"{self.color_code}[{self.name}]\033[0m {cleaned}", flush=True)
+                # Clean unicode markers for Windows console
+                safe_line = (
+                    cleaned.replace("\u2713", "[OK]")
+                    .replace("\u25b2", "[^]")
+                    .replace("\u26a0\ufe0f", "[WARN]")
+                    .replace("\u26a0", "[WARN]")
+                )
+                print(f"{self.color_code}[{self.name}]\033[0m {safe_line}", flush=True)
 
     def check_health(self) -> bool:
         try:
@@ -382,7 +397,7 @@ class ManagedService:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. SUPERVISOR CONTROLLER WITH INSTRUMENTED SHUTDOWN
+# 5. SUPERVISOR CONTROLLER WITH INSTRUMENTED SHUTDOWN & PREFLIGHT
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ServiceSupervisor:
@@ -394,6 +409,41 @@ class ServiceSupervisor:
         self.trading_ready = False
         self.protected_pids: Set[int] = {os.getpid()}
         self._setup_services()
+
+    def preflight_checks(self) -> Tuple[bool, List[str]]:
+        """
+        Validates Python, Node, npm, package.json, lockfile, and Next.js binaries
+        BEFORE launching any child processes.
+        """
+        errors = []
+
+        # 1. Python check
+        if not Path(PYTHON_EXEC).exists() and not sys.executable:
+            errors.append(f"Python executable not found at {PYTHON_EXEC}")
+
+        # 2. Frontend directory & configuration
+        if not FRONTEND_DIR.exists():
+            errors.append(f"Frontend directory not found at {FRONTEND_DIR}")
+        elif not (FRONTEND_DIR / "package.json").exists():
+            errors.append(f"package.json not found in {FRONTEND_DIR}")
+
+        # 3. Node.js binary check
+        try:
+            node_ver = subprocess.check_output(["node", "--version"], text=True, stderr=subprocess.DEVNULL).strip()
+            log("PREFLIGHT", f"Node.js runtime detected: {node_ver}", "\033[96m")
+        except Exception:
+            errors.append("Node.js is not installed or not in system PATH.")
+
+        # 4. Next.js executable check
+        next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
+        next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
+        if not next_dist.exists() and not next_cmd_bin.exists():
+            errors.append(
+                "Frontend dependencies or Next.js binary missing.\n"
+                f"  [REPAIR] Please run: cd \"{FRONTEND_DIR}\" && npm ci"
+            )
+
+        return len(errors) == 0, errors
 
     def _setup_services(self):
         # 1. Market Data Gateway (5051)
@@ -431,23 +481,18 @@ class ServiceSupervisor:
         frontend_env["MARKET_GATEWAY_URL"] = f"http://127.0.0.1:{GATEWAY_PORT}"
         frontend_env["PORT"] = str(FRONTEND_PORT)
         
-        # Clean stale production build cache if booting in dev mode to prevent chunk 404 mismatches
-        next_build_id = FRONTEND_DIR / ".next" / "BUILD_ID"
-        if next_build_id.exists():
-            try:
-                import shutil
-                shutil.rmtree(FRONTEND_DIR / ".next", ignore_errors=True)
-            except Exception:
-                pass
-
-        if sys.platform == "win32":
+        next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
+        next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
+        
+        # Use direct node execution of Next.js binary for deterministic cross-platform execution
+        if next_dist.exists():
+            frontend_cmd = ["node", str(next_dist), "dev", "-p", str(FRONTEND_PORT)]
+        elif next_cmd_bin.exists():
+            frontend_cmd = [str(next_cmd_bin), "dev", "-p", str(FRONTEND_PORT)]
+        elif sys.platform == "win32":
             frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
         else:
-            next_bin = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
-            if next_bin.exists():
-                frontend_cmd = ["node", str(next_bin), "dev", "-p", str(FRONTEND_PORT)]
-            else:
-                frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
+            frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
 
         self.services["FRONTEND"] = ManagedService(
             name="FRONTEND",
@@ -487,6 +532,17 @@ class ServiceSupervisor:
         if not self.lock.acquire():
             return False
 
+        # Run preflight verification before launching services
+        ok, errors = self.preflight_checks()
+        if not ok:
+            print("\n" + "=" * 64)
+            log("PREFLIGHT", "\033[91m[ERROR] PREFLIGHT VERIFICATION FAILED:\033[0m")
+            for err in errors:
+                print(f"  * {err}")
+            print("=" * 64 + "\n")
+            self.lock.release()
+            return False
+
         # Clean only truly orphaned processes before starting
         clean_stale_quantos_processes(force=True, caller="SUPERVISOR_STARTUP")
 
@@ -510,14 +566,23 @@ class ServiceSupervisor:
         self.running = True
         self.supervisor_running = True
         self._save_runtime_state()
-        self._evaluate_system_readiness()
+        backend_ok, gateway_ok, frontend_ok = self._evaluate_system_readiness()
+
+        all_operational = backend_ok and gateway_ok and frontend_ok
 
         print("\n" + "=" * 64)
-        print("\033[92m  [OK] QUANT.OS SYSTEM FULLY OPERATIONAL\033[0m")
-        print(f"  * Frontend Terminal : \033[96mhttp://localhost:{FRONTEND_PORT}\033[0m")
-        print(f"  * Backend Engine    : \033[96mhttp://127.0.0.1:{BACKEND_PORT}\033[0m")
-        print(f"  * Market Gateway    : \033[96mhttp://127.0.0.1:{GATEWAY_PORT}\033[0m (WS: ws://127.0.0.1:{GATEWAY_PORT}/ws)")
-        print(f"  * Trading Health    : \033[92mREADY (Fail-Closed Safety Active)\033[0m")
+        if all_operational:
+            print("\033[92m  [OK] QUANT.OS SYSTEM FULLY OPERATIONAL\033[0m")
+        elif self.trading_ready:
+            print("\033[93m  [WARN] QUANT.OS SYSTEM STATUS: DEGRADED (Frontend Unhealthy / Offline)\033[0m")
+            print("\033[92m  * Trading Engine    : READY (Fail-Closed Safety Active)\033[0m")
+        else:
+            print("\033[91m  [ERROR] QUANT.OS SYSTEM STARTUP FAILED (Critical Services Failed)\033[0m")
+
+        print(f"  * Frontend Terminal : \033[96mhttp://localhost:{FRONTEND_PORT}\033[0m ({'[OK]' if frontend_ok else '[OFFLINE]'})")
+        print(f"  * Backend Engine    : \033[96mhttp://127.0.0.1:{BACKEND_PORT}\033[0m ({'[OK]' if backend_ok else '[FAILED]'})")
+        print(f"  * Market Gateway    : \033[96mhttp://127.0.0.1:{GATEWAY_PORT}\033[0m ({'[OK]' if gateway_ok else '[FAILED]'}) (WS: ws://127.0.0.1:{GATEWAY_PORT}/ws)")
+        print(f"  * Trading Health    : \033[92m{'READY' if self.trading_ready else 'NOT_READY'} (Fail-Closed Safety Active)\033[0m")
         print("=" * 64 + "\n")
         print("Press Ctrl+C to stop all services.\n")
 
@@ -545,6 +610,12 @@ class ServiceSupervisor:
                             svc.restart_count = 0
 
                         svc.restart_count += 1
+                        
+                        if svc.restart_count > MAX_CONSECUTIVE_RESTARTS:
+                            log("SUPERVISOR", f"\033[91m[HALT] Service {svc_name} exceeded max restart attempts ({MAX_CONSECUTIVE_RESTARTS}). Supervision halted for this service.\033[0m")
+                            log("SUPERVISOR", f"\033[91m[REPAIR] Check logs above and restart manually once resolved.\033[0m")
+                            continue
+
                         delay_idx = min(svc.restart_count - 1, len(RESTART_BACKOFF_DELAYS) - 1)
                         delay = RESTART_BACKOFF_DELAYS[delay_idx]
 
@@ -572,6 +643,9 @@ class ServiceSupervisor:
 
     def _await_readiness(self, svc: ManagedService, max_retries: int = 30, delay: float = 0.5):
         for _ in range(max_retries):
+            if not svc.is_alive():
+                log("WARN", f"{svc.name} process exited during startup probe (Code: {svc.get_exit_code()}).", "\033[91m")
+                return False
             if svc.check_health():
                 log("HEALTH", f"\033[92m[OK] {svc.name} is HEALTHY on port {svc.port}!\033[0m")
                 return True
@@ -579,9 +653,10 @@ class ServiceSupervisor:
         log("WARN", f"{svc.name} did not immediately respond to health probe on port {svc.port}; supervisor will monitor.", "\033[93m")
         return False
 
-    def _evaluate_system_readiness(self):
-        backend_ok = self.services["BACKEND"].check_health()
-        gateway_ok = self.services["GATEWAY"].check_health()
+    def _evaluate_system_readiness(self) -> Tuple[bool, bool, bool]:
+        backend_ok = self.services["BACKEND"].is_healthy or self.services["BACKEND"].check_health()
+        gateway_ok = self.services["GATEWAY"].is_healthy or self.services["GATEWAY"].check_health()
+        frontend_ok = self.services["FRONTEND"].is_healthy or self.services["FRONTEND"].check_health()
 
         prev_ready = self.trading_ready
         self.trading_ready = backend_ok and gateway_ok
@@ -589,7 +664,9 @@ class ServiceSupervisor:
         if prev_ready and not self.trading_ready:
             log("SAFETY", "\033[91m[FAIL-CLOSED] System dependencies degraded. Trading marked NOT_READY.\033[0m")
         elif not prev_ready and self.trading_ready:
-            log("SAFETY", "\033[92m[OPERATIONAL] All dependencies healthy. Trading marked READY.\033[0m")
+            log("SAFETY", "\033[92m[OPERATIONAL] All core trading engine dependencies healthy. Trading marked READY.\033[0m")
+
+        return backend_ok, gateway_ok, frontend_ok
 
     def shutdown(
         self,
@@ -659,3 +736,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

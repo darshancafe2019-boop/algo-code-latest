@@ -479,9 +479,9 @@ const MemoizedMarketRow = memo(function MarketRow({
             {formatPrice(instrument.bid, currSymbol, undefined, "—")} / {formatPrice(instrument.ask, currSymbol, undefined, "—")}
           </td>
           <td className="px-3 text-right text-slate-200">{formatVolume(instrument.volume_24h)}</td>
-          <td className="px-3 text-right text-slate-200">{formatQuantity(instrument.open_interest || 12800)}</td>
-          <td className="px-3 text-right text-amber-400">{instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "48.2%"}</td>
-          <td className="px-3 text-right text-cyan-400">{instrument.delta ? instrument.delta.toFixed(2) : "0.52"}</td>
+          <td className="px-3 text-right text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-3 text-right text-amber-400">{instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "—"}</td>
+          <td className="px-3 text-right text-cyan-400">{instrument.delta != null ? instrument.delta.toFixed(2) : "—"}</td>
           <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
         </>
       ) : category === "CRYPTO" ? (
@@ -501,9 +501,9 @@ const MemoizedMarketRow = memo(function MarketRow({
             {formatPrice(instrument.bid, currSymbol, undefined, "—")} / {formatPrice(instrument.ask, currSymbol, undefined, "—")}
           </td>
           <td className="px-3 text-right text-emerald-400">
-            {instrument.funding_rate ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "+0.0100%"}
+            {instrument.funding_rate != null ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "—"}
           </td>
-          <td className="px-3 text-right text-slate-200">{formatQuantity(instrument.open_interest || 89200)}</td>
+          <td className="px-3 text-right text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
           <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
         </>
       ) : category === "FOREX" ? (

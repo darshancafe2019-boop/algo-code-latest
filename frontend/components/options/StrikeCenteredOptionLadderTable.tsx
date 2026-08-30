@@ -79,13 +79,28 @@ export function StrikeCenteredOptionLadderTable({
               <th className="p-2 text-left">OI (k)</th>
             </tr>
           </thead>
-
           {/* Table Body Rows */}
           <tbody className="divide-y divide-slate-800/60">
             {strikes.map((row) => {
               const isATM = row.is_atm;
-              const ceITM = row.ce?.moneyness === "ITM" || row.strike < spotPrice;
-              const peITM = row.pe?.moneyness === "ITM" || row.strike > spotPrice;
+              const ce = row.ce || (row as any).call;
+              const pe = row.pe || (row as any).put;
+
+              const ceITM = ce?.moneyness === "ITM" || (ce?.strike ? ce.strike < spotPrice : row.strike < spotPrice);
+              const peITM = pe?.moneyness === "ITM" || (pe?.strike ? pe.strike > spotPrice : row.strike > spotPrice);
+
+              const ceLtp = ce?.ltp ?? ce?.last_price ?? ce?.mark_price ?? 0;
+              const peLtp = pe?.ltp ?? pe?.last_price ?? pe?.mark_price ?? 0;
+              const ceBid = ce?.bid ?? ce?.best_bid ?? 0;
+              const ceAsk = ce?.ask ?? ce?.best_ask ?? 0;
+              const peBid = pe?.bid ?? pe?.best_bid ?? 0;
+              const peAsk = pe?.ask ?? pe?.best_ask ?? 0;
+              const ceOI = ce?.open_interest ?? ce?.oi ?? 0;
+              const peOI = pe?.open_interest ?? pe?.oi ?? 0;
+              const ceIV = ce?.iv ?? ce?.mark_iv ?? 0;
+              const peIV = pe?.iv ?? pe?.mark_iv ?? 0;
+              const ceVol = ce?.volume ?? ce?.volume_24h ?? 0;
+              const peVol = pe?.volume ?? pe?.volume_24h ?? 0;
 
               return (
                 <tr
@@ -96,33 +111,33 @@ export function StrikeCenteredOptionLadderTable({
                 >
                   {/* CE Columns */}
                   <td className={`p-2 text-right text-slate-300 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {((row.ce?.open_interest || 0) / 1000).toFixed(1)}k
+                    {ceOI >= 1000 ? `${(ceOI / 1000).toFixed(1)}k` : ceOI.toLocaleString()}
                   </td>
                   <td className={`p-2 text-right text-slate-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {(row.ce?.volume || 0).toLocaleString()}
+                    {ceVol.toLocaleString()}
                   </td>
                   <td className={`p-2 text-right text-slate-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {row.ce?.iv ? `${row.ce.iv.toFixed(1)}%` : "N/A"}
+                    {ceIV > 0 ? `${ceIV.toFixed(1)}%` : "N/A"}
                   </td>
                   <td className={`p-2 text-right text-cyan-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {row.ce?.delta ? row.ce.delta.toFixed(2) : "N/A"}
+                    {ce?.delta !== undefined && ce?.delta !== null ? ce.delta.toFixed(2) : "N/A"}
                   </td>
                   <td className={`p-2 text-right text-rose-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {row.ce?.theta ? row.ce.theta.toFixed(1) : "N/A"}
+                    {ce?.theta !== undefined && ce?.theta !== null ? ce.theta.toFixed(1) : "N/A"}
                   </td>
                   <td className={`p-2 text-right text-purple-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {row.ce?.vega ? row.ce.vega.toFixed(1) : "N/A"}
+                    {ce?.vega !== undefined && ce?.vega !== null ? ce.vega.toFixed(1) : "N/A"}
                   </td>
                   <td className={`p-2 text-right text-[10px] text-slate-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {currency}{row.ce?.bid?.toFixed(1)} / {currency}{row.ce?.ask?.toFixed(1)}
+                    {currency}{ceBid.toFixed(1)} / {currency}{ceAsk.toFixed(1)}
                   </td>
                   <td
-                    onClick={() => onSelectOption(row.strike, "CE", row.ce)}
+                    onClick={() => onSelectOption(row.strike, "CE", ce)}
                     className={`p-2 text-right font-bold text-white cursor-pointer hover:underline ${
                       ceITM ? "bg-rose-950/30 text-rose-300" : ""
                     }`}
                   >
-                    {currency}{row.ce?.ltp?.toFixed(2)}
+                    {currency}{ceLtp.toFixed(2)}
                   </td>
                   <td className={`p-2 text-center ${ceITM ? "bg-rose-950/20" : ""}`}>
                     <span
@@ -138,53 +153,54 @@ export function StrikeCenteredOptionLadderTable({
                     </span>
                   </td>
                   <td className={`p-2 text-center border-r border-slate-700 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => onAddStrategyLeg?.(row.strike, "CE", "BUY", row.ce?.ltp || 0)}
-                        className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px]"
-                        title="Buy Call"
-                      >
-                        B
-                      </button>
-                      <button
-                        onClick={() => onAddStrategyLeg?.(row.strike, "CE", "SELL", row.ce?.ltp || 0)}
-                        className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[9px]"
-                        title="Sell Call"
-                      >
-                        S
-                      </button>
-                    </div>
+                    {onAddStrategyLeg && (
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => onAddStrategyLeg(row.strike, "CE", "BUY", ceLtp)}
+                          className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[9px] font-bold"
+                        >
+                          B
+                        </button>
+                        <button
+                          onClick={() => onAddStrategyLeg(row.strike, "CE", "SELL", ceLtp)}
+                          className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-[9px] font-bold"
+                        >
+                          S
+                        </button>
+                      </div>
+                    )}
                   </td>
 
-                  {/* Center Strike Column */}
+                  {/* STRIKE CENTER */}
                   <td
-                    className={`p-2 text-center font-extrabold border-r border-slate-700 tracking-tight ${
-                      isATM
-                        ? "bg-amber-500 text-slate-950 shadow-md scale-105"
-                        : "bg-[#0B111E] text-white"
+                    className={`p-2 text-center font-extrabold border-r border-slate-700 bg-slate-900 ${
+                      isATM ? "text-amber-300 bg-amber-950/40" : "text-white"
                     }`}
                   >
-                    {row.strike.toLocaleString()}
+                    <div className="flex items-center justify-center gap-1">
+                      {isATM && <Target className="w-3 h-3 text-amber-400 inline" />}
+                      <span>{currency}{row.strike.toLocaleString()}</span>
+                    </div>
                   </td>
 
                   {/* PE Columns */}
-                  <td className={`p-2 text-center ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => onAddStrategyLeg?.(row.strike, "PE", "BUY", row.pe?.ltp || 0)}
-                        className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[9px]"
-                        title="Buy Put"
-                      >
-                        B
-                      </button>
-                      <button
-                        onClick={() => onAddStrategyLeg?.(row.strike, "PE", "SELL", row.pe?.ltp || 0)}
-                        className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-bold text-[9px]"
-                        title="Sell Put"
-                      >
-                        S
-                      </button>
-                    </div>
+                  <td className={`p-2 text-center border-l border-slate-700 ${peITM ? "bg-emerald-950/20" : ""}`}>
+                    {onAddStrategyLeg && (
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => onAddStrategyLeg(row.strike, "PE", "BUY", peLtp)}
+                          className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[9px] font-bold"
+                        >
+                          B
+                        </button>
+                        <button
+                          onClick={() => onAddStrategyLeg(row.strike, "PE", "SELL", peLtp)}
+                          className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-[9px] font-bold"
+                        >
+                          S
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className={`p-2 text-center ${peITM ? "bg-emerald-950/20" : ""}`}>
                     <span
@@ -200,33 +216,33 @@ export function StrikeCenteredOptionLadderTable({
                     </span>
                   </td>
                   <td
-                    onClick={() => onSelectOption(row.strike, "PE", row.pe)}
+                    onClick={() => onSelectOption(row.strike, "PE", pe)}
                     className={`p-2 text-left font-bold text-white cursor-pointer hover:underline ${
                       peITM ? "bg-emerald-950/30 text-emerald-300" : ""
                     }`}
                   >
-                    {currency}{row.pe?.ltp?.toFixed(2)}
+                    {currency}{peLtp.toFixed(2)}
                   </td>
                   <td className={`p-2 text-left text-[10px] text-slate-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {currency}{row.pe?.bid?.toFixed(1)} / {currency}{row.pe?.ask?.toFixed(1)}
+                    {currency}{peBid.toFixed(1)} / {currency}{peAsk.toFixed(1)}
                   </td>
                   <td className={`p-2 text-left text-purple-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {row.pe?.vega ? row.pe.vega.toFixed(1) : "N/A"}
+                    {pe?.vega !== undefined && pe?.vega !== null ? pe.vega.toFixed(1) : "N/A"}
                   </td>
                   <td className={`p-2 text-left text-rose-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {row.pe?.theta ? row.pe.theta.toFixed(1) : "N/A"}
+                    {pe?.theta !== undefined && pe?.theta !== null ? pe.theta.toFixed(1) : "N/A"}
                   </td>
                   <td className={`p-2 text-left text-cyan-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {row.pe?.delta ? row.pe.delta.toFixed(2) : "N/A"}
+                    {pe?.delta !== undefined && pe?.delta !== null ? pe.delta.toFixed(2) : "N/A"}
                   </td>
                   <td className={`p-2 text-left text-slate-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {row.pe?.iv ? `${row.pe.iv.toFixed(1)}%` : "N/A"}
+                    {peIV > 0 ? `${peIV.toFixed(1)}%` : "N/A"}
                   </td>
                   <td className={`p-2 text-left text-slate-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {(row.pe?.volume || 0).toLocaleString()}
+                    {peVol.toLocaleString()}
                   </td>
                   <td className={`p-2 text-left text-slate-300 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {((row.pe?.open_interest || 0) / 1000).toFixed(1)}k
+                    {peOI >= 1000 ? `${(peOI / 1000).toFixed(1)}k` : peOI.toLocaleString()}
                   </td>
                 </tr>
               );

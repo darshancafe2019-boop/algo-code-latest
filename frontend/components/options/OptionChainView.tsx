@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layers, RefreshCw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { OptionChainData, OptionContractQuote, MultiLegPayoff } from "@/types/option-chain";
+import { apiClient } from "@/lib/apiClient";
 
 import { OptionsCommandHeader } from "./OptionsCommandHeader";
 import { OptionsAnalyticsSummaryBar } from "./OptionsAnalyticsSummaryBar";
@@ -32,34 +33,67 @@ export function OptionChainView() {
   const [feedback, setFeedback] = useState<{ status: "success" | "error"; message: string } | null>(null);
 
   // 1. Fetch Option Chain Data
+  const isCrypto = ["BTC", "ETH", "SOL", "XAUT"].includes(underlying.toUpperCase());
+
   const { data, isLoading, error, refetch, isFetching } = useQuery<OptionChainData>({
-    queryKey: ["optionChain", underlying, selectedExpiry, strikeRange],
+    queryKey: ["optionChain", underlying, selectedExpiry, strikeRange, isCrypto],
     queryFn: async () => {
+      const endpoint = isCrypto ? "/api/markets/delta/options/chain" : "/api/options/chain";
       const params = new URLSearchParams({
         underlying,
         strike_count: strikeRange.toString(),
       });
       if (selectedExpiry) params.append("expiry", selectedExpiry);
 
-      const res = await fetch(`/api/options/chain?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch option chain");
-      return res.json();
+      const res = await apiClient.get<any>(`${endpoint}?${params.toString()}`, { timeoutMs: 6000 });
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch option chain");
+      }
+      return res.data.data || res.data;
     },
-    staleTime: 3000,
-    refetchInterval: 5000,
+    staleTime: 4000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 6000),
+    retry: 1,
   });
 
-  const spotPrice = data?.spot_price || 24350.0;
-  const currentExpiry = data?.selected_expiry || selectedExpiry || "";
+  // 2. Real-time Live SSE Stream for Delta Exchange Crypto Options
+  React.useEffect(() => {
+    if (!isCrypto) return;
+
+    const streamUrl = `/api/markets/delta/options/stream?underlying=${underlying}${selectedExpiry ? `&expiry=${selectedExpiry}` : ""}`;
+    const handle = apiClient.createResilientEventSource(streamUrl, {
+      key: `delta_options_${underlying}_${selectedExpiry}`,
+      onMessage: (payload) => {
+        if (payload?.data?.strikes) {
+          queryClient.setQueryData(
+            ["optionChain", underlying, selectedExpiry, strikeRange, isCrypto],
+            (old: any) => ({
+              ...old,
+              ...payload.data,
+              is_live: payload.isLive ?? true,
+              is_stale: payload.isStale ?? false,
+            })
+          );
+        }
+      },
+    });
+
+    return () => {
+      handle.close();
+    };
+  }, [underlying, selectedExpiry, strikeRange, isCrypto, queryClient]);
+
+  const spotPrice = data?.spot_price || 78000.0;
+  const rawCurrentExpiry = data?.selected_expiry || (data as any)?.expiry || selectedExpiry || "";
+  const currentExpiry = typeof rawCurrentExpiry === "string" ? rawCurrentExpiry : (rawCurrentExpiry?.expiry_date || rawCurrentExpiry?.settlement_time || "");
   const expiriesList = data?.available_expiries || [];
   const strikesList = data?.strikes || [];
 
-  const isCrypto = underlying === "BTC" || underlying === "ETH";
   const currencySymbol = isCrypto ? "$" : "₹";
 
   // Calculate ATM Strike
   const stepSize = spotPrice > 40000 ? 500 : spotPrice > 15000 ? 100 : 50;
-  const atmStrike = Math.round(spotPrice / stepSize) * stepSize;
+  const atmStrike = data?.atm_strike || (Math.round(spotPrice / stepSize) * stepSize);
 
   // Single Option Execution Mutation
   const singleOptionMutation = useMutation({

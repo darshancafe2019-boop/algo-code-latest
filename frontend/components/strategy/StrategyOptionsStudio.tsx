@@ -15,28 +15,30 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react";
-import { OptionsBuilderConfig, OptionLegBuilderItem } from "@/types/strategy-builder";
+import { OptionLegBuilderItem, OptionsBuilderConfig } from "@/types/strategy-builder";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
+import { RawExpiryItem } from "@/types/option-chain";
 
-interface StrategyOptionsStudioProps {
+interface Props {
   config: OptionsBuilderConfig;
-  onUpdateConfig: (updated: Partial<OptionsBuilderConfig>) => void;
+  onUpdateConfig: (partial: Partial<OptionsBuilderConfig>) => void;
 }
 
-export function StrategyOptionsStudio({ config, onUpdateConfig }: StrategyOptionsStudioProps) {
-  const [selectedPreset, setSelectedPreset] = useState<string>(config.preset || "IRON_CONDOR");
+export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
+  const [selectedPreset, setSelectedPreset] = useState<string>("IRON_CONDOR");
 
   const presets = [
-    { id: "IRON_CONDOR", name: "Iron Condor", type: "Credit", desc: "Defined-risk range-bound market strategy" },
-    { id: "IRON_BUTTERFLY", name: "Iron Butterfly", type: "Credit", desc: "Maximum profit at specific pin strike" },
-    { id: "BULL_CALL_SPREAD", name: "Bull Call Spread", type: "Debit", desc: "Directional upside with capped risk" },
-    { id: "BEAR_PUT_SPREAD", name: "Bear Put Spread", type: "Debit", desc: "Directional downside with capped risk" },
-    { id: "LONG_STRADDLE", name: "Long Straddle", type: "Debit", desc: "Volatility breakout in either direction" },
-    { id: "LONG_STRANGLE", name: "Long Strangle", type: "Debit", desc: "Low-cost high-volatility expansion" },
+    { id: "IRON_CONDOR", name: "Iron Condor", type: "Neutral", desc: "4-Leg range-bound income strategy" },
+    { id: "BULL_CALL_SPREAD", name: "Bull Call Spread", type: "Bullish", desc: "2-Leg defined risk directional upside" },
+    { id: "BEAR_PUT_SPREAD", name: "Bear Put Spread", type: "Bearish", desc: "2-Leg defined risk directional downside" },
+    { id: "STRADDLE", name: "Long Straddle", type: "Volatility", desc: "2-Leg long volatility non-directional breakout" },
+    { id: "STRANGLE", name: "Long Strangle", type: "Volatility", desc: "2-Leg OTM long volatility play" },
+    { id: "CALENDAR_SPREAD", name: "Calendar Spread", type: "Time Decay", desc: "Time decay harvesting across expiries" },
     { id: "CUSTOM_MULTI_LEG", name: "Custom Multi-Leg", type: "Flexible", desc: "Build any arbitrary multi-leg options matrix" },
   ];
 
   // Fetch Expiries
-  const { data: expiriesData } = useQuery<{ status: string; expiries: string[] }>({
+  const { data: expiriesData } = useQuery<{ status: string; expiries: RawExpiryItem[] }>({
     queryKey: ["optionsStudioExpiries", config.underlying],
     queryFn: async () => {
       const res = await fetch(`/api/crypto/options/expiries?underlying=${config.underlying || "BTC"}`);
@@ -45,11 +47,14 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: StrategyOption
     },
   });
 
-  const availableExpiries = Array.isArray(expiriesData?.expiries) && expiriesData.expiries.length > 0
-    ? expiriesData.expiries
-    : ["2026-08-28", "2026-09-25", "2026-10-30"];
+  const normalizedExpiries = React.useMemo(() => {
+    const raw = Array.isArray(expiriesData?.expiries) && expiriesData.expiries.length > 0
+      ? expiriesData.expiries
+      : ["2026-08-28", "2026-09-25", "2026-10-30"];
+    return normalizeExpiriesList(raw, config.underlying || "BTC");
+  }, [expiriesData?.expiries, config.underlying]);
 
-  const activeExpiry = config.expiry || availableExpiries[0] || "2026-08-28";
+  const activeExpiry = config.expiry || normalizedExpiries[0]?.value || "2026-08-28";
   const spotPrice = config.spot_price || 64500.0;
 
   // Handle Preset Selection
@@ -169,9 +174,9 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: StrategyOption
             onChange={(e) => onUpdateConfig({ expiry: e.target.value })}
             className="bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-500"
           >
-            {availableExpiries.map((exp) => (
-              <option key={exp} value={exp}>
-                {exp}
+            {normalizedExpiries.map((opt) => (
+              <option key={opt.key} value={opt.value}>
+                {opt.label}
               </option>
             ))}
           </select>

@@ -15,16 +15,19 @@ import {
   Lock,
 } from "lucide-react";
 import { UpstoxHealthReport } from "@/lib/upstox/types";
+import { apiClient } from "@/lib/apiClient";
 
 export function UpstoxMarketDataPanel() {
   const { data, isLoading, refetch } = useQuery<UpstoxHealthReport>({
     queryKey: ["upstoxHealth"],
     queryFn: async () => {
-      const res = await fetch("/api/upstox/health");
-      if (!res.ok) throw new Error("Failed to load Upstox health");
-      return res.json();
+      const res = await apiClient.get<UpstoxHealthReport>("/api/upstox/health", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) throw new Error("Failed to load Upstox health");
+      return res.data;
     },
-    refetchInterval: 10000,
+    refetchInterval: () => (apiClient.isOffline() ? false : 10000),
+    staleTime: 5000,
+    retry: 1,
   });
 
   const isAuth = Boolean(data?.authenticated);

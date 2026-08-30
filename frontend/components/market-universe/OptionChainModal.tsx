@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { OptionChainData, OptionStrike } from "@/types/market-universe";
 import { X, Layers, Activity, TrendingUp, TrendingDown, RefreshCw, ShieldAlert, Zap } from "lucide-react";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 interface OptionChainModalProps {
   underlying: string;
@@ -19,23 +20,24 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
   const { data, isLoading, refetch, isFetching } = useQuery<{ status: string; data: OptionChainData }>({
     queryKey: ["optionChain", selectedUnderlying, selectedExpiry],
     queryFn: async () => {
-      const p = new URLSearchParams({ underlying: selectedUnderlying });
-      if (selectedExpiry) p.append("expiry", selectedExpiry);
-      const res = await fetch(`/api/universe/option-chain?${p.toString()}`);
+      const res = await fetch(`/api/market/options/chain?underlying=${selectedUnderlying}&expiry=${selectedExpiry}`);
       if (!res.ok) throw new Error("Failed to fetch option chain");
       return res.json();
     },
     enabled: isOpen,
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   });
-
-  if (!isOpen) return null;
 
   const chain = data?.data;
   const spotPrice = chain?.spot_price || 0.0;
   const strikes = chain?.strikes || [];
-  const expiries = chain?.available_expiries || [];
-  const activeExpiry = selectedExpiry || chain?.selected_expiry || expiries[0] || "";
+  const normalizedExpiries = React.useMemo(() => {
+    const rawExpiries = chain?.available_expiries || [];
+    return normalizeExpiriesList(rawExpiries, selectedUnderlying);
+  }, [chain?.available_expiries, selectedUnderlying]);
+  const activeExpiry = selectedExpiry || chain?.selected_expiry || normalizedExpiries[0]?.value || "";
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
@@ -79,15 +81,15 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
             </select>
 
             {/* Expiry Selector */}
-            {expiries.length > 0 && (
+            {normalizedExpiries.length > 0 && (
               <select
                 value={activeExpiry}
                 onChange={(e) => setSelectedExpiry(e.target.value)}
                 className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1E293B] text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500"
               >
-                {expiries.map((exp) => (
-                  <option key={exp} value={exp}>
-                    Expiry: {exp}
+                {normalizedExpiries.map((opt) => (
+                  <option key={opt.key} value={opt.value}>
+                    Expiry: {opt.label}
                   </option>
                 ))}
               </select>

@@ -16,9 +16,11 @@ const BACKEND_INTERNAL_URL =
  * and syncs token with the backend engine.
  */
 export async function GET(req: NextRequest) {
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "127.0.0.1:3100";
+  const proto = req.headers.get("x-forwarded-proto") || "http";
+  const origin = req.nextUrl?.origin || `${proto}://${host}`;
   const urlObj = new URL(req.url);
   const searchParams = req.nextUrl?.searchParams || urlObj.searchParams;
-  const origin = req.nextUrl?.origin || urlObj.origin || "http://localhost:3100";
 
   const code = searchParams.get("code")?.trim();
   const state = searchParams.get("state")?.trim();

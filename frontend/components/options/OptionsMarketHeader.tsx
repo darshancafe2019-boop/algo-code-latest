@@ -13,6 +13,7 @@ import {
   Lock,
   ChevronDown,
 } from "lucide-react";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 export function OptionsMarketHeader() {
   const {
@@ -34,6 +35,10 @@ export function OptionsMarketHeader() {
     setSelectedExpiry,
     refreshMarketSnapshot,
   } = useOptionsMarketContext();
+
+  const normalizedExpiries = React.useMemo(() => {
+    return normalizeExpiriesList(availableExpiries, selectedUnderlying?.symbol || "NIFTY");
+  }, [availableExpiries, selectedUnderlying]);
 
   return (
     <header className="sticky top-0 z-30 bg-[#080E1E]/95 backdrop-blur-xl border border-slate-800 rounded-3xl p-3.5 shadow-2xl space-y-3 font-mono text-xs">
@@ -116,9 +121,9 @@ export function OptionsMarketHeader() {
               onChange={(e) => setSelectedExpiry(e.target.value)}
               className="px-2.5 py-1 rounded-xl bg-slate-950 border border-slate-800 text-cyan-300 font-bold text-xs"
             >
-              {availableExpiries.map((exp) => (
-                <option key={exp} value={exp}>
-                  {exp}
+              {normalizedExpiries.map((opt) => (
+                <option key={opt.key} value={opt.value}>
+                  {opt.label}
                 </option>
               ))}
             </select>

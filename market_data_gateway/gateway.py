@@ -31,6 +31,7 @@ from market_data_gateway.adapters.binance_ws import BinanceWSAdapter
 from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
+from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
@@ -55,6 +56,7 @@ class MarketDataGateway:
         # Initialize adapters
         self.adapters = {
             "binance_ws": BinanceWSAdapter(),
+            "delta_options_ws": DeltaOptionsWSAdapter(),
             "upstox_ws": UpstoxWSAdapter(),
             "angelone": AngelOneAdapter(),
             "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),

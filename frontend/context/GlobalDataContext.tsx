@@ -118,25 +118,17 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
 
   // 6. Real-time SSE Stream Listener for sub-second portfolio broadcast
   useEffect(() => {
-    let evtSource: EventSource | null = null;
-    try {
-      evtSource = new EventSource(`/api/stream/portfolio?mode=${tradingMode}`);
-      evtSource.onmessage = (e) => {
-        try {
-          const parsed = JSON.parse(e.data);
-          if (parsed.type === "PORTFOLIO_SNAPSHOT" && parsed.data) {
-            setLiveSseSnapshot(parsed.data as PortfolioSnapshot);
-          }
-        } catch {
-          // Safe fallback
+    const handle = apiClient.createResilientEventSource(`/api/stream/portfolio?mode=${tradingMode}`, {
+      key: `stream_portfolio_${tradingMode}`,
+      onMessage: (parsed) => {
+        if (parsed?.type === "PORTFOLIO_SNAPSHOT" && parsed?.data) {
+          setLiveSseSnapshot(parsed.data as PortfolioSnapshot);
         }
-      };
-    } catch {
-      // Safe fallback to polling
-    }
+      },
+    });
 
     return () => {
-      if (evtSource) evtSource.close();
+      handle.close();
     };
   }, [tradingMode]);
 

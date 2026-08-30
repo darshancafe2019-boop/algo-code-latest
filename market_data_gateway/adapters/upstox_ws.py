@@ -93,7 +93,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
     @property
     def feed_state(self) -> str:
         if not global_upstox_service.is_authenticated:
-            return "ACCESS_TOKEN_MISSING"
+            return global_upstox_service._auth_status if global_upstox_service._auth_status != "INITIAL" else "ACCESS_TOKEN_MISSING"
         if not is_indian_market_open() and self._status == "CONNECTED":
             return "MARKET_CLOSED"
         return self._status
@@ -108,10 +108,13 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             return
 
         self._running = True
-        if not global_upstox_service.is_authenticated:
+        
+        # Pre-validate token before opening WebSocket connection
+        val = global_upstox_service.validate_token()
+        if not val.get("valid"):
             self._status = "DISCONNECTED"
-            self._auth_error_reason = "UPSTOX_ACCESS_TOKEN_MISSING"
-            logger.info("Upstox WebSocket: UPSTOX_ACCESS_TOKEN not configured. Live feed idle.")
+            self._auth_error_reason = val.get("status", "AUTH_REQUIRED")
+            logger.info("Upstox WebSocket: %s (%s). Live feed idle (no retry loop).", self._auth_error_reason, val.get("message"))
             return
 
         self._status = "CONNECTING"
@@ -194,17 +197,29 @@ class UpstoxWSAdapter(BaseProviderAdapter):
 
     async def _ws_loop(self) -> None:
         while self._running:
-            if not global_upstox_service.is_authenticated:
+            if not global_upstox_service.is_authenticated or global_upstox_service._circuit_breaker_open:
                 self._status = "DISCONNECTED"
-                self._auth_error_reason = "UPSTOX_ACCESS_TOKEN_MISSING"
-                await asyncio.sleep(5.0)
-                continue
+                self._auth_error_reason = global_upstox_service._auth_status or "AUTH_REQUIRED"
+                logger.info("Upstox WebSocket: Circuit breaker active (%s). Halting WebSocket loop.", self._auth_error_reason)
+                break
 
             auth_res = global_upstox_service.authorize_market_data_feed()
             if not auth_res.get("success"):
                 self._status = "DISCONNECTED"
-                self._auth_error_reason = auth_res.get("error", "AUTHORIZATION_FAILED")
-                logger.warning("Upstox V3 Market Data Feed authorization failed: %s (%s)", self._auth_error_reason, auth_res.get("message"))
+                err_code = auth_res.get("error_code") or auth_res.get("error") or "AUTHORIZATION_FAILED"
+                self._auth_error_reason = err_code
+                if err_code in ("UDAPI100050", "AUTH_REQUIRED", "UPSTOX_ACCESS_TOKEN_MISSING"):
+                    logger.warning(
+                        "Upstox V3 Market Data Feed authorization rejected (%s). Halting retry loop until user reconnects.",
+                        err_code
+                    )
+                    break
+                
+                # Transient network error only -> bounded retry
+                self._retry_count += 1
+                if self._retry_count > 5:
+                    logger.warning("Upstox V3 Market Data Feed exceeded max transient retries. Halting loop.")
+                    break
                 await asyncio.sleep(10.0)
                 continue
 
@@ -212,8 +227,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             if not ws_url:
                 self._status = "DISCONNECTED"
                 self._auth_error_reason = "NO_AUTHORIZED_URI"
-                await asyncio.sleep(10.0)
-                continue
+                break
 
             try:
                 logger.info("Connecting to authorized Upstox V3 WebSocket URI...")
@@ -248,8 +262,11 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             except Exception as e:
                 self._status = "DEGRADED"
                 self._retry_count += 1
+                if self._retry_count > 5:
+                    logger.warning("Upstox WebSocket error: %s. Max retries exceeded. Live feed idle.", e)
+                    break
                 backoff = min(MAX_BACKOFF_SEC, 2.0 ** min(self._retry_count, 5))
-                logger.warning("Upstox WebSocket error: %s. Reconnecting in %.1fs (attempt %d)...", e, backoff, self._retry_count)
+                logger.warning("Upstox WebSocket error: %s. Reconnecting in %.1fs (attempt %d/5)...", e, backoff, self._retry_count)
                 await asyncio.sleep(backoff)
 
     def _process_binary_message(self, binary_data: bytes) -> None:
@@ -371,22 +388,20 @@ class UpstoxWSAdapter(BaseProviderAdapter):
     async def health_check(self) -> ProviderHealth:
         age = (time.time() - self._last_msg_time) if self._last_msg_time else 9999.0
         status = self._status
-        if not global_upstox_service.is_authenticated:
+        if global_upstox_service._auth_status == "AUTH_REQUIRED" or self._auth_error_reason == "AUTH_REQUIRED" or self._auth_error_reason == "UDAPI100050":
+            status = "AUTH_REQUIRED"
+            msg = "Upstox access token expired or invalid (UDAPI100050). Please reconnect in Settings -> Brokers."
+        elif not global_upstox_service.is_authenticated:
             status = "ACCESS_TOKEN_MISSING"
+            msg = "Access token missing; set UPSTOX_ACCESS_TOKEN in .env or login via Settings -> Brokers."
         elif not is_indian_market_open() and self._status == "CONNECTED":
             status = "MARKET_CLOSED"
+            msg = "Indian market is CLOSED (Mon-Fri 09:15-15:30 IST)"
         elif status == "LIVE" and age > 15.0 and is_indian_market_open():
             status = "STALE"
-
-        msg = (
-            "Access token missing; set UPSTOX_ACCESS_TOKEN in .env"
-            if not global_upstox_service.is_authenticated
-            else (
-                "Indian market is CLOSED (Mon-Fri 09:15-15:30 IST)"
-                if not is_indian_market_open()
-                else f"Upstox V3 Market Data Feed {status}"
-            )
-        )
+            msg = f"Upstox V3 Market Data Feed STALE ({age:.1f}s since last tick)"
+        else:
+            msg = f"Upstox V3 Market Data Feed {status}"
 
         return ProviderHealth(
             provider_id="upstox_ws",

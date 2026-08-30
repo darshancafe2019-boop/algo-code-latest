@@ -34,6 +34,14 @@ ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
 ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "true").lower() == "true"
 INDIA_BROKER = os.getenv("INDIA_BROKER", "UPSTOX")
 
+# Delta Exchange Options Integration
+DELTA_REST_URL = os.getenv("DELTA_REST_URL", "https://api.india.delta.exchange").rstrip("/")
+DELTA_PUBLIC_WS_URL = os.getenv("DELTA_PUBLIC_WS_URL", "wss://public-socket.india.delta.exchange")
+DELTA_API_KEY = os.getenv("DELTA_API_KEY", "")
+DELTA_API_SECRET = os.getenv("DELTA_API_SECRET", "")
+DELTA_TRADING_ENABLED = os.getenv("DELTA_TRADING_ENABLED", "false").lower() == "true"
+ENABLE_DELTA_OPTIONS = os.getenv("ENABLE_DELTA_OPTIONS", "true").lower() == "true"
+
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_COMMANDS_ENABLED = os.getenv("TELEGRAM_COMMANDS_ENABLED", "false").lower() == "true"

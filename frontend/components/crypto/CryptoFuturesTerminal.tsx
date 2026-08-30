@@ -10,7 +10,6 @@ import { FuturesAccountSummary } from "./FuturesAccountSummary";
 import { FuturesContractMasterTable } from "./FuturesContractMasterTable";
 import { FuturesOrderTicket } from "./FuturesOrderTicket";
 import { FuturesIntelligenceHub } from "./FuturesIntelligenceHub";
-import { FuturesPositionOrderStrip } from "./FuturesPositionOrderStrip";
 import { FuturesContractDetailDrawer } from "./FuturesContractDetailDrawer";
 import { ChevronDown, Globe, Layers, Search } from "lucide-react";
 import { useGlobalData } from "@/context/GlobalDataContext";
@@ -262,10 +261,7 @@ export function CryptoFuturesTerminal({ initialUnderlying = "BTC" }: Props) {
         </div>
       </div>
 
-      {/* 5. Bottom Positions & Orders Drawer */}
-      <FuturesPositionOrderStrip refreshTrigger={refreshTrigger} />
-
-      {/* 6. On-Demand Contract Details Drawer */}
+      {/* 5. On-Demand Contract Details Drawer */}
       <FuturesContractDetailDrawer
         isOpen={isContractDrawerOpen}
         onClose={() => setIsContractDrawerOpen(false)}

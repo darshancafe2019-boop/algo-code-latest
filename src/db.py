@@ -2592,7 +2592,177 @@ def init_db(force: bool = False) -> None:
                     )
                     """
                 )
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_opt_audit_ts ON options_audit_log(created_at DESC)")
+                # ============================================================================
+                # DELTA EXCHANGE CRYPTO OPTIONS ENGINE TABLES
+                # ============================================================================
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_underlyings (
+                        underlying_symbol TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        precision INTEGER DEFAULT 8,
+                        sort_priority INTEGER DEFAULT 1,
+                        spot_index_symbol TEXT DEFAULT '',
+                        is_active INTEGER DEFAULT 1,
+                        last_synced_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_und_active ON delta_underlyings(is_active, sort_priority)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_option_expiries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        underlying_symbol TEXT NOT NULL,
+                        expiry_date TEXT NOT NULL,
+                        settlement_time TEXT NOT NULL,
+                        days_to_expiry REAL DEFAULT 0.0,
+                        is_active INTEGER DEFAULT 1,
+                        last_synced_at TEXT NOT NULL,
+                        UNIQUE(underlying_symbol, settlement_time)
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_exp_und ON delta_option_expiries(underlying_symbol, is_active, settlement_time)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_option_contracts (
+                        product_id INTEGER PRIMARY KEY,
+                        symbol TEXT UNIQUE NOT NULL,
+                        underlying_symbol TEXT NOT NULL,
+                        contract_type TEXT NOT NULL,
+                        strike_price REAL NOT NULL,
+                        settlement_time TEXT NOT NULL,
+                        expiry_date TEXT NOT NULL,
+                        contract_value TEXT DEFAULT '0.001',
+                        tick_size REAL DEFAULT 0.1,
+                        trading_status TEXT DEFAULT 'operational',
+                        state TEXT DEFAULT 'live',
+                        quoting_asset TEXT DEFAULT 'USD',
+                        settling_asset TEXT DEFAULT 'USD',
+                        raw_json TEXT DEFAULT '{}',
+                        is_active INTEGER DEFAULT 1,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_cnt_und_exp ON delta_option_contracts(underlying_symbol, expiry_date, strike_price, contract_type)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_cnt_symbol ON delta_option_contracts(symbol)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_cnt_active ON delta_option_contracts(is_active, state)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_option_quotes (
+                        product_id INTEGER PRIMARY KEY,
+                        symbol TEXT UNIQUE NOT NULL,
+                        underlying_symbol TEXT NOT NULL,
+                        contract_type TEXT NOT NULL,
+                        strike_price REAL NOT NULL,
+                        settlement_time TEXT NOT NULL,
+                        mark_price REAL DEFAULT 0.0,
+                        spot_price REAL DEFAULT 0.0,
+                        best_bid REAL DEFAULT 0.0,
+                        best_ask REAL DEFAULT 0.0,
+                        bid_size REAL DEFAULT 0.0,
+                        ask_size REAL DEFAULT 0.0,
+                        bid_iv REAL DEFAULT 0.0,
+                        ask_iv REAL DEFAULT 0.0,
+                        mark_iv REAL DEFAULT 0.0,
+                        delta REAL DEFAULT 0.0,
+                        gamma REAL DEFAULT 0.0,
+                        theta REAL DEFAULT 0.0,
+                        vega REAL DEFAULT 0.0,
+                        rho REAL DEFAULT 0.0,
+                        oi REAL DEFAULT 0.0,
+                        oi_value_usd REAL DEFAULT 0.0,
+                        volume_24h REAL DEFAULT 0.0,
+                        turnover_24h REAL DEFAULT 0.0,
+                        open_price REAL DEFAULT 0.0,
+                        high_price REAL DEFAULT 0.0,
+                        low_price REAL DEFAULT 0.0,
+                        close_price REAL DEFAULT 0.0,
+                        price_change_24h REAL DEFAULT 0.0,
+                        price_band_lower REAL DEFAULT 0.0,
+                        price_band_upper REAL DEFAULT 0.0,
+                        exchange_timestamp TEXT DEFAULT '',
+                        received_timestamp TEXT DEFAULT '',
+                        is_stale INTEGER DEFAULT 0,
+                        data_source TEXT DEFAULT 'DELTA_EXCHANGE'
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_q_und ON delta_option_quotes(underlying_symbol, settlement_time)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_q_sym ON delta_option_quotes(symbol)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_option_chain_snapshots (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        underlying_symbol TEXT NOT NULL,
+                        expiry_date TEXT NOT NULL,
+                        settlement_time TEXT NOT NULL,
+                        snapshot_timestamp TEXT NOT NULL,
+                        spot_price REAL DEFAULT 0.0,
+                        atm_strike REAL DEFAULT 0.0,
+                        pcr_oi REAL DEFAULT 1.0,
+                        pcr_vol REAL DEFAULT 1.0,
+                        max_pain_strike REAL DEFAULT 0.0,
+                        chain_data_json TEXT NOT NULL DEFAULT '[]',
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_snap_und_exp ON delta_option_chain_snapshots(underlying_symbol, expiry_date, snapshot_timestamp DESC)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_option_trades (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        symbol TEXT NOT NULL,
+                        trade_id TEXT DEFAULT '',
+                        price REAL NOT NULL,
+                        size REAL NOT NULL,
+                        side TEXT DEFAULT 'BUY',
+                        timestamp TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_trd_sym ON delta_option_trades(symbol, timestamp DESC)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_settlement_records (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        product_id INTEGER NOT NULL,
+                        symbol TEXT NOT NULL,
+                        settlement_price REAL DEFAULT 0.0,
+                        settlement_time TEXT NOT NULL,
+                        recorded_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_stl_sym ON delta_settlement_records(symbol, settlement_time)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS delta_ingestion_events (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        event_type TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        contracts_discovered INTEGER DEFAULT 0,
+                        quotes_updated INTEGER DEFAULT 0,
+                        latency_ms REAL DEFAULT 0.0,
+                        error_message TEXT DEFAULT '',
+                        timestamp TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_delta_ingest_ts ON delta_ingestion_events(timestamp DESC)")
 
                 cursor.execute("UPDATE bot_instances SET group_name = 'Crypto Scalping Bots' WHERE group_name IS NULL OR group_name = ''")
 
@@ -10054,6 +10224,368 @@ def get_active_security_alerts() -> List[Dict[str, Any]]:
 def resolve_security_alert(alert_id: str) -> bool:
     """Resolves a security alert."""
     return safe_execute("UPDATE security_alerts SET status = 'RESOLVED' WHERE alert_id = ?", (alert_id,))
+
+
+# ============================================================================
+# DELTA EXCHANGE OPTIONS HELPER FUNCTIONS
+# ============================================================================
+
+def upsert_delta_underlying(data: Dict[str, Any]) -> bool:
+    """Upsert an underlying asset in delta_underlyings."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        """
+        INSERT INTO delta_underlyings (
+            underlying_symbol, name, precision, sort_priority, spot_index_symbol, is_active, last_synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(underlying_symbol) DO UPDATE SET
+            name = excluded.name,
+            precision = excluded.precision,
+            sort_priority = excluded.sort_priority,
+            spot_index_symbol = excluded.spot_index_symbol,
+            is_active = excluded.is_active,
+            last_synced_at = excluded.last_synced_at
+        """,
+        (
+            data["underlying_symbol"].upper().strip(),
+            data.get("name", data["underlying_symbol"]),
+            int(data.get("precision", 8)),
+            int(data.get("sort_priority", 1)),
+            data.get("spot_index_symbol", ""),
+            int(data.get("is_active", 1)),
+            data.get("last_synced_at", now_iso),
+        ),
+    )
+
+
+def get_delta_underlyings(active_only: bool = True) -> List[Dict[str, Any]]:
+    """Fetches all discovered Delta options underlyings."""
+    if active_only:
+        return safe_query("SELECT * FROM delta_underlyings WHERE is_active = 1 ORDER BY sort_priority ASC, underlying_symbol ASC")
+    return safe_query("SELECT * FROM delta_underlyings ORDER BY sort_priority ASC, underlying_symbol ASC")
+
+
+def upsert_delta_expiries(underlying: str, expiries_list: List[Dict[str, Any]]) -> int:
+    """Upsert a list of expiry records for a given underlying."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    count = 0
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        for item in expiries_list:
+            cursor.execute(
+                """
+                INSERT INTO delta_option_expiries (
+                    underlying_symbol, expiry_date, settlement_time, days_to_expiry, is_active, last_synced_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(underlying_symbol, settlement_time) DO UPDATE SET
+                    expiry_date = excluded.expiry_date,
+                    days_to_expiry = excluded.days_to_expiry,
+                    is_active = excluded.is_active,
+                    last_synced_at = excluded.last_synced_at
+                """,
+                (
+                    underlying.upper().strip(),
+                    item["expiry_date"],
+                    item["settlement_time"],
+                    float(item.get("days_to_expiry", 0.0)),
+                    int(item.get("is_active", 1)),
+                    item.get("last_synced_at", now_iso),
+                ),
+            )
+            count += 1
+    return count
+
+
+def get_delta_expiries(underlying: str, active_only: bool = True) -> List[Dict[str, Any]]:
+    """Fetches expiries for an underlying ordered by settlement time."""
+    und = underlying.upper().strip()
+    if active_only:
+        return safe_query(
+            "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? AND is_active = 1 ORDER BY settlement_time ASC",
+            (und,),
+        )
+    return safe_query(
+        "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? ORDER BY settlement_time ASC",
+        (und,),
+    )
+
+
+def upsert_delta_contracts(contracts_list: List[Dict[str, Any]]) -> int:
+    """Batch upserts Delta options contract specifications."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    count = 0
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        for c in contracts_list:
+            raw_str = c.get("raw_json", "{}")
+            if isinstance(raw_str, dict):
+                raw_str = json.dumps(raw_str)
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO delta_option_contracts (
+                    product_id, symbol, underlying_symbol, contract_type, strike_price,
+                    settlement_time, expiry_date, contract_value, tick_size, trading_status,
+                    state, quoting_asset, settling_asset, raw_json, is_active, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(c["product_id"]),
+                    str(c["symbol"]).strip(),
+                    str(c["underlying_symbol"]).upper().strip(),
+                    str(c["contract_type"]).lower().strip(),
+                    float(c["strike_price"]),
+                    str(c["settlement_time"]),
+                    str(c.get("expiry_date", "")),
+                    str(c.get("contract_value", "0.001")),
+                    float(c.get("tick_size", 0.1)),
+                    str(c.get("trading_status", "operational")),
+                    str(c.get("state", "live")),
+                    str(c.get("quoting_asset", "USD")),
+                    str(c.get("settling_asset", "USD")),
+                    raw_str,
+                    int(c.get("is_active", 1)),
+                    c.get("created_at", now_iso),
+                    now_iso,
+                ),
+            )
+            count += 1
+    return count
+
+
+def get_delta_contracts(
+    underlying: Optional[str] = None,
+    expiry: Optional[str] = None,
+    active_only: bool = True
+) -> List[Dict[str, Any]]:
+    """Queries Delta options contracts with optional underlying and expiry filters."""
+    query = "SELECT * FROM delta_option_contracts WHERE 1=1"
+    params: List[Any] = []
+    if underlying:
+        query += " AND underlying_symbol = ?"
+        params.append(underlying.upper().strip())
+    if expiry:
+        query += " AND (expiry_date = ? OR settlement_time LIKE ?)"
+        params.extend([expiry, f"{expiry}%"])
+    if active_only:
+        query += " AND is_active = 1 AND state = 'live'"
+    query += " ORDER BY strike_price ASC, contract_type ASC"
+    return safe_query(query, tuple(params))
+
+
+def get_delta_contract_by_id(product_id: int) -> Optional[Dict[str, Any]]:
+    """Fetches a specific Delta contract by product ID."""
+    rows = safe_query("SELECT * FROM delta_option_contracts WHERE product_id = ?", (int(product_id),))
+    return rows[0] if rows else None
+
+
+def get_delta_contract_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    """Fetches a specific Delta contract by exact executable symbol."""
+    rows = safe_query("SELECT * FROM delta_option_contracts WHERE symbol = ?", (symbol.strip(),))
+    return rows[0] if rows else None
+
+
+def upsert_delta_quotes(quotes_list: List[Dict[str, Any]]) -> int:
+    """Batch upserts real-time normalized quotes into delta_option_quotes."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    count = 0
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        for q in quotes_list:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO delta_option_quotes (
+                    product_id, symbol, underlying_symbol, contract_type, strike_price,
+                    settlement_time, mark_price, spot_price, best_bid, best_ask,
+                    bid_size, ask_size, bid_iv, ask_iv, mark_iv,
+                    delta, gamma, theta, vega, rho,
+                    oi, oi_value_usd, volume_24h, turnover_24h,
+                    open_price, high_price, low_price, close_price,
+                    price_change_24h, price_band_lower, price_band_upper,
+                    exchange_timestamp, received_timestamp, is_stale, data_source
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    int(q["product_id"]),
+                    str(q["symbol"]).strip(),
+                    str(q.get("underlying_symbol", "")).upper().strip(),
+                    str(q.get("contract_type", "")).lower().strip(),
+                    float(q.get("strike_price", 0.0)),
+                    str(q.get("settlement_time", "")),
+                    float(q.get("mark_price", 0.0)),
+                    float(q.get("spot_price", 0.0)),
+                    float(q.get("best_bid", 0.0)),
+                    float(q.get("best_ask", 0.0)),
+                    float(q.get("bid_size", 0.0)),
+                    float(q.get("ask_size", 0.0)),
+                    float(q.get("bid_iv", 0.0)),
+                    float(q.get("ask_iv", 0.0)),
+                    float(q.get("mark_iv", 0.0)),
+                    float(q.get("delta", 0.0)),
+                    float(q.get("gamma", 0.0)),
+                    float(q.get("theta", 0.0)),
+                    float(q.get("vega", 0.0)),
+                    float(q.get("rho", 0.0)),
+                    float(q.get("oi", 0.0)),
+                    float(q.get("oi_value_usd", 0.0)),
+                    float(q.get("volume_24h", 0.0)),
+                    float(q.get("turnover_24h", 0.0)),
+                    float(q.get("open_price", 0.0)),
+                    float(q.get("high_price", 0.0)),
+                    float(q.get("low_price", 0.0)),
+                    float(q.get("close_price", 0.0)),
+                    float(q.get("price_change_24h", 0.0)),
+                    float(q.get("price_band_lower", 0.0)),
+                    float(q.get("price_band_upper", 0.0)),
+                    str(q.get("exchange_timestamp", "")),
+                    q.get("received_timestamp", now_iso),
+                    int(q.get("is_stale", 0)),
+                    str(q.get("data_source", "DELTA_EXCHANGE")),
+                ),
+            )
+            count += 1
+    return count
+
+
+def get_delta_quotes(
+    underlying: Optional[str] = None,
+    expiry: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """Fetches normalized Delta quotes for an underlying and/or expiry."""
+    query = "SELECT * FROM delta_option_quotes WHERE 1=1"
+    params: List[Any] = []
+    if underlying:
+        query += " AND underlying_symbol = ?"
+        params.append(underlying.upper().strip())
+    if expiry:
+        query += " AND (settlement_time LIKE ?)"
+        params.append(f"{expiry}%")
+    query += " ORDER BY strike_price ASC, contract_type ASC"
+    return safe_query(query, tuple(params))
+
+
+def get_delta_quote_by_id(product_id: int) -> Optional[Dict[str, Any]]:
+    """Fetches a single quote by product ID."""
+    rows = safe_query("SELECT * FROM delta_option_quotes WHERE product_id = ?", (int(product_id),))
+    return rows[0] if rows else None
+
+
+def get_delta_quote_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
+    """Fetches a single quote by symbol."""
+    rows = safe_query("SELECT * FROM delta_option_quotes WHERE symbol = ?", (symbol.strip(),))
+    return rows[0] if rows else None
+
+
+def save_delta_chain_snapshot(data: Dict[str, Any]) -> int:
+    """Saves a structured option chain snapshot with PCR and Max Pain metrics."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    chain_json = data.get("chain_data_json", "[]")
+    if isinstance(chain_json, (list, dict)):
+        chain_json = json.dumps(chain_json)
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO delta_option_chain_snapshots (
+                underlying_symbol, expiry_date, settlement_time, snapshot_timestamp,
+                spot_price, atm_strike, pcr_oi, pcr_vol, max_pain_strike, chain_data_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                data["underlying_symbol"].upper().strip(),
+                data["expiry_date"],
+                data["settlement_time"],
+                data.get("snapshot_timestamp", now_iso),
+                float(data.get("spot_price", 0.0)),
+                float(data.get("atm_strike", 0.0)),
+                float(data.get("pcr_oi", 1.0)),
+                float(data.get("pcr_vol", 1.0)),
+                float(data.get("max_pain_strike", 0.0)),
+                chain_json,
+                now_iso,
+            ),
+        )
+        return cursor.lastrowid or 0
+
+
+def get_latest_delta_chain_snapshot(underlying: str, expiry: str) -> Optional[Dict[str, Any]]:
+    """Retrieves the most recent snapshot for an underlying and expiry."""
+    rows = safe_query(
+        """
+        SELECT * FROM delta_option_chain_snapshots
+        WHERE underlying_symbol = ? AND (expiry_date = ? OR settlement_time LIKE ?)
+        ORDER BY snapshot_timestamp DESC LIMIT 1
+        """,
+        (underlying.upper().strip(), expiry, f"{expiry}%"),
+    )
+    return rows[0] if rows else None
+
+
+def log_delta_ingestion_event(
+    event_type: str,
+    status: str,
+    contracts_discovered: int = 0,
+    quotes_updated: int = 0,
+    latency_ms: float = 0.0,
+    error_message: str = ""
+) -> int:
+    """Logs an ingestion audit event."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO delta_ingestion_events (
+                event_type, status, contracts_discovered, quotes_updated, latency_ms, error_message, timestamp
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (event_type, status, int(contracts_discovered), int(quotes_updated), float(latency_ms), error_message, now_iso),
+        )
+        return cursor.lastrowid or 0
+
+
+def get_recent_delta_ingestion_events(limit: int = 20) -> List[Dict[str, Any]]:
+    """Fetches recent ingestion events."""
+    return safe_query("SELECT * FROM delta_ingestion_events ORDER BY timestamp DESC LIMIT ?", (limit,))
+
+
+def archive_expired_delta_contracts(current_time_iso: Optional[str] = None) -> int:
+    """Marks contracts whose settlement_time is in the past as inactive and moves quotes to settlement."""
+    if not current_time_iso:
+        current_time_iso = datetime.now(timezone.utc).isoformat()
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        # Find newly expired active contracts
+        cursor.execute(
+            "SELECT product_id, symbol, settlement_time FROM delta_option_contracts WHERE settlement_time < ? AND is_active = 1",
+            (current_time_iso,),
+        )
+        expired = [dict(r) for r in cursor.fetchall()]
+        for exp in expired:
+            cursor.execute(
+                "UPDATE delta_option_contracts SET is_active = 0, state = 'expired' WHERE product_id = ?",
+                (exp["product_id"],),
+            )
+            # Record settlement if quote exists
+            cursor.execute(
+                "SELECT mark_price, spot_price FROM delta_option_quotes WHERE product_id = ?",
+                (exp["product_id"],),
+            )
+            q_row = cursor.fetchone()
+            settle_px = q_row["spot_price"] if q_row and q_row["spot_price"] else (q_row["mark_price"] if q_row else 0.0)
+            cursor.execute(
+                """
+                INSERT INTO delta_settlement_records (product_id, symbol, settlement_price, settlement_time, recorded_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (exp["product_id"], exp["symbol"], settle_px, exp["settlement_time"], current_time_iso),
+            )
+        # Update expiries table
+        cursor.execute(
+            "UPDATE delta_option_expiries SET is_active = 0 WHERE settlement_time < ? AND is_active = 1",
+            (current_time_iso,),
+        )
+        return len(expired)
+
 
 
 

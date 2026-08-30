@@ -17,6 +17,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { OptionStrategyEvaluation, OptionStrategyLeg } from "@/types/crypto-derivatives";
+import { normalizeExpiriesList } from "@/lib/expiry-utils";
 
 export function OptionStrategyBuilder() {
   const [underlying, setUnderlying] = useState("BTC");
@@ -35,8 +36,12 @@ export function OptionStrategyBuilder() {
     },
   });
 
-  const availableExpiries = Array.isArray(expiriesData?.expiries) ? expiriesData.expiries : [];
-  const activeExpiry = availableExpiries[0] || "2026-08-28";
+  const normalizedExpiries = React.useMemo(() => {
+    const raw = Array.isArray(expiriesData?.expiries) ? expiriesData.expiries : [];
+    return normalizeExpiriesList(raw, underlying);
+  }, [expiriesData?.expiries, underlying]);
+
+  const activeExpiry = normalizedExpiries[0]?.value || "2026-08-28";
 
   // Evaluate Strategy
   const { data: evalData, isLoading, refetch, isFetching } = useQuery<OptionStrategyEvaluation>({

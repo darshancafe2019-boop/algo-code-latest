@@ -66,7 +66,7 @@ class TestInstrumentResolverOptions(unittest.TestCase):
         assert res.instrument.lot_size == 250.0
 
     def test_crypto_option_resolution(self):
-        res = global_instrument_resolver.resolve("BTC-260327-70000-C")
+        res = global_instrument_resolver.resolve("BTC-260925-70000-C")
         assert res.is_valid
         assert res.instrument.base_asset == "BTC"
         assert res.instrument.strike == 70000.0

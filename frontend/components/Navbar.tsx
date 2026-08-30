@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { executeCommand } from "@/lib/commandClient";
+import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
@@ -104,12 +105,8 @@ export function Navbar({
     },
   });
 
-  // SSE + Polling Fallback Effect with AbortController and controlled retry
+  // Resilient SSE Ticker Stream with single-connection ownership and exponential backoff
   useEffect(() => {
-    let eventSource: EventSource | null = null;
-    let fallbackInterval: NodeJS.Timeout | null = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let abortController = new AbortController();
     let isSubscribed = true;
 
     const handleNewPrice = (newPrice: number, data: any) => {
@@ -137,87 +134,21 @@ export function Navbar({
       });
     };
 
-    const pollTicker = async () => {
-      if (!isSubscribed) return;
-      try {
-        const res = await fetch(`/api/ticker?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}`, {
-          signal: abortController.signal,
-          headers: { Accept: "application/json" },
-        });
-        if (res.ok && isSubscribed) {
-          const json = await res.json();
-          const raw = json.data || json.ticker || json;
-          const price = parseFloat(raw.last || raw.price || 65420.0);
-          if (!isNaN(price) && price > 0) {
-            handleNewPrice(price, raw);
-          }
+    const streamUrl = `/api/stream/ticker?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}`;
+    const handle = apiClient.createResilientEventSource(streamUrl, {
+      key: `ticker_stream_${activeSymbol}`,
+      onMessage: (data) => {
+        const raw = data.data || data.ticker || data;
+        const price = parseFloat(raw.price || raw.last);
+        if (!isNaN(price) && price > 0) {
+          handleNewPrice(price, raw);
         }
-      } catch (err: any) {
-        if (err.name !== "AbortError") {
-          // Silent fallback logging
-        }
-      }
-    };
-
-    const setupStream = () => {
-      if (!isSubscribed) return;
-      try {
-        eventSource = new EventSource(`/api/stream/ticker?symbol=${encodeURIComponent(activeSymbol || "BTC/USDT")}`);
-
-        eventSource.onmessage = (e) => {
-          try {
-            const data = JSON.parse(e.data);
-            const raw = data.data || data.ticker || data;
-            const price = parseFloat(raw.price || raw.last);
-            if (!isNaN(price) && price > 0) {
-              handleNewPrice(price, raw);
-            }
-          } catch {
-            // Silently ignore malformed SSE frames
-          }
-        };
-
-        eventSource.onerror = () => {
-          if (eventSource) {
-            eventSource.close();
-            eventSource = null;
-          }
-
-          // Start controlled fallback polling (every 6s) while scheduling an SSE reconnect
-          if (!fallbackInterval && isSubscribed) {
-            pollTicker();
-            fallbackInterval = setInterval(pollTicker, 6000);
-          }
-
-          if (!reconnectTimeout && isSubscribed) {
-            reconnectTimeout = setTimeout(() => {
-              reconnectTimeout = null;
-              if (isSubscribed && !eventSource) {
-                if (fallbackInterval) {
-                  clearInterval(fallbackInterval);
-                  fallbackInterval = null;
-                }
-                setupStream();
-              }
-            }, 8000);
-          }
-        };
-      } catch {
-        if (!fallbackInterval && isSubscribed) {
-          pollTicker();
-          fallbackInterval = setInterval(pollTicker, 6000);
-        }
-      }
-    };
-
-    setupStream();
+      },
+    });
 
     return () => {
       isSubscribed = false;
-      abortController.abort();
-      if (eventSource) eventSource.close();
-      if (fallbackInterval) clearInterval(fallbackInterval);
-      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      handle.close();
     };
   }, [activeSymbol]);
 

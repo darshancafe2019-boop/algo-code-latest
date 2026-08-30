@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { DataQualityStatus } from "@/types/crypto-derivatives";
+import { apiClient } from "@/lib/apiClient";
 
 export interface CryptoTickData {
   type: string;
@@ -24,77 +25,38 @@ export function useCryptoRealtime() {
 
   useEffect(() => {
     isMountedRef.current = true;
-    let es: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let retryAttempt = 0;
 
-    const connectSSE = () => {
-      if (!isMountedRef.current) return;
-
-      // Close previous connection if any
-      if (es) {
-        try {
-          es.close();
-        } catch {}
-        es = null;
-      }
-
-      try {
-        es = new EventSource("/api/stream/crypto");
-
-        es.onopen = () => {
-          if (!isMountedRef.current) return;
-          retryAttempt = 0;
-          const now = Date.now();
-          lastHeartbeatRef.current = now;
-          setLastHeartbeatTime(now);
-          setConnectionStatus("LIVE");
-        };
-
-        es.onmessage = (event) => {
-          if (!isMountedRef.current) return;
-          try {
-            const data = JSON.parse(event.data);
-            const now = Date.now();
-            lastHeartbeatRef.current = now;
-            setLastHeartbeatTime(now);
-
-            if (data.type === "CRYPTO_TICK") {
-              setLatestTick(data);
-              setConnectionStatus("LIVE");
-            } else if (data.type === "HEARTBEAT") {
-              setConnectionStatus("LIVE");
-            }
-          } catch {
-            // Ignore malformed frames
-          }
-        };
-
-        es.onerror = () => {
-          if (!isMountedRef.current) return;
-          setConnectionStatus("DISCONNECTED");
-          if (es) {
-            try {
-              es.close();
-            } catch {}
-            es = null;
-          }
-
-          // Exponential backoff with jitter
-          retryAttempt = Math.min(retryAttempt + 1, 5);
-          const delay = Math.min(10000, 1000 * Math.pow(1.5, retryAttempt) + Math.floor(Math.random() * 500));
-          if (reconnectTimer) clearTimeout(reconnectTimer);
-          reconnectTimer = setTimeout(connectSSE, delay);
-        };
-      } catch {
+    const handle = apiClient.createResilientEventSource("/api/stream/crypto", {
+      key: "stream_crypto",
+      onOpen: () => {
         if (!isMountedRef.current) return;
-        setConnectionStatus("DISCONNECTED");
-        if (reconnectTimer) clearTimeout(reconnectTimer);
-        reconnectTimer = setTimeout(connectSSE, 4000);
-      }
-    };
+        const now = Date.now();
+        lastHeartbeatRef.current = now;
+        setLastHeartbeatTime(now);
+        setConnectionStatus("LIVE");
+      },
+      onMessage: (data) => {
+        if (!isMountedRef.current) return;
+        const now = Date.now();
+        lastHeartbeatRef.current = now;
+        setLastHeartbeatTime(now);
 
-    connectSSE();
+        if (data?.type === "CRYPTO_TICK") {
+          setLatestTick(data);
+          setConnectionStatus("LIVE");
+        } else if (data?.type === "HEARTBEAT") {
+          setConnectionStatus("LIVE");
+        }
+      },
+      onStateChange: (state) => {
+        if (!isMountedRef.current) return;
+        if (state === "CLOSED" || state === "RECONNECTING") {
+          setConnectionStatus("DISCONNECTED");
+        } else if (state === "OPEN") {
+          setConnectionStatus("LIVE");
+        }
+      },
+    });
 
     // Heartbeat watchdog: checks staleness without triggering re-connection
     const watchdog = setInterval(() => {
@@ -108,14 +70,9 @@ export function useCryptoRealtime() {
     return () => {
       isMountedRef.current = false;
       clearInterval(watchdog);
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (es) {
-        try {
-          es.close();
-        } catch {}
-      }
+      handle.close();
     };
-  }, []); // Run only once on mount
+  }, []);
 
   return {
     latestTick,

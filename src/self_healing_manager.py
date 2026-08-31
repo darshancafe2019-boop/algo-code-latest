@@ -389,6 +389,18 @@ class SelfHealingManager:
             }
         }
 
+    def auto_heal_all(self) -> Dict[str, Any]:
+        """Runs global fleet and platform autonomous self-healing pass."""
+        from src.autonomous_repair_engine import global_autonomous_repair_engine
+        return global_autonomous_repair_engine.auto_heal_all_subsystems()
+
+    def get_healing_telemetry(self) -> Dict[str, Any]:
+        """Returns structured self-healing and learning telemetry."""
+        from src.autonomous_repair_engine import global_autonomous_repair_engine
+        return global_autonomous_repair_engine.get_healing_telemetry()
+
 
 # Global Singleton Instance
 global_self_healing_manager = SelfHealingManager()
+
+

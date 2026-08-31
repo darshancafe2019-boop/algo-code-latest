@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from src import config, db
 
 logger = logging.getLogger("OrderRouter")
@@ -18,7 +18,8 @@ class MultiAssetOrderRouter:
         position_size: float,
         price: float,
         asset_class: str = "Crypto",
-        is_live: bool = False
+        is_live: bool = False,
+        exchange: Optional[str] = None
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Routes order to appropriate adapter while verifying safety controls.
@@ -48,10 +49,12 @@ class MultiAssetOrderRouter:
                 return False, "FOREX_LIVE_TRADING flag is disabled.", {}
 
         # Route to Adapter
-        if asset_class == "Crypto":
+        if exchange in ["delta_exchange", "delta_india", "delta_global"] or asset_class in ["Crypto_Options", "Crypto_Futures"] or (inst and inst.get("exchange") in ["DELTA_EXCHANGE", "DELTA_INDIA"]):
+            adapter_name = "Delta Exchange Adapter (Crypto Spot/Futures/Options)"
+        elif asset_class == "Crypto":
             adapter_name = "CCXT Binance Adapter"
         elif asset_class == "Stock" and inst and inst.get("country") == "IN":
-            adapter_name = "Indian Stock Broker Adapter (NSE Paper/Zerodha)"
+            adapter_name = "Upstox Indian Stock Broker Adapter (NSE/BSE)"
         elif asset_class == "Stock":
             adapter_name = "Global Stock Broker Adapter (Alpaca/Paper)"
         elif asset_class == "Forex":

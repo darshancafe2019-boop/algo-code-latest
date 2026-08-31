@@ -62,8 +62,8 @@ export function BotSummaryCards({ metrics }: { metrics: Metrics }) {
     },
     {
       title: "Today's Realized P&L",
-      value: `${todayPnl >= 0 ? "+" : ""}$${todayPnl.toFixed(2)}`,
-      sub: `Total: ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(2)}`,
+      value: `${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)}`,
+      sub: `Total: ${totalPnl >= 0 ? "+" : "-"}$${Math.abs(totalPnl).toFixed(2)}`,
       icon: TrendingUp,
       color: todayPnl >= 0 ? "text-emerald-400" : "text-red-400",
       bg: todayPnl >= 0 ? "bg-emerald-500/10" : "bg-red-500/10",

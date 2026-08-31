@@ -58,7 +58,7 @@ const ASSET_CLASSES: { id: WizardAssetClass; label: string; icon: any; desc: str
   { id: "OPTIONS", label: "Options", icon: Layers, desc: "Index & Stock Options Spreads" },
   { id: "FUTURES", label: "Futures", icon: Activity, desc: "Perpetual & Dated Futures" },
   { id: "CRYPTO", label: "Crypto", icon: Coins, desc: "Spot & Perpetual Crypto Pairs" },
-  { id: "CRYPTO_OPTIONS", label: "Crypto Options", icon: Zap, desc: "Deribit, Binance & OKX Chains" },
+  { id: "CRYPTO_OPTIONS", label: "Crypto Options", icon: Zap, desc: "Delta Exchange, Binance & Deribit" },
   { id: "COMMODITIES", label: "Commodities", icon: Globe, desc: "Gold, Silver, Crude Oil (MCX)" },
   { id: "FOREX", label: "Forex", icon: DollarSign, desc: "Major & Cross Currency Pairs" },
   { id: "ETF", label: "ETF", icon: Briefcase, desc: "Sector & Index Exchange Funds" },
@@ -110,10 +110,10 @@ const POPULAR_INSTRUMENTS: Record<WizardAssetClass, { symbol: string; name: stri
     { symbol: "LINK/USDT", name: "Chainlink / Tether Spot", exchange: "BINANCE" },
   ],
   CRYPTO_OPTIONS: [
-    { symbol: "BTC-260925-70000-C", name: "Bitcoin 70,000 CALL (Sep 2026)", exchange: "BINANCE" },
-    { symbol: "BTC-260925-65000-P", name: "Bitcoin 65,000 PUT (Sep 2026)", exchange: "BINANCE" },
-    { symbol: "ETH-260925-3500-C", name: "Ethereum 3,500 CALL (Sep 2026)", exchange: "BINANCE" },
-    { symbol: "SOL-260925-150-C", name: "Solana 150 CALL (Sep 2026)", exchange: "BINANCE" },
+    { symbol: "BTC-260925-70000-C", name: "Bitcoin 70,000 CALL (Delta Exchange)", exchange: "DELTA_EXCHANGE" },
+    { symbol: "BTC-260925-65000-P", name: "Bitcoin 65,000 PUT (Delta Exchange)", exchange: "DELTA_EXCHANGE" },
+    { symbol: "ETH-260925-3500-C", name: "Ethereum 3,500 CALL (Delta Exchange)", exchange: "DELTA_EXCHANGE" },
+    { symbol: "SOL-260925-150-C", name: "Solana 150 CALL (Delta Exchange)", exchange: "DELTA_EXCHANGE" },
   ],
   COMMODITIES: [
     { symbol: "GOLD", name: "Gold Standard Futures / Options", exchange: "MCX" },
@@ -1596,12 +1596,13 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                     >
                       {(brokersData?.brokers || [
                         { id: "paper_simulator", name: "QuantOS Paper Simulator", status: "CONNECTED" },
+                        { id: "delta_exchange", name: "Delta Exchange India & Global", status: "CONNECTED" },
+                        { id: "upstox", name: "Upstox Pro (NSE / BSE / MCX)", status: "CONNECTED" },
+                        { id: "ccxt_binance", name: "Binance Global", status: "CONNECTED" },
                         { id: "dhan_india", name: "Dhan HQ (NSE Equities / F&O)", status: "CONNECTED" },
                         { id: "zerodha_kite", name: "Zerodha Kite Connect", status: "CONNECTED" },
-                        { id: "ccxt_binance", name: "Binance Global", status: "CONNECTED" },
                         { id: "bybit", name: "Bybit Global", status: "CONNECTED" },
                         { id: "deribit", name: "Deribit Crypto Options", status: "CONNECTED" },
-                        { id: "interactive_brokers", name: "Interactive Brokers", status: "NOT_CONFIGURED" },
                       ]).map((b: any) => (
                         <option key={b.id} value={b.id}>
                           {b.name} ({b.status})

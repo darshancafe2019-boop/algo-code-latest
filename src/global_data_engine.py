@@ -211,8 +211,9 @@ class GlobalDataEngine:
         losses = []
 
         for t in closed_trades:
-            pnl_val = Decimal(str(t.get("net_pnl") or t.get("realized_pnl") or 0.0))
-            gross_val = Decimal(str(t.get("gross_pnl") or pnl_val))
+            raw_pnl = t.get("net_pnl") if t.get("net_pnl") is not None else (t.get("realized_pnl") if t.get("realized_pnl") is not None else (t.get("result_pnl") or 0.0))
+            pnl_val = Decimal(str(raw_pnl))
+            gross_val = Decimal(str(t.get("gross_pnl") if t.get("gross_pnl") is not None else pnl_val))
             fee_val = Decimal(str(t.get("fees") or 0.0))
             fund_val = Decimal(str(t.get("funding") or 0.0))
             ts_str = t.get("exit_timestamp") or t.get("timestamp") or ""
@@ -227,7 +228,7 @@ class GlobalDataEngine:
             elif pnl_val < 0:
                 losses.append(float(abs(pnl_val)))
 
-            if ts_str >= today_start_iso:
+            if ts_str.startswith(now_dt.strftime("%Y-%m-%d")) or ts_str >= today_start_iso:
                 daily_pnl += pnl_val
             if ts_str >= week_start_iso:
                 weekly_pnl += pnl_val

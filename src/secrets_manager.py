@@ -165,6 +165,26 @@ class SecretsManager:
         enc_s = rows[0]["encrypted_secret_key"]
         return self.decrypt_secret(enc_k), self.decrypt_secret(enc_s)
 
+    def get_active_credential(self, provider_id: str) -> Optional[Dict[str, Any]]:
+        """Returns active credential metadata for a specific provider."""
+        rows = db.safe_query(
+            "SELECT * FROM broker_credentials WHERE provider_id = ? AND status = 'CONNECTED' ORDER BY created_at DESC LIMIT 1",
+            (provider_id,),
+        )
+        if not rows:
+            return None
+        r = rows[0]
+        return {
+            "credential_id": r["credential_id"],
+            "provider_id": r["provider_id"],
+            "account_name": r["account_name"],
+            "key_prefix": r["key_prefix"],
+            "allow_read": bool(r["allow_read"]),
+            "allow_trade": bool(r["allow_trade"]),
+            "allow_withdraw": 0,
+            "status": r["status"]
+        }
+
     def get_masked_credentials(self) -> List[Dict[str, Any]]:
         """Returns safe masked credential metadata for frontend Security Center display."""
         rows = db.safe_query("SELECT * FROM broker_credentials ORDER BY created_at DESC")

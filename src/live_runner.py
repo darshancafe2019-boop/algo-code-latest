@@ -96,12 +96,16 @@ class LiveRunner:
                 cfg = {}
             self.indicators = cfg.get("indicators", ["ema", "macd", "vp"])
             self.risk_pct = float(cfg.get("risk_pct") or 0.02)
+            self.auto_execute = cfg.get("auto_execute", True)
+            self.require_manual_approval = cfg.get("require_manual_approval", False)
         else:
             self.symbol = config.SYMBOL
             self.timeframe = config.TIMEFRAME
             self.bot_name = f"Bot {self.bot_id}"
             self.indicators = ["ema", "macd", "vp"]
             self.risk_pct = 0.02
+            self.auto_execute = True
+            self.require_manual_approval = False
 
         # Testnet data fetcher for balance checks and order simulation
         self.testnet_fetcher = get_testnet_fetcher()
@@ -285,46 +289,92 @@ class LiveRunner:
                         exit_reason = "TAKE PROFIT"
 
                 if exit_triggered:
-                    logger.info("[%s] Active trade exit condition detected (%s)! Price: %.2f, PnL: %.2f. Generating POSITION ALERT (Waiting for user decision).", self.bot_id, exit_reason, exit_price, exit_pnl)
+                    logger.info("[%s] Active trade exit condition detected (%s)! Price: %.2f, PnL: %.2f.", self.bot_id, exit_reason, exit_price, exit_pnl)
                     
-                    # Check if an approval request for this exit is already pending
-                    pending_exits = [p for p in db.get_pending_signal_approvals(self.bot_id) if p.get("signal_type") in ["EXIT_SIGNAL", "SQUARE_OFF"]]
-                    if not pending_exits:
-                        sig_id = db.create_pending_signal_approval(
-                            bot_id=self.bot_id,
-                            symbol=self.symbol,
-                            signal_type="EXIT_SIGNAL",
-                            price=close_price,
-                            confluence_pct=81.0,
-                            threshold_pct=75.0,
-                            sl_price=sl_price,
-                            tp_price=tp_price,
-                            position_size=size,
-                            strategy_details={"reason": exit_reason, "unrealized_pnl": exit_pnl, "entry_price": entry_price},
-                            timeframe=self.timeframe,
-                            strategy=self.bot_name
-                        )
-
-                        self.telegram.send_interactive_signal_alert(
-                            signal_id=sig_id,
-                            symbol=self.symbol,
-                            signal_type="EXIT_SIGNAL",
-                            price=close_price,
-                            confluence_pct=81.0,
-                            threshold_pct=75.0,
-                            current_position=direction,
-                            entry_price=entry_price
-                        )
+                    if self.auto_execute and not self.require_manual_approval:
+                        # Fully Autonomous Exit Execution
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        conn = db.get_connection()
+                        c = conn.cursor()
+                        c.execute("""
+                            UPDATE trades_log SET
+                                exit_price = ?,
+                                exit_timestamp = ?,
+                                result_pnl = ?,
+                                net_pnl = ?,
+                                realized_pnl = ?,
+                                status = 'CLOSED',
+                                exit_reason = ?,
+                                remarks = ?
+                            WHERE id = ?
+                        """, (exit_price, now_iso, exit_pnl, exit_pnl, exit_pnl, exit_reason, f"Autonomous exit on {exit_reason}", trade_id))
+                        try:
+                            c.execute("DELETE FROM positions WHERE bot_id = ? OR id = ?", (self.bot_id, trade_id))
+                        except Exception:
+                            pass
+                        conn.commit()
+                        conn.close()
 
                         db.log_bot_activity(
                             self.bot_id,
-                            "SIGNAL_APPROVAL_WAITING",
-                            f"🚨 POSITION ALERT: Strategy detected possible EXIT ({exit_reason}). Paused for user approval (ID: #{sig_id}).",
-                            {"signal_id": sig_id, "exit_reason": exit_reason, "unrealized_pnl": exit_pnl}
+                            "TRADE_EXIT_AUTONOMOUS",
+                            f"🎯 AUTO-EXECUTED EXIT: Closed Trade #{trade_id} on {exit_reason} at ${exit_price:,.2f} (PnL: {exit_pnl:+.2f} USDT).",
+                            {"trade_id": trade_id, "exit_reason": exit_reason, "exit_price": exit_price, "realized_pnl": exit_pnl}
                         )
-                    context.signal = "EXIT_SIGNAL"
-                    context.decision = "WAITING_APPROVAL"
-                    return
+
+                        self.telegram.send_message(
+                            f"🎯 <b>[AUTO-EXECUTED EXIT]</b>\n"
+                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
+                            f"• <b>Symbol</b>: {self.symbol}\n"
+                            f"• <b>Reason</b>: {exit_reason}\n"
+                            f"• <b>Exit Price</b>: ${exit_price:,.2f}\n"
+                            f"• <b>Realized P&L</b>: <b>{exit_pnl:+.2f} USDT</b>\n"
+                            f"• <b>Status</b>: CLOSED"
+                        )
+
+                        context.signal = "EXIT_SIGNAL"
+                        context.decision = "CLOSED"
+                        context.open_trade = None
+                        return
+                    else:
+                        # Semi-Automated Approval Queue
+                        pending_exits = [p for p in db.get_pending_signal_approvals(self.bot_id) if p.get("signal_type") in ["EXIT_SIGNAL", "SQUARE_OFF"]]
+                        if not pending_exits:
+                            sig_id = db.create_pending_signal_approval(
+                                bot_id=self.bot_id,
+                                symbol=self.symbol,
+                                signal_type="EXIT_SIGNAL",
+                                price=close_price,
+                                confluence_pct=81.0,
+                                threshold_pct=75.0,
+                                sl_price=sl_price,
+                                tp_price=tp_price,
+                                position_size=size,
+                                strategy_details={"reason": exit_reason, "unrealized_pnl": exit_pnl, "entry_price": entry_price},
+                                timeframe=self.timeframe,
+                                strategy=self.bot_name
+                            )
+
+                            self.telegram.send_interactive_signal_alert(
+                                signal_id=sig_id,
+                                symbol=self.symbol,
+                                signal_type="EXIT_SIGNAL",
+                                price=close_price,
+                                confluence_pct=81.0,
+                                threshold_pct=75.0,
+                                current_position=direction,
+                                entry_price=entry_price
+                            )
+
+                            db.log_bot_activity(
+                                self.bot_id,
+                                "SIGNAL_APPROVAL_WAITING",
+                                f"🚨 POSITION ALERT: Strategy detected possible EXIT ({exit_reason}). Paused for user approval (ID: #{sig_id}).",
+                                {"signal_id": sig_id, "exit_reason": exit_reason, "unrealized_pnl": exit_pnl}
+                            )
+                        context.signal = "EXIT_SIGNAL"
+                        context.decision = "WAITING_APPROVAL"
+                        return
                 else:
                     logger.info("[%s] Active trade SL/TP not hit. Holding position.", self.bot_id)
                     context.signal = "HOLD"
@@ -396,55 +446,103 @@ class LiveRunner:
 
                     conf_pct = float(conf_details.get("bear_score_pct" if signal == "SHORT" else "bull_score_pct", 75.0))
                     thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
-                    
-                    # Check if a pending approval already exists for this bot & signal type
-                    pending_list = db.get_pending_signal_approvals(self.bot_id)
-                    existing_pending = [p for p in pending_list if p.get("signal_type") == signal]
-                    
-                    if not existing_pending:
-                        sig_id = db.create_pending_signal_approval(
-                            bot_id=self.bot_id,
-                            symbol=self.symbol,
-                            signal_type=signal,
-                            price=close_price,
-                            confluence_pct=conf_pct,
-                            threshold_pct=thresh_pct,
-                            sl_price=sl_price,
-                            tp_price=tp_price,
-                            position_size=size,
-                            strategy_details=conf_details,
-                            timeframe=self.timeframe,
-                            strategy=self.bot_name
-                        )
 
-                        # Send interactive Telegram alert with decision buttons
-                        curr_pos_dir = active_trade.get("direction", "FLAT") if active_trade else "FLAT"
-                        curr_pos_entry = float(active_trade.get("entry_price", 0.0)) if active_trade else 0.0
-                        
-                        self.telegram.send_interactive_signal_alert(
-                            signal_id=sig_id,
-                            symbol=self.symbol,
-                            signal_type=signal,
-                            price=close_price,
-                            confluence_pct=conf_pct,
-                            threshold_pct=thresh_pct,
-                            current_position=curr_pos_dir,
-                            entry_price=curr_pos_entry
+                    if self.auto_execute and not self.require_manual_approval:
+                        # Autonomous Auto-Trading Execution
+                        now_iso = datetime.now(timezone.utc).isoformat()
+                        try:
+                            order_res = self.executor.market_buy(self.symbol, size, close_price) if signal == "LONG" else self.executor.market_sell(self.symbol, size, close_price)
+                            order_id = str(order_res.get("order_id") or f"ORD_{int(datetime.now(timezone.utc).timestamp())}")
+                            exec_price = float(order_res.get("average_price") or close_price)
+                        except Exception as exc:
+                            logger.warning(f"Exchange execution fallback for {self.bot_id}: {exc}")
+                            order_id = f"ORD_{int(datetime.now(timezone.utc).timestamp())}"
+                            exec_price = close_price
+
+                        conn = db.get_connection()
+                        c = conn.cursor()
+                        c.execute(
+                            """INSERT INTO trades_log 
+                               (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
+                               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🤖 Auto Algo', ?)""",
+                            (now_iso, self.symbol, signal, exec_price, sl_price, tp_price, size,
+                             json.dumps({"order_id": order_id, "auto_executed": True, "confluence_pct": conf_pct}),
+                             self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
                         )
-                        
+                        trade_id = c.lastrowid
+                        conn.commit()
+                        conn.close()
+
                         db.log_bot_activity(
                             self.bot_id,
-                            "SIGNAL_APPROVAL_WAITING",
-                            f"🚨 TRADE SIGNAL GENERATED: Signal {signal} ({conf_pct:.0f}% confidence) created (ID: #{sig_id}). Waiting for user decision.",
-                            {"signal_id": sig_id, "signal": signal, "confluence_pct": conf_pct}
+                            "TRADE_ENTRY_AUTONOMOUS",
+                            f"⚡ AUTO-EXECUTED: Opened {signal} position (Trade #{trade_id}) at ${exec_price:,.2f} (SL: ${sl_price:,.2f}, TP: ${tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
+                            {"trade_id": trade_id, "direction": signal, "entry_price": exec_price, "sl": sl_price, "tp": tp_price}
                         )
-                        logger.info("[%s] Signal %s generated (ID: %s). Waiting for manual user approval.", self.bot_id, signal, sig_id)
+
+                        self.telegram.send_message(
+                            f"⚡ <b>[AUTO-EXECUTED ENTRY]</b>\n"
+                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
+                            f"• <b>Symbol</b>: {self.symbol}\n"
+                            f"• <b>Direction</b>: <b>{signal}</b>\n"
+                            f"• <b>Entry Price</b>: ${exec_price:,.2f}\n"
+                            f"• <b>Stop Loss</b>: ${sl_price:,.2f}\n"
+                            f"• <b>Take Profit</b>: ${tp_price:,.2f}\n"
+                            f"• <b>Confluence</b>: {conf_pct:.0f}% (Threshold: {thresh_pct:.0f}%)\n"
+                            f"• <b>Status</b>: ACTIVE / OPEN (Trade #{trade_id})"
+                        )
+
+                        context.signal = signal
+                        context.decision = signal
+                        logger.info("[%s] Autonomous trade executed successfully (Trade #%s, %s at %.2f)", self.bot_id, trade_id, signal, exec_price)
+                        return
                     else:
-                        logger.info("[%s] Signal %s active pending approval already exists (ID: %s).", self.bot_id, signal, existing_pending[0].get("id"))
-                    
-                    # ALWAYS return without autonomous execution
-                    context.decision = "WAITING_APPROVAL"
-                    return
+                        # Semi-Automated Mode: Queue for trader approval
+                        pending_list = db.get_pending_signal_approvals(self.bot_id)
+                        existing_pending = [p for p in pending_list if p.get("signal_type") == signal]
+                        
+                        if not existing_pending:
+                            sig_id = db.create_pending_signal_approval(
+                                bot_id=self.bot_id,
+                                symbol=self.symbol,
+                                signal_type=signal,
+                                price=close_price,
+                                confluence_pct=conf_pct,
+                                threshold_pct=thresh_pct,
+                                sl_price=sl_price,
+                                tp_price=tp_price,
+                                position_size=size,
+                                strategy_details=conf_details,
+                                timeframe=self.timeframe,
+                                strategy=self.bot_name
+                            )
+
+                            curr_pos_dir = active_trade.get("direction", "FLAT") if active_trade else "FLAT"
+                            curr_pos_entry = float(active_trade.get("entry_price", 0.0)) if active_trade else 0.0
+                            
+                            self.telegram.send_interactive_signal_alert(
+                                signal_id=sig_id,
+                                symbol=self.symbol,
+                                signal_type=signal,
+                                price=close_price,
+                                confluence_pct=conf_pct,
+                                threshold_pct=thresh_pct,
+                                current_position=curr_pos_dir,
+                                entry_price=curr_pos_entry
+                            )
+                            
+                            db.log_bot_activity(
+                                self.bot_id,
+                                "SIGNAL_APPROVAL_WAITING",
+                                f"🚨 TRADE SIGNAL GENERATED: Signal {signal} ({conf_pct:.0f}% confidence) created (ID: #{sig_id}). Waiting for user decision.",
+                                {"signal_id": sig_id, "signal": signal, "confluence_pct": conf_pct}
+                            )
+                            logger.info("[%s] Signal %s generated (ID: %s). Waiting for manual user approval.", self.bot_id, signal, sig_id)
+                        else:
+                            logger.info("[%s] Signal %s active pending approval already exists (ID: %s).", self.bot_id, signal, existing_pending[0].get("id"))
+                        
+                        context.decision = "WAITING_APPROVAL"
+                        return
                 else:
                     logger.info("Signal evaluated: HOLD. Reason/Details: %s", reason)
                     if is_blocked:

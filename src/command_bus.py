@@ -150,12 +150,25 @@ class CommandBus:
             "SELECT_BOT": cls._handle_select_bot,
             "START_ALL_BOTS": cls._handle_start_all_bots,
             "PAUSE_ALL_BOTS": cls._handle_pause_all_bots,
+            "RESUME_ALL_BOTS": cls._handle_resume_all_bots,
             "STOP_ALL_BOTS": cls._handle_stop_all_bots,
+            "RESTART_ALL_BOTS": cls._handle_restart_all_bots,
             "RESET_PAPER_SANDBOX": cls._handle_reset_paper_sandbox,
             "ACTIVATE_KILL_SWITCH": cls._handle_activate_kill_switch,
             "DEACTIVATE_KILL_SWITCH": cls._handle_deactivate_kill_switch,
             "RECONCILE_ACCOUNT": cls._handle_reconcile_account,
             "REFRESH_MARKET_DATA": cls._handle_refresh_market_data,
+            "SYNC_UNIVERSE": cls._handle_refresh_market_data,
+            "SYNC_UNIVERSE_MASTER": cls._handle_refresh_market_data,
+            "CLEAR_CACHE": cls._handle_clear_cache,
+            "PURGE_CACHE": cls._handle_clear_cache,
+            "SELF_HEAL_FLEET": cls._handle_self_heal_fleet,
+            "AUTO_RESOLVE_INCIDENTS": cls._handle_self_heal_fleet,
+            "REPAIR_STALE_POSITIONS": cls._handle_reconcile_account,
+            "RESET_CORRUPTED_CACHE": cls._handle_clear_cache,
+            "REPAIR_ORPHAN_ORDERS": cls._handle_reconcile_account,
+            "CHECK_HEALTH": cls._handle_check_health,
+            "RUN_DIAGNOSTICS": cls._handle_run_diagnostics,
             "SQUARE_OFF_POSITION": cls._handle_square_off_position,
             "MODIFY_POSITION_PROTECTION": cls._handle_modify_position_protection,
             "PARTIAL_CLOSE_POSITION": cls._handle_partial_close_position,
@@ -313,6 +326,17 @@ class CommandBus:
         from src.process_manager import multi_bot_manager
         res = multi_bot_manager.pause_all_bots()
         return CommandStatus.SUCCEEDED, True, res.get("message", "Paused bots"), res
+
+    @classmethod
+    def _handle_resume_all_bots(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.process_manager import multi_bot_manager
+        bots = db.safe_query("SELECT id FROM bot_instances WHERE status = 'PAUSED' AND COALESCE(is_deleted, 0) = 0")
+        resumed = []
+        for b in bots:
+            r = multi_bot_manager.resume_bot(b["id"])
+            if r.get("status") in ["success", "already_running"]:
+                resumed.append(b["id"])
+        return CommandStatus.SUCCEEDED, True, f"Resumed {len(resumed)} paused bots.", {"resumed": resumed}
 
     @classmethod
     def _handle_stop_all_bots(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
@@ -696,6 +720,38 @@ class CommandBus:
         return CommandStatus.SUCCEEDED, True, f"Exported {len(trades)} trade records", {"trades_count": len(trades)}
 
     @classmethod
+    def _handle_restart_all_bots(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.process_manager import multi_bot_manager
+        multi_bot_manager.stop_all_bots()
+        time.sleep(0.5)
+        res = multi_bot_manager.start_all_bots()
+        return CommandStatus.SUCCEEDED, True, f"Restarted all bots: {len(res.get('started', []))} started.", res
+
+    @classmethod
+    def _handle_clear_cache(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.autonomous_repair_engine import global_autonomous_repair_engine
+        res = global_autonomous_repair_engine.heal_stale_cache()
+        return CommandStatus.SUCCEEDED, True, "Cache purged and market data synchronized.", res
+
+    @classmethod
+    def _handle_self_heal_fleet(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.autonomous_repair_engine import global_autonomous_repair_engine
+        res = global_autonomous_repair_engine.auto_heal_all_subsystems()
+        return CommandStatus.SUCCEEDED, True, res.get("message", "Self-healing pass completed"), res
+
+    @classmethod
+    def _handle_check_health(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.self_healing_manager import global_self_healing_manager
+        res = global_self_healing_manager.get_system_health_status()
+        return CommandStatus.SUCCEEDED, True, "System health retrieved", res
+
+    @classmethod
+    def _handle_run_diagnostics(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
+        from src.autonomous_repair_engine import global_autonomous_repair_engine
+        telemetry = global_autonomous_repair_engine.get_healing_telemetry()
+        return CommandStatus.SUCCEEDED, True, "Platform diagnostics computed", telemetry
+
+    @classmethod
     def _handle_export_analytics(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
         from src import performance_analytics
         metrics = performance_analytics.compute_complete_performance_metrics()
@@ -703,3 +759,6 @@ class CommandBus:
 
 
 command_bus = CommandBus()
+
+
+

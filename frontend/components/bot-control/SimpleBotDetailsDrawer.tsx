@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2, Layers, Sparkles } from "lucide-react";
+import { X, Play, Pause, Square, AlertTriangle, RotateCcw, ChevronDown, ChevronUp, Activity, ShieldCheck, ShieldAlert, Sliders, Trash2, Layers, Sparkles, Zap, TrendingUp } from "lucide-react";
 import { BotRowItem } from "./SimpleBotTable";
 import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 import { OptionsContractSelectorModal, SelectedOptionsContract } from "@/components/options/OptionsContractSelectorModal";
@@ -29,6 +29,7 @@ export function SimpleBotDetailsDrawer({
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isUpdatingContract, setIsUpdatingContract] = useState(false);
+  const [isForcingTrade, setIsForcingTrade] = useState(false);
 
   if (!isOpen || !bot) return null;
 
@@ -94,6 +95,62 @@ export function SimpleBotDetailsDrawer({
       setActionFeedback(`Error: ${err.message || "Failed action"}`);
     } finally {
       setIsActing(false);
+    }
+  };
+
+  const handleForceTestTrade = async (type?: "LONG_ENTRY" | "WIN_TP" | "LOSS_SL") => {
+    setIsForcingTrade(true);
+    setActionFeedback(null);
+    const targetType = type || (pos.has_position ? "WIN_TP" : "LONG_ENTRY");
+    try {
+      const res = await fetch(`/api/bots/${bot.id}/force_test_trade`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trade_type: targetType }),
+      });
+      const data = await res.json();
+      if (res.ok && (data.status === "success" || data.success)) {
+        if (targetType === "WIN_TP") {
+          setActionFeedback(`🎯 Position Closed with Take-Profit (+$${(Number(data.pnl || data.realized_pnl) || 30.0).toFixed(2)}). Today's Profit updated!`);
+        } else if (targetType === "LOSS_SL") {
+          setActionFeedback(`🛑 Position Closed with Stop-Loss (-$${Math.abs(Number(data.pnl || 15.0)).toFixed(2)}).`);
+        } else {
+          setActionFeedback(`⚡ Test Trade Executed! ${data.direction || "LONG"} order placed at $${(Number(data.price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}.`);
+        }
+        onRefresh();
+      } else {
+        setActionFeedback(`Failed to execute trade: ${data.message || "Unknown error"}`);
+      }
+    } catch (err: any) {
+      setActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsForcingTrade(false);
+    }
+  };
+
+  const handleAutoFixSymbol = async () => {
+    setIsUpdatingContract(true);
+    setActionFeedback(null);
+    try {
+      const res = await fetch(`/api/bots/${bot.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbol: "BTC/USDT",
+          asset_class: "CRYPTO",
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && (data.status === "success" || data.success)) {
+        setActionFeedback("Bot symbol resolved to BTC/USDT successfully!");
+        onRefresh();
+      } else {
+        setActionFeedback(`Failed to update symbol: ${data.message || "Error"}`);
+      }
+    } catch (err: any) {
+      setActionFeedback(`Error: ${err.message}`);
+    } finally {
+      setIsUpdatingContract(false);
     }
   };
 
@@ -184,16 +241,26 @@ export function SimpleBotDetailsDrawer({
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-sans">
-              &apos;{bot.symbol}&apos; is a generic asset category. Select an active dated strike contract from the live chain before starting this bot.
+              &apos;{bot.symbol}&apos; is a generic asset category. Select an active dated strike contract from the live chain or resolve to BTC/USDT.
             </p>
-            <button
-              onClick={() => setIsOptionsModalOpen(true)}
-              disabled={isUpdatingContract}
-              className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{isUpdatingContract ? "Updating..." : "Select Options Contract from Live Chain"}</span>
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setIsOptionsModalOpen(true)}
+                disabled={isUpdatingContract}
+                className="py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95 disabled:opacity-50"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>{isUpdatingContract ? "Updating..." : "Options Chain"}</span>
+              </button>
+              <button
+                onClick={handleAutoFixSymbol}
+                disabled={isUpdatingContract}
+                className="py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(6,182,212,0.3)] active:scale-95 disabled:opacity-50"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Use BTC/USDT</span>
+              </button>
+            </div>
           </div>
         )}
 
@@ -277,6 +344,43 @@ export function SimpleBotDetailsDrawer({
             </span>
           </div>
         </div>
+
+        {/* 2.5 Active Position Management Card */}
+        {pos.has_position && (
+          <div className="p-3.5 bg-emerald-950/20 border border-emerald-500/40 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase">
+                  ACTIVE {pos.direction}
+                </span>
+                <span className="text-xs text-white font-mono font-bold">
+                  {pos.size} {bot.symbol}
+                </span>
+              </div>
+              <span className="text-xs font-mono font-bold text-slate-300">
+                Entry: ${pos.entry_price ? Number(pos.entry_price).toLocaleString("en-US", { minimumFractionDigits: 2 }) : "Market"}
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                onClick={() => handleForceTestTrade("WIN_TP")}
+                disabled={isForcingTrade || isActing}
+                className="py-2 px-3 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(16,185,129,0.3)] active:scale-95 disabled:opacity-50"
+              >
+                <TrendingUp className="w-3.5 h-3.5" />
+                <span>{isForcingTrade ? "Executing..." : "🎯 Take Profit Now (+Win)"}</span>
+              </button>
+              <button
+                onClick={() => handleForceTestTrade("LOSS_SL")}
+                disabled={isForcingTrade || isActing}
+                className="py-2 px-3 rounded-lg bg-rose-600/30 border border-rose-500/50 hover:bg-rose-600/40 text-rose-200 font-bold text-xs transition flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
+              >
+                <Square className="w-3.5 h-3.5" />
+                <span>{isForcingTrade ? "Executing..." : "🛑 Stop Loss Exit (-Loss)"}</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 3. Live Strategy Logic & Indicators */}
         <div className="p-4 bg-slate-900/70 border border-slate-800 rounded-xl space-y-3">
@@ -423,6 +527,33 @@ export function SimpleBotDetailsDrawer({
               >
                 <RotateCcw className="w-4 h-4" />
                 <span>Retry Recovery</span>
+              </button>
+            )}
+
+            {/* Instant Force Test Paper Trade Button */}
+            {!isGenericOptionsCategory && (
+              <button
+                onClick={() => handleForceTestTrade(pos.has_position ? "WIN_TP" : "LONG_ENTRY")}
+                disabled={isForcingTrade || isActing}
+                className={`col-span-2 py-2.5 px-4 rounded-xl border font-black text-xs transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 active:scale-98 ${
+                  pos.has_position
+                    ? "bg-gradient-to-r from-emerald-600/40 to-teal-600/40 border-emerald-400 text-emerald-200 hover:text-white hover:bg-emerald-600/50 shadow-[0_0_15px_rgba(16,185,129,0.2)]"
+                    : "bg-gradient-to-r from-cyan-900/60 to-emerald-900/60 border-cyan-500/40 hover:border-emerald-400 text-cyan-200 hover:text-white"
+                }`}
+                title={pos.has_position ? "Immediately take profit and close open position" : "Immediately place a test entry order"}
+              >
+                {pos.has_position ? (
+                  <TrendingUp className={`w-4 h-4 text-emerald-400 ${isForcingTrade ? "animate-spin" : ""}`} />
+                ) : (
+                  <Zap className={`w-4 h-4 text-amber-400 ${isForcingTrade ? "animate-spin" : ""}`} />
+                )}
+                <span>
+                  {isForcingTrade
+                    ? "Executing..."
+                    : pos.has_position
+                    ? "🎯 Instant Take Profit & Close Trade (+Win)"
+                    : "⚡ Force Test Buy Order (Enter Trade)"}
+                </span>
               </button>
             )}
           </div>

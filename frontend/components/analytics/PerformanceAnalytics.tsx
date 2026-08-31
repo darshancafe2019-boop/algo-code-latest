@@ -131,12 +131,12 @@ export function PerformanceAnalytics() {
   const usedMargin = portfolioSnapshot?.marginUsed ?? 0.0;
   const totalFees = portfolioSnapshot?.fees ?? 0.0;
   const totalFunding = portfolioSnapshot?.funding ?? 0.0;
-  const maxDrawdownPct = portfolioSnapshot?.maxDrawdownPct ?? 2.45;
-  const winRate = portfolioSnapshot?.winRate ?? 64.7;
-  const profitFactor = portfolioSnapshot?.profitFactor ?? 1.85;
-  const totalTrades = portfolioSnapshot?.totalTradesCount ?? 34;
-  const winTrades = portfolioSnapshot?.winningTradesCount ?? 22;
-  const lossTrades = portfolioSnapshot?.losingTradesCount ?? 12;
+  const maxDrawdownPct = portfolioSnapshot?.maxDrawdownPct ?? 0.0;
+  const winRate = portfolioSnapshot?.winRate ?? 0.0;
+  const profitFactor = portfolioSnapshot?.profitFactor ?? 0.0;
+  const totalTrades = portfolioSnapshot?.totalTradesCount ?? 0;
+  const winTrades = portfolioSnapshot?.winningTradesCount ?? 0;
+  const lossTrades = portfolioSnapshot?.losingTradesCount ?? 0;
 
   const netPnlFmt = formatPnL(netPnl, "$");
   const dailyPnlFmt = formatPnL(dailyPnl, "$");

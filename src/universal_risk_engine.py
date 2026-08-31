@@ -314,6 +314,25 @@ def calculate_universal_position_size(
     }
 
 
+def calculate_position_size(
+    account_equity: float = 10000.0,
+    entry_price: float = 65000.0,
+    stop_loss_price: float = 64000.0,
+    risk_pct: float = 2.0,
+    model: str = "percent_equity",
+    **kwargs
+) -> Dict[str, Any]:
+    """Canonical wrapper for calculate_universal_position_size."""
+    return calculate_universal_position_size(
+        account_balance=account_equity,
+        entry_price=entry_price,
+        stop_loss_price=stop_loss_price,
+        method=model.lower(),
+        risk_pct=risk_pct,
+        **kwargs
+    )
+
+
 # =============================================================================
 # 4. FUTURES RISK & MARGIN CALCULATOR
 # =============================================================================

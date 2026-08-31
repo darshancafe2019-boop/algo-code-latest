@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
+import { SelfHealingDashboardWidget } from "@/components/system-health/SelfHealingDashboardWidget";
 
 interface SubsystemInfo {
   status: "HEALTHY" | "WARNING" | "ERROR" | "DISCONNECTED" | "NOT_CONFIGURED" | "ARMED" | "HALTED" | "READY" | "RUNNING" | "IDLE" | "PROTECTED";
@@ -170,6 +171,9 @@ export function SystemHealthHub() {
           <div className="text-[10px] text-slate-400 mt-0.5">Safety Circuit Status</div>
         </div>
       </div>
+
+      {/* Autonomous Self-Healing & Diagnostic Hub */}
+      <SelfHealingDashboardWidget />
 
       {/* 10 Subsystems Grid */}
       <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 space-y-4 shadow-xl">

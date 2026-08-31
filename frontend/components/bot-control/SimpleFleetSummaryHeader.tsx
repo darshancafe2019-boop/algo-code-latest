@@ -125,10 +125,10 @@ export function SimpleFleetSummaryHeader({
             <TrendingUp className={`w-3.5 h-3.5 ${isPnlPositive ? "text-emerald-400" : "text-rose-400"}`} />
           </div>
           <div className={`text-base md:text-lg font-black font-mono ${isPnlPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {isPnlPositive ? "+" : ""}${Math.abs(metrics.today_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {metrics.today_pnl >= 0 ? "+" : "-"}${Math.abs(metrics.today_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </div>
           <div className="text-[10px] text-slate-500 font-sans">
-            Realized: ${metrics.realized_pnl.toFixed(2)}
+            Realized: {metrics.realized_pnl >= 0 ? "+" : "-"}${Math.abs(metrics.realized_pnl).toFixed(2)}
           </div>
         </div>
 

@@ -21,7 +21,7 @@ export function useStockFilters() {
         setFilters(parsed);
       }
     }
-  }, []);
+  }, [searchParams, setFilters]);
 
   // Update URL on filter changes (shallow)
   const applyFilters = (newFilters: Partial<typeof filters>) => {

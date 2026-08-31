@@ -115,13 +115,17 @@ export function RuntimeCommandCenter() {
 
   const availableCommands = [
     { id: "START_ALL_BOTS", label: "START ALL BOTS", desc: "Launch all authorized bot processes", icon: Play },
-    { id: "STOP_ALL_BOTS", label: "STOP ALL BOTS", desc: "Gracefully shut down all running bots", icon: Square },
     { id: "PAUSE_ALL_BOTS", label: "PAUSE ALL BOTS", desc: "Suspend entry signal evaluation", icon: Pause },
     { id: "RESUME_ALL_BOTS", label: "RESUME ALL BOTS", desc: "Re-enable active bot execution cycles", icon: Play },
+    { id: "RESTART_ALL_BOTS", label: "RESTART ALL BOTS", desc: "Restart background bot worker threads", icon: RotateCcw },
+    { id: "STOP_ALL_BOTS", label: "STOP ALL BOTS", desc: "Gracefully shut down all running bots", icon: Square },
+    { id: "SELF_HEAL_FLEET", label: "SELF-HEAL FLEET", desc: "Autonomous self-healing & error resolution pass", icon: Zap },
     { id: "REFRESH_MARKET_DATA", label: "REFRESH MARKET DATA", desc: "Force update live candles & tickers", icon: RefreshCw },
     { id: "RECONCILE_ACCOUNT", label: "RECONCILE ACCOUNT", desc: "Synchronize broker balances & ledger", icon: RotateCcw },
     { id: "SYNC_UNIVERSE", label: "SYNC UNIVERSE MASTER", desc: "Sync 220+ canonical market instruments", icon: Database },
     { id: "CLEAR_CACHE", label: "PURGE CACHE", desc: "Clear in-memory fast session cache", icon: RefreshCw },
+    { id: "RUN_DIAGNOSTICS", label: "RUN DIAGNOSTICS", desc: "Evaluate platform reliability & self-healing telemetry", icon: Activity },
+    { id: "RESET_PAPER_SANDBOX", label: "RESET PAPER SANDBOX", desc: "Reset balances to $10,000 baseline", icon: RotateCcw },
   ];
 
   return (

@@ -206,12 +206,7 @@ except Exception as bp_err:
     logger.warning(f"Notice: Failed registering stocks blueprint: {bp_err}")
 
 @app.route("/health", methods=["GET"])
-@app.route("/health/live", methods=["GET"])
-@app.route("/health/ready", methods=["GET"])
-@app.route("/health/system", methods=["GET"])
 @app.route("/api/health", methods=["GET"])
-@app.route("/api/health/live", methods=["GET"])
-@app.route("/api/health/ready", methods=["GET"])
 def health_check():
     return jsonify({
         "status": "ok",
@@ -1050,39 +1045,51 @@ def api_status():
     heartbeats = safe_query("SELECT timestamp, status, details FROM heartbeat_log ORDER BY id DESC LIMIT 1")
     last_heartbeat = heartbeats[0] if heartbeats else None
 
+    # Fetch Canonical Authoritative Portfolio Snapshot for consistent metrics
+    current_mode = str(request.args.get("mode") or bot_status.get("execution_mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+    try:
+        from src.global_data_engine import GlobalDataEngine
+        snapshot = GlobalDataEngine.get_instance().get_portfolio_snapshot(mode=current_mode)
+    except Exception as gde_err:
+        logger.warning(f"Failed to fetch GlobalDataEngine snapshot for api_status: {gde_err}")
+        snapshot = {}
+
+    bal = float(snapshot.get("cashBalance") or 50000.0 if current_mode == "PAPER" else 10000.0)
+    eq = float(snapshot.get("equity") or bal)
+    todays_pnl = float(snapshot.get("dailyPnl") or 0.0)
+    open_trade_pnl = float(snapshot.get("unrealizedPnl") or 0.0)
+    open_positions_count = int(snapshot.get("openPositions") or 0)
+    net_realized_pnl = float(snapshot.get("netRealizedPnl") or 0.0)
+    total_net_pnl = float(snapshot.get("netPnl") or 0.0)
+
     # Read system health safely
     try:
         hr = safe_query_one("SELECT * FROM system_health ORDER BY rowid DESC LIMIT 1")
     except Exception:
         hr = None
 
+    metrics = {}
     if hr:
-        metrics = {}
         try:
             metrics = json.loads(hr.get("metrics_json") or "{}") if isinstance(hr.get("metrics_json"), str) else (hr.get("metrics_json") or {})
         except Exception:
             metrics = {}
-        bal = float(metrics.get("balance") or hr.get("balance") or 10000.0)
-        eq = float(metrics.get("equity") or hr.get("equity") or bal)
-        health = {
-            "balance": bal,
-            "equity": eq,
-            "open_trade_pnl": round(eq - bal, 2),
-            "internet_connected": bool(metrics.get("internet_connected", hr.get("status") == "HEALTHY" if "status" in hr else True)),
-            "cpu_percent": float(metrics.get("cpu_percent") or 0.0),
-            "ram_mb": float(metrics.get("ram_mb") or 0.0),
-            "latency_ms": float(metrics.get("latency_ms") or 0.0)
-        }
-    else:
-        health = {"balance": 10000.0, "equity": 10000.0, "open_trade_pnl": 0.0, "internet_connected": True}
+
+    health = {
+        "balance": round(bal, 2),
+        "equity": round(eq, 2),
+        "open_trade_pnl": round(open_trade_pnl, 2),
+        "net_realized_pnl": round(net_realized_pnl, 2),
+        "total_net_pnl": round(total_net_pnl, 2),
+        "open_positions_count": open_positions_count,
+        "internet_connected": bool(metrics.get("internet_connected", hr.get("status") == "HEALTHY" if hr and "status" in hr else True)),
+        "cpu_percent": float(metrics.get("cpu_percent") or 0.0),
+        "ram_mb": float(metrics.get("ram_mb") or 0.0),
+        "latency_ms": float(metrics.get("latency_ms") or 0.0)
+    }
 
     # Open trade check for specific bot_id
-    open_trade = safe_query_one("SELECT * FROM trades_log WHERE bot_id = ? AND status = 'OPEN' ORDER BY id DESC LIMIT 1", (bot_id_arg,))
-
-    # Today's realized PnL
-    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-    todays_trades = safe_query("SELECT result_pnl FROM trades_log WHERE status='CLOSED' AND exit_timestamp LIKE ?", (f"{today_str}%",))
-    todays_pnl = sum(float(t.get("result_pnl") or 0.0) for t in todays_trades)
+    open_trade = safe_query_one("SELECT * FROM trades_log WHERE bot_id = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL') ORDER BY id DESC LIMIT 1", (bot_id_arg,))
 
     # Aggregate system summary across all active bot instances
     all_bots = safe_query("SELECT status FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
@@ -1117,18 +1124,12 @@ def api_status():
         "error_count": error_cnt,
         "kill_switch_active": kill_switch_active,
         "system_state": system_state,
-        "headline": headline
+        "headline": headline,
+        "open_positions_count": open_positions_count
     }
 
-    # Open positions across system
-    open_positions_rows = safe_query("SELECT id FROM trades_log WHERE status = 'OPEN'")
-    open_positions_count = len(open_positions_rows)
-    health["open_positions_count"] = open_positions_count
-    system_summary["open_positions_count"] = open_positions_count
-
     # Today's realized PnL and percentage calculation
-    balance_val = float(health.get("balance") or 10000.0)
-    todays_pnl_pct = (todays_pnl / balance_val * 100.0) if balance_val > 0 else 0.0
+    todays_pnl_pct = (todays_pnl / bal * 100.0) if bal > 0 else 0.0
 
     # Risk gate status derivation
     if kill_switch_active:
@@ -1162,12 +1163,14 @@ def api_status():
         "open_positions_count": open_positions_count,
         "last_signal": last_signal,
         "todays_pnl": todays_pnl,
-        "todays_pnl_pct": todays_pnl_pct,
+        "todays_pnl_pct": round(todays_pnl_pct, 2),
+        "net_realized_pnl": net_realized_pnl,
+        "total_net_pnl": total_net_pnl,
         "risk_status": risk_status,
         "system_summary": system_summary,
         "symbol": target_sym,
         "timeframe": bot_status.get("timeframe", config.TIMEFRAME),
-        "trading_mode": bot_status.get("execution_mode", config.TRADING_MODE),
+        "trading_mode": current_mode,
         "live_price": live_price,
         "allow_shorts": config.ALLOW_SHORTS,
         "last_updated": datetime.now(timezone.utc).isoformat()
@@ -5129,6 +5132,121 @@ def api_execute_command():
     )
     http_code = 200 if result.get("success") else 400
     return jsonify(result), http_code
+
+
+# ============================================================================
+# AUTONOMOUS SELF-HEALING & BOT COPILOT REST ENDPOINTS
+# ============================================================================
+
+@app.route("/api/self-healing/status", methods=["GET"])
+def api_self_healing_status():
+    """Telemetry, active incidents, auto-resolved count, MTTR, and learned patterns."""
+    from src.autonomous_repair_engine import global_autonomous_repair_engine
+    return jsonify(global_autonomous_repair_engine.get_healing_telemetry())
+
+
+@app.route("/api/self-healing/auto-resolve", methods=["POST"])
+def api_self_healing_auto_resolve():
+    """Triggers an instant autonomous self-healing pass across all platform pipelines."""
+    from src.autonomous_repair_engine import global_autonomous_repair_engine
+    res = global_autonomous_repair_engine.auto_heal_all_subsystems()
+    return jsonify(res)
+
+
+@app.route("/api/self-healing/learning-ledger", methods=["GET"])
+def api_self_healing_learning_ledger():
+    """Returns persistent learning ledger data and error patterns."""
+    from src.autonomous_repair_engine import global_autonomous_repair_engine
+    telemetry = global_autonomous_repair_engine.get_healing_telemetry()
+    return jsonify({
+        "status": "success",
+        "learning_ledger": telemetry.get("learned_patterns", []),
+        "recent_events": telemetry.get("recent_events", [])
+    })
+
+
+@app.route("/api/bot-copilot/query", methods=["POST"])
+def api_bot_copilot_query():
+    """Natural Language Bot Assistant & Command Copilot NLP processor."""
+    data = request.get_json(silent=True) or {}
+    query_text = (data.get("query") or "").strip().lower()
+
+    if not query_text:
+        return jsonify({"success": False, "message": "Query text cannot be empty."}), 400
+
+    # 1. Natural Language Command Intent Classification
+    action = None
+    bot_id = data.get("bot_id")
+    payload = data.get("payload", {})
+    explanation = ""
+
+    if "health" in query_text or "status" in query_text:
+        action = "CHECK_HEALTH"
+        explanation = "Retrieving authoritative health telemetry."
+    elif "start all" in query_text or "launch all" in query_text or "run all" in query_text:
+        action = "START_ALL_BOTS"
+        explanation = "Broadcasting start signal to all eligible bot instances."
+    elif "pause all" in query_text or "pause fleet" in query_text:
+        action = "PAUSE_ALL_BOTS"
+        explanation = "Pausing signal processing across all active bot instances."
+    elif "resume all" in query_text:
+        action = "RESUME_ALL_BOTS"
+        explanation = "Resuming execution cycles across all paused bot instances."
+    elif "restart all" in query_text or "reboot all" in query_text:
+        action = "RESTART_ALL_BOTS"
+        explanation = "Restarting background runner processes for all bots."
+    elif "stop all" in query_text:
+        action = "STOP_ALL_BOTS"
+        explanation = "Gracefully stopping all running bot workers."
+    elif "kill" in query_text or "halt" in query_text or "emergency" in query_text:
+        action = "ACTIVATE_KILL_SWITCH"
+        explanation = "Engaging global emergency kill switch and locking trade execution pipeline."
+    elif "fix" in query_text or "heal" in query_text or "repair" in query_text or "solve" in query_text or "resolve" in query_text:
+        action = "SELF_HEAL_FLEET"
+        explanation = "Executing autonomous self-healing pass across all subsystems."
+    elif "clear cache" in query_text or "purge cache" in query_text or "reset cache" in query_text:
+        action = "CLEAR_CACHE"
+        explanation = "Purging memory cache and resynchronizing market universe."
+    elif "reconcile" in query_text or "ledger" in query_text:
+        action = "RECONCILE_ACCOUNT"
+        explanation = "Reconciling broker balances, open orders, and trade ledger."
+    elif "refresh market" in query_text or "sync universe" in query_text:
+        action = "REFRESH_MARKET_DATA"
+        explanation = "Refreshing market data feeds and syncing canonical universe."
+    elif "conservative" in query_text:
+        action = "APPLY_RISK_PROFILE"
+        payload = {"profile_name": "CONSERVATIVE"}
+        explanation = "Applying Conservative Risk Profile across risk engines."
+    elif "aggressive" in query_text:
+        action = "APPLY_RISK_PROFILE"
+        payload = {"profile_name": "AGGRESSIVE"}
+        explanation = "Applying Aggressive Risk Profile across risk engines."
+    elif "moderate" in query_text or "balanced" in query_text:
+        action = "APPLY_RISK_PROFILE"
+        payload = {"profile_name": "MODERATE"}
+        explanation = "Applying Moderate Risk Profile across risk engines."
+    elif "diagnos" in query_text or "telemetry" in query_text:
+        action = "RUN_DIAGNOSTICS"
+        explanation = "Computing platform reliability and error resolution diagnostics."
+    else:
+        action = "RUN_DIAGNOSTICS"
+        explanation = f"Analyzed request '{query_text}'. Executing platform diagnostics."
+
+    # 2. Execute via authoritative CommandBus
+    exec_res = command_bus.execute(
+        action=action,
+        bot_id=bot_id,
+        payload=payload,
+        user="BotCopilot/AI"
+    )
+
+    return jsonify({
+        "success": exec_res.get("success", True),
+        "action": action,
+        "explanation": explanation,
+        "command_result": exec_res,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
 
 
 @app.route("/health/live", methods=["GET"])
@@ -13605,6 +13723,126 @@ def api_delta_options_stream():
                 time.sleep(2.0)
 
     return Response(event_stream(), mimetype="text/event-stream")
+
+
+# ============================================================================
+# DELTA EXCHANGE INTEGRATION & BROKER ENDPOINTS
+# ============================================================================
+@app.route("/api/delta/status", methods=["GET"])
+def api_delta_status():
+    """Returns authoritative Delta Exchange connection status and capabilities."""
+    try:
+        from src.delta_exchange_adapter import global_delta_adapter
+        status_data = global_delta_adapter.get_connection_status()
+        return jsonify(status_data), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/status: {e}")
+        return jsonify({
+            "status": "ERROR",
+            "connected": False,
+            "broker": "DELTA_EXCHANGE",
+            "message": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), 500
+
+
+@app.route("/api/delta/ping", methods=["POST", "GET"])
+def api_delta_ping():
+    """Executes real-time ping diagnostic against Delta Exchange."""
+    try:
+        from src.delta_exchange_adapter import global_delta_adapter
+        ping_res = global_delta_adapter.ping()
+        return jsonify(ping_res), 200
+    except Exception as e:
+        logger.error(f"Error in POST /api/delta/ping: {e}")
+        return jsonify({
+            "status": "ERROR",
+            "connected": False,
+            "message": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), 500
+
+
+@app.route("/api/delta/wallet", methods=["GET"])
+def api_delta_wallet():
+    """Returns Delta Exchange account wallet balances."""
+    try:
+        from src.delta_exchange_adapter import global_delta_adapter
+        wallet_res = global_delta_adapter.get_wallet_balances()
+        return jsonify(wallet_res), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/wallet: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/delta/positions", methods=["GET"])
+def api_delta_positions():
+    """Returns active Delta Exchange futures and options positions."""
+    try:
+        from src.delta_exchange_adapter import global_delta_adapter
+        positions = global_delta_adapter.get_positions()
+        return jsonify({"success": True, "positions": positions}), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/positions: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/delta/contracts", methods=["GET"])
+def api_delta_contracts():
+    """Returns product catalogue of active contracts."""
+    try:
+        from src.delta_exchange_adapter import global_delta_adapter
+        contract_type = request.args.get("type", "perpetual_futures")
+        products = global_delta_adapter.get_products(contract_types=contract_type)
+        return jsonify({"success": True, "products": products, "count": len(products)}), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/contracts: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/delta/credentials", methods=["POST"])
+def api_delta_save_credentials():
+    """Securely stores encrypted Delta Exchange API keys."""
+    try:
+        from src.secrets_manager import SecretsManager
+        from src.delta_exchange_adapter import global_delta_adapter
+        data = request.get_json() or {}
+        api_key = data.get("api_key", "").strip()
+        secret_key = data.get("secret_key", "").strip()
+        is_india = bool(data.get("is_india", True))
+
+        if not api_key or not secret_key:
+            return jsonify({"success": False, "message": "API Key and Secret Key are required."}), 400
+
+        sm = SecretsManager()
+        provider_id = "delta_india" if is_india else "delta_global"
+        account_name = "Delta Exchange India" if is_india else "Delta Exchange Global"
+
+        res = sm.store_credential(
+            provider_id=provider_id,
+            account_name=account_name,
+            api_key=api_key,
+            secret_key=secret_key,
+            allow_read=True,
+            allow_trade=True,
+            allow_withdraw=False
+        )
+
+        global_delta_adapter.api_key = api_key
+        global_delta_adapter.api_secret = secret_key
+        global_delta_adapter.is_india = is_india
+        global_delta_adapter.base_url = (
+            global_delta_adapter.DELTA_INDIA_BASE if is_india else global_delta_adapter.DELTA_GLOBAL_BASE
+        )
+
+        return jsonify({
+            "success": True,
+            "message": f"Credentials for {account_name} securely saved and encrypted.",
+            "credential": res
+        }), 200
+    except Exception as e:
+        logger.error(f"Error in POST /api/delta/credentials: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 # ============================================================================

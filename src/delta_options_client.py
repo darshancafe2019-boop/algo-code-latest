@@ -8,6 +8,8 @@ and contract specifications with Decimal precision and circuit-breaker protectio
 
 import time
 import json
+import hmac
+import hashlib
 import logging
 import urllib.request
 import urllib.error
@@ -144,6 +146,16 @@ class DeltaOptionsClient:
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
+
+        if self.api_key and self.api_secret:
+            timestamp_str = str(int(time.time()))
+            query_or_body = query_str if method.upper() == "GET" else ""
+            msg = method.upper() + timestamp_str + clean_endpoint + query_or_body
+            sig = hmac.new(self.api_secret.encode("utf-8"), msg.encode("utf-8"), hashlib.sha256).hexdigest()
+            req_headers["api-key"] = self.api_key
+            req_headers["timestamp"] = timestamp_str
+            req_headers["signature"] = sig
+
         if headers:
             req_headers.update(headers)
 

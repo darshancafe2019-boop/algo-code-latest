@@ -33,6 +33,7 @@ import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
+import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
 
 interface TickerData {
   symbol: string;
@@ -62,7 +63,7 @@ export function Navbar({
   const { openAppearanceDrawer, config: themeConfig } = useTheme();
   const [activateSuccess, setActivateSuccess] = useState(false);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
-
+  const [isBotAssistantOpen, setIsBotAssistantOpen] = useState(false);
   const [isMarketAnalystOpen, setIsMarketAnalystOpen] = useState(false);
   const [ticker, setTicker] = useState<TickerData>({
     symbol: activeSymbol || "BTC/USDT",
@@ -234,6 +235,19 @@ export function Navbar({
 
         {/* Right Top Action Buttons */}
         <div className="flex items-center gap-2">
+          {/* AI Bot Copilot & Self-Healing Trigger */}
+          <button
+            onClick={() => setIsBotAssistantOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition shadow-md shadow-cyan-950/40"
+            title="Open AI Bot Copilot & Autonomous Resolver (Ctrl+J / Cmd+J)"
+          >
+            <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
+            <span className="hidden sm:inline">Bot Copilot</span>
+            <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
+              Ctrl+J
+            </kbd>
+          </button>
+
           {/* Market Analyst Copilot Quick Trigger */}
           <button
             onClick={() => setIsMarketAnalystOpen(true)}
@@ -251,7 +265,7 @@ export function Navbar({
           <button
             onClick={() => onOpenCommandPalette?.()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition"
-            title="Open Command Palette"
+            title="Open Command Palette (Ctrl+K)"
           >
             <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
             <span className="hidden sm:inline">Commands</span>
@@ -356,6 +370,12 @@ export function Navbar({
         symbol={ticker?.symbol || activeSymbol || "BTC/USDT"}
         assetClass="crypto"
         exchange="binance"
+      />
+
+      {/* AI Bot Copilot & Self-Healing Modal */}
+      <BotAssistantModal
+        isOpen={isBotAssistantOpen}
+        onClose={() => setIsBotAssistantOpen(false)}
       />
     </header>
   );

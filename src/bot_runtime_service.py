@@ -135,7 +135,14 @@ class BotRuntimeService:
         raw_bots = [dict(r) for r in c.fetchall()]
 
         # 2. Pre-fetch closed trades for exact bot_id P&L attribution
-        c.execute("SELECT bot_id, result_pnl, timestamp FROM trades_log WHERE status = 'CLOSED'")
+        c.execute("""
+            SELECT bot_id, 
+                   COALESCE(net_pnl, realized_pnl, result_pnl, 0.0) as final_pnl,
+                   COALESCE(gross_pnl, net_pnl, realized_pnl, result_pnl, 0.0) as gross_val,
+                   exit_timestamp, timestamp 
+            FROM trades_log 
+            WHERE status IN ('CLOSED', 'FILLED')
+        """)
         closed_trades = [dict(r) for r in c.fetchall()]
 
         # 3. Pre-fetch open positions
@@ -149,24 +156,26 @@ class BotRuntimeService:
         # 4. Pre-fetch active open trades
         open_trades = []
         try:
-            c.execute("SELECT * FROM trades_log WHERE status = 'OPEN'")
+            c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL')")
             open_trades = [dict(r) for r in c.fetchall()]
         except Exception:
             open_trades = []
 
         conn.close()
 
-        # Map closed trades by bot_id
-        today_utc_prefix = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Map closed trades by bot_id with robust timezone handling
+        now_dt = datetime.now(timezone.utc)
+        today_start_iso = now_dt.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+        today_utc_prefix = now_dt.strftime("%Y-%m-%d")
         bot_pnl_map: Dict[str, Dict[str, float]] = {}
         for t in closed_trades:
             bid = t.get("bot_id") or "system"
             if bid not in bot_pnl_map:
                 bot_pnl_map[bid] = {"realized": 0.0, "today": 0.0}
-            pnl_val = float(t.get("result_pnl") or 0.0)
+            pnl_val = float(t.get("final_pnl") if t.get("final_pnl") is not None else 0.0)
             bot_pnl_map[bid]["realized"] += pnl_val
-            ts = t.get("timestamp") or ""
-            if ts.startswith(today_utc_prefix):
+            ts = t.get("exit_timestamp") or t.get("timestamp") or ""
+            if ts.startswith(today_utc_prefix) or ts >= today_start_iso:
                 bot_pnl_map[bid]["today"] += pnl_val
 
         # Map open positions/trades by bot_id

@@ -42,6 +42,7 @@ export async function GET(req: NextRequest) {
       try {
         const backendRes = await fetch(`${BACKEND_INTERNAL_URL}/api/upstox/status`, {
           cache: "no-store",
+          signal: AbortSignal.timeout(3000),
         });
         if (backendRes.ok) {
           backendInfo = await backendRes.json();

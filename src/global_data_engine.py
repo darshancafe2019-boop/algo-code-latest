@@ -581,6 +581,23 @@ class GlobalDataEngine:
         max_drawdown_amt = 0.0
         max_drawdown_pct = 0.0
 
+        # Filter trades by time boundaries
+        filtered_trades = []
+        for t in raw_trades:
+            ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at")
+            if ts_str and (start_cutoff or end_cutoff):
+                try:
+                    t_dt = datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+                    if t_dt.tzinfo is None:
+                        t_dt = t_dt.replace(tzinfo=timezone.utc)
+                    if start_cutoff and t_dt < start_cutoff:
+                        continue
+                    if end_cutoff and t_dt > end_cutoff:
+                        continue
+                except Exception:
+                    pass
+            filtered_trades.append(t)
+
         for t in filtered_trades:
             pnl = float(t.get("net_pnl") or t.get("realized_pnl") or 0.0)
             fee = float(t.get("fees") or 0.0)

@@ -193,6 +193,7 @@ export function OrderExecutionCenter({
       queryClient.invalidateQueries({ queryKey: ["tradesList"] });
       queryClient.invalidateQueries({ queryKey: ["terminalPositions"] });
       queryClient.invalidateQueries({ queryKey: ["accountSummary"] });
+      refreshAll();
     },
     onError: (err: Error) => {
       setOrderFeedback({
@@ -200,6 +201,7 @@ export function OrderExecutionCenter({
         message: `Execution Blocked: ${err.message}`,
       });
       setIsPreviewOpen(false);
+      refreshAll();
     },
   });
 
@@ -215,6 +217,7 @@ export function OrderExecutionCenter({
       });
       queryClient.invalidateQueries({ queryKey: ["tradesList"] });
       queryClient.invalidateQueries({ queryKey: ["terminalPositions"] });
+      refreshAll();
     },
   });
 

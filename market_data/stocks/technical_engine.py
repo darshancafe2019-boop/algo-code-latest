@@ -6,7 +6,7 @@ RSI (14), EMA (20, 50, 200), MACD (12, 26, 9), ATR (14), VWAP, Bollinger Bands,
 Pivot Levels (R1, R2, S1, S2), Breakouts & Breakdowns.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 import math
 from market_data.stocks.models import StockTechnicals

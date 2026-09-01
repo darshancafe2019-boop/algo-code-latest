@@ -46,6 +46,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   const [marketPrice, setMarketPrice] = useState(65240.0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isPriceLoading, setIsPriceLoading] = useState(false);
 
   // 2. Order Parameters State
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
@@ -75,8 +76,52 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
   // 7. Modal & Execution State
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [executionState, setExecutionState] = useState<"READY" | "EXECUTING" | "SUCCESS" | "FAILED" | "UNKNOWN">("READY");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [orderFeedback, setOrderFeedback] = useState<{ status: "success" | "error"; message: string } | null>(null);
+  const [orderFeedback, setOrderFeedback] = useState<{ status: "success" | "error" | "unknown"; message: string } | null>(null);
+  const [lastExecutedOrder, setLastExecutedOrder] = useState<{
+    orderId: string;
+    tradeId?: string | number;
+    symbol: string;
+    side: string;
+    quantity: number;
+    orderType: string;
+    executionPrice: number;
+    status: string;
+    timestamp: string;
+    mode: string;
+  } | null>(null);
+
+  // Fetch live market price for selected symbol
+  useEffect(() => {
+    let isMounted = true;
+    const fetchLivePrice = async () => {
+      try {
+        setIsPriceLoading(true);
+        const res = await fetch(`/api/ticker?symbol=${encodeURIComponent(selectedSymbol)}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        const p = Number(data.last || data.price || data.close || 0);
+        if (p > 0 && isMounted) {
+          setMarketPrice(p);
+          if (orderType === "MARKET") {
+            setLimitPrice(p);
+          }
+        }
+      } catch {
+        // Fallback gracefully to existing price
+      } finally {
+        if (isMounted) setIsPriceLoading(false);
+      }
+    };
+
+    fetchLivePrice();
+    const interval = setInterval(fetchLivePrice, 4000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [selectedSymbol, orderType]);
 
   // Sync price when instrument changes
   const handleSelectInstrument = (inst: { symbol: string; price: number }) => {
@@ -151,27 +196,35 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   }, [isKillSwitchActive, isMarginOK, requiredMargin, availableCapital]);
 
   // Order Placement
-  const handleExecuteOrder = async () => {
+  const handleExecuteOrder = async (overrideSide?: "BUY" | "SELL") => {
     if (isSubmitting) return;
+    const targetSide = overrideSide || side;
+
     if (!riskCheck.passed) {
       setOrderFeedback({ status: "error", message: riskCheck.reason });
       setIsReviewModalOpen(false);
+      setExecutionState("FAILED");
       return;
     }
 
     setIsSubmitting(true);
+    setExecutionState("EXECUTING");
     setOrderFeedback(null);
 
     const idempotencyKey = `ORD_IDEM_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           symbol: selectedSymbol,
-          direction: side,
-          side: side,
+          direction: targetSide,
+          side: targetSide,
           quantity: effectiveQty,
           order_type: orderType,
           price: orderType === "LIMIT" ? limitPrice : undefined,
@@ -184,25 +237,55 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         }),
       });
 
+      clearTimeout(timeoutId);
+
       const data = await res.json();
       if (!res.ok || !data.success) {
+        setExecutionState("FAILED");
         throw new Error(data.message || data.error || "Order execution rejected by risk engine.");
       }
 
+      setExecutionState("SUCCESS");
+      const orderId = String(data.order_id || data.id || idempotencyKey.substring(9));
+      const fillPrice = Number(data.fill_price || activePrice);
+
+      setLastExecutedOrder({
+        orderId,
+        tradeId: data.trade_id,
+        symbol: selectedSymbol,
+        side: targetSide,
+        quantity: effectiveQty,
+        orderType,
+        executionPrice: fillPrice,
+        status: "FILLED",
+        timestamp: new Date().toLocaleTimeString(),
+        mode: tradingMode,
+      });
+
       setOrderFeedback({
         status: "success",
-        message: data.message || `Order for ${effectiveQty} ${selectedSymbol} executed successfully!`,
+        message: data.message || `${tradingMode} ${targetSide} order for ${effectiveQty} ${selectedSymbol} FILLED @ $${fillPrice.toLocaleString()}!`,
       });
 
       setIsReviewModalOpen(false);
       await refreshAll();
 
       setTimeout(() => {
-        setOrderFeedback(null);
-      }, 4000);
+        setExecutionState("READY");
+      }, 5000);
     } catch (err: any) {
-      setOrderFeedback({ status: "error", message: err.message || "Order placement failed." });
+      if (err.name === "AbortError") {
+        setExecutionState("UNKNOWN");
+        setOrderFeedback({
+          status: "unknown",
+          message: "ORDER STATUS UNKNOWN: Server request timed out. Do not submit duplicate orders without checking open orders ledger.",
+        });
+      } else {
+        setExecutionState("FAILED");
+        setOrderFeedback({ status: "error", message: err.message || "Order placement failed." });
+      }
       setIsReviewModalOpen(false);
+      await refreshAll();
     } finally {
       setIsSubmitting(false);
     }
@@ -570,6 +653,8 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 animate-in fade-in duration-150 ${
             orderFeedback.status === "success"
               ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300"
+              : orderFeedback.status === "unknown"
+              ? "bg-amber-950/80 border-amber-500/40 text-amber-300"
               : "bg-rose-950/80 border-rose-500/40 text-rose-300"
           }`}
         >
@@ -587,28 +672,103 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         </div>
       )}
 
-      {/* 9. Action Submit Button (Opens Review Modal) */}
-      <button
-        type="button"
-        disabled={!riskCheck.passed || isSubmitting}
-        onClick={() => setIsReviewModalOpen(true)}
-        className={`w-full py-3.5 px-4 rounded-xl font-black font-mono text-sm tracking-wide transition flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed ${
-          isBuy
-            ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
-            : "bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20"
-        }`}
-      >
-        <Zap className="w-4 h-4" />
-        <span>
-          REVIEW {tradingMode} ORDER ({isBuy ? "BUY" : "SELL"} {effectiveQty} {selectedSymbol.split("/")[0]} @ ${activePrice.toLocaleString()})
-        </span>
-      </button>
+      {/* Post-Execution Transaction Summary */}
+      {lastExecutedOrder && (
+        <div className="p-3 bg-slate-950/90 border border-cyan-500/30 rounded-xl space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+            <span className="text-[11px] font-extrabold text-cyan-400">LAST EXECUTED TRANSACTION</span>
+            <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20">
+              {lastExecutedOrder.mode} • {lastExecutedOrder.status}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
+            <div>
+              <span className="text-slate-500 block">Order ID</span>
+              <span className="text-slate-200 font-bold font-mono truncate block">#{lastExecutedOrder.orderId}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Execution</span>
+              <span className={`font-bold ${lastExecutedOrder.side === "BUY" ? "text-emerald-400" : "text-rose-400"}`}>
+                {lastExecutedOrder.side} {lastExecutedOrder.quantity} {lastExecutedOrder.symbol.split("/")[0]}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Fill Price</span>
+              <span className="text-white font-bold">${lastExecutedOrder.executionPrice.toLocaleString()}</span>
+            </div>
+            <div>
+              <span className="text-slate-500 block">Timestamp</span>
+              <span className="text-slate-300">{lastExecutedOrder.timestamp}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 9. Action Buttons with Execution State Machine */}
+      <div className="space-y-2 pt-1">
+        <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
+          <span>Execution Engine State:</span>
+          <span
+            className={`font-black px-2 py-0.5 rounded text-[10px] tracking-wider ${
+              executionState === "EXECUTING"
+                ? "bg-amber-500/20 text-amber-300 animate-pulse border border-amber-500/30"
+                : executionState === "SUCCESS"
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : executionState === "FAILED"
+                ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                : executionState === "UNKNOWN"
+                ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
+                : "bg-slate-800 text-slate-300"
+            }`}
+          >
+            ● {executionState}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          {/* Quick BUY Button */}
+          <button
+            type="button"
+            disabled={!riskCheck.passed || isSubmitting}
+            onClick={() => handleExecuteOrder("BUY")}
+            className="py-3 px-3 rounded-xl font-black font-mono text-xs tracking-wide transition flex items-center justify-center gap-1.5 shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>
+              {isSubmitting && side === "BUY" ? "EXECUTING BUY..." : `BUY ${effectiveQty} ${selectedSymbol.split("/")[0]}`}
+            </span>
+          </button>
+
+          {/* Quick SELL Button */}
+          <button
+            type="button"
+            disabled={!riskCheck.passed || isSubmitting}
+            onClick={() => handleExecuteOrder("SELL")}
+            className="py-3 px-3 rounded-xl font-black font-mono text-xs tracking-wide transition flex items-center justify-center gap-1.5 shadow-lg bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Zap className="w-3.5 h-3.5" />
+            <span>
+              {isSubmitting && side === "SELL" ? "EXECUTING SELL..." : `SELL ${effectiveQty} ${selectedSymbol.split("/")[0]}`}
+            </span>
+          </button>
+        </div>
+
+        {/* Detailed Review Order Button */}
+        <button
+          type="button"
+          disabled={!riskCheck.passed || isSubmitting}
+          onClick={() => setIsReviewModalOpen(true)}
+          className="w-full py-2 px-3 rounded-xl font-bold font-mono text-xs text-slate-300 bg-slate-900 border border-slate-700 hover:bg-slate-800 hover:text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <span>REVIEW & CUSTOMIZE ORDER DETAILS</span>
+        </button>
+      </div>
 
       {/* Confirmation Review Modal */}
       <OrderReviewConfirmationModal
         isOpen={isReviewModalOpen}
         onClose={() => setIsReviewModalOpen(false)}
-        onConfirm={handleExecuteOrder}
+        onConfirm={() => handleExecuteOrder()}
         isSubmitting={isSubmitting}
         mode={tradingMode}
         symbol={selectedSymbol}

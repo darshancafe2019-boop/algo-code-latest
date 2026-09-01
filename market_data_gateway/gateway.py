@@ -32,6 +32,7 @@ from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
+from market_data_gateway.adapters.alphavantage import AlphaVantageAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
@@ -59,6 +60,7 @@ class MarketDataGateway:
             "delta_options_ws": DeltaOptionsWSAdapter(),
             "upstox_ws": UpstoxWSAdapter(),
             "angelone": AngelOneAdapter(),
+            "alpha_vantage": AlphaVantageAdapter(),
             "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
             # Stub adapters for providers that need credentials
             "twelve_data": NotConfiguredAdapter(

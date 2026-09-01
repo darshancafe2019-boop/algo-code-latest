@@ -5,7 +5,7 @@ Maintains a single source of truth for all configured data sources,
 preventing requests for unsupported features (e.g. asking for NSE fundamentals from Binance).
 """
 
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from market_data.common.provider_interfaces import ProviderCapability, ProviderMetadata, BaseMarketDataProvider
 
 

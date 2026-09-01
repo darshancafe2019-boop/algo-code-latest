@@ -13,9 +13,9 @@ import { apiClient } from "@/lib/apiClient";
 export interface NormalizedUnderlying {
   symbol: string;
   name: string;
-  market: "India" | "Global" | "Crypto";
+  market: "India" | "Global" | "Crypto" | "Commodities";
   exchange: string;
-  assetClass: "INDEX" | "STOCK" | "ETF" | "CRYPTO_PERP";
+  assetClass: "INDEX" | "STOCK" | "ETF" | "CRYPTO_PERP" | "COMMODITY";
   spotPrice: number;
   step: number;
   lotSize: number;
@@ -25,29 +25,37 @@ export interface NormalizedUnderlying {
 }
 
 export const CANONICAL_UNDERLYINGS: NormalizedUnderlying[] = [
-  // India (NSE / BSE)
-  { symbol: "NIFTY", name: "NIFTY 50", market: "India", exchange: "NSE", assetClass: "INDEX", spotPrice: 24800.0, step: 50, lotSize: 25, multiplier: 25, currency: "INR", currencySymbol: "₹" },
-  { symbol: "BANKNIFTY", name: "BANK NIFTY", market: "India", exchange: "NSE", assetClass: "INDEX", spotPrice: 51200.0, step: 100, lotSize: 15, multiplier: 15, currency: "INR", currencySymbol: "₹" },
-  { symbol: "FINNIFTY", name: "FINNIFTY", market: "India", exchange: "NSE", assetClass: "INDEX", spotPrice: 23600.0, step: 50, lotSize: 40, multiplier: 40, currency: "INR", currencySymbol: "₹" },
-  { symbol: "MIDCPNIFTY", name: "NIFTY MIDCAP", market: "India", exchange: "NSE", assetClass: "INDEX", spotPrice: 12850.0, step: 25, lotSize: 75, multiplier: 75, currency: "INR", currencySymbol: "₹" },
-  { symbol: "SENSEX", name: "BSE SENSEX", market: "India", exchange: "BSE", assetClass: "INDEX", spotPrice: 79800.0, step: 100, lotSize: 10, multiplier: 10, currency: "INR", currencySymbol: "₹" },
-  { symbol: "RELIANCE", name: "Reliance Industries", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 2980.0, step: 20, lotSize: 250, multiplier: 250, currency: "INR", currencySymbol: "₹" },
-  { symbol: "TCS", name: "Tata Consultancy Services", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 4190.0, step: 20, lotSize: 175, multiplier: 175, currency: "INR", currencySymbol: "₹" },
-  { symbol: "HDFCBANK", name: "HDFC Bank", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1640.0, step: 10, lotSize: 550, multiplier: 550, currency: "INR", currencySymbol: "₹" },
-  { symbol: "ICICIBANK", name: "ICICI Bank", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1150.0, step: 10, lotSize: 700, multiplier: 700, currency: "INR", currencySymbol: "₹" },
-  { symbol: "INFY", name: "Infosys Ltd", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1820.0, step: 10, lotSize: 400, multiplier: 400, currency: "INR", currencySymbol: "₹" },
+  // India (NSE / BSE / Upstox)
+  { symbol: "NIFTY", name: "NIFTY 50 Index Options", market: "India", exchange: "NSE / Upstox", assetClass: "INDEX", spotPrice: 24800.0, step: 50, lotSize: 25, multiplier: 25, currency: "INR", currencySymbol: "₹" },
+  { symbol: "BANKNIFTY", name: "BANK NIFTY Index Options", market: "India", exchange: "NSE / Upstox", assetClass: "INDEX", spotPrice: 51200.0, step: 100, lotSize: 15, multiplier: 15, currency: "INR", currencySymbol: "₹" },
+  { symbol: "FINNIFTY", name: "FINNIFTY Index Options", market: "India", exchange: "NSE / Upstox", assetClass: "INDEX", spotPrice: 23600.0, step: 50, lotSize: 40, multiplier: 40, currency: "INR", currencySymbol: "₹" },
+  { symbol: "MIDCPNIFTY", name: "NIFTY MIDCAP Options", market: "India", exchange: "NSE / Upstox", assetClass: "INDEX", spotPrice: 12850.0, step: 25, lotSize: 75, multiplier: 75, currency: "INR", currencySymbol: "₹" },
+  { symbol: "SENSEX", name: "BSE SENSEX Options", market: "India", exchange: "BSE", assetClass: "INDEX", spotPrice: 79800.0, step: 100, lotSize: 10, multiplier: 10, currency: "INR", currencySymbol: "₹" },
+  { symbol: "RELIANCE", name: "Reliance Industries Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 2980.0, step: 20, lotSize: 250, multiplier: 250, currency: "INR", currencySymbol: "₹" },
+  { symbol: "TCS", name: "Tata Consultancy Services Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 4190.0, step: 20, lotSize: 175, multiplier: 175, currency: "INR", currencySymbol: "₹" },
+  { symbol: "HDFCBANK", name: "HDFC Bank Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1640.0, step: 10, lotSize: 550, multiplier: 550, currency: "INR", currencySymbol: "₹" },
+  { symbol: "ICICIBANK", name: "ICICI Bank Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1150.0, step: 10, lotSize: 700, multiplier: 700, currency: "INR", currencySymbol: "₹" },
+  { symbol: "INFY", name: "Infosys Ltd Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1820.0, step: 10, lotSize: 400, multiplier: 400, currency: "INR", currencySymbol: "₹" },
 
-  // Global (US / CBOE / NASDAQ)
-  { symbol: "SPY", name: "SPDR S&P 500 ETF", market: "Global", exchange: "NYSE", assetClass: "ETF", spotPrice: 562.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "QQQ", name: "Invesco QQQ Trust", market: "Global", exchange: "NASDAQ", assetClass: "ETF", spotPrice: 485.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "AAPL", name: "Apple Inc.", market: "Global", exchange: "NASDAQ", assetClass: "STOCK", spotPrice: 228.0, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "NVDA", name: "NVIDIA Corp.", market: "Global", exchange: "NASDAQ", assetClass: "STOCK", spotPrice: 125.5, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "TSLA", name: "Tesla Inc.", market: "Global", exchange: "NASDAQ", assetClass: "STOCK", spotPrice: 215.0, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  // Global / US (Alpha Vantage / CBOE / NASDAQ / OPRA)
+  { symbol: "SPY", name: "SPDR S&P 500 ETF Options", market: "Global", exchange: "NYSE / Alpha Vantage", assetClass: "ETF", spotPrice: 562.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "QQQ", name: "Invesco QQQ Trust Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "ETF", spotPrice: 485.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "AAPL", name: "Apple Inc. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 316.85, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "NVDA", name: "NVIDIA Corp. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 125.5, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "MSFT", name: "Microsoft Corp. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 418.2, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "TSLA", name: "Tesla Inc. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 215.0, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
 
-  // Crypto (Binance / Deribit)
-  { symbol: "BTC/USDT", name: "Bitcoin Perpetual", market: "Crypto", exchange: "Binance", assetClass: "CRYPTO_PERP", spotPrice: 64500.0, step: 1000, lotSize: 1, multiplier: 1, currency: "USDT", currencySymbol: "USDT " },
-  { symbol: "ETH/USDT", name: "Ethereum Perpetual", market: "Crypto", exchange: "Binance", assetClass: "CRYPTO_PERP", spotPrice: 3450.0, step: 50, lotSize: 1, multiplier: 1, currency: "USDT", currencySymbol: "USDT " },
-  { symbol: "SOL/USDT", name: "Solana Perpetual", market: "Crypto", exchange: "Binance", assetClass: "CRYPTO_PERP", spotPrice: 152.0, step: 5, lotSize: 1, multiplier: 1, currency: "USDT", currencySymbol: "USDT " },
+  // Crypto Options (Delta Exchange / Deribit)
+  { symbol: "BTC-OPTIONS", name: "Bitcoin Options Chain", market: "Crypto", exchange: "Delta Exchange / Deribit", assetClass: "CRYPTO_PERP", spotPrice: 78520.0, step: 500, lotSize: 0.1, multiplier: 1, currency: "USD", currencySymbol: "$" },
+  { symbol: "ETH-OPTIONS", name: "Ethereum Options Chain", market: "Crypto", exchange: "Delta Exchange / Deribit", assetClass: "CRYPTO_PERP", spotPrice: 3480.0, step: 50, lotSize: 1, multiplier: 1, currency: "USD", currencySymbol: "$" },
+  { symbol: "SOL-OPTIONS", name: "Solana Options Chain", market: "Crypto", exchange: "Delta Exchange / Deribit", assetClass: "CRYPTO_PERP", spotPrice: 188.0, step: 5, lotSize: 10, multiplier: 1, currency: "USD", currencySymbol: "$" },
+  { symbol: "BTC/USDT", name: "Bitcoin Perpetual Options", market: "Crypto", exchange: "Binance", assetClass: "CRYPTO_PERP", spotPrice: 78520.0, step: 1000, lotSize: 1, multiplier: 1, currency: "USDT", currencySymbol: "USDT " },
+  { symbol: "ETH/USDT", name: "Ethereum Perpetual Options", market: "Crypto", exchange: "Binance", assetClass: "CRYPTO_PERP", spotPrice: 3480.0, step: 50, lotSize: 1, multiplier: 1, currency: "USDT", currencySymbol: "USDT " },
+
+  // Commodities & Macro (Gold / Silver / Crude)
+  { symbol: "GOLD", name: "Gold Spot/Options (XAU/USD)", market: "Commodities", exchange: "Global / CME", assetClass: "COMMODITY", spotPrice: 2510.0, step: 10, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "SILVER", name: "Silver Spot/Options (XAG/USD)", market: "Commodities", exchange: "Global / CME", assetClass: "COMMODITY", spotPrice: 29.5, step: 0.5, lotSize: 5000, multiplier: 5000, currency: "USD", currencySymbol: "$" },
+  { symbol: "CRUDE_OIL", name: "WTI Crude Oil Options", market: "Commodities", exchange: "NYMEX / CME", assetClass: "COMMODITY", spotPrice: 76.5, step: 0.5, lotSize: 1000, multiplier: 1000, currency: "USD", currencySymbol: "$" },
 ];
 
 export type WorkstationPrimarySection = "build" | "analyze" | "monitor" | "backtest" | "system";
@@ -57,7 +65,7 @@ export type BrokerAccountStatus = "CONNECTED" | "AUTH_REQUIRED" | "UNCONFIGURED"
 
 interface OptionsMarketContextType {
   // 1. Unified Market & Instrument Snapshot
-  market: "India" | "Global" | "Crypto";
+  market: "India" | "Global" | "Crypto" | "Commodities";
   selectedUnderlying: NormalizedUnderlying;
   underlyingsList: NormalizedUnderlying[];
   spotPrice: number;
@@ -103,7 +111,7 @@ interface OptionsMarketContextType {
   statusNotification: { text: string; type: "success" | "warn" | "info" } | null;
 
   // 6. Universal Action Dispatchers
-  setMarket: (market: "India" | "Global" | "Crypto") => void;
+  setMarket: (market: "India" | "Global" | "Crypto" | "Commodities") => void;
   setSelectedUnderlyingSymbol: (symbol: string) => void;
   setSelectedExpiry: (expiry: string) => void;
   setExecutionMode: (mode: "PAPER" | "LIVE") => void;
@@ -131,7 +139,7 @@ interface OptionsMarketContextType {
 const OptionsMarketContext = createContext<OptionsMarketContextType | null>(null);
 
 export function OptionsMarketProvider({ children }: { children: React.ReactNode }) {
-  const [market, setMarketState] = useState<"India" | "Global" | "Crypto">("India");
+  const [market, setMarketState] = useState<"India" | "Global" | "Crypto" | "Commodities">("India");
   const [selectedUnderlying, setSelectedUnderlying] = useState<NormalizedUnderlying>(CANONICAL_UNDERLYINGS[0]);
   const [spotPrice, setSpotPrice] = useState<number>(CANONICAL_UNDERLYINGS[0].spotPrice);
   const [quoteTimestamp, setQuoteTimestamp] = useState<string>(new Date().toISOString());

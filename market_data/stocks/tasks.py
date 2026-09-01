@@ -5,6 +5,7 @@ Manages scheduled background synchronization, periodic quote refreshes,
 and precalculated technical metrics.
 """
 
+from typing import Optional, Any
 import threading
 import time
 import logging

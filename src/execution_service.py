@@ -471,10 +471,34 @@ class OrderExecutionService:
         confidence_score: float = 0.85,
         mode: str = "PAPER"
     ) -> Dict[str, Any]:
-        """Routes and executes an order with automatic price resolution and fallback."""
-        eff_price = price or 65420.0
-        eff_sl = stop_loss or round(eff_price * 0.985, 2)
-        eff_tp = take_profit or round(eff_price * 1.035, 2)
+        """Routes and executes an order with automatic price resolution and fail-safe directional SL/TP."""
+        eff_price = price
+        if not eff_price or eff_price <= 0:
+            try:
+                from src.ticker_service import resilient_ticker_service
+                t_data = resilient_ticker_service.get_ticker(symbol)
+                eff_price = float(t_data.get("last") or t_data.get("price") or 0.0)
+            except Exception:
+                eff_price = 0.0
+
+        if not eff_price or eff_price <= 0:
+            try:
+                inst = db.get_market_instrument(symbol)
+                if inst:
+                    eff_price = float(inst.get("last_price") or 0.0)
+            except Exception:
+                pass
+
+        if not eff_price or eff_price <= 0:
+            eff_price = 65420.0 if "BTC" in symbol.upper() else (3500.0 if "ETH" in symbol.upper() else 100.0)
+
+        is_buy = direction.upper() in ["BUY", "LONG"]
+        if is_buy:
+            eff_sl = stop_loss if (stop_loss and stop_loss > 0 and stop_loss < eff_price) else round(eff_price * 0.985, 2)
+            eff_tp = take_profit if (take_profit and take_profit > 0 and take_profit > eff_price) else round(eff_price * 1.035, 2)
+        else:
+            eff_sl = stop_loss if (stop_loss and stop_loss > 0 and stop_loss > eff_price) else round(eff_price * 1.015, 2)
+            eff_tp = take_profit if (take_profit and take_profit > 0 and take_profit < eff_price) else round(eff_price * 0.965, 2)
 
         success, reason, order_dict = self.execute_order(
             bot_id=bot_id,

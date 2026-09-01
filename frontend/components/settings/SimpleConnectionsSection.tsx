@@ -17,6 +17,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { UpstoxConnectionCard } from "./UpstoxConnectionCard";
 import { BinanceConnectionCard } from "./BinanceConnectionCard";
 import { DeltaConnectionCard } from "./DeltaConnectionCard";
+import { AlphaVantageConnectionCard } from "./AlphaVantageConnectionCard";
 
 interface BrokerCredential {
   credential_id: string;
@@ -218,6 +219,7 @@ export function SimpleConnectionsSection() {
         <BinanceConnectionCard />
         <DeltaConnectionCard />
         <UpstoxConnectionCard />
+        <AlphaVantageConnectionCard />
       </div>
 
       {/* Manage Connections Modal */}

@@ -325,6 +325,36 @@ class UpstoxMarketAdapter(ProviderAdapter):
             raise e
 
 
+class AlphaVantageAdapter(ProviderAdapter):
+    """Alpha Vantage Provider Adapter for global stocks, indicators, and cross-asset data."""
+
+    def __init__(self):
+        super().__init__("alpha_vantage", "Alpha Vantage Market Data Engine")
+
+    def supports_instrument(self, instrument: CanonicalInstrument) -> bool:
+        return instrument.provider in ["alpha_vantage", "alphavantage"] or instrument.exchange == "ALPHA_VANTAGE"
+
+    def fetch_ohlcv(self, instrument: CanonicalInstrument, timeframe: str, limit: int = 500) -> pd.DataFrame:
+        from src.market_data.alphavantage_service import global_alphavantage_service
+        t0 = time.time()
+        self.request_count += 1
+        try:
+            df = global_alphavantage_service.fetch_ohlcv(instrument.canonical_symbol, timeframe=timeframe, limit=limit)
+            elapsed_ms = (time.time() - t0) * 1000.0
+            self.latencies.append(elapsed_ms)
+            if len(self.latencies) > 100:
+                self.latencies.pop(0)
+
+            self.circuit.record_success()
+            self.last_success_time = datetime.now(timezone.utc).strftime("%H:%M:%S")
+            return df
+        except Exception as e:
+            self.error_count += 1
+            self.circuit.record_failure()
+            logger.error("Alpha Vantage Market Data fetch error for %s: %s", instrument.canonical_symbol, e)
+            raise e
+
+
 class ProviderManager:
     """
     Central Provider Router that enforces capability validation, circuit breakers,
@@ -336,6 +366,7 @@ class ProviderManager:
         self.futures_adapter = BinanceFuturesAdapter()
         self.options_adapter = OptionsPlaceholderAdapter()
         self.upstox_adapter = UpstoxMarketAdapter()
+        self.alphavantage_adapter = AlphaVantageAdapter()
         self._adapters: Dict[str, ProviderAdapter] = {
             "binance_spot": self.spot_adapter,
             "binance_futures": self.futures_adapter,
@@ -344,6 +375,8 @@ class ProviderManager:
             "upstox": self.upstox_adapter,
             "upstox_ws": self.upstox_adapter,
             "zerodha": self.upstox_adapter,
+            "alpha_vantage": self.alphavantage_adapter,
+            "alphavantage": self.alphavantage_adapter,
         }
 
     def route_instrument(self, instrument: CanonicalInstrument) -> ProviderAdapter:

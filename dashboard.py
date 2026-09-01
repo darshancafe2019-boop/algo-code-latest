@@ -197,13 +197,20 @@ def handle_generic_exception(e):
 db.init_db()
 audit.init_audit_db()
 
-# Register Market Data Stocks Blueprint
+# Register Market Data Stocks & Futures Blueprints
 try:
     from market_data.stocks.routes import stocks_blueprint
     app.register_blueprint(stocks_blueprint, url_prefix="/api/market-data/stocks")
     logger.info("Successfully registered /api/market-data/stocks blueprint.")
 except Exception as bp_err:
     logger.warning(f"Notice: Failed registering stocks blueprint: {bp_err}")
+
+try:
+    from market_data.futures.routes import futures_bp
+    app.register_blueprint(futures_bp)
+    logger.info("Successfully registered /api/futures blueprint.")
+except Exception as fbp_err:
+    logger.warning(f"Notice: Failed registering futures blueprint: {fbp_err}")
 
 @app.route("/health", methods=["GET"])
 @app.route("/api/health", methods=["GET"])
@@ -4423,35 +4430,10 @@ def api_orders():
 
     elif request.method == "DELETE":
         try:
-            order_id = request.args.get("order_id") or request.args.get("id")
-            return jsonify({
-                "success": True,
-                "status": "success",
-                "message": f"Order {order_id} cancellation acknowledged."
-            }), 200
-        except Exception as e:
-            return jsonify({"success": False, "status": "error", "message": str(e)}), 500
-
-            with _quick_trade_cache_lock:
-                _quick_trade_idempotency_cache[client_order_id] = (time.time(), response_payload)
-
-            return jsonify(response_payload), 201
-
-        except Exception as e:
-            logger.error(f"Error executing order: {e}", exc_info=True)
-            return jsonify({
-                "success": False,
-                "status": "error",
-                "error": str(e),
-                "code": "ORDER_EXECUTION_ERROR"
-            }), 500
-
-    elif request.method == "DELETE":
-        try:
             payload = request.get_json(silent=True) or {}
             bot_id = request.args.get("bot_id") or payload.get("bot_id")
             symbol = request.args.get("symbol") or payload.get("symbol")
-            order_id = request.args.get("order_id") or payload.get("order_id")
+            order_id = request.args.get("order_id") or request.args.get("id") or payload.get("order_id")
 
             sql = "UPDATE trades_log SET status = 'CANCELLED', exit_timestamp = ?, exit_reason = 'EMERGENCY_CANCELLED' WHERE status = 'OPEN'"
             params = [datetime.now(timezone.utc).isoformat()]

@@ -12,6 +12,9 @@ interface UIState {
   activeIndicators: string[];
   quickOrderSide: "BUY" | "SELL";
   interfaceMode: "SIMPLE" | "ADVANCED";
+  isAICopilotOpen: boolean;
+  isMarketSwitcherOpen: boolean;
+  copilotTargetMarket: string;
   
   setActiveWorkspace: (workspace: string) => void;
   setActiveSymbol: (symbol: string) => void;
@@ -25,6 +28,9 @@ interface UIState {
   setQuickOrderSide: (side: "BUY" | "SELL") => void;
   setInterfaceMode: (mode: "SIMPLE" | "ADVANCED") => void;
   toggleInterfaceMode: () => void;
+  setAICopilotOpen: (open: boolean) => void;
+  setMarketSwitcherOpen: (open: boolean) => void;
+  setCopilotTargetMarket: (market: string) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -39,6 +45,9 @@ export const useUIStore = create<UIState>((set) => ({
   activeIndicators: ["EMA_20", "RSI_14", "VOLUME_PROFILE"],
   quickOrderSide: "BUY",
   interfaceMode: "SIMPLE",
+  isAICopilotOpen: false,
+  isMarketSwitcherOpen: false,
+  copilotTargetMarket: "ALL",
 
   setActiveWorkspace: (workspace) => set({ activeWorkspace: workspace }),
   setActiveSymbol: (symbol) => set({ activeSymbol: symbol.toUpperCase().trim() }),
@@ -60,4 +69,7 @@ export const useUIStore = create<UIState>((set) => ({
     set((state) => ({
       interfaceMode: state.interfaceMode === "SIMPLE" ? "ADVANCED" : "SIMPLE",
     })),
+  setAICopilotOpen: (open) => set({ isAICopilotOpen: open }),
+  setMarketSwitcherOpen: (open) => set({ isMarketSwitcherOpen: open }),
+  setCopilotTargetMarket: (market) => set({ copilotTargetMarket: market }),
 }));

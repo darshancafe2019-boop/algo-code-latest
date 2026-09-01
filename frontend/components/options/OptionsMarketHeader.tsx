@@ -60,7 +60,7 @@ export function OptionsMarketHeader() {
 
           {/* Market Universe Tabs */}
           <div className="flex items-center gap-1 bg-slate-950 p-0.5 rounded-xl border border-slate-800">
-            {(["India", "Global", "Crypto"] as const).map((m) => (
+            {(["India", "Global", "Crypto", "Commodities"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMarket(m)}

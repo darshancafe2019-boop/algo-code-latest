@@ -26,6 +26,7 @@ import { CryptoOptionChainTerminal } from "@/components/crypto/CryptoOptionChain
 import { OrderExecutionCenter } from "@/components/order-execution/OrderExecutionCenter";
 import { EcoPositionsView } from "@/components/positions/EcoPositionsView";
 import { OptionStrategyBuilder } from "@/components/crypto/OptionStrategyBuilder";
+import { FuturesUniverseView } from "@/src/features/markets/futures";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function MainApp() {
@@ -188,10 +189,10 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 18. Crypto Futures Terminal */}
+        {/* 18. Modular Futures Universe Terminal */}
         {(activeTab === "crypto-futures" || activeTab === "futures") && (
-          <ErrorBoundary title="Crypto Futures Terminal Failed">
-            <CryptoFuturesTerminal />
+          <ErrorBoundary title="Futures & Derivatives Terminal Failed">
+            <FuturesUniverseView />
           </ErrorBoundary>
         )}
 

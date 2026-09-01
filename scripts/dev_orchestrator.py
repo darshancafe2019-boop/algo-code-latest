@@ -26,12 +26,21 @@ import threading
 from datetime import datetime, timezone
 from collections import deque
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Any
+from typing import Dict, List, Optional, Set, Any, Tuple
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
 LOCK_FILE = ROOT_DIR / "quantos_supervisor.lock"
 RUNTIME_STATE_FILE = ROOT_DIR / "quantos_runtime_state.json"
+
+try:
+    from dotenv import load_dotenv
+    if (ROOT_DIR / ".env").exists():
+        load_dotenv(ROOT_DIR / ".env")
+    if (FRONTEND_DIR / ".env.local").exists():
+        load_dotenv(FRONTEND_DIR / ".env.local")
+except Exception:
+    pass
 
 if hasattr(sys.stdout, "reconfigure"):
     try:

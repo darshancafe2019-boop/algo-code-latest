@@ -1,0 +1,322 @@
+import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+
+const UNIVERSE_CONTRACTS = [
+  // 🪙 Crypto Perpetuals
+  {
+    symbol: "BTC/USDT:USDT",
+    underlying: "BTC",
+    displayName: "BTC/USDT Perpetual",
+    contract_type: "PERPETUAL",
+    venue: "BINANCE",
+    mark_price: 78540.0,
+    index_price: 78520.0,
+    last_price: 78540.0,
+    change_24h_pct: 2.65,
+    volume_24h_usd: 4200000000.0,
+    open_interest_usd: 1850000000.0,
+    open_interest_coins: 23554.8,
+    funding_rate: {
+      symbol: "BTC/USDT:USDT",
+      venue: "BINANCE",
+      funding_rate_8h: 0.00012,
+      funding_rate_annualized: 13.14,
+      predicted_next_rate: 0.000126,
+      next_funding_time: "04:18:22",
+      countdown_seconds: 15502,
+      historical_avg_7d: 0.00011,
+    },
+    basis: {
+      symbol: "BTC/USDT:USDT",
+      spot_symbol: "BTC/USDT",
+      spot_price: 78520.0,
+      futures_price: 78540.0,
+      basis_absolute: 20.0,
+      basis_percentage: 0.025,
+      annualized_basis: 0.31,
+      regime: "CONTANGO",
+    },
+    max_leverage: 125,
+    min_qty: 0.001,
+    tick_size: 0.1,
+    is_active: true,
+    long_short_ratio: 1.12,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    symbol: "ETH/USDT:USDT",
+    underlying: "ETH",
+    displayName: "ETH/USDT Perpetual",
+    contract_type: "PERPETUAL",
+    venue: "BINANCE",
+    mark_price: 3485.0,
+    index_price: 3480.0,
+    last_price: 3485.0,
+    change_24h_pct: 1.95,
+    volume_24h_usd: 2100000000.0,
+    open_interest_usd: 950000000.0,
+    open_interest_coins: 272596.8,
+    funding_rate: {
+      symbol: "ETH/USDT:USDT",
+      venue: "BINANCE",
+      funding_rate_8h: 0.00008,
+      funding_rate_annualized: 8.76,
+      predicted_next_rate: 0.000084,
+      next_funding_time: "04:18:22",
+      countdown_seconds: 15502,
+      historical_avg_7d: 0.000074,
+    },
+    basis: {
+      symbol: "ETH/USDT:USDT",
+      spot_symbol: "ETH/USDT",
+      spot_price: 3480.0,
+      futures_price: 3485.0,
+      basis_absolute: 5.0,
+      basis_percentage: 0.144,
+      annualized_basis: 1.75,
+      regime: "CONTANGO",
+    },
+    max_leverage: 100,
+    min_qty: 0.01,
+    tick_size: 0.01,
+    is_active: true,
+    long_short_ratio: 1.08,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    symbol: "SOL/USDT:USDT",
+    underlying: "SOL",
+    displayName: "SOL/USDT Perpetual",
+    contract_type: "PERPETUAL",
+    venue: "BINANCE",
+    mark_price: 188.8,
+    index_price: 188.2,
+    last_price: 188.8,
+    change_24h_pct: 4.25,
+    volume_24h_usd: 1250000000.0,
+    open_interest_usd: 480000000.0,
+    open_interest_coins: 2542372.8,
+    funding_rate: {
+      symbol: "SOL/USDT:USDT",
+      venue: "BINANCE",
+      funding_rate_8h: 0.00022,
+      funding_rate_annualized: 24.09,
+      predicted_next_rate: 0.00023,
+      next_funding_time: "04:18:22",
+      countdown_seconds: 15502,
+      historical_avg_7d: 0.00020,
+    },
+    basis: {
+      symbol: "SOL/USDT:USDT",
+      spot_symbol: "SOL/USDT",
+      spot_price: 188.2,
+      futures_price: 188.8,
+      basis_absolute: 0.6,
+      basis_percentage: 0.319,
+      annualized_basis: 3.88,
+      regime: "CONTANGO",
+    },
+    max_leverage: 50,
+    min_qty: 0.1,
+    tick_size: 0.01,
+    is_active: true,
+    long_short_ratio: 1.25,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    symbol: "BNB/USDT:USDT",
+    underlying: "BNB",
+    displayName: "BNB/USDT Perpetual",
+    contract_type: "PERPETUAL",
+    venue: "BINANCE",
+    mark_price: 585.0,
+    index_price: 584.2,
+    last_price: 585.0,
+    change_24h_pct: 1.15,
+    volume_24h_usd: 340000000.0,
+    open_interest_usd: 180000000.0,
+    open_interest_coins: 307692.3,
+    funding_rate: {
+      symbol: "BNB/USDT:USDT",
+      venue: "BINANCE",
+      funding_rate_8h: 0.00006,
+      funding_rate_annualized: 6.57,
+      predicted_next_rate: 0.000063,
+      next_funding_time: "04:18:22",
+      countdown_seconds: 15502,
+      historical_avg_7d: 0.000055,
+    },
+    max_leverage: 50,
+    min_qty: 0.01,
+    tick_size: 0.01,
+    is_active: true,
+    long_short_ratio: 0.98,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    symbol: "XRP/USDT:USDT",
+    underlying: "XRP",
+    displayName: "XRP/USDT Perpetual",
+    contract_type: "PERPETUAL",
+    venue: "BINANCE",
+    mark_price: 0.582,
+    index_price: 0.580,
+    last_price: 0.582,
+    change_24h_pct: 3.40,
+    volume_24h_usd: 680000000.0,
+    open_interest_usd: 260000000.0,
+    open_interest_coins: 446735395.0,
+    funding_rate: {
+      symbol: "XRP/USDT:USDT",
+      venue: "BINANCE",
+      funding_rate_8h: 0.00015,
+      funding_rate_annualized: 16.43,
+      predicted_next_rate: 0.000158,
+      next_funding_time: "04:18:22",
+      countdown_seconds: 15502,
+      historical_avg_7d: 0.00014,
+    },
+    max_leverage: 50,
+    min_qty: 1.0,
+    tick_size: 0.0001,
+    is_active: true,
+    long_short_ratio: 1.15,
+    timestamp: new Date().toISOString(),
+  },
+
+  // 🇮🇳 Indian Index & Stock Futures
+  {
+    symbol: "NIFTY-FUT",
+    underlying: "NIFTY",
+    displayName: "NIFTY 50 Current Month Futures",
+    contract_type: "INDEX_FUTURES",
+    venue: "UPSTOX_NSE",
+    mark_price: 24890.0,
+    index_price: 24850.0,
+    last_price: 24890.0,
+    change_24h_pct: 0.72,
+    volume_24h_usd: 850000000.0,
+    open_interest_usd: 620000000.0,
+    open_interest_coins: 24909.6,
+    basis: {
+      symbol: "NIFTY-FUT",
+      spot_symbol: "NIFTY",
+      spot_price: 24850.0,
+      futures_price: 24890.0,
+      basis_absolute: 40.0,
+      basis_percentage: 0.161,
+      annualized_basis: 3.26,
+      regime: "CONTANGO",
+    },
+    max_leverage: 20,
+    min_qty: 25,
+    tick_size: 0.05,
+    expiry_date: "Last Thursday of Month",
+    is_active: true,
+    long_short_ratio: 1.08,
+    timestamp: new Date().toISOString(),
+  },
+  {
+    symbol: "BANKNIFTY-FUT",
+    underlying: "BANKNIFTY",
+    displayName: "Bank NIFTY Current Month Futures",
+    contract_type: "INDEX_FUTURES",
+    venue: "UPSTOX_NSE",
+    mark_price: 51320.0,
+    index_price: 51200.0,
+    last_price: 51320.0,
+    change_24h_pct: 0.88,
+    volume_24h_usd: 620000000.0,
+    open_interest_usd: 480000000.0,
+    open_interest_coins: 9353.0,
+    basis: {
+      symbol: "BANKNIFTY-FUT",
+      spot_symbol: "BANKNIFTY",
+      spot_price: 51200.0,
+      futures_price: 51320.0,
+      basis_absolute: 120.0,
+      basis_percentage: 0.234,
+      annualized_basis: 4.74,
+      regime: "CONTANGO",
+    },
+    max_leverage: 20,
+    min_qty: 15,
+    tick_size: 0.05,
+    expiry_date: "Last Thursday of Month",
+    is_active: true,
+    long_short_ratio: 1.10,
+    timestamp: new Date().toISOString(),
+  },
+
+  // 💱 Commodities
+  {
+    symbol: "XAU/USD:FUT",
+    underlying: "GOLD",
+    displayName: "Gold Spot/Futures Index",
+    contract_type: "COMMODITY_FUTURES",
+    venue: "CME",
+    mark_price: 2515.0,
+    index_price: 2510.0,
+    last_price: 2515.0,
+    change_24h_pct: 0.82,
+    volume_24h_usd: 1450000000.0,
+    open_interest_usd: 890000000.0,
+    open_interest_coins: 353876.7,
+    basis: {
+      symbol: "XAU/USD:FUT",
+      spot_symbol: "GOLD",
+      spot_price: 2510.0,
+      futures_price: 2515.0,
+      basis_absolute: 5.0,
+      basis_percentage: 0.199,
+      annualized_basis: 2.91,
+      regime: "CONTANGO",
+    },
+    max_leverage: 50,
+    min_qty: 0.1,
+    tick_size: 0.1,
+    expiry_date: "Next Monthly Cycle",
+    is_active: true,
+    long_short_ratio: 1.02,
+    timestamp: new Date().toISOString(),
+  },
+];
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const underlying = searchParams.get("underlying")?.toUpperCase();
+    const exchange = searchParams.get("exchange")?.toUpperCase();
+    const type = searchParams.get("type")?.toUpperCase();
+
+    let list = UNIVERSE_CONTRACTS;
+
+    if (underlying) {
+      list = list.filter(
+        (c) => c.underlying.includes(underlying) || c.symbol.includes(underlying)
+      );
+    }
+    if (exchange && exchange !== "ALL") {
+      list = list.filter((c) => c.venue === exchange);
+    }
+    if (type && type !== "ALL") {
+      list = list.filter((c) => c.contract_type === type);
+    }
+
+    return NextResponse.json(
+      {
+        status: "SUCCESS",
+        count: list.length,
+        contracts: list,
+      },
+      { status: 200 }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      { status: "ERROR", message: err.message },
+      { status: 500 }
+    );
+  }
+}

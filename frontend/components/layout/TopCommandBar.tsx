@@ -25,6 +25,8 @@ import Link from "next/link";
 import { formatMoney, formatPnL } from "@/lib/formatters";
 import { EcoBadge } from "@/components/eco/EcoBadge";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
+import { QuickMarketSwitcherModal } from "@/components/layout/QuickMarketSwitcherModal";
+import { UniversalMarketAICopilot } from "@/components/ai/UniversalMarketAICopilot";
 import { useUIStore } from "@/lib/store/useUIStore";
 
 interface TopCommandBarProps {
@@ -39,6 +41,7 @@ export function TopCommandBar({
   const { activeBot, activeSymbol, activeTimeframe } = useActiveBot();
   const { openAppearanceDrawer, config: currentThemeConfig } = useTheme();
   const { portfolioSnapshot, riskSummary, tradingMode: globalTradingMode, reconciliationStatus } = useGlobalData();
+  const { setMarketSwitcherOpen, setAICopilotOpen } = useUIStore();
 
   const [showKillSwitchModal, setShowKillSwitchModal] = useState(false);
   const [confirmWord, setConfirmWord] = useState("");
@@ -209,12 +212,28 @@ export function TopCommandBar({
             </div>
           </div>
 
-          {/* Market & Symbol Pill */}
-          <div className="flex items-center gap-1.5 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1 text-xs font-mono">
-            <span className="text-[var(--theme-accent)] font-bold">{activeSymbol || "BTC/USDT"}</span>
+          {/* Market & Symbol Pill (Interactive Switcher) */}
+          <button
+            type="button"
+            onClick={() => setMarketSwitcherOpen(true)}
+            className="flex items-center gap-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-cyan-500/50 rounded-xl px-2.5 py-1 text-xs font-mono transition cursor-pointer group shadow-sm active:scale-95"
+            title="Click to Switch Market Universe"
+          >
+            <span className="text-[var(--theme-accent)] font-bold group-hover:underline">
+              {(() => {
+                const sym = activeSymbol || "BTC/USDT";
+                if (sym === "BTC-OPTIONS") return "BTC Options";
+                if (sym === "ETH-OPTIONS") return "ETH Options";
+                if (sym === "SOL-OPTIONS") return "SOL Options";
+                if (sym.includes("-OPTIONS")) return sym.replace("-OPTIONS", " Options");
+                if (sym === "NIFTY") return "NIFTY 50";
+                if (sym === "BANKNIFTY") return "Bank Nifty";
+                return sym;
+              })()}
+            </span>
             <span className="text-[var(--theme-text-muted)]">•</span>
             <span className="text-[var(--theme-text-secondary)] font-bold">{(activeTimeframe || "5M").toUpperCase()}</span>
-          </div>
+          </button>
 
           {/* Operating Mode Indicator Badge */}
           <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl text-xs font-mono">
@@ -255,15 +274,29 @@ export function TopCommandBar({
         </div>
 
         {/* Center: Global Search Bar Trigger (⌘K) */}
-        <div className="flex items-center max-w-md w-full justify-center">
+        <div className="flex items-center max-w-md w-full justify-center gap-2">
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 rounded-xl text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-all w-full"
+            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 rounded-xl text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-all flex-1"
           >
             <Search className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
             <span className="flex-1 text-left truncate">Search spots, futures, options, strikes...</span>
             <kbd className="px-1.5 py-0.5 bg-[var(--theme-bg)] border border-[var(--theme-border)] rounded text-[10px] text-[var(--theme-text-secondary)]">
               ⌘K
+            </kbd>
+          </button>
+
+          {/* AI Copilot Global Header Button */}
+          <button
+            type="button"
+            onClick={() => setAICopilotOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-300 border border-purple-500/40 font-bold font-mono transition-all shadow-[0_0_12px_rgba(168,85,247,0.15)] active:scale-95 group shrink-0"
+            title="Open Universal AI Market Copilot (⌘J)"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-purple-400 group-hover:rotate-12 transition-transform animate-pulse" />
+            <span className="hidden sm:inline">AI COPILOT</span>
+            <kbd className="hidden lg:inline px-1 py-0.2 bg-purple-950/60 border border-purple-500/30 rounded text-[9px] text-purple-300">
+              ⌘J
             </kbd>
           </button>
         </div>
@@ -595,6 +628,10 @@ export function TopCommandBar({
         assetClass="crypto"
         exchange="binance"
       />
+
+      {/* Universal AI Market Copilot & Quick Market Switcher */}
+      <QuickMarketSwitcherModal />
+      <UniversalMarketAICopilot />
     </>
   );
 }

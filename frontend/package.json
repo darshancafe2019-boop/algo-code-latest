@@ -6,13 +6,14 @@
     "node": ">=18.17.0"
   },
   "scripts": {
+    "predev": "node -e \"const fs=require('fs');try{fs.rmSync('.next/server',{recursive:true,force:true});}catch(e){}\"",
     "dev": "next dev",
     "dev:all": "python ../run_system.py",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "clean": "node -e \"const fs=require('fs');fs.rmSync('.next',{recursive:true,force:true});console.log('.next cleaned');\"",
+    "clean": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true});console.log('.next and tsbuildinfo cleaned');}catch(e){}\"",
     "test": "tsc --noEmit && next lint",
     "test:smoke": "node ./tests/static_assets_smoke_test.js",
     "test:upstox": "tsx ../scripts/test_upstox_complete.mjs"

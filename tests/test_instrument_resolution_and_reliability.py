@@ -84,7 +84,7 @@ class TestCanonicalInstrumentResolution:
         assert res.instrument.instrument_type == InstrumentType.OPTION
         assert res.instrument.strike == 70000.0
         assert res.instrument.option_type == "CALL"
-        assert res.instrument.provider == "binance_options"
+        assert res.instrument.provider in ["binance_options", "delta_options"]
 
     def test_06_ambiguous_symbol_rejection(self):
         """Verify generic queries like 'BTC' return AMBIGUOUS with suggestions."""

@@ -212,3 +212,24 @@ def test_command_bus_protection_and_partial_close(setup_test_positions):
     assert res2.get("status") == "SUCCEEDED" or res2.get("success") is True
     data2 = res2.get("data", {})
     assert "remaining_quantity" in data2
+
+
+def test_bulk_action_move_to_breakeven(client, setup_test_positions):
+    """Test bulk action MOVE_TO_BREAKEVEN updates stop losses across positions."""
+    res = client.post(
+        "/api/positions/bulk-action",
+        json={
+            "action": "MOVE_TO_BREAKEVEN",
+            "mode": "PAPER",
+            "position_ids": [setup_test_positions["long_id"], setup_test_positions["short_id"]]
+        }
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "success"
+    assert data["affected_count"] >= 2
+
+    # Verify stop loss matches entry price for the long position
+    row = db.safe_query_one("SELECT stop_loss, entry_price FROM trades_log WHERE id = ?", (setup_test_positions["long_id"],))
+    assert row["stop_loss"] == row["entry_price"]
+

@@ -2,24 +2,34 @@
 
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { PositionsCommandHeader, PositionViewMode } from "./PositionsCommandHeader";
+import { PositionsCommandHeader } from "./PositionsCommandHeader";
 import { PositionsKpiStrip } from "./PositionsKpiStrip";
-import { PositionsFilterBar, PositionFilterCategory, PositionSortKey } from "./PositionsFilterBar";
-import { PositionsCompactTable, PositionRecord } from "./PositionsCompactTable";
+import { PositionsFilterBar } from "./PositionsFilterBar";
+import { PositionsCompactTable } from "./PositionsCompactTable";
 import { PositionsCardGrid } from "./PositionsCardGrid";
 import { PositionsPriceLadderMatrix } from "./PositionsPriceLadderMatrix";
+import { PositionsRiskMatrix } from "./PositionsRiskMatrix";
 import { PositionDetailDrawer } from "./PositionDetailDrawer";
 import { ModifyProtectionModal } from "./ModifyProtectionModal";
 import { PartialSquareOffModal } from "./PartialSquareOffModal";
+import { PositionsBulkActionModal } from "./PositionsBulkActionModal";
 import { PositionsEmptyState } from "./PositionsEmptyState";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { executeCommand } from "@/lib/commandClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
+import {
+  PositionRecord,
+  PositionViewMode,
+  PositionFilterCategory,
+  PositionSortKey,
+  BulkActionType,
+  PositionsSummaryData,
+} from "@/types/positions";
 
 export function EcoPositionsView() {
   const queryClient = useQueryClient();
-  const { positions, portfolioSnapshot, riskSummary, tradingMode, refreshAll } = useGlobalData();
+  const { tradingMode, refreshAll } = useGlobalData();
 
   // State
   const [viewMode, setViewMode] = useState<PositionViewMode>("table");
@@ -29,28 +39,32 @@ export function EcoPositionsView() {
   const [selectedPosition, setSelectedPosition] = useState<PositionRecord | null>(null);
   const [modifyingPosition, setModifyingPosition] = useState<PositionRecord | null>(null);
   const [partialClosingPosition, setPartialClosingPosition] = useState<PositionRecord | null>(null);
+  const [activeBulkAction, setActiveBulkAction] = useState<BulkActionType | null>(null);
   const [statusNotification, setStatusNotification] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // 1. Fetch Real Positions Telemetry & Summary
   const { data: positionsData, isLoading: isPositionsLoading, refetch: refetchPositions, isRefetching } = useQuery({
-    queryKey: ["positions"],
+    queryKey: ["positions", tradingMode],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/positions", { timeoutMs: 6000 });
+      const res = await apiClient.get<{ status?: string; positions: PositionRecord[]; summary?: PositionsSummaryData }>(
+        `/api/positions?mode=${tradingMode}`,
+        { timeoutMs: 6000 }
+      );
       if (!res.ok) return { positions: [], summary: {} };
       return res.data || { positions: [], summary: {} };
     },
-    staleTime: 4000,
-    refetchInterval: 6000,
+    staleTime: 3000,
+    refetchInterval: 5000,
     placeholderData: (prev) => prev,
   });
 
-  // 2. Fetch System Status (Environment Mode & Kill Switch)
+  // 2. Fetch System Status
   const { data: systemStatusData } = useQuery({
     queryKey: ["systemStatus"],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
-      if (!res.ok) return { trading_mode: "PAPER", system_summary: { kill_switch_active: false } };
-      return res.data || { trading_mode: "PAPER", system_summary: { kill_switch_active: false } };
+      if (!res.ok) return { trading_mode: tradingMode, system_summary: { kill_switch_active: false } };
+      return res.data || { trading_mode: tradingMode, system_summary: { kill_switch_active: false } };
     },
     staleTime: 4000,
     refetchInterval: 6000,
@@ -65,10 +79,11 @@ export function EcoPositionsView() {
     onSuccess: (data) => {
       setStatusNotification({
         type: "success",
-        text: data.message || "Account and positions reconciled successfully with broker.",
+        text: data.message || "Account and positions reconciled successfully with broker OMS.",
       });
       setTimeout(() => setStatusNotification(null), 4000);
       refetchPositions();
+      refreshAll();
     },
     onError: (err: any) => {
       setStatusNotification({ type: "error", text: `Reconciliation error: ${err.message}` });
@@ -88,10 +103,42 @@ export function EcoPositionsView() {
       });
       setTimeout(() => setStatusNotification(null), 6000);
       refetchPositions();
+      refreshAll();
       queryClient.invalidateQueries({ queryKey: ["systemStatus"] });
     },
     onError: (err: any) => {
       setStatusNotification({ type: "error", text: `Kill switch trigger failed: ${err.message}` });
+      setTimeout(() => setStatusNotification(null), 4000);
+    },
+  });
+
+  // Move Single Position to Breakeven Mutation
+  const moveBreakevenMutation = useMutation({
+    mutationFn: async (position: PositionRecord) => {
+      const entryP = Number(position.entry_price || 0);
+      const res = await apiClient.post(`/api/positions/${position.id}/modify-protection`, {
+        position_id: position.id,
+        stop_loss: entryP,
+        trailing_stop: entryP,
+        source: "1-Click Breakeven Button",
+      }, { timeoutMs: 8000 });
+
+      if (!res.ok) {
+        throw new Error(res.error?.message || "Failed to adjust stop loss to breakeven");
+      }
+      return res.data;
+    },
+    onSuccess: () => {
+      setStatusNotification({
+        type: "success",
+        text: "Stop loss moved to Breakeven (Entry Price). Downside risk eliminated.",
+      });
+      setTimeout(() => setStatusNotification(null), 4000);
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
+      queryClient.invalidateQueries({ queryKey: ["authoritativePositions"] });
+    },
+    onError: (err: any) => {
+      setStatusNotification({ type: "error", text: `Breakeven adjustment failed: ${err.message}` });
       setTimeout(() => setStatusNotification(null), 4000);
     },
   });
@@ -112,8 +159,10 @@ export function EcoPositionsView() {
       });
       setTimeout(() => setStatusNotification(null), 4000);
       queryClient.invalidateQueries({ queryKey: ["positions"] });
+      queryClient.invalidateQueries({ queryKey: ["authoritativePositions"] });
       queryClient.invalidateQueries({ queryKey: ["dockTrades"] });
       queryClient.invalidateQueries({ queryKey: ["performance"] });
+      refreshAll();
     },
     onError: (err: any) => {
       setStatusNotification({ type: "error", text: `Square off failed: ${err.message}` });
@@ -125,7 +174,7 @@ export function EcoPositionsView() {
     return Array.isArray(positionsData?.positions) ? positionsData.positions : [];
   }, [positionsData]);
   const summary = positionsData?.summary || {};
-  const executionMode = (systemStatusData?.trading_mode || systemStatusData?.environment || "PAPER").toUpperCase() as "PAPER" | "LIVE";
+  const executionMode = (systemStatusData?.trading_mode || tradingMode || "PAPER").toUpperCase() as "PAPER" | "LIVE";
 
   // Category counts
   const counts = useMemo(() => {
@@ -171,8 +220,10 @@ export function EcoPositionsView() {
       .sort((a, b) => {
         const pnlA = a.unrealized_pnl || 0;
         const pnlB = b.unrealized_pnl || 0;
-        const sizeA = a.current_notional || a.notional_value || a.position_size || 0;
-        const sizeB = b.current_notional || b.notional_value || b.position_size || 0;
+        const sizeA = a.current_notional || a.notional_value || (Number(a.entry_price || 0) * Number(a.position_size || 0));
+        const sizeB = b.current_notional || b.notional_value || (Number(b.entry_price || 0) * Number(b.position_size || 0));
+        const riskA = a.planned_risk || 0;
+        const riskB = b.planned_risk || 0;
 
         switch (sortKey) {
           case "pnl_desc":
@@ -181,6 +232,8 @@ export function EcoPositionsView() {
             return pnlA - pnlB;
           case "size_desc":
             return sizeB - sizeA;
+          case "risk_desc":
+            return riskB - riskA;
           case "duration_desc":
             return (b.duration_seconds || 0) - (a.duration_seconds || 0);
           case "symbol_asc":
@@ -197,9 +250,13 @@ export function EcoPositionsView() {
     }
   };
 
+  const handleMoveBreakevenConfirm = (pos: PositionRecord) => {
+    moveBreakevenMutation.mutate(pos);
+  };
+
   const handleExportCsv = () => {
     try {
-      const headers = ["ID", "Symbol", "Direction", "Entry Price", "Current Price", "Unrealized PnL", "Margin"];
+      const headers = ["ID", "Symbol", "Direction", "Entry Price", "Current Price", "Unrealized PnL", "Margin", "Leverage", "Stop Loss", "Take Profit"];
       const rows = processedPositions.map((p) => [
         p.id,
         p.symbol,
@@ -208,6 +265,9 @@ export function EcoPositionsView() {
         p.current_price,
         p.unrealized_pnl,
         p.margin_used,
+        p.leverage,
+        p.stop_loss,
+        p.take_profit,
       ]);
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
       const encodedUri = encodeURI(csvContent);
@@ -252,7 +312,7 @@ export function EcoPositionsView() {
         </div>
       )}
 
-      {/* 1. Header with Mode & Actions */}
+      {/* 1. Command Header with Mode, Bulk & Controls */}
       <PositionsCommandHeader
         executionMode={executionMode}
         viewMode={viewMode}
@@ -260,8 +320,11 @@ export function EcoPositionsView() {
         onRefresh={() => refetchPositions()}
         onReconcile={() => reconcileMutation.mutate()}
         onKillSwitch={() => killSwitchMutation.mutate()}
+        onTriggerBulkAction={(act) => setActiveBulkAction(act)}
         isRefreshing={isRefetching}
         isReconciling={reconcileMutation.isPending}
+        openPositionsCount={rawPositions.length}
+        profitableCount={counts.profit}
       />
 
       {/* 2. Institutional KPI Strip */}
@@ -283,16 +346,16 @@ export function EcoPositionsView() {
         onExportJson={handleExportJson}
       />
 
-      {/* 4. Main Body: Table / Cards / Ladder or Empty State */}
+      {/* 4. Main Body: Table / Cards / Ladder / Risk Matrix or Empty State */}
       {isPositionsLoading && rawPositions.length === 0 ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-3 border border-[var(--theme-border)] rounded-2xl bg-[var(--theme-surface)] font-mono text-xs text-[var(--theme-text-muted)]">
+        <div className="h-64 flex flex-col items-center justify-center gap-3 border border-[var(--theme-border)] rounded-3xl bg-[var(--theme-surface)]/90 font-mono text-xs text-[var(--theme-text-muted)]">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--theme-accent)] border-t-transparent animate-spin" />
           <span>Synchronizing live OMS position books...</span>
         </div>
       ) : rawPositions.length === 0 ? (
         <PositionsEmptyState executionMode={executionMode} />
       ) : processedPositions.length === 0 ? (
-        <div className="p-12 text-center border border-[var(--theme-border)] rounded-2xl bg-[var(--theme-surface)] space-y-2 font-mono text-xs">
+        <div className="p-12 text-center border border-[var(--theme-border)] rounded-3xl bg-[var(--theme-surface)]/90 space-y-2 font-mono text-xs">
           <p className="text-[var(--theme-text-secondary)]">No positions matched your search or active filter.</p>
           <button
             onClick={() => {
@@ -311,6 +374,7 @@ export function EcoPositionsView() {
           onModifyProtection={setModifyingPosition}
           onSquareOff={handleSquareOffConfirm}
           onPartialClose={setPartialClosingPosition}
+          onMoveToBreakeven={handleMoveBreakevenConfirm}
         />
       ) : viewMode === "cards" ? (
         <PositionsCardGrid
@@ -319,9 +383,18 @@ export function EcoPositionsView() {
           onModifyProtection={setModifyingPosition}
           onSquareOff={handleSquareOffConfirm}
           onPartialClose={setPartialClosingPosition}
+          onMoveToBreakeven={handleMoveBreakevenConfirm}
+        />
+      ) : viewMode === "ladder" ? (
+        <PositionsPriceLadderMatrix
+          positions={processedPositions}
+          onSelectPosition={setSelectedPosition}
+          onModifyProtection={setModifyingPosition}
+          onSquareOff={handleSquareOffConfirm}
+          onMoveToBreakeven={handleMoveBreakevenConfirm}
         />
       ) : (
-        <PositionsPriceLadderMatrix
+        <PositionsRiskMatrix
           positions={processedPositions}
           onSelectPosition={setSelectedPosition}
           onModifyProtection={setModifyingPosition}
@@ -329,7 +402,7 @@ export function EcoPositionsView() {
         />
       )}
 
-      {/* 6. Position Detail Slide-out Drawer */}
+      {/* 5. Position Detail Slide-out Drawer */}
       <PositionDetailDrawer
         position={selectedPosition}
         onClose={() => setSelectedPosition(null)}
@@ -345,20 +418,36 @@ export function EcoPositionsView() {
           setSelectedPosition(null);
           handleSquareOffConfirm(pos);
         }}
+        onMoveToBreakeven={(pos) => {
+          handleMoveBreakevenConfirm(pos);
+        }}
       />
 
-      {/* 7. Modify Protection Modal */}
+      {/* 6. Modify Protection Modal */}
       <ModifyProtectionModal
         position={modifyingPosition}
         isOpen={Boolean(modifyingPosition)}
         onClose={() => setModifyingPosition(null)}
       />
 
-      {/* 8. Partial Square Off Modal */}
+      {/* 7. Partial Square Off Modal */}
       <PartialSquareOffModal
         position={partialClosingPosition}
         isOpen={Boolean(partialClosingPosition)}
         onClose={() => setPartialClosingPosition(null)}
+      />
+
+      {/* 8. Bulk Action Confirmation Modal */}
+      <PositionsBulkActionModal
+        action={activeBulkAction}
+        positions={rawPositions}
+        executionMode={executionMode}
+        isOpen={Boolean(activeBulkAction)}
+        onClose={() => setActiveBulkAction(null)}
+        onSuccess={(msg) => {
+          setStatusNotification({ type: "success", text: msg });
+          setTimeout(() => setStatusNotification(null), 4000);
+        }}
       />
     </div>
   );

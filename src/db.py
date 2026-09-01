@@ -4601,6 +4601,87 @@ def reconcile_stale_bot_statuses() -> Dict[str, Any]:
     return summary
 
 
+def seed_default_bots_if_empty() -> int:
+    """Seeds default standard bot fleet if bot_instances is empty."""
+    try:
+        count_row = safe_query_one("SELECT COUNT(*) as c FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0")
+        if count_row and count_row["c"] > 0:
+            return 0
+
+        now_str = datetime.now(timezone.utc).isoformat()
+        default_bots = [
+            {
+                "id": "bot-btc-trend",
+                "name": "BTC Trend Alpha",
+                "symbol": "BTC/USDT",
+                "asset_class": "CRYPTO",
+                "timeframe": "5m",
+                "strategy": "EMA_MACD_VP",
+                "allocated_capital": 10000.0,
+                "execution_mode": "PAPER",
+                "status": "STOPPED",
+            },
+            {
+                "id": "bot-eth-momentum",
+                "name": "ETH Momentum Scalper",
+                "symbol": "ETH/USDT",
+                "asset_class": "CRYPTO",
+                "timeframe": "15m",
+                "strategy": "MOMENTUM_SCALPER",
+                "allocated_capital": 5000.0,
+                "execution_mode": "PAPER",
+                "status": "STOPPED",
+            },
+            {
+                "id": "bot-nifty-options",
+                "name": "Nifty Options Flow",
+                "symbol": "NIFTY-OPTIONS",
+                "asset_class": "OPTIONS",
+                "timeframe": "5m",
+                "strategy": "OPTIONS_DELTA_NEUTRAL",
+                "allocated_capital": 50000.0,
+                "execution_mode": "PAPER",
+                "status": "STOPPED",
+            },
+            {
+                "id": "bot-sol-mean-rev",
+                "name": "SOL Mean Reversion",
+                "symbol": "SOL/USDT",
+                "asset_class": "CRYPTO",
+                "timeframe": "1h",
+                "strategy": "MEAN_REVERSION_BB",
+                "allocated_capital": 5000.0,
+                "execution_mode": "PAPER",
+                "status": "STOPPED",
+            },
+        ]
+
+        conn = get_connection()
+        c = conn.cursor()
+        for b in default_bots:
+            c.execute(
+                """
+                INSERT OR IGNORE INTO bot_instances (
+                    id, name, symbol, asset_class, timeframe, strategy,
+                    allocated_capital, current_equity, execution_mode, status,
+                    created_at, updated_at, config_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '{}')
+                """,
+                (
+                    b["id"], b["name"], b["symbol"], b["asset_class"], b["timeframe"], b["strategy"],
+                    b["allocated_capital"], b["allocated_capital"], b["execution_mode"], b["status"],
+                    now_str, now_str
+                )
+            )
+        conn.commit()
+        conn.close()
+        return len(default_bots)
+    except Exception as e:
+        logger.warning(f"Default bot fleet seed notice: {e}")
+        return 0
+
+
+
 def compute_bot_health(
     bot_id: str,
     live_market_price: Optional[Any] = None,
@@ -4790,6 +4871,8 @@ def audit_and_clean_db() -> Dict[str, Any]:
             if t_time_str:
                 try:
                     t_dt = datetime.fromisoformat(t_time_str.replace("Z", "+00:00"))
+                    if t_dt.tzinfo is None:
+                        t_dt = t_dt.replace(tzinfo=timezone.utc)
                 except Exception:
                     pass
 
@@ -4800,8 +4883,12 @@ def audit_and_clean_db() -> Dict[str, Any]:
                     abs(float(t["entry_price"]) - float(prev["entry_price"])) < 0.01 and
                     abs(float(t["position_size"]) - float(prev["position_size"])) < 0.00001):
 
-                    if t_dt and prev["dt"]:
-                        diff_sec = abs((t_dt - prev["dt"]).total_seconds())
+                    prev_dt = prev.get("dt")
+                    if prev_dt and prev_dt.tzinfo is None:
+                        prev_dt = prev_dt.replace(tzinfo=timezone.utc)
+
+                    if t_dt and prev_dt:
+                        diff_sec = abs((t_dt - prev_dt).total_seconds())
                         if diff_sec <= 15:
                             is_dup = True
                             break

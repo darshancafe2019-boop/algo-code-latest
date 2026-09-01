@@ -14,46 +14,11 @@ import {
   Eye,
   Check,
   Minus,
+  Bot,
+  Zap,
 } from "lucide-react";
-
-export interface BotRowItem {
-  id: string;
-  bot_id: string;
-  name: string;
-  symbol: string;
-  asset_class: string;
-  timeframe: string;
-  strategy: string;
-  strategy_id: string;
-  strategy_version: string;
-  execution_mode: string;
-  status: string;
-  state: string;
-  health: string;
-  allocated_capital: number;
-  position: {
-    has_position: boolean;
-    direction: string;
-    size: number;
-    entry_price: number;
-    unrealized_pnl: number;
-    stop_loss?: number | null;
-    take_profit?: number | null;
-  };
-  pnl: {
-    today: number;
-    realized: number;
-    unrealized: number;
-    net: number;
-  };
-  live_pnl: number;
-  next_action: string;
-  last_heartbeat?: string;
-  last_error?: string;
-  updated_at: string;
-  config: Record<string, any>;
-  indicators: any[];
-}
+import { BotRowItem } from "@/types/bot-control";
+export type { BotRowItem };
 
 interface SimpleBotTableProps {
   bots: BotRowItem[];
@@ -108,8 +73,6 @@ export function SimpleBotTable({
     setLoadingActionBotId(botId);
     try {
       await onBotAction(botId, action);
-    } catch {
-      // Handled and displayed via parent notification banner
     } finally {
       setLoadingActionBotId(null);
     }
@@ -126,6 +89,7 @@ export function SimpleBotTable({
       setTogglingModeBotId(null);
     }
   };
+
   const handleDeleteClick = (e: React.MouseEvent, bot: BotRowItem) => {
     e.stopPropagation();
     setActiveMenuBotId(null);
@@ -145,9 +109,9 @@ export function SimpleBotTable({
 
   if (isLoading && bots.length === 0) {
     return (
-      <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs shadow-xl">
-        <Activity className="w-6 h-6 text-cyan-400 animate-spin mx-auto mb-2" />
-        Loading fleet state...
+      <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-12 text-center text-[var(--theme-text-muted)] font-mono text-xs shadow-xl space-y-3">
+        <div className="w-8 h-8 rounded-full border-2 border-[var(--theme-accent)] border-t-transparent animate-spin mx-auto" />
+        <p>Synchronizing fleet engine telemetry...</p>
       </div>
     );
   }
@@ -155,38 +119,41 @@ export function SimpleBotTable({
   if (bots.length === 0) {
     const marketLabel = selectedMarket === "ALL" ? "" : `${selectedMarket} `;
     return (
-      <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl p-12 text-center font-mono text-xs shadow-xl space-y-3">
-        <p className="text-slate-400 font-sans text-sm">
-          No {marketLabel}bots match your current filter.
+      <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-12 text-center font-mono text-xs shadow-xl space-y-4">
+        <div className="p-3.5 rounded-2xl bg-[var(--theme-elevated)] w-fit mx-auto text-[var(--theme-text-muted)]">
+          <Bot className="w-8 h-8" />
+        </div>
+        <p className="text-[var(--theme-text-secondary)] font-sans text-sm max-w-md mx-auto">
+          No {marketLabel}bots match your current filter. Create a new automated trading bot to deploy strategies.
         </p>
         <button
           onClick={onCreateBot}
-          className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs transition inline-flex items-center gap-1.5 shadow-lg shadow-cyan-500/20"
+          className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] hover:opacity-90 text-[var(--theme-bg)] font-extrabold text-xs transition inline-flex items-center gap-1.5 shadow-lg shadow-[var(--theme-accent)]/20 font-mono"
         >
           <Plus className="w-4 h-4 stroke-[3]" />
-          <span>Create a Bot</span>
+          <span>+ Create a Bot</span>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl overflow-visible backdrop-blur-md shadow-xl font-mono text-xs">
-      <div className="overflow-x-auto rounded-2xl">
+    <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl overflow-visible backdrop-blur-md shadow-xl font-sans select-none text-xs">
+      <div className="overflow-x-auto rounded-3xl">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800 text-[11px] select-none">
+          <thead className="bg-[var(--theme-elevated)] text-[var(--theme-text-muted)] border-b border-[var(--theme-border-subtle)] text-[11px] font-mono select-none">
             <tr>
               {/* Checkbox Column */}
-              <th className="py-3 px-3 w-10 text-center">
+              <th className="py-3.5 px-3.5 w-10 text-center">
                 <button
                   type="button"
                   onClick={onToggleSelectAll}
-                  className={`w-4 h-4 rounded border flex items-center justify-center transition ${
+                  className={`w-4 h-4 rounded border flex items-center justify-center transition mx-auto ${
                     allFilteredSelected
-                      ? "bg-cyan-500 border-cyan-400 text-slate-950"
+                      ? "bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-bg)]"
                       : someFilteredSelected
-                      ? "bg-cyan-500/20 border-cyan-500 text-cyan-300"
-                      : "border-slate-700 bg-slate-800/80 hover:border-slate-500 text-transparent"
+                      ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)]"
+                      : "border-[var(--theme-border-subtle)] bg-[var(--theme-surface)] hover:border-[var(--theme-border)] text-transparent"
                   }`}
                   title={allFilteredSelected ? "Deselect All" : "Select All"}
                 >
@@ -194,17 +161,17 @@ export function SimpleBotTable({
                   {someFilteredSelected && <Minus className="w-3 h-3 stroke-[3]" />}
                 </button>
               </th>
-              <th className="py-3 px-4 font-semibold">BOT</th>
-              <th className="py-3 px-4 font-semibold">MARKET</th>
-              <th className="py-3 px-4 font-semibold text-center">MODE</th>
-              <th className="py-3 px-4 font-semibold">STATUS</th>
-              <th className="py-3 px-4 font-semibold">POSITION</th>
-              <th className="py-3 px-4 font-semibold text-right">TODAY P&L</th>
-              <th className="py-3 px-4 font-semibold text-center">HEALTH</th>
-              <th className="py-3 px-4 font-semibold text-right w-20">ACTIONS</th>
+              <th className="py-3.5 px-4 font-bold">BOT INSTANCE</th>
+              <th className="py-3.5 px-4 font-bold">MARKET & TF</th>
+              <th className="py-3.5 px-4 font-bold text-center">MODE</th>
+              <th className="py-3.5 px-4 font-bold">LIFECYCLE STATUS</th>
+              <th className="py-3.5 px-4 font-bold">ACTIVE POSITION</th>
+              <th className="py-3.5 px-4 font-bold text-right">TODAY P&L</th>
+              <th className="py-3.5 px-4 font-bold text-center">HEALTH</th>
+              <th className="py-3.5 px-4 font-bold text-right w-20">ACTIONS</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/40 font-mono">
+          <tbody className="divide-y divide-[var(--theme-border-subtle)]/60 font-mono">
             {bots.map((bot) => {
               const state = (bot.status || bot.state || "STOPPED").toUpperCase();
               const isRunning = state === "RUNNING";
@@ -215,7 +182,7 @@ export function SimpleBotTable({
               const isLive = (bot.execution_mode || "").toUpperCase() === "LIVE";
               const isTogglingMode = togglingModeBotId === bot.id;
 
-              const pos = bot.position || { has_position: false, direction: "FLAT", size: 0 };
+              const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
               const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
               const isPnlPositive = pnl >= 0;
 
@@ -229,13 +196,13 @@ export function SimpleBotTable({
                   onClick={() => onSelectBot(bot)}
                   className={`transition cursor-pointer group ${
                     isSelected
-                      ? "bg-cyan-500/10 hover:bg-cyan-500/15"
-                      : "hover:bg-slate-800/30"
+                      ? "bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/15"
+                      : "hover:bg-[var(--theme-elevated)]/50"
                   }`}
                 >
                   {/* Checkbox */}
                   <td
-                    className="py-3 px-3 text-center"
+                    className="py-3.5 px-3.5 text-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleSelectBot(bot.id);
@@ -245,8 +212,8 @@ export function SimpleBotTable({
                       type="button"
                       className={`w-4 h-4 rounded border flex items-center justify-center transition mx-auto ${
                         isSelected
-                          ? "bg-cyan-500 border-cyan-400 text-slate-950"
-                          : "border-slate-700 bg-slate-800/60 group-hover:border-slate-500 text-transparent"
+                          ? "bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-bg)]"
+                          : "border-[var(--theme-border-subtle)] bg-[var(--theme-surface)] group-hover:border-[var(--theme-border)] text-transparent"
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
@@ -254,53 +221,53 @@ export function SimpleBotTable({
                   </td>
 
                   {/* 1. BOT */}
-                  <td className="py-3 px-4">
-                    <div className="font-extrabold text-white group-hover:text-cyan-300 transition text-xs">
-                      {bot.name}
+                  <td className="py-3.5 px-4 font-sans">
+                    <div className="font-extrabold text-[var(--theme-text-primary)] group-hover:text-[var(--theme-accent)] transition text-xs flex items-center gap-1.5">
+                      <span>{bot.name}</span>
                     </div>
-                    <div className="text-[10px] text-slate-500 font-sans truncate max-w-xs">
+                    <div className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-xs mt-0.5">
                       {bot.next_action || bot.strategy}
                     </div>
                   </td>
 
                   {/* 2. MARKET */}
-                  <td className="py-3 px-4">
-                    <div className="font-bold text-slate-200 text-xs">{bot.symbol}</div>
-                    <div className="text-[10px] text-slate-500 font-sans">
-                      {bot.timeframe}
+                  <td className="py-3.5 px-4 font-mono">
+                    <div className="font-bold text-[var(--theme-text-primary)] text-xs">{bot.symbol}</div>
+                    <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
+                      {bot.timeframe} • {bot.asset_class || "CRYPTO"}
                     </div>
                   </td>
 
                   {/* 3. MODE (Interactive Live / Paper Switch) */}
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center">
                     <button
                       onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
                       disabled={isTogglingMode}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all border shadow-sm ${
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold font-mono transition-all border shadow-sm ${
                         isLive
-                          ? "bg-rose-950/90 text-rose-300 border-rose-600/80 hover:bg-rose-900/90 hover:border-rose-400"
-                          : "bg-cyan-950/90 text-cyan-300 border-cyan-600/80 hover:bg-cyan-900/90 hover:border-cyan-400"
+                          ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40 hover:bg-[var(--theme-loss)]/25"
+                          : "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40 hover:bg-[var(--theme-accent)]/25"
                       }`}
-                      title={isLive ? "Currently executing LIVE orders. Click to switch to PAPER simulation." : "Currently in PAPER mode. Click to take LIVE (real order execution)."}
+                      title={isLive ? "Currently executing LIVE orders. Click to switch to PAPER simulation." : "Currently in PAPER mode. Click to switch to LIVE."}
                     >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-rose-400 animate-pulse" : "bg-cyan-400"}`} />
-                      <span>{isTogglingMode ? "SWITCHING..." : isLive ? "LIVE" : "PAPER"}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-[var(--theme-loss)] animate-pulse" : "bg-[var(--theme-accent)]"}`} />
+                      <span>{isTogglingMode ? "SWITCH..." : isLive ? "LIVE" : "PAPER"}</span>
                     </button>
                   </td>
 
                   {/* 4. STATUS */}
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-black ${
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono border ${
                         isRunning
-                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse"
+                          ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/40 animate-pulse"
                           : isPaused
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/40"
+                          ? "bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border-[var(--theme-warning)]/40"
                           : isError
-                          ? "bg-rose-500/20 text-rose-400 border border-rose-500/40"
+                          ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40"
                           : isRecovering
-                          ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
-                          : "bg-slate-800 text-slate-400 border border-slate-700"
+                          ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40"
+                          : "bg-[var(--theme-elevated)] text-[var(--theme-text-muted)] border-[var(--theme-border-subtle)]"
                       }`}
                     >
                       {state}
@@ -308,56 +275,56 @@ export function SimpleBotTable({
                   </td>
 
                   {/* 5. POSITION */}
-                  <td className="py-3 px-4">
+                  <td className="py-3.5 px-4">
                     {pos.has_position ? (
                       <div>
                         <span
                           className={`font-black text-xs ${
-                            pos.direction === "LONG" ? "text-emerald-400" : "text-rose-400"
+                            pos.direction === "LONG" ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
                           }`}
                         >
                           {pos.direction} {pos.size}
                         </span>
-                        <div className="text-[10px] text-slate-500 font-sans">
+                        <div className="text-[10px] text-[var(--theme-text-muted)] font-mono">
                           @ ${pos.entry_price ? pos.entry_price.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}
                         </div>
                       </div>
                     ) : (
-                      <span className="text-slate-500 font-sans text-xs">—</span>
+                      <span className="text-[var(--theme-text-muted)] font-sans text-xs">FLAT</span>
                     )}
                   </td>
 
                   {/* 6. TODAY P&L */}
-                  <td className="py-3 px-4 text-right">
+                  <td className="py-3.5 px-4 text-right">
                     <div
                       className={`font-black text-xs ${
-                        isPnlPositive ? "text-emerald-400" : "text-rose-400"
+                        isPnlPositive ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
                       }`}
                     >
                       {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                    <div className="text-[10px] text-slate-500 font-sans">
+                    <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
                       Cap: ${(bot.allocated_capital / 1000).toFixed(1)}K
                     </div>
                   </td>
 
                   {/* 7. HEALTH */}
-                  <td className="py-3 px-4 text-center">
+                  <td className="py-3.5 px-4 text-center">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         bot.health === "HEALTHY"
-                          ? "bg-emerald-500/10 text-emerald-400"
+                          ? "bg-[var(--theme-profit)]/10 text-[var(--theme-profit)]"
                           : bot.health === "ERROR"
-                          ? "bg-rose-500/10 text-rose-400"
-                          : "bg-amber-500/10 text-amber-400"
+                          ? "bg-[var(--theme-loss)]/10 text-[var(--theme-loss)]"
+                          : "bg-[var(--theme-warning)]/10 text-[var(--theme-warning)]"
                       }`}
                     >
                       {bot.health || "HEALTHY"}
                     </span>
                   </td>
 
-                  {/* 7. COMPACT CONSOLIDATED KEBAB ACTION */}
-                  <td className="py-3 px-4 text-right relative">
+                  {/* 8. CONSOLIDATED KEBAB ACTION */}
+                  <td className="py-3.5 px-4 text-right relative">
                     <div className="inline-flex items-center justify-end relative">
                       <button
                         type="button"
@@ -368,13 +335,13 @@ export function SimpleBotTable({
                         disabled={isActionLoading}
                         className={`p-1.5 rounded-lg border transition flex items-center justify-center ${
                           isMenuOpen
-                            ? "bg-cyan-500/20 border-cyan-500/40 text-cyan-300 shadow-md shadow-cyan-500/10"
-                            : "bg-slate-900/80 border-slate-700/80 text-slate-400 hover:text-white hover:border-slate-500"
+                            ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)] shadow-md"
+                            : "bg-[var(--theme-elevated)] border-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] hover:border-[var(--theme-border)]"
                         } disabled:opacity-50`}
                         title="Bot Actions"
                       >
                         {isActionLoading ? (
-                          <div className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+                          <div className="w-3.5 h-3.5 border-2 border-[var(--theme-accent)] border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <MoreVertical className="w-4 h-4" />
                         )}
@@ -385,14 +352,14 @@ export function SimpleBotTable({
                         <div
                           ref={menuRef}
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-full mt-1 z-40 w-44 bg-[#0B132B] border border-slate-700 rounded-xl shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100"
+                          className="absolute right-0 top-full mt-1.5 z-40 w-44 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1.5 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
                         >
                           {/* Contextual Execution Controls */}
                           {isStopped && (
                             <button
                               type="button"
                               onClick={(e) => handleAction(e, bot.id, "START")}
-                              className="w-full px-3 py-2 text-emerald-400 hover:bg-emerald-500/15 flex items-center gap-2 font-bold transition"
+                              className="w-full px-3.5 py-2 text-[var(--theme-profit)] hover:bg-[var(--theme-profit)]/15 flex items-center gap-2 font-bold transition font-mono"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
                               <span>Start Bot</span>
@@ -404,7 +371,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "PAUSE")}
-                                className="w-full px-3 py-2 text-amber-400 hover:bg-amber-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-warning)] hover:bg-[var(--theme-warning)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <Pause className="w-3.5 h-3.5 fill-current" />
                                 <span>Pause Bot</span>
@@ -412,7 +379,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                                 <span>Stop Bot</span>
@@ -425,7 +392,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "RESUME")}
-                                className="w-full px-3 py-2 text-cyan-300 hover:bg-cyan-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current" />
                                 <span>Resume Bot</span>
@@ -433,7 +400,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                                 <span>Stop Bot</span>
@@ -446,7 +413,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleDetailsClick(e, bot)}
-                                className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 <span>Review Incident</span>
@@ -454,7 +421,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "START")}
-                                className="w-full px-3 py-2 text-cyan-300 hover:bg-cyan-500/15 flex items-center gap-2 font-bold transition"
+                                className="w-full px-3.5 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/15 flex items-center gap-2 font-bold transition font-mono"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 <span>Retry / Start</span>
@@ -466,39 +433,35 @@ export function SimpleBotTable({
                             <button
                               type="button"
                               onClick={(e) => handleAction(e, bot.id, "STOP")}
-                              className="w-full px-3 py-2 text-rose-400 hover:bg-rose-500/15 flex items-center gap-2 font-bold transition"
+                              className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
                             >
                               <Square className="w-3.5 h-3.5 fill-current" />
                               <span>Stop Bot</span>
                             </button>
                           )}
 
-                          {/* View Details Option (available on all except error which has Review) */}
+                          {/* View Details Option */}
                           {!isError && (
                             <button
                               type="button"
                               onClick={(e) => handleDetailsClick(e, bot)}
-                              className="w-full px-3 py-2 text-slate-300 hover:bg-slate-800 flex items-center gap-2 font-medium transition"
+                              className="w-full px-3.5 py-2 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)] flex items-center gap-2 font-medium transition"
                             >
-                              <Eye className="w-3.5 h-3.5 text-slate-400" />
+                              <Eye className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
                               <span>View Details</span>
                             </button>
                           )}
 
                           {/* Divider */}
-                          <div className="h-px bg-slate-800 my-1" />
+                          <div className="h-px bg-[var(--theme-border-subtle)] my-1" />
 
-                          {/* Delete / Force Delete Bot Option (available on ALL bot states) */}
+                          {/* Delete / Force Delete Bot Option */}
                           <button
                             type="button"
                             onClick={(e) => handleDeleteClick(e, bot)}
-                            className={`w-full px-3 py-2 flex items-center gap-2 font-bold transition ${
-                              isError || isRecovering
-                                ? "text-rose-400 bg-rose-500/10 hover:bg-rose-500/25 hover:text-rose-300"
-                                : "text-rose-400 hover:bg-rose-500/20 hover:text-rose-300"
-                            }`}
+                            className="w-full px-3.5 py-2 flex items-center gap-2 font-bold transition text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/20"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                            <Trash2 className="w-3.5 h-3.5 text-[var(--theme-loss)]" />
                             <span>{isError || isRecovering ? "Force Delete Bot" : "Delete Bot"}</span>
                           </button>
                         </div>

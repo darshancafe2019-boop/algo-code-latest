@@ -22,8 +22,11 @@ import io
 import csv
 import uuid
 import time
+import urllib.request
+import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
+import pandas as pd
 
 from flask import Flask, jsonify, render_template, request, Response, send_file, send_from_directory, make_response
 
@@ -279,6 +282,7 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
 # Server Startup Reconciliation & Audit
 db_audit_report = db.audit_and_clean_db()
 welcome_summary_data = db.reconcile_stale_bot_statuses()
+db.seed_default_bots_if_empty()
 logger.info(f"Startup DB Audit: {db_audit_report}")
 
 def background_server_heartbeat_loop():
@@ -5066,6 +5070,96 @@ def api_positions_partial_close_rest(position_id=None):
         "remaining_quantity": remaining_qty,
         "exit_price": curr_price,
         "realized_pnl": round(realized_pnl, 2),
+    })
+
+
+@app.route("/api/positions/bulk-action", methods=["POST"])
+def api_positions_bulk_action_rest():
+    """Execute batch operations across active positions (Move to Breakeven, Harvest Profits, Square Off All)."""
+    if config.KILL_SWITCH_FILE.exists():
+        return jsonify({"status": "error", "message": "Execution pipeline is locked: 🔴 TRADING HALTED via Kill Switch."}), 403
+
+    data = request.get_json(silent=True) or {}
+    action = (data.get("action") or "").upper()
+    source = data.get("source", "Positions Command Centre")
+    mode = data.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
+    target_ids = data.get("position_ids") or []
+
+    from src.global_data_engine import GlobalDataEngine
+    gde = GlobalDataEngine.get_instance()
+
+    conn = db.get_connection()
+    c = conn.cursor()
+    if target_ids:
+        placeholders = ",".join("?" for _ in target_ids)
+        c.execute(f"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND id IN ({placeholders})", [mode, *target_ids])
+    else:
+        c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ?", (mode,))
+    open_trades = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    if not open_trades:
+        return jsonify({"status": "error", "message": "No matching active positions found for bulk execution."}), 404
+
+    affected_count = 0
+
+    if action == "MOVE_TO_BREAKEVEN":
+        for t in open_trades:
+            tid = t["id"]
+            entry_p = float(t.get("entry_price") or 0.0)
+            if entry_p > 0:
+                db.safe_execute(
+                    "UPDATE trades_log SET stop_loss = ?, trailing_stop = ? WHERE id = ? AND status = 'OPEN'",
+                    (entry_p, entry_p, tid)
+                )
+                affected_count += 1
+        msg = f"Successfully moved {affected_count} position(s) stop loss to breakeven (${entry_p:,.2f})."
+
+    elif action == "HARVEST_PROFITS":
+        for t in open_trades:
+            tid = t["id"]
+            sym = t.get("symbol") or getattr(config, "SYMBOL", "BTC/USDT")
+            curr_p = float(gde.get_latest_price(sym) or t.get("entry_price") or 65000.0)
+            entry_p = float(t.get("entry_price") or 0.0)
+            sz = float(t.get("position_size") or 0.1)
+            dir_val = (t.get("direction") or "LONG").upper()
+            pnl = (curr_p - entry_p) * sz if dir_val in ["LONG", "BUY"] else (entry_p - curr_p) * sz
+
+            if pnl > 0:
+                db.log_trade_exit(tid, curr_p, pnl, reason=f"Bulk Profit Harvest ({source})")
+                affected_count += 1
+        msg = f"Successfully harvested profits across {affected_count} profitable position(s)."
+
+    elif action in ["SQUARE_OFF_ALL", "FLATTEN_ALL"]:
+        for t in open_trades:
+            tid = t["id"]
+            sym = t.get("symbol") or getattr(config, "SYMBOL", "BTC/USDT")
+            curr_p = float(gde.get_latest_price(sym) or t.get("entry_price") or 65000.0)
+            entry_p = float(t.get("entry_price") or 0.0)
+            sz = float(t.get("position_size") or 0.1)
+            dir_val = (t.get("direction") or "LONG").upper()
+            pnl = (curr_p - entry_p) * sz if dir_val in ["LONG", "BUY"] else (entry_p - curr_p) * sz
+
+            db.log_trade_exit(tid, curr_p, pnl, reason=f"Bulk Emergency Flatten ({source})")
+            affected_count += 1
+        msg = f"Successfully squared off all {affected_count} active position(s)."
+
+    else:
+        return jsonify({"status": "error", "message": f"Unsupported bulk action: '{action}'"}), 400
+
+    audit.log_bot_event(
+        event_type="POSITIONS_BULK_ACTION",
+        message=f"{msg} Action: {action}, Source: {source}",
+        bot_instance_id="global-oms",
+        severity="INFO",
+        metadata={"action": action, "affected_count": affected_count, "source": source}
+    )
+
+    return jsonify({
+        "status": "success",
+        "message": msg,
+        "affected_count": affected_count,
+        "action": action
     })
 
 

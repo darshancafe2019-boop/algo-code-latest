@@ -167,7 +167,7 @@ export function QuickMarketSwitcherModal() {
         <div className="max-h-72 overflow-y-auto space-y-2 pr-1 no-scrollbar">
           {filtered.length === 0 ? (
             <div className="text-center py-8 text-slate-500 font-mono">
-              No matching markets found for "{search}".
+              No matching markets found for &quot;{search}&quot;.
             </div>
           ) : (
             filtered.map((item) => {

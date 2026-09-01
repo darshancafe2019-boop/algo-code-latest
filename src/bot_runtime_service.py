@@ -135,14 +135,7 @@ class BotRuntimeService:
         raw_bots = [dict(r) for r in c.fetchall()]
 
         # 2. Pre-fetch closed trades for exact bot_id P&L attribution
-        c.execute("""
-            SELECT bot_id, 
-                   COALESCE(net_pnl, realized_pnl, result_pnl, 0.0) as final_pnl,
-                   COALESCE(gross_pnl, net_pnl, realized_pnl, result_pnl, 0.0) as gross_val,
-                   exit_timestamp, timestamp 
-            FROM trades_log 
-            WHERE status IN ('CLOSED', 'FILLED')
-        """)
+        c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED')")
         closed_trades = [dict(r) for r in c.fetchall()]
 
         # 3. Pre-fetch open positions
@@ -172,9 +165,18 @@ class BotRuntimeService:
             bid = t.get("bot_id") or "system"
             if bid not in bot_pnl_map:
                 bot_pnl_map[bid] = {"realized": 0.0, "today": 0.0}
-            pnl_val = float(t.get("final_pnl") if t.get("final_pnl") is not None else 0.0)
+            
+            pnl_val = 0.0
+            for k in ("net_pnl", "realized_pnl", "result_pnl", "gross_pnl"):
+                val = t.get(k)
+                if val is not None and float(val) != 0.0:
+                    pnl_val = float(val)
+                    break
+            if pnl_val == 0.0:
+                pnl_val = float(t.get("net_pnl") if t.get("net_pnl") is not None else (t.get("realized_pnl") if t.get("realized_pnl") is not None else (t.get("result_pnl") or 0.0)))
+
             bot_pnl_map[bid]["realized"] += pnl_val
-            ts = t.get("exit_timestamp") or t.get("timestamp") or ""
+            ts = str(t.get("exit_timestamp") or t.get("timestamp") or "")
             if ts.startswith(today_utc_prefix) or ts >= today_start_iso:
                 bot_pnl_map[bid]["today"] += pnl_val
 

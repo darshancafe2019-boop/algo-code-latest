@@ -15,6 +15,66 @@ export type BotStatus =
 
 export type BotExecutionMode = "PAPER" | "LIVE";
 
+export type BotViewMode = "table" | "cards" | "matrix";
+
+export interface FleetMetrics {
+  total_bots: number;
+  running: number;
+  paused: number;
+  stopped: number;
+  error: number;
+  draft: number;
+  healthy_count: number;
+  health_display: string;
+  today_pnl: number;
+  realized_pnl: number;
+  unrealized_pnl: number;
+  allocated_capital: number;
+  capital_used: number;
+  current_exposure: number;
+  available_capital: number;
+  emergency_halt_active: boolean;
+}
+
+export interface BotRowItem {
+  id: string;
+  bot_id: string;
+  name: string;
+  symbol: string;
+  asset_class: string;
+  timeframe: string;
+  strategy: string;
+  strategy_id: string;
+  strategy_version: string;
+  execution_mode: string;
+  status: string;
+  state: string;
+  health: string;
+  allocated_capital: number;
+  position: {
+    has_position: boolean;
+    direction: string;
+    size: number;
+    entry_price: number;
+    unrealized_pnl: number;
+    stop_loss?: number | null;
+    take_profit?: number | null;
+  };
+  pnl: {
+    today: number;
+    realized: number;
+    unrealized: number;
+    net: number;
+  };
+  live_pnl: number;
+  next_action: string;
+  last_heartbeat?: string;
+  last_error?: string;
+  updated_at: string;
+  config: Record<string, any>;
+  indicators: any[];
+}
+
 export type MarketAssetClass =
   | "crypto"
   | "equity"

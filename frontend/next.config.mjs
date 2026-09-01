@@ -11,41 +11,27 @@ const nextConfig = {
   poweredByHeader: false,
   // Permanent correction for development HMR hot-chunk freshness and production static asset caching
   async headers() {
+    if (!isProd) {
+      return [];
+    }
     return [
       {
         // In production: immutable long-term caching for fingerprinted Next.js static assets.
-        // In development: disable caching so Webpack module factory IDs and HMR chunks are never stale.
         source: "/_next/static/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: isProd
-              ? "public, max-age=31536000, immutable"
-              : "no-cache, no-store, max-age=0, must-revalidate",
+            value: "public, max-age=31536000, immutable",
           },
-          ...(isProd
-            ? []
-            : [
-                { key: "Pragma", value: "no-cache" },
-                { key: "Expires", value: "0" },
-              ]),
         ],
       },
       {
-        // Never cache HTML pages, RSC payloads, or dynamic API routes to prevent stale chunk 404 mismatches
+        // Never cache HTML pages, RSC payloads, or dynamic API routes
         source: "/((?!_next/static|_next/image|favicon.ico).*)",
         headers: [
           {
             key: "Cache-Control",
             value: "no-cache, no-store, max-age=0, must-revalidate",
-          },
-          {
-            key: "Pragma",
-            value: "no-cache",
-          },
-          {
-            key: "Expires",
-            value: "0",
           },
         ],
       },

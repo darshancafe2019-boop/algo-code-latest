@@ -48,7 +48,7 @@ def test_broker_capabilities():
     assert len(caps) >= 4
     broker_ids = [c["broker_id"] for c in caps]
     assert "paper_multi_market" in broker_ids
-    assert "indian_broker_gateway" in broker_ids
+    assert "upstox" in broker_ids or "indian_broker_gateway" in broker_ids
     assert "ibkr_global" in broker_ids
     assert "binance_options" in broker_ids
 

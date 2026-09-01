@@ -156,6 +156,7 @@ export function UniversalMarketAICopilot() {
         toolMode: activeTool,
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAICopilotOpen, currentSymbol, selectedUniverse, activeTool]);
 
   if (!isAICopilotOpen) return null;

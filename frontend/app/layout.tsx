@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import QueryProvider from "@/components/QueryProvider";
+import { AuthProvider } from "@/context/AuthContext";
 import { ActiveBotProvider } from "@/context/ActiveBotContext";
 import { GlobalLayoutProvider } from "@/context/GlobalLayoutContext";
 import { ThemeProvider } from "@/context/ThemeContext";
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import { BackendAvailabilityBanner } from "@/components/common/BackendAvailabilityBanner";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 export default function RootLayout({
   children,
@@ -28,16 +30,17 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#00F0FF" />
-        {/* Anti-FOUC: Immediately apply stored theme tokens before hydration */}
+        {/* Anti-FOUC & Startup Recovery */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var stored = localStorage.getItem('algo_terminal_appearance_v2');
+                localStorage.removeItem('algo_terminal_appearance_v2');
+                var stored = localStorage.getItem('quantos_appearance_v3');
+                var r = document.documentElement;
                 if (stored) {
                   var cfg = JSON.parse(stored);
-                  if (cfg && cfg.colors) {
-                    var r = document.documentElement;
+                  if (cfg && cfg.colors && cfg.version >= 4) {
                     r.style.setProperty('--theme-bg', cfg.colors.pageBg);
                     r.style.setProperty('--theme-surface', cfg.colors.surface);
                     r.style.setProperty('--theme-elevated', cfg.colors.elevated);
@@ -99,16 +102,20 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col font-sans bg-[var(--theme-bg)] text-[var(--theme-text-primary)]">
         <QueryProvider>
           <ThemeProvider>
-            <ActiveBotProvider>
-              <GlobalLayoutProvider>
-                <MarketGatewayProvider>
-                  <GlobalDataProvider>
-                    <BackendAvailabilityBanner />
-                    {children}
-                  </GlobalDataProvider>
-                </MarketGatewayProvider>
-              </GlobalLayoutProvider>
-            </ActiveBotProvider>
+            <AuthProvider>
+              <ActiveBotProvider>
+                <GlobalLayoutProvider>
+                  <MarketGatewayProvider>
+                    <GlobalDataProvider>
+                      <BackendAvailabilityBanner />
+                      <AuthGuard>
+                        {children}
+                      </AuthGuard>
+                    </GlobalDataProvider>
+                  </MarketGatewayProvider>
+                </GlobalLayoutProvider>
+              </ActiveBotProvider>
+            </AuthProvider>
           </ThemeProvider>
         </QueryProvider>
       </body>

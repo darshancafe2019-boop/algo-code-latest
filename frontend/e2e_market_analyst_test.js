@@ -50,10 +50,6 @@ async function runMarketAnalystE2ETest() {
     }
   });
 
-  const screenshotsDir = path.join(__dirname, "..", "screenshots");
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-  }
 
   try {
     // 1. Navigate to main page
@@ -91,10 +87,7 @@ async function runMarketAnalystE2ETest() {
     console.log(`  ✓ Detected Directional Bias & Confluence: ${hasDirectionalBias}`);
     console.log(`  ✓ Detected Support / Resistance Levels: ${hasKeyLevels}`);
 
-    // Capture Analyst Drawer Screenshot
-    const drawerScreenshotPath = path.join(screenshotsDir, "market_analyst_copilot_drawer.png");
-    await page.screenshot({ path: drawerScreenshotPath, fullPage: false });
-    console.log(`  ✓ Saved Market Analyst Screenshot: ${drawerScreenshotPath}`);
+    console.log("  ✓ Verified Market Analyst copilot drawer content");
 
     // 4. Test Tab Switching to TIMEFRAMES
     console.log("\n[TEST 3] Testing TIMEFRAMES tab...");

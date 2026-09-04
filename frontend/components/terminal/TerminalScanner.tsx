@@ -69,29 +69,29 @@ export function TerminalScanner() {
   });
 
   return (
-    <div className="flex flex-col h-full bg-[#0E1524] border-l border-[#1A2333]">
+    <div className="flex flex-col h-full bg-[var(--theme-surface)] border-l border-[var(--theme-border)] select-none font-sans">
       {/* Scanner Header & Controls */}
-      <div className="p-3 border-b border-[#1A2333] space-y-3">
+      <div className="p-3 border-b border-[var(--theme-border)] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Radar className="h-4 w-4 text-cyan-400" />
-            <h2 className="text-xs font-bold text-white tracking-wide uppercase">Market Scanner</h2>
+            <Radar className="h-4 w-4 text-sky-400" />
+            <h2 className="text-xs font-bold text-[var(--theme-text-primary)] tracking-wide uppercase font-mono">Market Scanner</h2>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
-            Confluence Engine ≥{minConfluence}%
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono font-semibold">
+            Confluence ≥{minConfluence}%
           </span>
         </div>
 
         {/* Scope selector */}
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-3 gap-1 bg-[var(--theme-elevated)] p-1 rounded-xl border border-[var(--theme-border)] font-mono">
           {(["WATCHLIST", "CRYPTO", "ALL"] as const).map((scope) => (
             <button
               key={scope}
               onClick={() => setScanScope(scope)}
-              className={`py-1 rounded text-[10px] font-semibold transition-colors ${
+              className={`py-1 rounded-lg text-[10px] font-semibold transition-all ${
                 scanScope === scope
-                  ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
-                  : "bg-[#162032] text-slate-400 hover:text-slate-200"
+                  ? "bg-sky-500/20 text-sky-300 border border-sky-500/30 shadow-sm font-bold"
+                  : "text-slate-400 hover:text-slate-200"
               }`}
             >
               {scope}
@@ -101,12 +101,12 @@ export function TerminalScanner() {
 
         {/* Filter controls row */}
         <div className="flex items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400 font-mono">
             <span className="text-[11px]">TF:</span>
             <select
               value={timeframe}
               onChange={(e) => setTimeframe(e.target.value)}
-              className="bg-[#121927] border border-[#1E293B] rounded px-1.5 py-0.5 text-slate-200 text-xs focus:outline-none"
+              className="bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-lg px-2 py-0.5 text-slate-200 text-xs focus:outline-none focus:border-sky-500 transition-colors"
             >
               <option value="5m">5m</option>
               <option value="15m">15m</option>
@@ -116,7 +116,7 @@ export function TerminalScanner() {
             </select>
           </div>
 
-          <div className="flex items-center gap-1.5 text-slate-400">
+          <div className="flex items-center gap-1.5 text-slate-400 font-mono">
             <span className="text-[11px]">Min Conf:</span>
             <input
               type="range"
@@ -125,9 +125,9 @@ export function TerminalScanner() {
               step="5"
               value={minConfluence}
               onChange={(e) => setMinConfluence(Number(e.target.value))}
-              className="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer"
+              className="w-16 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-sky-500"
             />
-            <span className="text-slate-200 font-mono text-[10px]">{minConfluence}%</span>
+            <span className="text-sky-400 font-mono text-[10px] font-bold">{minConfluence}%</span>
           </div>
         </div>
 
@@ -135,7 +135,7 @@ export function TerminalScanner() {
         <button
           onClick={() => scanMutation.mutate()}
           disabled={scanMutation.isPending}
-          className="w-full py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50"
+          className="w-full py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-xs shadow-md shadow-sky-500/20 flex items-center justify-center gap-1.5 transition-all disabled:opacity-50 font-mono"
         >
           {scanMutation.isPending ? (
             <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -149,15 +149,15 @@ export function TerminalScanner() {
       {/* Scanner Results Feed */}
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {scanMutation.isPending ? (
-          <div className="p-8 text-center text-xs text-slate-400 space-y-2">
-            <RefreshCw className="h-5 w-5 animate-spin text-cyan-400 mx-auto" />
+          <div className="p-8 text-center text-xs text-slate-400 space-y-2 font-mono">
+            <RefreshCw className="h-5 w-5 animate-spin text-sky-400 mx-auto" />
             <p>Evaluating Technical Confluence Across Universe...</p>
           </div>
         ) : results.length === 0 ? (
           <div className="p-8 text-center text-xs text-slate-500 space-y-1">
             <Sparkles className="h-6 w-6 text-slate-600 mx-auto" />
-            <p className="font-semibold text-slate-400">Scanner Ready</p>
-            <p className="text-[11px]">Click &quot;Run Confluence Scan&quot; to discover high-probability setups.</p>
+            <p className="font-semibold text-slate-300">Scanner Ready</p>
+            <p className="text-[11px] text-slate-400">Click &quot;Run Confluence Scan&quot; to discover high-probability setups.</p>
           </div>
         ) : (
           results.map((item) => {
@@ -166,54 +166,54 @@ export function TerminalScanner() {
             return (
               <div
                 key={item.symbol}
-                className="bg-[#121927] border border-[#1E293B] rounded-xl p-2.5 hover:border-cyan-500/50 transition-all space-y-2"
+                className="card-specular bg-[var(--theme-elevated)]/60 border border-[var(--theme-border)] rounded-xl p-2.5 hover:border-sky-500/40 transition-all space-y-2"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-bold text-white">{item.symbol}</span>
+                    <span className="text-xs font-bold text-[var(--theme-text-primary)] font-mono">{item.symbol}</span>
                     <span className="text-[10px] font-mono text-slate-400">{item.timeframe}</span>
                   </div>
                   <div className="flex items-center gap-1">
                     <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      className={`text-[10px] px-2 py-0.5 rounded-full font-bold font-mono ${
                         isBullish
-                          ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                          : "bg-red-950 text-red-400 border border-red-800"
+                          ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                          : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                       }`}
                     >
                       {item.recommendation}
                     </span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono font-bold">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 font-mono font-bold">
                       {item.confluence_score}%
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[10px] bg-[#0E1524] p-1.5 rounded-lg font-mono">
+                <div className="grid grid-cols-3 gap-2 text-[10px] bg-[var(--theme-pageBg)] p-2 rounded-lg font-mono">
                   <div>
-                    <span className="text-slate-500">RSI(14): </span>
+                    <span className="text-slate-400">RSI: </span>
                     <strong className="text-slate-200">{item.rsi_14}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-500">MACD: </span>
-                    <strong className={item.macd_signal === "BUY" ? "text-emerald-400" : "text-red-400"}>
+                    <span className="text-slate-400">MACD: </span>
+                    <strong className={item.macd_signal === "BUY" ? "text-emerald-400" : "text-rose-400"}>
                       {item.macd_signal}
                     </strong>
                   </div>
                   <div>
-                    <span className="text-slate-500">R:R: </span>
-                    <strong className="text-cyan-400">{item.risk_reward_ratio}:1</strong>
+                    <span className="text-slate-400">R:R: </span>
+                    <strong className="text-sky-400">{item.risk_reward_ratio}:1</strong>
                   </div>
                 </div>
 
                 {/* 1-Click Action Buttons */}
-                <div className="flex items-center gap-1 pt-1">
+                <div className="flex items-center gap-1 pt-0.5">
                   <button
                     onClick={() => {
                       setActiveSymbol(item.symbol);
                       setActiveTimeframe(item.timeframe);
                     }}
-                    className="flex-1 py-1 rounded bg-[#1A253A] hover:bg-cyan-600 text-slate-200 hover:text-white text-[10px] font-bold transition-colors flex items-center justify-center gap-1"
+                    className="flex-1 py-1 rounded-lg bg-[var(--theme-surface)] hover:bg-sky-500 hover:text-slate-950 text-slate-300 border border-[var(--theme-border)] text-[10px] font-bold transition-all flex items-center justify-center gap-1 font-mono"
                   >
                     <BarChart2 className="h-3 w-3" />
                     Open Chart

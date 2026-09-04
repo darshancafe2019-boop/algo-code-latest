@@ -48,9 +48,9 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-BACKEND_PORT = 5050
-GATEWAY_PORT = 5051
-FRONTEND_PORT = 3100
+BACKEND_PORT = int(os.getenv("PORT", 5050))
+GATEWAY_PORT = int(os.getenv("MARKET_GATEWAY_PORT", 5051))
+FRONTEND_PORT = int(os.getenv("FRONTEND_PORT", 3100))
 
 RESTART_BACKOFF_DELAYS = [1.0, 2.0, 4.0, 8.0, 15.0]
 STABLE_RUN_RESET_SECONDS = 30.0
@@ -479,7 +479,7 @@ class ServiceSupervisor:
             command=[PYTHON_EXEC, "dashboard.py"],
             cwd=ROOT_DIR,
             env=backend_env,
-            health_url=f"http://127.0.0.1:{BACKEND_PORT}/health/ready",
+            health_url=f"http://127.0.0.1:{BACKEND_PORT}/api/health/live",
             port=BACKEND_PORT,
             color_code="\033[92m"
         )
@@ -722,10 +722,117 @@ class ServiceSupervisor:
         self._cleanup_runtime_state()
         self.lock.release()
         log("SHUTDOWN", "\033[92mAll supervisor-owned processes stopped cleanly. Zero orphans remaining.\033[0m")
-        sys.exit(0)
+def stop_supervisor(caller: str = "CLI") -> bool:
+    """Stops any currently running supervisor and cleans up all owned services."""
+    active_state = get_active_supervisor_state()
+    stopped_anything = False
+
+    # Also check lockfile directly
+    lock_pid = None
+    if LOCK_FILE.exists():
+        try:
+            content = LOCK_FILE.read_text().strip()
+            if content.isdigit():
+                lock_pid = int(content)
+        except Exception:
+            pass
+
+    sup_pid = (active_state.get("supervisor_pid") if active_state else None) or lock_pid
+
+    if sup_pid and is_pid_alive(sup_pid):
+        log("STOP", f"Terminating active supervisor process (PID: {sup_pid})...", "\033[93m")
+        _kill_process_tree(sup_pid)
+        stopped_anything = True
+
+    if active_state:
+        services = active_state.get("services", {})
+        for name, spid in services.items():
+            if spid and isinstance(spid, int) and is_pid_alive(spid):
+                log("STOP", f"Terminating service {name} (PID: {spid})...", "\033[93m")
+                _kill_process_tree(spid)
+                stopped_anything = True
+
+    # Clean orphaned port holders
+    clean_stale_quantos_processes(force=True, caller=caller)
+
+    # Clean runtime files
+    if RUNTIME_STATE_FILE.exists():
+        try:
+            RUNTIME_STATE_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+    if LOCK_FILE.exists():
+        try:
+            LOCK_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    if stopped_anything:
+        log("STOP", "\033[92mSuccessfully stopped existing Quant.OS supervisor and services.\033[0m")
+    else:
+        log("STOP", "No active Quant.OS supervisor was running.", "\033[94m")
+    return True
+
+
+def status_supervisor():
+    """Prints current supervisor and service status."""
+    active_state = get_active_supervisor_state()
+    lock_pid = None
+    if LOCK_FILE.exists():
+        try:
+            content = LOCK_FILE.read_text().strip()
+            if content.isdigit():
+                lock_pid = int(content)
+        except Exception:
+            pass
+
+    print("=" * 60)
+    print("           QUANT.OS SUPERVISOR STATUS")
+    print("=" * 60)
+    if active_state or (lock_pid and is_pid_alive(lock_pid)):
+        sup_pid = (active_state.get("supervisor_pid") if active_state else None) or lock_pid
+        started = active_state.get("started_at", "Unknown") if active_state else "Unknown"
+        print(f"Status        : RUNNING")
+        print(f"Supervisor PID: {sup_pid}")
+        print(f"Started At    : {started}")
+        print("-" * 60)
+        print("Services:")
+        services = active_state.get("services", {}) if active_state else {}
+        for name, port in [("FRONTEND", FRONTEND_PORT), ("BACKEND", BACKEND_PORT), ("GATEWAY", GATEWAY_PORT)]:
+            pid = services.get(name)
+            port_active = is_port_in_use(port)
+            status_str = f"PID {pid} (Port {port} active)" if port_active else f"PID {pid} (Port {port} down)"
+            print(f"  * {name:<10}: {status_str}")
+    else:
+        print("Status: STOPPED (No active supervisor running)")
+        print("Ports:")
+        for name, port in [("FRONTEND", FRONTEND_PORT), ("BACKEND", BACKEND_PORT), ("GATEWAY", GATEWAY_PORT)]:
+            active = is_port_in_use(port)
+            print(f"  * {name:<10} (Port {port}): {'IN USE' if active else 'FREE'}")
+    print("=" * 60)
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Quant.OS Unified System Orchestrator & Supervisor")
+    parser.add_argument("--stop", action="store_true", help="Stop any running Quant.OS supervisor and services")
+    parser.add_argument("--restart", action="store_true", help="Restart Quant.OS supervisor and services")
+    parser.add_argument("--status", action="store_true", help="Show Quant.OS supervisor status")
+    args = parser.parse_args()
+
+    if args.status:
+        status_supervisor()
+        return
+
+    if args.stop:
+        stop_supervisor()
+        return
+
+    if args.restart:
+        log("RESTART", "Stopping existing supervisor before restarting...", "\033[93m")
+        stop_supervisor(caller="CLI_RESTART")
+        time.sleep(1.0)
+
     supervisor = ServiceSupervisor()
 
     def handle_signal(sig, frame):
@@ -745,4 +852,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

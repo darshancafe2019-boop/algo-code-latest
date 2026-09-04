@@ -75,21 +75,21 @@ export function HomeExecutiveOverview() {
   return (
     <div className="w-full space-y-5 text-[var(--theme-text-primary)] font-sans max-w-7xl mx-auto pb-12">
       {/* 1. Executive Operations Header */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-xl flex flex-wrap items-center justify-between gap-4">
+      <div className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] shadow-xl card-specular backdrop-blur-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
-          <div className="p-3 rounded-2xl bg-[var(--theme-accent)]/15 border border-[var(--theme-accent)]/30 text-[var(--theme-accent)] shadow-md shadow-[var(--theme-accent)]/10">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-500/20 via-blue-600/10 to-transparent border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-[0_0_16px_rgba(56,189,248,0.25)]">
             <Activity className="h-6 w-6" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-bold tracking-tight">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-lg sm:text-xl font-bold tracking-tight text-slate-100">
                 Executive Trading Operations
               </h1>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold font-mono bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30">
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full font-bold font-mono bg-sky-500/10 text-sky-400 border border-sky-500/30 tracking-wider shadow-xs">
                 PORTFOLIO OVERVIEW
               </span>
             </div>
-            <p className="text-xs text-[var(--theme-text-secondary)] mt-0.5">
+            <p className="text-xs text-slate-400 mt-0.5 font-normal">
               Real-time capital posture, active execution engines, and risk telemetry.
             </p>
           </div>
@@ -97,43 +97,45 @@ export function HomeExecutiveOverview() {
 
         {/* Global Operational Health Badges */}
         <div className="flex items-center gap-2.5 text-xs font-mono">
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-bold ${
+          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 font-bold shadow-xs ${
             tradingMode === "LIVE"
-              ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40 animate-pulse"
-              : "bg-[var(--theme-info)]/15 text-[var(--theme-info)] border-[var(--theme-info)]/40"
+              ? "bg-rose-500/15 text-rose-300 border-rose-500/40 animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.3)]"
+              : "bg-sky-500/10 text-sky-300 border-sky-500/30 shadow-[0_0_10px_rgba(56,189,248,0.15)]"
           }`}>
-            <Shield className="h-3.5 w-3.5" />
+            <Shield className="h-3.5 w-3.5 text-sky-400" />
             <span>MODE: {tradingMode}</span>
           </div>
 
-          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-1.5 font-bold ${
+          <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 font-bold shadow-xs ${
             killSwitchActive
-              ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40"
-              : "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/40"
+              ? "bg-rose-500/15 text-rose-300 border-rose-500/40"
+              : "bg-emerald-500/10 text-emerald-300 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]"
           }`}>
-            <span className={`w-2 h-2 rounded-full ${killSwitchActive ? "bg-[var(--theme-loss)]" : "bg-[var(--theme-profit)] animate-pulse"}`} />
+            <span className={`w-2 h-2 rounded-full ${killSwitchActive ? "bg-rose-500" : "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.9)]"}`} />
             <span>{killSwitchActive ? "HALT ACTIVE" : "GATE ARMED"}</span>
           </div>
         </div>
       </div>
 
       {/* 2. Top Metric Cards Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Metric 1: Account Balance */}
         <div
           onClick={() => router.push("/pnl")}
-          className="p-4 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 transition-all cursor-pointer shadow-lg group relative overflow-hidden"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular card-interactive cursor-pointer group relative overflow-hidden backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-[var(--theme-text-secondary)]">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">Total Balance</span>
-            <DollarSign className="h-4 w-4 text-[var(--theme-accent)] group-hover:scale-110 transition" />
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Total Balance</span>
+            <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform">
+              <DollarSign className="h-4 w-4" />
+            </div>
           </div>
-          <div className="mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-[var(--theme-text-primary)]">
+          <div className="mt-3 text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-slate-50 tracking-tight">
             {formatMoney(balance, "$")}
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/[0.06] pt-2.5">
             <span>Available Capital</span>
-            <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
+            <span className="text-sky-400 group-hover:text-sky-300 font-semibold flex items-center gap-0.5 transition-colors">
               Ledger <ChevronRight className="h-3 w-3" />
             </span>
           </div>
@@ -142,27 +144,29 @@ export function HomeExecutiveOverview() {
         {/* Metric 2: Today's P&L */}
         <div
           onClick={() => router.push("/pnl")}
-          className="p-4 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 transition-all cursor-pointer shadow-lg group relative overflow-hidden"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular card-interactive cursor-pointer group relative overflow-hidden backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-[var(--theme-text-secondary)]">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">Today&apos;s Realized P&L</span>
-            {isProfit ? (
-              <TrendingUp className="h-4 w-4 text-[var(--theme-profit)] group-hover:scale-110 transition" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-[var(--theme-loss)] group-hover:scale-110 transition" />
-            )}
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Today&apos;s Realized P&L</span>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform ${
+              isProfit
+                ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"
+                : "bg-rose-500/10 border border-rose-500/20 text-rose-400"
+            }`}>
+              {isProfit ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+            </div>
           </div>
-          <div className={`mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
+          <div className={`mt-3 text-2xl sm:text-3xl font-extrabold font-mono tabular-nums tracking-tight ${isProfit ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPnL(todaysPnl, "$").formatted}
-            <span className="text-xs font-semibold ml-1.5 opacity-90">
+            <span className="text-xs font-semibold ml-1.5 opacity-90 font-mono">
               {todaysPnlPct !== null && !isNaN(todaysPnlPct)
                 ? `(${formatPercent(todaysPnlPct, 2, true)})`
                 : "(N/A)"}
             </span>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/[0.06] pt-2.5">
             <span>Authoritative P&L</span>
-            <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
+            <span className="text-sky-400 group-hover:text-sky-300 font-semibold flex items-center gap-0.5 transition-colors">
               Analytics <ChevronRight className="h-3 w-3" />
             </span>
           </div>
@@ -171,18 +175,20 @@ export function HomeExecutiveOverview() {
         {/* Metric 3: Active Positions */}
         <div
           onClick={() => router.push("/positions")}
-          className="p-4 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 transition-all cursor-pointer shadow-lg group relative overflow-hidden"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular card-interactive cursor-pointer group relative overflow-hidden backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-[var(--theme-text-secondary)]">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">Active Positions</span>
-            <Layers className="h-4 w-4 text-[var(--theme-info)] group-hover:scale-110 transition" />
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Active Positions</span>
+            <div className="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 group-hover:scale-110 transition-transform">
+              <Layers className="h-4 w-4" />
+            </div>
           </div>
-          <div className="mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-[var(--theme-text-primary)]">
-            {openPositionsCount} <span className="text-xs font-normal text-[var(--theme-text-secondary)]">OPEN</span>
+          <div className="mt-3 text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-slate-50 tracking-tight">
+            {openPositionsCount} <span className="text-xs font-semibold text-slate-400 font-sans">OPEN</span>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/[0.06] pt-2.5">
             <span>Exposure Protected</span>
-            <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
+            <span className="text-sky-400 group-hover:text-sky-300 font-semibold flex items-center gap-0.5 transition-colors">
               Positions <ChevronRight className="h-3 w-3" />
             </span>
           </div>
@@ -191,36 +197,40 @@ export function HomeExecutiveOverview() {
         {/* Metric 4: Risk Gate Status */}
         <div
           onClick={() => router.push("/risk")}
-          className="p-4 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 transition-all cursor-pointer shadow-lg group relative overflow-hidden"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular card-interactive cursor-pointer group relative overflow-hidden backdrop-blur-md"
         >
-          <div className="flex items-center justify-between text-xs text-[var(--theme-text-secondary)]">
-            <span className="font-semibold uppercase tracking-wider text-[10px]">Risk Gate Pipeline</span>
-            <Shield className="h-4 w-4 text-[var(--theme-profit)] group-hover:scale-110 transition" />
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="font-semibold uppercase tracking-wider text-[11px]">Risk Gate Pipeline</span>
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 group-hover:scale-110 transition-transform">
+              <Shield className="h-4 w-4" />
+            </div>
           </div>
-          <div className="mt-2 text-xl sm:text-2xl font-bold font-mono tabular-nums text-[var(--theme-profit)]">
+          <div className="mt-3 text-2xl sm:text-3xl font-extrabold font-mono tabular-nums text-emerald-400 tracking-tight">
             {riskStatus}
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] border-t border-[var(--theme-border-subtle)] pt-2">
+          <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400 border-t border-white/[0.06] pt-2.5">
             <span>14 Pre-Order Gates</span>
-            <span className="text-[var(--theme-accent)] font-semibold flex items-center gap-0.5">
+            <span className="text-sky-400 group-hover:text-sky-300 font-semibold flex items-center gap-0.5 transition-colors">
               Risk Engine <ChevronRight className="h-3 w-3" />
             </span>
           </div>
         </div>
       </div>
 
-      {/* 3. Mid-Grid: Active Bots & Recent Executions (Compact Previews) */}
+      {/* 3. Mid-Grid: Active Bots & Recent Executions */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Card A: Active Bots Preview */}
-        <div className="p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-xl flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
-            <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4 text-[var(--theme-accent)]" />
-              <h3 className="text-sm font-bold tracking-tight">Active Execution Bots</h3>
+        <div className="p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular backdrop-blur-md flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                <Bot className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-bold tracking-tight text-slate-100">Active Execution Bots</h3>
             </div>
             <button
               onClick={() => router.push("/bots")}
-              className="text-xs font-semibold text-[var(--theme-accent)] hover:underline flex items-center gap-1"
+              className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors"
             >
               <span>View All Bots</span>
               <ExternalLink className="h-3 w-3" />
@@ -229,7 +239,7 @@ export function HomeExecutiveOverview() {
 
           <div className="space-y-2.5">
             {(!botsData || botsData.length === 0) ? (
-              <div className="p-6 text-center text-xs text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border-subtle)]">
+              <div className="p-8 text-center text-xs text-slate-400 bg-[var(--theme-elevated)]/40 rounded-xl border border-dashed border-white/[0.08]">
                 No active bot instances currently configured.
               </div>
             ) : (
@@ -240,24 +250,24 @@ export function HomeExecutiveOverview() {
                   <div
                     key={bot.id || idx}
                     onClick={() => router.push("/bots")}
-                    className="p-3 rounded-xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-border)] transition flex items-center justify-between gap-3 cursor-pointer"
+                    className="p-3.5 rounded-xl bg-[var(--theme-elevated)]/70 border border-white/[0.05] hover:border-sky-500/30 hover:bg-[var(--theme-elevated)] transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs"
                   >
                     <div className="flex items-center gap-3">
-                      <span className={`w-2 h-2 rounded-full ${isRunning ? "bg-[var(--theme-profit)] animate-pulse" : "bg-[var(--theme-text-muted)]"}`} />
+                      <span className={`w-2.5 h-2.5 rounded-full ${isRunning ? "bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" : "bg-slate-500"}`} />
                       <div>
-                        <div className="text-xs font-bold text-[var(--theme-text-primary)]">{bot.name || "Bot Instance"}</div>
-                        <div className="text-[11px] text-[var(--theme-text-secondary)] font-mono">
+                        <div className="text-xs font-bold text-slate-100">{bot.name || "Bot Instance"}</div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                           {bot.symbol || "BTC/USDT"} • {bot.strategy || "Trend Confluence"}
                         </div>
                       </div>
                     </div>
 
                     <div className="text-right">
-                      <div className={`text-xs font-mono font-bold ${pnl >= 0 ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
+                      <div className={`text-xs font-mono font-bold ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                         {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                       </div>
-                      <span className={`text-[9px] px-2 py-0.5 rounded font-mono font-bold ${
-                        isRunning ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)]" : "bg-[var(--theme-text-muted)]/15 text-[var(--theme-text-muted)]"
+                      <span className={`text-[9px] px-2 py-0.5 rounded-md font-mono font-bold mt-1 inline-block ${
+                        isRunning ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" : "bg-slate-700/40 text-slate-400 border border-slate-600/30"
                       }`}>
                         {bot.status || "STOPPED"}
                       </span>
@@ -270,15 +280,17 @@ export function HomeExecutiveOverview() {
         </div>
 
         {/* Card B: Recent Trade Executions Preview */}
-        <div className="p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-xl flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
-            <div className="flex items-center gap-2">
-              <Send className="h-4 w-4 text-[var(--theme-info)]" />
-              <h3 className="text-sm font-bold tracking-tight">Recent Order Executions</h3>
+        <div className="p-5 rounded-2xl bg-[var(--theme-surface)]/85 border border-[var(--theme-border)] card-specular backdrop-blur-md flex flex-col justify-between space-y-4">
+          <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1.5 rounded-lg bg-sky-500/10 text-sky-400">
+                <Send className="h-4 w-4" />
+              </div>
+              <h3 className="text-sm font-bold tracking-tight text-slate-100">Recent Order Executions</h3>
             </div>
             <button
               onClick={() => router.push("/orders")}
-              className="text-xs font-semibold text-[var(--theme-accent)] hover:underline flex items-center gap-1"
+              className="text-xs font-semibold text-sky-400 hover:text-sky-300 flex items-center gap-1 transition-colors"
             >
               <span>View All Orders</span>
               <ExternalLink className="h-3 w-3" />
@@ -287,7 +299,7 @@ export function HomeExecutiveOverview() {
 
           <div className="space-y-2.5">
             {(!tradesData || tradesData.length === 0) ? (
-              <div className="p-6 text-center text-xs text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border-subtle)]">
+              <div className="p-8 text-center text-xs text-slate-400 bg-[var(--theme-elevated)]/40 rounded-xl border border-dashed border-white/[0.08]">
                 No recent executions recorded in ledger.
               </div>
             ) : (
@@ -298,25 +310,25 @@ export function HomeExecutiveOverview() {
                   <div
                     key={trade.id || idx}
                     onClick={() => router.push("/orders")}
-                    className="p-3 rounded-xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-border)] transition flex items-center justify-between gap-3 cursor-pointer font-sans"
+                    className="p-3.5 rounded-xl bg-[var(--theme-elevated)]/70 border border-white/[0.05] hover:border-sky-500/30 hover:bg-[var(--theme-elevated)] transition-all flex items-center justify-between gap-3 cursor-pointer shadow-xs font-sans"
                   >
                     <div className="flex items-center gap-3">
-                      <span className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold ${
-                        isBuy ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30" : "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border border-[var(--theme-loss)]/30"
+                      <span className={`text-[10px] px-2.5 py-1 rounded-md font-mono font-bold tracking-wider ${
+                        isBuy ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shadow-[0_0_8px_rgba(16,185,129,0.15)]" : "bg-rose-500/15 text-rose-400 border border-rose-500/30 shadow-[0_0_8px_rgba(244,63,94,0.15)]"
                       }`}>
                         {isBuy ? "BUY" : "SELL"}
                       </span>
                       <div>
-                        <div className="text-xs font-bold text-[var(--theme-text-primary)]">{trade.symbol || "BTC/USDT"}</div>
-                        <div className="text-[11px] text-[var(--theme-text-muted)] font-mono">
+                        <div className="text-xs font-bold text-slate-100">{trade.symbol || "BTC/USDT"}</div>
+                        <div className="text-[11px] text-slate-400 font-mono mt-0.5">
                           Qty: {trade.quantity || trade.amount || "0.05"} • {trade.timestamp ? String(trade.timestamp).slice(11, 19) : "Just now"}
                         </div>
                       </div>
                     </div>
 
                     <div className="text-right font-mono">
-                      <div className="text-xs font-bold text-[var(--theme-text-primary)]">${fillPrice.toFixed(2)}</div>
-                      <span className="text-[10px] text-[var(--theme-profit)] font-semibold">FILLED</span>
+                      <div className="text-xs font-bold text-slate-100">${fillPrice.toFixed(2)}</div>
+                      <span className="text-[10px] text-emerald-400 font-semibold tracking-wide">FILLED</span>
                     </div>
                   </div>
                 );

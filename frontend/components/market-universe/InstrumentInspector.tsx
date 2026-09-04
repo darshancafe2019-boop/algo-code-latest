@@ -38,7 +38,6 @@ import {
   formatExactNumber,
   formatNumber,
 } from "@/lib/formatters";
-import { InstrumentMiniChart } from "./InstrumentMiniChart";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface InstrumentInspectorProps {
@@ -287,7 +286,7 @@ export function InstrumentInspector({
 
       {/* 2. Navigation Tabs */}
       <div className="flex items-center border-b border-slate-800 bg-[#070C1B] px-3 shrink-0">
-        {(["OVERVIEW", "CHART", "ANALYZE", "TRADE"] as const).map((tab) => {
+        {(["OVERVIEW", "ANALYZE", "TRADE"] as const).map((tab) => {
           if (tab === "TRADE" && isEconomy) return null; // Economy is non-tradable
           const isActive = activeTab === tab;
           return (
@@ -467,12 +466,6 @@ export function InstrumentInspector({
           </div>
         )}
 
-        {/* TAB: CHART */}
-        {activeTab === "CHART" && (
-          <div className="space-y-3">
-            <InstrumentMiniChart instrument={instrument} height={240} />
-          </div>
-        )}
 
         {/* TAB: ANALYZE */}
         {activeTab === "ANALYZE" && (

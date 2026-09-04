@@ -4,7 +4,6 @@ import React from "react";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
 import { NseMarketStrip } from "@/components/nse/NseMarketStrip";
 import { NseAlgoBotPanel } from "@/components/nse/NseAlgoBotPanel";
-import { NseCandleTerminal } from "@/components/nse/NseCandleTerminal";
 import { NseOptionChainTerminal } from "@/components/nse/NseOptionChainTerminal";
 import { NseComprehensiveIntelligence } from "@/components/nse/NseComprehensiveIntelligence";
 import { NseDerivativesHub } from "@/components/nse/NseDerivativesHub";
@@ -27,7 +26,7 @@ export default function NseTerminalPage() {
                 NSE India Market & Algorithmic Trading Bot Terminal
               </h1>
               <p className="text-xs text-slate-400">
-                Authoritative Live NIFTY/BANKNIFTY Multi-Timeframe Candlesticks, Greeks Solver, OI Spurts & Automated Bots
+                Authoritative Live NIFTY/BANKNIFTY Telemetry, Greeks Solver, OI Spurts & Automated Bots
               </p>
             </div>
           </div>
@@ -45,8 +44,6 @@ export default function NseTerminalPage() {
         {/* 2. Automated Algorithmic Trading Bot Hub */}
         <NseAlgoBotPanel />
 
-        {/* 3. Multi-Timeframe Candlestick Feed & Scrip Search */}
-        <NseCandleTerminal />
 
         {/* 4. Live Option Chain Terminal & Greeks Solver */}
         <NseOptionChainTerminal />

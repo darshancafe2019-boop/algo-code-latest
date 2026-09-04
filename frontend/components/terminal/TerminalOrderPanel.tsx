@@ -171,18 +171,18 @@ export function TerminalOrderPanel() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#0E1524] border-l border-[#1A2333] p-3 space-y-3 overflow-y-auto">
+    <div className="flex flex-col h-full bg-[var(--theme-surface)] border-l border-[var(--theme-border)] p-3 space-y-3 overflow-y-auto select-none font-sans">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1A2333] pb-2">
+      <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-2 font-mono">
         <div className="flex items-center gap-1.5">
-          <Zap className="h-4 w-4 text-cyan-400" />
-          <h2 className="text-xs font-bold text-white tracking-wide uppercase">Order Execution</h2>
+          <Zap className="h-4 w-4 text-sky-400" />
+          <h2 className="text-xs font-bold text-[var(--theme-text-primary)] tracking-wide uppercase">Order Execution</h2>
         </div>
         <span
-          className={`text-[10px] px-2 py-0.5 rounded font-bold font-mono ${
+          className={`text-[10px] px-2 py-0.5 rounded-full font-bold font-mono ${
             activeBot?.execution_mode === "LIVE"
-              ? "bg-red-950 text-red-400 border border-red-800"
-              : "bg-cyan-950 text-cyan-400 border border-cyan-800"
+              ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+              : "bg-sky-500/15 text-sky-300 border border-sky-500/30"
           }`}
         >
           {activeBot?.execution_mode || "PAPER"} MODE
@@ -190,12 +190,12 @@ export function TerminalOrderPanel() {
       </div>
 
       {/* Side Selector (BUY vs SELL) */}
-      <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#121927] rounded-xl border border-[#1E293B]">
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)] font-mono">
         <button
           onClick={() => setSide("BUY")}
           className={`py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
             side === "BUY"
-              ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -205,7 +205,7 @@ export function TerminalOrderPanel() {
           onClick={() => setSide("SELL")}
           className={`py-1.5 rounded-lg text-xs font-bold tracking-wide transition-all ${
             side === "SELL"
-              ? "bg-red-600 text-white shadow-lg shadow-red-600/30"
+              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -214,15 +214,15 @@ export function TerminalOrderPanel() {
       </div>
 
       {/* Order Type Selector */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 bg-[var(--theme-elevated)] p-1 rounded-xl border border-[var(--theme-border)] font-mono">
         {(["MARKET", "LIMIT", "STOP", "STOP_LIMIT"] as const).map((t) => (
           <button
             key={t}
             onClick={() => setOrderType(t)}
-            className={`flex-1 py-1 rounded text-[10px] font-semibold transition-colors ${
+            className={`flex-1 py-1 rounded-lg text-[10px] font-semibold transition-all ${
               orderType === t
-                ? "bg-cyan-500/20 text-cyan-400 border border-cyan-500/40"
-                : "bg-[#162032] text-slate-400 hover:text-slate-200"
+                ? "bg-slate-700/80 text-white font-bold shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
             }`}
           >
             {t}
@@ -234,7 +234,7 @@ export function TerminalOrderPanel() {
       <div className="space-y-1">
         <label className="text-[11px] font-medium text-slate-400 flex justify-between">
           <span>Quantity ({activeSymbol.split("/")[0] || "BTC"})</span>
-          <span className="font-mono text-slate-300">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+          <span className="font-mono text-slate-200">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
         </label>
         <input
           type="number"
@@ -242,7 +242,7 @@ export function TerminalOrderPanel() {
           min="0.001"
           value={quantity}
           onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-          className="w-full bg-[#121927] border border-[#1E293B] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+          className="w-full bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--theme-text-primary)] font-mono focus:outline-none focus:border-sky-500 transition-colors"
         />
       </div>
 
@@ -255,7 +255,7 @@ export function TerminalOrderPanel() {
             step="1"
             value={price}
             onChange={(e) => setPrice(parseFloat(e.target.value) || 0)}
-            className="w-full bg-[#121927] border border-[#1E293B] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500"
+            className="w-full bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-xl px-3 py-1.5 text-xs text-[var(--theme-text-primary)] font-mono focus:outline-none focus:border-sky-500 transition-colors"
           />
         </div>
       )}
@@ -263,13 +263,13 @@ export function TerminalOrderPanel() {
       {/* Stop Loss & Take Profit */}
       <div className="grid grid-cols-2 gap-2">
         <div className="space-y-1">
-          <label className="text-[11px] font-medium text-red-400">Stop Loss ($)</label>
+          <label className="text-[11px] font-medium text-rose-400">Stop Loss ($)</label>
           <input
             type="number"
             step="1"
             value={stopLoss}
             onChange={(e) => setStopLoss(parseFloat(e.target.value) || 0)}
-            className="w-full bg-[#121927] border border-red-900/50 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-red-500"
+            className="w-full bg-[var(--theme-pageBg)] border border-rose-500/30 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-rose-500 transition-colors"
           />
         </div>
         <div className="space-y-1">
@@ -279,20 +279,20 @@ export function TerminalOrderPanel() {
             step="1"
             value={takeProfit}
             onChange={(e) => setTakeProfit(parseFloat(e.target.value) || 0)}
-            className="w-full bg-[#121927] border border-emerald-900/50 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+            className="w-full bg-[var(--theme-pageBg)] border border-emerald-500/30 rounded-xl px-2.5 py-1.5 text-xs text-white font-mono focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
       </div>
 
       {/* Risk / Reward & Margin Breakdown */}
-      <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-2.5 space-y-1.5 text-[11px] font-mono">
+      <div className="bg-[var(--theme-elevated)]/70 border border-[var(--theme-border)] rounded-xl p-2.5 space-y-1.5 text-[11px] font-mono">
         <div className="flex justify-between text-slate-400">
           <span>Notional Value:</span>
           <strong className="text-slate-200">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>
         </div>
         <div className="flex justify-between text-slate-400">
           <span>Risk Amount ($):</span>
-          <strong className="text-red-400">${riskAmount.toFixed(2)}</strong>
+          <strong className="text-rose-400">${riskAmount.toFixed(2)}</strong>
         </div>
         <div className="flex justify-between text-slate-400">
           <span>Reward Amount ($):</span>
@@ -312,9 +312,9 @@ export function TerminalOrderPanel() {
       <button
         onClick={() => riskCheckMutation.mutate()}
         disabled={riskCheckMutation.isPending}
-        className="w-full py-1.5 rounded-lg bg-[#162032] hover:bg-[#1E2D44] border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
+        className="w-full py-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-border)] border border-[var(--theme-border)] text-slate-200 hover:text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all font-mono"
       >
-        <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
+        <ShieldCheck className="h-3.5 w-3.5 text-sky-400" />
         <span>{riskCheckMutation.isPending ? "VALIDATING 14 CHECKS..." : "RUN PRE-TRADE RISK CHECK"}</span>
       </button>
 
@@ -323,15 +323,15 @@ export function TerminalOrderPanel() {
         <div
           className={`p-2.5 rounded-xl border text-xs space-y-1 ${
             riskCheckResult.approved
-              ? "bg-emerald-950/30 border-emerald-800 text-emerald-300"
-              : "bg-red-950/30 border-red-800 text-red-300"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border-rose-500/30 text-rose-300"
           }`}
         >
-          <div className="flex items-center gap-1.5 font-bold">
+          <div className="flex items-center gap-1.5 font-bold font-mono">
             {riskCheckResult.approved ? (
               <CheckCircle className="h-4 w-4 text-emerald-400" />
             ) : (
-              <ShieldAlert className="h-4 w-4 text-red-400" />
+              <ShieldAlert className="h-4 w-4 text-rose-400" />
             )}
             <span>{riskCheckResult.approved ? "RISK CHECK APPROVED" : "TRADE BLOCKED"}</span>
           </div>
@@ -343,10 +343,10 @@ export function TerminalOrderPanel() {
       <button
         onClick={handleOrderSubmit}
         disabled={isSubmitting}
-        className={`w-full py-2.5 rounded-xl text-xs font-bold text-white shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 ${
+        className={`w-full py-2.5 rounded-xl text-xs font-bold text-white shadow-md flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50 font-mono ${
           side === "BUY"
-            ? "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-emerald-600/20"
-            : "bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-600/20"
+            ? "bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20"
+            : "bg-rose-600 hover:bg-rose-500 shadow-rose-600/20"
         }`}
       >
         {isSubmitting ? (
@@ -366,14 +366,14 @@ export function TerminalOrderPanel() {
         <div
           className={`p-2.5 rounded-xl border text-xs flex items-center gap-2 ${
             orderFeedback.success
-              ? "bg-emerald-950/40 border-emerald-800 text-emerald-300"
-              : "bg-red-950/40 border-red-800 text-red-300"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border-rose-500/30 text-rose-300"
           }`}
         >
           {orderFeedback.success ? (
             <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-400" />
           ) : (
-            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-400" />
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 text-rose-400" />
           )}
           <span className="font-mono text-[11px]">{orderFeedback.message}</span>
         </div>

@@ -324,7 +324,7 @@ export function PositionDetailDrawer({
               className="p-3 rounded-2xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] border border-[var(--theme-border-subtle)] flex items-center justify-center gap-2 transition"
             >
               <ExternalLink className="h-4 w-4 text-[var(--theme-accent)]" />
-              <span>Open in Terminal Chart</span>
+              <span>Open in Markets</span>
             </button>
 
             <button

@@ -7,7 +7,6 @@ import { useStocksStore } from "../state/stocks-store";
 import { useStockDetails } from "../hooks/use-stock-details";
 import { formatStockCurrency, formatStockPercent } from "../utils/formatting";
 import { StockOverview } from "./StockOverview";
-import { StockChart } from "./StockChart";
 import { StockAnalysis } from "./StockAnalysis";
 import { StockFundamentals } from "./StockFundamentals";
 import { StockTechnicals } from "./StockTechnicals";
@@ -20,7 +19,7 @@ interface StockDetailsDrawerProps {
   onClose: () => void;
 }
 
-type TabType = "OVERVIEW" | "CHART" | "ANALYSIS" | "FUNDAMENTALS" | "TECHNICALS" | "QUALITY";
+type TabType = "OVERVIEW" | "ANALYSIS" | "FUNDAMENTALS" | "TECHNICALS" | "QUALITY";
 
 export const StockDetailsDrawer: React.FC<StockDetailsDrawerProps> = ({ stock, onClose }) => {
   const [activeTab, setActiveTab] = useState<TabType>("OVERVIEW");
@@ -28,7 +27,7 @@ export const StockDetailsDrawer: React.FC<StockDetailsDrawerProps> = ({ stock, o
   const router = useRouter();
 
   const isFav = favorites.has(stock.instrument_id);
-  const { instrument, candles, fundamentals, analysis, isLoading } = useStockDetails(
+  const { instrument, fundamentals, analysis, isLoading } = useStockDetails(
     stock.instrument_id,
     stock.symbol
   );
@@ -47,7 +46,6 @@ export const StockDetailsDrawer: React.FC<StockDetailsDrawerProps> = ({ stock, o
 
   const tabs: { id: TabType; label: string }[] = [
     { id: "OVERVIEW", label: "Overview" },
-    { id: "CHART", label: "Chart" },
     { id: "ANALYSIS", label: "Analysis" },
     { id: "FUNDAMENTALS", label: "Fundamentals" },
     { id: "TECHNICALS", label: "Technicals" },
@@ -149,7 +147,6 @@ export const StockDetailsDrawer: React.FC<StockDetailsDrawerProps> = ({ stock, o
       {/* 3. Tab Body (Scrollable) */}
       <div className="p-4 overflow-y-auto space-y-4 flex-1 custom-scrollbar">
         {activeTab === "OVERVIEW" && <StockOverview quote={stock} instrument={instrument} />}
-        {activeTab === "CHART" && <StockChart candles={candles} currency={stock.currency} isPositive={isPositive} />}
         {activeTab === "ANALYSIS" && <StockAnalysis analysis={analysis} />}
         {activeTab === "FUNDAMENTALS" && <StockFundamentals fundamentals={fundamentals} />}
         {activeTab === "TECHNICALS" && <StockTechnicals technicals={undefined} lastPrice={stock.last_price} />}

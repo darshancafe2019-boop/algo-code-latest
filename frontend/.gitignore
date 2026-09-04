@@ -39,3 +39,24 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Automated browser screenshots
+/screenshots/
+*.png.tmp
+
+# Browser test artifacts & reports
+/test-results/
+/playwright-report/
+/blob-report/
+
+# Browser videos and traces
+/videos/
+trace.zip
+*.trace.zip
+
+# Temporary backup files
+*.bak
+*.backup
+*.old
+*.orig
+*~

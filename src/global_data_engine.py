@@ -73,9 +73,22 @@ class GlobalDataEngine:
 
     def __init__(self):
         self._quote_cache: Dict[str, Dict[str, Any]] = {}
+        self._snapshot_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+        self._positions_cache: Dict[str, Tuple[float, List[Dict[str, Any]]]] = {}
         self._last_snapshot: Optional[Dict[str, Any]] = None
         self._subscribers: List[Any] = []
         self._lock = threading.Lock()
+
+    def invalidate_cache(self, mode: Optional[str] = None):
+        """Invalidates in-memory snapshot and position caches."""
+        with self._lock:
+            if mode:
+                m = mode.upper()
+                self._snapshot_cache.pop(m, None)
+                self._positions_cache.pop(m, None)
+            else:
+                self._snapshot_cache.clear()
+                self._positions_cache.clear()
 
     @classmethod
     def get_instance(cls) -> "GlobalDataEngine":
@@ -132,12 +145,17 @@ class GlobalDataEngine:
             return 152.40
         return None
 
-    def get_portfolio_snapshot(self, mode: str = "PAPER") -> Dict[str, Any]:
+    def get_portfolio_snapshot(self, mode: str = "PAPER", max_age_sec: float = 1.5) -> Dict[str, Any]:
         """
         Builds the authoritative canonical portfolio snapshot.
         Exact contract implementation matching Phase 8 specification.
         """
         trading_mode = str(mode or "PAPER").upper()
+        now_ts = time.time()
+        with self._lock:
+            cached_entry = self._snapshot_cache.get(trading_mode)
+            if cached_entry and (now_ts - cached_entry[0] < max_age_sec):
+                return dict(cached_entry[1])
         is_paper = trading_mode == "PAPER"
         now_iso = datetime.now(timezone.utc).isoformat()
         now_dt = datetime.now(timezone.utc)
@@ -326,11 +344,19 @@ class GlobalDataEngine:
         }
 
         self._last_snapshot = snapshot
+        with self._lock:
+            self._snapshot_cache[trading_mode] = (now_ts, dict(snapshot))
         return snapshot
 
-    def get_positions(self, mode: str = "PAPER") -> List[Dict[str, Any]]:
+    def get_positions(self, mode: str = "PAPER", max_age_sec: float = 1.5) -> List[Dict[str, Any]]:
         """Returns active open positions with live mark prices and real-time P&L."""
         trading_mode = str(mode or "PAPER").upper()
+        now_ts = time.time()
+        with self._lock:
+            cached_pos = self._positions_cache.get(trading_mode)
+            if cached_pos and (now_ts - cached_pos[0] < max_age_sec):
+                return list(cached_pos[1])
+
         rows = []
         try:
             conn = _get_db()
@@ -386,6 +412,8 @@ class GlobalDataEngine:
                 "execution_mode": trading_mode,
             })
 
+        with self._lock:
+            self._positions_cache[trading_mode] = (now_ts, list(positions))
         return positions
 
     def get_orders(self, mode: str = "PAPER", limit: int = 100) -> List[Dict[str, Any]]:

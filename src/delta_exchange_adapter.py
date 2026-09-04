@@ -283,10 +283,14 @@ class DeltaExchangeAdapter:
         stop_price: Optional[float] = None,
         time_in_force: str = "ioc"
     ) -> Dict[str, Any]:
-        """
-        Places a real or paper order on Delta Exchange.
-        """
-        if not self.api_key or not self.api_secret:
+        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        from src.trading_authorization_service import global_trading_authorization_service
+        is_locked = global_trading_authorization_service.is_live_trading_locked()
+
+        if is_locked and trading_mode == "LIVE":
+            raise PermissionError("LIVE Delta Exchange trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
+
+        if trading_mode != "LIVE" or is_locked or not self.api_key or not self.api_secret:
             # Safe paper fallback execution
             return {
                 "success": True,
@@ -326,3 +330,4 @@ class DeltaExchangeAdapter:
 
 
 global_delta_adapter = DeltaExchangeAdapter()
+global_delta_exchange_adapter = global_delta_adapter

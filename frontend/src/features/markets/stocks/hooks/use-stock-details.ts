@@ -8,7 +8,6 @@ import { useQuery } from "@tanstack/react-query";
 import { globalStockStreamClient } from "../api/stocks-stream";
 import {
   fetchStockDetail,
-  fetchStockHistory,
   fetchStockFundamentals,
   fetchStockAnalysis,
 } from "../api/stocks-api";
@@ -41,13 +40,6 @@ export function useStockDetails(instrumentId: string | null, symbol: string | nu
     staleTime: 60000,
   });
 
-  const historyQuery = useQuery({
-    queryKey: ["stockHistory", instrumentId, "15m"],
-    queryFn: () => fetchStockHistory(instrumentId!, "15m", 60),
-    enabled: isEnabled,
-    staleTime: 10000,
-  });
-
   const fundamentalsQuery = useQuery({
     queryKey: ["stockFundamentals", instrumentId],
     queryFn: () => fetchStockFundamentals(instrumentId!),
@@ -64,7 +56,6 @@ export function useStockDetails(instrumentId: string | null, symbol: string | nu
 
   return {
     instrument: detailQuery.data?.data,
-    candles: historyQuery.data?.data || [],
     fundamentals: fundamentalsQuery.data?.data,
     analysis: analysisQuery.data?.data,
     isLoading: detailQuery.isLoading || analysisQuery.isLoading,

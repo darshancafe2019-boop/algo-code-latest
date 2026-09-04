@@ -70,33 +70,33 @@ export function GlobalHealthBar() {
 
   return (
     <>
-      <div className="w-full bg-[#0E1524] border-b border-[#1E293B] px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="w-full bg-[var(--theme-surface)]/90 backdrop-blur-md border-b border-[var(--theme-border)] px-4 py-2 flex flex-wrap items-center justify-between gap-3 text-xs transition-colors select-none font-sans">
         {/* Left Status Pill */}
         <div className="flex items-center gap-3">
           <div
             className={`flex items-center gap-2 px-3 py-1 rounded-full border font-medium transition-all ${
               isKillSwitchActive
-                ? "bg-red-950/60 border-red-500/50 text-red-400 animate-pulse"
+                ? "bg-[var(--theme-loss)]/15 border-[var(--theme-loss)]/40 text-[var(--theme-loss)] animate-pulse"
                 : isHealthy
-                ? "bg-emerald-950/50 border-emerald-500/30 text-emerald-400"
-                : "bg-amber-950/50 border-amber-500/30 text-amber-400"
+                ? "bg-[var(--theme-profit)]/15 border-[var(--theme-profit)]/30 text-[var(--theme-profit)]"
+                : "bg-[var(--theme-warning)]/15 border-[var(--theme-warning)]/30 text-[var(--theme-warning)]"
             }`}
           >
             {isKillSwitchActive ? (
-              <ShieldAlert className="h-3.5 w-3.5 text-red-400" />
+              <ShieldAlert className="h-3.5 w-3.5 text-[var(--theme-loss)]" />
             ) : (
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+              <ShieldCheck className="h-3.5 w-3.5 text-[var(--theme-profit)]" />
             )}
-            <span>
+            <span className="font-mono text-[11px] font-semibold">
               {isKillSwitchActive
-                ? "🔴 TRADING HALTED — Emergency Kill Switch Active"
+                ? "TRADING HALTED — Emergency Kill Switch Active"
                 : `System Healthy — ${metrics.running} Running, ${metrics.stopped} Stopped, ${metrics.paper} Paper`}
             </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-4 text-slate-400 text-xs">
-            <span>Total Bots: <strong className="text-white">{metrics.total_bots}</strong></span>
-            <span>Paper: <strong className="text-cyan-400">{metrics.paper}</strong></span>
+          <div className="hidden md:flex items-center gap-4 text-[var(--theme-text-secondary)] text-xs font-mono">
+            <span>Total Bots: <strong className="text-[var(--theme-text-primary)]">{metrics.total_bots}</strong></span>
+            <span>Paper: <strong className="text-sky-400">{metrics.paper}</strong></span>
             <span>Live: <strong className="text-amber-400">{metrics.live}</strong></span>
           </div>
         </div>
@@ -107,17 +107,17 @@ export function GlobalHealthBar() {
             <button
               onClick={() => killSwitchMutation.mutate({ action: "DEACTIVATE_KILL_SWITCH" })}
               disabled={killSwitchMutation.isPending}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--theme-profit)]/20 hover:bg-[var(--theme-profit)]/30 text-[var(--theme-profit)] border border-[var(--theme-profit)]/40 font-semibold transition-colors"
             >
-              <Zap className="h-3.5 w-3.5 text-emerald-400" />
+              <Zap className="h-3.5 w-3.5 text-[var(--theme-profit)]" />
               <span>Deactivate Kill Switch</span>
             </button>
           ) : (
             <button
               onClick={() => setShowKillSwitchModal(true)}
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-red-600/20 hover:bg-red-600/30 text-red-300 border border-red-500/40 font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[var(--theme-loss)]/15 hover:bg-[var(--theme-loss)]/25 text-[var(--theme-loss)] border border-[var(--theme-loss)]/30 font-semibold transition-colors shadow-sm"
             >
-              <Power className="h-3.5 w-3.5 text-red-400" />
+              <Power className="h-3.5 w-3.5 text-[var(--theme-loss)]" />
               <span>Emergency Kill Switch</span>
             </button>
           )}
@@ -126,31 +126,31 @@ export function GlobalHealthBar() {
 
       {/* Kill Switch Confirmation Modal */}
       {showKillSwitchModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-[#121824] border border-red-500/40 rounded-xl p-6 shadow-2xl">
-            <div className="flex items-center gap-3 mb-4 text-red-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="card-specular w-full max-w-md bg-[var(--theme-surface)] border border-[var(--theme-loss)]/40 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center gap-3 mb-4 text-[var(--theme-loss)]">
               <ShieldAlert className="h-6 w-6 shrink-0" />
-              <h2 className="text-lg font-bold text-white">Emergency Kill Switch</h2>
+              <h2 className="text-lg font-bold text-[var(--theme-text-primary)]">Emergency Kill Switch</h2>
             </div>
-            <p className="text-xs text-slate-300 mb-4 leading-relaxed">
+            <p className="text-xs text-[var(--theme-text-secondary)] mb-4 leading-relaxed">
               Activating the Kill Switch will immediately stop all active trading processes, cancel pending orders, close open positions, and lock the execution pipeline.
             </p>
 
             <div className="mb-4">
-              <label className="block text-xs text-slate-400 mb-1">
-                Type <code className="text-red-400 font-bold">CONFIRM-KILL-SWITCH</code> to proceed:
+              <label className="block text-xs text-[var(--theme-text-muted)] mb-1.5">
+                Type <code className="text-[var(--theme-loss)] font-bold">CONFIRM-KILL-SWITCH</code> to proceed:
               </label>
               <input
                 type="text"
                 value={confirmToken}
                 onChange={(e) => setConfirmToken(e.target.value)}
                 placeholder="CONFIRM-KILL-SWITCH"
-                className="w-full bg-[#0B0F17] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:border-red-500 focus:outline-none"
+                className="w-full bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-sm text-[var(--theme-text-primary)] font-mono focus:border-[var(--theme-loss)] focus:outline-none transition-colors"
               />
             </div>
 
             {errorMessage && (
-              <p className="text-xs text-red-400 bg-red-950/40 border border-red-800 p-2 rounded mb-4">
+              <p className="text-xs text-[var(--theme-loss)] bg-[var(--theme-loss)]/10 border border-[var(--theme-loss)]/30 p-2.5 rounded-xl mb-4">
                 {errorMessage}
               </p>
             )}
@@ -162,7 +162,7 @@ export function GlobalHealthBar() {
                   setErrorMessage("");
                   setConfirmToken("");
                 }}
-                className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                className="px-4 py-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] text-xs font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -174,7 +174,7 @@ export function GlobalHealthBar() {
                     token: confirmToken,
                   })
                 }
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white text-xs font-bold transition-colors"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--theme-loss)] hover:opacity-90 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-lg shadow-[var(--theme-loss)]/25"
               >
                 {killSwitchMutation.isPending && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
                 Trigger Kill Switch

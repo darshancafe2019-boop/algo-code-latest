@@ -44,26 +44,45 @@ def _audit_writer_worker():
             continue
 
         if items:
+            insert_sql = """
+                INSERT INTO bot_event_audit (
+                    event_id, timestamp_utc, local_timestamp, bot_instance_id, bot_instance_name,
+                    account_id, asset_class, symbol, event_type, event_subtype, severity, status,
+                    message, reason, strategy_name, timeframe, confidence_score, threshold, order_id,
+                    trade_id, position_id, correlation_id, provider, exchange, latency_ms,
+                    error_code, error_message, metadata_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """
             try:
-                with get_db_transaction() as conn:
-                    cursor = conn.cursor()
-                    cursor.executemany(
-                        """
-                        INSERT INTO bot_event_audit (
-                            event_id, timestamp_utc, local_timestamp, bot_instance_id, bot_instance_name,
-                            account_id, asset_class, symbol, event_type, event_subtype, severity, status,
-                            message, reason, strategy_name, timeframe, confidence_score, threshold, order_id,
-                            trade_id, position_id, correlation_id, provider, exchange, latency_ms,
-                            error_code, error_message, metadata_json, created_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        items
-                    )
+                clean_items = []
+                for it in items:
+                    clean_it = tuple(None if (isinstance(v, str) and v == "") else v for v in it)
+                    clean_items.append(clean_it)
+
+                if getattr(config, "IS_POSTGRES", False):
+                    from src.db import get_pg_connection, _pg_pool, translate_sqlite_sql_to_postgres
+                    pg_sql = translate_sqlite_sql_to_postgres(insert_sql)
+                    conn = get_pg_connection()
+                    try:
+                        with conn.cursor() as cur:
+                            cur.executemany(pg_sql, clean_items)
+                        conn.commit()
+                    finally:
+                        if _pg_pool:
+                            _pg_pool.putconn(conn)
+                        else:
+                            conn.close()
+                else:
+                    with get_db_transaction() as conn:
+                        cursor = conn.cursor()
+                        cursor.executemany(insert_sql, clean_items)
             except Exception as e:
                 logger.error("Audit batch write failed: %s", e)
+
             finally:
                 for _ in range(len(items)):
                     _audit_queue.task_done()
+
 
 
 def ensure_audit_worker_started():

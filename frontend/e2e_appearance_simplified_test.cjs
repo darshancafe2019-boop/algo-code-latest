@@ -18,10 +18,6 @@ async function runAppearanceSimplifiedE2ETest() {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
-  const screenshotsDir = path.join(__dirname, "..", "screenshots");
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-  }
 
   try {
     // 1. Navigate to home
@@ -59,10 +55,7 @@ async function runAppearanceSimplifiedE2ETest() {
     console.log(`    - Graphite: ${hasGraphite}`);
     console.log(`    - Light Professional: ${hasLight}`);
 
-    // Capture Appearance Modal Screenshot
-    const screenshotPath = path.join(screenshotsDir, "appearance_simplified_4options.png");
-    await page.screenshot({ path: screenshotPath, fullPage: false });
-    console.log(`  ✓ Saved Simplified Appearance Screenshot: ${screenshotPath}`);
+    console.log("  ✓ Appearance modal options verified");
 
     // 4. Test Live Preview (Click Midnight Emerald)
     console.log("\n[TEST 3] Testing Live Preview & Swatch Selection...");
@@ -106,10 +99,7 @@ async function runAppearanceSimplifiedE2ETest() {
     console.log(`    - Typography Families: ${hasTypography}`);
     console.log(`    - WCAG Scorecard: ${hasWcag}`);
 
-    // Capture Advanced Settings Screenshot
-    const advScreenshotPath = path.join(screenshotsDir, "appearance_advanced_settings_expanded.png");
-    await page.screenshot({ path: advScreenshotPath, fullPage: false });
-    console.log(`  ✓ Saved Advanced Settings Screenshot: ${advScreenshotPath}`);
+    console.log("  ✓ Advanced settings verified");
 
     // 7. Test Apply Changes
     console.log("\n[TEST 5] Testing Apply Changes...");

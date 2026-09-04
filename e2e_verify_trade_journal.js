@@ -38,8 +38,8 @@ async function verifyTradeJournal() {
   });
 
   try {
-    console.log("\n[1] Navigating to http://localhost:3000/trade-journal...");
-    await page.goto("http://localhost:3000/trade-journal", { waitUntil: "networkidle2", timeout: 30000 });
+    console.log("\n[1] Navigating to http://localhost:3100/trade-journal...");
+    await page.goto("http://localhost:3100/trade-journal", { waitUntil: "networkidle2", timeout: 30000 });
 
     // 1. Verify Page Title
     const title = await page.evaluate(() => {
@@ -117,8 +117,8 @@ async function verifyTradeJournal() {
     }
 
     // 5. Test Dedicated URL /trade-journal/1
-    console.log("[+] Testing standalone route http://localhost:3000/trade-journal/1...");
-    await page.goto("http://localhost:3000/trade-journal/1", { waitUntil: "networkidle2", timeout: 20000 });
+    console.log("[+] Testing standalone route http://localhost:3100/trade-journal/1...");
+    await page.goto("http://localhost:3100/trade-journal/1", { waitUntil: "networkidle2", timeout: 20000 });
     const standaloneLoaded = await page.evaluate(() => {
       return document.body.innerText.includes("Trade") || document.body.innerText.includes("Overview") || document.body.innerText.includes("STANDALONE");
     });

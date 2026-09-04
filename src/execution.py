@@ -46,6 +46,11 @@ class ExecutionEngine:
         # Validate against market minima using provided ref_price
         self._check_minimums(symbol, amt, ref_price)
 
+        from src import config
+        from src.trading_authorization_service import global_trading_authorization_service
+        if global_trading_authorization_service.is_live_trading_locked() and getattr(config, "TRADING_MODE", "PAPER") == "LIVE":
+            raise PermissionError("LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
+
         order = self.exchange.create_order(symbol, 'market', 'buy', amt)
 
         filled = order.get('filled') if order.get('filled') is not None else amt
@@ -66,6 +71,11 @@ class ExecutionEngine:
             amt = round(amt, 8)
 
         self._check_minimums(symbol, amt, ref_price)
+
+        from src import config
+        from src.trading_authorization_service import global_trading_authorization_service
+        if global_trading_authorization_service.is_live_trading_locked() and getattr(config, "TRADING_MODE", "PAPER") == "LIVE":
+            raise PermissionError("LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
 
         order = self.exchange.create_order(symbol, 'market', 'sell', amt)
 

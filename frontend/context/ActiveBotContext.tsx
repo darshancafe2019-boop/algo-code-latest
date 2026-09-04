@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
 
 export interface BotInstance {
   id: string;
@@ -36,6 +37,7 @@ interface ActiveBotContextType {
 const ActiveBotContext = createContext<ActiveBotContextType | undefined>(undefined);
 
 export function ActiveBotProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [activeBotId, setActiveBotIdState] = useState<string | null>(null);
   const [activeSymbol, setActiveSymbolState] = useState<string>("BTC/USDT");
   const [activeTimeframe, setActiveTimeframeState] = useState<string>("15m");
@@ -77,8 +79,9 @@ export function ActiveBotProvider({ children }: { children: React.ReactNode }) {
       const list = json.bots || json.data || (Array.isArray(json) ? json : []);
       return (Array.isArray(list) ? list : []) as BotInstance[];
     },
+    enabled: !!isAuthenticated,
     staleTime: 6000,
-    refetchInterval: 10000,
+    refetchInterval: isAuthenticated ? 10000 : false,
     placeholderData: (prev) => prev, // Never replace valid data with empty/zero on transient network error
   });
 

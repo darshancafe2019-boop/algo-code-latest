@@ -43,10 +43,6 @@ async function runBotDeletionE2ETest() {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
-  const screenshotsDir = path.join(__dirname, "..", "screenshots");
-  if (!fs.existsSync(screenshotsDir)) {
-    fs.mkdirSync(screenshotsDir, { recursive: true });
-  }
 
   try {
     // 1. Navigate to Bots page
@@ -61,9 +57,7 @@ async function runBotDeletionE2ETest() {
     }
     await new Promise((r) => setTimeout(r, 1000));
 
-    // Capture initial table screenshot
-    await page.screenshot({ path: path.join(screenshotsDir, "e2e_bot_table_clean.png") });
-    console.log("  ✓ Loaded /bots page. Screenshot saved: e2e_bot_table_clean.png");
+    console.log("  ✓ Loaded /bots page successfully.");
 
     // 2. Verify Kebab Actions Menu
     console.log("\n[TEST 2] Testing Kebab Action Menu ('⋮') on Bot Row...");
@@ -78,8 +72,7 @@ async function runBotDeletionE2ETest() {
         return Array.from(menus).map(m => m.textContent).join(" | ");
       });
       console.log(`  Kebab Menu options visible: ${menuText}`);
-      await page.screenshot({ path: path.join(screenshotsDir, "e2e_kebab_menu_open.png") });
-      console.log("  ✓ Kebab menu opened successfully. Screenshot saved: e2e_kebab_menu_open.png");
+      console.log("  ✓ Kebab menu opened successfully.");
 
       // 3. Test Delete Bot Modal Trigger
       console.log("\n[TEST 3] Clicking 'Delete Bot' from Kebab Menu...");
@@ -98,8 +91,7 @@ async function runBotDeletionE2ETest() {
         return h ? h.textContent : "";
       });
       console.log(`  Confirmation Modal Title: "${modalTitle}"`);
-      await page.screenshot({ path: path.join(screenshotsDir, "e2e_single_delete_modal.png") });
-      console.log("  ✓ Single Delete Modal verified. Screenshot saved: e2e_single_delete_modal.png");
+      console.log("  ✓ Single Delete Modal verified.");
 
       // Close modal
       const cancelBtn = await page.evaluateHandle(() => {
@@ -128,8 +120,7 @@ async function runBotDeletionE2ETest() {
         return bar ? bar.textContent : "Not Found";
       });
       console.log(`  Bulk Action Bar content: "${bulkBarText}"`);
-      await page.screenshot({ path: path.join(screenshotsDir, "e2e_bulk_action_bar.png") });
-      console.log("  ✓ Bulk action bar active. Screenshot saved: e2e_bulk_action_bar.png");
+      console.log("  ✓ Bulk action bar active.");
 
       // 5. Test Bulk Delete Modal Trigger
       console.log("\n[TEST 5] Testing Bulk Delete Confirmation Modal...");
@@ -141,8 +132,7 @@ async function runBotDeletionE2ETest() {
         await bulkDeleteBtn.asElement().click();
         await new Promise((r) => setTimeout(r, 800));
 
-        await page.screenshot({ path: path.join(screenshotsDir, "e2e_bulk_delete_modal.png") });
-        console.log("  ✓ Bulk Delete Modal verified. Screenshot saved: e2e_bulk_delete_modal.png");
+        console.log("  ✓ Bulk Delete Modal verified.");
       }
     }
 

@@ -168,19 +168,11 @@ export class TradingCommandRouter {
         }
 
         case "LIVE_MODE": {
-          if (RiskEngine.isKillSwitchActive()) {
-            return {
-              success: false,
-              message: "Cannot switch to LIVE mode while Kill Switch is active",
-              timestamp,
-            };
-          }
-          globalExecutionEngine.setExecutionMode("LIVE");
           return {
-            success: true,
-            message: "Switched options engine to LIVE execution mode",
+            success: false,
+            message: "LIVE execution is strictly BLOCKED: Platform is operating under authoritative server-side lockdown. Only PAPER mode is permitted.",
             timestamp,
-            data: { mode: "LIVE" },
+            data: { mode: "PAPER" },
           };
         }
 

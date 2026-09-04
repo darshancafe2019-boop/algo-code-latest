@@ -164,8 +164,15 @@ class UpstoxBrokerAdapter(BrokerAdapter):
         ik = global_upstox_service.resolve_instrument_key(clean_sym) or f"NSE_EQ|{clean_sym}"
         order_id = f"UPSTOX_ORD_{uuid.uuid4().hex[:10]}"
 
+        # --- AUTHORITATIVE LIVE LOCK & PAPER GATE ---
+        from src.trading_authorization_service import global_trading_authorization_service
+        is_locked = global_trading_authorization_service.is_live_trading_locked()
+
+        if is_locked and trading_mode == "LIVE":
+            raise PermissionError("LIVE Indian trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
+
         # --- LIVE ORDER ROUTING ---
-        if trading_mode == "LIVE":
+        if trading_mode == "LIVE" and not is_locked:
             if not getattr(config, "ENABLE_INDIA_MARKET", True):
                 raise PermissionError("LIVE Indian trading is disabled in configuration (ENABLE_INDIA_MARKET=false).")
 

@@ -59,13 +59,16 @@ class CandleStore:
                 logger.info("CandleStore: using TimescaleDB")
                 return
 
-        # Fall back to SQLite
-        db_path = os.environ.get("DATABASE_PATH", "data/quantos.db")
-        if not os.path.exists(db_path):
-            db_path = "trading_bot.db"
+        # Fall back to canonical SQLite database
+        from pathlib import Path
+        project_root = Path(__file__).resolve().parent.parent
+        default_db = project_root / "data" / "trading_bot.db"
+        db_path = os.environ.get("DATABASE_PATH", str(default_db))
+        if not os.path.exists(db_path) and default_db.exists():
+            db_path = str(default_db)
         self._sqlite_path = db_path
         self._init_sqlite()
-        logger.info("CandleStore: using SQLite at %s", self._sqlite_path)
+        logger.info("CandleStore: using canonical SQLite at %s", self._sqlite_path)
 
     async def _init_timescale(self, url: str) -> bool:
         try:

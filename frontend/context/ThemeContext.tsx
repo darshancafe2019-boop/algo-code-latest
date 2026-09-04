@@ -150,17 +150,30 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Initialize from localStorage with migration
   useEffect(() => {
     try {
+      // Clear obsolete legacy keys
+      localStorage.removeItem("algo_terminal_appearance_v2");
+      localStorage.removeItem("quantos_appearance_v2");
+
       const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.colors) {
+          const isBuiltin = parsed.themeId && parsed.themeId in BUILTIN_THEMES;
+          const isOutdated = !parsed.version || parsed.version < 4;
+
+          const baseTheme = isBuiltin
+            ? BUILTIN_THEMES[parsed.themeId as ThemePreset]
+            : DEFAULT_APPEARANCE_CONFIG;
+
           const merged: AppearanceConfig = {
-            ...DEFAULT_APPEARANCE_CONFIG,
+            ...baseTheme,
             ...parsed,
-            colors: { ...DEFAULT_APPEARANCE_CONFIG.colors, ...parsed.colors },
-            typography: { ...DEFAULT_APPEARANCE_CONFIG.typography, ...parsed.typography },
-            chart: { ...DEFAULT_APPEARANCE_CONFIG.chart, ...parsed.chart },
+            colors: isOutdated && isBuiltin ? { ...baseTheme.colors } : { ...baseTheme.colors, ...parsed.colors },
+            typography: { ...baseTheme.typography, ...parsed.typography },
+            chart: { ...baseTheme.chart, ...parsed.chart },
+            version: 4,
           };
+
           if (merged.themeId !== "custom" && !(merged.themeId in BUILTIN_THEMES)) {
             merged.themeId = "obsidian-blue";
             merged.name = BUILTIN_THEMES["obsidian-blue"].name;
@@ -169,10 +182,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
           setConfig(merged);
           setDraftConfig(merged);
           applyCssTokensToDom(merged);
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(merged));
+          } catch {}
+          return;
         }
-      } else {
-        applyCssTokensToDom(DEFAULT_APPEARANCE_CONFIG);
       }
+      applyCssTokensToDom(DEFAULT_APPEARANCE_CONFIG);
     } catch (e) {
       console.warn("Theme storage load warning:", e);
       applyCssTokensToDom(DEFAULT_APPEARANCE_CONFIG);

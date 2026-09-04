@@ -10,11 +10,6 @@ const path = require("path");
 
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const BASE_URL = "http://localhost:3100";
-const ARTIFACTS_DIR = path.join(__dirname, "../../.artifacts/quant-os-verification");
-
-if (!fs.existsSync(ARTIFACTS_DIR)) {
-  fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
-}
 
 // Master Tab Inventory from Project Navigation
 const NAVIGATION_TABS = [
@@ -260,19 +255,7 @@ async function runMasterTabAudit() {
       console.error("  Sample Failed Network:", failedNetwork.slice(0, 3));
     }
 
-    // Save JSON Artifact
-    const reportArtifact = {
-      timestamp: new Date().toISOString(),
-      totalChecks: results.length,
-      passedCount,
-      failedCount,
-      results,
-    };
-    fs.writeFileSync(
-      path.join(ARTIFACTS_DIR, "tab_verification_report.json"),
-      JSON.stringify(reportArtifact, null, 2)
-    );
-    console.log(`\nArtifact report saved to: ${path.join(ARTIFACTS_DIR, "tab_verification_report.json")}`);
+    console.log(`\nAudit checks completed: ${passedCount} passed, ${failedCount} failed.`);
 
   } finally {
     await browser.close();

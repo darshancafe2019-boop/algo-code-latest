@@ -25,7 +25,7 @@ async function runE2ETests() {
 
   // Test 1: /api/upstox/login
   console.log("\n[1] Testing GET /api/upstox/login...");
-  const loginReq = new Request("http://localhost:3000/api/upstox/login");
+  const loginReq = new Request("http://localhost:3100/api/upstox/login");
   const loginResp = await loginHandler(loginReq);
   console.log("  Status Code:", loginResp.status);
   const location = loginResp.headers.get("location");
@@ -43,7 +43,7 @@ async function runE2ETests() {
 
   // Test 2: /api/upstox/callback with state mismatch (CSRF attack test)
   console.log("\n[2] Testing GET /api/upstox/callback (CSRF protection)...");
-  const badCallbackReq = new Request("http://localhost:3000/api/upstox/callback?code=fake_code&state=wrong_state");
+  const badCallbackReq = new Request("http://localhost:3100/api/upstox/callback?code=fake_code&state=wrong_state");
   const badCallbackResp = await callbackHandler(badCallbackReq);
   const badLocation = badCallbackResp.headers.get("location");
   console.log("  Redirect with bad state:", badLocation);
@@ -54,7 +54,7 @@ async function runE2ETests() {
 
   // Test 3: /api/upstox/status (disconnected)
   console.log("\n[3] Testing GET /api/upstox/status (disconnected)...");
-  const statusReq = new Request("http://localhost:3000/api/upstox/status");
+  const statusReq = new Request("http://localhost:3100/api/upstox/status");
   const statusResp = await statusHandler(statusReq);
   const statusJson = await statusResp.json();
   console.log("  Status Response:", statusJson);
@@ -65,7 +65,7 @@ async function runE2ETests() {
 
   // Test 4: /api/upstox/disconnect
   console.log("\n[4] Testing POST /api/upstox/disconnect...");
-  const discReq = new Request("http://localhost:3000/api/upstox/disconnect", { method: "POST" });
+  const discReq = new Request("http://localhost:3100/api/upstox/disconnect", { method: "POST" });
   const discResp = await disconnectHandler(discReq);
   const discJson = await discResp.json();
   console.log("  Disconnect Response:", discJson);

@@ -111,13 +111,10 @@ class TestBotRegistryAndLifecycle(unittest.TestCase):
     def test_03_bot_lifecycle_transitions_and_idempotency(self):
         """Verify START, PAUSE, RESUME, STOP, RESTART lifecycle transitions and idempotency."""
         bot_id = f"test-lifecycle-{int(time.time()*1000)}"
-        conn = db.get_connection()
-        conn.execute(
+        db.safe_execute(
             "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, 'STOPPED', ?, ?)",
             (bot_id, "Lifecycle Bot", "BTC/USDT", "EMA_MACD_VP", "5m", datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc).isoformat())
         )
-        conn.commit()
-        conn.close()
 
         # 1. Start bot
         res_start = self.client.post(f"/api/bots/{bot_id}/control", json={"action": "START"})

@@ -20,6 +20,7 @@ import React, {
   useState,
 } from "react";
 import { apiClient } from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,6 +99,7 @@ const FALLBACK_SNAPSHOT_POLL_MS = 10_000;
 type SubRef = { reasons: Map<SubscriptionReason, number> };
 
 export function MarketGatewayProvider({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated } = useAuth();
   const [quotes, setQuotes] = useState<Map<string, NormalizedQuote>>(new Map());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("CONNECTING");
   const [providerHealth, setProviderHealth] = useState<ProviderHealthEntry[]>([]);
@@ -110,11 +112,16 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const lastHeartbeatRef = useRef<number>(Date.now());
   const heartbeatWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subRefsRef = useRef<Map<string, SubRef>>(new Map());
+  const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
+  const batchFrameRef = useRef<number | null>(null);
 
   // Resolve optimal gateway WebSocket URL
   const getGatewayWsUrl = useCallback((): string => {
     if (typeof window === "undefined") return "ws://127.0.0.1:5051/ws";
 
+    if (process.env.NEXT_PUBLIC_MARKET_WS_URL) {
+      return process.env.NEXT_PUBLIC_MARKET_WS_URL;
+    }
     if (process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL) {
       return process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL;
     }
@@ -129,7 +136,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // ─── WebSocket connection ───────────────────────────────────────────────────
 
   const connectWS = useCallback(() => {
-    if (!mountedRef.current) return;
+    if (!mountedRef.current || !isAuthenticated) return;
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
         return;
@@ -177,20 +184,39 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         const msg = JSON.parse(event.data);
         if (msg.type === "QUOTE" && msg.data) {
           const quote = msg.data as NormalizedQuote;
-          setQuotes((prev) => {
-            const next = new Map(prev);
-            next.set(quote.symbol.toUpperCase(), quote);
-            return next;
-          });
-          setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
-        } else if (msg.type === "SNAPSHOT" && msg.data) {
-          setQuotes((prev) => {
-            const next = new Map(prev);
-            Object.entries(msg.data as Record<string, NormalizedQuote>).forEach(([sym, q]) => {
-              next.set(sym.toUpperCase(), q);
+          pendingQuotesRef.current.set(quote.symbol.toUpperCase(), quote);
+          if (batchFrameRef.current === null) {
+            batchFrameRef.current = requestAnimationFrame(() => {
+              batchFrameRef.current = null;
+              if (!mountedRef.current || pendingQuotesRef.current.size === 0) return;
+              const updates = new Map(pendingQuotesRef.current);
+              pendingQuotesRef.current.clear();
+              setQuotes((prev) => {
+                const next = new Map(prev);
+                updates.forEach((q, sym) => next.set(sym, q));
+                return next;
+              });
+              setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
             });
-            return next;
+          }
+        } else if (msg.type === "SNAPSHOT" && msg.data) {
+          const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
+          snapshotEntries.forEach(([sym, q]) => {
+            pendingQuotesRef.current.set(sym.toUpperCase(), q);
           });
+          if (batchFrameRef.current === null) {
+            batchFrameRef.current = requestAnimationFrame(() => {
+              batchFrameRef.current = null;
+              if (!mountedRef.current || pendingQuotesRef.current.size === 0) return;
+              const updates = new Map(pendingQuotesRef.current);
+              pendingQuotesRef.current.clear();
+              setQuotes((prev) => {
+                const next = new Map(prev);
+                updates.forEach((q, sym) => next.set(sym, q));
+                return next;
+              });
+            });
+          }
         } else if (msg.type === "HEARTBEAT") {
           setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
         }
@@ -294,6 +320,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // ─── Provider Health Polling ─────────────────────────────────────────────────
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     let isCancelled = false;
 
     const fetchHealth = async () => {
@@ -317,16 +344,31 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       isCancelled = true;
       clearInterval(timer);
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // ─── Initial Connection & Cleanup ────────────────────────────────────────────
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      if (wsRef.current) {
+        try {
+          wsRef.current.close();
+        } catch {}
+        wsRef.current = null;
+      }
+      setConnectionStatus("DISCONNECTED");
+      return;
+    }
+
     mountedRef.current = true;
     connectWS();
 
     return () => {
       mountedRef.current = false;
+      if (batchFrameRef.current !== null) {
+        cancelAnimationFrame(batchFrameRef.current);
+        batchFrameRef.current = null;
+      }
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -359,7 +401,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         wsRef.current = null;
       }
     };
-  }, [connectWS]);
+  }, [isAuthenticated, connectWS]);
 
   // ─── Subscribe / Unsubscribe API ─────────────────────────────────────────────
 

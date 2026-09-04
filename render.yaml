@@ -1,0 +1,44 @@
+services:
+  # 1. Python Flask Backend (Quant.OS API Engine)
+  - type: web
+    name: quantos-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn dashboard:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    healthCheckPath: /health/live
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: APP_ENV
+        value: production
+      - key: TRADING_MODE
+        value: PAPER
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: AUTH_ADMIN_EMAIL
+        value: ashishparadkar1999@gmail.com
+      - key: AUTH_EMAIL_FROM
+        value: onboarding@resend.dev
+      - key: DATABASE_URL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: AUTH_SESSION_SECRET
+        sync: false
+      - key: AUTH_TOTP_ENCRYPTION_KEY
+        sync: false
+
+  # 2. Market Data Gateway (Low-Latency Streaming Gateway)
+  - type: web
+    name: quantos-gateway
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python start_gateway.py
+    healthCheckPath: /health/live
+    envVars:
+      - key: HOST
+        value: 0.0.0.0
+      - key: MARKET_GATEWAY_SECRET
+        sync: false

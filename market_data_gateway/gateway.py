@@ -402,6 +402,11 @@ def create_app() -> tuple:
     app = web.Application(middlewares=[cors_middleware])
 
     app.router.add_get("/health", gateway.handle_health)
+    app.router.add_get("/health/live", gateway.handle_health)
+    app.router.add_get("/health/ready", gateway.handle_health)
+    app.router.add_get("/api/health", gateway.handle_health)
+    app.router.add_get("/api/health/live", gateway.handle_health)
+    app.router.add_get("/api/health/ready", gateway.handle_health)
     app.router.add_get("/providers/health", gateway.handle_health)
     app.router.add_get("/snapshot", gateway.handle_snapshot)
     app.router.add_get("/history", gateway.handle_history)
@@ -422,13 +427,14 @@ def create_app() -> tuple:
 
 
 async def main():
-    port = int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
+    port = int(os.environ.get("MARKET_GATEWAY_PORT", os.environ.get("PORT", "5051")))
+    host = os.environ.get("HOST", "0.0.0.0")
     app, _ = create_app()
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
-    site = web.TCPSite(runner, "127.0.0.1", port)
+    site = web.TCPSite(runner, host, port)
     await site.start()
-    logger.info("Market Data Gateway running on http://127.0.0.1:%d", port)
+    logger.info("Market Data Gateway running on http://%s:%d", host, port)
     stop_event = asyncio.Event()
     try:
         await stop_event.wait()

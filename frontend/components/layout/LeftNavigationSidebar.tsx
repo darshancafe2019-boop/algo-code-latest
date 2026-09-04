@@ -72,6 +72,7 @@ export function LeftNavigationSidebar({
     {
       groupName: "TRADING",
       items: [
+        { id: "terminal", label: "TERMINAL", path: "/terminal", icon: Terminal, shortcut: "⌘T" },
         { id: "bots", label: "BOTS", path: "/bots", icon: Bot, badge: "LIVE" },
         { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
         { id: "futures", label: "FUTURES", path: "/crypto/futures", icon: TrendingUp },
@@ -142,7 +143,7 @@ export function LeftNavigationSidebar({
           {navGroups.map((group) => (
             <div key={group.groupName} className="space-y-1">
               {!isCollapsed && (
-                <span className="hidden xl:block px-3 text-[9px] font-mono font-bold tracking-widest text-[var(--theme-text-muted)] uppercase mb-1.5">
+                <span className="hidden xl:block px-3 text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase mb-2">
                   {group.groupName}
                 </span>
               )}
@@ -159,20 +160,20 @@ export function LeftNavigationSidebar({
                     aria-label={item.label}
                     data-nav-id={item.id}
                     data-nav-path={item.path}
-                    className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative ${
+                    className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${
                       active
-                        ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40 shadow-sm shadow-[var(--theme-accent)]/10"
-                        : "text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-elevated)] border border-transparent"
+                        ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
+                        : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
                     }`}
                   >
                     {/* Active Left Indicator Bar */}
                     {active && (
-                      <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-[var(--theme-accent)] rounded-r-full" />
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-sky-400 rounded-r-full shadow-[0_0_10px_rgba(56,189,248,0.9)]" />
                     )}
 
                     <Icon
                       className={`h-4 w-4 shrink-0 transition-colors ${
-                        active ? "text-[var(--theme-accent)]" : "text-[var(--theme-text-muted)]"
+                        active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
                       }`}
                     />
 
@@ -180,12 +181,12 @@ export function LeftNavigationSidebar({
                       <>
                         <span className="hidden xl:inline-block flex-1 text-left tracking-wide truncate">{item.label}</span>
                         {item.badge && (
-                          <span className="hidden xl:inline-block px-1.5 py-0.2 rounded bg-[var(--theme-elevated)] text-[var(--theme-accent)] text-[9px] font-bold border border-[var(--theme-border)]">
+                          <span className="hidden xl:inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
                             {item.badge}
                           </span>
                         )}
                         {item.shortcut && (
-                          <kbd className="text-[9px] text-[var(--theme-text-muted)] font-mono hidden 2xl:inline">
+                          <kbd className="text-[9px] text-slate-500 font-mono hidden 2xl:inline">
                             {item.shortcut}
                           </kbd>
                         )}

@@ -40,8 +40,8 @@ async function runThemeVerification() {
 
   try {
     // 1. Initial Page Load
-    console.log("\n[1] Navigating to Root URL (http://localhost:3000/)...");
-    await page.goto('http://localhost:3000/', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[1] Navigating to Root URL (http://localhost:3100/)...");
+    await page.goto('http://localhost:3100/', { waitUntil: 'networkidle2', timeout: 20000 });
 
     // 2. Check Default Theme Variables
     console.log("\n[2] Checking Default Theme CSS Custom Properties (Midnight Emerald)...");
@@ -184,8 +184,8 @@ async function runThemeVerification() {
     console.log("    ✓ Persisted Font Mono after reload:", persistedTokens.mono);
 
     // 8. Test Settings Page Appearance Integration
-    console.log("\n[8] Navigating to Settings Page (http://localhost:3000/settings)...");
-    await page.goto('http://localhost:3000/settings', { waitUntil: 'networkidle2' });
+    console.log("\n[8] Navigating to Settings Page (http://localhost:3100/settings)...");
+    await page.goto('http://localhost:3100/settings', { waitUntil: 'networkidle2' });
     const settingsAppearancePresent = await page.evaluate(() => {
       return document.body.textContent.includes('Terminal Theme & Typography System');
     });
@@ -207,8 +207,8 @@ async function runThemeVerification() {
 
     console.log("\n[9] Running Route Smoke Checks across Valid Next.js App Routes...");
     for (const r of validRoutes) {
-      await page.goto(`http://localhost:3000${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
-      console.log(`    ✓ Loaded http://localhost:3000${r} cleanly.`);
+      await page.goto(`http://localhost:3100${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
+      console.log(`    ✓ Loaded http://localhost:3100${r} cleanly.`);
     }
 
     console.log("\n===============================================================");

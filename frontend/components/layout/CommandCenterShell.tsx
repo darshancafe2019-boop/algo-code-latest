@@ -12,6 +12,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MobileCommandSheet } from "./MobileCommandSheet";
 import { QuickOrderModal } from "@/components/order-execution/QuickOrderModal";
 import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
+import { AuthGuard } from "@/components/auth/AuthGuard";
 
 interface CommandCenterShellProps {
   children: React.ReactNode;
@@ -82,54 +83,56 @@ export function CommandCenterShell({
   }, [isSearchOpen, router, setIsSearchOpen]);
 
   return (
-    <div className="min-h-screen h-screen bg-[var(--theme-bg)] text-[var(--theme-text-primary)] flex flex-col font-sans overflow-hidden">
-      {/* 1. TOP COMMAND BAR */}
-      <ErrorBoundary title="Top Command Bar Failed">
-        <TopCommandBar
-          onOpenSearch={() => setIsSearchOpen(true)}
-        />
-      </ErrorBoundary>
-
-      {/* 2. MIDDLE AREA: LEFT NAV + MAIN WORKSPACE */}
-      <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Navigation Sidebar */}
-        <ErrorBoundary title="Left Navigation Failed">
-          <LeftNavigationSidebar
-            isCollapsed={isSidebarCollapsed}
-            onToggleCollapse={toggleSidebar}
-            activeTab={activeTab}
-            onTabSelect={onTabSelect}
+    <AuthGuard>
+      <div className="min-h-screen h-screen bg-[var(--theme-bg)] text-[var(--theme-text-primary)] flex flex-col font-sans overflow-hidden">
+        {/* 1. TOP COMMAND BAR */}
+        <ErrorBoundary title="Top Command Bar Failed">
+          <TopCommandBar
+            onOpenSearch={() => setIsSearchOpen(true)}
           />
         </ErrorBoundary>
 
-        {/* Center Main Workspace */}
-        <main className="flex-1 overflow-y-auto bg-[var(--theme-bg)] p-3 sm:p-4 pb-20 md:pb-4 min-w-0">
-          <ErrorBoundary title="Workspace View Failed">{children}</ErrorBoundary>
-        </main>
-      </div>
+        {/* 2. MIDDLE AREA: LEFT NAV + MAIN WORKSPACE */}
+        <div className="flex-1 flex overflow-hidden relative">
+          {/* Left Navigation Sidebar */}
+          <ErrorBoundary title="Left Navigation Failed">
+            <LeftNavigationSidebar
+              isCollapsed={isSidebarCollapsed}
+              onToggleCollapse={toggleSidebar}
+              activeTab={activeTab}
+              onTabSelect={onTabSelect}
+            />
+          </ErrorBoundary>
 
-      {/* 3. BOTTOM ACTIVITY DOCK */}
-      <ErrorBoundary title="Bottom Activity Dock Failed">
-        <BottomActivityDock
-          isOpen={isBottomDockOpen}
-          onToggle={toggleBottomDock}
+          {/* Center Main Workspace */}
+          <main className="flex-1 overflow-y-auto bg-[var(--theme-bg)] bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(56,189,248,0.07),transparent)] p-3 sm:p-5 pb-20 md:pb-5 min-w-0">
+            <ErrorBoundary title="Workspace View Failed">{children}</ErrorBoundary>
+          </main>
+        </div>
+
+        {/* 3. BOTTOM ACTIVITY DOCK */}
+        <ErrorBoundary title="Bottom Activity Dock Failed">
+          <BottomActivityDock
+            isOpen={isBottomDockOpen}
+            onToggle={toggleBottomDock}
+          />
+        </ErrorBoundary>
+
+        {/* 4. GLOBAL SEARCH MODAL (⌘K) */}
+        <GlobalSearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onNavigateTab={onTabSelect}
         />
-      </ErrorBoundary>
 
-      {/* 4. GLOBAL SEARCH MODAL (⌘K) */}
-      <GlobalSearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onNavigateTab={onTabSelect}
-      />
+        {/* 5. CUSTOM APPEARANCE & THEME EDITOR DRAWER */}
+        <AppearanceDrawer />
 
-      {/* 5. CUSTOM APPEARANCE & THEME EDITOR DRAWER */}
-      <AppearanceDrawer />
-
-      {/* 6. MOBILE COMMAND DOCK & QUICK MODALS */}
-      <MobileCommandSheet />
-      <QuickOrderModal />
-      <CreateBotModal />
-    </div>
+        {/* 6. MOBILE COMMAND DOCK & QUICK MODALS */}
+        <MobileCommandSheet />
+        <QuickOrderModal />
+        <CreateBotModal />
+      </div>
+    </AuthGuard>
   );
 }

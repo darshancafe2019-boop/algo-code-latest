@@ -19,10 +19,13 @@ import struct
 import base64
 import secrets
 import hashlib
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional, List, Tuple
 
-from src import db
+logger = logging.getLogger(__name__)
+
+from src import db, config
 
 # Rate Limiter State: IP/Action -> list of timestamps
 _RATE_LIMIT_STORE: Dict[str, List[float]] = {}
@@ -90,13 +93,77 @@ class PasswordManager:
 
 
 class TOTPManager:
-    """RFC 6238 compliant TOTP engine with anti-replay tracking."""
+    """RFC 6238 compliant TOTP engine with anti-replay tracking and encrypted storage."""
 
     @staticmethod
     def generate_secret() -> str:
-        """Generates 20-byte base32-encoded TOTP secret."""
-        raw_bytes = secrets.token_bytes(20)
-        return base64.b32encode(raw_bytes).decode("utf-8").replace("=", "")
+        """Generates 20-byte base32-encoded TOTP secret compatible with Google Authenticator."""
+        try:
+            import pyotp
+            return pyotp.random_base32()
+        except Exception:
+            raw_bytes = secrets.token_bytes(20)
+            return base64.b32encode(raw_bytes).decode("utf-8").replace("=", "")
+
+    @staticmethod
+    def _get_fernet() -> Any:
+        from cryptography.fernet import Fernet
+        key_raw = (getattr(config, "AUTH_TOTP_ENCRYPTION_KEY", None) or "algo-crypto-secret-key-32bytes!!").encode("utf-8")
+        key_hash = hashlib.sha256(key_raw).digest()
+        b64_key = base64.urlsafe_b64encode(key_hash)
+        return Fernet(b64_key)
+
+    @classmethod
+    def encrypt_secret(cls, secret_b32: str) -> str:
+        """Encrypts base32 secret for safe storage at rest."""
+        if not secret_b32:
+            return ""
+        try:
+            f = cls._get_fernet()
+            return f.encrypt(secret_b32.strip().encode("utf-8")).decode("utf-8")
+        except Exception as e:
+            logger.warning("Secret encryption warning: %s", e)
+            return secret_b32
+
+    @classmethod
+    def decrypt_secret(cls, secret_or_encrypted: str) -> str:
+        """Decrypts secret if encrypted, or returns plaintext as fallback."""
+        if not secret_or_encrypted:
+            return ""
+        raw = secret_or_encrypted.strip()
+        try:
+            f = cls._get_fernet()
+            return f.decrypt(raw.encode("utf-8")).decode("utf-8")
+        except Exception:
+            # Fallback if already stored in plaintext base32
+            return raw
+
+    @staticmethod
+    def get_provisioning_uri(username: str, secret_b32: str, issuer: str = "ALPHA ALGO TERMINAL") -> str:
+        """Generates standardized otpauth:// provisioning URI for Google Authenticator."""
+        try:
+            import pyotp
+            return pyotp.totp.TOTP(secret_b32).provisioning_uri(name=username, issuer_name=issuer)
+        except Exception:
+            return f"otpauth://totp/{issuer}:{username}?secret={secret_b32}&issuer={issuer}&algorithm=SHA1&digits=6&period=30"
+
+    @staticmethod
+    def generate_qr_base64(otpauth_uri: str) -> str:
+        """Generates PNG base64 data URI from otpauth URI."""
+        try:
+            import io
+            import qrcode
+            qr = qrcode.QRCode(version=1, box_size=6, border=2)
+            qr.add_data(otpauth_uri)
+            qr.make(fit=True)
+            img = qr.make_image(fill_color="black", back_color="white")
+            buf = io.BytesIO()
+            img.save(buf, format="PNG")
+            b64_str = base64.b64encode(buf.getvalue()).decode("utf-8")
+            return f"data:image/png;base64,{b64_str}"
+        except Exception as e:
+            logger.warning("QR code generation error: %s", e)
+            return ""
 
     @staticmethod
     def generate_totp_code(secret_b32: str, time_step: Optional[int] = None) -> str:
@@ -117,12 +184,16 @@ class TOTPManager:
         return f"{code_int % 1_000_000:06d}"
 
     @classmethod
-    def verify_totp_code(cls, user_id: str, secret_b32: str, code: str, allowed_drift: int = 1) -> bool:
+    def verify_totp_code(cls, user_id: str, secret_or_encrypted: str, code: str, allowed_drift: int = 1) -> bool:
         """
         Verifies a 6-digit TOTP code within clock skew tolerance (±1 step = 30s).
-        Enforces single-use replay protection.
+        Decrypts secret if encrypted. Enforces single-use replay protection.
         """
         if not code or len(code.strip()) != 6 or not code.strip().isdigit():
+            return False
+
+        secret_b32 = cls.decrypt_secret(secret_or_encrypted)
+        if not secret_b32:
             return False
 
         current_step = int(time.time() // 30)
@@ -133,12 +204,23 @@ class TOTPManager:
             if now - _TOTP_REPLAY_CACHE[k] > 90:
                 _TOTP_REPLAY_CACHE.pop(k, None)
 
+        try:
+            import pyotp
+            totp = pyotp.TOTP(secret_b32)
+            if totp.verify(code.strip(), valid_window=allowed_drift):
+                replay_key = (user_id, current_step)
+                if replay_key in _TOTP_REPLAY_CACHE:
+                    return False
+                _TOTP_REPLAY_CACHE[replay_key] = now
+                return True
+        except Exception:
+            pass
+
         for step in range(current_step - allowed_drift, current_step + allowed_drift + 1):
             expected = cls.generate_totp_code(secret_b32, step)
             if hmac.compare_digest(code.strip(), expected):
                 replay_key = (user_id, step)
                 if replay_key in _TOTP_REPLAY_CACHE:
-                    # Code was already used in this window
                     return False
                 _TOTP_REPLAY_CACHE[replay_key] = now
                 return True
@@ -195,6 +277,11 @@ class RecoveryCodesManager:
     """Manages one-time high-entropy recovery codes."""
 
     @staticmethod
+    def hash_recovery_code(code: str) -> str:
+        """Returns canonical SHA-256 hash of cleaned uppercase recovery code."""
+        return hashlib.sha256(code.strip().upper().encode("utf-8")).hexdigest()
+
+    @staticmethod
     def generate_recovery_codes(count: int = 8) -> Tuple[List[str], List[str]]:
         """
         Generates alphanumeric recovery codes.
@@ -217,23 +304,43 @@ class RecoveryCodesManager:
     def verify_and_consume_code(user_id: str, code: str, stored_hashed_codes: List[str]) -> Tuple[bool, List[str]]:
         """
         Validates recovery code and removes it from the stored list.
-        Returns (is_valid, updated_hashed_codes).
+        Uses constant-time comparison. Returns (is_valid, updated_hashed_codes).
         """
         cleaned = code.strip().upper()
         h = hashlib.sha256(cleaned.encode("utf-8")).hexdigest()
-        if h in stored_hashed_codes:
-            remaining = [c for c in stored_hashed_codes if c != h]
-            return True, remaining
+        for idx, stored in enumerate(stored_hashed_codes):
+            if hmac.compare_digest(h, stored):
+                remaining = stored_hashed_codes[:idx] + stored_hashed_codes[idx + 1:]
+                return True, remaining
         return False, stored_hashed_codes
 
 
+TOTPManager.hash_recovery_code = RecoveryCodesManager.hash_recovery_code
+
+
+# In-memory fast validation cache: token_hash -> (cached_at_timestamp, session_dict)
+_SESSION_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_LAST_ACTIVITY_UPDATE: Dict[str, float] = {}
+_SESSION_CACHE_TTL_SEC = 20.0
+_ACTIVITY_UPDATE_INTERVAL_SEC = 60.0
+
+
 class SessionManager:
-    """Cryptographically secure session manager."""
+    """Cryptographically secure session manager with rotation and idle timeout."""
 
     SESSION_EXPIRY_DAYS = 7
+    IDLE_TIMEOUT_MINUTES = 30
 
     @staticmethod
-    def create_session(user_id: str, device_name: str = "MacBook / Chrome", ip_address: str = "127.0.0.1", user_agent: str = "") -> Tuple[str, Dict[str, Any]]:
+    def invalidate_cache(token_hash: Optional[str] = None):
+        """Clears in-memory session cache for a specific token or entirely."""
+        if token_hash:
+            _SESSION_CACHE.pop(token_hash, None)
+        else:
+            _SESSION_CACHE.clear()
+
+    @staticmethod
+    def create_session(user_id: str, device_name: str = "Browser", ip_address: str = "127.0.0.1", user_agent: str = "") -> Tuple[str, Dict[str, Any]]:
         """
         Creates a new session.
         Returns (raw_session_token, session_metadata).
@@ -243,6 +350,7 @@ class SessionManager:
         session_id = f"sess-{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
         expires_at = (now + timedelta(days=SessionManager.SESSION_EXPIRY_DAYS)).isoformat()
+        now_iso = now.isoformat()
 
         session_dict = {
             "session_id": session_id,
@@ -251,22 +359,71 @@ class SessionManager:
             "device_name": device_name,
             "ip_address": ip_address,
             "user_agent": user_agent,
-            "approximate_location": "Indore, India",
+            "approximate_location": "Localhost",
+            "last_active_at": now_iso,
             "expires_at": expires_at,
         }
 
         db.create_user_session(session_dict)
+        _SESSION_CACHE[token_hash] = (time.time(), dict(session_dict))
         return raw_token, session_dict
 
     @staticmethod
+    def rotate_session(old_session_id: str, user_id: str, device_name: str = "Browser", ip_address: str = "127.0.0.1", user_agent: str = "") -> Tuple[str, Dict[str, Any]]:
+        """Rotates session token on privilege changes or login to protect against session fixation."""
+        SessionManager.invalidate_cache()
+        if old_session_id:
+            db.revoke_session(old_session_id)
+        return SessionManager.create_session(user_id, device_name, ip_address, user_agent)
+
+    @staticmethod
     def validate_session(raw_token: str) -> Optional[Dict[str, Any]]:
-        """Validates raw token against stored session hash."""
+        """Validates raw token against stored session hash, cached in-memory with idle timeout enforcement."""
         if not raw_token:
             return None
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+        now_ts = time.time()
+
+        # 1. Fast in-memory hit
+        cached_entry = _SESSION_CACHE.get(token_hash)
+        if cached_entry:
+            cached_at, cached_session = cached_entry
+            if now_ts - cached_at < _SESSION_CACHE_TTL_SEC:
+                # Throttle database activity update to at most once per 60s
+                last_act = _LAST_ACTIVITY_UPDATE.get(cached_session["session_id"], 0.0)
+                if now_ts - last_act > _ACTIVITY_UPDATE_INTERVAL_SEC:
+                    _LAST_ACTIVITY_UPDATE[cached_session["session_id"]] = now_ts
+                    db.update_session_activity(cached_session["session_id"])
+                return cached_session
+
+        # 2. Database fetch
         session = db.get_user_session_by_token_hash(token_hash)
-        if session:
+        if not session:
+            _SESSION_CACHE.pop(token_hash, None)
+            return None
+
+        # Enforce idle timeout
+        now = datetime.now(timezone.utc)
+        try:
+            last_active_str = session.get("last_active_at")
+            if last_active_str:
+                last_active = datetime.fromisoformat(last_active_str)
+                if last_active.tzinfo is None:
+                    last_active = last_active.replace(tzinfo=timezone.utc)
+                if (now - last_active).total_seconds() > (SessionManager.IDLE_TIMEOUT_MINUTES * 60):
+                    db.revoke_session(session["session_id"])
+                    _SESSION_CACHE.pop(token_hash, None)
+                    return None
+        except Exception:
+            pass
+
+        # Update activity in DB if due
+        last_act = _LAST_ACTIVITY_UPDATE.get(session["session_id"], 0.0)
+        if now_ts - last_act > _ACTIVITY_UPDATE_INTERVAL_SEC:
+            _LAST_ACTIVITY_UPDATE[session["session_id"]] = now_ts
             db.update_session_activity(session["session_id"])
+
+        _SESSION_CACHE[token_hash] = (now_ts, session)
         return session
 
 
@@ -318,66 +475,78 @@ class SecurityAuthManager:
     """Authoritative singleton integrating all identity, authentication and credential subsystems."""
 
     @classmethod
-    def bootstrap_default_admin_if_needed(cls):
-        """Initializes default administrative security credentials if user table is empty."""
+    def initialize_bootstrap_admin(cls) -> None:
+        """
+        Creates or synchronizes bootstrap admin account if AUTH_BOOTSTRAP_ENABLED is set.
+        Guarantees that admin is always accessible with the configured AUTH_BOOTSTRAP_PASSWORD.
+        """
         db.init_db()
-        users = db.safe_query("SELECT * FROM users")
-        if not users:
-            admin_id = "usr_admin_01"
-            username = "admin"
-            email = "admin@algotrading.local"
-            # Default institutional strong password: AlgoTrading@2026!
-            pwd_hash, salt = PasswordManager.hash_password("AlgoTrading@2026!")
-            totp_sec = TOTPManager.generate_secret()
-            raw_codes, hashed_codes = RecoveryCodesManager.generate_recovery_codes()
 
-            passkeys = [
-                {
-                    "credential_id": f"pk_{secrets.token_hex(8)}",
-                    "name": "MacBook Touch ID",
-                    "added_at": datetime.now(timezone.utc).isoformat(),
-                    "last_used_at": datetime.now(timezone.utc).isoformat(),
-                    "sign_count": 42
-                }
-            ]
+        enabled_raw = os.environ.get("AUTH_BOOTSTRAP_ENABLED", "").strip().lower()
+        is_prod = os.environ.get("NODE_ENV") == "production" or os.environ.get("FLASK_ENV") == "production"
+        if enabled_raw:
+            is_enabled = enabled_raw in ["true", "1", "yes"]
+        else:
+            is_enabled = not is_prod
 
-            db.upsert_user({
-                "id": admin_id,
-                "username": username,
-                "email": email,
-                "password_hash": pwd_hash,
-                "salt": salt,
-                "role": "ADMIN",
-                "is_active": 1,
-                "is_2fa_enabled": 1,
-                "totp_secret_encrypted": totp_sec,
-                "passkeys_json": json.dumps(passkeys),
-                "recovery_codes_json": json.dumps(hashed_codes),
-            })
+        if not is_enabled:
+            return
 
-            # Seed default broker credentials with WITHDRAW = 0
-            from src.secrets_manager import global_secrets_manager
-            global_secrets_manager.store_credential(
-                provider_id="binance_spot",
-                account_name="Binance Primary (PAPER/TESTNET)",
-                api_key="bk_test_88449911223344556677",
-                secret_key="sk_test_secret_key_vault_encrypted_secure",
-                allow_read=True,
-                allow_trade=True,
-                allow_withdraw=False,
-                ip_restrictions=["127.0.0.1", "192.168.1.0/24"]
-            )
+        username = (os.environ.get("AUTH_BOOTSTRAP_USERNAME") or "admin").strip()
+        raw_password = (os.environ.get("AUTH_BOOTSTRAP_PASSWORD") or "").strip()
+        if not raw_password and not is_prod:
+            raw_password = (os.environ.get("DEFAULT_BOOTSTRAP_PASS") or "").strip()
+            if not raw_password:
+                raw_password = "AlgoTrading@2026!"
 
-            db.log_security_audit_event(
-                action="SECURITY_BOOTSTRAP_INITIALIZED",
-                actor_user_id=admin_id,
-                actor_role="ADMIN",
-                resource_type="USER",
-                resource_id=admin_id,
-                result="SUCCESS",
-                assurance_level="LEVEL_4_CRITICAL_SECURITY",
-                details={"username": username, "2fa_seeded": True, "passkey_seeded": True}
-            )
+        if not raw_password:
+            if is_prod:
+                logging.getLogger(__name__).error(
+                    "Production bootstrap error: AUTH_BOOTSTRAP_PASSWORD environment variable is not configured. "
+                    "Halting administrator auto-creation to prevent insecure credentials."
+                )
+                return
+
+        existing_user = db.get_user_by_username(username)
+        if existing_user:
+            # If the admin exists and a password is configured in env, synchronize it to prevent lockout
+            if raw_password and not PasswordManager.verify_password(raw_password, existing_user["password_hash"], existing_user["salt"]):
+                pwd_hash, salt = PasswordManager.hash_password(raw_password)
+                db.update_user_password(existing_user["id"], pwd_hash, salt, must_change_password=0)
+                logging.getLogger(__name__).info(f"Bootstrap admin '{username}' password synchronized with AUTH_BOOTSTRAP_PASSWORD.")
+            return
+
+        admin_id = "usr_admin_01"
+        email = os.environ.get("AUTH_BOOTSTRAP_EMAIL", f"{username}@algotrading.local").strip()
+        pwd_hash, salt = PasswordManager.hash_password(raw_password)
+
+        db.upsert_user({
+            "id": admin_id,
+            "username": username,
+            "email": email,
+            "password_hash": pwd_hash,
+            "salt": salt,
+            "role": "ADMIN",
+            "is_active": 1,
+            "is_2fa_enabled": 0,
+            "totp_secret_encrypted": "",
+            "passkeys_json": "[]",
+            "recovery_codes_json": "[]",
+            "must_change_password": 0,
+        })
+
+        db.log_security_audit_event(
+            action="SECURITY_BOOTSTRAP_INITIALIZED",
+            actor_user_id=admin_id,
+            actor_role="ADMIN",
+            resource_type="USER",
+            resource_id=admin_id,
+            result="SUCCESS",
+            assurance_level="LEVEL_4_CRITICAL_SECURITY",
+            details={"username": username, "must_change_password": True}
+        )
+
+    bootstrap_default_admin_if_needed = initialize_bootstrap_admin
 
 
 global_auth_manager = SecurityAuthManager()

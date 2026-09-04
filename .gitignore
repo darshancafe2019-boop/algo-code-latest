@@ -2,7 +2,9 @@
 .env
 .env*
 .env.local
+.env.production
 .env.*.local
+.neon
 
 # SQLite databases
 *.db
@@ -51,6 +53,32 @@ Thumbs.db
 .artifacts/
 .chrome_dev_audit/
 scratch/
+
+# Automated browser screenshots
+/screenshots/
+/frontend/screenshots/
+*.png.tmp
+
+# Browser test artifacts & reports
+/test-results/
+/frontend/test-results/
+/playwright-report/
+/frontend/playwright-report/
+/blob-report/
+/frontend/blob-report/
+
+# Browser videos and traces
+/videos/
+/frontend/videos/
+trace.zip
+*.trace.zip
+
+# Temporary backup files
+*.bak
+*.backup
+*.old
+*.orig
+*~
 
 # Python cache & build files
 __pycache__/

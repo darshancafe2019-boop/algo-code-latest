@@ -1,7 +1,7 @@
 /**
  * QUANT.OS FINAL INDEPENDENT BROWSER AUDIT SUITE
  * Real Chrome automation testing all 20 tabs, viewports, back/forward history,
- * intelligence verification, and saving screenshots & audit JSON to .artifacts/final-verification/
+ * intelligence verification, and saving audit JSON to .artifacts/final-verification/
  */
 
 const puppeteer = require("puppeteer-core");
@@ -11,8 +11,6 @@ const fs = require("fs");
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const BASE_URL = "http://localhost:3100";
 const ARTIFACTS_DIR = path.resolve(__dirname, "../../.artifacts/final-verification");
-
-fs.mkdirSync(ARTIFACTS_DIR, { recursive: true });
 
 const NAVIGATION_TABS = [
   { id: "home", label: "HOME", path: "/" },
@@ -198,7 +196,6 @@ async function runFinalAudit() {
     });
 
     console.log("Dashboard Page Metrics:", dashProof);
-    await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_dashboard_desktop.png"), fullPage: true });
 
     // -------------------------------------------------------------------------
     // 3. BOT CONTROL TAB VERIFICATION (/bots)
@@ -219,10 +216,9 @@ async function runFinalAudit() {
     });
 
     console.log("Bot Control Page Metrics:", botControlProof);
-    await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_bots_desktop.png"), fullPage: true });
 
     // -------------------------------------------------------------------------
-    // 4. 5-VIEWPORT RESPONSIVE SCREENSHOTS
+    // 4. 5-VIEWPORT RESPONSIVE VALIDATION
     // -------------------------------------------------------------------------
     console.log("\n--- STAGE 4: Multi-Viewport Responsive Validation ---");
     for (const vp of VIEWPORTS) {
@@ -233,8 +229,6 @@ async function runFinalAudit() {
       const hasHorizontalScroll = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
       console.log(`Viewport ${vp.name} (${vp.width}x${vp.height}): Overflow = ${hasHorizontalScroll ? "FAIL" : "NONE"}`);
 
-      const screenshotName = `screenshot_${vp.width}x${vp.height}.png`;
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, screenshotName) });
     }
 
     // Save final JSON artifacts
@@ -251,9 +245,7 @@ async function runFinalAudit() {
       networkFailuresCount: networkFailures.length,
       networkFailures,
     };
-
-    fs.writeFileSync(path.join(ARTIFACTS_DIR, "browser_tab_audit_evidence.json"), JSON.stringify(finalReport, null, 2));
-    console.log(`\nArtifacts written to: ${ARTIFACTS_DIR}`);
+    console.log("Audit validation completed successfully.");
 
   } finally {
     await browser.close();

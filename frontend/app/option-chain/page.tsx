@@ -5,7 +5,6 @@ import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
 import { OptionChainView } from "@/components/options/OptionChainView";
 import { NseMarketStrip } from "@/components/nse/NseMarketStrip";
 import { NseAlgoBotPanel } from "@/components/nse/NseAlgoBotPanel";
-import { NseCandleTerminal } from "@/components/nse/NseCandleTerminal";
 import { NseOptionChainTerminal } from "@/components/nse/NseOptionChainTerminal";
 import { NseComprehensiveIntelligence } from "@/components/nse/NseComprehensiveIntelligence";
 import { NseDerivativesHub } from "@/components/nse/NseDerivativesHub";
@@ -25,10 +24,10 @@ export default function OptionChainPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold font-mono text-white tracking-wide">
-                Institutional Option Chain Terminal & Multi-Timeframe Candlesticks
+                Institutional Option Chain Terminal
               </h1>
               <p className="text-xs text-slate-400">
-                Authoritative Candlesticks, Greeks Solver, Strike Analytics, PCR, Max Pain & 1-Click Execution
+                Greeks Solver, Strike Analytics, PCR, Max Pain & 1-Click Execution
               </p>
             </div>
           </div>
@@ -65,7 +64,6 @@ export default function OptionChainPage() {
           <div className="space-y-6">
             <NseMarketStrip />
             <NseAlgoBotPanel />
-            <NseCandleTerminal />
             <NseOptionChainTerminal />
             <NseComprehensiveIntelligence />
             <NseDerivativesHub />

@@ -9,7 +9,6 @@ import {
   Cpu,
   TrendingUp,
   TrendingDown,
-  BarChart2,
   CheckCircle2,
   AlertCircle,
   Zap,
@@ -17,10 +16,10 @@ import {
   ArrowRight,
   ShieldCheck,
 } from "lucide-react";
-import { useNseDerivatives, useNseOiQuadrants, useNseCandles, useNseMarketSummary } from "@/hooks/useNseData";
+import { useNseDerivatives, useNseOiQuadrants, useNseMarketSummary } from "@/hooks/useNseData";
 
 interface OptionsAdvancedDrawersProps {
-  activeDrawer: "none" | "details" | "chart" | "matrix" | "strategies" | "explore";
+  activeDrawer: "none" | "details" | "matrix" | "strategies" | "explore";
   onClose: () => void;
   underlying: string;
   spotPrice: number;
@@ -38,13 +37,11 @@ export function OptionsAdvancedDrawers({
   maxPain,
   setupData,
 }: OptionsAdvancedDrawersProps) {
-  const [chartInterval, setChartInterval] = useState("15m");
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
 
   // Queries for drawers (lazy / cached)
   const { data: derivativesData } = useNseDerivatives();
   const { data: oiQuadrants } = useNseOiQuadrants();
-  const { data: candleData } = useNseCandles(underlying === "NIFTY" ? "NIFTY 50" : underlying, "NSE", chartInterval, 7, true);
   const { data: marketSummary } = useNseMarketSummary();
 
   if (activeDrawer === "none") return null;
@@ -57,7 +54,6 @@ export function OptionsAdvancedDrawers({
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
               {activeDrawer === "details" && <Cpu className="w-5 h-5" />}
-              {activeDrawer === "chart" && <BarChart2 className="w-5 h-5" />}
               {activeDrawer === "matrix" && <Activity className="w-5 h-5" />}
               {activeDrawer === "strategies" && <Zap className="w-5 h-5" />}
               {activeDrawer === "explore" && <Layers className="w-5 h-5" />}
@@ -65,14 +61,12 @@ export function OptionsAdvancedDrawers({
             <div>
               <h3 className="text-base font-bold text-white font-mono uppercase tracking-wider">
                 {activeDrawer === "details" && "System & Greeks Engine Details"}
-                {activeDrawer === "chart" && `${underlying} Interactive Chart`}
                 {activeDrawer === "matrix" && "NSE Market Matrix (4 Quadrants)"}
                 {activeDrawer === "strategies" && "Deterministic Options Strategies"}
                 {activeDrawer === "explore" && "Derivatives Explorer & Movers"}
               </h3>
               <p className="text-[11px] text-slate-400 font-sans">
                 {activeDrawer === "details" && "Provider Health, Pricing Engine & Ingestion Pipeline"}
-                {activeDrawer === "chart" && "Real-time OHLCV, VWAP & Technical Indicators"}
                 {activeDrawer === "matrix" && "Deterministic Price / Open Interest Build-Up Model"}
                 {activeDrawer === "strategies" && "Review Setup Conditions & Assign Strategy to Bot"}
                 {activeDrawer === "explore" && "Most Active Options Contracts by Volume & OI"}
@@ -144,57 +138,6 @@ export function OptionsAdvancedDrawers({
             </div>
           )}
 
-          {/* 2. CHART DRAWER */}
-          {activeDrawer === "chart" && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-2 bg-slate-900 rounded-xl border border-slate-800">
-                <div className="flex items-center gap-1">
-                  {["1m", "5m", "15m", "1h", "1d"].map((tf) => (
-                    <button
-                      key={tf}
-                      onClick={() => setChartInterval(tf)}
-                      className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
-                        chartInterval === tf
-                          ? "bg-cyan-500 text-slate-950 font-extrabold shadow-sm"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      {tf}
-                    </button>
-                  ))}
-                </div>
-                <div className="text-slate-400 text-xs">
-                  {underlying} Spot: <span className="text-white font-bold">₹{spotPrice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              {/* Candles / Mini Chart Viewer */}
-              <div className="p-4 bg-slate-900 border border-slate-800 rounded-xl min-h-[300px] flex flex-col justify-between">
-                <div className="text-xs text-slate-400 mb-2">Recent Candles ({chartInterval})</div>
-                <div className="space-y-1.5 font-mono text-[11px] overflow-y-auto max-h-[250px]">
-                  {(candleData?.candles || []).slice(-10).map((c: any, i: number) => {
-                    const isGreen = c.close >= c.open;
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between p-2 bg-slate-950 rounded-lg border border-slate-800/60"
-                      >
-                        <span className="text-slate-500">{c.timestamp?.substring(11, 19) || `Bar ${i}`}</span>
-                        <span>
-                          O: <span className="text-slate-300">₹{c.open}</span> H: <span className="text-slate-300">₹{c.high}</span> L:{" "}
-                          <span className="text-slate-300">₹{c.low}</span> C:{" "}
-                          <span className={`font-bold ${isGreen ? "text-emerald-400" : "text-rose-400"}`}>
-                            ₹{c.close}
-                          </span>
-                        </span>
-                        <span className="text-slate-400 text-[10px]">Vol: {c.volume?.toLocaleString() || "—"}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* 3. MARKET MATRIX (4 QUADRANTS) */}
           {activeDrawer === "matrix" && (

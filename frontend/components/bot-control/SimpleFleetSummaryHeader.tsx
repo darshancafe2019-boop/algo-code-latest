@@ -44,7 +44,7 @@ export function SimpleFleetSummaryHeader({
     : 0;
 
   return (
-    <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl font-sans select-none space-y-4">
+    <div className="card-specular bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-4 sm:p-5 backdrop-blur-md shadow-xl font-sans select-none space-y-4">
       {/* Top Strip: Fleet Status, Telemetry & Global Actions */}
       <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--theme-border-subtle)] pb-4">
         <div className="flex items-center gap-3.5">
@@ -134,7 +134,7 @@ export function SimpleFleetSummaryHeader({
       {/* 4 Essential Institutional KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
         {/* 1. TODAY P&L */}
-        <div className="p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
+        <div className="card-specular card-interactive p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
           <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] font-sans">
             <span className="font-semibold">Today P&L (Net)</span>
             <TrendingUp className={`w-3.5 h-3.5 ${isPnlPositive ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`} />
@@ -149,7 +149,7 @@ export function SimpleFleetSummaryHeader({
         </div>
 
         {/* 2. CURRENT EXPOSURE */}
-        <div className="p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
+        <div className="card-specular card-interactive p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
           <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] font-sans">
             <span className="font-semibold">Market Exposure</span>
             <DollarSign className="w-3.5 h-3.5 text-[var(--theme-accent)]" />
@@ -163,7 +163,7 @@ export function SimpleFleetSummaryHeader({
         </div>
 
         {/* 3. CAPITAL USED & UTILIZATION */}
-        <div className="p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
+        <div className="card-specular card-interactive p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
           <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] font-sans">
             <span className="font-semibold">Capital Allocation</span>
             <Shield className="w-3.5 h-3.5 text-[var(--theme-warning)]" />
@@ -185,7 +185,7 @@ export function SimpleFleetSummaryHeader({
         </div>
 
         {/* 4. FLEET HEALTH */}
-        <div className="p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
+        <div className="card-specular card-interactive p-3.5 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] rounded-2xl space-y-1.5 shadow-sm">
           <div className="flex items-center justify-between text-[11px] text-[var(--theme-text-muted)] font-sans">
             <span className="font-semibold">Fleet Engine Health</span>
             <ShieldCheck className="w-3.5 h-3.5 text-[var(--theme-profit)]" />

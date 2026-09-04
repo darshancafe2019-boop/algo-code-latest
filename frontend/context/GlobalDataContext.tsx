@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
+import { useAuth } from "@/context/AuthContext";
 import {
   PortfolioSnapshot,
   PositionItem,
@@ -30,6 +31,7 @@ const GlobalDataContext = createContext<GlobalDataContextValue | null>(null);
 
 export function GlobalDataProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   const [tradingMode, setTradingMode] = useState<"PAPER" | "LIVE">("PAPER");
   const [liveSseSnapshot, setLiveSseSnapshot] = useState<PortfolioSnapshot | null>(null);
 
@@ -51,8 +53,9 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       }
       return res.data;
     },
+    enabled: isAuthenticated,
     staleTime: 3000,
-    refetchInterval: 5000,
+    refetchInterval: isAuthenticated ? 5000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -67,8 +70,9 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       if (!res.ok || !res.data) return { positions: [] };
       return res.data;
     },
+    enabled: isAuthenticated,
     staleTime: 3000,
-    refetchInterval: 5000,
+    refetchInterval: isAuthenticated ? 5000 : false,
   });
 
   // 3. Authoritative Orders Query
@@ -82,8 +86,9 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       if (!res.ok || !res.data) return { orders: [] };
       return res.data;
     },
+    enabled: isAuthenticated,
     staleTime: 4000,
-    refetchInterval: 6000,
+    refetchInterval: isAuthenticated ? 6000 : false,
   });
 
   // 4. Authoritative Providers Query
@@ -97,8 +102,9 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       if (!res.ok || !res.data) return { providers: [] };
       return res.data;
     },
+    enabled: isAuthenticated,
     staleTime: 15000,
-    refetchInterval: 30000,
+    refetchInterval: isAuthenticated ? 30000 : false,
   });
 
   // 5. Authoritative Risk Summary Query
@@ -112,12 +118,14 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       if (!res.ok || !res.data) return null;
       return res.data.risk;
     },
+    enabled: isAuthenticated,
     staleTime: 4000,
-    refetchInterval: 6000,
+    refetchInterval: isAuthenticated ? 6000 : false,
   });
 
   // 6. Real-time SSE Stream Listener for sub-second portfolio broadcast
   useEffect(() => {
+    if (!isAuthenticated) return;
     const handle = apiClient.createResilientEventSource(`/api/stream/portfolio?mode=${tradingMode}`, {
       key: `stream_portfolio_${tradingMode}`,
       onMessage: (parsed) => {
@@ -130,7 +138,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
     return () => {
       handle.close();
     };
-  }, [tradingMode]);
+  }, [tradingMode, isAuthenticated]);
 
   const portfolioSnapshot = liveSseSnapshot || restSnapshot || null;
   const positions = positionsData?.positions || [];
@@ -147,6 +155,16 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       refetchRisk(),
     ]);
   }, [refetchSnapshot, refetchPositions, refetchOrders, refetchProviders, refetchRisk]);
+
+  useEffect(() => {
+    const handleReconcile = () => {
+      refreshAll();
+    };
+    window.addEventListener("quantos:reconcile", handleReconcile);
+    return () => {
+      window.removeEventListener("quantos:reconcile", handleReconcile);
+    };
+  }, [refreshAll]);
 
   const value: GlobalDataContextValue = {
     portfolioSnapshot,

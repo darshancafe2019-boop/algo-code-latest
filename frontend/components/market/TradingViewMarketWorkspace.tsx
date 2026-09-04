@@ -19,7 +19,6 @@ import {
   Radio,
   ExternalLink,
 } from "lucide-react";
-import { TradingViewTimeframeSelector } from "@/components/terminal/TradingViewTimeframeSelector";
 import { MultiTimeframeSignalMatrix } from "@/components/terminal/MultiTimeframeSignalMatrix";
 import { QuickTradePanel } from "@/components/terminal/QuickTradePanel";
 import { MarketHealthTelemetry } from "./MarketHealthTelemetry";
@@ -207,11 +206,6 @@ export function TradingViewMarketWorkspace() {
         </div>
       </div>
 
-      {/* 3. TradingView-Style Timeframe Bar */}
-      <TradingViewTimeframeSelector
-        activeTimeframe={activeTimeframe || "5m"}
-        onSelectTimeframe={(tf) => setActiveTimeframe(tf)}
-      />
 
       {/* 4. Multi-Timeframe Confluence Signal Matrix */}
       <MultiTimeframeSignalMatrix symbol={activeSymbol || "BTC/USDT"} />

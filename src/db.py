@@ -2,6 +2,7 @@ import copy
 import json
 import logging
 import random
+import re
 import shutil
 import sqlite3
 import threading
@@ -20,6 +21,49 @@ logger = logging.getLogger("DB")
 _db_initialized = False
 _db_init_lock = threading.Lock()
 F = TypeVar("F", bound=Callable[..., Any])
+
+
+def translate_sqlite_sql_to_postgres(sql: str) -> str:
+    """Translates SQLite SQL constructs (placeholders, INSERT OR REPLACE, INSERT OR IGNORE) to PostgreSQL."""
+    pg_sql = sql
+    
+    # 1. Escape literal % so psycopg doesn't mistake them for format specifiers
+    pg_sql = re.sub(r'(?<!%)%(?!%)', '%%', pg_sql)
+    
+    # 2. Parameter placeholder translation (? -> %s)
+    pg_sql = pg_sql.replace("?", "%s")
+    
+    # 3. Handle legacy SQLite rowid
+    pg_sql = re.sub(r'\bORDER\s+BY\s+rowid\b', 'ORDER BY 1', pg_sql, flags=re.IGNORECASE)
+    pg_sql = re.sub(r'\browid\b', 'id', pg_sql, flags=re.IGNORECASE)
+    
+    # 4. INSERT OR IGNORE INTO
+    if re.search(r'INSERT\s+OR\s+IGNORE\s+INTO', pg_sql, re.IGNORECASE):
+        pg_sql = re.sub(r'INSERT\s+OR\s+IGNORE\s+INTO', 'INSERT INTO', pg_sql, flags=re.IGNORECASE)
+        if "ON CONFLICT" not in pg_sql.upper():
+            pg_sql = pg_sql.rstrip(" ;") + " ON CONFLICT DO NOTHING"
+            
+    # 5. INSERT OR REPLACE INTO table_name (col1, col2, ...) VALUES (%s, %s, ...)
+    replace_match = re.search(r'INSERT\s+OR\s+REPLACE\s+INTO\s+([`"\'\w]+)\s*\((.*?)\)\s*VALUES', pg_sql, re.IGNORECASE | re.DOTALL)
+    if replace_match:
+        table_name = replace_match.group(1).strip('`"\'')
+        cols_str = replace_match.group(2)
+        cols = [c.strip().strip('`"\'') for c in cols_str.split(",") if c.strip()]
+        if cols:
+            pk_col = cols[0]
+            update_cols = cols[1:]
+            if update_cols:
+                update_clause = ", ".join([f'"{c}" = EXCLUDED."{c}"' for c in update_cols])
+                on_conflict = f' ON CONFLICT ("{pk_col}") DO UPDATE SET {update_clause}'
+            else:
+                on_conflict = f' ON CONFLICT ("{pk_col}") DO NOTHING'
+            
+            pg_sql = re.sub(r'INSERT\s+OR\s+REPLACE\s+INTO', 'INSERT INTO', pg_sql, flags=re.IGNORECASE)
+            if "ON CONFLICT" not in pg_sql.upper():
+                pg_sql = pg_sql.rstrip(" ;") + on_conflict
+
+    return pg_sql
+
 
 
 def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: float = 1.0) -> Callable[[F], F]:
@@ -53,6 +97,21 @@ def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: flo
                     raise
         return wrapper  # type: ignore
     return decorator
+
+
+_pg_pool = None
+
+def get_pg_connection():
+    """Returns a PostgreSQL connection, using a connection pool if available."""
+    global _pg_pool
+    if _pg_pool is None:
+        try:
+            from psycopg_pool import ConnectionPool
+            _pg_pool = ConnectionPool(config.DATABASE_URL, min_size=1, max_size=10, timeout=10)
+        except Exception:
+            import psycopg
+            return psycopg.connect(config.DATABASE_URL)
+    return _pg_pool.getconn()
 
 
 def get_connection() -> sqlite3.Connection:
@@ -97,6 +156,21 @@ def get_db_transaction():
 @with_db_retry(max_retries=5)
 def safe_execute(sql: str, params: tuple = ()) -> bool:
     """Execute a mutating statement (INSERT, UPDATE, DELETE) inside a committed transaction."""
+    if getattr(config, "IS_POSTGRES", False):
+        import psycopg
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        conn = get_pg_connection()
+        try:
+            with conn.cursor() as cur:
+                cur.execute(pg_sql, params)
+            conn.commit()
+            return True
+        finally:
+            if _pg_pool:
+                _pg_pool.putconn(conn)
+            else:
+                conn.close()
+
     with get_db_transaction() as conn:
         cursor = conn.cursor()
         cursor.execute(sql, params)
@@ -106,6 +180,25 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
 @with_db_retry(max_retries=5)
 def safe_query(sql: str, params: tuple = ()) -> list:
     """Execute a read-only query safely and return dict rows."""
+    if getattr(config, "IS_POSTGRES", False):
+        import psycopg
+        from psycopg.rows import dict_row
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        conn = get_pg_connection()
+        try:
+            with conn.cursor(row_factory=dict_row) as cur:
+                cur.execute(pg_sql, params)
+                return list(cur.fetchall())
+        except Exception as e:
+            logger.error("safe_query postgres error: %s", e)
+            return []
+
+        finally:
+            if _pg_pool:
+                _pg_pool.putconn(conn)
+            else:
+                conn.close()
+
     conn = None
     try:
         conn = get_connection()
@@ -131,11 +224,55 @@ def safe_query_one(sql: str, params: tuple = ()) -> Optional[dict]:
 
 
 def init_db(force: bool = False) -> None:
-    """Create or verify SQLite tables and configure WAL journal mode once at startup."""
+    """Create or verify database tables (PostgreSQL in production, SQLite in local dev)."""
     global _db_initialized
     with _db_init_lock:
         if _db_initialized and not force:
             return
+
+        if getattr(config, "IS_POSTGRES", False):
+            logger.info("Initializing & verifying authoritative PostgreSQL connection...")
+            try:
+                conn = get_pg_connection()
+                with conn.cursor() as cur:
+                    cur.execute("SELECT 1;")
+                    critical_tables = [
+                        "users", "user_sessions", "password_reset_tokens", "temp_auth_challenges", "email_otp_challenges", "email_delivery_events",
+                        "trades_log", "positions", "derivative_orders", "bot_instances", "strategies", "security_audit_events"
+                    ]
+                    cur.execute(
+                        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(%s);",
+                        (critical_tables,)
+                    )
+                    found = {r[0] for r in cur.fetchall()}
+                    missing = set(critical_tables) - found
+                    if missing:
+                        err_msg = f"PostgreSQL database missing critical tables: {missing}. Run scripts/migrate_sqlite_to_postgres.py"
+                        logger.critical("DATABASE_STARTUP_CRITICAL_FAILURE: %s", err_msg)
+                        raise RuntimeError(err_msg)
+                    # Ensure critical composite indexes exist in PostgreSQL
+                    pg_indexes = [
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_user_sessions_lookup" ON "user_sessions"("token_hash", "is_revoked", "expires_at");',
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_trades_log_query" ON "trades_log"("execution_mode", "status", "timestamp" DESC);',
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_query" ON "bot_instances"("execution_mode", "status");',
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
+                    ]
+                    for idx_sql in pg_indexes:
+                        try:
+                            cur.execute(idx_sql)
+                        except Exception:
+                            pass
+                    conn.commit()
+                if _pg_pool:
+                    _pg_pool.putconn(conn)
+                else:
+                    conn.close()
+                _db_initialized = True
+                logger.info("[OK] PostgreSQL database connection & critical tables verified.")
+                return
+            except Exception as e:
+                logger.critical("FATAL: Failed connecting to authoritative PostgreSQL: %s", e)
+                raise RuntimeError(f"PostgreSQL startup connection failed: {e}")
 
         for attempt in range(5):
             try:
@@ -147,6 +284,7 @@ def init_db(force: bool = False) -> None:
                     cursor.execute("PRAGMA busy_timeout=10000;")
                 except Exception as pragma_err:
                     logger.debug("WAL pragma setup notice: %s", pragma_err)
+
 
                 cursor.execute(
                     """
@@ -2320,6 +2458,7 @@ def init_db(force: bool = False) -> None:
                         totp_secret_encrypted TEXT DEFAULT '',
                         passkeys_json TEXT DEFAULT '[]',
                         recovery_codes_json TEXT DEFAULT '[]',
+                        must_change_password INTEGER NOT NULL DEFAULT 0,
                         created_at TEXT NOT NULL,
                         updated_at TEXT NOT NULL
                     )
@@ -2327,6 +2466,93 @@ def init_db(force: bool = False) -> None:
                 )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+
+                # Safe migration for must_change_password column
+                try:
+                    cursor.execute("ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0")
+                except Exception:
+                    pass
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS totp_enrollments (
+                        enrollment_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        totp_secret TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_totp_enroll_user ON totp_enrollments(user_id)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        token_hash TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        used_at TEXT,
+                        created_at TEXT NOT NULL,
+                        requested_ip TEXT,
+                        FOREIGN KEY(user_id) REFERENCES users(id)
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_pw_reset_hash ON password_reset_tokens(token_hash)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_pw_reset_user ON password_reset_tokens(user_id, used_at)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS email_otp_challenges (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        purpose TEXT NOT NULL,
+                        otp_hash TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        used_at TEXT,
+                        attempt_count INTEGER DEFAULT 0,
+                        requested_ip TEXT,
+                        request_id TEXT
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_otp_user_purp ON email_otp_challenges(user_id, purpose)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_otp_exp ON email_otp_challenges(expires_at)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_otp_hash ON email_otp_challenges(otp_hash)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS email_delivery_events (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT,
+                        recipient_email TEXT NOT NULL,
+                        purpose TEXT NOT NULL,
+                        provider TEXT NOT NULL DEFAULT 'resend',
+                        provider_message_id TEXT DEFAULT '',
+                        status TEXT NOT NULL DEFAULT 'QUEUED',
+                        error_details TEXT DEFAULT '',
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_deliv_rec ON email_delivery_events(recipient_email, created_at DESC)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_email_deliv_status ON email_delivery_events(status)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS temp_auth_challenges (
+                        challenge_id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        ip_address TEXT,
+                        expires_at TEXT NOT NULL,
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_chal_exp ON temp_auth_challenges(expires_at)")
 
                 cursor.execute(
                     """
@@ -9396,7 +9622,7 @@ def reconcile_startup_bot_states() -> Dict[str, Any]:
 
             if not is_alive:
                 safe_execute(
-                    "UPDATE bot_instances SET status = 'STOPPED', process_id = '', lease_token = '', stuck_explanation = 'Process terminated during server restart' WHERE id = ?",
+                    "UPDATE bot_instances SET status = 'STOPPED', desired_state = 'STOPPED', process_id = '', lease_token = '', stuck_explanation = 'Process terminated during server restart' WHERE id = ?",
                     (b_id,)
                 )
                 release_bot_worker_lease(b_id)
@@ -10053,8 +10279,8 @@ def upsert_user(user_dict: Dict[str, Any]) -> bool:
         INSERT INTO users (
             id, username, email, password_hash, salt, role, is_active,
             is_2fa_enabled, totp_secret_encrypted, passkeys_json, recovery_codes_json,
-            created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            must_change_password, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             email = excluded.email,
             password_hash = excluded.password_hash,
@@ -10065,6 +10291,7 @@ def upsert_user(user_dict: Dict[str, Any]) -> bool:
             totp_secret_encrypted = excluded.totp_secret_encrypted,
             passkeys_json = excluded.passkeys_json,
             recovery_codes_json = excluded.recovery_codes_json,
+            must_change_password = excluded.must_change_password,
             updated_at = excluded.updated_at
         """,
         (
@@ -10079,10 +10306,196 @@ def upsert_user(user_dict: Dict[str, Any]) -> bool:
             user_dict.get("totp_secret_encrypted", ""),
             user_dict.get("passkeys_json", "[]"),
             user_dict.get("recovery_codes_json", "[]"),
+            user_dict.get("must_change_password", 0),
             user_dict.get("created_at", now_iso),
             now_iso,
         )
     )
+
+
+create_user = upsert_user
+
+
+def update_user_password(user_id: str, password_hash: str, salt: str, must_change_password: int = 0) -> bool:
+    """Updates user password hash and salt, clearing or setting must_change_password."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET password_hash = ?, salt = ?, must_change_password = ?, updated_at = ? WHERE id = ?",
+        (password_hash, salt, must_change_password, now_iso, user_id)
+    )
+
+
+def set_user_2fa_settings(user_id: str, is_2fa_enabled: int, totp_secret_encrypted: str = "", recovery_codes_json: str = "[]") -> bool:
+    """Updates user 2FA status, secret, and recovery codes."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET is_2fa_enabled = ?, totp_secret_encrypted = ?, recovery_codes_json = ?, updated_at = ? WHERE id = ?",
+        (is_2fa_enabled, totp_secret_encrypted, recovery_codes_json, now_iso, user_id)
+    )
+
+
+def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    """Fetches user record by email address (case-insensitive)."""
+    rows = safe_query("SELECT * FROM users WHERE LOWER(email) = LOWER(?) AND is_active = 1", (email.strip(),))
+    return rows[0] if rows else None
+
+
+def create_password_reset_token(token_id: str, user_id: str, token_hash: str, expires_at: str, requested_ip: str = "") -> bool:
+    """Inserts a new single-use password reset token record."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        """
+        INSERT INTO password_reset_tokens (id, user_id, token_hash, expires_at, used_at, created_at, requested_ip)
+        VALUES (?, ?, ?, ?, NULL, ?, ?)
+        """,
+        (token_id, user_id, token_hash, expires_at, now_iso, requested_ip)
+    )
+
+
+def get_password_reset_token_by_hash(token_hash: str) -> Optional[Dict[str, Any]]:
+    """Fetches unused password reset token by its SHA-256 hash."""
+    rows = safe_query(
+        "SELECT * FROM password_reset_tokens WHERE token_hash = ? AND used_at IS NULL",
+        (token_hash,)
+    )
+    return rows[0] if rows else None
+
+
+def mark_password_reset_token_used(token_id: str) -> bool:
+    """Marks a password reset token as permanently consumed."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE password_reset_tokens SET used_at = ? WHERE id = ?",
+        (now_iso, token_id)
+    )
+
+
+def revoke_all_user_reset_tokens(user_id: str) -> bool:
+    """Invalidates all remaining password reset tokens for a user upon reset completion."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE password_reset_tokens SET used_at = ? WHERE user_id = ? AND used_at IS NULL",
+        (now_iso, user_id)
+    )
+
+
+def create_email_otp_challenge(
+    challenge_id: str,
+    user_id: str,
+    purpose: str,
+    otp_hash: str,
+    expires_at: str,
+    requested_ip: str = "",
+    request_id: str = ""
+) -> bool:
+    """Inserts a new single-use hashed email OTP challenge."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        """
+        INSERT INTO email_otp_challenges (
+            id, user_id, purpose, otp_hash, created_at, expires_at, used_at, attempt_count, requested_ip, request_id
+        ) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?, ?)
+        """,
+        (challenge_id, user_id, purpose, otp_hash, now_iso, expires_at, requested_ip, request_id)
+    )
+
+
+def get_email_otp_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches an email OTP challenge by ID."""
+    rows = safe_query("SELECT * FROM email_otp_challenges WHERE id = ?", (challenge_id,))
+    return rows[0] if rows else None
+
+
+def increment_email_otp_attempts(challenge_id: str) -> int:
+    """Increments the failed attempt counter for an OTP challenge and returns the new count."""
+    safe_execute("UPDATE email_otp_challenges SET attempt_count = attempt_count + 1 WHERE id = ?", (challenge_id,))
+    challenge = get_email_otp_challenge(challenge_id)
+    return challenge.get("attempt_count", 0) if challenge else 0
+
+
+def mark_email_otp_challenge_used(challenge_id: str) -> bool:
+    """Marks an email OTP challenge as permanently consumed."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute("UPDATE email_otp_challenges SET used_at = ? WHERE id = ?", (now_iso, challenge_id))
+
+
+def invalidate_user_otp_challenges(user_id: str, purpose: str) -> bool:
+    """Invalidates all prior active OTP challenges for a user with the given purpose."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE email_otp_challenges SET used_at = ? WHERE user_id = ? AND purpose = ? AND used_at IS NULL",
+        (now_iso, user_id, purpose)
+    )
+
+
+def record_email_delivery_event(
+    event_id: str,
+    user_id: Optional[str],
+    recipient_email: str,
+    purpose: str,
+    provider: str = "resend",
+    provider_message_id: str = "",
+    status: str = "SENT",
+    error_details: str = ""
+) -> bool:
+    """Persists an immutable email delivery tracking event for full observability."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        """
+        INSERT INTO email_delivery_events (
+            id, user_id, recipient_email, purpose, provider, provider_message_id, status, error_details, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (event_id, user_id, recipient_email, purpose, provider, provider_message_id, status, error_details, now_iso)
+    )
+
+
+def sync_admin_email_in_db(username: str = "admin", target_email: str = "ashishparadkar1999@gmail.com") -> bool:
+    """Safely updates administrator email in database without affecting password hashes or creating duplicates."""
+    return safe_execute("UPDATE users SET email = ? WHERE username = ?", (target_email, username))
+
+
+def create_temp_auth_challenge(challenge_id: str, user_id: str, ip_address: str, expires_at: str) -> bool:
+    """Inserts a short-lived pre-auth challenge for 2FA verification."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        """
+        INSERT INTO temp_auth_challenges (challenge_id, user_id, ip_address, expires_at, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (challenge_id, user_id, ip_address, expires_at, now_iso)
+    )
+
+
+def get_temp_auth_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches a pre-auth challenge by ID."""
+    rows = safe_query("SELECT * FROM temp_auth_challenges WHERE challenge_id = ?", (challenge_id,))
+    return rows[0] if rows else None
+
+
+def delete_temp_auth_challenge(challenge_id: str) -> bool:
+    """Deletes/consumes a pre-auth challenge after verification."""
+    return safe_execute("DELETE FROM temp_auth_challenges WHERE challenge_id = ?", (challenge_id,))
+
+
+def save_temp_totp_enrollment(enrollment_id: str, user_id: str, totp_secret: str, expires_at: str) -> bool:
+    """Saves temporary unconfirmed TOTP enrollment."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "INSERT INTO totp_enrollments (enrollment_id, user_id, totp_secret, expires_at, created_at) VALUES (?, ?, ?, ?, ?)",
+        (enrollment_id, user_id, totp_secret, expires_at, now_iso)
+    )
+
+
+def get_temp_totp_enrollment(enrollment_id: str) -> Optional[Dict[str, Any]]:
+    """Retrieves temporary TOTP enrollment."""
+    rows = safe_query("SELECT * FROM totp_enrollments WHERE enrollment_id = ?", (enrollment_id,))
+    return rows[0] if rows else None
+
+
+def delete_temp_totp_enrollment(enrollment_id: str) -> bool:
+    """Deletes temporary TOTP enrollment."""
+    return safe_execute("DELETE FROM totp_enrollments WHERE enrollment_id = ?", (enrollment_id,))
 
 
 def create_user_session(session_dict: Dict[str, Any]) -> bool:
@@ -10140,6 +10553,11 @@ def revoke_session(session_id: str) -> bool:
 def revoke_all_other_sessions(user_id: str, keep_session_id: str) -> bool:
     """Revokes all active sessions for a user except current."""
     return safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ? AND session_id != ?", (user_id, keep_session_id))
+
+
+def revoke_all_user_sessions(user_id: str) -> bool:
+    """Revokes all active sessions for a user."""
+    return safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ?", (user_id,))
 
 
 def get_active_sessions_for_user(user_id: str) -> List[Dict[str, Any]]:

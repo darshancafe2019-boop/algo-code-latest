@@ -20,8 +20,12 @@ import {
   AlertTriangle,
   Lock,
   BrainCircuit,
+  User,
+  LogOut,
+  KeyRound,
 } from "lucide-react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 import { formatMoney, formatPnL } from "@/lib/formatters";
 import { EcoBadge } from "@/components/eco/EcoBadge";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
@@ -42,11 +46,13 @@ export function TopCommandBar({
   const { openAppearanceDrawer, config: currentThemeConfig } = useTheme();
   const { portfolioSnapshot, riskSummary, tradingMode: globalTradingMode, reconciliationStatus } = useGlobalData();
   const { setMarketSwitcherOpen, setAICopilotOpen } = useUIStore();
+  const { user, session, logout, lockTerminal } = useAuth();
 
   const [showKillSwitchModal, setShowKillSwitchModal] = useState(false);
   const [confirmWord, setConfirmWord] = useState("");
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
   const [isMarketAnalystOpen, setIsMarketAnalystOpen] = useState(false);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleOnline = () => setIsBrowserOnline(true);
@@ -194,20 +200,20 @@ export function TopCommandBar({
         </div>
       )}
 
-      <header className="h-14 bg-[var(--theme-surface)]/95 border-b border-[var(--theme-border)] backdrop-blur-xl px-4 flex items-center justify-between gap-3 select-none text-[var(--theme-text-primary)] z-30 font-sans">
+      <header className="h-14 bg-[var(--theme-surface)]/90 border-b border-[var(--theme-border)] backdrop-blur-xl px-4 flex items-center justify-between gap-3 select-none text-[var(--theme-text-primary)] z-30 font-sans shadow-[0_4px_20px_-4px_rgba(0,0,0,0.35)]">
         {/* Left: Brand Identity & Active Instrument Context */}
         <div className="flex items-center gap-3">
           {/* Logo */}
-          <div className="flex items-center gap-2 pr-3 border-r border-[var(--theme-border-subtle)]">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--theme-elevated)] to-[var(--theme-surface)] border border-[var(--theme-border)] flex items-center justify-center text-[var(--theme-accent)] shadow-md">
+          <div className="flex items-center gap-2.5 pr-3 border-r border-[var(--theme-border-subtle)]">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-sky-500/20 via-blue-600/10 to-transparent border border-sky-500/30 flex items-center justify-center text-sky-400 shadow-[0_0_14px_rgba(56,189,248,0.25)]">
               <Sparkles className="h-4 w-4" />
             </div>
             <div className="hidden sm:block">
-              <span className="text-xs font-black tracking-wider text-[var(--theme-text-primary)] uppercase block font-mono">
-                QUANT<span className="text-[var(--theme-accent)]">.OS</span>
+              <span className="text-xs font-black tracking-wider text-slate-100 uppercase block font-mono">
+                ALPHA<span className="text-sky-400">.ALGO</span>
               </span>
-              <span className="text-[8px] tracking-widest text-[var(--theme-text-muted)] uppercase block font-mono">
-                QUANT COMMAND CENTER
+              <span className="text-[8px] tracking-widest text-slate-400 uppercase block font-mono">
+                QUANT TERMINAL
               </span>
             </div>
           </div>
@@ -216,10 +222,10 @@ export function TopCommandBar({
           <button
             type="button"
             onClick={() => setMarketSwitcherOpen(true)}
-            className="flex items-center gap-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-cyan-500/50 rounded-xl px-2.5 py-1 text-xs font-mono transition cursor-pointer group shadow-sm active:scale-95"
+            className="flex items-center gap-2 bg-[var(--theme-elevated)]/80 hover:bg-[var(--theme-elevated)] border border-[var(--theme-border)] hover:border-sky-500/40 rounded-xl px-3 py-1.5 text-xs font-mono transition-all cursor-pointer group shadow-sm active:scale-95"
             title="Click to Switch Market Universe"
           >
-            <span className="text-[var(--theme-accent)] font-bold group-hover:underline">
+            <span className="text-sky-400 font-bold group-hover:underline">
               {(() => {
                 const sym = activeSymbol || "BTC/USDT";
                 if (sym === "BTC-OPTIONS") return "BTC Options";
@@ -231,43 +237,46 @@ export function TopCommandBar({
                 return sym;
               })()}
             </span>
-            <span className="text-[var(--theme-text-muted)]">•</span>
-            <span className="text-[var(--theme-text-secondary)] font-bold">{(activeTimeframe || "5M").toUpperCase()}</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-300 font-bold">{(activeTimeframe || "5M").toUpperCase()}</span>
           </button>
 
           {/* Operating Mode Indicator Badge */}
-          <div className="hidden md:flex items-center gap-1.5 px-2.5 py-1 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl text-xs font-mono">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-[var(--theme-elevated)]/80 border border-[var(--theme-border)] rounded-xl text-xs font-mono shadow-sm">
             {operatingMode === "ONLINE" && (
               <>
-                <span className="w-2 h-2 rounded-full bg-[var(--theme-profit)] animate-ping" />
-                <span className="text-[var(--theme-profit)] font-bold">ONLINE</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-emerald-400 font-bold tracking-wide">ONLINE</span>
               </>
             )}
             {operatingMode === "DEGRADED" && (
               <>
                 <span className="w-2 h-2 rounded-full bg-amber-400" />
-                <span className="text-amber-300 font-bold">DEGRADED</span>
+                <span className="text-amber-300 font-bold tracking-wide">DEGRADED</span>
               </>
             )}
             {operatingMode === "OFFLINE" && (
               <>
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
-                <span className="text-rose-300 font-bold">OFFLINE</span>
+                <span className="text-rose-300 font-bold tracking-wide">OFFLINE</span>
               </>
             )}
           </div>
 
           {/* Risk Gate Status */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl text-xs font-mono">
+          <div className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 bg-[var(--theme-elevated)]/80 border border-[var(--theme-border)] rounded-xl text-xs font-mono shadow-sm">
             {isKillSwitchActive ? (
               <>
-                <ShieldAlert className="h-3 w-3 text-[var(--theme-loss)]" />
-                <span className="text-[var(--theme-loss)] font-bold">RISK HALTED</span>
+                <ShieldAlert className="h-3.5 w-3.5 text-rose-400" />
+                <span className="text-rose-400 font-bold tracking-wide">RISK HALTED</span>
               </>
             ) : (
               <>
-                <ShieldCheck className="h-3 w-3 text-[var(--theme-profit)]" />
-                <span className="text-[var(--theme-profit)] font-bold">RISK SAFE</span>
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-emerald-400 font-bold tracking-wide">RISK SAFE</span>
               </>
             )}
           </div>
@@ -277,11 +286,11 @@ export function TopCommandBar({
         <div className="flex items-center max-w-md w-full justify-center gap-2">
           <button
             onClick={onOpenSearch}
-            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 rounded-xl text-xs font-mono text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] transition-all flex-1"
+            className="hidden md:flex items-center gap-3 px-3.5 py-1.5 bg-[var(--theme-elevated)]/60 hover:bg-[var(--theme-elevated)] border border-[var(--theme-border)] hover:border-sky-500/40 rounded-xl text-xs font-mono text-slate-400 hover:text-slate-200 transition-all flex-1 shadow-inner"
           >
-            <Search className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
-            <span className="flex-1 text-left truncate">Search spots, futures, options, strikes...</span>
-            <kbd className="px-1.5 py-0.5 bg-[var(--theme-bg)] border border-[var(--theme-border)] rounded text-[10px] text-[var(--theme-text-secondary)]">
+            <Search className="h-3.5 w-3.5 text-sky-400" />
+            <span className="flex-1 text-left truncate text-slate-400">Search spots, futures, options, strikes...</span>
+            <kbd className="px-1.5 py-0.5 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded text-[10px] text-slate-400 font-semibold shadow-xs">
               ⌘K
             </kbd>
           </button>
@@ -290,7 +299,7 @@ export function TopCommandBar({
           <button
             type="button"
             onClick={() => setAICopilotOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-300 border border-purple-500/40 font-bold font-mono transition-all shadow-[0_0_12px_rgba(168,85,247,0.15)] active:scale-95 group shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-500/20 to-blue-500/20 hover:from-purple-500/30 hover:to-blue-500/30 text-purple-300 border border-purple-500/40 font-bold font-mono transition-all shadow-[0_0_14px_rgba(168,85,247,0.2)] active:scale-95 group shrink-0"
             title="Open Universal AI Market Copilot (⌘J)"
           >
             <Sparkles className="h-3.5 w-3.5 text-purple-400 group-hover:rotate-12 transition-transform animate-pulse" />
@@ -311,7 +320,7 @@ export function TopCommandBar({
               setQuickOrderSide("BUY");
               setOrderPlacementModalOpen(true);
             }}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--theme-profit)]/15 hover:bg-[var(--theme-profit)]/25 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30 font-bold transition-all shadow-sm active:scale-98"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500/50 font-bold transition-all shadow-[0_0_12px_-2px_rgba(16,185,129,0.25)] active:scale-95 cursor-pointer"
             title="Open Quick Order Router (Buy / Long)"
           >
             <span>+ ORDER</span>
@@ -324,7 +333,7 @@ export function TopCommandBar({
               const { setCreateBotModalOpen } = useUIStore.getState();
               setCreateBotModalOpen(true);
             }}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[var(--theme-accent)]/15 hover:bg-[var(--theme-accent)]/25 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30 font-bold transition-all shadow-sm active:scale-98"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/15 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 hover:border-sky-500/50 font-bold transition-all shadow-[0_0_12px_-2px_rgba(56,189,248,0.25)] active:scale-95 cursor-pointer"
             title="Deploy New Quant Bot Instance"
           >
             <span>+ BOT</span>
@@ -334,7 +343,7 @@ export function TopCommandBar({
           <button
             type="button"
             onClick={() => setShowModeModal(true)}
-            className="cursor-pointer focus:outline-none focus:ring-1 focus:ring-[var(--theme-accent)] rounded-lg"
+            className="cursor-pointer focus:outline-none focus:ring-1 focus:ring-sky-500 rounded-lg"
             title="Click to manage live execution / paper mode gate"
           >
             <EcoBadge variant={tradingMode === "LIVE" ? "live" : "paper"} size="sm" dot pulse>
@@ -345,15 +354,15 @@ export function TopCommandBar({
           {/* Account Equity & Today's Net P&L (Click opens P&L Center) */}
           <Link
             href="/pnl"
-            className="hidden sm:flex flex-col items-end pr-2 border-r border-[var(--theme-border-subtle)] hover:opacity-80 transition-opacity cursor-pointer"
+            className="hidden sm:flex flex-col items-end pr-2 border-r border-[var(--theme-border-subtle)] hover:opacity-85 transition-opacity cursor-pointer"
             title="View P&L & Portfolio Performance Center"
           >
-            <span className="text-[9px] text-[var(--theme-text-muted)] uppercase tracking-wider">EQUITY / TODAY</span>
+            <span className="text-[9px] text-slate-400 uppercase tracking-wider font-medium">EQUITY / TODAY</span>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs font-bold text-[var(--theme-text-primary)]">
+              <span className="text-xs font-bold text-slate-100">
                 {formatMoney(totalEquity, "$")}
               </span>
-              <span className={`text-xs font-extrabold ${isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
+              <span className={`text-xs font-extrabold ${isProfit ? "text-emerald-400" : "text-rose-400"}`}>
                 {formatPnL(todaysPnl, "$").formatted}
               </span>
             </div>
@@ -362,10 +371,10 @@ export function TopCommandBar({
           {/* Emergency Kill Switch Button (ALWAYS VISIBLE) */}
           <button
             onClick={() => setShowKillSwitchModal(true)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all shadow-sm cursor-pointer ${
               isKillSwitchActive
-                ? "bg-[var(--theme-loss)] text-[var(--theme-text-primary)] border-[var(--theme-loss)] animate-pulse"
-                : "bg-[var(--theme-surface)] hover:bg-[var(--theme-elevated)] text-[var(--theme-loss)] border-[var(--theme-loss)]/40"
+                ? "bg-rose-500 text-white border-rose-400 animate-pulse shadow-[0_0_16px_rgba(244,63,94,0.5)]"
+                : "bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border-rose-500/30 hover:border-rose-500/50 shadow-[0_0_12px_-2px_rgba(244,63,94,0.2)]"
             }`}
             title="Global Kill Switch / Emergency Halt"
           >
@@ -436,6 +445,90 @@ export function TopCommandBar({
                   <Paintbrush className="h-4 w-4 text-[var(--theme-accent)]" />
                   <span>Themes & Appearance</span>
                 </button>
+              </div>
+            )}
+          </div>
+
+          {/* Operator Profile & Session Controls */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setIsUserMenuOpen(!isUserMenuOpen);
+                setIsMoreMenuOpen(false);
+              }}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl border border-[var(--theme-border)] bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-primary)] transition-all shadow-sm cursor-pointer"
+              title="Operator Identity & Security Controls"
+            >
+              <div className="h-6 w-6 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono font-bold text-xs flex items-center justify-center border border-cyan-500/30">
+                {user?.username?.substring(0, 2).toUpperCase() || "AD"}
+              </div>
+              <div className="hidden sm:flex flex-col text-left">
+                <span className="text-xs font-mono font-bold text-[var(--theme-text-primary)] leading-tight">
+                  {user?.username || "admin"}
+                </span>
+                <span className="text-[10px] font-mono text-cyan-400 font-medium leading-none">
+                  {user?.role || "ADMIN"}
+                </span>
+              </div>
+            </button>
+
+            {isUserMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 z-50 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-3 shadow-2xl w-64 flex flex-col gap-2.5 text-xs font-mono">
+                {/* User Summary */}
+                <div className="p-2.5 bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-[var(--theme-text-primary)]">
+                      {user?.username || "admin"}
+                    </span>
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold">
+                      {user?.role || "ADMIN"}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-[var(--theme-text-secondary)] truncate">
+                    {user?.email || "admin@algotrading.local"}
+                  </p>
+                  <div className="flex items-center gap-1.5 pt-1 text-[10px] text-emerald-400 font-sans">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    <span>Cryptographic Session Active</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex flex-col gap-1">
+                  {/* Lock Terminal */}
+                  <button
+                    onClick={() => {
+                      lockTerminal();
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-amber-400 hover:bg-amber-500/10 font-semibold transition-colors text-left"
+                  >
+                    <Lock className="h-4 w-4" />
+                    <span>Lock Terminal</span>
+                  </button>
+
+                  {/* Security Settings Link */}
+                  <Link
+                    href="/settings"
+                    onClick={() => setIsUserMenuOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-elevated)] font-semibold transition-colors text-left"
+                  >
+                    <KeyRound className="h-4 w-4 text-cyan-400" />
+                    <span>Account & Security Center</span>
+                  </Link>
+
+                  {/* Sign Out */}
+                  <button
+                    onClick={async () => {
+                      setIsUserMenuOpen(false);
+                      await logout();
+                    }}
+                    className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 font-semibold transition-colors text-left border-t border-[var(--theme-border-subtle)]"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>Sign Out</span>
+                  </button>
+                </div>
               </div>
             )}
           </div>

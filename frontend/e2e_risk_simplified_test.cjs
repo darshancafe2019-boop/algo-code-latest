@@ -45,8 +45,6 @@ async function runRiskSimplifiedE2ETest() {
   page.on("console", (msg) => {
     if (msg.type() === "error") console.error("  [BROWSER CONSOLE ERROR]:", msg.text());
   });
-  const screenshotDir = path.join(__dirname, "../screenshots");
-  if (!fs.existsSync(screenshotDir)) fs.mkdirSync(screenshotDir, { recursive: true });
 
   try {
     // 1. Navigate to Risk Page on 1920x1080 Viewport
@@ -79,9 +77,7 @@ async function runRiskSimplifiedE2ETest() {
     console.log(`    - Daily Drawdown: ${hasDailyDrawdown}`);
     console.log(`    - Margin Utilization: ${hasMarginUtilization}`);
 
-    const shotOverview = path.join(screenshotDir, "risk_center_overview_1920.png");
-    await page.screenshot({ path: shotOverview, fullPage: false });
-    console.log(`  ✓ Saved Overview Screenshot: ${shotOverview}`);
+
 
     // Helper to click section button
     async function clickSectionTab(tabLabel) {
@@ -104,9 +100,7 @@ async function runRiskSimplifiedE2ETest() {
       const capText = await page.evaluate(() => document.body.innerText);
       const hasCapBar = capText.includes("Capital Allocation") || capText.includes("Total Account Equity");
       console.log(`  ✓ Detected Visual Capital Bar: ${hasCapBar}`);
-      const shotCap = path.join(screenshotDir, "risk_center_capital_exposure.png");
-      await page.screenshot({ path: shotCap, fullPage: false });
-      console.log(`  ✓ Saved Capital & Exposure Screenshot: ${shotCap}`);
+
     }
 
     // 4. Test Section 3: Limits & Edit Drawer
@@ -126,9 +120,7 @@ async function runRiskSimplifiedE2ETest() {
         const drawerText = await page.evaluate(() => document.body.innerText);
         const hasDrawer = drawerText.includes("Edit Risk Threshold");
         console.log(`  ✓ Successfully Opened Risk Limit Edit Drawer: ${hasDrawer}`);
-        const shotLimits = path.join(screenshotDir, "risk_center_limits_drawer.png");
-        await page.screenshot({ path: shotLimits, fullPage: false });
-        console.log(`  ✓ Saved Limits Edit Drawer Screenshot: ${shotLimits}`);
+
 
         // Close drawer
         const closeBtn = await page.$("button[class*='cursor-pointer']");
@@ -145,9 +137,7 @@ async function runRiskSimplifiedE2ETest() {
       const advText = await page.evaluate(() => document.body.innerText);
       const hasPosSizing = advText.includes("Position Size") || advText.includes("Calculator") || advText.includes("Stress");
       console.log(`  ✓ Detected Advanced Tools Container: ${hasPosSizing}`);
-      const shotAdv = path.join(screenshotDir, "risk_center_advanced_tools.png");
-      await page.screenshot({ path: shotAdv, fullPage: false });
-      console.log(`  ✓ Saved Advanced Tools Screenshot: ${shotAdv}`);
+
     }
 
     // 6. Test Responsive Viewports (1440, 768, 375)
@@ -166,9 +156,7 @@ async function runRiskSimplifiedE2ETest() {
       if (hasOverflow) throw new Error(`Horizontal overflow detected on ${vp.name}`);
     }
 
-    const shotMobile = path.join(screenshotDir, "risk_center_mobile_375.png");
-    await page.screenshot({ path: shotMobile, fullPage: false });
-    console.log(`  ✓ Saved Mobile Screenshot: ${shotMobile}`);
+
 
     console.log("\n==================================================");
     console.log("🎉 ALL RISK CENTER E2E TESTS PASSED (0 ERRORS)");

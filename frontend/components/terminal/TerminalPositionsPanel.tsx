@@ -121,15 +121,15 @@ export function TerminalPositionsPanel() {
   const posList = positions || [];
 
   return (
-    <div className="flex flex-col h-full bg-[#0E1524] border-t border-[#1A2333]">
+    <div className="flex flex-col h-full bg-[var(--theme-surface)] border-t border-[var(--theme-border)] select-none font-sans">
       {/* Dock Tabs Header */}
-      <div className="flex items-center justify-between px-3 border-b border-[#1A2333] bg-[#0A0E17]">
-        <div className="flex items-center gap-1">
+      <div className="flex items-center justify-between px-3 border-b border-[var(--theme-border)] bg-[var(--theme-elevated)]/40">
+        <div className="flex items-center gap-1 font-mono">
           <button
             onClick={() => setActiveBottomTab("positions")}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
               activeBottomTab === "positions"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-950/20"
+                ? "border-sky-400 text-sky-300 bg-sky-500/10"
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -139,9 +139,9 @@ export function TerminalPositionsPanel() {
 
           <button
             onClick={() => setActiveBottomTab("orders")}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
               activeBottomTab === "orders"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-950/20"
+                ? "border-sky-400 text-sky-300 bg-sky-500/10"
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -151,9 +151,9 @@ export function TerminalPositionsPanel() {
 
           <button
             onClick={() => setActiveBottomTab("history")}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
               activeBottomTab === "history"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-950/20"
+                ? "border-sky-400 text-sky-300 bg-sky-500/10"
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -163,9 +163,9 @@ export function TerminalPositionsPanel() {
 
           <button
             onClick={() => setActiveBottomTab("logs")}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-semibold border-b-2 transition-all ${
               activeBottomTab === "logs"
-                ? "border-cyan-400 text-cyan-400 bg-cyan-950/20"
+                ? "border-sky-400 text-sky-300 bg-sky-500/10"
                 : "border-transparent text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -180,7 +180,7 @@ export function TerminalPositionsPanel() {
             queryClient.invalidateQueries({ queryKey: ["activeOrders"] });
             queryClient.invalidateQueries({ queryKey: ["closedTrades"] });
           }}
-          className="p-1 rounded text-slate-400 hover:text-slate-200"
+          className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[var(--theme-elevated)] transition-colors"
           title="Refresh All Docks"
         >
           <RefreshCw className="h-3.5 w-3.5" />
@@ -188,49 +188,49 @@ export function TerminalPositionsPanel() {
       </div>
 
       {/* Dock Content Body */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-3">
         {/* 1. Open Positions Tab */}
         {activeBottomTab === "positions" && (
           <div className="w-full overflow-x-auto">
             {isLoadingPositions ? (
-              <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                <RefreshCw className="h-4 w-4 animate-spin text-cyan-400" />
+              <div className="p-8 text-center text-xs text-slate-400 flex items-center justify-center gap-2 font-mono">
+                <RefreshCw className="h-4 w-4 animate-spin text-sky-400" />
                 Loading Positions...
               </div>
             ) : posList.length === 0 ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-8 text-center text-xs text-slate-500 font-mono">
                 No open positions currently active. Ready for new signal executions.
               </div>
             ) : (
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="border-b border-[#1A2333] text-slate-400 text-[11px]">
-                    <th className="pb-2 font-medium">Symbol</th>
-                    <th className="pb-2 font-medium">Side</th>
-                    <th className="pb-2 font-medium">Quantity</th>
-                    <th className="pb-2 font-medium">Entry Price</th>
-                    <th className="pb-2 font-medium">Current Price</th>
-                    <th className="pb-2 font-medium">Stop Loss</th>
-                    <th className="pb-2 font-medium">Take Profit</th>
-                    <th className="pb-2 font-medium">Unrealized P&L</th>
-                    <th className="pb-2 font-medium">Strategy</th>
-                    <th className="pb-2 font-medium text-right">Actions</th>
+                  <tr className="border-b border-[var(--theme-border)] text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                    <th className="pb-2.5 font-medium">Symbol</th>
+                    <th className="pb-2.5 font-medium">Side</th>
+                    <th className="pb-2.5 font-medium">Quantity</th>
+                    <th className="pb-2.5 font-medium">Entry Price</th>
+                    <th className="pb-2.5 font-medium">Current Price</th>
+                    <th className="pb-2.5 font-medium">Stop Loss</th>
+                    <th className="pb-2.5 font-medium">Take Profit</th>
+                    <th className="pb-2.5 font-medium">Unrealized P&L</th>
+                    <th className="pb-2.5 font-medium">Strategy</th>
+                    <th className="pb-2.5 font-medium text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#162032]">
+                <tbody className="divide-y divide-[var(--theme-border-subtle)]">
                   {posList.map((pos) => {
                     const isLong = pos.side.includes("BUY") || pos.side.includes("LONG");
                     const isPos = pos.unrealized_pnl >= 0;
 
                     return (
-                      <tr key={pos.trade_id} className="hover:bg-[#131D2E] transition-colors">
-                        <td className="py-2.5 font-bold text-white">{pos.symbol}</td>
+                      <tr key={pos.trade_id} className="hover:bg-slate-800/40 transition-colors">
+                        <td className="py-2.5 font-bold text-slate-50">{pos.symbol}</td>
                         <td className="py-2.5">
                           <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                               isLong
-                                ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                                : "bg-red-950 text-red-400 border border-red-800"
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                                : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
                             }`}
                           >
                             {isLong ? "LONG" : "SHORT"}
@@ -239,10 +239,10 @@ export function TerminalPositionsPanel() {
                         <td className="py-2.5 text-slate-200">{pos.quantity}</td>
                         <td className="py-2.5 text-slate-300">${pos.entry_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="py-2.5 text-slate-300">${pos.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2.5 text-red-400">${pos.stop_loss.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="py-2.5 text-rose-400">${pos.stop_loss.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="py-2.5 text-emerald-400">${pos.take_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                         <td className="py-2.5">
-                          <div className={`flex items-center gap-1 font-bold ${isPos ? "text-emerald-400" : "text-red-400"}`}>
+                          <div className={`flex items-center gap-1 font-bold ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
                             {isPos ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
                             <span>${pos.unrealized_pnl.toFixed(2)} ({isPos ? "+" : ""}{pos.unrealized_pnl_pct.toFixed(2)}%)</span>
                           </div>
@@ -252,7 +252,7 @@ export function TerminalPositionsPanel() {
                           <button
                             onClick={() => squareOffMutation.mutate(pos.trade_id)}
                             disabled={squaringOffId === pos.trade_id}
-                            className="px-2.5 py-1 rounded bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/40 text-[10px] font-bold transition-all disabled:opacity-50"
+                            className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-[10px] font-bold transition-all disabled:opacity-50"
                           >
                             {squaringOffId === pos.trade_id ? "CLOSING..." : "SQUARE OFF"}
                           </button>
@@ -270,27 +270,27 @@ export function TerminalPositionsPanel() {
         {activeBottomTab === "orders" && (
           <div className="w-full overflow-x-auto">
             {(!activeOrders || activeOrders.length === 0) ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-8 text-center text-xs text-slate-500 font-mono">
                 No active pending orders in broker queue.
               </div>
             ) : (
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="border-b border-[#1A2333] text-slate-400 text-[11px]">
-                    <th className="pb-2 font-medium">Order ID</th>
-                    <th className="pb-2 font-medium">Symbol</th>
-                    <th className="pb-2 font-medium">Type</th>
-                    <th className="pb-2 font-medium">Side</th>
-                    <th className="pb-2 font-medium">Quantity</th>
-                    <th className="pb-2 font-medium">Price</th>
-                    <th className="pb-2 font-medium">Status</th>
+                  <tr className="border-b border-[var(--theme-border)] text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                    <th className="pb-2.5 font-medium">Order ID</th>
+                    <th className="pb-2.5 font-medium">Symbol</th>
+                    <th className="pb-2.5 font-medium">Type</th>
+                    <th className="pb-2.5 font-medium">Side</th>
+                    <th className="pb-2.5 font-medium">Quantity</th>
+                    <th className="pb-2.5 font-medium">Price</th>
+                    <th className="pb-2.5 font-medium">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#162032]">
+                <tbody className="divide-y divide-[var(--theme-border-subtle)]">
                   {activeOrders.map((ord: any) => (
-                    <tr key={ord.id || ord.order_id} className="hover:bg-[#131D2E]">
-                      <td className="py-2 text-cyan-400">{ord.order_id || ord.id}</td>
-                      <td className="py-2 font-bold text-white">{ord.symbol}</td>
+                    <tr key={ord.id || ord.order_id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="py-2 text-sky-400">{ord.order_id || ord.id}</td>
+                      <td className="py-2 font-bold text-slate-50">{ord.symbol}</td>
                       <td className="py-2 text-slate-300">{ord.order_type || "LIMIT"}</td>
                       <td className="py-2">
                         <span className="text-emerald-400 font-bold">{ord.side || "BUY"}</span>
@@ -298,7 +298,7 @@ export function TerminalPositionsPanel() {
                       <td className="py-2 text-slate-200">{ord.quantity}</td>
                       <td className="py-2 text-slate-300">${ord.entry_price || ord.price}</td>
                       <td className="py-2">
-                        <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 text-[10px]">
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 text-[10px] font-semibold">
                           {ord.status || "PENDING"}
                         </span>
                       </td>
@@ -314,35 +314,35 @@ export function TerminalPositionsPanel() {
         {activeBottomTab === "history" && (
           <div className="w-full overflow-x-auto">
             {(!closedTrades || closedTrades.length === 0) ? (
-              <div className="p-8 text-center text-xs text-slate-500">
+              <div className="p-8 text-center text-xs text-slate-500 font-mono">
                 No closed trades recorded in ledger.
               </div>
             ) : (
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="border-b border-[#1A2333] text-slate-400 text-[11px]">
-                    <th className="pb-2 font-medium">Trade ID</th>
-                    <th className="pb-2 font-medium">Symbol</th>
-                    <th className="pb-2 font-medium">Side</th>
-                    <th className="pb-2 font-medium">Entry</th>
-                    <th className="pb-2 font-medium">Exit</th>
-                    <th className="pb-2 font-medium">Net P&L</th>
-                    <th className="pb-2 font-medium">Exit Reason</th>
+                  <tr className="border-b border-[var(--theme-border)] text-slate-400 text-[10px] uppercase font-bold tracking-wider">
+                    <th className="pb-2.5 font-medium">Trade ID</th>
+                    <th className="pb-2.5 font-medium">Symbol</th>
+                    <th className="pb-2.5 font-medium">Side</th>
+                    <th className="pb-2.5 font-medium">Entry</th>
+                    <th className="pb-2.5 font-medium">Exit</th>
+                    <th className="pb-2.5 font-medium">Net P&L</th>
+                    <th className="pb-2.5 font-medium">Exit Reason</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#162032]">
+                <tbody className="divide-y divide-[var(--theme-border-subtle)]">
                   {closedTrades.map((tr: any) => {
                     const pnl = parseFloat(tr.net_pnl || tr.pnl || 0);
                     const isWin = pnl >= 0;
 
                     return (
-                      <tr key={tr.id || tr.trade_id} className="hover:bg-[#131D2E]">
+                      <tr key={tr.id || tr.trade_id} className="hover:bg-slate-800/40 transition-colors">
                         <td className="py-2 text-slate-400">{tr.trade_id || tr.id}</td>
-                        <td className="py-2 font-bold text-white">{tr.symbol}</td>
-                        <td className="py-2">{tr.side || tr.trade_type}</td>
+                        <td className="py-2 font-bold text-slate-50">{tr.symbol}</td>
+                        <td className="py-2 text-slate-300">{tr.side || tr.trade_type}</td>
                         <td className="py-2 text-slate-300">${tr.entry_price}</td>
                         <td className="py-2 text-slate-300">${tr.exit_price}</td>
-                        <td className={`py-2 font-bold ${isWin ? "text-emerald-400" : "text-red-400"}`}>
+                        <td className={`py-2 font-bold ${isWin ? "text-emerald-400" : "text-rose-400"}`}>
                           ${pnl.toFixed(2)}
                         </td>
                         <td className="py-2 text-slate-400 text-[11px]">{tr.exit_reason || "TAKE_PROFIT"}</td>
@@ -357,7 +357,7 @@ export function TerminalPositionsPanel() {
 
         {/* 4. Real-Time Signals & Logs Tab */}
         {activeBottomTab === "logs" && (
-          <div className="space-y-1 font-mono text-[11px]">
+          <div className="space-y-1.5 font-mono text-[11px]">
             {(!decisionLogs || decisionLogs.length === 0) ? (
               <div className="p-8 text-center text-xs text-slate-500">
                 No recent bot decision logs.
@@ -366,11 +366,11 @@ export function TerminalPositionsPanel() {
               decisionLogs.map((log: any, idx: number) => (
                 <div
                   key={idx}
-                  className="px-2.5 py-1.5 rounded bg-[#121927] border border-[#1E293B] flex items-center justify-between gap-2"
+                  className="px-3 py-2 rounded-xl bg-[var(--theme-elevated)]/60 border border-[var(--theme-border)] flex items-center justify-between gap-2 hover:border-slate-700 transition-colors"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2.5">
                     <span className="text-slate-500 text-[10px]">{log.timestamp_utc?.slice(11, 19) || "NOW"}</span>
-                    <span className="px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-400 text-[10px] font-bold">
+                    <span className="px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-bold">
                       {log.event_type}
                     </span>
                     <span className="text-slate-200">{log.message}</span>

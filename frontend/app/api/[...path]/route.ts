@@ -63,11 +63,49 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
   // ── 2. Special Case: /api/health* Probes ────────────────────────────────────
   if (subPath.startsWith("health")) {
     if (subPath === "health/live") {
-      return NextResponse.json({
-        status: "ALIVE",
-        frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
-        proxy_latency_ms: Math.round(performance.now() - startTime),
-      }, { status: 200, headers: { "X-Request-Id": requestId } });
+      try {
+        const liveRes = await fetch(`${BACKEND_URL}/api/health/live`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(3000),
+          headers: { "Accept": "application/json", "X-Request-Id": requestId }
+        });
+        if (liveRes.ok) {
+          const liveData = await liveRes.json().catch(() => ({ status: "ok" }));
+          return NextResponse.json({
+            status: liveData.status || "ok",
+            service: liveData.service || "alpha-algo-backend",
+            frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+            proxy_latency_ms: Math.round(performance.now() - startTime),
+          }, { status: 200, headers: { "X-Request-Id": requestId } });
+        }
+      } catch {
+        // Fallback probe to alternate /health/live
+        try {
+          const liveRes = await fetch(`${BACKEND_URL}/health/live`, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(3000),
+            headers: { "Accept": "application/json", "X-Request-Id": requestId }
+          });
+          if (liveRes.ok) {
+            return NextResponse.json({
+              status: "ok",
+              service: "alpha-algo-backend",
+              frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+              proxy_latency_ms: Math.round(performance.now() - startTime),
+            }, { status: 200, headers: { "X-Request-Id": requestId } });
+          }
+        } catch {
+          // Backend is genuinely unreachable
+          return NextResponse.json({
+            status: "unavailable",
+            error: {
+              code: "BACKEND_UNREACHABLE",
+              message: `Quantitative backend unreachable at ${BACKEND_URL}`,
+            },
+            proxy_latency_ms: Math.round(performance.now() - startTime),
+          }, { status: 503, headers: { "X-Request-Id": requestId } });
+        }
+      }
     }
 
     if (subPath === "health/dependencies") {
@@ -78,35 +116,74 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
           return NextResponse.json(bData, { status: bRes.status, headers: { "X-Request-Id": requestId } });
         }
       } catch {
-        // Fallthrough to standard health probe
+        // Fallthrough
       }
     }
 
-    // Default /api/health or /api/health/ready
-    let backendReady = false;
-    let backendLatency = 0;
+    // Default /api/health or /api/health/ready: probe real backend ready status
     try {
       const t0 = performance.now();
-      const bRes = await fetch(`${BACKEND_URL}/health/ready`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-      backendReady = bRes.status === 200;
-      backendLatency = Math.round(performance.now() - t0);
+      const bRes = await fetch(`${BACKEND_URL}/api/health/ready`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(3000),
+        headers: { "Accept": "application/json", "X-Request-Id": requestId }
+      });
+      const bLatency = Math.round(performance.now() - t0);
+      if (bRes.ok) {
+        const bData = await bRes.json().catch(() => ({}));
+        return NextResponse.json({
+          status: bData.status || "ok",
+          backend: bData.backend ?? true,
+          database: bData.database ?? true,
+          market_data: bData.market_data ?? true,
+          binance: bData.binance ?? true,
+          upstox: bData.upstox ?? true,
+          frontend: { status: "HEALTHY", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+          proxy_latency_ms: Math.round(performance.now() - startTime),
+          backend_latency_ms: bLatency,
+        }, { status: 200, headers: { "X-Request-Id": requestId } });
+      }
     } catch {
+      // If /api/health/ready failed, try legacy /health/ready
       try {
-        const bRes = await fetch(`${BACKEND_URL}/api/status`, { cache: "no-store", signal: AbortSignal.timeout(3000) });
-        backendReady = bRes.status === 200;
+        const bRes = await fetch(`${BACKEND_URL}/health/ready`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(3000)
+        });
+        if (bRes.ok) {
+          const bData = await bRes.json().catch(() => ({}));
+          return NextResponse.json({
+            status: "ok",
+            backend: true,
+            database: bData.database === "OK" || bData.database === true,
+            market_data: true,
+            binance: true,
+            upstox: true,
+            frontend: { status: "HEALTHY", uptime_seconds: process.uptime() },
+            proxy_latency_ms: Math.round(performance.now() - startTime),
+          }, { status: 200, headers: { "X-Request-Id": requestId } });
+        }
       } catch {
-        backendReady = false;
+        // Backend genuinely offline
       }
     }
 
     return NextResponse.json(
       {
-        status: backendReady ? "ok" : "degraded",
+        status: "unavailable",
+        backend: false,
+        database: false,
+        market_data: false,
+        binance: false,
+        upstox: false,
         frontend: { status: "HEALTHY", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
-        backend: { status: backendReady ? "HEALTHY" : "DEGRADED", latency_ms: backendLatency },
+        error: {
+          code: "BACKEND_UNREACHABLE",
+          message: `Backend engine is offline at ${BACKEND_URL}`,
+        },
         proxy_latency_ms: Math.round(performance.now() - startTime),
       },
-      { status: backendReady ? 200 : 200, headers: { "X-Request-Id": requestId } }
+      { status: 503, headers: { "X-Request-Id": requestId } }
     );
   }
 
@@ -228,6 +305,18 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
     responseHeaders.set("X-Request-Id", requestId);
     responseHeaders.set("X-Response-Time-Ms", latencyMs.toString());
     responseHeaders.set("Content-Type", "application/json");
+
+    if (typeof (finalResponse.headers as any).getSetCookie === "function") {
+      const cookies: string[] = (finalResponse.headers as any).getSetCookie();
+      for (const cookie of cookies) {
+        responseHeaders.append("set-cookie", cookie);
+      }
+    } else {
+      const setCookie = finalResponse.headers.get("set-cookie");
+      if (setCookie) {
+        responseHeaders.set("set-cookie", setCookie);
+      }
+    }
 
     return new NextResponse(JSON.stringify(jsonBody ?? {}), {
       status: finalResponse.status,

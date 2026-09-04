@@ -168,21 +168,21 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
   };
 
   return (
-    <div className="bg-[#0E1524] border border-[#1A2333] rounded-2xl p-4 shadow-xl flex flex-col gap-3.5 select-none">
+    <div className="card-specular bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-4 shadow-xl flex flex-col gap-3.5 select-none font-sans">
       {/* Panel Header & Mode Switch */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-cyan-400" />
-          <h3 className="text-xs font-bold text-white uppercase tracking-wider">Quick Order Execution</h3>
+          <Zap className="h-4 w-4 text-sky-400" />
+          <h3 className="text-xs font-bold text-[var(--theme-text-primary)] uppercase tracking-wider font-mono">Quick Order Execution</h3>
         </div>
 
         {/* Paper vs Live Mode Toggle */}
-        <div className="flex items-center gap-1 bg-[#121927] p-0.5 rounded-lg border border-[#1E293B]">
+        <div className="flex items-center gap-1 bg-[var(--theme-elevated)] p-0.5 rounded-xl border border-[var(--theme-border)]">
           <button
             onClick={() => setExecutionMode("PAPER")}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
               executionMode === "PAPER"
-                ? "bg-cyan-500 text-slate-950 shadow-sm"
+                ? "bg-sky-500/20 text-sky-300 border border-sky-500/30 shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -190,7 +190,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
           </button>
           <button
             onClick={() => setExecutionMode("LIVE")}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold transition-all ${
+            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
               executionMode === "LIVE"
                 ? "bg-rose-500 text-white shadow-sm animate-pulse"
                 : "text-slate-400 hover:text-rose-400"
@@ -202,12 +202,12 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
       </div>
 
       {/* Direction BUY / SELL Tabs */}
-      <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#121927] rounded-xl border border-[#1E293B]">
+      <div className="grid grid-cols-2 gap-1.5 p-1 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)] font-mono">
         <button
           onClick={() => setDirection("LONG")}
           className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
             direction === "LONG"
-              ? "bg-emerald-500 text-slate-950 shadow-lg shadow-emerald-500/20"
+              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shadow-sm font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -218,7 +218,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
           onClick={() => setDirection("SHORT")}
           className={`py-2 rounded-lg text-xs font-extrabold flex items-center justify-center gap-1.5 transition-all ${
             direction === "SHORT"
-              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+              ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 shadow-sm font-bold"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -228,14 +228,14 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
       </div>
 
       {/* Order Type Selector */}
-      <div className="grid grid-cols-3 gap-1 bg-[#121927] p-1 rounded-lg border border-[#1E293B]">
+      <div className="grid grid-cols-3 gap-1 bg-[var(--theme-elevated)] p-1 rounded-xl border border-[var(--theme-border)] font-mono">
         {(["MARKET", "LIMIT", "STOP_LIMIT"] as const).map((type) => (
           <button
             key={type}
             onClick={() => setOrderType(type)}
-            className={`py-1 rounded text-[11px] font-semibold transition-all ${
+            className={`py-1 rounded-lg text-[11px] font-semibold transition-all ${
               orderType === type
-                ? "bg-slate-700 text-white font-bold"
+                ? "bg-slate-700/80 text-white font-bold shadow-sm"
                 : "text-slate-400 hover:text-slate-200"
             }`}
           >
@@ -255,7 +255,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             step="0.01"
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
-            className="w-full px-3 py-1.5 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white focus:outline-none focus:border-cyan-500"
+            className="w-full px-3 py-1.5 bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-xl text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-sky-500 transition-colors"
           />
         </div>
 
@@ -264,7 +264,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
               Leverage
             </label>
-            <span className="text-[10px] font-mono text-cyan-400 font-bold">{leverage}x</span>
+            <span className="text-[10px] font-mono text-sky-400 font-bold">{leverage}x</span>
           </div>
           <input
             type="range"
@@ -273,7 +273,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             step="1"
             value={leverage}
             onChange={(e) => setLeverage(parseInt(e.target.value, 10))}
-            className="w-full accent-cyan-500 cursor-pointer h-2 bg-slate-800 rounded-lg mt-2"
+            className="w-full accent-sky-500 cursor-pointer h-1.5 bg-slate-800 rounded-lg mt-2.5"
           />
         </div>
       </div>
@@ -294,7 +294,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             step="10"
             value={stopLoss}
             onChange={(e) => setStopLoss(e.target.value)}
-            className="w-full px-3 py-1.5 bg-[#0A0E17] border border-rose-900/40 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-rose-500"
+            className="w-full px-3 py-1.5 bg-[var(--theme-pageBg)] border border-rose-500/30 rounded-xl text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-rose-500 transition-colors"
           />
         </div>
 
@@ -312,16 +312,16 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             step="10"
             value={takeProfit}
             onChange={(e) => setTakeProfit(e.target.value)}
-            className="w-full px-3 py-1.5 bg-[#0A0E17] border border-emerald-900/40 rounded-lg text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+            className="w-full px-3 py-1.5 bg-[var(--theme-pageBg)] border border-emerald-500/30 rounded-xl text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-emerald-500 transition-colors"
           />
         </div>
       </div>
 
       {/* Risk Metrics Card */}
-      <div className="p-3 bg-[#121927] border border-[#1E293B] rounded-xl space-y-1.5 text-xs font-mono">
+      <div className="p-3 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border)] rounded-xl space-y-1.5 text-xs font-mono">
         <div className="flex items-center justify-between text-slate-400">
           <span>Required Margin:</span>
-          <span className="text-white font-bold">${(estimate?.required_margin || 0).toLocaleString()}</span>
+          <span className="text-slate-100 font-bold">${(estimate?.required_margin || 0).toLocaleString()}</span>
         </div>
         <div className="flex items-center justify-between text-slate-400">
           <span>Max Risk (SL):</span>
@@ -331,9 +331,9 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
           <span>Potential Profit (TP):</span>
           <span className="text-emerald-400 font-bold">+${(estimate?.take_profit_potential || 0).toFixed(2)}</span>
         </div>
-        <div className="flex items-center justify-between text-slate-400 border-t border-[#1E293B] pt-1">
+        <div className="flex items-center justify-between text-slate-400 border-t border-[var(--theme-border-subtle)] pt-1">
           <span>Risk : Reward:</span>
-          <span className="text-cyan-400 font-bold">1 : {estimate?.risk_reward_ratio || "2.0"}</span>
+          <span className="text-sky-400 font-bold">1 : {estimate?.risk_reward_ratio || "2.0"}</span>
         </div>
       </div>
 
@@ -343,10 +343,10 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
           <div
             key={key}
             title={`${key.replace("_", " ").toUpperCase()}: ${c.message}`}
-            className={`flex items-center gap-1 px-1.5 py-0.5 rounded border ${
+            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md border ${
               c.status === "PASS"
-                ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-400"
-                : "bg-amber-950/40 border-amber-800/40 text-amber-400"
+                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
             }`}
           >
             <span className="w-1 h-1 rounded-full bg-current" />
@@ -360,8 +360,8 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
         <div
           className={`p-2.5 rounded-xl text-xs font-mono border ${
             executionStatus.type === "success"
-              ? "bg-emerald-950/80 border-emerald-800 text-emerald-300"
-              : "bg-rose-950/80 border-rose-800 text-rose-300"
+              ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+              : "bg-rose-500/15 border-rose-500/30 text-rose-300"
           }`}
         >
           {executionStatus.message}
@@ -372,12 +372,12 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
       <button
         onClick={handleExecuteTrade}
         disabled={submitting}
-        className={`w-full py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg ${
+        className={`w-full py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-md ${
           executionMode === "LIVE"
-            ? "bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white shadow-rose-950/50"
+            ? "bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/25"
             : direction === "LONG"
-            ? "bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 shadow-emerald-950/50"
-            : "bg-gradient-to-r from-rose-500 to-red-500 hover:from-rose-400 hover:to-red-400 text-white shadow-rose-950/50"
+            ? "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40"
+            : "bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40"
         }`}
       >
         <Shield className="h-4 w-4" />
@@ -388,22 +388,22 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
 
       {/* Live Trading 2-Step Confirmation Modal */}
       {showLiveConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0E1524] border border-rose-600/60 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="card-specular bg-[var(--theme-surface)] border border-rose-500/50 rounded-2xl p-5 max-w-sm w-full space-y-4 shadow-2xl">
             <div className="flex items-center gap-2 text-rose-400">
               <AlertTriangle className="h-5 w-5" />
-              <h4 className="text-sm font-bold">ARM REAL LIVE TRADING</h4>
+              <h4 className="text-sm font-bold text-[var(--theme-text-primary)]">ARM REAL LIVE TRADING</h4>
             </div>
 
-            <p className="text-xs text-slate-300">
+            <p className="text-xs text-slate-300 leading-relaxed">
               You are about to route a <strong>REAL LIVE ORDER</strong> to the exchange. Capital will be committed to real markets.
             </p>
 
-            <div className="p-3 bg-rose-950/40 border border-rose-900/50 rounded-xl text-xs font-mono space-y-1">
-              <div>Symbol: <strong>{symbol}</strong></div>
-              <div>Side: <strong>{direction}</strong></div>
-              <div>Quantity: <strong>{quantity}</strong></div>
-              <div>Leverage: <strong>{leverage}x</strong></div>
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-mono space-y-1 text-slate-200">
+              <div>Symbol: <strong className="text-white">{symbol}</strong></div>
+              <div>Side: <strong className="text-white">{direction}</strong></div>
+              <div>Quantity: <strong className="text-white">{quantity}</strong></div>
+              <div>Leverage: <strong className="text-sky-400">{leverage}x</strong></div>
             </div>
 
             <div>
@@ -415,21 +415,21 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
                 value={liveConfirmWord}
                 onChange={(e) => setLiveConfirmWord(e.target.value.toUpperCase())}
                 placeholder="CONFIRM"
-                className="w-full px-3 py-1.5 bg-[#0A0E17] border border-[#1E293B] rounded-lg text-xs font-mono text-white text-center focus:outline-none focus:border-rose-500"
+                className="w-full px-3 py-1.5 bg-[var(--theme-pageBg)] border border-[var(--theme-border)] rounded-xl text-xs font-mono text-white text-center focus:outline-none focus:border-rose-500 transition-colors"
               />
             </div>
 
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowLiveConfirm(false)}
-                className="flex-1 py-2 bg-[#121927] hover:bg-[#1A253A] text-slate-300 rounded-xl text-xs font-semibold"
+                className="flex-1 py-2 bg-[var(--theme-elevated)] hover:bg-[var(--theme-border)] text-slate-300 hover:text-white rounded-xl text-xs font-semibold transition-colors"
               >
                 Cancel
               </button>
               <button
                 disabled={liveConfirmWord !== "CONFIRM"}
                 onClick={handleExecuteTrade}
-                className="flex-1 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold"
+                className="flex-1 py-2 bg-rose-600 hover:bg-rose-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-rose-600/30"
               >
                 Execute Live
               </button>

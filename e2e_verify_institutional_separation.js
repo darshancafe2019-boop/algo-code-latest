@@ -40,8 +40,8 @@ async function runInstitutionalSeparationVerification() {
 
   try {
     // 1. HOME (Executive Overview)
-    console.log("\n[1] Verifying HOME (http://localhost:3000/)...");
-    await page.goto('http://localhost:3000/', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[1] Verifying HOME (http://localhost:3100/)...");
+    await page.goto('http://localhost:3100/', { waitUntil: 'networkidle2', timeout: 20000 });
     const homeCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -58,8 +58,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Home Executive Overview:", Object.values(homeCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 2. MARKETS (Market Discovery)
-    console.log("\n[2] Verifying MARKETS (http://localhost:3000/charts)...");
-    await page.goto('http://localhost:3000/charts', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[2] Verifying MARKETS (http://localhost:3100/charts)...");
+    await page.goto('http://localhost:3100/charts', { waitUntil: 'networkidle2', timeout: 20000 });
     const marketsCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -71,8 +71,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Markets Discovery Center:", Object.values(marketsCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 3. ORDERS (Canonical Order Ticket & Lifecycle)
-    console.log("\n[3] Verifying ORDERS (http://localhost:3000/orders)...");
-    await page.goto('http://localhost:3000/orders', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[3] Verifying ORDERS (http://localhost:3100/orders)...");
+    await page.goto('http://localhost:3100/orders', { waitUntil: 'networkidle2', timeout: 20000 });
     const ordersCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -89,8 +89,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Canonical Orders Execution Center:", Object.values(ordersCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 4. POSITIONS (Current Market Exposure)
-    console.log("\n[4] Verifying POSITIONS (http://localhost:3000/positions)...");
-    await page.goto('http://localhost:3000/positions', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[4] Verifying POSITIONS (http://localhost:3100/positions)...");
+    await page.goto('http://localhost:3100/positions', { waitUntil: 'networkidle2', timeout: 20000 });
     const positionsCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -101,8 +101,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Positions Exposure View:", Object.values(positionsCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 5. P&L (Financial Performance Analytics)
-    console.log("\n[5] Verifying P&L ANALYTICS (http://localhost:3000/pnl)...");
-    await page.goto('http://localhost:3000/pnl', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[5] Verifying P&L ANALYTICS (http://localhost:3100/pnl)...");
+    await page.goto('http://localhost:3100/pnl', { waitUntil: 'networkidle2', timeout: 20000 });
     const pnlCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -115,8 +115,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ P&L Financial Performance Analytics:", Object.values(pnlCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 6. TRADE JOURNAL (Human Trade Review & Psychology)
-    console.log("\n[6] Verifying TRADE JOURNAL (http://localhost:3000/trade-journal)...");
-    await page.goto('http://localhost:3000/trade-journal', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[6] Verifying TRADE JOURNAL (http://localhost:3100/trade-journal)...");
+    await page.goto('http://localhost:3100/trade-journal', { waitUntil: 'networkidle2', timeout: 20000 });
     const journalCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -132,8 +132,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Human Trade Review & Behavioral Journal:", Object.values(journalCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 7. AUDIT LOGS (Immutable Forensic Record)
-    console.log("\n[7] Verifying AUDIT LOGS (http://localhost:3000/logs)...");
-    await page.goto('http://localhost:3000/logs', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[7] Verifying AUDIT LOGS (http://localhost:3100/logs)...");
+    await page.goto('http://localhost:3100/logs', { waitUntil: 'networkidle2', timeout: 20000 });
     const logsCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -143,8 +143,8 @@ async function runInstitutionalSeparationVerification() {
     console.log("    ✓ Immutable Audit Logs:", Object.values(logsCheck).every(Boolean) ? "PASS" : "FAIL");
 
     // 8. COMMAND CENTER (Runtime Operations)
-    console.log("\n[8] Verifying COMMAND CENTER (http://localhost:3000/dashboard)...");
-    await page.goto('http://localhost:3000/dashboard', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[8] Verifying COMMAND CENTER (http://localhost:3100/dashboard)...");
+    await page.goto('http://localhost:3100/dashboard', { waitUntil: 'networkidle2', timeout: 20000 });
     const cmdCheck = await page.evaluate(() => {
       const text = document.body.textContent || "";
       return {
@@ -174,8 +174,8 @@ async function runInstitutionalSeparationVerification() {
 
     console.log("\n[9] Running Smoke Checks Across Remaining Specialized Routes...");
     for (const r of otherRoutes) {
-      await page.goto(`http://localhost:3000${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
-      console.log(`    ✓ Loaded http://localhost:3000${r} cleanly.`);
+      await page.goto(`http://localhost:3100${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
+      console.log(`    ✓ Loaded http://localhost:3100${r} cleanly.`);
     }
 
     console.log("\n===============================================================");

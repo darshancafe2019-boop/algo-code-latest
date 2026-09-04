@@ -43,7 +43,12 @@ export class ExecutionEngine {
   }
 
   public setExecutionMode(mode: ExecutionMode): void {
-    this.executionMode = mode;
+    if (mode === "LIVE") {
+      console.warn("LIVE mode strictly blocked by authoritative safety gate. Defaulting to PAPER.");
+      this.executionMode = "PAPER";
+      return;
+    }
+    this.executionMode = "PAPER";
   }
 
   public getExecutionMode(): ExecutionMode {

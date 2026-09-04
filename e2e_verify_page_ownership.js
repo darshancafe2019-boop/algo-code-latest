@@ -42,8 +42,8 @@ async function runPageOwnershipVerification() {
     // -------------------------------------------------------------
     // TEST 1: HOME (Executive Overview)
     // -------------------------------------------------------------
-    console.log("\n[1] Testing HOME Page (http://localhost:3000/)...");
-    await page.goto('http://localhost:3000/', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[1] Testing HOME Page (http://localhost:3100/)...");
+    await page.goto('http://localhost:3100/', { waitUntil: 'networkidle2', timeout: 20000 });
 
     const homeContent = await page.evaluate(() => {
       const text = document.body.textContent || "";
@@ -82,8 +82,8 @@ async function runPageOwnershipVerification() {
     // -------------------------------------------------------------
     // TEST 2: MARKETS (Market Discovery & Analysis)
     // -------------------------------------------------------------
-    console.log("\n[2] Testing MARKETS Page (http://localhost:3000/charts)...");
-    await page.goto('http://localhost:3000/charts', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[2] Testing MARKETS Page (http://localhost:3100/charts)...");
+    await page.goto('http://localhost:3100/charts', { waitUntil: 'networkidle2', timeout: 20000 });
 
     const marketsContent = await page.evaluate(() => {
       const text = document.body.textContent || "";
@@ -108,8 +108,8 @@ async function runPageOwnershipVerification() {
     // -------------------------------------------------------------
     // TEST 3: COMMAND CENTER (Runtime Operations & Control)
     // -------------------------------------------------------------
-    console.log("\n[3] Testing COMMAND CENTER Page (http://localhost:3000/dashboard)...");
-    await page.goto('http://localhost:3000/dashboard', { waitUntil: 'networkidle2', timeout: 20000 });
+    console.log("\n[3] Testing COMMAND CENTER Page (http://localhost:3100/dashboard)...");
+    await page.goto('http://localhost:3100/dashboard', { waitUntil: 'networkidle2', timeout: 20000 });
 
     const cmdContent = await page.evaluate(() => {
       const text = document.body.textContent || "";
@@ -142,8 +142,8 @@ async function runPageOwnershipVerification() {
     console.log("\n[4] Running Route Smoke Checks across All Dedicated Pages...");
     const remainingRoutes = ['/bots', '/orders', '/positions', '/risk', '/indicators', '/pnl', '/alerts', '/logs', '/settings', '/system-health', '/providers'];
     for (const r of remainingRoutes) {
-      await page.goto(`http://localhost:3000${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
-      console.log(`    ✓ Loaded http://localhost:3000${r} cleanly.`);
+      await page.goto(`http://localhost:3100${r}`, { waitUntil: 'networkidle2', timeout: 15000 });
+      console.log(`    ✓ Loaded http://localhost:3100${r} cleanly.`);
     }
 
     console.log("\n===============================================================");

@@ -163,7 +163,8 @@ class OrderExecutionService:
         confidence_score: float,
         market_tick_iso: Optional[str] = None,
         account_balance: float = 10000.0,
-        is_live: bool = False
+        is_live: bool = False,
+        client_order_id: Optional[str] = None
     ) -> Tuple[bool, str]:
         """Strict 14-Point Pre-Order Validation Check."""
 
@@ -194,8 +195,11 @@ class OrderExecutionService:
             return False, "POSITION_MISMATCH_LOCKED: Live positions mismatched with broker state"
 
         # 5. DuplicateCheck / Idempotency
-        signal_time_str = market_tick_iso or datetime.now(timezone.utc).isoformat()
-        idem_key = self.generate_idempotency_key(bot_id, strategy, symbol, signal_time_str[:16])
+        if client_order_id:
+            idem_key = f"IDEM_{client_order_id}"
+        else:
+            signal_time_str = market_tick_iso or datetime.now(timezone.utc).isoformat()
+            idem_key = self.generate_idempotency_key(bot_id, strategy, symbol, signal_time_str[:16])
         existing_orders = _execute_query("SELECT id FROM bot_event_audit WHERE correlation_id = ? AND status = 'SUCCESS'", (idem_key,))
         if existing_orders:
             return False, f"DUPLICATE_ORDER_ATTEMPT: Signal {idem_key} already processed"
@@ -208,8 +212,9 @@ class OrderExecutionService:
 
         if amount > max_allowed_qty:
             return False, f"EXCEEDS_MAX_POSITION_SIZE: Requested {amount} > max {max_allowed_qty}"
-        if order_cost > config.MAX_ORDER_VALUE:
-            return False, f"EXCEEDS_MAX_ORDER_VALUE: Requested ${order_cost:,.2f} > max ${config.MAX_ORDER_VALUE:,.2f}"
+        max_order_limit = config.MAX_ORDER_VALUE if is_live else max(config.MAX_ORDER_VALUE, account_balance)
+        if order_cost > max_order_limit:
+            return False, f"EXCEEDS_MAX_ORDER_VALUE: Requested ${order_cost:,.2f} > max ${max_order_limit:,.2f}"
 
         # 7. DailyLossCheck
         todays_stats = _execute_query("SELECT daily_pnl FROM daily_statistics WHERE date_key = DATE('now')")
@@ -284,7 +289,8 @@ class OrderExecutionService:
         confidence_score: float,
         market_tick_iso: Optional[str] = None,
         account_balance: float = 10000.0,
-        is_live: bool = False
+        is_live: bool = False,
+        client_order_id: Optional[str] = None
     ) -> Tuple[bool, str, Dict[str, Any]]:
         """
         Single Authoritative Order Execution Entrypoint.
@@ -294,11 +300,15 @@ class OrderExecutionService:
             bot_id=bot_id, strategy=strategy, symbol=symbol, side=side, amount=amount,
             price=price, stop_loss=stop_loss, take_profit=take_profit,
             confidence_score=confidence_score, market_tick_iso=market_tick_iso,
-            account_balance=account_balance, is_live=is_live
+            account_balance=account_balance, is_live=is_live,
+            client_order_id=client_order_id
         )
 
-        signal_time_str = market_tick_iso or datetime.now(timezone.utc).isoformat()
-        idem_key = self.generate_idempotency_key(bot_id, strategy, symbol, signal_time_str[:16])
+        if client_order_id:
+            idem_key = f"IDEM_{client_order_id}"
+        else:
+            signal_time_str = market_tick_iso or datetime.now(timezone.utc).isoformat()
+            idem_key = self.generate_idempotency_key(bot_id, strategy, symbol, signal_time_str[:16])
 
         if not passed:
             log_bot_event(
@@ -469,7 +479,8 @@ class OrderExecutionService:
         bot_id: str = "quant-paper-bot",
         strategy: str = "QUANT_CONFLUENCE_PRO",
         confidence_score: float = 0.85,
-        mode: str = "PAPER"
+        mode: str = "PAPER",
+        client_order_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """Routes and executes an order with automatic price resolution and fail-safe directional SL/TP."""
         eff_price = price
@@ -490,7 +501,18 @@ class OrderExecutionService:
                 pass
 
         if not eff_price or eff_price <= 0:
-            eff_price = 65420.0 if "BTC" in symbol.upper() else (3500.0 if "ETH" in symbol.upper() else 100.0)
+            return {
+                "status": "error",
+                "success": False,
+                "reason": f"PRICE_UNAVAILABLE: Real-time price resolution failed for {symbol}. Order rejected.",
+                "order_id": "",
+                "trade_id": None,
+                "symbol": symbol,
+                "direction": direction,
+                "quantity": quantity,
+                "mode": mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
 
         is_buy = direction.upper() in ["BUY", "LONG"]
         if is_buy:
@@ -512,6 +534,7 @@ class OrderExecutionService:
             confidence_score=confidence_score,
             account_balance=50000.0,
             is_live=(mode == "LIVE"),
+            client_order_id=client_order_id
         )
         notional = round(quantity * eff_price, 2)
         return {

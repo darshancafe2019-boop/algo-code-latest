@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    const origin = req.nextUrl?.origin || "http://localhost:3000";
+    const origin = req.nextUrl?.origin || "http://localhost:3100";
     const errorUrl = new URL("/settings", origin);
     errorUrl.searchParams.set("tab", "brokers");
     errorUrl.searchParams.set("upstox", "error");

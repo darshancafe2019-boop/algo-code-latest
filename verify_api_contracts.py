@@ -33,7 +33,60 @@ def test_api_contracts():
     print("  VERIFYING FRONTEND -> BACKEND PROXIED API CONTRACTS (PORT 3100 / 5050)")
     print("=" * 80)
 
-    _flask_client = None
+    import hashlib
+    from datetime import datetime, timezone, timedelta
+    from src import db
+    from src.security_auth import PasswordManager
+    import dashboard
+
+    db.init_db()
+    token = "test_contract_verifier_session_token_12345"
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    user_id = "usr_contract_verifier"
+    pwd_hash, salt = PasswordManager.hash_password("VerifierPass@2026!")
+    db.upsert_user({
+        "id": user_id,
+        "username": "contract_tester",
+        "email": "tester@algotrading.local",
+        "password_hash": pwd_hash,
+        "salt": salt,
+        "role": "ADMIN",
+        "is_active": 1,
+        "is_2fa_enabled": 0,
+        "must_change_password": 0,
+    })
+    now_iso = datetime.now(timezone.utc).isoformat()
+    expires_iso = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
+    db.safe_execute(
+        """
+        INSERT OR REPLACE INTO user_sessions (
+            session_id, user_id, token_hash, device_name, ip_address,
+            user_agent, approximate_location, last_active_at, expires_at,
+            is_revoked, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+        """,
+        (
+            "sess-contract-verifier",
+            user_id,
+            token_hash,
+            "Contract Tester",
+            "127.0.0.1",
+            "ContractTester",
+            "Localhost",
+            now_iso,
+            expires_iso,
+            now_iso,
+        )
+    )
+
+    auth_headers = {
+        "User-Agent": "ContractTester/1.0",
+        "Cookie": f"algo_session_token={token}",
+        "Authorization": f"Bearer {token}"
+    }
+
+    _flask_client = dashboard.app.test_client()
+    _flask_client.set_cookie("algo_session_token", token, domain="localhost", path="/")
     all_passed = True
     for path, expected_type, required_keys in endpoints:
         data = None
@@ -41,22 +94,19 @@ def test_api_contracts():
         # Try live HTTP 3100 / 5050 first
         try:
             url = f"http://127.0.0.1:3100{path}"
-            req = urllib.request.Request(url, headers={"User-Agent": "ContractTester/1.0"})
+            req = urllib.request.Request(url, headers=auth_headers)
             with urllib.request.urlopen(req, timeout=1.5) as resp:
                 status = resp.status
                 data = json.loads(resp.read().decode())
         except Exception:
             try:
                 url = f"http://127.0.0.1:5050{path}"
-                req = urllib.request.Request(url, headers={"User-Agent": "ContractTester/1.0"})
+                req = urllib.request.Request(url, headers=auth_headers)
                 with urllib.request.urlopen(req, timeout=1.5) as resp:
                     status = resp.status
                     data = json.loads(resp.read().decode())
             except Exception:
-                if _flask_client is None:
-                    import dashboard
-                    _flask_client = dashboard.app.test_client()
-                resp = _flask_client.get(path)
+                resp = _flask_client.get(path, headers=auth_headers)
                 status = resp.status_code
                 data = resp.get_json(silent=True)
 

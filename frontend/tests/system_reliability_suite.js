@@ -12,7 +12,6 @@ const fs = require("fs");
 
 const CHROME_PATH = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const BASE_URL = "http://localhost:3100";
-const ARTIFACTS_DIR = "/Users/ashishparadkar/.gemini/antigravity-ide/brain/aad7af73-cb2a-4d73-b0d5-ffdefb01de48";
 
 function checkEndpoint(endpoint) {
   return new Promise((resolve) => {
@@ -195,28 +194,6 @@ async function runTestSuite() {
     report(`[${vp.name}] Zero Hydration Errors`, hydrationErrors.length === 0, `Found ${hydrationErrors.length}`);
     report(`[${vp.name}] Zero Unhandled Errors`, consoleErrors.length === 0, `Found ${consoleErrors.length}`);
 
-    // Capture screenshots for walkthrough
-    if (vp.width === 320) {
-      await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
-      await new Promise((r) => setTimeout(r, 1000));
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_320.png") });
-    } else if (vp.width === 390) {
-      await page.goto(`${BASE_URL}/charts`, { waitUntil: "domcontentloaded" });
-      await new Promise((r) => setTimeout(r, 1000));
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_390.png") });
-    } else if (vp.width === 768) {
-      await page.goto(`${BASE_URL}/bots`, { waitUntil: "domcontentloaded" });
-      await new Promise((r) => setTimeout(r, 1000));
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_768.png") });
-    } else if (vp.width === 1440) {
-      await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
-      await new Promise((r) => setTimeout(r, 1000));
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_1440.png") });
-    } else if (vp.width === 2560) {
-      await page.goto(`${BASE_URL}/`, { waitUntil: "domcontentloaded" });
-      await new Promise((r) => setTimeout(r, 1000));
-      await page.screenshot({ path: path.join(ARTIFACTS_DIR, "screenshot_responsive_2560.png") });
-    }
 
     await page.close();
   }

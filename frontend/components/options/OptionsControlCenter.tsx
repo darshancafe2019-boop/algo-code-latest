@@ -239,11 +239,18 @@ export function OptionsControlCenter({
 
   // Switch Trading Mode
   const handleSwitchMode = async (newMode: "PAPER" | "LIVE") => {
+    if (newMode === "LIVE") {
+      setActionNotice({
+        type: "error",
+        message: "🔒 LIVE execution is strictly BLOCKED by authoritative server safety gate. Only PAPER mode is active.",
+      });
+      return;
+    }
     const res = await TradingCommandRouter.execute({
-      type: newMode === "PAPER" ? "PAPER_MODE" : "LIVE_MODE",
+      type: "PAPER_MODE",
     });
     if (res.success) {
-      setExecutionMode(newMode);
+      setExecutionMode("PAPER");
       refreshRegistry();
       setActionNotice({ type: "info", message: res.message });
     } else {

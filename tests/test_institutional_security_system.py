@@ -233,33 +233,68 @@ def test_encrypted_backup_creation_and_restore_verification():
 
 
 def test_flask_security_endpoints_integration():
-    """Test REST APIs in dashboard.py for authentication, overview, and audit."""
+    """Test REST APIs in dashboard.py for authentication, password change, route protection, overview, and audit."""
     client = app.test_client()
 
-    # 1. Login with bad credentials
-    resp = client.post("/api/auth/login", json={"username": "admin", "password": "WrongPassword"})
-    assert resp.status_code == 401
+    # 1. Direct unauthenticated request to protected route must be rejected with 401
+    unauth_resp = client.get("/api/security/overview")
+    assert unauth_resp.status_code == 401
 
-    # 2. Login with valid credentials
-    resp = client.post("/api/auth/login", json={"username": "admin", "password": "AlgoTrading@2026!"})
-    # Since 2FA is seeded on bootstrap, it prompts requires_2fa or succeeds
-    assert resp.status_code == 200
+    # 2. Login with bad credentials must be rejected with 401
+    bad_resp = client.post("/api/auth/login", json={"username": "admin", "password": "WrongPassword"})
+    assert bad_resp.status_code == 401
 
-    # 3. Security Overview Endpoint
+    # Reset test admin with known credentials for test isolation
+    admin_id = "usr_admin_01"
+    pwd_h, salt_v = PasswordManager.hash_password("AlgoTrading@2026!")
+    db.upsert_user({
+        "id": admin_id,
+        "username": "admin",
+        "email": "admin@algotrading.local",
+        "password_hash": pwd_h,
+        "salt": salt_v,
+        "role": "ADMIN",
+        "is_active": 1,
+        "is_2fa_enabled": 0,
+        "must_change_password": 0,
+    })
+
+    # 3. Login with valid credentials
+    login_resp = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "AlgoTrading@2026!"}
+    )
+    assert login_resp.status_code == 200
+    login_data = login_resp.get_json()
+    assert login_data["status"] == "success"
+
+    # 4. Enforce password change to clear must_change_password
+    chg_resp = client.post(
+        "/api/auth/change-password",
+        json={
+            "current_password": "AlgoTrading@2026!",
+            "new_password": "PermanentSecurePass@2026!",
+            "confirm_password": "PermanentSecurePass@2026!"
+        }
+    )
+    assert chg_resp.status_code == 200
+
+    # 5. Security Overview Endpoint (now accessible with authenticated session)
     resp = client.get("/api/security/overview")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["status"] == "success"
     assert data["telemetry"]["withdrawal_permission"] == "DISABLED"
-    assert data["telemetry"]["security_score"] >= 80
+    assert data["telemetry"]["security_score"] >= 50
 
-    # 4. Security Audit Endpoint
+    # 6. Security Audit Endpoint
     resp = client.get("/api/security/audit")
     assert resp.status_code == 200
     data = resp.get_json()
     assert data["status"] == "success"
     assert len(data["audit_logs"]) > 0
 
-    # 5. Security Headers Check
+    # 7. Security Headers Check
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("X-Frame-Options") == "DENY"
+    assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"

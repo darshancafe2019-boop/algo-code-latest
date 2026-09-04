@@ -96,20 +96,20 @@ export function BottomActivityDock({ isOpen, onToggle }: BottomActivityDockProps
                   setActiveTab(tab.id);
                   if (!isOpen) onToggle();
                 }}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs transition-all ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
                   isSelected && isOpen
-                    ? "bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/40 font-bold shadow-sm"
-                    : "text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface)]"
+                    ? "bg-sky-500/15 text-sky-400 border border-sky-500/35 font-bold shadow-xs"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-[var(--theme-surface)]/80 border border-transparent"
                 }`}
               >
-                <Icon className="h-3.5 w-3.5" />
-                <span>{tab.label}</span>
+                <Icon className={`h-3.5 w-3.5 ${isSelected && isOpen ? "text-sky-400" : "text-slate-400"}`} />
+                <span className="tracking-wide">{tab.label}</span>
                 {tab.count && (
                   <span
-                    className={`px-1.5 py-0.2 rounded text-[10px] ${
+                    className={`px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold ${
                       isSelected && isOpen
-                        ? "bg-[var(--theme-bg)] text-[var(--theme-accent)]"
-                        : "bg-[var(--theme-bg)] text-[var(--theme-text-muted)]"
+                        ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                        : "bg-[var(--theme-bg)] text-slate-500 border border-white/[0.04]"
                     }`}
                   >
                     {tab.count}

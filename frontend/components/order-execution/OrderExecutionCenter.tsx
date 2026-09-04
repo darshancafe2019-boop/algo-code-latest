@@ -222,7 +222,7 @@ export function OrderExecutionCenter({
   });
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+    <div className="card-specular bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 font-sans select-none">
       {/* 1. Header with Mode Switch & Latency */}
       <OrderCommandHeader
         executionMode={executionMode}

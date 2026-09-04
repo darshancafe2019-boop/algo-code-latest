@@ -13,12 +13,90 @@
  * 9. Standardized ApiResponse envelope with request correlation IDs and audit timestamps.
  */
 
+export type ConnectionState = "HEALTHY" | "UNSTABLE" | "BACKEND_UNAVAILABLE";
+
+export type ApiErrorCode =
+  | "BACKEND_UNREACHABLE"
+  | "AUTHENTICATION_REQUIRED"
+  | "AUTHORIZATION_DENIED"
+  | "RATE_LIMITED"
+  | "BACKEND_INTERNAL_ERROR"
+  | "PROVIDER_DEGRADED"
+  | "DATABASE_DEGRADED"
+  | "CIRCUIT_BREAKER_OPEN"
+  | "REQUEST_TIMEOUT"
+  | "NETWORK_ERROR"
+  | "BUSINESS_LOGIC_ERROR"
+  | string;
+
 export interface ApiError {
-  code: string;
+  code: ApiErrorCode;
   message: string;
   details?: any;
   retryable?: boolean;
   statusCode?: number;
+}
+
+export function classifyHttpError(
+  status: number,
+  data?: any
+): { code: ApiErrorCode; message: string; isNetworkFailure: boolean } {
+  if (status === 401) {
+    return {
+      code: "AUTHENTICATION_REQUIRED",
+      message: data?.error?.message || data?.message || "Authentication required. Please sign in.",
+      isNetworkFailure: false,
+    };
+  }
+  if (status === 403) {
+    return {
+      code: "AUTHORIZATION_DENIED",
+      message: data?.error?.message || data?.message || "Access denied. Insufficient privileges.",
+      isNetworkFailure: false,
+    };
+  }
+  if (status === 429) {
+    return {
+      code: "RATE_LIMITED",
+      message: data?.error?.message || data?.message || "Rate limit reached. Please wait before retrying.",
+      isNetworkFailure: false,
+    };
+  }
+  if (status === 503 || status === 504) {
+    const isProvider = data?.error?.code === "PROVIDER_DEGRADED" || data?.provider;
+    const isDb = data?.error?.code === "DATABASE_DEGRADED" || data?.database === "ERROR" || data?.database === false;
+    if (isProvider) {
+      return {
+        code: "PROVIDER_DEGRADED",
+        message: data?.error?.message || data?.message || "Market data provider is degraded.",
+        isNetworkFailure: false,
+      };
+    }
+    if (isDb) {
+      return {
+        code: "DATABASE_DEGRADED",
+        message: data?.error?.message || data?.message || "Database storage is currently degraded.",
+        isNetworkFailure: false,
+      };
+    }
+    return {
+      code: "BACKEND_UNREACHABLE",
+      message: data?.error?.message || data?.message || "Backend service is unreachable.",
+      isNetworkFailure: true,
+    };
+  }
+  if (status >= 500) {
+    return {
+      code: "BACKEND_INTERNAL_ERROR",
+      message: data?.error?.message || data?.message || `Server internal error (${status})`,
+      isNetworkFailure: false,
+    };
+  }
+  return {
+    code: data?.error?.code || `HTTP_${status}`,
+    message: data?.error?.message || data?.message || `Request failed with status ${status}`,
+    isNetworkFailure: false,
+  };
 }
 
 export interface ApiResponse<T = any> {
@@ -64,6 +142,7 @@ export interface ResilientEventSourceHandle {
   isConnected: () => boolean;
 }
 
+
 class ResilientApiClient {
   private inFlightRequests: Map<string, Promise<ApiResponse<any>>> = new Map();
   private circuitBreakers: Map<string, CircuitState> = new Map();
@@ -71,23 +150,37 @@ class ResilientApiClient {
   private maxConsecutiveFailures = 3;
   private circuitCooldownMs = 6000;
   private isBackendOffline = false;
-  private consecutiveGlobalFailures = 0;
   private lastConnectedTimestamp = Date.now();
-  private healthProbeTimer: any = null;
   private lastLoggedFailureEpisode = 0;
+
+  // Dedicated 3-Stage State Machine for Liveness
+  private connectionState: ConnectionState = "HEALTHY";
+  private consecutiveLivenessFailures = 0;
+  private consecutiveLivenessSuccesses = 0;
+  private backoffIndex = 0;
+  private readonly backoffDelaysMs = [1000, 2000, 5000, 10000, 15000, 30000];
+  private readonly normalPollingIntervalMs = 5000;
+  private healthPollingTimer: any = null;
+  private activeProbeController: AbortController | null = null;
 
   constructor() {
     if (typeof window !== "undefined") {
       window.addEventListener("online", () => {
-        if (this.isBackendOffline) {
-          this.probeHealth();
-        }
+        this.probeHealth();
       });
       window.addEventListener("offline", () => {
+        this.connectionState = "BACKEND_UNAVAILABLE";
         this.isBackendOffline = true;
         this.notifyOffline({ statusCode: 0, reason: "Browser offline" });
       });
+
+      // Start the single continuous background health polling loop
+      this.startHealthPolling();
     }
+  }
+
+  public getConnectionState(): ConnectionState {
+    return this.connectionState;
   }
 
   /**
@@ -112,7 +205,7 @@ class ResilientApiClient {
    * Returns current backend offline state
    */
   public isOffline(): boolean {
-    return this.isBackendOffline;
+    return this.isBackendOffline || this.connectionState === "BACKEND_UNAVAILABLE";
   }
 
   /**
@@ -201,28 +294,24 @@ class ResilientApiClient {
     if (success) {
       state.failures = 0;
       state.state = "CLOSED";
-      this.consecutiveGlobalFailures = 0;
       this.lastConnectedTimestamp = now;
-
-      if (this.isBackendOffline) {
-        this.isBackendOffline = false;
-        this.clearHealthProbe();
-        this.notifyOnline();
-      }
     } else {
+      // 401, 403, 429, and client 4xx errors are NOT endpoint circuit trips or backend outages
+      if (statusCode && statusCode >= 400 && statusCode < 500) {
+        return;
+      }
+
       state.failures += 1;
       state.lastFailureTime = now;
-      this.consecutiveGlobalFailures += 1;
 
       if (state.failures >= this.maxConsecutiveFailures || state.state === "HALF_OPEN") {
         state.state = "OPEN";
         state.nextAttemptTime = now + this.circuitCooldownMs;
       }
 
-      if (this.consecutiveGlobalFailures >= 3 && !this.isBackendOffline) {
-        this.isBackendOffline = true;
-        this.notifyOffline({ statusCode });
-        this.startHealthProbe();
+      // If genuine network transport or gateway failure occurred, trigger health probe immediately
+      if (statusCode === 503 || statusCode === 504 || statusCode === 0) {
+        this.probeHealth();
       }
     }
   }
@@ -246,73 +335,147 @@ class ResilientApiClient {
   }
 
   /**
-   * Start controlled background health probe when offline
+   * Start the single continuous background health polling loop
    */
-  private startHealthProbe() {
-    if (this.healthProbeTimer) return;
-
-    let probeAttempt = 0;
-    const scheduleNextProbe = () => {
-      probeAttempt++;
-      const baseDelay = Math.min(15000, 3000 * Math.pow(1.5, probeAttempt - 1));
-      const jitter = Math.floor(Math.random() * 500);
-      const delay = baseDelay + jitter;
-
-      this.healthProbeTimer = setTimeout(async () => {
-        const recovered = await this.probeHealth();
-        if (!recovered && this.isBackendOffline) {
-          scheduleNextProbe();
-        }
-      }, delay);
-    };
-
-    scheduleNextProbe();
+  public startHealthPolling() {
+    if (this.healthPollingTimer) return;
+    this.scheduleNextProbe(this.normalPollingIntervalMs);
   }
 
-  private clearHealthProbe() {
-    if (this.healthProbeTimer) {
-      clearTimeout(this.healthProbeTimer);
-      this.healthProbeTimer = null;
+  public stopHealthPolling() {
+    if (this.healthPollingTimer) {
+      clearTimeout(this.healthPollingTimer);
+      this.healthPollingTimer = null;
+    }
+    if (this.activeProbeController) {
+      this.activeProbeController.abort();
+      this.activeProbeController = null;
     }
   }
 
+  private scheduleNextProbe(explicitDelayMs?: number) {
+    if (this.healthPollingTimer) {
+      clearTimeout(this.healthPollingTimer);
+      this.healthPollingTimer = null;
+    }
+
+    const nextDelay =
+      explicitDelayMs !== undefined
+        ? explicitDelayMs
+        : this.connectionState === "HEALTHY"
+        ? this.normalPollingIntervalMs
+        : this.backoffDelaysMs[Math.min(this.backoffIndex, this.backoffDelaysMs.length - 1)];
+
+    this.healthPollingTimer = setTimeout(async () => {
+      this.healthPollingTimer = null;
+      await this.probeHealth();
+      this.scheduleNextProbe();
+    }, nextDelay);
+  }
+
   /**
-   * Probe backend health directly
+   * Dedicated 3-Stage Liveness State Machine:
+   * Polls /api/health/live.
+   * - 1 failure: silent retry, stay in current state (no red banner).
+   * - 2 consecutive failures: UNSTABLE, continue retrying.
+   * - 3 consecutive failures: BACKEND_UNAVAILABLE, activate fail-closed protection, dispatch quantos:offline.
+   * - Recovery: requires 2 consecutive HTTP 200 responses before returning to HEALTHY.
    */
   public async probeHealth(): Promise<boolean> {
-    try {
-      const url = this.resolveUrl("/api/health/ready");
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), 4000);
+    if (typeof window === "undefined") return true;
 
+    if (this.activeProbeController) {
+      this.activeProbeController.abort();
+    }
+    const controller = new AbortController();
+    this.activeProbeController = controller;
+    const timer = setTimeout(() => controller.abort(), 3500);
+
+    const url = this.resolveUrl("/api/health/live");
+    let isSuccess = false;
+    let statusCode = 0;
+
+    try {
       const res = await fetch(url, {
         method: "GET",
-        headers: { "Accept": "application/json", "X-Request-Id": this.generateRequestId() },
+        headers: {
+          Accept: "application/json",
+          "X-Request-Id": this.generateRequestId(),
+        },
         signal: controller.signal,
         cache: "no-store",
       });
-
       clearTimeout(timer);
+      this.activeProbeController = null;
+      statusCode = res.status;
       if (res.ok) {
-        this.recordCircuitResult("GET:/api/health/ready", true, res.status);
-        this.circuitBreakers.clear();
-        return true;
+        isSuccess = true;
       }
-      return false;
     } catch {
+      clearTimeout(timer);
+      this.activeProbeController = null;
+      isSuccess = false;
+    }
+
+    if (isSuccess) {
+      this.lastConnectedTimestamp = Date.now();
+      this.consecutiveLivenessFailures = 0;
+      this.consecutiveLivenessSuccesses += 1;
+
+      // Require 2 consecutive HTTP 200 liveness responses before returning to HEALTHY
+      if (this.consecutiveLivenessSuccesses >= 2 || this.connectionState === "HEALTHY") {
+        if (this.connectionState !== "HEALTHY") {
+          this.connectionState = "HEALTHY";
+          this.isBackendOffline = false;
+          this.backoffIndex = 0;
+          this.circuitBreakers.clear();
+          this.notifyOnline();
+          // Trigger authoritative state reconciliation upon recovery
+          window.dispatchEvent(new CustomEvent("quantos:reconcile"));
+        }
+      }
+      return true;
+    } else {
+      this.consecutiveLivenessSuccesses = 0;
+      this.consecutiveLivenessFailures += 1;
+
+      if (this.consecutiveLivenessFailures === 1) {
+        // One failed request: silent retry, do not show global red outage banner
+      } else if (this.consecutiveLivenessFailures === 2) {
+        // Two consecutive failures: mark connection unstable, continue retrying
+        this.connectionState = "UNSTABLE";
+      } else if (this.consecutiveLivenessFailures >= 3) {
+        // Three consecutive liveness failures: enter BACKEND_UNAVAILABLE state
+        const wasOffline = this.isBackendOffline;
+        this.connectionState = "BACKEND_UNAVAILABLE";
+        this.isBackendOffline = true;
+        if (!wasOffline) {
+          this.notifyOffline({ statusCode, reason: "3 consecutive liveness failures" });
+        }
+      }
+
+      if (this.backoffIndex < this.backoffDelaysMs.length - 1) {
+        this.backoffIndex += 1;
+      }
+
       return false;
     }
   }
 
   /**
-   * Resets circuit breaker manually
+   * Resets circuit breaker manually and restores normal state
    */
   public resetCircuit() {
     this.circuitBreakers.clear();
-    this.consecutiveGlobalFailures = 0;
+    this.consecutiveLivenessFailures = 0;
+    this.consecutiveLivenessSuccesses = 2;
+    this.connectionState = "HEALTHY";
     this.isBackendOffline = false;
-    this.clearHealthProbe();
+    this.backoffIndex = 0;
     this.notifyOnline();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("quantos:reconcile"));
+    }
   }
 
   /**
@@ -333,6 +496,7 @@ class ResilientApiClient {
       ...(options.customHeaders || {}),
     };
 
+
     if (options.idempotencyKey) {
       headers["X-Idempotency-Key"] = options.idempotencyKey;
     }
@@ -345,6 +509,7 @@ class ResilientApiClient {
 
     try {
       const response = await fetch(url, {
+        credentials: options.credentials || "include",
         ...options,
         headers: {
           ...headers,
@@ -382,18 +547,13 @@ class ResilientApiClient {
       }
 
       if (!response.ok) {
-        const errorMsg =
-          parsedData?.error?.message ||
-          parsedData?.error ||
-          parsedData?.message ||
-          `HTTP Error ${response.status}`;
-
+        const classified = classifyHttpError(response.status, parsedData);
         return {
           ok: false,
           data: parsedData,
           error: {
-            code: parsedData?.error?.code || `HTTP_${response.status}`,
-            message: typeof errorMsg === "string" ? errorMsg : JSON.stringify(errorMsg),
+            code: classified.code,
+            message: classified.message,
             details: parsedData,
             statusCode: response.status,
             retryable: response.status >= 500 || response.status === 429,
@@ -467,6 +627,22 @@ class ResilientApiClient {
     const shouldDeduplicate = options.deduplicate !== false && isIdempotent;
     const maxRetries = isIdempotent ? (options.retries !== undefined ? options.retries : 1) : 0;
     const requestId = this.generateRequestId();
+
+    // Strict fail-closed execution protection: block non-idempotent order/bot execution while backend is offline
+    if (this.isOffline() && !options.skipCircuitBreaker && !isIdempotent) {
+      return {
+        ok: false,
+        data: null,
+        error: {
+          code: "BACKEND_UNREACHABLE",
+          message: "Execution blocked: Fail-closed trading protection active while backend is offline.",
+          retryable: false,
+          statusCode: 503,
+        },
+        requestId,
+        timestamp: new Date().toISOString(),
+      };
+    }
 
     // Check circuit breaker
     if (!options.skipCircuitBreaker) {

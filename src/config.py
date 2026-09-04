@@ -64,6 +64,27 @@ BACKUP_PATH.mkdir(parents=True, exist_ok=True)
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
+# Database Configuration (PostgreSQL / SQLite)
+DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
+DATABASE_MIGRATION_URL = os.getenv("DATABASE_MIGRATION_URL", DATABASE_URL)
+IS_POSTGRES = DATABASE_PROVIDER == "postgresql" or DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
+
+
+# Institutional Authentication, 2FA & Password Reset
+AUTH_TOTP_ENCRYPTION_KEY = os.getenv("AUTH_TOTP_ENCRYPTION_KEY", "algo-crypto-secret-key-32bytes!!")
+EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "resend").lower()
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "onboarding@resend.dev")
+AUTH_EMAIL_FROM = os.getenv("AUTH_EMAIL_FROM", "onboarding@resend.dev")
+AUTH_ADMIN_EMAIL = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com")
+AUTH_BOOTSTRAP_EMAIL = os.getenv("AUTH_BOOTSTRAP_EMAIL", "ashishparadkar1999@gmail.com")
+APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://localhost:3100")
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+
 # ==========================================
 # BOT IDENTIFICATION & EXECUTION SAFETY FLAGS
 # ==========================================

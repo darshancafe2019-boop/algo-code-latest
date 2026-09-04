@@ -112,7 +112,7 @@ class TestIndianMarketIntegration(unittest.TestCase):
         base = 2900.0
         for i in range(250):
             sample_data.append({
-                "timestamp": pd.Timestamp("2026-08-01") + pd.Timedelta(minutes=15 * i),
+                "timestamp": pd.Timestamp("2026-08-01") + pd.Timedelta(value=15 * i, unit="min"),
                 "open": base + i * 0.1,
                 "high": base + i * 0.1 + 5.0,
                 "low": base + i * 0.1 - 5.0,

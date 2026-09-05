@@ -437,3 +437,60 @@ export function formatCurrency(amount: number, currency: string = "INR"): string
   return `${symbol}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
 }
 
+export interface ValidationEvidenceItem {
+  id: string;
+  category: string;
+  label: string;
+  status: "PASSED" | "WARNING" | "FAILED";
+  evidence_text: string;
+  timestamp: string;
+}
+
+export interface BotWizardValidationResponse {
+  status: "success" | "error";
+  is_valid: boolean;
+  errors: string[];
+  warnings: string[];
+  slug: string;
+  preview: {
+    name: string;
+    slug: string;
+    symbol: string;
+    asset_class: string;
+    timeframe: string;
+    total_capital: number;
+    allocated_capital: number;
+    remaining_capital: number;
+    allocation_pct: number;
+    currency_symbol: string;
+    leverage: number;
+    lot_size: number;
+    lots_count: number;
+    total_quantity: number;
+    stop_loss_pct: number;
+    profit_target_pct: number;
+    risk_reward_ratio: string;
+    estimated_notional: number;
+    required_margin: number;
+    maximum_loss: number;
+    max_trade_risk: number;
+    execution_mode: string;
+    broker_id: string;
+    resolved_instrument?: Record<string, any> | null;
+    risk_precheck_status?: string;
+    risk_precheck_score?: number;
+  };
+  evidence: ValidationEvidenceItem[];
+  validation_timestamp: string;
+}
+
+export interface BotDraftItem {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  owner_id: string;
+  draft: Record<string, any>;
+}
+
+

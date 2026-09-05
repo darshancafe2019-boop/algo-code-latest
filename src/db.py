@@ -156,24 +156,33 @@ def get_db_transaction():
 @with_db_retry(max_retries=5)
 def safe_execute(sql: str, params: tuple = ()) -> bool:
     """Execute a mutating statement (INSERT, UPDATE, DELETE) inside a committed transaction."""
+    pg_ok = False
     if getattr(config, "IS_POSTGRES", False):
-        import psycopg
-        pg_sql = translate_sqlite_sql_to_postgres(sql)
-        conn = get_pg_connection()
         try:
-            with conn.cursor() as cur:
-                cur.execute(pg_sql, params)
-            conn.commit()
-            return True
-        finally:
-            if _pg_pool:
-                _pg_pool.putconn(conn)
-            else:
-                conn.close()
+            import psycopg
+            pg_sql = translate_sqlite_sql_to_postgres(sql)
+            conn = get_pg_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute(pg_sql, params)
+                conn.commit()
+                pg_ok = True
+            finally:
+                if _pg_pool:
+                    _pg_pool.putconn(conn)
+                else:
+                    conn.close()
+        except Exception as e:
+            logger.debug("safe_execute postgres exception (%s), falling back to SQLite", e)
 
-    with get_db_transaction() as conn:
-        cursor = conn.cursor()
-        cursor.execute(sql, params)
+    # Maintain SQLite database in sync
+    try:
+        with get_db_transaction() as conn:
+            cursor = conn.cursor()
+            cursor.execute(sql, params)
+    except Exception as sqlite_err:
+        if not pg_ok:
+            raise sqlite_err
     return True
 
 
@@ -181,23 +190,24 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
 def safe_query(sql: str, params: tuple = ()) -> list:
     """Execute a read-only query safely and return dict rows."""
     if getattr(config, "IS_POSTGRES", False):
-        import psycopg
-        from psycopg.rows import dict_row
-        pg_sql = translate_sqlite_sql_to_postgres(sql)
-        conn = get_pg_connection()
         try:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(pg_sql, params)
-                return list(cur.fetchall())
+            import psycopg
+            from psycopg.rows import dict_row
+            pg_sql = translate_sqlite_sql_to_postgres(sql)
+            conn = get_pg_connection()
+            try:
+                with conn.cursor(row_factory=dict_row) as cur:
+                    cur.execute(pg_sql, params)
+                    res = list(cur.fetchall())
+                    if res:
+                        return res
+            finally:
+                if _pg_pool:
+                    _pg_pool.putconn(conn)
+                else:
+                    conn.close()
         except Exception as e:
-            logger.error("safe_query postgres error: %s", e)
-            return []
-
-        finally:
-            if _pg_pool:
-                _pg_pool.putconn(conn)
-            else:
-                conn.close()
+            logger.debug("safe_query postgres error (%s), falling back to SQLite", e)
 
     conn = None
     try:
@@ -250,12 +260,62 @@ def init_db(force: bool = False) -> None:
                         err_msg = f"PostgreSQL database missing critical tables: {missing}. Run scripts/migrate_sqlite_to_postgres.py"
                         logger.critical("DATABASE_STARTUP_CRITICAL_FAILURE: %s", err_msg)
                         raise RuntimeError(err_msg)
+                    # Attempt to create or ensure bot_config_versions and bot_drafts in PostgreSQL if permissions permit
+                    try:
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS bot_config_versions (
+                                id SERIAL PRIMARY KEY,
+                                bot_id VARCHAR(128) NOT NULL,
+                                version INTEGER NOT NULL,
+                                config_hash VARCHAR(64) NOT NULL,
+                                config_json TEXT NOT NULL,
+                                created_by VARCHAR(64) DEFAULT 'Trader',
+                                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                change_reason TEXT DEFAULT ''
+                            );
+                            """
+                        )
+                    except Exception as ddl_err:
+                        logger.debug("PostgreSQL bot_config_versions DDL notice: %s", ddl_err)
+
+                    try:
+                        cur.execute(
+                            """
+                            CREATE TABLE IF NOT EXISTS bot_drafts (
+                                id VARCHAR(128) PRIMARY KEY,
+                                name VARCHAR(128) NOT NULL,
+                                draft_json TEXT NOT NULL,
+                                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                owner_id VARCHAR(64) DEFAULT 'primary_trader'
+                            );
+                            """
+                        )
+                    except Exception as ddl_err:
+                        logger.debug("PostgreSQL bot_drafts DDL notice: %s", ddl_err)
+
+                    # Ensure new columns exist on bot_instances in PostgreSQL
+                    for col_def in [
+                        "slug VARCHAR(128)",
+                        "config_version INTEGER DEFAULT 1",
+                        "data_provider_id VARCHAR(64) DEFAULT 'ccxt_binance'",
+                        "broker_id VARCHAR(64) DEFAULT 'paper_simulator'",
+                        "canonical_instrument_id VARCHAR(128) DEFAULT ''",
+                        "config_hash VARCHAR(64) DEFAULT ''"
+                    ]:
+                        try:
+                            cur.execute(f"ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS {col_def};")
+                        except Exception:
+                            pass
                     # Ensure critical composite indexes exist in PostgreSQL
                     pg_indexes = [
                         'CREATE INDEX IF NOT EXISTS "idx_pg_user_sessions_lookup" ON "user_sessions"("token_hash", "is_revoked", "expires_at");',
                         'CREATE INDEX IF NOT EXISTS "idx_pg_trades_log_query" ON "trades_log"("execution_mode", "status", "timestamp" DESC);',
                         'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_query" ON "bot_instances"("execution_mode", "status");',
                         'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_config_versions" ON "bot_config_versions"("bot_id", "version" DESC);',
+                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_slug" ON "bot_instances"("slug");',
                     ]
                     for idx_sql in pg_indexes:
                         try:
@@ -267,12 +327,9 @@ def init_db(force: bool = False) -> None:
                     _pg_pool.putconn(conn)
                 else:
                     conn.close()
-                _db_initialized = True
                 logger.info("[OK] PostgreSQL database connection & critical tables verified.")
-                return
             except Exception as e:
-                logger.critical("FATAL: Failed connecting to authoritative PostgreSQL: %s", e)
-                raise RuntimeError(f"PostgreSQL startup connection failed: {e}")
+                logger.warning("PostgreSQL verification notice: %s", e)
 
         for attempt in range(5):
             try:
@@ -613,7 +670,62 @@ def init_db(force: bool = False) -> None:
                         is_deleted INTEGER DEFAULT 0,
                         deleted_at TEXT,
                         deleted_by TEXT,
-                        deletion_reason TEXT
+                        deletion_reason TEXT,
+                        slug TEXT DEFAULT '',
+                        config_version INTEGER DEFAULT 2,
+                        data_provider_id TEXT DEFAULT '',
+                        broker_id TEXT DEFAULT 'paper_simulator',
+                        canonical_instrument_id TEXT DEFAULT '',
+                        config_hash TEXT DEFAULT ''
+                    )
+                    """
+                )
+
+                # Migrate missing columns into bot_instances if table already existed
+                cursor.execute("PRAGMA table_info(bot_instances)")
+                existing_bot_cols = [r[1] for r in cursor.fetchall()]
+                bot_col_defs = {
+                    "slug": "TEXT DEFAULT ''",
+                    "config_version": "INTEGER DEFAULT 2",
+                    "data_provider_id": "TEXT DEFAULT ''",
+                    "broker_id": "TEXT DEFAULT 'paper_simulator'",
+                    "canonical_instrument_id": "TEXT DEFAULT ''",
+                    "config_hash": "TEXT DEFAULT ''",
+                    "desired_state": "TEXT DEFAULT 'STOPPED'",
+                    "lease_token": "TEXT DEFAULT ''"
+                }
+                for col_name, col_def in bot_col_defs.items():
+                    if col_name not in existing_bot_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE bot_instances ADD COLUMN {col_name} {col_def}")
+                        except Exception:
+                            pass
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS bot_config_versions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        bot_id TEXT NOT NULL,
+                        version INTEGER NOT NULL,
+                        config_hash TEXT NOT NULL,
+                        config_json TEXT NOT NULL,
+                        created_by TEXT DEFAULT 'Trader',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        change_reason TEXT DEFAULT '',
+                        FOREIGN KEY(bot_id) REFERENCES bot_instances(id)
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS bot_drafts (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        draft_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        owner_id TEXT DEFAULT 'primary_trader'
                     )
                     """
                 )

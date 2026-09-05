@@ -11,13 +11,14 @@ Provides single, canonical source of truth for:
 """
 
 import enum
+import hashlib
 import json
 import logging
 import threading
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from src import audit, config, db, pnl_engine
 from src.process_manager import multi_bot_manager
@@ -27,6 +28,8 @@ logger = logging.getLogger("BotRuntimeService")
 
 class BotLifecycleState(str, enum.Enum):
     DRAFT = "DRAFT"
+    VALIDATING = "VALIDATING"
+    READY_PAPER = "READY_PAPER"
     STOPPED = "STOPPED"
     STARTING = "STARTING"
     RUNNING = "RUNNING"
@@ -35,6 +38,7 @@ class BotLifecycleState(str, enum.Enum):
     STOPPING = "STOPPING"
     RECOVERING = "RECOVERING"
     ERROR = "ERROR"
+    QUARANTINED = "QUARANTINED"
     DISABLED = "DISABLED"
 
 
@@ -48,15 +52,18 @@ class BotHealthState(str, enum.Enum):
 
 # Legal State Transitions
 VALID_TRANSITIONS: Dict[BotLifecycleState, Set[BotLifecycleState]] = {
-    BotLifecycleState.DRAFT: {BotLifecycleState.STOPPED, BotLifecycleState.DISABLED},
-    BotLifecycleState.STOPPED: {BotLifecycleState.STARTING, BotLifecycleState.DISABLED, BotLifecycleState.ERROR},
+    BotLifecycleState.DRAFT: {BotLifecycleState.VALIDATING, BotLifecycleState.READY_PAPER, BotLifecycleState.STOPPED, BotLifecycleState.DISABLED},
+    BotLifecycleState.VALIDATING: {BotLifecycleState.READY_PAPER, BotLifecycleState.DRAFT, BotLifecycleState.ERROR},
+    BotLifecycleState.READY_PAPER: {BotLifecycleState.STOPPED, BotLifecycleState.STARTING, BotLifecycleState.DRAFT, BotLifecycleState.DISABLED},
+    BotLifecycleState.STOPPED: {BotLifecycleState.STARTING, BotLifecycleState.VALIDATING, BotLifecycleState.DISABLED, BotLifecycleState.ERROR},
     BotLifecycleState.STARTING: {BotLifecycleState.RUNNING, BotLifecycleState.ERROR, BotLifecycleState.STOPPED},
-    BotLifecycleState.RUNNING: {BotLifecycleState.PAUSING, BotLifecycleState.STOPPING, BotLifecycleState.ERROR, BotLifecycleState.RECOVERING},
+    BotLifecycleState.RUNNING: {BotLifecycleState.PAUSING, BotLifecycleState.STOPPING, BotLifecycleState.ERROR, BotLifecycleState.QUARANTINED, BotLifecycleState.RECOVERING},
     BotLifecycleState.PAUSING: {BotLifecycleState.PAUSED, BotLifecycleState.ERROR, BotLifecycleState.STOPPED},
     BotLifecycleState.PAUSED: {BotLifecycleState.STARTING, BotLifecycleState.RUNNING, BotLifecycleState.STOPPING, BotLifecycleState.ERROR},
     BotLifecycleState.STOPPING: {BotLifecycleState.STOPPED, BotLifecycleState.ERROR},
-    BotLifecycleState.RECOVERING: {BotLifecycleState.RUNNING, BotLifecycleState.ERROR, BotLifecycleState.STOPPED},
-    BotLifecycleState.ERROR: {BotLifecycleState.STARTING, BotLifecycleState.STOPPED, BotLifecycleState.RECOVERING, BotLifecycleState.DISABLED},
+    BotLifecycleState.RECOVERING: {BotLifecycleState.RUNNING, BotLifecycleState.ERROR, BotLifecycleState.STOPPED, BotLifecycleState.QUARANTINED},
+    BotLifecycleState.QUARANTINED: {BotLifecycleState.STOPPED, BotLifecycleState.RECOVERING, BotLifecycleState.DISABLED},
+    BotLifecycleState.ERROR: {BotLifecycleState.STARTING, BotLifecycleState.STOPPED, BotLifecycleState.RECOVERING, BotLifecycleState.QUARANTINED, BotLifecycleState.DISABLED},
     BotLifecycleState.DISABLED: {BotLifecycleState.STOPPED, BotLifecycleState.DRAFT},
 }
 
@@ -684,7 +691,129 @@ class BotRuntimeService:
                 "message": f"Bot '{bot.get('name')}' successfully switched to {mode} mode."
             }
 
+    def is_valid_transition(self, from_state: Union[str, BotLifecycleState], to_state: Union[str, BotLifecycleState]) -> bool:
+        """Check if transition between lifecycle states is permitted."""
+        try:
+            from_enum = BotLifecycleState(from_state.value if isinstance(from_state, BotLifecycleState) else str(from_state))
+            to_enum = BotLifecycleState(to_state.value if isinstance(to_state, BotLifecycleState) else str(to_state))
+            return to_enum in VALID_TRANSITIONS.get(from_enum, set())
+        except Exception:
+            return False
+
+    # Draft & Configuration Management
+    def save_draft(self, draft_id: str, name: str, draft_data: Dict[str, Any], owner_id: str = "primary_trader") -> Dict[str, Any]:
+        """Save uncommitted wizard state as a draft."""
+        now_str = datetime.now(timezone.utc).isoformat()
+        draft_json_str = json.dumps(draft_data)
+        
+        # Check if draft exists
+        existing = db.safe_query("SELECT id FROM bot_drafts WHERE id = ?", (draft_id,))
+        if existing:
+            db.safe_execute(
+                "UPDATE bot_drafts SET name = ?, draft_json = ?, updated_at = ?, owner_id = ? WHERE id = ?",
+                (name, draft_json_str, now_str, owner_id, draft_id)
+            )
+        else:
+            db.safe_execute(
+                "INSERT INTO bot_drafts (id, name, draft_json, created_at, updated_at, owner_id) VALUES (?, ?, ?, ?, ?, ?)",
+                (draft_id, name, draft_json_str, now_str, now_str, owner_id)
+            )
+        return {"status": "success", "draft_id": draft_id, "name": name, "updated_at": now_str}
+
+    def get_draft(self, draft_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieve a saved wizard draft by ID."""
+        rows = db.safe_query("SELECT * FROM bot_drafts WHERE id = ?", (draft_id,))
+        if not rows:
+            return None
+        row = dict(rows[0])
+        try:
+            row["draft"] = json.loads(row.get("draft_json", "{}"))
+        except Exception:
+            row["draft"] = {}
+        return row
+
+    def list_drafts(self, owner_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """List all saved wizard drafts."""
+        if owner_id:
+            rows = db.safe_query("SELECT id, name, created_at, updated_at, owner_id, draft_json FROM bot_drafts WHERE owner_id = ? ORDER BY updated_at DESC", (owner_id,))
+        else:
+            rows = db.safe_query("SELECT id, name, created_at, updated_at, owner_id, draft_json FROM bot_drafts ORDER BY updated_at DESC")
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["draft"] = json.loads(d.pop("draft_json", "{}"))
+            except Exception:
+                d["draft"] = {}
+            result.append(d)
+        return result
+
+    def delete_draft(self, draft_id: str) -> bool:
+        """Delete a saved wizard draft."""
+        return db.safe_execute("DELETE FROM bot_drafts WHERE id = ?", (draft_id,))
+
+    def record_config_version(self, bot_id: str, version: int, config_json: str, change_reason: str = "", created_by: str = "Trader") -> None:
+        """Record an immutable version snapshot of a bot's configuration."""
+        config_hash = hashlib.sha256(config_json.encode("utf-8")).hexdigest()
+        now_str = datetime.now(timezone.utc).isoformat()
+        try:
+            db.safe_execute(
+                """
+                INSERT INTO bot_config_versions (bot_id, version, config_hash, config_json, created_by, created_at, change_reason)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (bot_id, version, config_hash, config_json, created_by, now_str, change_reason)
+            )
+        except Exception as ex:
+            logger.warning(f"Failed recording config version for {bot_id}: {ex}")
+
+    def get_config_history(self, bot_id: str) -> List[Dict[str, Any]]:
+        """Retrieve audit history of all configuration versions for a bot."""
+        rows = db.safe_query(
+            "SELECT id, bot_id, version, config_hash, created_by, created_at, change_reason, config_json FROM bot_config_versions WHERE bot_id = ? ORDER BY version DESC",
+            (bot_id,)
+        )
+        history = []
+        for r in rows:
+            item = dict(r)
+            try:
+                item["config"] = json.loads(item.pop("config_json", "{}"))
+            except Exception:
+                item["config"] = {}
+            history.append(item)
+        return history
+
 
 # Global singleton instance
 global_bot_runtime_service = BotRuntimeService()
+
+
+def save_draft(draft_id: str, name: str, draft_data: Dict[str, Any], owner_id: str = "Trader", step: int = 1) -> Dict[str, Any]:
+    return global_bot_runtime_service.save_draft(draft_id, name, draft_data, owner_id)
+
+
+def get_draft(draft_id: str) -> Optional[Dict[str, Any]]:
+    return global_bot_runtime_service.get_draft(draft_id)
+
+
+def list_drafts(owner_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    return global_bot_runtime_service.list_drafts(owner_id)
+
+
+def delete_draft(draft_id: str) -> bool:
+    return global_bot_runtime_service.delete_draft(draft_id)
+
+
+def record_config_version(bot_id: str, version: int, config_dict_or_json: Any, change_reason: str = "", created_by: str = "Trader") -> None:
+    if isinstance(config_dict_or_json, dict):
+        config_str = json.dumps(config_dict_or_json)
+    else:
+        config_str = str(config_dict_or_json)
+    global_bot_runtime_service.record_config_version(bot_id, version, config_str, change_reason, created_by)
+
+
+def get_config_history(bot_id: str) -> List[Dict[str, Any]]:
+    return global_bot_runtime_service.get_config_history(bot_id)
+
+
 

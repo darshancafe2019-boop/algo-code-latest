@@ -568,6 +568,13 @@ class ResilientApiClient {
       } else {
         // Within grace period: mark as RECONNECTING with zero trading restriction
         this.connectionState = "RECONNECTING";
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("quantos:connection_state_changed", {
+              detail: { state: "RECONNECTING", statusCode },
+            })
+          );
+        }
       }
 
       if (this.backoffIndex < this.backoffDelaysMs.length - 1) {

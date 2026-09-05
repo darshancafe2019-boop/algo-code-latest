@@ -159,7 +159,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
   const riskSummary = riskData || null;
 
   const refreshAll = useCallback(async () => {
-    await Promise.all([
+    await Promise.allSettled([
       refetchSnapshot(),
       refetchPositions(),
       refetchOrders(),

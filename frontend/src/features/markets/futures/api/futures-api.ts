@@ -4,6 +4,7 @@
  * Fast, resilient API client with cached fallbacks.
  */
 
+import { apiClient } from "@/lib/apiClient";
 import {
   CanonicalFuturesContract,
   FundingHeatmapItem,
@@ -21,10 +22,12 @@ export async function fetchFuturesUniverse(params?: {
     if (params?.exchange && params.exchange !== "ALL") query.set("exchange", params.exchange);
     if (params?.type && params.type !== "ALL") query.set("type", params.type);
 
-    const res = await fetch(`/api/futures/universe?${query.toString()}`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data.contracts) ? data.contracts : [];
+    const res = await apiClient.get<any>(`/api/futures/universe?${query.toString()}`, {
+      timeoutMs: 5000,
+      deduplicate: true,
+    });
+    if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch futures universe");
+    return Array.isArray(res.data.contracts) ? res.data.contracts : [];
   } catch (err) {
     console.warn("Falling back to internal mock contracts:", err);
     return [];
@@ -33,10 +36,12 @@ export async function fetchFuturesUniverse(params?: {
 
 export async function fetchFundingHeatmap(): Promise<FundingHeatmapItem[]> {
   try {
-    const res = await fetch("/api/futures/funding-heatmap");
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return Array.isArray(data.data) ? data.data : [];
+    const res = await apiClient.get<any>("/api/futures/funding-heatmap", {
+      timeoutMs: 5000,
+      deduplicate: true,
+    });
+    if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch funding heatmap");
+    return Array.isArray(res.data.data) ? res.data.data : [];
   } catch (err) {
     console.warn("Funding heatmap fetch fallback:", err);
     return [];
@@ -49,14 +54,11 @@ export async function calculateLiquidation(payload: {
   leverage: number;
 }): Promise<LiquidationCalcResult | null> {
   try {
-    const res = await fetch("/api/futures/calculate-liquidation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const res = await apiClient.post<any>("/api/futures/calculate-liquidation", payload, {
+      timeoutMs: 5000,
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    return data.result || null;
+    if (!res.ok || !res.data) throw new Error(res.error?.message || "Liquidation calculation error");
+    return res.data.result || null;
   } catch (err) {
     console.warn("Liquidation calculation fallback:", err);
     // Fallback calculation

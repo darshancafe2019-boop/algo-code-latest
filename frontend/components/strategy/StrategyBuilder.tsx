@@ -9,6 +9,7 @@ import {
   StrategyIdePreflight,
   BacktestResultPayload,
 } from "@/types/strategy-ide";
+import { apiClient } from "@/lib/apiClient";
 
 import { StrategyIdeHeader } from "./StrategyIdeHeader";
 import { StrategyBuildLibrary, RuleTargetStage } from "./StrategyBuildLibrary";
@@ -186,22 +187,19 @@ export function StrategyBuilder() {
   const { data: catalogData } = useQuery<{ strategies: any[] }>({
     queryKey: ["strategyCatalog"],
     queryFn: async () => {
-      const res = await fetch("/api/strategy/ide/strategies");
-      if (!res.ok) return { strategies: [] };
-      return res.json();
+      const res = await apiClient.get<any>("/api/strategy/ide/strategies", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) return { strategies: [] };
+      return res.data;
     },
+    placeholderData: (prev) => prev,
   });
 
   // Revalidate Strategy when changed
   const validateStrategy = useCallback(async (currentStrat: StrategyIdeDefinition) => {
     try {
-      const res = await fetch("/api/strategy/ide/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ strategy: currentStrat }),
-      });
-      if (res.ok) {
-        const json = await res.json();
+      const res = await apiClient.post<any>("/api/strategy/ide/validate", { strategy: currentStrat }, { timeoutMs: 5000 });
+      if (res.ok && res.data) {
+        const json = res.data;
         setReadiness(json.readiness);
         setPreflight(json.preflight);
         if (json.compiled_expression) {
@@ -293,11 +291,7 @@ export function StrategyBuilder() {
   const handleSaveDraft = useCallback(async () => {
     setIsSaving(true);
     try {
-      const res = await fetch("/api/strategy/ide/save", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(strategy),
-      });
+      const res = await apiClient.post<any>("/api/strategy/ide/save", strategy, { timeoutMs: 5000 });
       if (res.ok) {
         setAutosaveTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
         queryClient.invalidateQueries({ queryKey: ["strategyCatalog"] });
@@ -314,10 +308,9 @@ export function StrategyBuilder() {
     setIsBacktesting(true);
     setIsBacktestStale(false);
     try {
-      const res = await fetch("/api/strategy/ide/backtest", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await apiClient.post<any>(
+        "/api/strategy/ide/backtest",
+        {
           symbol: strategy.symbol,
           timeframe: strategy.base_timeframe,
           start_date: "2026-01-01",
@@ -328,11 +321,11 @@ export function StrategyBuilder() {
           name: strategy.name,
           version: strategy.active_version,
           allow_shorts: strategy.direction !== "LONG",
-        }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        setBacktestResult(json);
+        },
+        { timeoutMs: 15000 }
+      );
+      if (res.ok && res.data) {
+        setBacktestResult(res.data);
       } else {
         // Fallback realistic deterministic simulation
         setBacktestResult({

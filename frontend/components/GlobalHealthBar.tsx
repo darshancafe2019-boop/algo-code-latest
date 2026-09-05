@@ -4,6 +4,8 @@ import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Activity, ShieldAlert, ShieldCheck, Power, Zap, RefreshCw } from "lucide-react";
 
+import { apiClient } from "@/lib/apiClient";
+
 export function GlobalHealthBar() {
   const queryClient = useQueryClient();
   const [showKillSwitchModal, setShowKillSwitchModal] = useState(false);
@@ -13,35 +15,32 @@ export function GlobalHealthBar() {
   const { data: summaryData, isLoading: isSummaryLoading } = useQuery({
     queryKey: ["botsSummary"],
     queryFn: async () => {
-      const res = await fetch("/api/bots/summary");
-      if (!res.ok) throw new Error("Failed to fetch summary");
-      return res.json();
+      const res = await apiClient.get<any>("/api/bots/summary", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     refetchInterval: 3000,
+    placeholderData: (prev) => prev,
   });
 
   const { data: healthData } = useQuery({
     queryKey: ["systemHealth"],
     queryFn: async () => {
-      const res = await fetch("/api/bot/status");
-      if (!res.ok) throw new Error("Failed to fetch status");
-      return res.json();
+      const res = await apiClient.get<any>("/api/bot/status", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     refetchInterval: 5000,
+    placeholderData: (prev) => prev,
   });
 
   const killSwitchMutation = useMutation({
     mutationFn: async ({ action, token }: { action: string; token?: string }) => {
-      const res = await fetch("/api/bot/control", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, confirmation_token: token }),
-      });
-      const data = await res.json();
-      if (!res.ok || data.status === "error") {
-        throw new Error(data.message || "Kill switch action failed");
+      const res = await apiClient.post<any>("/api/bot/control", { action, confirmation_token: token });
+      if (!res.ok || res.data?.status === "error") {
+        throw new Error(res.error?.message || res.data?.message || "Kill switch action failed");
       }
-      return data;
+      return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["botsSummary"] });

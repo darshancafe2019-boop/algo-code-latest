@@ -784,7 +784,7 @@ export function getAnalystTelemetry(): AnalystTelemetry {
     errorsToday: telemetry.errorsToday,
     cacheHitsToday: telemetry.cacheHitsToday,
     averageLatencyMs: avgLatency,
-    circuitState: isCircuitBreakerOpen() ? "OPEN (Degraded)" : "CLOSED (Healthy)",
+    circuitState: isCircuitBreakerOpen() ? "OPEN (Throttled)" : "CLOSED (Healthy)",
     configuredModel: config.isConfigured ? config.model : "UNCONFIGURED (Local Deterministic Mode)",
     rateLimitUsage: {
       currentMinuteRequests: 0,

@@ -119,9 +119,9 @@ export function OptionsAdvancedDrawers({
                     { provider: "NSE India (Direct JSON API)", status: "LIVE", latency: "18ms" },
                     { provider: "Binance WebSocket Gateway", status: "CONNECTED", latency: "24ms" },
                     { provider: "Authoritative Trade Ledger", status: "OPTIMIZED", latency: "2ms" },
-                  ].map((p, idx) => (
+                  ].map((p) => (
                     <div
-                      key={idx}
+                      key={p.provider}
                       className="flex items-center justify-between p-2.5 bg-slate-950 rounded-lg border border-slate-800"
                     >
                       <span className="text-slate-300 font-bold">{p.provider}</span>
@@ -152,7 +152,7 @@ export function OptionsAdvancedDrawers({
                   <div className="text-[10px] text-slate-400">Bullish Aggressive Buying</div>
                   <div className="space-y-1 pt-1 max-h-[140px] overflow-y-auto">
                     {(oiQuadrants?.long_buildup || []).slice(0, 5).map((item: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
+                      <div key={item.symbol || item.Symbol || `long-${i}`} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
                         <span className="font-bold text-white">{item.symbol || item.Symbol}</span>
                         <span className="text-emerald-400 font-mono">+{item.change_oi || item.chng_in_oi || "5.2"}%</span>
                       </div>
@@ -169,7 +169,7 @@ export function OptionsAdvancedDrawers({
                   <div className="text-[10px] text-slate-400">Bearish Short Creation</div>
                   <div className="space-y-1 pt-1 max-h-[140px] overflow-y-auto">
                     {(oiQuadrants?.short_buildup || []).slice(0, 5).map((item: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
+                      <div key={item.symbol || item.Symbol || `short-${i}`} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
                         <span className="font-bold text-white">{item.symbol || item.Symbol}</span>
                         <span className="text-rose-400 font-mono">+{item.change_oi || item.chng_in_oi || "4.1"}%</span>
                       </div>
@@ -186,7 +186,7 @@ export function OptionsAdvancedDrawers({
                   <div className="text-[10px] text-slate-400">Bears Exiting Positions</div>
                   <div className="space-y-1 pt-1 max-h-[140px] overflow-y-auto">
                     {(oiQuadrants?.short_covering || []).slice(0, 5).map((item: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
+                      <div key={item.symbol || item.Symbol || `covering-${i}`} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
                         <span className="font-bold text-white">{item.symbol || item.Symbol}</span>
                         <span className="text-cyan-400 font-mono">-{item.change_oi || item.chng_in_oi || "3.8"}%</span>
                       </div>
@@ -203,7 +203,7 @@ export function OptionsAdvancedDrawers({
                   <div className="text-[10px] text-slate-400">Bulls Profit Taking</div>
                   <div className="space-y-1 pt-1 max-h-[140px] overflow-y-auto">
                     {(oiQuadrants?.long_unwinding || []).slice(0, 5).map((item: any, i: number) => (
-                      <div key={i} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
+                      <div key={item.symbol || item.Symbol || `unwinding-${i}`} className="flex items-center justify-between text-[11px] p-1 bg-slate-950 rounded">
                         <span className="font-bold text-white">{item.symbol || item.Symbol}</span>
                         <span className="text-amber-400 font-mono">-{item.change_oi || item.chng_in_oi || "2.9"}%</span>
                       </div>
@@ -237,7 +237,7 @@ export function OptionsAdvancedDrawers({
                     { name: "Total OI Balance", status: "PASS", rule: "Put OI > Call OI", value: "Aligned" },
                   ]).map((cond: any, idx: number) => (
                     <div
-                      key={idx}
+                      key={cond.name || `cond-${idx}`}
                       className="flex items-center justify-between p-2 bg-slate-950 rounded-lg border border-slate-800"
                     >
                       <div>
@@ -316,7 +316,7 @@ export function OptionsAdvancedDrawers({
                 <div className="space-y-1.5">
                   {(derivativesData?.most_active_options || []).slice(0, 8).map((opt: any, idx: number) => (
                     <div
-                      key={idx}
+                      key={opt.symbol || opt.contract_name || opt.instrument_key || `active-opt-${idx}`}
                       className="flex items-center justify-between p-2 bg-slate-950 rounded-lg border border-slate-800/80"
                     >
                       <div>

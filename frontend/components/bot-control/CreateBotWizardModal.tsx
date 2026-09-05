@@ -34,6 +34,7 @@ import {
   Lock,
   Globe
 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 import {
   WizardAssetClass,
   BotExecutionMode,
@@ -264,11 +265,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
   const { data: brokersData } = useQuery({
     queryKey: ["brokersStatus"],
     queryFn: async () => {
-      const res = await fetch("/api/brokers/status");
-      if (!res.ok) return null;
-      return res.json();
+      const res = await apiClient.get<any>("/api/brokers/status", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     staleTime: 30000,
+    placeholderData: (prev) => prev,
   });
 
   // Currency & Capital Adapters
@@ -469,17 +471,17 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
         },
       };
 
-      const res = await fetch("/api/bots/create", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+      const idempotencyKey = apiClient.generateIdempotencyKey("CREATE_BOT", name);
+      const res = await apiClient.post<any>("/api/bots/create", payload, {
+        idempotencyKey,
+        timeoutMs: 10000,
+        retries: 0,
       });
 
-      const data = await res.json();
-      if (!res.ok || data.status === "error") {
-        throw new Error(data.message || "Failed to create bot instance");
+      if (!res.ok || !res.data || res.data.status === "error") {
+        throw new Error(res.error?.message || res.data?.message || "Failed to create bot instance");
       }
-      return data;
+      return res.data;
     },
     onSuccess: () => {
       localStorage.removeItem("quantos_bot_wizard_draft");

@@ -21,6 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { PositionRecord, formatPositionDuration } from "@/types/positions";
+import { apiClient } from "@/lib/apiClient";
 
 interface PositionDetailDrawerProps {
   position: PositionRecord | null;
@@ -47,14 +48,13 @@ export function PositionDetailDrawer({
   // Add observation mutation
   const addNoteMutation = useMutation({
     mutationFn: async ({ tradeId, note }: { tradeId: number | string; note: string }) => {
-      const res = await fetch(`/api/trades/${tradeId}/observation`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ observation: note, source: "Positions Drawer" }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Failed to add journal note");
-      return data;
+      const res = await apiClient.post<any>(
+        `/api/trades/${tradeId}/observation`,
+        { observation: note, source: "Positions Drawer" },
+        { timeoutMs: 5000 }
+      );
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to add journal note");
+      return res.data;
     },
     onSuccess: () => {
       setNoteStatus("Observation recorded in trade journal.");

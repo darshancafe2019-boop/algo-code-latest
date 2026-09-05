@@ -132,7 +132,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [clearSessionState]);
 
-  // Initial load
+  // Initial load & Global Auth Event Bus Listeners
   useEffect(() => {
     try {
       const storedLockout = sessionStorage.getItem(LOCKOUT_UNTIL_KEY);
@@ -150,8 +150,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch {}
 
+    const handleAuthRestored = (e: any) => {
+      const detail = e?.detail || {};
+      if (detail.user) {
+        setUser(detail.user);
+        setSession(detail.session || null);
+        setIsAuthenticated(true);
+        setIsLoading(false);
+      }
+    };
+
+    const handleAuthRequired = () => {
+      clearSessionState();
+      setIsLoading(false);
+    };
+
+    window.addEventListener("quantos:auth_restored", handleAuthRestored);
+    window.addEventListener("quantos:auth_required", handleAuthRequired);
+
     checkSession();
-  }, [checkSession]);
+
+    return () => {
+      window.removeEventListener("quantos:auth_restored", handleAuthRestored);
+      window.removeEventListener("quantos:auth_required", handleAuthRequired);
+    };
+  }, [checkSession, clearSessionState]);
 
   // Lockout countdown timer
   useEffect(() => {

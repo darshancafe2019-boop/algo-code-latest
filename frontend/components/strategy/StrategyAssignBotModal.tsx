@@ -17,6 +17,7 @@ import {
   Check,
 } from "lucide-react";
 import { StrategyIdeDefinition } from "@/types/strategy-ide";
+import { apiClient } from "@/lib/apiClient";
 
 interface StrategyAssignBotModalProps {
   isOpen: boolean;
@@ -39,9 +40,9 @@ export function StrategyAssignBotModal({
   strategy,
   onAssignSuccess,
 }: StrategyAssignBotModalProps) {
-  const [selectedBotId, setSelectedBotId] = useState<string>("");
+  const [selectedBotId, setSelectedBotId] = useState<string>("NEW_BOT");
   const [executionMode, setExecutionMode] = useState<"PAPER" | "LIVE">("PAPER");
-  const [broker, setBroker] = useState<string>("binance");
+  const [broker, setBroker] = useState<string>("paper_sim");
   const [capital, setCapital] = useState<number>(strategy?.risk?.capital || 10000);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
@@ -50,11 +51,12 @@ export function StrategyAssignBotModal({
   const { data: botsData, isLoading } = useQuery<{ bots: any[] }>({
     queryKey: ["botsList"],
     queryFn: async () => {
-      const res = await fetch("/api/bots");
-      if (!res.ok) return { bots: [] };
-      return res.json();
+      const res = await apiClient.get<any>("/api/bots", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) return { bots: [] };
+      return res.data;
     },
     enabled: isOpen,
+    placeholderData: (prev) => prev,
   });
 
   if (!isOpen) return null;
@@ -88,10 +90,9 @@ export function StrategyAssignBotModal({
     try {
       if (selectedBotId === "NEW_BOT" || !selectedBotId) {
         // 1. Create new bot instance
-        const res = await fetch("/api/bot/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const res = await apiClient.post<any>(
+          "/api/bot/create",
+          {
             name: `${strategy.name} Bot`,
             symbol: strategy.symbol,
             timeframe: strategy.base_timeframe || "15m",
@@ -99,26 +100,35 @@ export function StrategyAssignBotModal({
             allocated_capital: capital,
             execution_mode: executionMode,
             broker,
-          }),
-        });
+          },
+          {
+            idempotencyKey: `create-bot-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            retries: 0,
+          }
+        );
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || err.message || "Failed to create bot instance");
+          throw new Error(res.error?.message || "Failed to create bot instance");
         }
-        const createdBot = await res.json();
-        const newBotId = createdBot.bot_id || `bot-${Date.now()}`;
+        const createdBot = res.data;
+        const newBotId = createdBot?.bot_id || `bot-${Date.now()}`;
 
         // 2. Attach strategy
-        await fetch("/api/strategy/ide/assign-bot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const assignRes = await apiClient.post<any>(
+          "/api/strategy/ide/assign-bot",
+          {
             strategy,
             bot_id: newBotId,
             execution_mode: executionMode,
-          }),
-        });
+          },
+          {
+            retries: 0,
+          }
+        );
+
+        if (!assignRes.ok) {
+          throw new Error(assignRes.error?.message || "Failed to assign strategy to bot");
+        }
 
         setFeedback({
           type: "success",
@@ -131,19 +141,20 @@ export function StrategyAssignBotModal({
         }, 1200);
       } else {
         // Assign to existing bot
-        const res = await fetch("/api/strategy/ide/assign-bot", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const res = await apiClient.post<any>(
+          "/api/strategy/ide/assign-bot",
+          {
             strategy,
             bot_id: selectedBotId,
             execution_mode: executionMode,
-          }),
-        });
+          },
+          {
+            retries: 0,
+          }
+        );
 
         if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.message || "Failed to assign strategy to bot");
+          throw new Error(res.error?.message || "Failed to assign strategy to bot");
         }
 
         setFeedback({

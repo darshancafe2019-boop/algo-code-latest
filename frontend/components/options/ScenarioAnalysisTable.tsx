@@ -73,7 +73,7 @@ export function ScenarioAnalysisTable(props: ScenarioAnalysisTableProps) {
 
             return (
               <tr
-                key={idx}
+                key={`shift-${s}-${idx}`}
                 className={`hover:bg-slate-900/60 transition ${
                   isSpot ? "bg-cyan-950/30 font-bold border-l-2 border-cyan-400" : ""
                 }`}

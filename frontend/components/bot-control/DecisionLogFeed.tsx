@@ -3,16 +3,19 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 
 export function DecisionLogFeed() {
   const { data, isLoading, refetch } = useQuery({
     queryKey: ["decisionLogs"],
     queryFn: async () => {
-      const res = await fetch("/api/bots/events?limit=15");
-      if (!res.ok) throw new Error("Failed to fetch decision logs");
-      return res.json();
+      const res = await apiClient.get<any>("/api/bots/events?limit=15", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch decision logs");
+      return res.data;
     },
-    refetchInterval: 5000,
+    staleTime: 5000,
+    refetchInterval: 8000,
+    placeholderData: (prev) => prev,
   });
 
   const logs = data?.events || data?.decision_logs || data?.logs || [];

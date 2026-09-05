@@ -14,6 +14,7 @@ import {
   ArrowRight,
   RotateCcw,
 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
 import {
   calculateNotional,
@@ -98,9 +99,12 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
     const fetchLivePrice = async () => {
       try {
         setIsPriceLoading(true);
-        const res = await fetch(`/api/ticker?symbol=${encodeURIComponent(selectedSymbol)}`, { cache: "no-store" });
-        if (!res.ok) return;
-        const data = await res.json();
+        const res = await apiClient.get<any>(`/api/ticker?symbol=${encodeURIComponent(selectedSymbol)}`, {
+          timeoutMs: 4000,
+          deduplicate: true,
+        });
+        if (!res.ok || !res.data) return;
+        const data = res.data;
         const p = Number(data.last || data.price || data.close || 0);
         if (p > 0 && isMounted) {
           setMarketPrice(p);
@@ -211,40 +215,35 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
     setExecutionState("EXECUTING");
     setOrderFeedback(null);
 
-    const idempotencyKey = `ORD_IDEM_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const idempotencyKey = apiClient.generateIdempotencyKey("ORDER", selectedSymbol);
 
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 12000);
-
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          symbol: selectedSymbol,
-          direction: targetSide,
-          side: targetSide,
-          quantity: effectiveQty,
-          order_type: orderType,
-          price: orderType === "LIMIT" ? limitPrice : undefined,
-          stop_loss: stopLossPrice,
-          take_profit: takeProfitPrice,
-          mode: tradingMode,
-          bot_id: "order-center",
-          strategy: "MANUAL_DISCRETIONARY",
-          idempotency_key: idempotencyKey,
-        }),
+      const res = await apiClient.post<any>("/api/orders", {
+        symbol: selectedSymbol,
+        direction: targetSide,
+        side: targetSide,
+        quantity: effectiveQty,
+        order_type: orderType,
+        price: orderType === "LIMIT" ? limitPrice : undefined,
+        stop_loss: stopLossPrice,
+        take_profit: takeProfitPrice,
+        mode: tradingMode,
+        bot_id: "order-center",
+        strategy: "MANUAL_DISCRETIONARY",
+        idempotency_key: idempotencyKey,
+      }, {
+        idempotencyKey,
+        timeoutMs: 12000,
+        retries: 0, // State-changing trade submissions must never auto-retry blindly
       });
 
-      clearTimeout(timeoutId);
-
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!res.ok || !res.data || !res.data.success) {
         setExecutionState("FAILED");
-        throw new Error(data.message || data.error || "Order execution rejected by risk engine.");
+        const errMsg = res.error?.message || res.data?.message || "Order execution rejected by risk engine.";
+        throw new Error(errMsg);
       }
 
+      const data = res.data;
       setExecutionState("SUCCESS");
       const orderId = String(data.order_id || data.id || idempotencyKey.substring(9));
       const fillPrice = Number(data.fill_price || activePrice);

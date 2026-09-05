@@ -68,15 +68,15 @@ export function BackendAvailabilityBanner() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-bold text-rose-300 text-xs tracking-wide">
-                BACKEND UNAVAILABLE — RECONNECTING SAFELY
+              <span className="font-bold text-amber-300 text-xs tracking-wide">
+                DASHBOARD RECONNECTING — OBSERVABILITY STREAM PAUSED
               </span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-rose-900/60 text-rose-200 border border-rose-500/30">
-                Fail-Closed Protection Active
+              <span className="text-[10px] px-2 py-0.5 rounded bg-amber-900/60 text-amber-200 border border-amber-500/30">
+                Observability Notice
               </span>
             </div>
             <p className="text-[11px] text-slate-300 font-sans">
-              All trading execution and polling are temporarily paused to prevent request storms. Last connected {timeAgoSec}s ago.
+              Dashboard UI is re-establishing connection with the backend engine. Background trading and open positions continue unaffected. Last synced {timeAgoSec}s ago.
             </p>
           </div>
         </div>

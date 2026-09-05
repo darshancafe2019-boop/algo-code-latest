@@ -266,6 +266,30 @@ def test_flask_security_endpoints_integration():
     )
     assert login_resp.status_code == 200
     login_data = login_resp.get_json()
+    if login_data.get("status") == "EMAIL_OTP_REQUIRED":
+        challenge_id = login_data["challenge_id"]
+        otp_code = ""
+        outbox_file = config.DATA_DIR / "outbox.log"
+        if outbox_file.exists():
+            with open(outbox_file, "r", encoding="utf-8") as f:
+                for line in reversed(f.readlines()):
+                    if line.strip():
+                        try:
+                            rec = json.loads(line)
+                            import re
+                            m = re.search(r"\b(\d{6})\b", rec.get("text", ""))
+                            if m:
+                                otp_code = m.group(1)
+                                break
+                        except Exception:
+                            pass
+        otp_resp = client.post(
+            "/api/auth/email-otp/verify",
+            json={"challenge_id": challenge_id, "otp": otp_code}
+        )
+        assert otp_resp.status_code == 200
+        login_data = otp_resp.get_json()
+
     assert login_data["status"] == "success"
 
     # 4. Enforce password change to clear must_change_password

@@ -234,7 +234,7 @@ export function OptionStrategyBuilder() {
 
                 return (
                   <div
-                    key={idx}
+                    key={`pt-${pt.underlying_price || idx}-${idx}`}
                     className="flex-1 flex flex-col items-center justify-end h-full group relative"
                   >
                     <div

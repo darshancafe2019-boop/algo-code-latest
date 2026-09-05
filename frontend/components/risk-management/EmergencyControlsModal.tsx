@@ -14,6 +14,8 @@ import {
   Lock,
 } from "lucide-react";
 
+import { apiClient } from "@/lib/apiClient";
+
 interface EmergencyControlsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -32,11 +34,14 @@ export function EmergencyControlsModal({
   // 1. Pause New Orders Mutation
   const pauseMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/bots/pause-all", { method: "POST" });
-      return res.json();
+      const res = await apiClient.post("/api/bots/pause-all", {}, {
+        idempotencyKey: apiClient.generateIdempotencyKey("PAUSE_ALL")
+      });
+      if (!res.ok) throw new Error(res.error?.message || "Failed to pause bots");
+      return res.data;
     },
-    onSuccess: (data) => {
-      setFeedback({ type: "success", message: data.message || "All active bots paused successfully." });
+    onSuccess: (data: any) => {
+      setFeedback({ type: "success", message: data?.message || "All active bots paused successfully." });
       queryClient.invalidateQueries({ queryKey: ["riskOverview"] });
       queryClient.invalidateQueries({ queryKey: ["botsList"] });
     },
@@ -45,14 +50,18 @@ export function EmergencyControlsModal({
   // 2. Cancel Open Orders Mutation
   const cancelOrdersMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/orders", { method: "DELETE" });
+      const res = await apiClient.delete("/api/orders", {
+        idempotencyKey: apiClient.generateIdempotencyKey("CANCEL_ALL_ORDERS")
+      });
       if (!res.ok) {
         // Fallback to stop-all if direct cancel all is mapped
-        await fetch("/api/bots/stop-all", { method: "POST" });
+        await apiClient.post("/api/bots/stop-all", {}, {
+          idempotencyKey: apiClient.generateIdempotencyKey("STOP_ALL_FALLBACK")
+        });
       }
       return { status: "success", message: "All open resting orders cancelled." };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setFeedback({ type: "success", message: data.message });
       queryClient.invalidateQueries({ queryKey: ["riskOverview"] });
       queryClient.invalidateQueries({ queryKey: ["botOrders"] });
@@ -62,11 +71,14 @@ export function EmergencyControlsModal({
   // 3. Close All Paper Positions Mutation
   const closePositionsMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/bots/paper/reset", { method: "POST" });
-      return res.json();
+      const res = await apiClient.post("/api/bots/paper/reset", {}, {
+        idempotencyKey: apiClient.generateIdempotencyKey("RESET_PAPER_POSITIONS")
+      });
+      if (!res.ok) throw new Error(res.error?.message || "Failed to close positions");
+      return res.data;
     },
-    onSuccess: (data) => {
-      setFeedback({ type: "success", message: data.message || "All simulated paper positions squared off." });
+    onSuccess: (data: any) => {
+      setFeedback({ type: "success", message: data?.message || "All simulated paper positions squared off." });
       queryClient.invalidateQueries({ queryKey: ["riskOverview"] });
       queryClient.invalidateQueries({ queryKey: ["botPositions"] });
     },
@@ -75,8 +87,11 @@ export function EmergencyControlsModal({
   // 4. Global Kill Switch Mutation (Authoritative Backend Stop)
   const killSwitchMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/bots/stop-all", { method: "POST" });
-      return res.json();
+      const res = await apiClient.post("/api/bots/stop-all", {}, {
+        idempotencyKey: apiClient.generateIdempotencyKey("KILL_SWITCH_STOP_ALL")
+      });
+      if (!res.ok) throw new Error(res.error?.message || "Failed to trigger stop-all");
+      return res.data;
     },
     onSuccess: (data) => {
       setFeedback({ type: "success", message: "SERVER KILL SWITCH ACTIVATED. System trading halted." });

@@ -10547,17 +10547,35 @@ def update_session_activity(session_id: str) -> bool:
 
 def revoke_session(session_id: str) -> bool:
     """Revokes a specific session."""
-    return safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ?", (session_id,))
+    res = safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE session_id = ?", (session_id,))
+    try:
+        from src.security_auth import SessionManager
+        SessionManager.invalidate_cache()
+    except Exception:
+        pass
+    return res
 
 
 def revoke_all_other_sessions(user_id: str, keep_session_id: str) -> bool:
     """Revokes all active sessions for a user except current."""
-    return safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ? AND session_id != ?", (user_id, keep_session_id))
+    res = safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ? AND session_id != ?", (user_id, keep_session_id))
+    try:
+        from src.security_auth import SessionManager
+        SessionManager.invalidate_cache()
+    except Exception:
+        pass
+    return res
 
 
 def revoke_all_user_sessions(user_id: str) -> bool:
     """Revokes all active sessions for a user."""
-    return safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ?", (user_id,))
+    res = safe_execute("UPDATE user_sessions SET is_revoked = 1 WHERE user_id = ?", (user_id,))
+    try:
+        from src.security_auth import SessionManager
+        SessionManager.invalidate_cache()
+    except Exception:
+        pass
+    return res
 
 
 def get_active_sessions_for_user(user_id: str) -> List[Dict[str, Any]]:

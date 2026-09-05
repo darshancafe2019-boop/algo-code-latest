@@ -18,6 +18,7 @@ import asyncio
 import argparse
 from pathlib import Path
 from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple, Any
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))

@@ -59,7 +59,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
     placeholderData: (prev) => prev,
   });
 
-  // 2. Authoritative Positions Query
+  // 2. Authoritative Positions Query (Preserves Last-Known-Good Positions on transient 401)
   const { data: positionsData, refetch: refetchPositions } = useQuery({
     queryKey: ["authoritativePositions", tradingMode],
     queryFn: async () => {
@@ -67,15 +67,18 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
         `/api/positions?mode=${tradingMode}`,
         { timeoutMs: 5000 }
       );
-      if (!res.ok || !res.data) return { positions: [] };
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch positions");
+      }
       return res.data;
     },
-    enabled: isAuthenticated,
+    enabled: Boolean(isAuthenticated),
     staleTime: 3000,
     refetchInterval: isAuthenticated ? 5000 : false,
+    placeholderData: (prev) => prev,
   });
 
-  // 3. Authoritative Orders Query
+  // 3. Authoritative Orders Query (Preserves Last-Known-Good Orders on transient 401)
   const { data: ordersData, refetch: refetchOrders } = useQuery({
     queryKey: ["authoritativeOrders", tradingMode],
     queryFn: async () => {
@@ -83,12 +86,15 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
         `/api/orders?mode=${tradingMode}&limit=100`,
         { timeoutMs: 5000 }
       );
-      if (!res.ok || !res.data) return { orders: [] };
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch orders");
+      }
       return res.data;
     },
-    enabled: isAuthenticated,
+    enabled: Boolean(isAuthenticated),
     staleTime: 4000,
     refetchInterval: isAuthenticated ? 6000 : false,
+    placeholderData: (prev) => prev,
   });
 
   // 4. Authoritative Providers Query
@@ -99,15 +105,18 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
         "/api/providers",
         { timeoutMs: 6000 }
       );
-      if (!res.ok || !res.data) return { providers: [] };
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch providers");
+      }
       return res.data;
     },
-    enabled: isAuthenticated,
+    enabled: Boolean(isAuthenticated),
     staleTime: 15000,
     refetchInterval: isAuthenticated ? 30000 : false,
+    placeholderData: (prev) => prev,
   });
 
-  // 5. Authoritative Risk Summary Query
+  // 5. Authoritative Risk Summary Query (Preserves Last-Known-Good Risk Metrics)
   const { data: riskData, refetch: refetchRisk } = useQuery({
     queryKey: ["authoritativeRisk", tradingMode],
     queryFn: async () => {
@@ -115,12 +124,15 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
         `/api/risk/summary?mode=${tradingMode}`,
         { timeoutMs: 5000 }
       );
-      if (!res.ok || !res.data) return null;
+      if (!res.ok || !res.data) {
+        throw new Error(res.error?.message || "Failed to fetch risk summary");
+      }
       return res.data.risk;
     },
-    enabled: isAuthenticated,
+    enabled: Boolean(isAuthenticated),
     staleTime: 4000,
     refetchInterval: isAuthenticated ? 6000 : false,
+    placeholderData: (prev) => prev,
   });
 
   // 6. Real-time SSE Stream Listener for sub-second portfolio broadcast

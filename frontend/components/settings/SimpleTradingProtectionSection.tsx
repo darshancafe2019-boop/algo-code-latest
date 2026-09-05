@@ -230,13 +230,13 @@ export function SimpleTradingProtectionSection({ onRefresh }: SimpleTradingProte
             </div>
 
             <div className="space-y-2">
-              {(protectionData?.bot_permissions || []).map((perm) => {
+              {(protectionData?.bot_permissions || []).map((perm, idx) => {
                 const isAllowed = perm.status === "ALLOWED";
                 const isNever = perm.status === "NEVER_ALLOWED";
 
                 return (
                   <div
-                    key={perm.id}
+                    key={perm.id || `perm-${perm.label || perm.category || idx}`}
                     className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-between"
                   >
                     <div className="space-y-0.5">

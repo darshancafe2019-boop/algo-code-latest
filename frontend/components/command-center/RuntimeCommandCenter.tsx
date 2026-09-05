@@ -28,6 +28,7 @@ import {
   Sliders,
   ChevronRight,
 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 
 interface CommandLogItem {
   id: string;
@@ -53,34 +54,37 @@ export function RuntimeCommandCenter() {
   const { data: healthData } = useQuery({
     queryKey: ["commandCenterHealth"],
     queryFn: async () => {
-      const res = await fetch("/api/system-health/status");
-      if (!res.ok) return null;
-      return res.json();
+      const res = await apiClient.get<any>("/api/system-health/status", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     refetchInterval: 3000,
+    placeholderData: (prev: any) => prev,
   });
 
   // 2. Fetch System Status & Operating Mode
   const { data: statusData } = useQuery({
     queryKey: ["commandCenterStatus"],
     queryFn: async () => {
-      const res = await fetch("/api/status");
-      if (!res.ok) return null;
-      return res.json();
+      const res = await apiClient.get<any>("/api/status", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     refetchInterval: 3000,
+    placeholderData: (prev: any) => prev,
   });
 
   // 3. Fetch Operational Events / Command Trace Logs
   const { data: eventsData } = useQuery({
     queryKey: ["commandCenterEvents"],
     queryFn: async () => {
-      const res = await fetch("/api/logs?limit=25");
-      if (!res.ok) return [];
-      const json = await res.json();
+      const res = await apiClient.get<any>("/api/logs?limit=25", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return [];
+      const json = res.data;
       return (json.logs || json.events || json.data || []).slice(0, 15);
     },
     refetchInterval: 4000,
+    placeholderData: (prev: any) => prev,
   });
 
   const isKillSwitchActive = statusData?.system_summary?.kill_switch_active || false;

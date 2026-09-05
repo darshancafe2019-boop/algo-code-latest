@@ -183,7 +183,7 @@ export function RiskSectionOverview({
                 ${maxOrderSize > 0 ? maxOrderSize.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "0"}
               </div>
               <span className="text-[10px] text-[var(--theme-text-muted)] block truncate">
-                {canTrade ? "Based on Collateral" : "Orders Restricted"}
+                {canTrade ? "Based on Collateral" : "Margin Restricted"}
               </span>
             </div>
 

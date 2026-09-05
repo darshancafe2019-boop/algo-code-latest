@@ -85,7 +85,7 @@ export function StrategyPerformanceLeaderboard({
               {rawList.map((st, idx) => {
                 const pnlMeta = formatPnL(st.net_pnl, currency, 2);
                 return (
-                  <tr key={st.strategy_name} className="hover:bg-[#141E33] transition-colors">
+                  <tr key={st.strategy_name || `strat-${idx}`} className="hover:bg-[#141E33] transition-colors">
                     <td className="p-2.5 font-bold text-white flex items-center gap-2">
                       <span className="w-5 h-5 rounded-full bg-[#141E33] border border-slate-700 flex items-center justify-center text-[10px] text-cyan-400 font-bold">
                         #{idx + 1}

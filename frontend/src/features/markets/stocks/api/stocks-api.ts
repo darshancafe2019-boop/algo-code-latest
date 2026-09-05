@@ -4,6 +4,7 @@
  * Typed HTTP client interfacing with /api/market-data/stocks/* endpoints.
  */
 
+import { apiClient } from "@/lib/apiClient";
 import {
   StockQuoteRow,
   StockInstrument,
@@ -22,28 +23,27 @@ export async function fetchStocks(
   filters: StockFilterState
 ): Promise<ApiResponseEnvelope<StockQuoteRow[]>> {
   const qs = serializeStockFilters(filters);
-  const res = await fetch(`${BASE_URL}?${qs}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
-    cache: "no-store",
+  const res = await apiClient.get<ApiResponseEnvelope<StockQuoteRow[]>>(`${BASE_URL}?${qs}`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch stocks (${res.status}): ${await res.text()}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch stocks: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockDetail(
   instrumentId: string
 ): Promise<ApiResponseEnvelope<StockInstrument>> {
-  const res = await fetch(`${BASE_URL}/${encodeURIComponent(instrumentId)}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+  const res = await apiClient.get<ApiResponseEnvelope<StockInstrument>>(`${BASE_URL}/${encodeURIComponent(instrumentId)}`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch stock detail: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch stock detail: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockHistory(
@@ -51,64 +51,64 @@ export async function fetchStockHistory(
   timeframe: string = "15m",
   limit: number = 100
 ): Promise<ApiResponseEnvelope<StockCandle[]>> {
-  const res = await fetch(
+  const res = await apiClient.get<ApiResponseEnvelope<StockCandle[]>>(
     `${BASE_URL}/${encodeURIComponent(instrumentId)}/history?timeframe=${timeframe}&limit=${limit}`,
     {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+      timeoutMs: 8000,
+      deduplicate: true,
     }
   );
-  if (!res.ok) {
-    throw new Error(`Failed to fetch stock candles: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch stock candles: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockFundamentals(
   instrumentId: string
 ): Promise<ApiResponseEnvelope<StockFundamentals>> {
-  const res = await fetch(`${BASE_URL}/${encodeURIComponent(instrumentId)}/fundamentals`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+  const res = await apiClient.get<ApiResponseEnvelope<StockFundamentals>>(`${BASE_URL}/${encodeURIComponent(instrumentId)}/fundamentals`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch fundamentals: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch fundamentals: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockTechnicals(
   instrumentId: string,
   timeframe: string = "1d"
 ): Promise<ApiResponseEnvelope<StockTechnicals>> {
-  const res = await fetch(
+  const res = await apiClient.get<ApiResponseEnvelope<StockTechnicals>>(
     `${BASE_URL}/${encodeURIComponent(instrumentId)}/analysis?timeframe=${timeframe}`,
     {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+      timeoutMs: 8000,
+      deduplicate: true,
     }
   );
-  if (!res.ok) {
-    throw new Error(`Failed to fetch analysis: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch analysis: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockAnalysis(
   instrumentId: string,
   timeframe: string = "1d"
 ): Promise<ApiResponseEnvelope<StockAnalysisResult>> {
-  const res = await fetch(
+  const res = await apiClient.get<ApiResponseEnvelope<StockAnalysisResult>>(
     `${BASE_URL}/${encodeURIComponent(instrumentId)}/analysis?timeframe=${timeframe}`,
     {
-      method: "GET",
-      headers: { "Content-Type": "application/json" },
+      timeoutMs: 8000,
+      deduplicate: true,
     }
   );
-  if (!res.ok) {
-    throw new Error(`Failed to fetch analysis: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch analysis: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchStockMovers(
@@ -119,34 +119,34 @@ export async function fetchStockMovers(
   const params = new URLSearchParams({ preset, limit: String(limit) });
   if (exchange && exchange !== "ALL") params.set("exchange", exchange);
 
-  const res = await fetch(`${BASE_URL}/movers?${params.toString()}`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+  const res = await apiClient.get<ApiResponseEnvelope<any[]>>(`${BASE_URL}/movers?${params.toString()}`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch stock movers: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch stock movers: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchFilterSchema(): Promise<ApiResponseEnvelope<any>> {
-  const res = await fetch(`${BASE_URL}/filters/schema`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+  const res = await apiClient.get<ApiResponseEnvelope<any>>(`${BASE_URL}/filters/schema`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch filter schema: ${res.statusText}`);
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to fetch filter schema: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }
 
 export async function fetchFavorites(): Promise<ApiResponseEnvelope<string[]>> {
-  const res = await fetch(`${BASE_URL}/favorites`, {
-    method: "GET",
-    headers: { "Content-Type": "application/json" },
+  const res = await apiClient.get<ApiResponseEnvelope<string[]>>(`${BASE_URL}/favorites`, {
+    timeoutMs: 8000,
+    deduplicate: true,
   });
-  if (!res.ok) return { success: true, data: [], meta: {} as any };
-  return res.json();
+  if (!res.ok || !res.data) return { success: true, data: [], meta: {} as any };
+  return res.data;
 }
 
 export async function toggleFavoriteStock(
@@ -154,13 +154,13 @@ export async function toggleFavoriteStock(
   symbol: string,
   exchange: string
 ): Promise<ApiResponseEnvelope<{ instrument_id: string; is_favorite: boolean }>> {
-  const res = await fetch(`${BASE_URL}/favorites/toggle`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ instrument_id: instrumentId, symbol, exchange }),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to toggle favorite: ${res.statusText}`);
+  const res = await apiClient.post<ApiResponseEnvelope<{ instrument_id: string; is_favorite: boolean }>>(
+    `${BASE_URL}/favorites/toggle`,
+    { instrument_id: instrumentId, symbol, exchange },
+    { timeoutMs: 5000 }
+  );
+  if (!res.ok || !res.data) {
+    throw new Error(`Failed to toggle favorite: ${res.error || "Unknown error"}`);
   }
-  return res.json();
+  return res.data;
 }

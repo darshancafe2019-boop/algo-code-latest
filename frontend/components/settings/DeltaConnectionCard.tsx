@@ -301,7 +301,7 @@ export function DeltaConnectionCard() {
           </div>
           <div className="flex items-center gap-4 font-mono text-[11px]">
             {walletData.balances.map((b: any, idx: number) => (
-              <div key={idx} className="flex items-center gap-1.5">
+              <div key={b.asset || `balance-${idx}`} className="flex items-center gap-1.5">
                 <span className="text-slate-400">{b.asset}:</span>
                 <span className="font-bold text-emerald-400">
                   {b.currency_symbol || ""}{Number(b.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -330,9 +330,9 @@ export function DeltaConnectionCard() {
             "Solana Options & Futures",
             "Zero-Loss Paper Sandbox",
             "Delta India INR Settlement"
-          ].map((mkt, idx) => (
+          ].map((mkt) => (
             <span
-              key={idx}
+              key={mkt}
               className="text-[11px] px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1E293B] text-slate-300 font-medium"
             >
               {mkt}

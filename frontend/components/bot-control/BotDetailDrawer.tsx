@@ -29,19 +29,13 @@ import {
   Download,
   Terminal,
 } from "lucide-react";
+import { apiClient } from "@/lib/apiClient";
 import {
   BotInstanceExtended,
   BotOrderLifecycleItem,
   BotPositionItem,
   BotDecisionLogItem,
 } from "@/types/bot-control";
-
-interface BotDetailDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  bot: BotInstanceExtended | null;
-  onBotAction: (botId: string, action: "START" | "PAUSE" | "RESUME" | "STOP" | "RESTART") => void;
-}
 
 type DrawerTab =
   | "overview"
@@ -52,49 +46,72 @@ type DrawerTab =
   | "analytics"
   | "logs"
   | "health"
-  | "telegram";
+  | "telegram"
+  | "diagnostics";
 
-export function BotDetailDrawer({ isOpen, onClose, bot, onBotAction }: BotDetailDrawerProps) {
+interface BotDetailDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  bot: BotInstanceExtended | null;
+  onBotAction?: (botId: string, action: "START" | "PAUSE" | "RESUME" | "STOP" | "RESTART") => void;
+  onTriggerAction?: (action: string, botId: string) => Promise<void>;
+  isActionLoading?: boolean;
+}
+
+export function BotDetailDrawer({
+  isOpen,
+  onClose,
+  bot,
+  onBotAction = () => {},
+  onTriggerAction,
+  isActionLoading,
+}: BotDetailDrawerProps) {
   const [activeTab, setActiveTab] = useState<DrawerTab>("overview");
   const [logFilter, setLogFilter] = useState<string>("ALL");
   const [logSearch, setLogSearch] = useState<string>("");
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
 
-  // Fetch Bot Decisions / Logs (`GET /api/bots/<bot_id>/decisions` or `/api/logs`)
+  // Fetch Bot Decisions / Logs (`GET /api/bots/<bot_id>/decisions`)
   const { data: decisionsData } = useQuery<{ decisions: any[] }>({
     queryKey: ["botDecisions", bot?.id],
     queryFn: async () => {
       if (!bot?.id) return { decisions: [] };
-      const res = await fetch(`/api/bots/${bot.id}/decisions`);
-      if (!res.ok) return { decisions: [] };
-      return res.json();
+      const res = await apiClient.get<any>(`/api/bots/${bot.id}/decisions`, { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch decisions");
+      return res.data;
     },
     enabled: isOpen && !!bot?.id,
-    refetchInterval: 3000,
+    staleTime: 5000,
+    refetchInterval: isOpen ? 6000 : false,
+    placeholderData: (prev) => prev,
   });
 
   // Fetch Bot Orders (`GET /api/orders`)
   const { data: ordersData } = useQuery<{ orders: any[] }>({
     queryKey: ["botOrders", bot?.id],
     queryFn: async () => {
-      const res = await fetch("/api/orders");
-      if (!res.ok) return { orders: [] };
-      return res.json();
+      const res = await apiClient.get<any>("/api/orders", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch orders");
+      return res.data;
     },
     enabled: isOpen && !!bot?.id,
-    refetchInterval: 3000,
+    staleTime: 5000,
+    refetchInterval: isOpen ? 6000 : false,
+    placeholderData: (prev) => prev,
   });
 
   // Fetch Bot Positions (`GET /api/positions`)
   const { data: positionsData } = useQuery<{ positions: any[] }>({
     queryKey: ["botPositions", bot?.id],
     queryFn: async () => {
-      const res = await fetch("/api/positions");
-      if (!res.ok) return { positions: [] };
-      return res.json();
+      const res = await apiClient.get<any>("/api/positions", { timeoutMs: 5000, deduplicate: true });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch positions");
+      return res.data;
     },
     enabled: isOpen && !!bot?.id,
-    refetchInterval: 3000,
+    staleTime: 5000,
+    refetchInterval: isOpen ? 6000 : false,
+    placeholderData: (prev) => prev,
   });
 
   if (!isOpen || !bot) return null;

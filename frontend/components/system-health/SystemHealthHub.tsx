@@ -24,6 +24,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 import { SelfHealingDashboardWidget } from "@/components/system-health/SelfHealingDashboardWidget";
 
+import { apiClient } from "@/lib/apiClient";
+
 interface SubsystemInfo {
   status: "HEALTHY" | "WARNING" | "ERROR" | "DISCONNECTED" | "NOT_CONFIGURED" | "ARMED" | "HALTED" | "READY" | "RUNNING" | "IDLE" | "PROTECTED";
   latency_ms?: number;
@@ -63,14 +65,15 @@ export function SystemHealthHub() {
   const queryClient = useQueryClient();
   const [testingComponent, setTestingComponent] = useState<string | null>(null);
 
-  const { data, isLoading, refetch, isFetching } = useQuery<SystemHealthResponse>({
+  const { data, isLoading, refetch, isFetching } = useQuery<SystemHealthResponse | null>({
     queryKey: ["systemHealthStatus"],
     queryFn: async () => {
-      const res = await fetch("/api/system-health/status");
-      if (!res.ok) throw new Error("Failed to fetch system health status");
-      return res.json();
+      const res = await apiClient.get<SystemHealthResponse>("/api/system-health/status", { timeoutMs: 5000 });
+      if (!res.ok || !res.data) return null;
+      return res.data;
     },
     refetchInterval: 3000,
+    placeholderData: (prev) => prev,
   });
 
   const getStatusBadge = (status: string) => {
@@ -121,7 +124,7 @@ export function SystemHealthHub() {
                   ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                   : "bg-amber-950 text-amber-300 border border-amber-800"
               }`}>
-                {data?.status || "CHECKING..."}
+                {data?.status || (isLoading ? "CONNECTING..." : "RECONNECTING...")}
               </span>
             </h1>
             <p className="text-xs text-slate-400 mt-1">
@@ -150,13 +153,23 @@ export function SystemHealthHub() {
         <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Active Bots</div>
           <div className="text-xl font-bold text-cyan-400 mt-1 font-mono">
-            {data?.system_summary?.running_bots || 0} / {data?.system_summary?.total_bots || 0}
+            {data?.system_summary?.running_bots !== undefined ? (
+              `${data.system_summary.running_bots} / ${data.system_summary.total_bots || 0}`
+            ) : (
+              <span className="text-xs text-slate-400">SYNCING...</span>
+            )}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Running Processes</div>
         </div>
         <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Active Positions</div>
-          <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">{data?.system_summary?.open_trades || 0}</div>
+          <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">
+            {data?.system_summary?.open_trades !== undefined ? (
+              data.system_summary.open_trades
+            ) : (
+              <span className="text-xs text-slate-400">SYNCING...</span>
+            )}
+          </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Open Market Exposure</div>
         </div>
         <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
@@ -164,8 +177,10 @@ export function SystemHealthHub() {
           <div className="text-xl font-bold font-mono mt-1">
             {data?.system_summary?.kill_switch_active ? (
               <span className="text-rose-400">ACTIVE / LOCKED</span>
-            ) : (
+            ) : data?.system_summary ? (
               <span className="text-emerald-400">NORMAL / ARMED</span>
+            ) : (
+              <span className="text-xs text-slate-400">SYNCING...</span>
             )}
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Safety Circuit Status</div>

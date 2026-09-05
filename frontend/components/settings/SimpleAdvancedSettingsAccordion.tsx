@@ -45,8 +45,10 @@ export function SimpleAdvancedSettingsAccordion({
   const { data: auditData, refetch: refetchAudit } = useQuery<{
     status: string;
     audit_logs: Array<{
-      id: number;
-      timestamp: string;
+      event_id?: string;
+      id?: string | number;
+      timestamp_utc?: string;
+      timestamp?: string;
       action: string;
       actor_user_id: string;
       resource_type: string;
@@ -228,27 +230,31 @@ export function SimpleAdvancedSettingsAccordion({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40 text-[11px]">
-                    {filteredAudit.map((log) => (
-                      <tr key={log.id} className="hover:bg-slate-800/20">
-                        <td className="py-2 px-3 text-slate-400">
-                          {log.timestamp ? new Date(log.timestamp).toLocaleString() : "—"}
-                        </td>
-                        <td className="py-2 px-3 font-bold text-white">{log.action}</td>
-                        <td className="py-2 px-3 text-slate-300">{log.actor_user_id || "admin"}</td>
-                        <td className="py-2 px-3 text-slate-400">{log.resource_type || "SYSTEM"}</td>
-                        <td className="py-2 px-3 text-right">
-                          <span
-                            className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
-                              log.result === "SUCCESS"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : "bg-rose-500/20 text-rose-400"
-                            }`}
-                          >
-                            {log.result}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredAudit.map((log, idx) => {
+                      const rowKey = log.event_id || log.id || `audit-${log.action}-${idx}`;
+                      const rawTime = log.timestamp_utc || log.timestamp;
+                      return (
+                        <tr key={rowKey} className="hover:bg-slate-800/20">
+                          <td className="py-2 px-3 text-slate-400">
+                            {rawTime ? new Date(rawTime).toLocaleString() : "—"}
+                          </td>
+                          <td className="py-2 px-3 font-bold text-white">{log.action}</td>
+                          <td className="py-2 px-3 text-slate-300">{log.actor_user_id || "admin"}</td>
+                          <td className="py-2 px-3 text-slate-400">{log.resource_type || "SYSTEM"}</td>
+                          <td className="py-2 px-3 text-right">
+                            <span
+                              className={`px-1.5 py-0.2 rounded font-bold text-[10px] ${
+                                log.result === "SUCCESS"
+                                  ? "bg-emerald-500/20 text-emerald-400"
+                                  : "bg-rose-500/20 text-rose-400"
+                              }`}
+                            >
+                              {log.result}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -291,8 +297,8 @@ export function SimpleAdvancedSettingsAccordion({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/40 text-[11px]">
-                    {(backupsData?.backups || []).map((b) => (
-                      <tr key={b.backup_id} className="hover:bg-slate-800/20">
+                    {(backupsData?.backups || []).map((b, idx) => (
+                      <tr key={b.backup_id || `backup-${idx}`} className="hover:bg-slate-800/20">
                         <td className="py-2 px-3 font-bold text-white">{b.backup_id}</td>
                         <td className="py-2 px-3 text-slate-400">
                           {b.timestamp_utc ? new Date(b.timestamp_utc).toLocaleString() : "—"}
@@ -331,9 +337,9 @@ export function SimpleAdvancedSettingsAccordion({
               </div>
 
               <div className="space-y-2">
-                {checkup.map((item) => (
+                {checkup.map((item, idx) => (
                   <div
-                    key={item.id}
+                    key={item.id || `checkup-${idx}`}
                     className="p-3 bg-slate-900 rounded-xl border border-slate-800 flex items-center justify-between text-xs"
                   >
                     <div className="flex items-center gap-2">

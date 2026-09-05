@@ -311,11 +311,7 @@ except Exception as fbp_err:
     logger.warning(f"Notice: Failed registering futures blueprint: {fbp_err}")
 
 @app.route("/health", methods=["GET"])
-@app.route("/health/live", methods=["GET"])
-@app.route("/health/ready", methods=["GET"])
 @app.route("/api/health", methods=["GET"])
-@app.route("/api/health/live", methods=["GET"])
-@app.route("/api/health/ready", methods=["GET"])
 def health_check():
     return jsonify({
         "status": "ok",
@@ -11561,8 +11557,10 @@ def api_auth_step_up():
 def api_security_overview():
     """Returns authoritative security overview telemetry and configuration checkup."""
     try:
-        user, _ = get_current_user_and_session()
-        uid = user["id"] if user else "usr_admin_01"
+        user, _ = get_current_user_and_session(allow_dev_fallback=False)
+        if not user:
+            return jsonify({"status": "error", "error_code": "UNAUTHORIZED", "message": "Authentication required."}), 401
+        uid = user["id"]
         user_rec = db.get_user_by_id(uid) or db.get_user_by_username("admin") or {}
 
         passkeys = json.loads(user_rec.get("passkeys_json") or "[]")

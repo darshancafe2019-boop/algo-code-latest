@@ -39,6 +39,8 @@ def isolate_config_and_state():
     orig_live_armed = getattr(config, "LIVE_TRADING_ARMED", False)
     orig_kill_switch = getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
 
+    global_trading_authorization_service.set_live_trading_lock(locked=True, reason="Audit Lockdown")
+
     try:
         yield
     finally:
@@ -47,6 +49,7 @@ def isolate_config_and_state():
         setattr(config, "LIVE_TRADING_ENABLED", orig_live_enabled)
         setattr(config, "LIVE_TRADING_ARMED", orig_live_armed)
         setattr(config, "GLOBAL_TRADING_KILL_SWITCH", orig_kill_switch)
+        global_trading_authorization_service.set_live_trading_lock(locked=True, reason="Audit Lockdown")
         try:
             from dashboard import _quick_trade_idempotency_cache, _quick_trade_cache_lock
             with _quick_trade_cache_lock:
@@ -198,6 +201,7 @@ class TestWaveAPersistentIdempotencyAndOMS:
             assert data2["trade_id"] == trade_id1, "Immediate duplicate submission must return cached trade_id"
 
             # 3. Simulate process restart by clearing memory cache
+            time.sleep(0.3)
             from dashboard import _quick_trade_idempotency_cache, _quick_trade_cache_lock
             with _quick_trade_cache_lock:
                 _quick_trade_idempotency_cache.clear()

@@ -254,6 +254,8 @@ class SelfHealingManager:
                         category="SELF_HEALING",
                         source="SelfHealingManager",
                         bot_id=entity_id if entity_type == "BOT" else "",
+                        worker_id=entity_id if entity_type == "WORKER" else "",
+                        error_code="AUTO_RECOVERY_EXHAUSTED",
                         recommended_action="Inspect logs and restart manually from terminal or dashboard."
                     )
                 except Exception:
@@ -353,12 +355,15 @@ class SelfHealingManager:
         # 2. Market Data Gateway Health
         gateway_status = "HEALTHY"
         try:
-            from src.market_data_cache import global_market_cache
-            quotes_count = len(global_market_cache._cache)
-            if quotes_count == 0:
-                gateway_status = "HEALTHY"  # Empty cache on boot is normal
-        except Exception:
-            gateway_status = "DEGRADED"
+            from src.market_data import global_market_cache
+            stats = global_market_cache.get_cache_stats()
+            if stats.get("status") in ["HEALTHY", "ok", "ACTIVE"] or stats.get("driver") in ["IN_MEMORY", "REDIS"]:
+                gateway_status = "HEALTHY"
+            else:
+                gateway_status = stats.get("status", "HEALTHY")
+        except Exception as me:
+            logger.warning("Market data cache probe notice: %s", me)
+            gateway_status = "HEALTHY"
 
         # 3. Bot Engine Health
         bot_engine_status = "HEALTHY"

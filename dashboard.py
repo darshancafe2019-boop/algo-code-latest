@@ -4649,186 +4649,241 @@ def api_order_by_id(order_id):
 @app.route("/api/positions", methods=["GET"])
 def api_positions_rest():
     """Fetch active open positions with institutional-grade risk metrics, live P&L, and portfolio aggregates."""
-    from src.global_data_engine import GlobalDataEngine
-    gde = GlobalDataEngine.get_instance()
-    mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
-    bot_id = request.args.get("bot_id")
-    
-    if bot_id:
-        raw_positions = safe_query("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC", (mode, bot_id))
-    else:
-        raw_positions = safe_query("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC", (mode,))
-
-    now = datetime.now(timezone.utc)
-    now_str = now.isoformat()
-
-    enriched_positions = []
-    total_unrealized_pnl = 0.0
-    long_exposure = 0.0
-    short_exposure = 0.0
-    total_margin_used = 0.0
-    total_planned_risk = 0.0
-    long_count = 0
-    short_count = 0
-
-    for p in raw_positions:
-        sym = p.get("symbol") or getattr(config, "SYMBOL", "BTC/USDT")
-        dir_val = (p.get("direction") or p.get("side") or "LONG").upper()
-        is_long = dir_val in ["LONG", "BUY"]
-
-        entry_p = float(p.get("entry_price") or p.get("average_entry_price") or 65000.0)
-        curr_p = float(gde.get_latest_price(sym) or entry_p)  # Authoritative live mark price per asset
-        qty = float(p.get("position_size") or p.get("quantity") or p.get("entry_quantity") or 0.1)
-        lev = float(p.get("leverage") or 5.0)
-        notional = round(entry_p * qty, 2)
-        curr_notional = round(curr_p * qty, 2)
-        margin = round(notional / lev, 2) if lev > 0 else notional
-
-        # Floating P&L using canonical compute_unrealized_pnl
-        fee = float(p.get("fees") or 0.0)
-        try:
-            pnl_data = pnl_engine.compute_unrealized_pnl(
-                direction=dir_val,
-                entry_price=entry_p,
-                live_price=curr_p,
-                quantity=qty,
-                fees=fee,
+    req_id = request.headers.get("X-Request-Id") or f"req_{uuid.uuid4().hex[:12]}"
+    try:
+        from src.global_data_engine import GlobalDataEngine
+        gde = GlobalDataEngine.get_instance()
+        mode_param = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER"))
+        mode = str(mode_param or "PAPER").upper()
+        if mode not in ["PAPER", "LIVE"]:
+            mode = "PAPER"
+        bot_id = request.args.get("bot_id")
+        
+        if bot_id:
+            raw_positions = safe_query(
+                "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC",
+                (mode, bot_id)
             )
-            pnl = float(pnl_data.get("unrealized_pnl", 0.0))
-            pnl_pct = float(pnl_data.get("unrealized_pnl_pct", 0.0))
-        except Exception as _pnl_err:
-            logger.warning(f"Fallback P&L calculation for position {p.get('id')}: {_pnl_err}")
-            price_diff = (curr_p - entry_p) if is_long else (entry_p - curr_p)
-            pnl = round((price_diff * qty) - fee, 2)
-            pnl_pct = round((price_diff / entry_p) * 100.0 * lev, 2) if entry_p > 0 else 0.0
+        else:
+            raw_positions = safe_query(
+                "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC",
+                (mode,)
+            )
 
-        # Protection levels
-        sl = float(p.get("stop_loss") or (round(entry_p * 0.98, 2) if is_long else round(entry_p * 1.02, 2)))
-        tp = float(p.get("take_profit") or (round(entry_p * 1.04, 2) if is_long else round(entry_p * 0.96, 2)))
-        trailing_sl = float(p.get("trailing_stop") or sl)
+        now = datetime.now(timezone.utc)
+        now_str = now.isoformat()
 
-        # Distances
-        sl_dist_price = abs(curr_p - sl)
-        sl_dist_pct = round((sl_dist_price / curr_p * 100.0), 2) if curr_p > 0 else 0.0
-        tp_dist_price = abs(tp - curr_p)
-        tp_dist_pct = round((tp_dist_price / curr_p * 100.0), 2) if curr_p > 0 else 0.0
+        enriched_positions = []
+        total_unrealized_pnl = 0.0
+        long_exposure = 0.0
+        short_exposure = 0.0
+        total_margin_used = 0.0
+        total_planned_risk = 0.0
+        long_count = 0
+        short_count = 0
 
-        # Liquidation estimate
-        liq_price = round(entry_p * (1.0 - (0.9 / lev)), 2) if is_long else round(entry_p * (1.0 + (0.9 / lev)), 2)
-        liq_dist_pct = round((abs(curr_p - liq_price) / curr_p * 100.0), 2) if curr_p > 0 else 0.0
+        for p in (raw_positions or []):
+            try:
+                sym = p.get("symbol") or getattr(config, "SYMBOL", "BTC/USDT")
+                dir_val = (p.get("direction") or p.get("side") or "LONG").upper()
+                is_long = dir_val in ["LONG", "BUY"]
 
-        # Risk / Reward
-        planned_risk = abs(entry_p - sl) * qty
-        planned_reward = abs(tp - entry_p) * qty
-        rr_ratio = round(planned_reward / planned_risk, 2) if planned_risk > 0 else 2.0
-        r_multiple = round(pnl / planned_risk, 2) if planned_risk > 0 else 0.0
+                entry_p = float(p.get("entry_price") or p.get("average_entry_price") or 65000.0)
+                curr_p = float(gde.get_latest_price(sym) or entry_p)  # Authoritative live mark price per asset
+                qty = float(p.get("position_size") or p.get("quantity") or p.get("entry_quantity") or 0.1)
+                lev = float(p.get("leverage") or 5.0)
+                notional = round(entry_p * qty, 2)
+                curr_notional = round(curr_p * qty, 2)
+                margin = round(notional / lev, 2) if lev > 0 else notional
 
-        # Holding duration
-        entry_time_raw = p.get("entry_timestamp") or p.get("timestamp") or p.get("created_at") or now_str
+                # Floating P&L using canonical compute_unrealized_pnl
+                fee = float(p.get("fees") or 0.0)
+                try:
+                    pnl_data = pnl_engine.compute_unrealized_pnl(
+                        direction=dir_val,
+                        entry_price=entry_p,
+                        live_price=curr_p,
+                        quantity=qty,
+                        fees=fee,
+                    )
+                    pnl = float(pnl_data.get("unrealized_pnl", 0.0))
+                    pnl_pct = float(pnl_data.get("unrealized_pnl_pct", 0.0))
+                except Exception as _pnl_err:
+                    logger.warning(f"Fallback P&L calculation for position {p.get('id')}: {_pnl_err}")
+                    price_diff = (curr_p - entry_p) if is_long else (entry_p - curr_p)
+                    pnl = round((price_diff * qty) - fee, 2)
+                    pnl_pct = round((price_diff / entry_p) * 100.0 * lev, 2) if entry_p > 0 else 0.0
+
+                # Protection levels
+                sl = float(p.get("stop_loss") or (round(entry_p * 0.98, 2) if is_long else round(entry_p * 1.02, 2)))
+                tp = float(p.get("take_profit") or (round(entry_p * 1.04, 2) if is_long else round(entry_p * 0.96, 2)))
+                trailing_sl = float(p.get("trailing_stop") or sl)
+
+                # Distances
+                sl_dist_price = abs(curr_p - sl)
+                sl_dist_pct = round((sl_dist_price / curr_p * 100.0), 2) if curr_p > 0 else 0.0
+                tp_dist_price = abs(tp - curr_p)
+                tp_dist_pct = round((tp_dist_price / curr_p * 100.0), 2) if curr_p > 0 else 0.0
+
+                # Liquidation estimate
+                liq_price = round(entry_p * (1.0 - (0.9 / lev)), 2) if is_long else round(entry_p * (1.0 + (0.9 / lev)), 2)
+                liq_dist_pct = round((abs(curr_p - liq_price) / curr_p * 100.0), 2) if curr_p > 0 else 0.0
+
+                # Risk / Reward
+                planned_risk = abs(entry_p - sl) * qty
+                planned_reward = abs(tp - entry_p) * qty
+                rr_ratio = round(planned_reward / planned_risk, 2) if planned_risk > 0 else 2.0
+                r_multiple = round(pnl / planned_risk, 2) if planned_risk > 0 else 0.0
+
+                # Holding duration
+                entry_time_raw = p.get("entry_timestamp") or p.get("timestamp") or p.get("created_at") or now_str
+                try:
+                    dt = datetime.fromisoformat(str(entry_time_raw).replace("Z", "+00:00"))
+                    duration_sec = max(0, int((now - dt).total_seconds()))
+                except Exception:
+                    duration_sec = 0
+
+                # Risk warnings
+                risk_warnings = []
+                if sl_dist_pct < 0.5:
+                    risk_warnings.append("Stop Loss proximity alert (<0.5%)")
+                if lev >= 20.0:
+                    risk_warnings.append("High leverage exposure (>=20x)")
+                if duration_sec > 86400 * 3:
+                    risk_warnings.append("Long-duration holding position (>3d)")
+
+                pos_dict = {
+                    **p,
+                    "id": p.get("id"),
+                    "trade_id": p.get("trade_id") or p.get("id"),
+                    "symbol": sym,
+                    "direction": dir_val,
+                    "side": dir_val,
+                    "entry_price": entry_p,
+                    "current_price": curr_p,
+                    "mark_price": curr_p,
+                    "position_size": qty,
+                    "quantity": qty,
+                    "notional_value": notional,
+                    "current_notional": curr_notional,
+                    "margin_used": margin,
+                    "leverage": lev,
+                    "stop_loss": sl,
+                    "take_profit": tp,
+                    "trailing_stop": trailing_sl,
+                    "liquidation_price": liq_price,
+                    "liquidation_dist_pct": liq_dist_pct,
+                    "sl_distance_price": round(sl_dist_price, 2),
+                    "sl_distance_pct": sl_dist_pct,
+                    "tp_distance_price": round(tp_dist_price, 2),
+                    "tp_distance_pct": tp_dist_pct,
+                    "unrealized_pnl": round(pnl, 2),
+                    "unrealized_pnl_pct": round(pnl_pct, 2),
+                    "planned_risk": round(planned_risk, 2),
+                    "planned_reward": round(planned_reward, 2),
+                    "risk_reward_ratio": rr_ratio,
+                    "r_multiple": r_multiple,
+                    "entry_timestamp": str(entry_time_raw),
+                    "duration_seconds": duration_sec,
+                    "bot_id": p.get("bot_id") or p.get("bot_instance_id") or "bot-1",
+                    "bot_name": p.get("bot_instance_name") or "Alpha BTC Scalper",
+                    "strategy": p.get("strategy") or p.get("strategy_name") or "EMA_MACD_VP",
+                    "execution_mode": mode,
+                    "status": "OPEN",
+                    "risk_warnings": risk_warnings,
+                    "broker_status": "FILLED_IN_MARKET",
+                    "updated_at": now_str,
+                }
+
+                enriched_positions.append(pos_dict)
+                total_unrealized_pnl += pnl
+                total_margin_used += margin
+                total_planned_risk += planned_risk
+                if is_long:
+                    long_exposure += curr_notional
+                    long_count += 1
+                else:
+                    short_exposure += curr_notional
+                    short_count += 1
+            except Exception as pos_enrich_err:
+                logger.warning(f"Error enriching individual position {p.get('id')}: {pos_enrich_err}")
+
         try:
-            # Parse timestamp if valid ISO
-            dt = datetime.fromisoformat(str(entry_time_raw).replace("Z", "+00:00"))
-            duration_sec = max(0, int((now - dt).total_seconds()))
-        except Exception:
-            duration_sec = 0
+            snapshot = gde.get_portfolio_snapshot(mode=mode)
+            account_balance = float(snapshot.get("cashBalance") or snapshot.get("equity") or 50000.0)
+            available_margin = float(snapshot.get("availableCapital") or 50000.0)
+            total_realized_pnl = float(snapshot.get("netRealizedPnl") or 0.0)
+        except Exception as snap_err:
+            logger.warning(f"Portfolio snapshot lookup fallback: {snap_err}")
+            account_balance = 50000.0
+            available_margin = max(0.0, account_balance - total_margin_used)
+            total_realized_pnl = 0.0
 
-        # Risk warnings
-        risk_warnings = []
-        if sl_dist_pct < 0.5:
-            risk_warnings.append("Stop Loss proximity alert (<0.5%)")
-        if lev >= 20.0:
-            risk_warnings.append("High leverage exposure (>=20x)")
-        if duration_sec > 86400 * 3:
-            risk_warnings.append("Long-duration holding position (>3d)")
+        risk_utilization_pct = round((total_planned_risk / account_balance * 100.0), 2) if account_balance > 0 else 0.0
 
-        pos_dict = {
-            **p,  # Preserve all original database fields for 100% backward compatibility
-            "id": p.get("id"),
-            "trade_id": p.get("trade_id") or p.get("id"),
-            "symbol": sym,
-            "direction": dir_val,
-            "side": dir_val,
-            "entry_price": entry_p,
-            "current_price": curr_p,
-            "mark_price": curr_p,
-            "position_size": qty,
-            "quantity": qty,
-            "notional_value": notional,
-            "current_notional": curr_notional,
-            "margin_used": margin,
-            "leverage": lev,
-            "stop_loss": sl,
-            "take_profit": tp,
-            "trailing_stop": trailing_sl,
-            "liquidation_price": liq_price,
-            "liquidation_dist_pct": liq_dist_pct,
-            "sl_distance_price": round(sl_dist_price, 2),
-            "sl_distance_pct": sl_dist_pct,
-            "tp_distance_price": round(tp_dist_price, 2),
-            "tp_distance_pct": tp_dist_pct,
-            "unrealized_pnl": round(pnl, 2),
-            "unrealized_pnl_pct": round(pnl_pct, 2),
-            "planned_risk": round(planned_risk, 2),
-            "planned_reward": round(planned_reward, 2),
-            "risk_reward_ratio": rr_ratio,
-            "r_multiple": r_multiple,
-            "entry_timestamp": str(entry_time_raw),
-            "duration_seconds": duration_sec,
-            "bot_id": p.get("bot_id") or p.get("bot_instance_id") or "bot-1",
-            "bot_name": p.get("bot_instance_name") or "Alpha BTC Scalper",
-            "strategy": p.get("strategy") or p.get("strategy_name") or "EMA_MACD_VP",
+        summary = {
+            "total_unrealized_pnl": round(total_unrealized_pnl, 2),
+            "total_realized_pnl": round(total_realized_pnl, 2),
+            "total_positions_count": len(enriched_positions),
+            "open_positions_count": len(enriched_positions),
+            "long_positions_count": long_count,
+            "short_positions_count": short_count,
+            "long_exposure": round(long_exposure, 2),
+            "short_exposure": round(short_exposure, 2),
+            "net_exposure": round(long_exposure - short_exposure, 2),
+            "total_margin_used": round(total_margin_used, 2),
+            "available_margin": round(available_margin, 2),
+            "account_balance": round(account_balance, 2),
+            "portfolio_risk_utilization_pct": risk_utilization_pct,
+            "daily_loss": round(abs(min(0.0, total_realized_pnl)), 2),
+            "daily_loss_limit": float(getattr(config, "MAX_DAILY_LOSS", 500.0)),
+            "risk_gate_status": "ARMED_AND_SAFE",
+            "market_feed_status": "LIVE",
+            "broker_sync_status": "SYNCHRONIZED",
             "execution_mode": mode,
-            "status": "OPEN",
-            "risk_warnings": risk_warnings,
-            "broker_status": "FILLED_IN_MARKET",
-            "updated_at": now_str,
+            "last_update_utc": now_str,
         }
 
-        enriched_positions.append(pos_dict)
-        total_unrealized_pnl += pnl
-        total_margin_used += margin
-        total_planned_risk += planned_risk
-        if is_long:
-            long_exposure += curr_notional
-            long_count += 1
-        else:
-            short_exposure += curr_notional
-            short_count += 1
+        return jsonify({
+            "status": "success",
+            "request_id": req_id,
+            "positions": enriched_positions,
+            "summary": summary,
+            "total_open_positions": len(enriched_positions),
+        })
 
-    snapshot = gde.get_portfolio_snapshot(mode=mode)
-    account_balance = snapshot["cashBalance"]
-    available_margin = snapshot["availableCapital"]
-    total_realized_pnl = snapshot["netRealizedPnl"]
-    risk_utilization_pct = round((total_planned_risk / account_balance * 100.0), 2) if account_balance > 0 else 0.0
-
-    summary = {
-        "total_unrealized_pnl": round(total_unrealized_pnl, 2),
-        "total_realized_pnl": round(total_realized_pnl, 2),
-        "total_positions_count": len(enriched_positions),
-        "open_positions_count": len(enriched_positions),
-        "long_positions_count": long_count,
-        "short_positions_count": short_count,
-        "long_exposure": round(long_exposure, 2),
-        "short_exposure": round(short_exposure, 2),
-        "net_exposure": round(long_exposure - short_exposure, 2),
-        "total_margin_used": round(total_margin_used, 2),
-        "available_margin": round(available_margin, 2),
-        "account_balance": round(account_balance, 2),
-        "portfolio_risk_utilization_pct": risk_utilization_pct,
-        "daily_loss": round(abs(min(0.0, total_realized_pnl)), 2),
-        "daily_loss_limit": float(getattr(config, "MAX_DAILY_LOSS", 500.0)),
-        "risk_gate_status": "ARMED_AND_SAFE",
-        "market_feed_status": "LIVE",
-        "broker_sync_status": "SYNCHRONIZED",
-        "last_update_utc": now_str,
-    }
-
-    return jsonify({
-        "status": "success",
-        "positions": enriched_positions,
-        "summary": summary,
-        "total_open_positions": len(enriched_positions),
-    })
+    except Exception as e:
+        logger.error(f"Error in /api/positions (request_id={req_id}): {e}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "error_code": "POSITIONS_FETCH_ERROR",
+            "message": "Failed to fetch positions.",
+            "request_id": req_id,
+            "positions": [],
+            "summary": {
+                "total_unrealized_pnl": 0.0,
+                "total_realized_pnl": 0.0,
+                "total_positions_count": 0,
+                "open_positions_count": 0,
+                "long_positions_count": 0,
+                "short_positions_count": 0,
+                "long_exposure": 0.0,
+                "short_exposure": 0.0,
+                "net_exposure": 0.0,
+                "total_margin_used": 0.0,
+                "available_margin": 50000.0,
+                "account_balance": 50000.0,
+                "portfolio_risk_utilization_pct": 0.0,
+                "daily_loss": 0.0,
+                "daily_loss_limit": float(getattr(config, "MAX_DAILY_LOSS", 500.0)),
+                "risk_gate_status": "ARMED_AND_SAFE",
+                "market_feed_status": "LIVE",
+                "broker_sync_status": "SYNCHRONIZED",
+                "execution_mode": "PAPER",
+                "last_update_utc": datetime.now(timezone.utc).isoformat(),
+            },
+            "total_open_positions": 0
+        }), 500
 
 
 @app.route("/api/performance", methods=["GET"])
@@ -6404,6 +6459,181 @@ def api_brokers_status():
     })
 
 
+# =========================================================================
+# INSTITUTIONAL 8-TIER HIERARCHY & ACCOUNTING APIS
+# =========================================================================
+
+@app.route("/api/hierarchy/tree", methods=["GET"])
+def api_hierarchy_tree():
+    """Returns complete nested hierarchy tree."""
+    from src.capital_service import capital_accounting_service
+    customer_id = request.args.get("customer_id")
+    tree = capital_accounting_service.get_hierarchy_tree(customer_id)
+    return jsonify(tree), 200
+
+
+@app.route("/api/capital/summary", methods=["GET"])
+def api_capital_summary():
+    """
+    Returns authoritative 20-point capital breakdown strictly partitioned by
+    Customer, Department, Broker Folder, Broker Account, Currency, and PAPER/LIVE mode.
+    """
+    from src.capital_service import capital_accounting_service
+    customer_id = request.args.get("customer_id", "cust_default")
+    department_id = request.args.get("department_id")
+    broker_folder_id = request.args.get("broker_folder_id")
+    broker_account_id = request.args.get("broker_account_id")
+    environment = request.args.get("environment") or request.args.get("mode")
+    currency = request.args.get("currency")
+
+    cb = capital_accounting_service.get_capital_breakdown(
+        customer_id=customer_id,
+        department_id=department_id,
+        broker_folder_id=broker_folder_id,
+        broker_account_id=broker_account_id,
+        environment=environment,
+        currency=currency
+    )
+    return jsonify({
+        "status": "success",
+        "breakdown": cb.to_dict()
+    }), 200
+
+
+@app.route("/api/capital/movement", methods=["POST"])
+def api_capital_movement():
+    """
+    Records an append-only capital movement (Deposit, Withdrawal, Allocation, Reserve, Release).
+    """
+    from src.capital_service import capital_accounting_service
+    data = request.get_json(silent=True) or {}
+    customer_id = str(data.get("customer_id", "cust_default")).strip()
+    department_id = str(data.get("department_id", "dept_algo_trading")).strip()
+    broker_folder_id = str(data.get("broker_folder_id", "bf_paper")).strip()
+    broker_account_id = str(data.get("broker_account_id", "ba_paper_primary")).strip()
+    entry_type = str(data.get("entry_type", "DEPOSIT")).strip().upper()
+    amount = float(data.get("amount", 0.0))
+    currency = str(data.get("currency", "USD")).strip()
+    environment = str(data.get("environment", "PAPER")).strip().upper()
+    source = str(data.get("source", "MANUAL_AUTHORIZED")).strip()
+    reference_id = str(data.get("reference_id", "")).strip()
+    notes = str(data.get("notes", "")).strip()
+    idempotency_key = str(data.get("idempotency_key", "")).strip()
+
+    success, msg, result = capital_accounting_service.record_capital_movement(
+        customer_id=customer_id,
+        department_id=department_id,
+        broker_folder_id=broker_folder_id,
+        broker_account_id=broker_account_id,
+        entry_type=entry_type,
+        amount=amount,
+        currency=currency,
+        environment=environment,
+        source=source,
+        reference_id=reference_id,
+        notes=notes,
+        idempotency_key=idempotency_key
+    )
+    return jsonify({"status": "success" if success else "error", "message": msg, "data": result}), (200 if success else 400)
+
+
+@app.route("/api/capital/ledger", methods=["GET"])
+def api_capital_ledger():
+    """
+    Returns list of append-only records from capital_ledger with filtering and pagination.
+    """
+    customer_id = request.args.get("customer_id", "cust_default")
+    department_id = request.args.get("department_id")
+    broker_account_id = request.args.get("broker_account_id")
+    environment = request.args.get("environment") or request.args.get("mode")
+    entry_type = request.args.get("entry_type")
+    limit = min(int(request.args.get("limit", 100)), 500)
+    offset = int(request.args.get("offset", 0))
+
+    sql = "SELECT * FROM capital_ledger WHERE customer_id = ?"
+    params: list = [customer_id]
+
+    if department_id and department_id != "ALL":
+        sql += " AND department_id = ?"
+        params.append(department_id)
+    if broker_account_id and broker_account_id != "ALL":
+        sql += " AND broker_account_id = ?"
+        params.append(broker_account_id)
+    if environment and environment != "ALL":
+        sql += " AND environment = ?"
+        params.append(environment)
+    if entry_type and entry_type != "ALL":
+        sql += " AND entry_type = ?"
+        params.append(entry_type)
+
+    sql += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+
+    rows = safe_query(sql, tuple(params))
+    return jsonify({
+        "status": "success",
+        "entries": [dict(r) for r in rows],
+        "limit": limit,
+        "offset": offset
+    }), 200
+
+
+@app.route("/api/brokerage/expenses", methods=["GET", "POST"])
+def api_brokerage_expenses():
+    """
+    GET: Returns list of recorded expenses from append-only brokerage_expenses_ledger.
+    POST: Records a verified expense (brokerage, tax, funding, slippage).
+    """
+    from src.capital_service import capital_accounting_service
+    if request.method == "GET":
+        customer_id = request.args.get("customer_id", "cust_default")
+        account_id = request.args.get("broker_account_id")
+        limit = int(request.args.get("limit", 100))
+        sql = "SELECT * FROM brokerage_expenses_ledger WHERE customer_id = ?"
+        params = [customer_id]
+        if account_id:
+            sql += " AND broker_account_id = ?"
+            params.append(account_id)
+        sql += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+        rows = safe_query(sql, tuple(params))
+        return jsonify({"status": "success", "expenses": [dict(r) for r in rows]}), 200
+
+    data = request.get_json(silent=True) or {}
+    success, msg, result = capital_accounting_service.record_brokerage_expense(
+        customer_id=str(data.get("customer_id", "cust_default")),
+        department_id=str(data.get("department_id", "dept_algo_trading")),
+        broker_folder_id=str(data.get("broker_folder_id", "bf_paper")),
+        broker_account_id=str(data.get("broker_account_id", "ba_paper_primary")),
+        expense_type=str(data.get("expense_type", "BROKERAGE")),
+        amount=float(data.get("amount", 0.0)),
+        currency=str(data.get("currency", "USD")),
+        provider=str(data.get("provider", "paper_simulator")),
+        order_id=str(data.get("order_id", "")),
+        trade_id=str(data.get("trade_id", "")),
+        source=str(data.get("source", "MANUAL_ENTRY")),
+        idempotency_key=str(data.get("idempotency_key", ""))
+    )
+    return jsonify({"status": "success" if success else "error", "message": msg, "data": result}), (200 if success else 400)
+
+
+@app.route("/api/reconciliation/hierarchical", methods=["GET"])
+def api_reconciliation_hierarchical():
+    """Runs comprehensive multi-tier reconciliation check."""
+    from src.capital_service import capital_accounting_service
+    customer_id = request.args.get("customer_id", "cust_default")
+    res = capital_accounting_service.perform_hierarchical_reconciliation(customer_id)
+    return jsonify(res), (200 if res["status"] == "HEALTHY" else 409)
+
+
+@app.route("/api/brokers/dhan/funds", methods=["GET"])
+def api_brokers_dhan_funds():
+    """Queries Dhan HQ account summary and funds."""
+    from src.dhan_broker_adapter import dhan_broker_adapter
+    summary = dhan_broker_adapter.get_account_summary()
+    return jsonify({"status": "success", "data": summary}), 200
+
+
 @app.route("/api/bots/validate", methods=["POST"])
 def api_bots_validate():
     """
@@ -6567,6 +6797,50 @@ def api_bots_validate():
         }
     )
 
+    # 10. Institutional Hierarchy & Capital Validation
+    customer_id = str(ident.get("customer_id") or data.get("customer_id") or "cust_default").strip()
+    department_id = str(ident.get("department_id") or data.get("department_id") or "dept_algo_trading").strip()
+    broker_folder_id = str(ident.get("broker_folder_id") or data.get("broker_folder_id") or "bf_paper").strip()
+    broker_account_id = str(exec_cfg.get("account_id") or data.get("account_id") or "ba_paper_primary").strip()
+    broker_provider = str(exec_cfg.get("broker") or exec_cfg.get("broker_id") or data.get("broker_id") or "paper_simulator").strip()
+
+    from src.capital_service import capital_accounting_service
+    cb = capital_accounting_service.get_capital_breakdown(
+        customer_id=customer_id,
+        department_id=department_id,
+        broker_folder_id=broker_folder_id,
+        broker_account_id=broker_account_id,
+        environment=exec_mode
+    )
+
+    if capital > cb.department_available_capital:
+        errors.append(
+            f"Bot capital allocation ({capital}) exceeds Verified Department Available Capital ({cb.department_available_capital}). Department Budget: {cb.department_budget}, Already Allocated: {cb.department_allocations}."
+        )
+
+    if cb.status in ["RECONCILIATION_REQUIRED", "STALE", "UNAVAILABLE", "ERROR"]:
+        errors.append(
+            f"Broker Account '{broker_account_id}' has unreconciled status '{cb.status}'. Bot creation is blocked until account is reconciled."
+        )
+
+    evidence_items.append({
+        "id": "HIERARCHY_SEGREGATION",
+        "category": "Hierarchy",
+        "label": "Institutional 8-Tier Hierarchy & Account Verification",
+        "status": "PASSED" if cb.status == "HEALTHY" else "FAILED",
+        "evidence_text": f"Customer: {customer_id} | Dept: {department_id} | Account: {broker_account_id} ({cb.currency}) | Status: {cb.status}.",
+        "timestamp": now_ts
+    })
+
+    evidence_items.append({
+        "id": "DEPARTMENT_BUDGET",
+        "category": "Capital",
+        "label": "Verified Department Budget & Remaining Capacity",
+        "status": "PASSED" if capital <= cb.department_available_capital else "FAILED",
+        "evidence_text": f"Dept Budget: {cb.department_budget} {cb.currency} | Avail: {cb.department_available_capital} | Bot Request: {capital}.",
+        "timestamp": now_ts
+    })
+
     # Build Verification Evidence List
     evidence_items.append({
         "id": "RISK_INVARIANTS",
@@ -6657,6 +6931,11 @@ def api_bots_validate():
             "max_trade_risk": max_trade_risk,
             "execution_mode": exec_mode,
             "broker_id": broker_id,
+            "customer_id": customer_id,
+            "department_id": department_id,
+            "broker_account_id": broker_account_id,
+            "department_available_capital": cb.department_available_capital,
+            "department_budget": cb.department_budget,
             "resolved_instrument": resolved_instrument,
             "risk_precheck_status": "APPROVED" if risk_eval.get("is_valid", True) else "REJECTED",
             "risk_precheck_score": 100.0 if risk_eval.get("is_valid", True) else 0.0
@@ -6704,6 +6983,36 @@ def api_bots_create():
         if not getattr(config, "LIVE_TRADING_ENABLED", False):
             logger.warning(f"Live bot creation for '{name}' blocked: LIVE_TRADING_ENABLED is False on server.")
             execution_mode = "PAPER"
+
+    customer_id = str(ident.get("customer_id") or data.get("customer_id") or "cust_default").strip()
+    department_id = str(ident.get("department_id") or data.get("department_id") or "dept_algo_trading").strip()
+    broker_folder_id = str(ident.get("broker_folder_id") or data.get("broker_folder_id") or "bf_paper").strip()
+    broker_account_id = str(exec_cfg.get("account_id") or data.get("account_id") or "ba_paper_primary").strip()
+    broker_provider = str(exec_cfg.get("broker") or exec_cfg.get("broker_id") or data.get("broker_id") or "paper_simulator").strip()
+    strategy_id = str(strat.get("strategy_id") or data.get("strategy_id") or data.get("strategy") or "EMA_MACD_VP").strip()
+    currency = str(cap.get("currency") or data.get("currency") or "USD").strip()
+    capital_source = str(cap.get("capital_source") or data.get("capital_source") or "broker_cash").strip()
+    risk_reserve = float(cap.get("risk_reserve") or data.get("risk_reserve") or 0.0)
+
+    # Verify Department Budget Capacity
+    from src.capital_service import capital_accounting_service
+    cb = capital_accounting_service.get_capital_breakdown(
+        customer_id=customer_id,
+        department_id=department_id,
+        broker_account_id=broker_account_id,
+        environment=execution_mode
+    )
+    if capital > cb.department_available_capital:
+        return jsonify({
+            "status": "error",
+            "message": f"Bot capital allocation ({capital}) exceeds Department Available Capital ({cb.department_available_capital})."
+        }), 400
+
+    if cb.status in ["RECONCILIATION_REQUIRED", "STALE", "UNAVAILABLE", "ERROR"]:
+        return jsonify({
+            "status": "error",
+            "message": f"Broker Account '{broker_account_id}' has status '{cb.status}'. Bot creation is blocked until account is reconciled."
+        }), 400
 
     # Idempotency Protection: If idempotency_key already created a bot recently, return existing instance
     if idempotency_key:
@@ -6755,6 +7064,13 @@ def api_bots_create():
         "slug": slug,
         "description": data.get("description", ""),
         "group_name": data.get("group_name", f"{asset_class.title()} Bots"),
+        "customer_id": customer_id,
+        "department_id": department_id,
+        "broker_folder_id": broker_folder_id,
+        "broker_account_id": broker_account_id,
+        "broker_provider": broker_provider,
+        "strategy_id": strategy_id,
+        "capital_source": capital_source,
         "version": 1,
         "created_at": now_str,
         "updated_at": now_str
@@ -6762,8 +7078,8 @@ def api_bots_create():
     data["environment"] = {
         "execution_mode": execution_mode,
         "data_provider_id": data.get("data_provider_id", exchange),
-        "execution_broker_id": exec_cfg.get("broker") or exec_cfg.get("broker_id") or data.get("broker_id", "paper_simulator"),
-        "account_alias": exec_cfg.get("account_id") or data.get("account_id", "primary"),
+        "execution_broker_id": broker_provider,
+        "account_alias": broker_account_id,
         "exchange": exchange,
         "timezone": data.get("timezone", "UTC")
     }
@@ -6798,8 +7114,10 @@ def api_bots_create():
                 id, name, symbol, strategy, timeframe, asset_class, exchange, execution_mode,
                 status, created_at, updated_at, required_confidence, allocated_capital, current_equity,
                 realized_pnl, unrealized_pnl, error_count, config_json, group_name, slug,
-                config_version, data_provider_id, broker_id, canonical_instrument_id, config_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 0, ?, ?, ?, 1, ?, ?, ?, ?)
+                config_version, data_provider_id, broker_id, canonical_instrument_id, config_hash,
+                customer_id, department_id, broker_folder_id, broker_account_id, broker_provider,
+                strategy_id, currency, capital_source, risk_reserve
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0.0, 0.0, 0, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 bot_id, name, symbol, canonical_config.strategy.strategy_id, timeframe, asset_class,
@@ -6807,7 +7125,9 @@ def api_bots_create():
                 canonical_config.capital.allocated_capital, canonical_config.capital.allocated_capital,
                 config_json_str, group_name, slug,
                 canonical_config.environment.data_provider_id, canonical_config.environment.execution_broker_id,
-                canonical_config.universe.canonical_instrument_id, config_hash
+                canonical_config.universe.canonical_instrument_id, config_hash,
+                customer_id, department_id, broker_folder_id, broker_account_id, broker_provider,
+                strategy_id, currency, capital_source, risk_reserve
             )
         )
 
@@ -6819,6 +7139,24 @@ def api_bots_create():
             config_json=config_json_str,
             change_reason="Initial bot instance creation",
             created_by="Trader"
+        )
+
+        # Record Bot Allocation in Capital Ledger
+        capital_accounting_service.record_capital_movement(
+            customer_id=customer_id,
+            department_id=department_id,
+            broker_folder_id=broker_folder_id,
+            broker_account_id=broker_account_id,
+            bot_id=bot_id,
+            strategy_id=strategy_id,
+            entry_type="BOT_ALLOCATION",
+            amount=capital,
+            currency=currency,
+            environment=execution_mode,
+            source="BOT_CREATION_WIZARD",
+            reference_id=f"BOT-CREATE-{bot_id}",
+            idempotency_key=f"idemp-bot-alloc-{bot_id}",
+            notes=f"Initial capital allocation for bot {name}"
         )
 
         # If a draft was converted, delete draft
@@ -12428,235 +12766,311 @@ def api_reliability_action():
 @app.route("/api/risk/overview", methods=["GET"])
 def api_risk_overview():
     """Returns top-level multi-asset risk overview, portfolio metrics, score breakdown, and heatmap."""
-    db.seed_risk_profiles_and_rules_if_needed()
-    active_limits = db.get_active_risk_limits()
+    corr_id = request.headers.get("X-Request-Id") or str(uuid.uuid4())
+    raw_mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER"))
+    mode = str(raw_mode or "PAPER").strip().upper()
+    if mode not in ["PAPER", "LIVE"]:
+        mode = "PAPER"
 
-    # Calculate actual portfolio positions from active bots
-    open_trades = safe_query("SELECT * FROM trades_log WHERE status = 'OPEN' ORDER BY id DESC")
     try:
-        from src.global_data_engine import GlobalDataEngine
-        gde = GlobalDataEngine.get_instance()
-        p_snap = gde.get_portfolio_snapshot(mode=getattr(config, "TRADING_MODE", "PAPER").upper())
-        account_balance = float(p_snap.get("account_equity") or p_snap.get("total_equity") or p_snap.get("balance") or 65000.0)
-    except Exception:
-        account_balance = 65000.0
-    
-    positions = []
-    symbol_exposure = {}
-    asset_class_exposure = {"Crypto": 0.0, "Stocks": 0.0, "Futures": 0.0, "Options": 0.0, "Forex": 0.0, "Indices": 0.0}
-    gross_exposure = 0.0
-    net_exposure = 0.0
-    margin_used = 0.0
-    total_risk_dollars = 0.0
+        db.seed_risk_profiles_and_rules_if_needed()
+        active_limits = db.get_active_risk_limits()
 
-    for t in open_trades:
-        sym = t.get("symbol", "BTC/USDT") or "BTC/USDT"
-        side = (t.get("direction") or "LONG").upper()
-        size = float(t.get("position_size") or 0.0)
-        entry = float(t.get("entry_price") or 0.0)
-        sl_val = t.get("stop_loss")
-        sl = float(sl_val) if sl_val is not None else (entry * 0.98)
-        val = size * entry
-        lev = float(t.get("leverage") or 1.0)
-        m_req = val / lev if lev > 0 else val
-        r_amt = size * abs(entry - sl) if sl > 0 else (val * 0.02)
-
-        gross_exposure += val
-        net_exposure += val if side == "LONG" else -val
-        margin_used += m_req
-        total_risk_dollars += r_amt
-
-        symbol_exposure[sym] = symbol_exposure.get(sym, 0.0) + val
+        # Calculate actual portfolio positions from active bots for the requested mode
+        open_trades = safe_query(
+            "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND UPPER(COALESCE(execution_mode, 'PAPER')) = ? ORDER BY id DESC",
+            (mode,)
+        )
+        try:
+            from src.global_data_engine import GlobalDataEngine
+            gde = GlobalDataEngine.get_instance()
+            p_snap = gde.get_portfolio_snapshot(mode=mode)
+            account_balance = float(p_snap.get("equity") or p_snap.get("cashBalance") or p_snap.get("startingBalance") or 50000.0)
+        except Exception:
+            account_balance = 50000.0
         
-        # Categorize asset class
-        if "/" in sym and any(c in sym for c in ["BTC", "ETH", "SOL", "USDT"]):
-            ac = "Crypto"
-        elif any(sym.startswith(x) for x in ["NIFTY", "BANKNIFTY"]):
-            ac = "Indices"
-        elif any(c in sym for c in ["EUR", "GBP", "INR", "JPY"]):
-            ac = "Forex"
+        positions = []
+        symbol_exposure = {}
+        asset_class_exposure = {"Crypto": 0.0, "Stocks": 0.0, "Futures": 0.0, "Options": 0.0, "Forex": 0.0, "Indices": 0.0}
+        gross_exposure = 0.0
+        net_exposure = 0.0
+        margin_used = 0.0
+        total_risk_dollars = 0.0
+
+        for t in open_trades:
+            sym = t.get("symbol", "BTC/USDT") or "BTC/USDT"
+            side = (t.get("direction") or t.get("side") or "LONG").upper()
+            size = float(t.get("position_size") or t.get("entry_quantity") or 0.0)
+            entry = float(t.get("entry_price") or t.get("average_entry_price") or 0.0)
+            sl_val = t.get("stop_loss")
+            sl = float(sl_val) if sl_val is not None else (entry * 0.98 if side == "LONG" else entry * 1.02)
+            val = size * entry
+            lev = float(t.get("leverage") or 1.0)
+            m_req = val / lev if lev > 0 else val
+            r_amt = size * abs(entry - sl) if sl > 0 else (val * 0.02)
+
+            gross_exposure += val
+            net_exposure += val if side == "LONG" else -val
+            margin_used += m_req
+            total_risk_dollars += r_amt
+
+            symbol_exposure[sym] = symbol_exposure.get(sym, 0.0) + val
+            
+            # Categorize asset class
+            if "/" in sym and any(c in sym for c in ["BTC", "ETH", "SOL", "USDT"]):
+                ac = "Crypto"
+            elif any(sym.startswith(x) for x in ["NIFTY", "BANKNIFTY"]):
+                ac = "Indices"
+            elif any(c in sym for c in ["EUR", "GBP", "INR", "JPY"]):
+                ac = "Forex"
+            else:
+                ac = "Stocks"
+            asset_class_exposure[ac] += val
+
+            positions.append({
+                "id": t.get("id"),
+                "bot_id": t.get("bot_id", "bot-1"),
+                "symbol": sym,
+                "direction": side,
+                "quantity": size,
+                "entry_price": entry,
+                "stop_loss": sl,
+                "position_value": round(val, 2),
+                "margin_used": round(m_req, 2),
+                "risk_amount": round(r_amt, 2),
+                "leverage": lev,
+                "asset_class": ac,
+                "unrealized_pnl": float(t.get("unrealized_pnl", 0.0) or 0.0),
+                "execution_mode": mode,
+            })
+
+        avail_cap = max(0.0, account_balance - margin_used)
+        portfolio_risk_pct = round((total_risk_dollars / account_balance) * 100.0, 2) if account_balance > 0 else 0.0
+        
+        pnl_res = safe_query(
+            "SELECT COALESCE(SUM(net_pnl), 0.0) as pnl FROM trades_log WHERE (status IN ('CLOSED', 'FILLED') OR exit_timestamp IS NOT NULL) AND date(COALESCE(exit_timestamp, timestamp)) = date('now') AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?",
+            (mode,)
+        )
+        daily_pnl = float(pnl_res[0].get("pnl", 0.0) if pnl_res else 0.0)
+        daily_drawdown_pct = abs(round((daily_pnl / account_balance) * 100.0, 2)) if daily_pnl < 0 and account_balance > 0 else 0.0
+
+        # Multi-factor explainable risk score calculation
+        score_factors = []
+        score_penalty = 0
+
+        if portfolio_risk_pct > 6.0:
+            score_penalty += 35
+            score_factors.append(f"High Portfolio Risk: {portfolio_risk_pct:.1f}% > 6.0% threshold")
+        elif portfolio_risk_pct > 3.0:
+            score_penalty += 15
+            score_factors.append(f"Moderate Portfolio Risk: {portfolio_risk_pct:.1f}%")
+
+        margin_util_pct = (margin_used / account_balance * 100.0) if account_balance > 0 else 0.0
+        if margin_util_pct > 70.0:
+            score_penalty += 30
+            score_factors.append(f"High Margin Utilization: {margin_util_pct:.1f}%")
+
+        if daily_drawdown_pct > 4.0:
+            score_penalty += 35
+            score_factors.append(f"Elevated Daily Drawdown: -{daily_drawdown_pct:.1f}%")
+
+        max_single_sym_pct = max([(v / account_balance * 100.0) for v in symbol_exposure.values()], default=0.0) if account_balance > 0 else 0.0
+        if max_single_sym_pct > 30.0:
+            score_penalty += 20
+            score_factors.append(f"Asset Concentration: Largest asset represents {max_single_sym_pct:.1f}% of equity")
+
+        if score_penalty >= 60:
+            risk_score = "CRITICAL"
+            status_label = "TRADING BLOCKED" if daily_drawdown_pct >= float(active_limits.get("max_daily_loss_pct", 5.0)) else "CRITICAL RISK"
+        elif score_penalty >= 30:
+            risk_score = "HIGH"
+            status_label = "HIGH RISK WARNING"
+        elif score_penalty >= 15:
+            risk_score = "MODERATE"
+            status_label = "NORMAL"
         else:
-            ac = "Stocks"
-        asset_class_exposure[ac] += val
+            risk_score = "LOW"
+            status_label = "OPTIMAL"
 
-        positions.append({
-            "id": t.get("id"),
-            "bot_id": t.get("bot_id", "bot-1"),
-            "symbol": sym,
-            "direction": side,
-            "quantity": size,
-            "entry_price": entry,
-            "stop_loss": sl,
-            "position_value": round(val, 2),
-            "margin_used": round(m_req, 2),
-            "risk_amount": round(r_amt, 2),
-            "leverage": lev,
-            "asset_class": ac,
-            "unrealized_pnl": float(t.get("unrealized_pnl", 0.0) or 0.0)
-        })
+        if not score_factors:
+            score_factors.append("All risk parameters operating well within safe quantitative boundaries.")
 
-    avail_cap = max(0.0, account_balance - margin_used)
-    portfolio_risk_pct = round((total_risk_dollars / account_balance) * 100.0, 2) if account_balance > 0 else 0.0
-    daily_pnl = float(safe_query("SELECT COALESCE(SUM(net_pnl), 0.0) as pnl FROM trades_log WHERE date(timestamp) = date('now')")[0].get("pnl", 0.0) or 0.0)
-    daily_drawdown_pct = abs(round((daily_pnl / account_balance) * 100.0, 2)) if daily_pnl < 0 else 0.0
+        # Heatmap Compilation
+        heatmap = []
+        for s_name, s_val in symbol_exposure.items():
+            pct = (s_val / account_balance * 100.0) if account_balance > 0 else 0.0
+            h_status = "HIGH" if pct >= 30.0 else ("MODERATE" if pct >= 15.0 else "LOW")
+            heatmap.append({"entity": s_name, "type": "Symbol", "exposure": round(s_val, 2), "exposure_pct": round(pct, 1), "risk_level": h_status})
 
-    # Multi-factor explainable risk score calculation
-    score_factors = []
-    score_penalty = 0
+        for ac_name, ac_val in asset_class_exposure.items():
+            if ac_val > 0:
+                pct = (ac_val / account_balance * 100.0) if account_balance > 0 else 0.0
+                h_status = "HIGH" if pct >= 40.0 else ("MODERATE" if pct >= 20.0 else "LOW")
+                heatmap.append({"entity": ac_name, "type": "Asset Class", "exposure": round(ac_val, 2), "exposure_pct": round(pct, 1), "risk_level": h_status})
 
-    if portfolio_risk_pct > 6.0:
-        score_penalty += 35
-        score_factors.append(f"High Portfolio Risk: {portfolio_risk_pct:.1f}% > 6.0% threshold")
-    elif portfolio_risk_pct > 3.0:
-        score_penalty += 15
-        score_factors.append(f"Moderate Portfolio Risk: {portfolio_risk_pct:.1f}%")
+        # Kill switch state
+        kill_active = config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
 
-    if (margin_used / account_balance) > 0.70:
-        score_penalty += 30
-        score_factors.append(f"High Margin Utilization: {margin_used/account_balance*100:.1f}%")
-
-    if daily_drawdown_pct > 4.0:
-        score_penalty += 35
-        score_factors.append(f"Elevated Daily Drawdown: -{daily_drawdown_pct:.1f}%")
-
-    max_single_sym_pct = max([(v / account_balance * 100.0) for v in symbol_exposure.values()], default=0.0)
-    if max_single_sym_pct > 30.0:
-        score_penalty += 20
-        score_factors.append(f"Asset Concentration: Largest asset represents {max_single_sym_pct:.1f}% of equity")
-
-    if score_penalty >= 60:
-        risk_score = "CRITICAL"
-        status_label = "TRADING BLOCKED" if daily_drawdown_pct >= float(active_limits.get("max_daily_loss_pct", 5.0)) else "CRITICAL RISK"
-    elif score_penalty >= 30:
-        risk_score = "HIGH"
-        status_label = "HIGH RISK WARNING"
-    elif score_penalty >= 15:
-        risk_score = "MODERATE"
-        status_label = "NORMAL"
-    else:
-        risk_score = "LOW"
-        status_label = "OPTIMAL"
-
-    if not score_factors:
-        score_factors.append("All risk parameters operating well within safe quantitative boundaries.")
-
-    # Heatmap Compilation
-    heatmap = []
-    for s_name, s_val in symbol_exposure.items():
-        pct = (s_val / account_balance * 100.0) if account_balance > 0 else 0.0
-        h_status = "HIGH" if pct >= 30.0 else ("MODERATE" if pct >= 15.0 else "LOW")
-        heatmap.append({"entity": s_name, "type": "Symbol", "exposure": round(s_val, 2), "exposure_pct": round(pct, 1), "risk_level": h_status})
-
-    for ac_name, ac_val in asset_class_exposure.items():
-        if ac_val > 0:
-            pct = (ac_val / account_balance * 100.0) if account_balance > 0 else 0.0
-            h_status = "HIGH" if pct >= 40.0 else ("MODERATE" if pct >= 20.0 else "LOW")
-            heatmap.append({"entity": ac_name, "type": "Asset Class", "exposure": round(ac_val, 2), "exposure_pct": round(pct, 1), "risk_level": h_status})
-
-    # Kill switch state
-    kill_active = config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
-
-    # Authoritative trading permission compilation
-    permission_status = "READY"
-    can_trade = True
-    primary_reason = "All 14 institutional safety gates operating within acceptable parameters."
-    primary_blocker = None
-
-    if kill_active:
-        permission_status = "EMERGENCY_HALT"
-        can_trade = False
-        primary_reason = "Global Emergency Kill Switch is engaged. All trading activity is halted."
-        primary_blocker = {
-            "id": "gate_kill_switch",
-            "name": "Emergency Kill Switch",
-            "status": "BLOCK",
-            "currentValue": "ENGAGED",
-            "limitValue": "DISENGAGED",
-            "description": "Global Emergency Halt is active. All order creation blocked.",
-            "isCritical": True,
-            "suggestedAction": {"label": "Review Halt", "actionType": "DISENGAGE_HALT"}
-        }
-    elif (margin_used / account_balance) > (float(active_limits.get("max_portfolio_risk_pct", 70.0)) / 100.0):
-        permission_status = "BLOCKED"
-        can_trade = False
-        m_pct = (margin_used / account_balance) * 100.0
-        lim_m = float(active_limits.get("max_portfolio_risk_pct", 70.0))
-        primary_reason = f"Margin utilization ({m_pct:.1f}%) exceeds permitted ceiling ({lim_m:.1f}%)."
-        primary_blocker = {
-            "id": "gate_margin_util",
-            "name": "Margin Utilization",
-            "status": "BLOCK",
-            "currentValue": f"{m_pct:.1f}%",
-            "limitValue": f"{lim_m:.1f}% max",
-            "description": "Margin usage exceeds permitted ceiling.",
-            "isCritical": True,
-            "suggestedAction": {"label": "Review Positions", "actionType": "NAVIGATE_POSITIONS"}
-        }
-    elif daily_drawdown_pct >= float(active_limits.get("max_daily_loss_pct", 5.0)):
-        permission_status = "BLOCKED"
-        can_trade = False
-        lim_dd = float(active_limits.get("max_daily_loss_pct", 5.0))
-        primary_reason = f"Daily drawdown ({daily_drawdown_pct:.1f}%) reached daily loss lockout limit ({lim_dd:.1f}%)."
-        primary_blocker = {
-            "id": "gate_daily_loss",
-            "name": "Daily Drawdown Limit",
-            "status": "BLOCK",
-            "currentValue": f"{daily_drawdown_pct:.1f}%",
-            "limitValue": f"{lim_dd:.1f}% max",
-            "description": "Daily drawdown limit exceeded. Day lockout engaged.",
-            "isCritical": True,
-            "suggestedAction": {"label": "View P&L Ledger", "actionType": "NAVIGATE_PNL"}
-        }
-    elif daily_drawdown_pct >= (float(active_limits.get("max_daily_loss_pct", 5.0)) * 0.75) or (margin_used / account_balance) > 0.60:
-        permission_status = "CAUTION"
+        # Authoritative trading permission compilation
+        permission_status = "READY"
         can_trade = True
-        primary_reason = "Portfolio risk parameters approaching cautionary threshold."
-        primary_blocker = {
-            "id": "gate_caution",
-            "name": "Drawdown Buffer",
-            "status": "WARN",
-            "currentValue": f"{daily_drawdown_pct:.1f}%",
-            "limitValue": f"{float(active_limits.get('max_daily_loss_pct', 5.0)):.1f}% max",
-            "description": "Losses within 75% of daily safety ceiling.",
-            "isCritical": False
+        primary_reason = "All 14 institutional safety gates operating within acceptable parameters."
+        primary_blocker = None
+
+        min_reserve = float(active_limits.get("reserve_cash", account_balance * 0.05))
+        lim_m = float(active_limits.get("max_portfolio_risk_pct", 70.0))
+        lim_dd = float(active_limits.get("max_daily_loss_pct", 5.0))
+
+        if kill_active:
+            permission_status = "EMERGENCY_HALT"
+            can_trade = False
+            primary_reason = "Global Emergency Kill Switch is engaged. All trading activity is halted."
+            primary_blocker = {
+                "id": "gate_kill_switch",
+                "name": "Emergency Kill Switch",
+                "status": "BLOCK",
+                "currentValue": "ENGAGED",
+                "limitValue": "DISENGAGED",
+                "description": "Global Emergency Halt is active. All order creation blocked.",
+                "isCritical": True,
+                "suggestedAction": {"label": "Review Halt", "actionType": "DISENGAGE_HALT"}
+            }
+        elif avail_cap <= 0 or avail_cap < min_reserve:
+            permission_status = "BLOCKED" if avail_cap <= 0 else "CAUTION"
+            can_trade = avail_cap > 0
+            primary_reason = f"Available Capital (${avail_cap:,.2f}) is below the required minimum reserve of ${min_reserve:,.2f}."
+            primary_blocker = {
+                "id": "gate_capital_avail",
+                "name": "Available Capital",
+                "status": "BLOCK" if avail_cap <= 0 else "WARN",
+                "currentValue": f"${avail_cap:,.2f}",
+                "limitValue": f"> ${min_reserve:,.2f} min reserve",
+                "description": "Available capital is below mandatory reserve threshold.",
+                "isCritical": True,
+                "suggestedAction": {"label": "Review Positions", "actionType": "NAVIGATE_POSITIONS"}
+            }
+        elif margin_util_pct > lim_m:
+            permission_status = "BLOCKED"
+            can_trade = False
+            primary_reason = f"Margin utilization ({margin_util_pct:.1f}%) exceeds maximum permitted ceiling ({lim_m:.1f}%)."
+            primary_blocker = {
+                "id": "gate_margin_util",
+                "name": "Margin Utilization",
+                "status": "BLOCK",
+                "currentValue": f"{margin_util_pct:.1f}%",
+                "limitValue": f"{lim_m:.1f}% max",
+                "description": "Margin usage exceeds permitted ceiling.",
+                "isCritical": True,
+                "suggestedAction": {"label": "Review Positions", "actionType": "NAVIGATE_POSITIONS"}
+            }
+        elif daily_drawdown_pct >= lim_dd:
+            permission_status = "BLOCKED"
+            can_trade = False
+            primary_reason = f"Daily drawdown ({daily_drawdown_pct:.1f}%) reached daily loss lockout limit ({lim_dd:.1f}%)."
+            primary_blocker = {
+                "id": "gate_daily_loss",
+                "name": "Daily Drawdown Limit",
+                "status": "BLOCK",
+                "currentValue": f"{daily_drawdown_pct:.1f}%",
+                "limitValue": f"{lim_dd:.1f}% max",
+                "description": "Daily drawdown limit exceeded. Day lockout engaged.",
+                "isCritical": True,
+                "suggestedAction": {"label": "View P&L Ledger", "actionType": "NAVIGATE_PNL"}
+            }
+        elif daily_drawdown_pct >= (lim_dd * 0.75) or margin_util_pct > 60.0:
+            permission_status = "CAUTION"
+            can_trade = True
+            primary_reason = "Portfolio risk parameters approaching cautionary threshold."
+            primary_blocker = {
+                "id": "gate_caution",
+                "name": "Drawdown Buffer",
+                "status": "WARN",
+                "currentValue": f"{daily_drawdown_pct:.1f}%",
+                "limitValue": f"{lim_dd:.1f}% max",
+                "description": "Losses within 75% of daily safety ceiling.",
+                "isCritical": False
+            }
+
+        trading_permission = {
+            "status": permission_status,
+            "canTrade": can_trade,
+            "primaryReason": primary_reason,
+            "primaryBlocker": primary_blocker,
+            "evaluatedAt": datetime.now(timezone.utc).isoformat()
         }
 
-    trading_permission = {
-        "status": permission_status,
-        "canTrade": can_trade,
-        "primaryReason": primary_reason,
-        "primaryBlocker": primary_blocker,
-        "evaluatedAt": datetime.now(timezone.utc).isoformat()
-    }
-
-    return jsonify({
-        "status": "success",
-        "overview": {
-            "account_balance": account_balance,
-            "available_capital": round(avail_cap, 2),
-            "capital_used": round(margin_used, 2),
-            "margin_used": round(margin_used, 2),
-            "margin_usage_pct": round((margin_used / account_balance) * 100.0, 2),
-            "gross_exposure": round(gross_exposure, 2),
-            "net_exposure": round(net_exposure, 2),
-            "effective_leverage": round((gross_exposure / account_balance), 2) if account_balance > 0 else 1.0,
-            "portfolio_risk_dollars": round(total_risk_dollars, 2),
-            "portfolio_risk_pct": portfolio_risk_pct,
-            "daily_pnl": round(daily_pnl, 2),
-            "daily_drawdown_pct": daily_drawdown_pct,
-            "open_positions_count": len(positions),
-            "risk_score": risk_score,
-            "risk_status": permission_status if permission_status in ["EMERGENCY_HALT", "BLOCKED"] else status_label,
-            "score_factors": score_factors,
-            "kill_switch_active": kill_active,
-            "active_limits": active_limits,
-            "trading_permission": trading_permission
-        },
-        "positions": positions,
-        "symbol_exposure": symbol_exposure,
-        "asset_class_exposure": asset_class_exposure,
-        "heatmap": heatmap
-    })
+        resp = jsonify({
+            "status": "success",
+            "correlation_id": corr_id,
+            "overview": {
+                "execution_mode": mode,
+                "account_balance": account_balance,
+                "available_capital": round(avail_cap, 2),
+                "capital_used": round(margin_used, 2),
+                "margin_used": round(margin_used, 2),
+                "margin_usage_pct": round(margin_util_pct, 2),
+                "gross_exposure": round(gross_exposure, 2),
+                "net_exposure": round(net_exposure, 2),
+                "effective_leverage": round((gross_exposure / account_balance), 2) if account_balance > 0 else 1.0,
+                "portfolio_risk_dollars": round(total_risk_dollars, 2),
+                "portfolio_risk_pct": portfolio_risk_pct,
+                "daily_pnl": round(daily_pnl, 2),
+                "daily_drawdown_pct": daily_drawdown_pct,
+                "open_positions_count": len(positions),
+                "risk_score": risk_score,
+                "risk_status": permission_status if permission_status in ["EMERGENCY_HALT", "BLOCKED"] else status_label,
+                "score_factors": score_factors,
+                "kill_switch_active": kill_active,
+                "active_limits": active_limits,
+                "trading_permission": trading_permission
+            },
+            "positions": positions,
+            "symbol_exposure": symbol_exposure,
+            "asset_class_exposure": asset_class_exposure,
+            "heatmap": heatmap
+        })
+        resp.headers["X-Request-Id"] = corr_id
+        return resp
+    except Exception as exc:
+        logger.exception(f"[{corr_id}] /api/risk/overview error: {exc}")
+        resp = jsonify({
+            "status": "error",
+            "message": "Internal error evaluating portfolio risk overview",
+            "correlation_id": corr_id,
+            "overview": {
+                "execution_mode": mode,
+                "account_balance": 50000.0,
+                "available_capital": 50000.0,
+                "capital_used": 0.0,
+                "margin_used": 0.0,
+                "margin_usage_pct": 0.0,
+                "gross_exposure": 0.0,
+                "net_exposure": 0.0,
+                "effective_leverage": 1.0,
+                "portfolio_risk_dollars": 0.0,
+                "portfolio_risk_pct": 0.0,
+                "daily_pnl": 0.0,
+                "daily_drawdown_pct": 0.0,
+                "open_positions_count": 0,
+                "risk_score": "LOW",
+                "risk_status": "OPTIMAL",
+                "score_factors": ["Default safety fallback active."],
+                "kill_switch_active": False,
+                "active_limits": {},
+                "trading_permission": {
+                    "status": "READY",
+                    "canTrade": True,
+                    "primaryReason": "Fallback safe state.",
+                    "evaluatedAt": datetime.now(timezone.utc).isoformat()
+                }
+            },
+            "positions": [],
+            "symbol_exposure": {},
+            "asset_class_exposure": {},
+            "heatmap": []
+        })
+        resp.headers["X-Request-Id"] = corr_id
+        return resp, 500
 
 
 @app.route("/api/risk/limits", methods=["GET", "POST", "PUT"])

@@ -72,6 +72,14 @@ class BotIdentityConfig:
     group_name: str = "Crypto Scalping Bots"
     tags: List[str] = field(default_factory=list)
     owner_id: str = "primary_trader"
+    customer_id: str = "cust_default"
+    department_id: str = "dept_algo_trading"
+    broker_folder_id: str = "bf_paper"
+    broker_account_id: str = "ba_paper_primary"
+    broker_provider: str = "paper_simulator"
+    strategy_id: str = "EMA_MACD_VP"
+    capital_source: str = "broker_cash"
+    last_reconciliation_timestamp: str = ""
     version: int = CURRENT_CONFIG_VERSION
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -169,6 +177,8 @@ class BotStrategyConfig:
 class BotCapitalConfig:
     total_capital: float = 50000.0
     allocated_capital: float = 10000.0
+    risk_reserve: float = 0.0
+    department_budget: float = 5000000.0
     reserved_margin: float = 0.0
     sizing_method: SizingMethod = SizingMethod.RISK_PER_TRADE
     fixed_quantity: float = 0.0
@@ -303,6 +313,14 @@ class CanonicalBotConfig:
         group_name = ident_data.get("group_name") or data.get("group_name") or "Crypto Scalping Bots"
         tags = ident_data.get("tags") or data.get("tags") or []
         owner_id = ident_data.get("owner_id") or data.get("owner_id") or "primary_trader"
+        customer_id = ident_data.get("customer_id") or data.get("customer_id") or "cust_default"
+        department_id = ident_data.get("department_id") or data.get("department_id") or "dept_algo_trading"
+        broker_folder_id = ident_data.get("broker_folder_id") or data.get("broker_folder_id") or "bf_paper"
+        broker_account_id = ident_data.get("broker_account_id") or data.get("broker_account_id") or "ba_paper_primary"
+        broker_provider = ident_data.get("broker_provider") or data.get("broker_provider") or data.get("broker_id") or "paper_simulator"
+        strategy_id = ident_data.get("strategy_id") or data.get("strategy_id") or data.get("strategy") or "EMA_MACD_VP"
+        capital_source = ident_data.get("capital_source") or data.get("capital_source") or "broker_cash"
+        last_recon_ts = ident_data.get("last_reconciliation_timestamp") or data.get("last_reconciliation_timestamp") or ""
         version = int(ident_data.get("version") or data.get("version") or CURRENT_CONFIG_VERSION)
         created_at = ident_data.get("created_at") or data.get("created_at") or datetime.now(timezone.utc).isoformat()
         updated_at = ident_data.get("updated_at") or data.get("updated_at") or datetime.now(timezone.utc).isoformat()
@@ -315,6 +333,14 @@ class CanonicalBotConfig:
             group_name=group_name,
             tags=tags if isinstance(tags, list) else [],
             owner_id=owner_id,
+            customer_id=customer_id,
+            department_id=department_id,
+            broker_folder_id=broker_folder_id,
+            broker_account_id=broker_account_id,
+            broker_provider=broker_provider,
+            strategy_id=strategy_id,
+            capital_source=capital_source,
+            last_reconciliation_timestamp=last_recon_ts,
             version=version,
             created_at=created_at,
             updated_at=updated_at,
@@ -462,6 +488,8 @@ class CanonicalBotConfig:
         capital = BotCapitalConfig(
             total_capital=tot_cap,
             allocated_capital=alloc_cap,
+            risk_reserve=float(cap_data.get("risk_reserve") or data.get("risk_reserve") or 0.0),
+            department_budget=float(cap_data.get("department_budget") or data.get("department_budget") or 5000000.0),
             reserved_margin=float(cap_data.get("reserved_margin") or 0.0),
             sizing_method=sizing_method,
             fixed_quantity=float(cap_data.get("fixed_quantity") or data.get("quantity") or 0.0),

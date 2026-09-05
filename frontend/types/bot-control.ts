@@ -47,6 +47,15 @@ export interface BotRowItem {
   strategy_id: string;
   strategy_version: string;
   execution_mode: string;
+  customer_id?: string;
+  department_id?: string;
+  broker_folder_id?: string;
+  broker_account_id?: string;
+  broker_provider?: string;
+  currency?: string;
+  capital_source?: string;
+  risk_reserve?: number;
+  last_reconciliation_timestamp?: string;
   status: string;
   state: string;
   health: string;
@@ -335,11 +344,21 @@ export interface BotConfiguration {
     description: string;
     groupName: string;
     environment: BotExecutionMode;
+    customer_id?: string;
+    department_id?: string;
+    broker_folder_id?: string;
+    broker_account_id?: string;
+    broker_provider?: string;
+    strategy_id?: string;
+    capital_source?: string;
   };
   capital: {
     totalCapital: number;
     allocatedCapital: number;
     currency: string;
+    department_trading_budget?: number;
+    risk_reserve?: number;
+    position_sizing_method?: string;
   };
   market: {
     assetClass: WizardAssetClass;
@@ -432,9 +451,9 @@ export function calculateRiskRewardRatio(stopLossPct: number, takeProfitPct: num
 export function formatCurrency(amount: number, currency: string = "INR"): string {
   const symbol = currency === "INR" || currency === "₹" ? "₹" : currency === "USDT" ? "USDT " : "$";
   if (currency === "INR" || currency === "₹") {
-    return `${symbol}${amount.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+    return `${symbol}${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
-  return `${symbol}${amount.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export interface ValidationEvidenceItem {
@@ -463,6 +482,18 @@ export interface BotWizardValidationResponse {
     remaining_capital: number;
     allocation_pct: number;
     currency_symbol: string;
+    currency?: string;
+    customer_id?: string;
+    department_id?: string;
+    broker_folder_id?: string;
+    broker_account_id?: string;
+    broker_provider?: string;
+    strategy_id?: string;
+    risk_reserve?: number;
+    department_budget?: number;
+    remaining_department_capital?: number;
+    estimated_brokerage_cost?: number;
+    verified_broker_balance?: number;
     leverage: number;
     lot_size: number;
     lots_count: number;

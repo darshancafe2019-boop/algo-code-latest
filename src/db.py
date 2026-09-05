@@ -343,6 +343,154 @@ def init_db(force: bool = False) -> None:
                     logger.debug("WAL pragma setup notice: %s", pragma_err)
 
 
+                # ==========================================
+                # INSTITUTIONAL 8-TIER HIERARCHY & LEDGERS
+                # Customer -> Department -> Broker Folder -> Broker Account -> Capital Ledger -> Brokerage Expenses
+                # ==========================================
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS customers (
+                        id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        email TEXT DEFAULT '',
+                        tier TEXT DEFAULT 'INSTITUTIONAL',
+                        status TEXT DEFAULT 'ACTIVE',
+                        base_currency TEXT DEFAULT 'USD',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS departments (
+                        id TEXT PRIMARY KEY,
+                        customer_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        trading_budget REAL DEFAULT 0.0,
+                        currency TEXT DEFAULT 'USD',
+                        risk_limit_pct REAL DEFAULT 100.0,
+                        status TEXT DEFAULT 'ACTIVE',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        FOREIGN KEY(customer_id) REFERENCES customers(id)
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_dept_customer ON departments(customer_id)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS broker_folders (
+                        id TEXT PRIMARY KEY,
+                        customer_id TEXT NOT NULL,
+                        department_id TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        broker_provider TEXT NOT NULL,
+                        currency TEXT DEFAULT 'USD',
+                        status TEXT DEFAULT 'ACTIVE',
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        FOREIGN KEY(customer_id) REFERENCES customers(id),
+                        FOREIGN KEY(department_id) REFERENCES departments(id)
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bf_dept ON broker_folders(department_id)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS broker_accounts (
+                        id TEXT PRIMARY KEY,
+                        customer_id TEXT NOT NULL,
+                        department_id TEXT NOT NULL,
+                        broker_folder_id TEXT NOT NULL,
+                        broker_provider TEXT NOT NULL,
+                        account_name TEXT NOT NULL,
+                        account_number TEXT NOT NULL,
+                        currency TEXT DEFAULT 'USD',
+                        environment TEXT NOT NULL DEFAULT 'PAPER',
+                        is_verified INTEGER DEFAULT 1,
+                        broker_cash REAL DEFAULT 0.0,
+                        broker_balance REAL DEFAULT 0.0,
+                        buying_power REAL DEFAULT 0.0,
+                        available_margin REAL DEFAULT 0.0,
+                        used_margin REAL DEFAULT 0.0,
+                        locked_collateral REAL DEFAULT 0.0,
+                        reconciliation_status TEXT DEFAULT 'HEALTHY',
+                        last_verified_at TEXT DEFAULT '',
+                        last_reconciliation_at TEXT DEFAULT '',
+                        auth_status TEXT DEFAULT 'CONNECTED',
+                        funding_api_supported INTEGER DEFAULT 0,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        FOREIGN KEY(customer_id) REFERENCES customers(id),
+                        FOREIGN KEY(department_id) REFERENCES departments(id),
+                        FOREIGN KEY(broker_folder_id) REFERENCES broker_folders(id)
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ba_folder ON broker_accounts(broker_folder_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ba_env ON broker_accounts(environment)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS capital_ledger (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        entry_id TEXT UNIQUE NOT NULL,
+                        customer_id TEXT NOT NULL,
+                        department_id TEXT NOT NULL,
+                        broker_folder_id TEXT NOT NULL,
+                        broker_account_id TEXT NOT NULL,
+                        bot_id TEXT DEFAULT '',
+                        strategy_id TEXT DEFAULT '',
+                        entry_type TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        currency TEXT NOT NULL,
+                        environment TEXT NOT NULL DEFAULT 'PAPER',
+                        source TEXT NOT NULL,
+                        reference_id TEXT DEFAULT '',
+                        user_id TEXT DEFAULT 'system',
+                        status TEXT DEFAULT 'CONFIRMED',
+                        notes TEXT DEFAULT '',
+                        idempotency_key TEXT UNIQUE,
+                        timestamp TEXT NOT NULL DEFAULT (datetime('now')),
+                        audit_id TEXT NOT NULL
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_cust ON capital_ledger(customer_id, department_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_acc ON capital_ledger(broker_account_id, environment)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_cap_ledger_bot ON capital_ledger(bot_id)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS brokerage_expenses_ledger (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        expense_id TEXT UNIQUE NOT NULL,
+                        customer_id TEXT NOT NULL,
+                        department_id TEXT NOT NULL,
+                        broker_folder_id TEXT NOT NULL,
+                        broker_account_id TEXT NOT NULL,
+                        bot_id TEXT DEFAULT '',
+                        strategy_id TEXT DEFAULT '',
+                        order_id TEXT DEFAULT '',
+                        trade_id TEXT DEFAULT '',
+                        expense_type TEXT NOT NULL,
+                        amount REAL NOT NULL,
+                        currency TEXT NOT NULL,
+                        provider TEXT NOT NULL,
+                        source TEXT NOT NULL DEFAULT 'EXECUTION_GATEWAY',
+                        audit_id TEXT NOT NULL,
+                        idempotency_key TEXT UNIQUE,
+                        timestamp TEXT NOT NULL DEFAULT (datetime('now'))
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_ledger_acc ON brokerage_expenses_ledger(broker_account_id, expense_type)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_ledger_bot ON brokerage_expenses_ledger(bot_id)")
+
                 cursor.execute(
                     """
                     CREATE TABLE IF NOT EXISTS signals_log (
@@ -692,12 +840,103 @@ def init_db(force: bool = False) -> None:
                     "canonical_instrument_id": "TEXT DEFAULT ''",
                     "config_hash": "TEXT DEFAULT ''",
                     "desired_state": "TEXT DEFAULT 'STOPPED'",
-                    "lease_token": "TEXT DEFAULT ''"
+                    "lease_token": "TEXT DEFAULT ''",
+                    "customer_id": "TEXT DEFAULT 'cust_default'",
+                    "department_id": "TEXT DEFAULT 'dept_algo_trading'",
+                    "broker_folder_id": "TEXT DEFAULT 'bf_paper'",
+                    "broker_account_id": "TEXT DEFAULT 'ba_paper_primary'",
+                    "broker_provider": "TEXT DEFAULT 'paper_simulator'",
+                    "strategy_id": "TEXT DEFAULT ''",
+                    "currency": "TEXT DEFAULT 'USD'",
+                    "capital_source": "TEXT DEFAULT 'broker_cash'",
+                    "risk_reserve": "REAL DEFAULT 0.0",
+                    "last_reconciliation_timestamp": "TEXT DEFAULT ''"
                 }
                 for col_name, col_def in bot_col_defs.items():
                     if col_name not in existing_bot_cols:
                         try:
                             cursor.execute(f"ALTER TABLE bot_instances ADD COLUMN {col_name} {col_def}")
+                        except Exception:
+                            pass
+
+                # Migrate missing columns into trades_log if table already existed
+                cursor.execute("PRAGMA table_info(trades_log)")
+                existing_trade_cols = [r[1] for r in cursor.fetchall()]
+                trade_col_defs = {
+                    "customer_id": "TEXT DEFAULT 'cust_default'",
+                    "department_id": "TEXT DEFAULT 'dept_algo_trading'",
+                    "broker_folder_id": "TEXT DEFAULT 'bf_paper'",
+                    "broker_account_id": "TEXT DEFAULT 'ba_paper_primary'",
+                    "broker_provider": "TEXT DEFAULT 'paper_simulator'",
+                    "strategy_id": "TEXT DEFAULT ''",
+                    "currency": "TEXT DEFAULT 'USD'",
+                    "commission": "REAL DEFAULT 0.0",
+                    "brokerage_fee": "REAL DEFAULT 0.0",
+                    "taxes": "REAL DEFAULT 0.0",
+                    "funding_cost": "REAL DEFAULT 0.0",
+                    "slippage": "REAL DEFAULT 0.0",
+                    "audit_id": "TEXT DEFAULT ''",
+                    "idempotency_key": "TEXT DEFAULT ''",
+                    "entry_timestamp": "TEXT DEFAULT ''",
+                    "canonical_symbol": "TEXT DEFAULT ''",
+                    "asset_class": "TEXT DEFAULT 'Crypto'",
+                    "exchange": "TEXT DEFAULT 'Binance'",
+                    "market": "TEXT DEFAULT 'Spot'",
+                    "timeframe": "TEXT DEFAULT '15m'",
+                    "side": "TEXT DEFAULT 'LONG'",
+                    "position_side": "TEXT DEFAULT 'LONG'",
+                    "entry_quantity": "REAL DEFAULT 0.0",
+                    "remaining_quantity": "REAL DEFAULT 0.0",
+                    "planned_risk": "REAL DEFAULT 0.0",
+                    "actual_risk": "REAL DEFAULT 0.0",
+                    "risk_percentage": "REAL DEFAULT 2.0",
+                    "notional_value": "REAL DEFAULT 0.0",
+                    "margin_used": "REAL DEFAULT 0.0",
+                    "leverage": "REAL DEFAULT 1.0",
+                    "normalized_currency": "TEXT DEFAULT 'USD'",
+                    "currency_rate": "REAL DEFAULT 1.0",
+                    "fees": "REAL DEFAULT 0.0",
+                    "funding": "REAL DEFAULT 0.0",
+                    "gross_pnl": "REAL DEFAULT 0.0",
+                    "net_pnl": "REAL DEFAULT 0.0",
+                    "unrealized_pnl": "REAL DEFAULT 0.0",
+                    "pnl_percentage": "REAL DEFAULT 0.0",
+                    "risk_reward": "REAL DEFAULT 0.0",
+                    "r_multiple": "REAL DEFAULT 0.0",
+                    "mae": "REAL DEFAULT 0.0",
+                    "mfe": "REAL DEFAULT 0.0",
+                    "entry_signal": "TEXT DEFAULT ''",
+                    "exit_signal": "TEXT DEFAULT ''",
+                    "signal_confidence": "REAL DEFAULT 75.0",
+                    "indicator_snapshot_json": "TEXT DEFAULT '{}'",
+                    "signal_snapshot_json": "TEXT DEFAULT '{}'",
+                    "market_snapshot_json": "TEXT DEFAULT '{}'",
+                    "risk_snapshot_json": "TEXT DEFAULT '{}'",
+                    "exit_snapshot_json": "TEXT DEFAULT '{}'",
+                    "market_regime": "TEXT DEFAULT 'TRENDING'",
+                    "trade_quality_score": "REAL DEFAULT 75.0",
+                    "execution_mode": "TEXT DEFAULT 'PAPER'",
+                    "trade_status": "TEXT DEFAULT 'OPEN'",
+                    "trade_result": "TEXT DEFAULT 'OPEN'",
+                    "entry_reason": "TEXT DEFAULT ''",
+                    "exit_reason": "TEXT DEFAULT ''",
+                    "broker_order_id": "TEXT DEFAULT ''",
+                    "execution_id": "TEXT DEFAULT ''",
+                    "bot_id": "TEXT DEFAULT 'bot-1'",
+                    "bot_instance_id": "TEXT DEFAULT 'bot-1'",
+                    "bot_instance_name": "TEXT DEFAULT ''",
+                    "strategy": "TEXT DEFAULT ''",
+                    "strategy_name": "TEXT DEFAULT ''",
+                    "strategy_version": "TEXT DEFAULT ''",
+                    "emotion_tag": "TEXT DEFAULT ''",
+                    "remarks": "TEXT DEFAULT ''",
+                    "created_at": "TEXT DEFAULT ''",
+                    "updated_at": "TEXT DEFAULT ''"
+                }
+                for col_name, col_def in trade_col_defs.items():
+                    if col_name not in existing_trade_cols:
+                        try:
+                            cursor.execute(f"ALTER TABLE trades_log ADD COLUMN {col_name} {col_def}")
                         except Exception:
                             pass
 
@@ -3114,6 +3353,7 @@ def init_db(force: bool = False) -> None:
                     logger.debug("trade ledger schema init notice: %s", tl_err)
                 logger.info("SQLite database tables verified/created.")
                 seed_demo_data_if_needed()
+                seed_institutional_hierarchy_if_needed()
                 return
             except sqlite3.OperationalError as exc:
                 if attempt == 4:
@@ -3485,6 +3725,123 @@ def seed_demo_data_if_needed() -> None:
         )
         conn.commit()
     conn.close()
+
+
+def seed_institutional_hierarchy_if_needed() -> None:
+    """
+    Seeds initial institutional 8-tier hierarchy:
+    Customer -> Department -> Broker Folder -> Broker Account -> Capital Ledger
+    Guarantees strict separation across Customer, Department, Broker Folder, Broker Account, Currency, PAPER/LIVE.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        now_str = datetime.now(timezone.utc).isoformat()
+
+        # 1. Customer
+        cursor.execute("SELECT COUNT(*) as count FROM customers")
+        if cursor.fetchone()["count"] == 0:
+            cursor.execute(
+                """
+                INSERT INTO customers (id, name, email, tier, status, base_currency, created_at, updated_at)
+                VALUES ('cust_default', 'Alpha Institutional Capital', 'treasury@alphacapital.internal', 'INSTITUTIONAL', 'ACTIVE', 'USD', ?, ?)
+                """,
+                (now_str, now_str)
+            )
+
+        # 2. Departments
+        cursor.execute("SELECT COUNT(*) as count FROM departments")
+        if cursor.fetchone()["count"] == 0:
+            departments = [
+                ("dept_algo_trading", "cust_default", "Algorithmic Trading", 5000000.0, "USD", 100.0, "ACTIVE", now_str, now_str),
+                ("dept_hft", "cust_default", "High-Frequency Trading", 2500000.0, "USD", 50.0, "ACTIVE", now_str, now_str),
+                ("dept_hedging", "cust_default", "Risk Management & Hedging", 1000000.0, "USD", 25.0, "ACTIVE", now_str, now_str),
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO departments (id, customer_id, name, trading_budget, currency, risk_limit_pct, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                departments
+            )
+
+        # 3. Broker Folders
+        cursor.execute("SELECT COUNT(*) as count FROM broker_folders")
+        if cursor.fetchone()["count"] == 0:
+            folders = [
+                ("bf_dhan", "cust_default", "dept_algo_trading", "Dhan", "dhan", "INR", "ACTIVE", now_str, now_str),
+                ("bf_upstox", "cust_default", "dept_algo_trading", "Upstox", "upstox", "INR", "ACTIVE", now_str, now_str),
+                ("bf_delta", "cust_default", "dept_algo_trading", "Delta Exchange", "delta_exchange", "USD", "ACTIVE", now_str, now_str),
+                ("bf_paper", "cust_default", "dept_algo_trading", "Paper Trading Simulator", "paper_simulator", "USD", "ACTIVE", now_str, now_str),
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO broker_folders (id, customer_id, department_id, name, broker_provider, currency, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                folders
+            )
+
+        # 4. Broker Accounts
+        cursor.execute("SELECT COUNT(*) as count FROM broker_accounts")
+        if cursor.fetchone()["count"] == 0:
+            accounts = [
+                ("ba_dhan_primary", "cust_default", "dept_algo_trading", "bf_dhan", "dhan", "DHAN-PRIMARY", "DHAN-100234", "INR", "LIVE", 1, 1250000.0, 1250000.0, 2500000.0, 1250000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 0, now_str, now_str),
+                ("ba_upstox_primary", "cust_default", "dept_algo_trading", "bf_upstox", "upstox", "UPSTOX-PRIMARY", "UPSTOX-88912", "INR", "LIVE", 1, 1000000.0, 1000000.0, 2000000.0, 1000000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 0, now_str, now_str),
+                ("ba_delta_primary", "cust_default", "dept_algo_trading", "bf_delta", "delta_exchange", "DELTA-PRIMARY", "DELTA-55410", "USD", "LIVE", 1, 50000.0, 50000.0, 100000.0, 50000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 0, now_str, now_str),
+                ("ba_paper_primary", "cust_default", "dept_algo_trading", "bf_paper", "paper_simulator", "PAPER-PRIMARY", "PAPER-SIM-001", "USD", "PAPER", 1, 100000.0, 100000.0, 200000.0, 100000.0, 0.0, 0.0, "HEALTHY", now_str, now_str, "CONNECTED", 1, now_str, now_str),
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO broker_accounts (
+                    id, customer_id, department_id, broker_folder_id, broker_provider,
+                    account_name, account_number, currency, environment, is_verified,
+                    broker_cash, broker_balance, buying_power, available_margin, used_margin,
+                    locked_collateral, reconciliation_status, last_verified_at, last_reconciliation_at,
+                    auth_status, funding_api_supported, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                accounts
+            )
+
+        # 5. Capital Ledger initial funding events
+        cursor.execute("SELECT COUNT(*) as count FROM capital_ledger")
+        if cursor.fetchone()["count"] == 0:
+            ledger_entries = [
+                ("cap-init-001", "cust_default", "dept_algo_trading", "bf_dhan", "ba_dhan_primary", "", "", "DEPOSIT", 1250000.0, "INR", "LIVE", "BROKER_VERIFIED_DEPOSIT", "DHAN-TX-001", "system", "CONFIRMED", "Initial verified institutional Dhan funding", "idemp-cap-dhan-init", now_str, "AUDIT-CAP-001"),
+                ("cap-init-002", "cust_default", "dept_algo_trading", "bf_upstox", "ba_upstox_primary", "", "", "DEPOSIT", 1000000.0, "INR", "LIVE", "BROKER_VERIFIED_DEPOSIT", "UPSTOX-TX-001", "system", "CONFIRMED", "Initial verified institutional Upstox funding", "idemp-cap-upstox-init", now_str, "AUDIT-CAP-002"),
+                ("cap-init-003", "cust_default", "dept_algo_trading", "bf_delta", "ba_delta_primary", "", "", "DEPOSIT", 50000.0, "USD", "LIVE", "BROKER_VERIFIED_DEPOSIT", "DELTA-TX-001", "system", "CONFIRMED", "Initial verified institutional Delta Exchange funding", "idemp-cap-delta-init", now_str, "AUDIT-CAP-003"),
+                ("cap-init-004", "cust_default", "dept_algo_trading", "bf_paper", "ba_paper_primary", "", "", "DEPOSIT", 100000.0, "USD", "PAPER", "SIMULATOR_INITIAL_CAPITAL", "PAPER-INIT-001", "system", "CONFIRMED", "Initial paper simulator allocated treasury", "idemp-cap-paper-init", now_str, "AUDIT-CAP-004"),
+            ]
+            cursor.executemany(
+                """
+                INSERT INTO capital_ledger (
+                    entry_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                    bot_id, strategy_id, entry_type, amount, currency, environment,
+                    source, reference_id, user_id, status, notes, idempotency_key, timestamp, audit_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                ledger_entries
+            )
+
+        # 6. Ensure all existing bots have hierarchy assignments
+        cursor.execute(
+            """
+            UPDATE bot_instances
+            SET customer_id = 'cust_default',
+                department_id = 'dept_algo_trading',
+                broker_folder_id = 'bf_paper',
+                broker_account_id = 'ba_paper_primary',
+                broker_provider = 'paper_simulator'
+            WHERE customer_id IS NULL OR customer_id = ''
+            """
+        )
+
+        conn.commit()
+        conn.close()
+        logger.info("[OK] Institutional 8-tier hierarchy verified and seeded.")
+    except Exception as exc:
+        logger.error(f"Error seeding institutional hierarchy: {exc}")
 
 
 def _json_dumps(value: Optional[Dict[str, Any]]) -> str:

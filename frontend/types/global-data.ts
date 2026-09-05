@@ -2,6 +2,52 @@
  * Authoritative Global Data & Portfolio Contracts for Quant.OS
  */
 
+export interface CapitalBreakdown {
+  customer_id: string;
+  department_id: string;
+  broker_folder_id: string;
+  broker_account_id: string;
+  currency: string;
+  environment: "PAPER" | "LIVE";
+  status: string;
+  as_of: string;
+  gross_capital: number;
+  deposits: number;
+  withdrawals: number;
+  net_equity: number;
+  realized_pnl: number;
+  unrealized_pnl: number;
+  brokerage_fees: number;
+  taxes: number;
+  funding_costs: number;
+  exchange_charges: number;
+  slippage: number;
+  other_charges: number;
+  total_expenses: number;
+  broker_cash: number;
+  broker_balance: number;
+  broker_buying_power: number;
+  available_margin: number;
+  used_margin: number;
+  locked_collateral: number;
+  pending_order_reserve: number;
+  margin_utilization_pct: number;
+  department_budget: number;
+  department_allocations: number;
+  department_reserves: number;
+  department_available_capital: number;
+  bot_allocations_total: number;
+  bot_deployed_capital: number;
+  bot_reserved_capital: number;
+  bot_available_capital: number;
+  unallocated_capital: number;
+  paper_funds: number;
+  live_funds: number;
+  data_source: string;
+  is_stale: boolean;
+  is_unavailable: boolean;
+}
+
 export interface PortfolioSnapshot {
   asOf: string;
   mode: "PAPER" | "LIVE";
@@ -38,6 +84,7 @@ export interface PortfolioSnapshot {
   accountingMethod: string;
   dataFreshness: "LIVE" | "DELAYED" | "CACHED" | "STALE";
   reconciliationStatus: "RECONCILED" | "UNRECONCILED";
+  capitalBreakdown?: CapitalBreakdown;
 }
 
 export interface PositionItem {

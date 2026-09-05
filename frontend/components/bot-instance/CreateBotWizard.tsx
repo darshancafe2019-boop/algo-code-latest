@@ -35,6 +35,7 @@ import {
   Save,
   CheckCircle,
   HelpCircle,
+  Play,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -159,6 +160,14 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
 
   const [activeStep, setActiveStep] = useState<number>(1);
 
+  // INSTITUTIONAL 8-TIER HIERARCHY STATE
+  const [customerId, setCustomerId] = useState<string>("cust_default");
+  const [departmentId, setDepartmentId] = useState<string>("dept_algo_trading");
+  const [brokerFolderId, setBrokerFolderId] = useState<string>("bf_paper");
+  const [brokerAccountId, setBrokerAccountId] = useState<string>("ba_paper_primary");
+  const [brokerProvider, setBrokerProvider] = useState<string>("paper_simulator");
+  const [riskReserve, setRiskReserve] = useState<number>(0);
+
   // STEP 1: IDENTITY & CAPITAL
   const [name, setName] = useState<string>("BTC Momentum Alpha Bot");
   const [description, setDescription] = useState<string>("Deterministic multi-indicator momentum bot with 20-stage risk gate.");
@@ -166,13 +175,39 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const [customGroup, setCustomGroup] = useState<string>("");
   const [isCreatingCustomGroup, setIsCreatingCustomGroup] = useState(false);
   const [environment, setEnvironment] = useState<BotExecutionMode>("PAPER");
-  const [currency, setCurrency] = useState<"INR" | "USDT" | "USD">("USDT");
+  const [currency, setCurrency] = useState<"INR" | "USDT" | "USD">("USD");
   const [timezone, setTimezone] = useState<string>("UTC");
   const [totalCapital, setTotalCapital] = useState<number>(50000);
   const [allocatedCapital, setAllocatedCapital] = useState<number>(10000);
   const [sizingMethod, setSizingMethod] = useState<"RISK_PER_TRADE" | "FIXED_QUANTITY" | "PERCENT_EQUITY">("RISK_PER_TRADE");
   const [lotSize, setLotSize] = useState<number>(1);
   const [lotsCount, setLotsCount] = useState<number>(1);
+
+  // Query Institutional Hierarchy Tree
+  const { data: hierarchyData } = useQuery({
+    queryKey: ["hierarchyTree"],
+    queryFn: async () => {
+      const res = await fetch("/api/hierarchy/tree");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
+  // Query Authoritative Capital Summary
+  const { data: capitalSummaryData } = useQuery({
+    queryKey: ["capitalSummary", customerId, departmentId, brokerAccountId, environment],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        customer_id: customerId,
+        department_id: departmentId,
+        broker_account_id: brokerAccountId,
+        environment: environment,
+      });
+      const res = await fetch(`/api/capital/summary?${params.toString()}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
 
   // STEP 2: MARKET & INSTRUMENT
   const [assetClass, setAssetClass] = useState<WizardAssetClass>("CRYPTO");
@@ -263,7 +298,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       takeProfitPct,
       leverage,
       brokerId,
-      environment
+      environment,
+      customerId,
+      departmentId,
+      brokerFolderId,
+      brokerAccountId,
     ],
     queryFn: async () => {
       const payload = {
@@ -282,6 +321,15 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         lots_count: lotsCount,
         broker_id: brokerId,
         execution_mode: environment,
+        customer_id: customerId,
+        department_id: departmentId,
+        broker_folder_id: brokerFolderId,
+        broker_account_id: brokerAccountId,
+        broker_provider: brokerProvider,
+        currency,
+        risk_reserve: riskReserve,
+        capital_source: brokerAccountId,
+        strategy_id: "strat_momentum_alpha",
         indicators: selectedIndicators,
         strategy_rules: strategyRules,
       };
@@ -324,6 +372,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       setEnvironment(b.execution_mode || "PAPER");
       setAllocatedCapital(b.allocated_capital || 10000);
       setGroupName(b.group_name || "Crypto Scalping Bots");
+      if (b.customer_id) setCustomerId(b.customer_id);
+      if (b.department_id) setDepartmentId(b.department_id);
+      if (b.broker_folder_id) setBrokerFolderId(b.broker_folder_id);
+      if (b.broker_account_id) setBrokerAccountId(b.broker_account_id);
+      if (b.broker_provider) setBrokerProvider(b.broker_provider);
+      if (b.currency) setCurrency(b.currency as any);
       if (c.risk?.stop_loss_pct || c.stop_loss_pct) setStopLossPct(c.risk?.stop_loss_pct || c.stop_loss_pct);
       if (c.risk?.profit_target_pct || c.profit_target_pct) setTakeProfitPct(c.risk?.profit_target_pct || c.profit_target_pct);
       if (c.capital?.leverage || c.leverage) setLeverage(c.capital?.leverage || c.leverage);
@@ -359,6 +413,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         leverage,
         brokerId,
         environment,
+        customer_id: customerId,
+        department_id: departmentId,
+        broker_folder_id: brokerFolderId,
+        broker_account_id: brokerAccountId,
+        broker_provider: brokerProvider,
+        currency,
       };
       const res = await fetch("/api/bots/drafts", {
         method: "POST",
@@ -399,6 +459,15 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         allocated_capital: allocatedCapital,
         currency,
         timezone,
+        customer_id: customerId,
+        department_id: departmentId,
+        broker_folder_id: brokerFolderId,
+        broker_account_id: brokerAccountId,
+        broker_provider: brokerProvider,
+        capital_source: brokerAccountId,
+        strategy_id: "strat_momentum_alpha",
+        risk_reserve: riskReserve,
+        department_trading_budget: capitalSummaryData?.capital_breakdown?.department_budget || totalCapital,
         group_name: isCreatingCustomGroup && customGroup ? customGroup.trim() : groupName,
         stop_loss_pct: stopLossPct,
         profit_target_pct: takeProfitPct,
@@ -425,7 +494,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         },
         execution_config: {
           broker_id: brokerId,
-          account_id: accountId,
+          account_id: brokerAccountId || accountId,
           execution_mode: executionMode,
           order_type: orderType,
           max_slippage_pct: maxSlippagePct,
@@ -542,14 +611,95 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       {/* Wizard Content Panels */}
       <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-6 shadow-xl space-y-6">
         
-        {/* STEP 1: IDENTITY & CAPITAL */}
+        {/* STEP 1: IDENTITY, INSTITUTIONAL HIERARCHY & CAPITAL */}
         {activeStep === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
             <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A3127] pb-2">
                 <Bot className="h-4 w-4 text-[#55C98A]" />
-                <span>Bot Identity & Grouping</span>
+                <span>Institutional Hierarchy & Identity</span>
               </h3>
+
+              {/* Tier 1 & 2: Customer & Department */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Customer Account</label>
+                  <select
+                    value={customerId}
+                    onChange={(e) => setCustomerId(e.target.value)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  >
+                    <option value="cust_default">Customer Default (Institutional)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Department Division</label>
+                  <select
+                    value={departmentId}
+                    onChange={(e) => setDepartmentId(e.target.value)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  >
+                    <option value="dept_algo_trading">Algorithmic Trading (₹1,000,000)</option>
+                    <option value="dept_derivatives">Derivatives & Options (₹500,000)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Tier 3 & 4: Broker Folder & Broker Account */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Broker Folder</label>
+                  <select
+                    value={brokerFolderId}
+                    onChange={(e) => {
+                      const fId = e.target.value;
+                      setBrokerFolderId(fId);
+                      if (fId === "bf_dhan") {
+                        setBrokerAccountId("ba_dhan_primary");
+                        setBrokerProvider("dhan");
+                        setCurrency("INR");
+                        setBrokerId("dhan_india");
+                      } else if (fId === "bf_upstox") {
+                        setBrokerAccountId("ba_upstox_primary");
+                        setBrokerProvider("upstox");
+                        setCurrency("INR");
+                        setBrokerId("upstox");
+                      } else if (fId === "bf_delta") {
+                        setBrokerAccountId("ba_delta_primary");
+                        setBrokerProvider("delta_exchange");
+                        setCurrency("USD");
+                        setBrokerId("delta_exchange");
+                      } else {
+                        setBrokerAccountId("ba_paper_primary");
+                        setBrokerProvider("paper_simulator");
+                        setCurrency("USD");
+                        setBrokerId("paper_simulator");
+                      }
+                    }}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                  >
+                    <option value="bf_paper">Paper Trading Sandbox</option>
+                    <option value="bf_dhan">Dhan HQ Folder (NSE/BSE)</option>
+                    <option value="bf_upstox">Upstox Pro Folder (NSE/BSE)</option>
+                    <option value="bf_delta">Delta Exchange Folder (Derivatives)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Broker Funding Account</label>
+                  <select
+                    value={brokerAccountId}
+                    onChange={(e) => setBrokerAccountId(e.target.value)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
+                  >
+                    <option value="ba_paper_primary">ba_paper_primary (Paper Sandbox)</option>
+                    <option value="ba_dhan_primary">ba_dhan_primary (Dhan HQ Primary)</option>
+                    <option value="ba_upstox_primary">ba_upstox_primary (Upstox Pro Primary)</option>
+                    <option value="ba_delta_primary">ba_delta_primary (Delta Primary USD)</option>
+                  </select>
+                </div>
+              </div>
 
               <div className="space-y-1.5">
                 <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
@@ -564,28 +714,17 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Description</label>
-                <textarea
-                  rows={2}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#55C98A] resize-none"
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Fleet Group</label>
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Base Currency</label>
                   <select
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none"
+                    value={currency}
+                    onChange={(e) => setCurrency(e.target.value as any)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                   >
-                    <option value="Crypto Scalping Bots">Crypto Scalping Bots</option>
-                    <option value="NSE Options Bots">NSE Options Bots</option>
-                    <option value="Futures Trend Bots">Futures Trend Bots</option>
-                    <option value="Commodity Momentum Bots">Commodity Momentum Bots</option>
+                    <option value="INR">INR (₹)</option>
+                    <option value="USD">USD ($)</option>
+                    <option value="USDT">USDT</option>
                   </select>
                 </div>
 
@@ -631,12 +770,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
             <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A3127] pb-2">
                 <DollarSign className="h-4 w-4 text-[#55C98A]" />
-                <span>Capital Sizing Model</span>
+                <span>Capital Sizing & Risk Reserve</span>
               </h3>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Total Capital Available *</label>
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Department Budget</label>
                   <input
                     type="number"
                     value={totalCapital}
@@ -646,7 +785,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Allocated Capital to Bot *</label>
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Bot Capital Allocation *</label>
                   <input
                     type="number"
                     value={allocatedCapital}
@@ -656,13 +795,38 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Risk Reserve Hold</label>
+                  <input
+                    type="number"
+                    value={riskReserve}
+                    onChange={(e) => setRiskReserve(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-amber-400 font-mono font-bold"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#8BA596] font-semibold">Position Sizing Method</label>
+                  <select
+                    value={sizingMethod}
+                    onChange={(e) => setSizingMethod(e.target.value as any)}
+                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none"
+                  >
+                    <option value="RISK_PER_TRADE">Risk Per Trade %</option>
+                    <option value="FIXED_QUANTITY">Fixed Lot Size</option>
+                    <option value="PERCENT_EQUITY">Percent of Bot Equity</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2 text-xs font-mono">
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Allocated / Total:</span>
+                  <span className="text-[#8BA596]">Allocated / Dept Budget:</span>
                   <span className="text-white font-bold">{formatCurrency(allocatedCapital, currency)} / {formatCurrency(totalCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Remaining Capital:</span>
+                  <span className="text-[#8BA596]">Remaining Dept Capital:</span>
                   <span className="text-[#55C98A] font-bold">{formatCurrency(remainingCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
@@ -1005,28 +1169,29 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
             <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
               <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
                 <Building2 className="h-4 w-4 text-[#55C98A]" />
-                <span>Broker & Execution Router</span>
+                <span>Broker Routing & Capability</span>
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Execution Broker</label>
-                <select
-                  value={brokerId}
-                  onChange={(e) => setBrokerId(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold"
-                >
-                  <option value="paper_simulator">QuantOS Paper Simulator (CONNECTED)</option>
-                  <option value="ccxt_binance">Binance Global (Spot & Perps)</option>
-                  <option value="upstox">Upstox Pro (NSE / BSE / MCX)</option>
-                  <option value="dhan_india">Dhan HQ (NSE Equities / F&O)</option>
-                  <option value="zerodha_kite">Zerodha Kite Connect</option>
-                  <option value="deribit">Deribit (Crypto Options)</option>
-                  <option value="interactive_brokers">Interactive Brokers TWS</option>
-                </select>
+                <label className="text-[11px] text-[#8BA596] font-semibold">Active Broker Account</label>
+                <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-1 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-[#8BA596]">Account ID:</span>
+                    <span className="text-cyan-400 font-bold">{brokerAccountId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8BA596]">Broker Provider:</span>
+                    <span className="text-white font-bold uppercase">{brokerProvider}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#8BA596]">Folder:</span>
+                    <span className="text-white">{brokerFolderId}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Leverage Multiplier</label>
+                <label className="text-[11px] text-[#8BA596] font-semibold">Execution Leverage</label>
                 <div className="grid grid-cols-5 gap-2">
                   {[1, 2, 3, 5, 10].map((lev) => (
                     <button
@@ -1044,7 +1209,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Order Type</label>
+                <label className="text-[11px] text-[#8BA596] font-semibold">Order Execution Type</label>
                 <select
                   value={orderType}
                   onChange={(e) => setOrderType(e.target.value as any)}
@@ -1056,29 +1221,63 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   <option value="STOP-LIMIT">STOP-LIMIT</option>
                 </select>
               </div>
+
+              {allocatedCapital > remainingCapital && (
+                <div className="p-3 bg-red-950/40 border border-red-800 rounded-xl space-y-1 text-xs text-red-300 font-sans">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                    <span>Insufficient Department Trading Capital</span>
+                  </div>
+                  <p className="text-[11px]">
+                    Bot allocation ({formatCurrency(allocatedCapital, currency)}) exceeds remaining verified department budget ({formatCurrency(remainingCapital, currency)}).
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4 text-xs font-mono">
               <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
                 <Shield className="h-4 w-4 text-[#55C98A]" />
-                <span>Margin Estimates & Safety Status</span>
+                <span>Pre-Flight Hierarchical Capital Breakdown</span>
               </h3>
 
-              <div className="flex justify-between">
-                <span className="text-[#8BA596]">Allocated Capital:</span>
-                <span className="text-white font-bold">{formatCurrency(allocatedCapital, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#8BA596]">Estimated Notional:</span>
-                <span className="text-cyan-400 font-bold">{formatCurrency(estimatedNotional, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-[#8BA596]">Required Margin:</span>
-                <span className="text-yellow-400 font-bold">{formatCurrency(requiredMargin, currency)}</span>
-              </div>
-              <div className="flex justify-between border-t border-[#1A3127] pt-1.5">
-                <span className="text-[#8BA596]">Leverage Active:</span>
-                <span className="text-[#55C98A] font-bold">{leverage}x</span>
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Customer Total Capital:</span>
+                  <span className="text-slate-100 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.net_equity ?? totalCapital, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Verified Broker Balance:</span>
+                  <span className="text-cyan-300 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.broker_balance ?? totalCapital, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Department Budget:</span>
+                  <span className="text-white font-bold">{formatCurrency(totalCapital, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">New Bot Allocation:</span>
+                  <span className="text-[#55C98A] font-bold">{formatCurrency(allocatedCapital, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Remaining Dept Capital:</span>
+                  <span className="text-white font-bold">{formatCurrency(remainingCapital, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Risk Reserve Hold:</span>
+                  <span className="text-amber-400 font-bold">{formatCurrency(riskReserve, currency)}</span>
+                </div>
+                <div className="flex justify-between border-t border-[#1A3127] pt-1.5">
+                  <span className="text-[#8BA596]">Required Margin ({leverage}x):</span>
+                  <span className="text-yellow-400 font-bold">{formatCurrency(requiredMargin, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Max Possible Loss (SL {stopLossPct}%):</span>
+                  <span className="text-rose-400 font-bold">{formatCurrency(estimatedMaxLoss, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#8BA596]">Estimated Brokerage Expense:</span>
+                  <span className="text-rose-300 font-bold">{formatCurrency(currency === "INR" ? 20.0 : 1.5, currency)}</span>
+                </div>
               </div>
 
               {environment === "LIVE" && (
@@ -1250,19 +1449,43 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 <ArrowRight className="h-4 w-4" />
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => saveMutation.mutate("STOPPED")}
-                disabled={saveMutation.isPending}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold transition-all shadow-md flex items-center gap-2"
-              >
-                {saveMutation.isPending ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Bot className="h-4 w-4" />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => saveDraftMutation.mutate()}
+                  disabled={saveDraftMutation.isPending || saveMutation.isPending}
+                  className="px-4 py-2.5 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-bold transition-colors border border-[#182C23] text-xs flex items-center gap-1.5"
+                >
+                  <Save className="h-4 w-4" />
+                  <span>{saveDraftMutation.isPending ? "Saving Draft..." : "Save Draft"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => saveMutation.mutate("STOPPED")}
+                  disabled={saveMutation.isPending}
+                  className="px-5 py-2.5 rounded-xl bg-[#14271F] hover:bg-[#1A3127] text-cyan-400 font-bold transition-all border border-cyan-800/40 text-xs flex items-center gap-2"
+                >
+                  {saveMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Bot className="h-4 w-4" />
+                  )}
+                  <span>{saveMutation.isPending ? "Creating..." : isEditMode ? "Save Changes" : "Create Bot Instance"}</span>
+                </button>
+
+                {environment === "PAPER" && (
+                  <button
+                    type="button"
+                    onClick={() => saveMutation.mutate("RUNNING_PAPER")}
+                    disabled={saveMutation.isPending}
+                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition-all shadow-md text-xs flex items-center gap-2"
+                  >
+                    <Play className="h-4 w-4" />
+                    <span>Activate Paper Bot</span>
+                  </button>
                 )}
-                <span>{saveMutation.isPending ? "Creating Instance..." : isEditMode ? "Save Changes" : "Create Bot Instance"}</span>
-              </button>
+              </div>
             )}
           </div>
         </div>

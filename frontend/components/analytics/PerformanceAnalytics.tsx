@@ -28,6 +28,7 @@ import {
   Globe,
   DollarSign,
   PieChart,
+  Landmark,
 } from "lucide-react";
 
 import {
@@ -42,6 +43,7 @@ import { PnLDistributionHistogram } from "./PnLDistributionHistogram";
 import { MultiDimensionAttributionMatrix } from "./MultiDimensionAttributionMatrix";
 import { InteractiveEquityCurvePanel } from "./InteractiveEquityCurvePanel";
 import { AuditableTradeLedgerTable } from "./AuditableTradeLedgerTable";
+import { InstitutionalCapitalSegregationTab } from "./InstitutionalCapitalSegregationTab";
 import { DayAnalysisDrawer } from "./DayAnalysisDrawer";
 import { PnLStatementExporter } from "./PnLStatementExporter";
 import { DailyProfitabilityBar } from "@/types/pnl-analytics";
@@ -53,7 +55,8 @@ type ActiveAnalyticsView =
   | "DRAWDOWN"
   | "DISTRIBUTION"
   | "ATTRIBUTION"
-  | "LEDGER";
+  | "LEDGER"
+  | "CAPITAL_SEGREGATION";
 
 export function PerformanceAnalytics() {
   const queryClient = useQueryClient();
@@ -293,6 +296,19 @@ export function PerformanceAnalytics() {
           <FileText className="w-4 h-4" />
           <span>📜 Audited Ledger</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveView("CAPITAL_SEGREGATION")}
+          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
+            activeView === "CAPITAL_SEGREGATION"
+              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/40"
+              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
+          }`}
+        >
+          <Landmark className="w-4 h-4" />
+          <span>🏛️ Institutional Fund Segregation</span>
+        </button>
       </div>
 
       {/* 4. ACTIVE VIEW RENDER CANVAS */}
@@ -375,6 +391,29 @@ export function PerformanceAnalytics() {
           currency={selectedCurrency.symbol}
           currencyRate={selectedCurrency.rate}
         />
+      )}
+
+      {/* VIEW 7: INSTITUTIONAL FUND SEGREGATION & CAPITAL LEDGERS */}
+      {activeView === "CAPITAL_SEGREGATION" && (
+        <InstitutionalCapitalSegregationTab />
+      )}
+
+      {/* PERSISTENT INSTITUTIONAL FUND SEGREGATION & BROKER FOLDERS (BELOW P&L) */}
+      {activeView !== "CAPITAL_SEGREGATION" && (
+        <div className="pt-6 border-t border-[#1F392D] space-y-3">
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-2">
+              <Landmark className="w-4 h-4 text-[#55C98A]" />
+              <h2 className="text-xs font-mono font-black text-slate-200 uppercase tracking-wider">
+                Institutional Fund Segregation & Broker Folders
+              </h2>
+            </div>
+            <span className="text-[10px] font-mono text-[#8BA596]">
+              Authoritative 9-Tier Capital Accounting & Ledgers
+            </span>
+          </div>
+          <InstitutionalCapitalSegregationTab />
+        </div>
       )}
 
       {/* 5. CLICK-TO-ANALYZE DAY DEEP-DIVE DRAWER */}

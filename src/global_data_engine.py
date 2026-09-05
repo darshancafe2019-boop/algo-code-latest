@@ -343,6 +343,13 @@ class GlobalDataEngine:
             "reconciliationStatus": recon_status,
         }
 
+        try:
+            from src.capital_service import capital_accounting_service
+            cb = capital_accounting_service.get_capital_breakdown(environment=trading_mode)
+            snapshot["capitalBreakdown"] = cb.to_dict()
+        except Exception as cb_err:
+            logger.debug(f"Capital breakdown attachment notice: {cb_err}")
+
         self._last_snapshot = snapshot
         with self._lock:
             self._snapshot_cache[trading_mode] = (now_ts, dict(snapshot))

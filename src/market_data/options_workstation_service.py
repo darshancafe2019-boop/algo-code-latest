@@ -13,7 +13,7 @@ import math
 import uuid
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timezone, timedelta
 import numpy as np
 import pandas as pd

@@ -27,6 +27,7 @@ import {
   X,
   BookOpen,
   History,
+  Landmark,
 } from "lucide-react";
 
 interface LeftNavigationSidebarProps {
@@ -39,6 +40,7 @@ interface LeftNavigationSidebarProps {
 interface NavItem {
   id: string;
   label: string;
+  subtitle?: string;
   path: string;
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
@@ -84,7 +86,15 @@ export function LeftNavigationSidebar({
       items: [
         { id: "positions", label: "POSITIONS", path: "/positions", icon: CheckCircle2, shortcut: "⌘P" },
         { id: "orders", label: "ORDERS", path: "/orders", icon: Send, shortcut: "⌘O" },
-        { id: "pnl", label: "P&L", path: "/pnl", icon: DollarSign },
+        { id: "pnl", label: "PORTFOLIO & P&L", path: "/pnl", icon: DollarSign },
+        {
+          id: "capital-funds",
+          label: "CAPITAL & FUNDS",
+          subtitle: "Institutional Fund Segregation",
+          path: "/capital",
+          icon: Landmark,
+          badge: "NEW",
+        },
       ],
     },
     {
@@ -118,6 +128,7 @@ export function LeftNavigationSidebar({
     if (pathname === item.path) return true;
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
     if (activeTab === item.id) return true;
+    if (item.id === "capital-funds" && (activeTab === "capital" || activeTab === "funds" || activeTab === "capital-funds")) return true;
     return false;
   };
 
@@ -156,7 +167,7 @@ export function LeftNavigationSidebar({
                   <button
                     key={item.id}
                     onClick={() => handleNavClick(item)}
-                    title={isCollapsed ? item.label : undefined}
+                    title={isCollapsed ? (item.subtitle ? `${item.label} (${item.subtitle})` : item.label) : undefined}
                     aria-label={item.label}
                     data-nav-id={item.id}
                     data-nav-path={item.path}
@@ -179,7 +190,14 @@ export function LeftNavigationSidebar({
 
                     {!isCollapsed && (
                       <>
-                        <span className="hidden xl:inline-block flex-1 text-left tracking-wide truncate">{item.label}</span>
+                        <div className="hidden xl:flex flex-col flex-1 text-left min-w-0">
+                          <span className="tracking-wide truncate font-bold text-xs">{item.label}</span>
+                          {item.subtitle && (
+                            <span className="text-[9px] text-[#8BA596] truncate font-sans font-normal -mt-0.5">
+                              {item.subtitle}
+                            </span>
+                          )}
+                        </div>
                         {item.badge && (
                           <span className="hidden xl:inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
                             {item.badge}
@@ -263,7 +281,14 @@ export function LeftNavigationSidebar({
                         }`}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
-                        <span className="flex-1 text-left">{item.label}</span>
+                        <div className="flex flex-col flex-1 text-left min-w-0">
+                          <span className="font-bold text-xs">{item.label}</span>
+                          {item.subtitle && (
+                            <span className="text-[10px] text-[#8BA596] font-sans font-normal">
+                              {item.subtitle}
+                            </span>
+                          )}
+                        </div>
                         {item.badge && (
                           <span className="px-1.5 py-0.2 rounded bg-[var(--theme-elevated)] text-[var(--theme-accent)] text-[9px] font-bold border border-[var(--theme-border)]">
                             {item.badge}

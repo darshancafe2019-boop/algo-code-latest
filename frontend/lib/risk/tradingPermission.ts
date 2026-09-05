@@ -288,7 +288,16 @@ export function evaluateTradingPermission(
     status = "BLOCKED";
     canTrade = false;
     primaryBlocker = failedGates[0];
-    primaryReason = `${primaryBlocker.name} (${primaryBlocker.currentValue}) exceeds limit (${primaryBlocker.limitValue}).`;
+    if (
+      primaryBlocker.id === "gate_capital_avail" ||
+      String(primaryBlocker.limitValue).startsWith(">") ||
+      String(primaryBlocker.limitValue).includes("min")
+    ) {
+      const cleanLimit = String(primaryBlocker.limitValue).replace(/^>\s*/, "");
+      primaryReason = `${primaryBlocker.name} (${primaryBlocker.currentValue}) is below the required minimum reserve of ${cleanLimit}.`;
+    } else {
+      primaryReason = `${primaryBlocker.name} (${primaryBlocker.currentValue}) exceeds maximum permitted limit (${primaryBlocker.limitValue}).`;
+    }
   } else if (warnings.length > 0) {
     status = "CAUTION";
     canTrade = true;
@@ -353,6 +362,7 @@ export function deriveCanonicalRiskSnapshot(
     latencyMs?: number;
   }
 ): CanonicalRiskSnapshot {
+  const executionMode = overview.execution_mode || "PAPER";
   const equity = Number(overview.account_balance || 10000.0);
   const marginUsed = Number(overview.margin_used || 0.0);
   const availableCash = Number(overview.available_capital ?? Math.max(0, equity - marginUsed));
@@ -387,6 +397,7 @@ export function deriveCanonicalRiskSnapshot(
 
   return {
     timestamp: new Date().toISOString(),
+    executionMode,
     permission,
     capital: {
       accountEquity: equity,

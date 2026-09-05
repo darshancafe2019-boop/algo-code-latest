@@ -96,10 +96,17 @@ export function UnifiedRiskTopBar({
               <h1 className="text-base sm:text-lg font-bold tracking-tight text-[var(--theme-text-primary)]">
                 Quant.OS Risk Center
               </h1>
-              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold font-mono bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-[var(--theme-profit)] animate-pulse" />
-                LIVE
-              </span>
+              {snapshot.executionMode === "LIVE" ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold font-mono bg-red-950/60 text-red-400 border border-red-700/50 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                  LIVE EXECUTION
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold font-mono bg-cyan-950/60 text-cyan-400 border border-cyan-700/50 flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                  PAPER MODE
+                </span>
+              )}
             </div>
             <p className="text-xs text-[var(--theme-text-secondary)]">
               Authoritative trading permissions, margin utilization, and institutional defense gates.
@@ -107,14 +114,19 @@ export function UnifiedRiskTopBar({
           </div>
         </div>
 
-        {/* Global Live Feed Telemetry Badge */}
-        <div className="flex items-center gap-2 text-xs font-mono text-[var(--theme-text-muted)]">
-          <span className="flex items-center gap-1">
-            Feed: <span className="text-[var(--theme-profit)] font-bold">{brokerHealth.feedStatus}</span> • {brokerHealth.latencyMs}ms
+        {/* Separated Telemetry Status Matrix (Phase 5) */}
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-[var(--theme-text-muted)]">
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)]">
+            Market Data: <span className={`font-bold ${brokerHealth.feedStatus === "LIVE" ? "text-[var(--theme-profit)]" : "text-amber-400"}`}>{brokerHealth.feedStatus || "LIVE"}</span>
           </span>
-          <span>•</span>
-          <span className="flex items-center gap-1">
-            Broker: <span className="text-[var(--theme-accent)] font-bold">{brokerHealth.status}</span>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)]">
+            Execution: <span className="text-cyan-400 font-bold">{snapshot.executionMode || "PAPER"}</span>
+          </span>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)]">
+            Live Orders: <span className={`font-bold ${snapshot.executionMode === "LIVE" ? "text-red-400" : "text-slate-400"}`}>{snapshot.executionMode === "LIVE" ? "ARMED" : "LOCKED"}</span>
+          </span>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)]">
+            Safety Gate: <span className={`font-bold ${permission.status === "EMERGENCY_HALT" ? "text-red-400" : "text-[var(--theme-profit)]"}`}>{permission.status === "EMERGENCY_HALT" ? "TRIGGERED" : "ARMED"}</span>
           </span>
         </div>
       </div>

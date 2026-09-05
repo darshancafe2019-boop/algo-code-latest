@@ -160,7 +160,7 @@ class AlertEngine:
                 }
 
         # Deterministic entity resolution (prevent cross-bot collisions)
-        resolved_entity = bot_id or symbol or order_id or position_id or source
+        resolved_entity = bot_id or worker_id or symbol or order_id or position_id or source
 
         fingerprint = self.generate_fingerprint(
             category=category,

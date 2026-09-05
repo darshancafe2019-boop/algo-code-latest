@@ -14,7 +14,7 @@ import pytest
 from src import config, db
 from src.audit import log_notification
 from src.alert_engine import global_alert_engine, SEVERITY_ERROR, SEVERITY_INFO
-from src.self_healing_manager import global_self_healing_manager, CircuitBreakerState
+from src.self_healing_manager import global_self_healing_manager, SelfHealingManager, CircuitBreakerState
 
 
 class TestAlertStormDeduplication:
@@ -144,63 +144,69 @@ class TestSafeSelfHealingManager:
 
     def test_bounded_recovery_exhaustion_and_escalation(self):
         """Test D: Failing service recovery must halt after max 3 attempts and escalate to operator."""
-        entity_id = f"test-worker-{time.time()}"
+        mgr = SelfHealingManager()
+        entity_id = f"test-isolated-worker-{time.time()}"
         call_count = [0]
 
         def _failing_recovery():
             call_count[0] += 1
             return {"status": "error", "message": f"Failed connection attempt {call_count[0]}"}
 
-        # Attempt 1
-        res1 = global_self_healing_manager.execute_safe_recovery(
-            entity_id=entity_id,
-            entity_type="WORKER",
-            failure_reason="Socket connection reset",
-            recovery_callback=_failing_recovery
-        )
-        assert res1["status"] == "failed"
-        assert res1["attempt"] == 1
+        try:
+            # Attempt 1
+            res1 = mgr.execute_safe_recovery(
+                entity_id=entity_id,
+                entity_type="WORKER",
+                failure_reason="Socket connection reset",
+                recovery_callback=_failing_recovery
+            )
+            assert res1["status"] == "failed"
+            assert res1["attempt"] == 1
 
-        # Bypass backoff sleep for test speed by updating last_attempt_time
-        with global_self_healing_manager._lock:
-            global_self_healing_manager._recovery_records[entity_id]["last_attempt_time"] -= 100.0
+            # Bypass backoff sleep for test speed by updating last_attempt_time
+            with mgr._lock:
+                mgr._recovery_records[entity_id]["last_attempt_time"] -= 100.0
 
-        # Attempt 2
-        res2 = global_self_healing_manager.execute_safe_recovery(
-            entity_id=entity_id,
-            entity_type="WORKER",
-            failure_reason="Socket connection reset",
-            recovery_callback=_failing_recovery
-        )
-        assert res2["status"] == "failed"
-        assert res2["attempt"] == 2
+            # Attempt 2
+            res2 = mgr.execute_safe_recovery(
+                entity_id=entity_id,
+                entity_type="WORKER",
+                failure_reason="Socket connection reset",
+                recovery_callback=_failing_recovery
+            )
+            assert res2["status"] == "failed"
+            assert res2["attempt"] == 2
 
-        with global_self_healing_manager._lock:
-            global_self_healing_manager._recovery_records[entity_id]["last_attempt_time"] -= 100.0
+            with mgr._lock:
+                mgr._recovery_records[entity_id]["last_attempt_time"] -= 100.0
 
-        # Attempt 3
-        res3 = global_self_healing_manager.execute_safe_recovery(
-            entity_id=entity_id,
-            entity_type="WORKER",
-            failure_reason="Socket connection reset",
-            recovery_callback=_failing_recovery
-        )
-        assert res3["status"] == "failed"
-        assert res3["attempt"] == 3
+            # Attempt 3
+            res3 = mgr.execute_safe_recovery(
+                entity_id=entity_id,
+                entity_type="WORKER",
+                failure_reason="Socket connection reset",
+                recovery_callback=_failing_recovery
+            )
+            assert res3["status"] == "failed"
+            assert res3["attempt"] == 3
 
-        with global_self_healing_manager._lock:
-            global_self_healing_manager._recovery_records[entity_id]["last_attempt_time"] -= 100.0
+            with mgr._lock:
+                mgr._recovery_records[entity_id]["last_attempt_time"] -= 100.0
 
-        # Attempt 4: Should be EXHAUSTED and reject auto-recovery
-        res4 = global_self_healing_manager.execute_safe_recovery(
-            entity_id=entity_id,
-            entity_type="WORKER",
-            failure_reason="Socket connection reset",
-            recovery_callback=_failing_recovery
-        )
-        assert res4["status"] == "exhausted"
-        assert res4["action_required"] == "MANUAL_INTERVENTION"
-        assert call_count[0] == 3, f"Expected exactly 3 calls before halting, got {call_count[0]}"
+            # Attempt 4: Should be EXHAUSTED and reject auto-recovery
+            res4 = mgr.execute_safe_recovery(
+                entity_id=entity_id,
+                entity_type="WORKER",
+                failure_reason="Socket connection reset",
+                recovery_callback=_failing_recovery
+            )
+            assert res4["status"] == "exhausted"
+            assert res4["action_required"] == "MANUAL_INTERVENTION"
+            assert call_count[0] == 3, f"Expected exactly 3 calls before halting, got {call_count[0]}"
+        finally:
+            # Clean up test-specific alerts and incidents created during test
+            db.safe_execute("DELETE FROM alerts WHERE bot_id = ? OR title LIKE ?", (entity_id, f"%{entity_id}%"))
+            db.safe_execute("DELETE FROM incidents WHERE bot_id = ? OR worker_id = ? OR title LIKE ?", (entity_id, entity_id, f"%{entity_id}%"))
 
     def test_protected_invariants_gate_raises_permission_error(self):
         """Test E: Self-healing engine must strictly reject any auto-modification of risk/trading parameters."""

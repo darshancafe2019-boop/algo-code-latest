@@ -66,23 +66,28 @@ def test_bot_draft_persistence(clean_db):
 def test_config_version_audit_trail(clean_db):
     bot_id = "bot_audit_test_01"
     from src.db import safe_execute
+    safe_execute("DELETE FROM bot_config_versions WHERE bot_id = ?", (bot_id,))
     safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
-    safe_execute(
-        "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (bot_id, "Audit Test Bot", "BTC/USDT", "RSI", "5m", 10000.0, "STOPPED")
-    )
-    cfg1 = {"version": 1, "capital": 10000.0}
-    cfg2 = {"version": 2, "capital": 15000.0}
+    try:
+        safe_execute(
+            "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (bot_id, "Audit Test Bot", "BTC/USDT", "RSI", "5m", 10000.0, "STOPPED")
+        )
+        cfg1 = {"version": 1, "capital": 10000.0}
+        cfg2 = {"version": 2, "capital": 15000.0}
 
-    # Record v1
-    record_config_version(bot_id, 1, cfg1, "Initial creation", "test_user")
+        # Record v1
+        record_config_version(bot_id, 1, cfg1, "Initial creation", "test_user")
 
-    # Record v2
-    record_config_version(bot_id, 2, cfg2, "Capital increased", "test_user")
+        # Record v2
+        record_config_version(bot_id, 2, cfg2, "Capital increased", "test_user")
 
-    # Retrieve history
-    history = get_config_history(bot_id)
-    assert len(history) >= 2
-    versions = [h["version"] for h in history]
-    assert 1 in versions
-    assert 2 in versions
+        # Retrieve history
+        history = get_config_history(bot_id)
+        assert len(history) >= 2
+        versions = [h["version"] for h in history]
+        assert 1 in versions
+        assert 2 in versions
+    finally:
+        safe_execute("DELETE FROM bot_config_versions WHERE bot_id = ?", (bot_id,))
+        safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))

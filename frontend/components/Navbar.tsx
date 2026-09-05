@@ -26,6 +26,7 @@ import {
   Sparkles,
   Paintbrush,
   BrainCircuit,
+  Landmark,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { executeCommand } from "@/lib/commandClient";
@@ -169,7 +170,8 @@ export function Navbar({
     { id: "risk-management", label: "🛡️ Risk Engine", icon: Shield },
     { id: "providers", label: "📡 Providers", icon: Radio },
     { id: "backtesting", label: "🧪 Backtest Lab", icon: FlaskConical },
-    { id: "performance", label: "📈 Analytics", icon: TrendingUp },
+    { id: "performance", label: "📈 Portfolio / Analytics", icon: TrendingUp },
+    { id: "capital-funds", label: "🏛️ Capital & Funds", icon: Landmark },
     { id: "trade-journal", label: "📘 Trade Journal", icon: BookOpen },
     { id: "alerts", label: "🔔 Alerts", icon: Bell },
     { id: "logs", label: "📜 Audit Logs", icon: Terminal },

@@ -15,6 +15,8 @@ import {
 
 import { RiskOverviewResponse, RiskOverviewState, RiskProfile } from "@/types/risk";
 import { deriveCanonicalRiskSnapshot } from "@/lib/risk/tradingPermission";
+import { useGlobalData } from "@/context/GlobalDataContext";
+import { apiClient } from "@/lib/apiClient";
 
 import { UnifiedRiskTopBar } from "./UnifiedRiskTopBar";
 import { RiskSectionOverview } from "./RiskSectionOverview";
@@ -34,11 +36,13 @@ export type PrimaryRiskSection =
 
 export function RiskManagement() {
   const queryClient = useQueryClient();
+  const { tradingMode } = useGlobalData();
   const [activeSection, setActiveSection] = useState<PrimaryRiskSection>("overview");
   const [isEmergencyModalOpen, setIsEmergencyModalOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(true);
 
   const fallbackOverview: RiskOverviewState = {
+    execution_mode: tradingMode || "PAPER",
     account_balance: 10000.0,
     available_capital: 6800.0,
     capital_used: 3200.0,
@@ -69,11 +73,14 @@ export function RiskManagement() {
     data: overviewData,
     refetch: refetchOverview,
   } = useQuery<RiskOverviewResponse>({
-    queryKey: ["riskOverview"],
+    queryKey: ["riskOverview", tradingMode],
     queryFn: async () => {
-      const res = await fetch("/api/risk/overview");
-      if (!res.ok) throw new Error("Failed to fetch authoritative risk overview from server.");
-      return res.json();
+      const res = await apiClient.get<RiskOverviewResponse>(
+        `/api/risk/overview?mode=${tradingMode}`,
+        { timeoutMs: 6000 }
+      );
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch authoritative risk overview from server.");
+      return res.data;
     },
     refetchInterval: 4000,
     staleTime: 3000,
@@ -91,15 +98,15 @@ export function RiskManagement() {
   const { data: profilesData } = useQuery<{ status: string; profiles: RiskProfile[] }>({
     queryKey: ["riskProfiles"],
     queryFn: async () => {
-      const res = await fetch("/api/risk/profiles");
-      if (!res.ok) throw new Error("Failed to fetch risk profiles.");
-      return res.json();
+      const res = await apiClient.get<{ status: string; profiles: RiskProfile[] }>("/api/risk/profiles", { timeoutMs: 6000 });
+      if (!res.ok || !res.data) throw new Error(res.error?.message || "Failed to fetch risk profiles.");
+      return res.data;
     },
     refetchInterval: 12000,
   });
 
   const handleRefreshAll = () => {
-    queryClient.invalidateQueries({ queryKey: ["riskOverview"] });
+    queryClient.invalidateQueries({ queryKey: ["riskOverview", tradingMode] });
     queryClient.invalidateQueries({ queryKey: ["riskProfiles"] });
     queryClient.invalidateQueries({ queryKey: ["riskLimits"] });
   };

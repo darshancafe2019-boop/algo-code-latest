@@ -9,6 +9,7 @@ import { BotControlTab } from "@/components/bot-control/BotControlTab";
 import { StrategyBuilder } from "@/components/strategy/StrategyBuilder";
 import { IndicatorCenter } from "@/components/indicators/IndicatorCenter";
 import { PerformanceAnalytics } from "@/components/analytics/PerformanceAnalytics";
+import { InstitutionalCapitalSegregationTab } from "@/components/analytics/InstitutionalCapitalSegregationTab";
 import { TradeJournal } from "@/components/trade-journal/TradeJournal";
 import { MarketUniverse } from "@/components/market-universe/MarketUniverse";
 import { AlertsMonitoring } from "@/components/alerts/AlertsMonitoring";
@@ -130,6 +131,15 @@ function MainApp() {
         {(activeTab === "performance" || activeTab === "pnl") && (
           <ErrorBoundary title="Performance Analytics Tab Failed">
             <PerformanceAnalytics />
+          </ErrorBoundary>
+        )}
+
+        {/* 11.5 Capital & Funds (Institutional Fund Segregation) */}
+        {(activeTab === "capital-funds" || activeTab === "capital" || activeTab === "funds") && (
+          <ErrorBoundary title="Capital & Funds Tab Failed">
+            <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+              <InstitutionalCapitalSegregationTab />
+            </div>
           </ErrorBoundary>
         )}
 

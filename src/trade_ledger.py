@@ -319,6 +319,17 @@ class AuthoritativeTradeLedger:
         try:
             conn = get_db_connection()
             cursor = conn.cursor()
+            cust_id = trade_data.get("customer_id") or "cust_default"
+            dept_id = trade_data.get("department_id") or "dept_algo_trading"
+            bf_id = trade_data.get("broker_folder_id") or "bf_paper"
+            ba_id = trade_data.get("broker_account_id") or "ba_paper_primary"
+            provider = trade_data.get("broker_provider") or trade_data.get("broker_id") or "paper_simulator"
+            audit_id = f"AUDIT-TRD-{uuid.uuid4().hex[:8].upper()}"
+            fee_amt = float(trade_data.get("fees", 1.50))
+            tax_amt = float(trade_data.get("taxes", 0.0))
+            funding_amt = float(trade_data.get("funding", 0.0))
+            slip_amt = float(trade_data.get("slippage", 0.0))
+
             cursor.execute(
                 """
                 INSERT INTO trades_log (
@@ -334,7 +345,8 @@ class AuthoritativeTradeLedger:
                     execution_mode, status, trade_status, trade_result, entry_reason, exit_reason,
                     idempotency_key, broker_order_id, execution_id, bot_id, bot_instance_id,
                     bot_instance_name, strategy, strategy_id, strategy_name, strategy_version,
-                    emotion_tag, remarks, created_at, updated_at
+                    emotion_tag, remarks, created_at, updated_at,
+                    customer_id, department_id, broker_folder_id, broker_account_id, broker_provider, audit_id
                 ) VALUES (
                     ?, ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?, ?, ?,
@@ -348,7 +360,8 @@ class AuthoritativeTradeLedger:
                     ?, 'OPEN', 'OPEN', 'OPEN', ?, '',
                     ?, ?, ?, ?, ?,
                     ?, ?, ?, ?, ?,
-                    '🎯 Disciplined', ?, ?, ?
+                    '🎯 Disciplined', ?, ?, ?,
+                    ?, ?, ?, ?, ?, ?
                 )
                 """,
                 (
@@ -356,7 +369,7 @@ class AuthoritativeTradeLedger:
                     trade_data.get("market", "Spot"), trade_data.get("timeframe", "15m"), direction, direction, direction, entry_price, position_size,
                     position_size, position_size, stop_loss, take_profit, planned_risk,
                     planned_risk, float(trade_data.get("risk_percentage", 2.0)), notional, notional, float(trade_data.get("leverage", 1.0)),
-                    trade_data.get("currency", "USDT"), trade_data.get("normalized_currency", "USD"), float(trade_data.get("currency_rate", 1.0)), float(trade_data.get("fees", 1.50)), 0.0, 0.0, float(trade_data.get("slippage", 0.0)),
+                    trade_data.get("currency", "USDT"), trade_data.get("normalized_currency", "USD"), float(trade_data.get("currency_rate", 1.0)), fee_amt, tax_amt, funding_amt, slip_amt,
                     risk_reward,
                     direction, "", conf,
                     json.dumps(trade_data.get("indicator_snapshot", {})), json.dumps(trade_data.get("signal_snapshot", {})), json.dumps(trade_data.get("market_snapshot", {})),
@@ -364,7 +377,8 @@ class AuthoritativeTradeLedger:
                     trade_data.get("execution_mode", "PAPER"), trade_data.get("entry_reason", "STRATEGY_SIGNAL"),
                     idem_key, trade_data.get("broker_order_id", ""), trade_data.get("execution_id", ""), bot_id, bot_id,
                     trade_data.get("bot_name", "Alpha BTC Scalper"), strategy_id, strategy_id, strategy_id, trade_data.get("strategy_version", "v1.4.2"),
-                    trade_data.get("remarks", "[ALGO ORDER]"), now_str, now_str
+                    trade_data.get("remarks", "[ALGO ORDER]"), now_str, now_str,
+                    cust_id, dept_id, bf_id, ba_id, provider, audit_id
                 )
             )
             trade_id = cursor.lastrowid
@@ -382,8 +396,8 @@ class AuthoritativeTradeLedger:
                 (
                     fill_id, trade_id, str(trade_data.get("order_id") or trade_id),
                     trade_data.get("broker_order_id", ""), trade_data.get("execution_id", ""),
-                    now_str, entry_price, position_size, float(trade_data.get("fees", 1.50)),
-                    trade_data.get("currency", "USDT"), float(trade_data.get("slippage", 0.0)),
+                    now_str, entry_price, position_size, fee_amt,
+                    trade_data.get("currency", "USDT"), slip_amt,
                     direction, now_str
                 )
             )
@@ -401,6 +415,24 @@ class AuthoritativeTradeLedger:
                     trade_data.get("entry_reason", "ENTRY_ORDER_FILLED"), fill_id, json.dumps({"order_id": trade_data.get("order_id")})
                 )
             )
+
+            # Append-only Brokerage Expenses Ledger
+            if fee_amt > 0:
+                cursor.execute(
+                    """
+                    INSERT INTO brokerage_expenses_ledger (
+                        expense_id, customer_id, department_id, broker_folder_id, broker_account_id,
+                        bot_id, strategy_id, order_id, trade_id, expense_type, amount,
+                        currency, provider, source, audit_id, idempotency_key, timestamp
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'BROKERAGE', ?, ?, ?, 'EXECUTION_GATEWAY', ?, ?, ?)
+                    """,
+                    (
+                        f"EXP-{uuid.uuid4().hex[:8].upper()}", cust_id, dept_id, bf_id, ba_id,
+                        bot_id, strategy_id, str(trade_data.get("order_id") or trade_id), str(trade_id),
+                        fee_amt, trade_data.get("currency", "USDT"), provider,
+                        audit_id, f"idemp-fee-{trade_id}", now_str
+                    )
+                )
 
             conn.commit()
         except Exception as e:

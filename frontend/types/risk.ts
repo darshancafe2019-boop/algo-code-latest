@@ -49,6 +49,8 @@ export interface RiskHeatmapItem {
 }
 
 export interface RiskOverviewState {
+  execution_mode?: "PAPER" | "LIVE" | string;
+  correlation_id?: string;
   account_balance: number;
   available_capital: number;
   capital_used: number;
@@ -387,6 +389,7 @@ export interface TradingPermission {
 
 export interface CanonicalRiskSnapshot {
   timestamp: string;
+  executionMode?: "PAPER" | "LIVE" | string;
   permission: TradingPermission;
   capital: {
     accountEquity: number;

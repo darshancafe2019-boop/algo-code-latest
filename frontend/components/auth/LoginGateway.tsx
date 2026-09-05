@@ -56,6 +56,7 @@ export function LoginGateway() {
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
   const [devOtp, setDevOtp] = useState<string | null>(null);
+  const [devOtpFlash, setDevOtpFlash] = useState(false);
 
   // Resend OTP Cooldown Timer (Seconds)
   const [resendCooldown, setResendCooldown] = useState<number>(0);
@@ -243,7 +244,15 @@ export function LoginGateway() {
       if (res.success) {
         if (res.challengeId) setChallengeId(res.challengeId);
         if (res.destination) setDestinationEmail(res.destination);
-        if (res.devOtp) setDevOtp(res.devOtp);
+        if (res.devOtp) {
+          // Clear first so React always triggers re-render + flash even if same code
+          setDevOtp(null);
+          setTimeout(() => {
+            setDevOtp(res.devOtp!);
+            setDevOtpFlash(true);
+            setTimeout(() => setDevOtpFlash(false), 1200);
+          }, 50);
+        }
         setResendCooldown(res.cooldown_seconds || 60);
         setSuccessMessage(`A fresh verification code has been dispatched to ${res.destination || destinationEmail || "your email"}.`);
         setOtpDigits(["", "", "", "", "", ""]);
@@ -616,7 +625,11 @@ export function LoginGateway() {
             {/* Dev Mode OTP Banner */}
             {devOtp && (
               <div
-                className="mb-3 p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-2xl cursor-pointer hover:bg-amber-500/20 transition-colors"
+                className={`mb-3 p-3.5 border rounded-2xl cursor-pointer transition-all duration-300 ${
+                  devOtpFlash
+                    ? "bg-amber-400/25 border-amber-400 shadow-lg shadow-amber-500/30 scale-[1.01]"
+                    : "bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20"
+                }`}
                 onClick={() => {
                   const chars = devOtp.split("");
                   setOtpDigits(chars);
@@ -630,14 +643,20 @@ export function LoginGateway() {
                     <Zap className="h-3 w-3" />
                     DEV MODE — No Email Provider Configured
                   </span>
-                  <span className="text-[9px] font-mono text-amber-600 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">Click to auto-fill</span>
+                  <div className="flex items-center gap-1.5">
+                    {devOtpFlash && (
+                      <span className="text-[9px] font-mono text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded animate-pulse font-bold">NEW</span>
+                    )}
+                    <span className="text-[9px] font-mono text-amber-600 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">Click to auto-fill</span>
+                  </div>
                 </div>
                 <div className="text-center py-1">
-                  <span className="font-mono text-3xl font-black tracking-[0.3em] text-amber-300">{devOtp}</span>
+                  <span className={`font-mono text-3xl font-black tracking-[0.3em] transition-colors duration-300 ${devOtpFlash ? "text-amber-200" : "text-amber-300"}`}>{devOtp}</span>
                 </div>
-                <p className="text-[10px] font-mono text-amber-600 text-center mt-1">OTP displayed here because RESEND_API_KEY is not set in .env</p>
+                <p className="text-[10px] font-mono text-amber-600 text-center mt-1">OTP shown here because RESEND_API_KEY is not set in .env</p>
               </div>
             )}
+
 
             {/* 6-Digit OTP Input Boxes */}
             <div>

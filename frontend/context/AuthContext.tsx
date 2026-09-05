@@ -30,6 +30,8 @@ export interface LoginResult {
   userId?: string;
   message?: string;
   error?: string;
+  devOtp?: string;
+  devMode?: boolean;
 }
 
 interface AuthContextType {
@@ -49,7 +51,7 @@ interface AuthContextType {
     remember_me?: boolean;
   }) => Promise<LoginResult>;
   verifyEmailOTP: (challengeId: string, otp: string) => Promise<LoginResult>;
-  resendEmailOTP: (challengeId: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string }>;
+  resendEmailOTP: (challengeId: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }>;
   verify2FA: (challengeId: string, code: string) => Promise<LoginResult>;
   forgotPassword: (emailOrUsername: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; error?: string }>;
   verifyResetOTP: (challengeId: string, otp: string) => Promise<{ success: boolean; resetToken?: string; message?: string; error?: string }>;
@@ -249,6 +251,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           destination: data.destination || data.email,
           userId: data.user_id,
           message: data.message || "Enter the 6-digit verification code sent to your email.",
+          devOtp: data.dev_otp,
+          devMode: data.dev_mode,
         };
       }
 
@@ -365,7 +369,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Resend Email OTP
   const resendEmailOTP = async (
     challengeId: string
-  ): Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string }> => {
+  ): Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }> => {
     try {
       const res = await fetch("/api/auth/email-otp/resend", {
         method: "POST",
@@ -381,6 +385,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           challengeId: data.challenge_id || challengeId,
           destination: data.destination,
           cooldown_seconds: data.cooldown_seconds || 60,
+          devOtp: data.dev_otp,
+          devMode: data.dev_mode,
         };
       }
       return {

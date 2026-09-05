@@ -55,6 +55,7 @@ export function LoginGateway() {
   const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [useRecoveryCode, setUseRecoveryCode] = useState(false);
   const [recoveryCode, setRecoveryCode] = useState("");
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   // Resend OTP Cooldown Timer (Seconds)
   const [resendCooldown, setResendCooldown] = useState<number>(0);
@@ -173,6 +174,7 @@ export function LoginGateway() {
         setAuthStep("email_otp");
         if (res.challengeId) setChallengeId(res.challengeId);
         if (res.destination) setDestinationEmail(res.destination);
+        if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(60);
         setOtpDigits(["", "", "", "", "", ""]);
         setSuccessMessage(`A 6-digit verification code was sent to ${res.destination || "your registered email"}.`);
@@ -241,6 +243,7 @@ export function LoginGateway() {
       if (res.success) {
         if (res.challengeId) setChallengeId(res.challengeId);
         if (res.destination) setDestinationEmail(res.destination);
+        if (res.devOtp) setDevOtp(res.devOtp);
         setResendCooldown(res.cooldown_seconds || 60);
         setSuccessMessage(`A fresh verification code has been dispatched to ${res.destination || destinationEmail || "your email"}.`);
         setOtpDigits(["", "", "", "", "", ""]);
@@ -609,6 +612,32 @@ export function LoginGateway() {
                 <span className="text-cyan-300 font-semibold">{destinationEmail || "your email"}</span>.
               </p>
             </div>
+
+            {/* Dev Mode OTP Banner */}
+            {devOtp && (
+              <div
+                className="mb-3 p-3.5 bg-amber-500/10 border border-amber-500/40 rounded-2xl cursor-pointer hover:bg-amber-500/20 transition-colors"
+                onClick={() => {
+                  const chars = devOtp.split("");
+                  setOtpDigits(chars);
+                  digitInputRefs.current[5]?.focus();
+                  submitEmailOTP(devOtp);
+                }}
+                title="Click to auto-fill and submit"
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
+                    <Zap className="h-3 w-3" />
+                    DEV MODE — No Email Provider Configured
+                  </span>
+                  <span className="text-[9px] font-mono text-amber-600 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">Click to auto-fill</span>
+                </div>
+                <div className="text-center py-1">
+                  <span className="font-mono text-3xl font-black tracking-[0.3em] text-amber-300">{devOtp}</span>
+                </div>
+                <p className="text-[10px] font-mono text-amber-600 text-center mt-1">OTP displayed here because RESEND_API_KEY is not set in .env</p>
+              </div>
+            )}
 
             {/* 6-Digit OTP Input Boxes */}
             <div>

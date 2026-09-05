@@ -11152,13 +11152,24 @@ def api_auth_login():
         )
 
         masked_dest = _mask_email_address(user_email)
-        return jsonify({
+
+        # Dev mode: if no real email provider is configured (console/outbox fallback),
+        # include the OTP in the response so it can be displayed directly on the login screen.
+        is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+        no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
+
+        response_payload = {
             "status": "EMAIL_OTP_REQUIRED",
             "challenge_id": challenge_id,
             "destination": masked_dest,
             "message": "Verification code sent.",
             "request_id": request_id
-        }), 200
+        }
+        if no_real_provider:
+            response_payload["dev_otp"] = otp_code
+            response_payload["dev_mode"] = True
+
+        return jsonify(response_payload), 200
 
     except Exception as exc:
         import traceback
@@ -11411,13 +11422,22 @@ def api_auth_email_otp_resend():
     )
 
     masked_dest = _mask_email_address(user_email)
-    return jsonify({
+
+    # Dev mode passthrough: include OTP in response if no real email provider is configured
+    is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+    no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
+    resend_payload = {
         "status": "success",
         "challenge_id": new_challenge_id,
         "destination": masked_dest,
         "message": "Verification code sent.",
+        "cooldown_seconds": 60,
         "request_id": request_id
-    }), 200
+    }
+    if no_real_provider:
+        resend_payload["dev_otp"] = otp_code
+        resend_payload["dev_mode"] = True
+    return jsonify(resend_payload), 200
 
 
 @app.route("/api/auth/2fa/verify", methods=["POST"])

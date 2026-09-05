@@ -621,6 +621,7 @@ export function LoginGateway() {
                     }}
                     type="text"
                     inputMode="numeric"
+                    autoComplete={idx === 0 ? "one-time-code" : "off"}
                     maxLength={1}
                     value={digit}
                     onChange={(e) => handleDigitChange(idx, e.target.value)}

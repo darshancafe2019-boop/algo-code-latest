@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { apiClient } from "@/lib/apiClient";
 import {
   TrendingUp,
   TrendingDown,
@@ -65,16 +66,17 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
     }
   }, [currentPrice, direction, orderType]);
 
-  // Request estimate whenever parameters change
+  // Request estimate whenever parameters change with AbortController
   useEffect(() => {
+    const controller = new AbortController();
     let isMounted = true;
+
     const fetchEstimate = async () => {
       setLoadingEstimate(true);
       try {
-        const res = await fetch("/api/quick-trade/estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const res = await apiClient.post(
+          "/api/quick-trade/estimate",
+          {
             symbol,
             direction,
             order_type: orderType,
@@ -83,27 +85,34 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
             leverage,
             stop_loss: parseFloat(stopLoss) || 0,
             take_profit: parseFloat(takeProfit) || 0,
-          }),
-        });
-        if (res.ok && isMounted) {
-          const data = await res.json();
-          setEstimate(data);
+          },
+          {
+            signal: controller.signal,
+            timeoutMs: 5000,
+            deduplicate: true,
+          }
+        );
+        if (res.ok && isMounted && res.data) {
+          setEstimate(res.data);
         }
       } catch {
-        // Fallback
+        // Fallback gracefully without error spam
       } finally {
         if (isMounted) setLoadingEstimate(false);
       }
     };
 
-    const timer = setTimeout(fetchEstimate, 300);
+    const timer = setTimeout(fetchEstimate, 250);
     return () => {
       isMounted = false;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [symbol, direction, orderType, quantity, price, leverage, stopLoss, takeProfit, currentPrice]);
 
   const handleExecuteTrade = async () => {
+    if (submitting) return; // Single-click protection: drop repeated rapid clicks
+
     if (executionMode === "LIVE" && !showLiveConfirm) {
       setShowLiveConfirm(true);
       return;
@@ -111,12 +120,12 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
 
     setSubmitting(true);
     setExecutionStatus({ type: null, message: "" });
-    const clientOrderId = `ct_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const clientOrderId = apiClient.generateIdempotencyKey("QUICK_TRADE", symbol);
+
     try {
-      const res = await fetch("/api/quick-trade/execute", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const res = await apiClient.post<any>(
+        "/api/quick-trade/execute",
+        {
           client_order_id: clientOrderId,
           symbol,
           direction,
@@ -127,13 +136,17 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
           take_profit: parseFloat(takeProfit) || 0,
           mode: executionMode,
           bot_id: "bot-1",
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.status === "success") {
+        },
+        {
+          idempotencyKey: clientOrderId,
+          timeoutMs: 12000,
+        }
+      );
+
+      if (res.ok && res.data) {
         setExecutionStatus({
           type: "success",
-          message: data.message || `Order successfully filled on ${executionMode} ledger.`,
+          message: res.data.message || `Order successfully filled on ${executionMode} ledger.`,
         });
         setShowLiveConfirm(false);
         setLiveConfirmWord("");
@@ -146,7 +159,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
       } else {
         setExecutionStatus({
           type: "error",
-          message: data.message || "Order rejected by risk engine.",
+          message: res.error?.message || res.data?.message || "Order rejected by risk engine.",
         });
       }
     } catch (err: any) {

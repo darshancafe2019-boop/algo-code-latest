@@ -178,20 +178,36 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
     };
   }, [refreshAll]);
 
-  const value: GlobalDataContextValue = {
+  const reconciliationStatus = portfolioSnapshot?.reconciliationStatus || "RECONCILED";
+  const isLive = tradingMode === "LIVE";
+
+  const value: GlobalDataContextValue = React.useMemo(() => ({
     portfolioSnapshot,
     positions,
     orders,
     providers,
     riskSummary,
     tradingMode,
-    isLive: tradingMode === "LIVE",
+    isLive,
     isLoading: isSnapshotLoading,
     isStale: isSnapshotStale,
-    reconciliationStatus: portfolioSnapshot?.reconciliationStatus || "RECONCILED",
+    reconciliationStatus,
     refreshAll,
     setTradingMode,
-  };
+  }), [
+    portfolioSnapshot,
+    positions,
+    orders,
+    providers,
+    riskSummary,
+    tradingMode,
+    isLive,
+    isSnapshotLoading,
+    isSnapshotStale,
+    reconciliationStatus,
+    refreshAll,
+    setTradingMode,
+  ]);
 
   return <GlobalDataContext.Provider value={value}>{children}</GlobalDataContext.Provider>;
 }

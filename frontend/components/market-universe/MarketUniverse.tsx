@@ -97,15 +97,24 @@ export function MarketUniverse() {
     return set;
   }, [watchedItems]);
 
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Update URL state cleanly without reload
   useEffect(() => {
     const params = new URLSearchParams();
     if (activeCategory !== "ALL") params.set("asset", activeCategory.toLowerCase());
-    if (searchQuery) params.set("search", searchQuery);
+    if (debouncedSearch) params.set("search", debouncedSearch);
     if (selectedInstrument?.canonical_symbol) params.set("symbol", selectedInstrument.canonical_symbol);
     const newUrl = params.toString() ? `/markets?${params.toString()}` : "/markets";
     window.history.replaceState(null, "", newUrl);
-  }, [activeCategory, searchQuery, selectedInstrument]);
+  }, [activeCategory, debouncedSearch, selectedInstrument]);
 
   // 1. Fetch Instruments from Canonical Registry (`GET /api/universe/instruments`)
   const {
@@ -113,7 +122,7 @@ export function MarketUniverse() {
     isLoading,
     error,
   } = useQuery<MarketUniverseResponse>({
-    queryKey: ["marketUniverseMaster", activeCategory, searchQuery, filters.exchange],
+    queryKey: ["marketUniverseMaster", activeCategory, debouncedSearch, filters.exchange],
     queryFn: async () => {
       const assetClassParam =
         activeCategory === "CRYPTO"
@@ -141,7 +150,7 @@ export function MarketUniverse() {
       const params = new URLSearchParams({
         asset_class: assetClassParam,
         exchange: filters.exchange !== "ALL" ? filters.exchange : "ALL",
-        search: searchQuery,
+        search: debouncedSearch,
         limit: "250",
       });
 

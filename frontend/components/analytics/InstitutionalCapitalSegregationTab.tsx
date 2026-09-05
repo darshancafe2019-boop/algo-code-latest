@@ -263,9 +263,13 @@ export function InstitutionalCapitalSegregationTab() {
   const currencySymbol = cb.currency === "INR" ? "₹" : cb.currency === "USDT" ? "USDT " : "$";
 
   // Flat accounts list from hierarchy
-  const hierarchyList = hierarchyData?.hierarchy || [];
-  const activeCustomer = hierarchyList.find((c: any) => c.id === selectedCustomerId) || hierarchyList[0];
-  const departments = activeCustomer?.departments || [];
+  const hierarchyList = useMemo(() => hierarchyData?.hierarchy || [], [hierarchyData?.hierarchy]);
+  const activeCustomer = useMemo(() => {
+    return hierarchyList.find((c: any) => c.id === selectedCustomerId) || hierarchyList[0];
+  }, [hierarchyList, selectedCustomerId]);
+  const departments = useMemo(() => {
+    return activeCustomer?.departments || [];
+  }, [activeCustomer]);
 
   // Extract all folders, accounts, bots, strategies for 9-tier filtering
   const allFolders = useMemo(() => {
@@ -343,7 +347,10 @@ export function InstitutionalCapitalSegregationTab() {
   }, [allBots, selectedDeptId, selectedFolderId, selectedProvider, selectedBrokerAccountId, selectedCurrencyFilter, selectedBotFilter, selectedStrategyFilter]);
 
   // Filtered Capital Ledger Entries
-  const ledgerEntries = capitalLedgerData?.entries || [];
+  const ledgerEntries = useMemo(() => {
+    return capitalLedgerData?.entries || [];
+  }, [capitalLedgerData?.entries]);
+
   const filteredLedgerEntries = useMemo(() => {
     if (!ledgerSearch.trim()) return ledgerEntries;
     const q = ledgerSearch.toLowerCase();

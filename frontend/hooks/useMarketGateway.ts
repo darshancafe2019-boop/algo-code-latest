@@ -8,7 +8,7 @@
  * @example
  *   const { quote, isStale, connectionStatus } = useMarketGateway("BTC/USDT", "CHART_VIEW");
  */
-import { useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   useMarketGatewayContext,
   NormalizedQuote,
@@ -35,19 +35,31 @@ export function useMarketGateway(
   symbol: string | null | undefined,
   reason: SubscriptionReason = "CHART_VIEW"
 ): MarketGatewayResult {
-  const { quotes, subscribe, unsubscribe, connectionStatus } = useMarketGatewayContext();
+  const { subscribe, unsubscribe, connectionStatus, getQuote, subscribeSymbolQuote } = useMarketGatewayContext();
 
   const sym = symbol?.toUpperCase() ?? null;
+  const [quote, setQuote] = useState<NormalizedQuote | null>(() => (sym && getQuote ? getQuote(sym) : null));
 
   useEffect(() => {
-    if (!sym) return;
+    if (!sym) {
+      setQuote(null);
+      return;
+    }
     subscribe(sym, reason);
+    if (getQuote) {
+      setQuote(getQuote(sym));
+    }
+    const unsub = subscribeSymbolQuote
+      ? subscribeSymbolQuote(sym, (newQuote) => {
+          setQuote(newQuote);
+        })
+      : undefined;
+
     return () => {
       unsubscribe(sym, reason);
+      if (unsub) unsub();
     };
-  }, [sym, reason, subscribe, unsubscribe]);
-
-  const quote = sym ? (quotes.get(sym) ?? null) : null;
+  }, [sym, reason, subscribe, unsubscribe, subscribeSymbolQuote, getQuote]);
 
   const formattedPrice = useMemo(() => {
     if (!quote) return "—";
@@ -88,13 +100,16 @@ export function useMultiMarketGateway(
 ): Map<string, NormalizedQuote> {
   const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
 
+  const symbolsKey = useMemo(() => {
+    return symbols.map((s) => s.toUpperCase()).sort().join(",");
+  }, [symbols]);
+
   useEffect(() => {
     symbols.forEach((sym) => subscribe(sym.toUpperCase(), reason));
     return () => {
       symbols.forEach((sym) => unsubscribe(sym.toUpperCase(), reason));
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(symbols), reason]);
+  }, [symbolsKey, reason, subscribe, unsubscribe, symbols]);
 
   return useMemo(() => {
     const result = new Map<string, NormalizedQuote>();
@@ -103,6 +118,5 @@ export function useMultiMarketGateway(
       if (q) result.set(sym.toUpperCase(), q);
     });
     return result;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quotes, JSON.stringify(symbols)]);
+  }, [quotes, symbols]);
 }

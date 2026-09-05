@@ -90,12 +90,18 @@ export function TradingTerminal() {
     refetchInterval: 6000,
   });
 
-  const accountBalance = Number(statusData?.health?.balance ?? 10000.0);
-  const terminalPnl = statusData?.todays_pnl !== undefined ? Number(statusData.todays_pnl) : 0.0;
-  const terminalPnlPct = statusData?.todays_pnl_pct !== undefined 
-    ? Number(statusData.todays_pnl_pct) 
-    : (accountBalance > 0 ? (terminalPnl / accountBalance) * 100 : null);
-  const isTermProfit = terminalPnl >= 0;
+  const rawBalance = statusData?.health?.balance ?? statusData?.balance;
+  const accountBalance: number | null = rawBalance !== undefined && rawBalance !== null ? Number(rawBalance) : null;
+  
+  const rawPnl = statusData?.todays_pnl ?? statusData?.pnl;
+  const terminalPnl: number | null = rawPnl !== undefined && rawPnl !== null ? Number(rawPnl) : null;
+  
+  const rawPnlPct = statusData?.todays_pnl_pct ?? statusData?.pnl_pct;
+  const terminalPnlPct: number | null = rawPnlPct !== undefined && rawPnlPct !== null
+    ? Number(rawPnlPct)
+    : (accountBalance !== null && accountBalance > 0 && terminalPnl !== null ? (terminalPnl / accountBalance) * 100 : null);
+    
+  const isTermProfit = (terminalPnl ?? 0) >= 0;
   const openPosCount = statusData?.open_positions_count ?? statusData?.health?.open_positions_count ?? 0;
   const terminalRiskStatus = statusData?.risk_status || "14/14 Checks Passed";
 
@@ -344,7 +350,9 @@ export function TradingTerminal() {
             <div className="card-specular card-interactive p-3.5 bg-[var(--theme-surface)]/80 border border-[var(--theme-border)] rounded-2xl flex items-center justify-between shadow-sm">
               <div>
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Account Balance</div>
-                <div className="text-sm sm:text-base font-extrabold text-slate-50 mt-0.5">${formatPrice(accountBalance, "", 2)}</div>
+                <div className="text-sm sm:text-base font-extrabold text-slate-50 mt-0.5">
+                  {accountBalance !== null ? `$${formatPrice(accountBalance, "", 2)}` : "—"}
+                </div>
               </div>
               <DollarSign className="h-5 w-5 text-sky-400" />
             </div>
@@ -352,16 +360,22 @@ export function TradingTerminal() {
             <div className="card-specular card-interactive p-3.5 bg-[var(--theme-surface)]/80 border border-[var(--theme-border)] rounded-2xl flex items-center justify-between shadow-sm">
               <div>
                 <div className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Today P&L</div>
-                <div className={`text-sm sm:text-base font-extrabold mt-0.5 ${isTermProfit ? "text-emerald-400" : "text-rose-400"}`}>
-                  {isTermProfit && terminalPnl > 0 ? "+" : terminalPnl < 0 ? "-" : ""}${formatPrice(Math.abs(terminalPnl), "", 2)}
-                  <span className="text-xs font-semibold ml-1 opacity-90 font-sans">
-                    {terminalPnlPct !== null && !isNaN(terminalPnlPct)
-                      ? `(${terminalPnlPct > 0 ? "+" : ""}${terminalPnlPct.toFixed(2)}%)`
-                      : "(N/A)"}
-                  </span>
+                <div className={`text-sm sm:text-base font-extrabold mt-0.5 ${terminalPnl === null ? "text-slate-400" : isTermProfit ? "text-emerald-400" : "text-rose-400"}`}>
+                  {terminalPnl !== null ? (
+                    <>
+                      {terminalPnl > 0 ? "+" : terminalPnl < 0 ? "-" : ""}${formatPrice(Math.abs(terminalPnl), "", 2)}
+                      <span className="text-xs font-semibold ml-1 opacity-90 font-sans">
+                        {terminalPnlPct !== null && !isNaN(terminalPnlPct)
+                          ? `(${terminalPnlPct > 0 ? "+" : ""}${terminalPnlPct.toFixed(2)}%)`
+                          : "(N/A)"}
+                      </span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
                 </div>
               </div>
-              {isTermProfit ? (
+              {terminalPnl !== null && isTermProfit ? (
                 <TrendingUp className="h-5 w-5 text-emerald-400" />
               ) : (
                 <TrendingDown className="h-5 w-5 text-rose-400" />

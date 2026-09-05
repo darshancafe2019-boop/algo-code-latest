@@ -175,18 +175,43 @@ export function BotControlTab() {
     setSelectedBotIds([]);
   };
 
-  // Execute Individual Bot Action (START, PAUSE, RESUME, STOP)
+  // In-flight action locks to prevent rapid duplicate double-clicks
+  const [inFlightActionKeys, setInFlightActionKeys] = useState<Set<string>>(new Set());
+
+  // Execute Individual Bot Action (START, PAUSE, RESUME, STOP) with single-click guard
   const handleBotAction = async (botId: string, action: string) => {
+    const lockKey = `${action}:${botId}`;
+    if (inFlightActionKeys.has(lockKey)) {
+      return; // Single-click lock: drop duplicate clicks while in-flight
+    }
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>(`/api/bots/${botId}/control`, { action });
-    if (!res.ok) {
-      const msg = res.error?.message || `Failed to execute ${action} on bot ${botId}`;
-      setActionError(msg);
-      throw new Error(msg);
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey(`BOT_${action}`, botId);
+      const res = await apiClient.post<any>(
+        `/api/bots/${botId}/control`,
+        { action, idempotency_key: idempotencyKey },
+        { idempotencyKey, timeoutMs: 12000 }
+      );
+
+      if (!res.ok) {
+        const msg = res.error?.message || `Failed to execute ${action} on bot ${botId}`;
+        setActionError(msg);
+        throw new Error(msg);
+      }
+
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Open Single Delete Modal
@@ -195,16 +220,23 @@ export function BotControlTab() {
     setIsDeleteModalOpen(true);
   };
 
-  // Confirm Single Delete
+  // Confirm Single Delete with in-flight lock
   const handleConfirmSingleDelete = async (botId: string, force: boolean = false) => {
+    const lockKey = `DELETE:${botId}`;
+    if (inFlightActionKeys.has(lockKey) || isDeleting) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
     setIsDeleting(true);
+
     try {
       const endpoint = force ? `/api/bots/${botId}/force-delete` : `/api/bots/${botId}`;
+      const idempotencyKey = apiClient.generateIdempotencyKey(force ? "FORCE_DELETE" : "DELETE", botId);
       const res = force
-        ? await apiClient.post<any>(endpoint, {})
-        : await apiClient.delete<any>(endpoint);
+        ? await apiClient.post<any>(endpoint, {}, { idempotencyKey, timeoutMs: 12000 })
+        : await apiClient.delete<any>(endpoint, { idempotencyKey, timeoutMs: 12000 });
+
       if (!res.ok) {
         throw new Error(res.error?.message || `Failed to delete bot ${botId}`);
       }
@@ -225,16 +257,32 @@ export function BotControlTab() {
       throw err;
     } finally {
       setIsDeleting(false);
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
   // Confirm Bulk Delete
   const handleConfirmBulkDelete = async (botIds: string[]) => {
+    const lockKey = "BULK_DELETE";
+    if (inFlightActionKeys.has(lockKey) || isDeleting) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
     setIsDeleting(true);
+
     try {
-      const res = await apiClient.post<any>("/api/bots/bulk-delete", { bot_ids: botIds });
+      const idempotencyKey = apiClient.generateIdempotencyKey("BULK_DELETE");
+      const res = await apiClient.post<any>(
+        "/api/bots/bulk-delete",
+        { bot_ids: botIds },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
       if (!res.ok) {
         throw new Error(res.error?.message || "Failed to bulk delete bots");
       }
@@ -258,117 +306,255 @@ export function BotControlTab() {
       throw err;
     } finally {
       setIsDeleting(false);
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
   // Bulk Stop Selected
   const handleBulkStop = async () => {
     if (selectedBotIds.length === 0) return;
+    const lockKey = "BULK_STOP";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>("/api/bots/bulk-stop", { bot_ids: selectedBotIds });
-    if (!res.ok) {
-      setActionError(res.error?.message || "Failed to stop selected bots");
-      return;
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("BULK_STOP");
+      const res = await apiClient.post<any>(
+        "/api/bots/bulk-stop",
+        { bot_ids: selectedBotIds },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        setActionError(res.error?.message || "Failed to stop selected bots");
+        return;
+      }
+      setActionSuccess(res.data?.message || `Stopped ${res.data?.stopped_count || selectedBotIds.length} bot(s).`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess(res.data?.message || `Stopped ${res.data?.stopped_count || selectedBotIds.length} bot(s).`);
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Bulk Start Selected
   const handleBulkStart = async () => {
     if (selectedBotIds.length === 0) return;
+    const lockKey = "BULK_START";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>("/api/bots/bulk-start", { bot_ids: selectedBotIds });
-    if (!res.ok) {
-      setActionError(res.error?.message || "Failed to start selected bots");
-      return;
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("BULK_START");
+      const res = await apiClient.post<any>(
+        "/api/bots/bulk-start",
+        { bot_ids: selectedBotIds },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        setActionError(res.error?.message || "Failed to start selected bots");
+        return;
+      }
+      setActionSuccess(res.data?.message || `Started ${res.data?.started_count || selectedBotIds.length} bot(s).`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess(res.data?.message || `Started ${res.data?.started_count || selectedBotIds.length} bot(s).`);
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Bulk Pause Selected
   const handleBulkPause = async () => {
     if (selectedBotIds.length === 0) return;
+    const lockKey = "BULK_PAUSE";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>("/api/bots/bulk-pause", { bot_ids: selectedBotIds });
-    if (!res.ok) {
-      setActionError(res.error?.message || "Failed to pause selected bots");
-      return;
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("BULK_PAUSE");
+      const res = await apiClient.post<any>(
+        "/api/bots/bulk-pause",
+        { bot_ids: selectedBotIds },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        setActionError(res.error?.message || "Failed to pause selected bots");
+        return;
+      }
+      setActionSuccess(res.data?.message || `Paused ${res.data?.paused_count || selectedBotIds.length} bot(s).`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess(res.data?.message || `Paused ${res.data?.paused_count || selectedBotIds.length} bot(s).`);
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Bulk Resume Selected
   const handleBulkResume = async () => {
     if (selectedBotIds.length === 0) return;
+    const lockKey = "BULK_RESUME";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>("/api/bots/bulk-resume", { bot_ids: selectedBotIds });
-    if (!res.ok) {
-      setActionError(res.error?.message || "Failed to resume selected bots");
-      return;
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("BULK_RESUME");
+      const res = await apiClient.post<any>(
+        "/api/bots/bulk-resume",
+        { bot_ids: selectedBotIds },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        setActionError(res.error?.message || "Failed to resume selected bots");
+        return;
+      }
+      setActionSuccess(res.data?.message || `Resumed ${res.data?.resumed_count || selectedBotIds.length} bot(s).`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess(res.data?.message || `Resumed ${res.data?.resumed_count || selectedBotIds.length} bot(s).`);
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Bulk Start Eligible (Header button)
   const handleConfirmBulkStart = async () => {
+    const lockKey = "START_ALL";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const res = await apiClient.post<any>("/api/bots/start-all", {
-      market_filter: selectedMarket === "ALL" ? null : selectedMarket,
-      environment: envFilter === "ALL" ? null : envFilter,
-    });
-    if (!res.ok) {
-      const msg = res.error?.message || "Failed bulk start";
-      setActionError(msg);
-      throw new Error(msg);
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("START_ALL");
+      const res = await apiClient.post<any>(
+        "/api/bots/start-all",
+        {
+          market_filter: selectedMarket === "ALL" ? null : selectedMarket,
+          environment: envFilter === "ALL" ? null : envFilter,
+        },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        const msg = res.error?.message || "Failed bulk start";
+        setActionError(msg);
+        throw new Error(msg);
+      }
+      setActionSuccess("Bulk start triggered for eligible bots.");
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess("Bulk start triggered for eligible bots.");
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Toggle Emergency Halt
   const handleToggleEmergencyHalt = async () => {
+    const lockKey = "EMERGENCY_HALT";
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
     setActionError(null);
     setActionSuccess(null);
-    const targetState = !metrics.emergency_halt_active;
-    const res = await apiClient.post<any>("/api/bots/emergency-halt", {
-      active: targetState,
-      reason: targetState ? "Emergency Halt Triggered by User" : "Emergency Halt Released",
-    });
-    if (!res.ok) {
-      const msg = res.error?.message || "Failed to toggle Emergency Halt";
-      setActionError(msg);
-      throw new Error(msg);
+
+    try {
+      const targetState = !metrics.emergency_halt_active;
+      const idempotencyKey = apiClient.generateIdempotencyKey(targetState ? "HALT_ACTIVE" : "HALT_RELEASE");
+      const res = await apiClient.post<any>(
+        "/api/bots/emergency-halt",
+        {
+          active: targetState,
+          reason: targetState ? "Emergency Halt Triggered by User" : "Emergency Halt Released",
+        },
+        { idempotencyKey, timeoutMs: 15000 }
+      );
+
+      if (!res.ok) {
+        const msg = res.error?.message || "Failed to toggle Emergency Halt";
+        setActionError(msg);
+        throw new Error(msg);
+      }
+      setActionSuccess(targetState ? "🔴 Emergency Halt Activated across fleet." : "🟢 Emergency Halt Released.");
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    setActionSuccess(targetState ? "🔴 Emergency Halt Activated across fleet." : "🟢 Emergency Halt Released.");
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   // Toggle Bot Execution Mode (LIVE vs PAPER)
   const handleToggleBotMode = async (botId: string, targetMode?: "LIVE" | "PAPER") => {
-    const res = await apiClient.post<any>(`/api/bots/${botId}/mode`, {
-      mode: targetMode,
-      requested_by: "TRADER_UI",
-    });
-    if (!res.ok) {
-      throw new Error(res.error?.message || "Failed to switch bot execution mode");
+    const lockKey = `TOGGLE_MODE:${botId}`;
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
+
+    try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("TOGGLE_MODE", botId);
+      const res = await apiClient.post<any>(
+        `/api/bots/${botId}/mode`,
+        {
+          mode: targetMode,
+          requested_by: "TRADER_UI",
+        },
+        { idempotencyKey, timeoutMs: 10000 }
+      );
+
+      if (!res.ok) {
+        throw new Error(res.error?.message || "Failed to switch bot execution mode");
+      }
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
-    await refetch();
-    queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
   };
 
   const handleSelectBot = (bot: BotRowItem) => {

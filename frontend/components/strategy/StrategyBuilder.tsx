@@ -287,11 +287,16 @@ export function StrategyBuilder() {
     handleUpdateStrategy({ entry: updatedEntry });
   };
 
-  // Save Draft (Manual or Autosave)
+  // Save Draft (Manual or Autosave) with single-click guard
   const handleSaveDraft = useCallback(async () => {
+    if (isSaving) return;
     setIsSaving(true);
     try {
-      const res = await apiClient.post<any>("/api/strategy/ide/save", strategy, { timeoutMs: 5000 });
+      const idempotencyKey = apiClient.generateIdempotencyKey("SAVE_STRATEGY", strategy.id);
+      const res = await apiClient.post<any>("/api/strategy/ide/save", strategy, {
+        idempotencyKey,
+        timeoutMs: 8000,
+      });
       if (res.ok) {
         setAutosaveTime(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
         queryClient.invalidateQueries({ queryKey: ["strategyCatalog"] });
@@ -301,13 +306,15 @@ export function StrategyBuilder() {
     } finally {
       setIsSaving(false);
     }
-  }, [strategy, queryClient]);
+  }, [strategy, queryClient, isSaving]);
 
-  // Backtest / Test Strategy Action
+  // Backtest / Test Strategy Action with single-click guard
   const handleRunTestStrategy = async () => {
+    if (isBacktesting) return;
     setIsBacktesting(true);
     setIsBacktestStale(false);
     try {
+      const idempotencyKey = apiClient.generateIdempotencyKey("BACKTEST_STRATEGY", strategy.id);
       const res = await apiClient.post<any>(
         "/api/strategy/ide/backtest",
         {
@@ -322,7 +329,7 @@ export function StrategyBuilder() {
           version: strategy.active_version,
           allow_shorts: strategy.direction !== "LONG",
         },
-        { timeoutMs: 15000 }
+        { idempotencyKey, timeoutMs: 15000 }
       );
       if (res.ok && res.data) {
         setBacktestResult(res.data);

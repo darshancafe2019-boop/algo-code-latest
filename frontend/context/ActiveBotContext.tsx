@@ -149,23 +149,38 @@ export function ActiveBotProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const isStale = isPlaceholderData || !!error;
+
+  const value: ActiveBotContextType = React.useMemo(() => ({
+    activeBot,
+    bots,
+    isLoadingBots,
+    isStale,
+    activeSymbol,
+    activeTimeframe,
+    activeStrategy,
+    setActiveBotId,
+    setActiveSymbol,
+    setActiveTimeframe,
+    setActiveStrategy,
+    refreshBots,
+  }), [
+    activeBot,
+    bots,
+    isLoadingBots,
+    isStale,
+    activeSymbol,
+    activeTimeframe,
+    activeStrategy,
+    setActiveBotId,
+    setActiveSymbol,
+    setActiveTimeframe,
+    setActiveStrategy,
+    refreshBots,
+  ]);
+
   return (
-    <ActiveBotContext.Provider
-      value={{
-        activeBot,
-        bots,
-        isLoadingBots,
-        isStale: isPlaceholderData || !!error,
-        activeSymbol,
-        activeTimeframe,
-        activeStrategy,
-        setActiveBotId,
-        setActiveSymbol,
-        setActiveTimeframe,
-        setActiveStrategy,
-        refreshBots,
-      }}
-    >
+    <ActiveBotContext.Provider value={value}>
       {children}
     </ActiveBotContext.Provider>
   );

@@ -29,6 +29,7 @@ import {
   DollarSign,
   PieChart,
   Landmark,
+  Scale,
 } from "lucide-react";
 
 import {
@@ -216,6 +217,57 @@ export function PerformanceAnalytics() {
         dailyProfitTarget={1000.0}
         dailyLossLimit={500.0}
       />
+
+      {/* 2.5 Tax Summary Integration */}
+      <div
+        onClick={() => {
+          if (typeof window !== "undefined") {
+            window.location.href = "/tax";
+          }
+        }}
+        className="p-3.5 bg-[#09110E] border border-[#1F392D] hover:border-emerald-500/50 rounded-2xl flex flex-wrap items-center justify-between gap-3 cursor-pointer transition-all shadow-md group"
+      >
+        <div className="flex items-center gap-2.5">
+          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
+            <Scale className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-white flex items-center gap-1.5 font-sans">
+              TAX SUMMARY
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                FY 2025-26
+              </span>
+            </div>
+            <div className="text-[11px] text-[#8BA596] font-mono">
+              Click to open Tax Intelligence Dashboard
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-5 text-xs font-mono">
+          <div>
+            <span className="text-[#8BA596] text-[10px] block">EST. LIABILITY</span>
+            <span className="text-amber-400 font-bold">{selectedCurrency.symbol} 14,352</span>
+          </div>
+          <div>
+            <span className="text-[#8BA596] text-[10px] block">REALIZED TAX P&L</span>
+            <span className="text-emerald-400 font-bold">+{selectedCurrency.symbol} 27,000</span>
+          </div>
+          <div>
+            <span className="text-[#8BA596] text-[10px] block">TAX RESERVE</span>
+            <span className="text-cyan-400 font-bold">{selectedCurrency.symbol} 14,082</span>
+          </div>
+          <div>
+            <span className="text-[#8BA596] text-[10px] block">NEXT DEADLINE</span>
+            <span className="text-slate-300 font-medium">15-Jun-2026</span>
+          </div>
+          <div className="hidden sm:block">
+            <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-[#142B21] border border-[#1F392D] text-emerald-300 group-hover:border-emerald-500/40 transition-colors">
+              Open Intelligence →
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* 3. MULTI-VIEW NAVIGATION TAB BAR */}
       <div className="flex items-center gap-1.5 bg-[#0B111E] border border-[#1E293B] rounded-2xl p-1.5 overflow-x-auto text-xs font-mono font-extrabold shadow-xl">

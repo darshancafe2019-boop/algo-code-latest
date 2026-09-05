@@ -48,6 +48,7 @@ export function TradeJournal() {
   // Header & Filter State
   const [timeframe, setTimeframe] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [directionFilter, setDirectionFilter] = useState("ALL");
   const [strategyFilter, setStrategyFilter] = useState("ALL");
@@ -55,6 +56,11 @@ export function TradeJournal() {
   const [emotionFilter, setEmotionFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery), 200);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   // Modal & Drawer State
   const [selectedTradeForReview, setSelectedTradeForReview] = useState<TradeJournalRecord | null>(null);
@@ -72,7 +78,7 @@ export function TradeJournal() {
     queryKey: [
       "journalTrades",
       timeframe,
-      searchQuery,
+      debouncedQuery,
       statusFilter,
       directionFilter,
       strategyFilter,
@@ -83,7 +89,7 @@ export function TradeJournal() {
     queryFn: async () => {
       const params = new URLSearchParams({
         timeframe,
-        query: searchQuery,
+        query: debouncedQuery,
         status: statusFilter,
         direction: directionFilter,
         strategy: strategyFilter,

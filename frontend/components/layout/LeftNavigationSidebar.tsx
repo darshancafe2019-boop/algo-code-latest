@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -28,6 +28,7 @@ import {
   BookOpen,
   History,
   Landmark,
+  Scale,
 } from "lucide-react";
 
 interface LeftNavigationSidebarProps {
@@ -68,7 +69,7 @@ export function LeftNavigationSidebar({
       items: [
         { id: "home", label: "HOME", path: "/", icon: LayoutDashboard },
         { id: "markets", label: "MARKETS", path: "/markets", icon: LineChart },
-        { id: "scanner", label: "SCANNER", path: "/scanner", icon: Radar, shortcut: "⌘S" },
+        { id: "scanner", label: "INDICATORS", path: "/scanner", icon: Radar, shortcut: "⌘S" },
       ],
     },
     {
@@ -79,6 +80,12 @@ export function LeftNavigationSidebar({
         { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
         { id: "futures", label: "FUTURES", path: "/crypto/futures", icon: TrendingUp },
         { id: "options", label: "OPTIONS", path: "/options", icon: Zap },
+        {
+          id: "tax",
+          label: "TAX INTELLIGENCE",
+          path: "/tax",
+          icon: Scale,
+        },
       ],
     },
     {
@@ -86,15 +93,14 @@ export function LeftNavigationSidebar({
       items: [
         { id: "positions", label: "POSITIONS", path: "/positions", icon: CheckCircle2, shortcut: "⌘P" },
         { id: "orders", label: "ORDERS", path: "/orders", icon: Send, shortcut: "⌘O" },
-        { id: "pnl", label: "PORTFOLIO & P&L", path: "/pnl", icon: DollarSign },
+        { id: "pnl", label: "P&L", path: "/pnl", icon: DollarSign },
         {
           id: "capital-funds",
-          label: "CAPITAL & FUNDS",
-          subtitle: "Institutional Fund Segregation",
+          label: " FUNDS",
           path: "/capital",
           icon: Landmark,
-          badge: "NEW",
         },
+
       ],
     },
     {
@@ -112,9 +118,42 @@ export function LeftNavigationSidebar({
         { id: "system-health", label: "SYSTEM HEALTH", path: "/system-health", icon: Activity },
         { id: "providers", label: "PROVIDERS", path: "/providers", icon: Cpu },
         { id: "settings", label: "SETTINGS", path: "/settings", icon: Sliders },
+
       ],
     },
   ];
+
+  useEffect(() => {
+    const idlePrefetch = () => {
+      const paths = [
+        "/",
+        "/terminal",
+        "/bots",
+        "/markets",
+        "/options",
+        "/capital",
+        "/pnl",
+        "/positions",
+        "/orders",
+        "/risk",
+        "/scanner",
+        "/crypto/futures",
+        "/tax",
+      ];
+      paths.forEach((p) => {
+        try {
+          router.prefetch(p);
+        } catch { }
+      });
+    };
+    if (typeof window !== "undefined") {
+      if ("requestIdleCallback" in window) {
+        (window as any).requestIdleCallback(idlePrefetch, { timeout: 3000 });
+      } else {
+        setTimeout(idlePrefetch, 1500);
+      }
+    }
+  }, [router]);
 
   const handleNavClick = (item: NavItem) => {
     if (onTabSelect) {
@@ -145,9 +184,8 @@ export function LeftNavigationSidebar({
     <>
       {/* Desktop & Tablet Adaptive Sidebar */}
       <aside
-        className={`hidden md:flex flex-col bg-[var(--theme-surface)]/95 border-r border-[var(--theme-border)] transition-all duration-200 select-none z-20 shrink-0 ${
-          isCollapsed ? "w-16" : "w-16 xl:w-60"
-        }`}
+        className={`hidden md:flex flex-col bg-[var(--theme-surface)]/95 border-r border-[var(--theme-border)] transition-all duration-200 select-none z-20 shrink-0 ${isCollapsed ? "w-16" : "w-16 xl:w-60"
+          }`}
       >
         {/* Navigation Groups */}
         <div className="flex-1 overflow-y-auto py-4 px-2.5 space-y-5 scrollbar-thin">
@@ -167,15 +205,19 @@ export function LeftNavigationSidebar({
                   <button
                     key={item.id}
                     onClick={() => handleNavClick(item)}
+                    onMouseEnter={() => {
+                      try {
+                        router.prefetch(item.path);
+                      } catch { }
+                    }}
                     title={isCollapsed ? (item.subtitle ? `${item.label} (${item.subtitle})` : item.label) : undefined}
                     aria-label={item.label}
                     data-nav-id={item.id}
                     data-nav-path={item.path}
-                    className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${
-                      active
-                        ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
-                        : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
-                    }`}
+                    className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
+                      ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
+                      : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
+                      }`}
                   >
                     {/* Active Left Indicator Bar */}
                     {active && (
@@ -183,9 +225,8 @@ export function LeftNavigationSidebar({
                     )}
 
                     <Icon
-                      className={`h-4 w-4 shrink-0 transition-colors ${
-                        active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
-                      }`}
+                      className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                        }`}
                     />
 
                     {!isCollapsed && (
@@ -272,13 +313,17 @@ export function LeftNavigationSidebar({
                       <button
                         key={item.id}
                         onClick={() => handleNavClick(item)}
+                        onMouseEnter={() => {
+                          try {
+                            router.prefetch(item.path);
+                          } catch { }
+                        }}
                         data-mobile-nav-id={item.id}
                         data-mobile-nav-path={item.path}
-                        className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-mono transition-all ${
-                          active
-                            ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40"
-                            : "text-[var(--theme-text-secondary)] active:bg-[var(--theme-elevated)]"
-                        }`}
+                        className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-mono transition-all ${active
+                          ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40"
+                          : "text-[var(--theme-text-secondary)] active:bg-[var(--theme-elevated)]"
+                          }`}
                       >
                         <Icon className="h-4 w-4 shrink-0" />
                         <div className="flex flex-col flex-1 text-left min-w-0">
@@ -317,14 +362,23 @@ export function LeftNavigationSidebar({
                 if (barItem.isMenu) {
                   setMobileDrawerOpen(true);
                 } else {
+                  if (onTabSelect) {
+                    onTabSelect(barItem.id);
+                  }
                   router.push(barItem.path);
                 }
               }}
-              className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-xl font-mono text-[10px] transition-all active:scale-95 ${
-                active
-                  ? "text-[var(--theme-accent)] font-bold"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
-              }`}
+              onMouseEnter={() => {
+                if (!barItem.isMenu) {
+                  try {
+                    router.prefetch(barItem.path);
+                  } catch { }
+                }
+              }}
+              className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-xl font-mono text-[10px] transition-all active:scale-95 ${active
+                ? "text-[var(--theme-accent)] font-bold"
+                : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
+                }`}
               aria-label={barItem.label}
             >
               <Icon className={`h-4 w-4 ${active ? "text-[var(--theme-accent)]" : "text-[var(--theme-text-muted)]"}`} />

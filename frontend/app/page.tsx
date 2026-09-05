@@ -1,37 +1,151 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { CommandCenterShell } from "@/components/layout/CommandCenterShell";
 import { HomeExecutiveOverview } from "@/components/home/HomeExecutiveOverview";
-import { RuntimeCommandCenter } from "@/components/command-center/RuntimeCommandCenter";
-import { TradingTerminal } from "@/components/terminal/TradingTerminal";
-import { BotControlTab } from "@/components/bot-control/BotControlTab";
-import { StrategyBuilder } from "@/components/strategy/StrategyBuilder";
-import { IndicatorCenter } from "@/components/indicators/IndicatorCenter";
-import { PerformanceAnalytics } from "@/components/analytics/PerformanceAnalytics";
-import { InstitutionalCapitalSegregationTab } from "@/components/analytics/InstitutionalCapitalSegregationTab";
-import { TradeJournal } from "@/components/trade-journal/TradeJournal";
-import { MarketUniverse } from "@/components/market-universe/MarketUniverse";
-import { AlertsMonitoring } from "@/components/alerts/AlertsMonitoring";
-import { AccountSecurity } from "@/components/account-security/AccountSecurity";
-import { RiskManagement } from "@/components/risk-management/RiskManagement";
-import { BacktestingLab } from "@/components/backtesting/BacktestingLab";
-import { LogsDebugging } from "@/components/logs/LogsDebugging";
-import { OptionChainView } from "@/components/options/OptionChainView";
-import { OrderBookDepthView } from "@/components/orderbook/OrderBookDepthView";
-import { ProviderMatrixView } from "@/components/providers/ProviderMatrixView";
-import { TerminalSettingsView } from "@/components/settings/TerminalSettingsView";
-import { CryptoOverviewView } from "@/components/crypto/CryptoOverviewView";
-import { CryptoFuturesTerminal } from "@/components/crypto/CryptoFuturesTerminal";
-import { CryptoOptionChainTerminal } from "@/components/crypto/CryptoOptionChainTerminal";
-import { OrderExecutionCenter } from "@/components/order-execution/OrderExecutionCenter";
-import { EcoPositionsView } from "@/components/positions/EcoPositionsView";
-import { OptionStrategyBuilder } from "@/components/crypto/OptionStrategyBuilder";
-import { FuturesUniverseView } from "@/src/features/markets/futures";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+
+// Code-split heavy tabs with zero-layout-shift and no SSR hydration delay
+const RuntimeCommandCenter = dynamic(
+  () => import("@/components/command-center/RuntimeCommandCenter").then((m) => m.RuntimeCommandCenter),
+  { ssr: false, loading: () => null }
+);
+const TradingTerminal = dynamic(
+  () => import("@/components/terminal/TradingTerminal").then((m) => m.TradingTerminal),
+  { ssr: false, loading: () => null }
+);
+const BotControlTab = dynamic(
+  () => import("@/components/bot-control/BotControlTab").then((m) => m.BotControlTab),
+  { ssr: false, loading: () => null }
+);
+const StrategyBuilder = dynamic(
+  () => import("@/components/strategy/StrategyBuilder").then((m) => m.StrategyBuilder),
+  { ssr: false, loading: () => null }
+);
+const IndicatorCenter = dynamic(
+  () => import("@/components/indicators/IndicatorCenter").then((m) => m.IndicatorCenter),
+  { ssr: false, loading: () => null }
+);
+const PerformanceAnalytics = dynamic(
+  () => import("@/components/analytics/PerformanceAnalytics").then((m) => m.PerformanceAnalytics),
+  { ssr: false, loading: () => null }
+);
+const InstitutionalCapitalSegregationTab = dynamic(
+  () => import("@/components/analytics/InstitutionalCapitalSegregationTab").then((m) => m.InstitutionalCapitalSegregationTab),
+  { ssr: false, loading: () => null }
+);
+const TradeJournal = dynamic(
+  () => import("@/components/trade-journal/TradeJournal").then((m) => m.TradeJournal),
+  { ssr: false, loading: () => null }
+);
+const MarketUniverse = dynamic(
+  () => import("@/components/market-universe/MarketUniverse").then((m) => m.MarketUniverse),
+  { ssr: false, loading: () => null }
+);
+const AlertsMonitoring = dynamic(
+  () => import("@/components/alerts/AlertsMonitoring").then((m) => m.AlertsMonitoring),
+  { ssr: false, loading: () => null }
+);
+const AccountSecurity = dynamic(
+  () => import("@/components/account-security/AccountSecurity").then((m) => m.AccountSecurity),
+  { ssr: false, loading: () => null }
+);
+const RiskManagement = dynamic(
+  () => import("@/components/risk-management/RiskManagement").then((m) => m.RiskManagement),
+  { ssr: false, loading: () => null }
+);
+const BacktestingLab = dynamic(
+  () => import("@/components/backtesting/BacktestingLab").then((m) => m.BacktestingLab),
+  { ssr: false, loading: () => null }
+);
+const LogsDebugging = dynamic(
+  () => import("@/components/logs/LogsDebugging").then((m) => m.LogsDebugging),
+  { ssr: false, loading: () => null }
+);
+const OptionChainView = dynamic(
+  () => import("@/components/options/OptionChainView").then((m) => m.OptionChainView),
+  { ssr: false, loading: () => null }
+);
+const OrderBookDepthView = dynamic(
+  () => import("@/components/orderbook/OrderBookDepthView").then((m) => m.OrderBookDepthView),
+  { ssr: false, loading: () => null }
+);
+const ProviderMatrixView = dynamic(
+  () => import("@/components/providers/ProviderMatrixView").then((m) => m.ProviderMatrixView),
+  { ssr: false, loading: () => null }
+);
+const TerminalSettingsView = dynamic(
+  () => import("@/components/settings/TerminalSettingsView").then((m) => m.TerminalSettingsView),
+  { ssr: false, loading: () => null }
+);
+const CryptoOverviewView = dynamic(
+  () => import("@/components/crypto/CryptoOverviewView").then((m) => m.CryptoOverviewView),
+  { ssr: false, loading: () => null }
+);
+const CryptoFuturesTerminal = dynamic(
+  () => import("@/components/crypto/CryptoFuturesTerminal").then((m) => m.CryptoFuturesTerminal),
+  { ssr: false, loading: () => null }
+);
+const CryptoOptionChainTerminal = dynamic(
+  () => import("@/components/crypto/CryptoOptionChainTerminal").then((m) => m.CryptoOptionChainTerminal),
+  { ssr: false, loading: () => null }
+);
+const OrderExecutionCenter = dynamic(
+  () => import("@/components/order-execution/OrderExecutionCenter").then((m) => m.OrderExecutionCenter),
+  { ssr: false, loading: () => null }
+);
+const EcoPositionsView = dynamic(
+  () => import("@/components/positions/EcoPositionsView").then((m) => m.EcoPositionsView),
+  { ssr: false, loading: () => null }
+);
+const OptionStrategyBuilder = dynamic(
+  () => import("@/components/crypto/OptionStrategyBuilder").then((m) => m.OptionStrategyBuilder),
+  { ssr: false, loading: () => null }
+);
+const FuturesUniverseView = dynamic(
+  () => import("@/src/features/markets/futures").then((m) => m.FuturesUniverseView),
+  { ssr: false, loading: () => null }
+);
+const TaxIntelligenceTab = dynamic(
+  () => import("@/components/tax-intelligence/TaxIntelligenceTab").then((m) => m.TaxIntelligenceTab),
+  { ssr: false, loading: () => null }
+);
+
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
+
+  // Idle-time chunk preloading: warms up heavy tab bundles during browser idle periods
+  useEffect(() => {
+    const preload = () => {
+      import("@/components/terminal/TradingTerminal");
+      import("@/components/bot-control/BotControlTab");
+      import("@/components/market-universe/MarketUniverse");
+      import("@/components/options/OptionChainView");
+      import("@/components/analytics/PerformanceAnalytics");
+      import("@/components/analytics/InstitutionalCapitalSegregationTab");
+      import("@/components/positions/EcoPositionsView");
+      import("@/components/order-execution/OrderExecutionCenter");
+      import("@/components/strategy/StrategyBuilder");
+      import("@/components/indicators/IndicatorCenter");
+      import("@/components/risk-management/RiskManagement");
+      import("@/components/trade-journal/TradeJournal");
+      import("@/components/logs/LogsDebugging");
+      import("@/src/features/markets/futures");
+      import("@/components/tax-intelligence/TaxIntelligenceTab");
+    };
+
+    if (typeof window !== "undefined") {
+      if ("requestIdleCallback" in window) {
+        const id = (window as any).requestIdleCallback(preload, { timeout: 2000 });
+        return () => (window as any).cancelIdleCallback(id);
+      } else {
+        const id = setTimeout(preload, 1200);
+        return () => clearTimeout(id);
+      }
+    }
+  }, []);
 
   return (
     <CommandCenterShell activeTab={activeTab} onTabSelect={setActiveTab}>
@@ -142,6 +256,14 @@ function MainApp() {
             </div>
           </ErrorBoundary>
         )}
+
+        {/* 11.8 Tax Intelligence */}
+        {(activeTab === "tax" || activeTab === "tax-intelligence") && (
+          <ErrorBoundary title="Tax Intelligence Tab Failed">
+            <TaxIntelligenceTab />
+          </ErrorBoundary>
+        )}
+
 
         {/* 12. Canonical Orders Execution & Lifecycle */}
         {activeTab === "orders" && (

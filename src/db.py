@@ -107,11 +107,11 @@ def get_pg_connection():
     if _pg_pool is None:
         try:
             from psycopg_pool import ConnectionPool
-            _pg_pool = ConnectionPool(config.DATABASE_URL, min_size=1, max_size=10, timeout=10)
+            _pg_pool = ConnectionPool(config.DATABASE_URL, min_size=0, max_size=5, timeout=2.0)
         except Exception:
             import psycopg
-            return psycopg.connect(config.DATABASE_URL)
-    return _pg_pool.getconn()
+            return psycopg.connect(config.DATABASE_URL, connect_timeout=2)
+    return _pg_pool.getconn(timeout=2.0)
 
 
 def get_connection() -> sqlite3.Connection:
@@ -2853,6 +2853,38 @@ def init_db(force: bool = False) -> None:
                 )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_pw_reset_hash ON password_reset_tokens(token_hash)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_pw_reset_user ON password_reset_tokens(user_id, used_at)")
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS auth_otp_challenges (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT NOT NULL,
+                        purpose TEXT NOT NULL,
+                        recipient_email TEXT NOT NULL,
+                        otp_hash TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'PENDING',
+                        provider TEXT NOT NULL DEFAULT 'resend',
+                        provider_message_id TEXT DEFAULT '',
+                        provider_status TEXT NOT NULL DEFAULT 'PENDING',
+                        created_at TEXT NOT NULL,
+                        expires_at TEXT NOT NULL,
+                        activated_at TEXT,
+                        verified_at TEXT,
+                        attempt_count INTEGER DEFAULT 0,
+                        last_attempt_at TEXT,
+                        resend_of TEXT,
+                        resend_count INTEGER DEFAULT 0,
+                        request_ip TEXT,
+                        request_id TEXT,
+                        used_at TEXT
+                    )
+                    """
+                )
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_otp_user_purp_status ON auth_otp_challenges(user_id, purpose, status)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_otp_exp ON auth_otp_challenges(expires_at)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_otp_provider_msg ON auth_otp_challenges(provider_message_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_otp_recipient ON auth_otp_challenges(recipient_email)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_auth_otp_hash ON auth_otp_challenges(otp_hash)")
 
                 cursor.execute(
                     """
@@ -10848,18 +10880,32 @@ def revoke_all_user_reset_tokens(user_id: str) -> bool:
     )
 
 
-def create_email_otp_challenge(
+def create_auth_otp_challenge(
     challenge_id: str,
     user_id: str,
     purpose: str,
+    recipient_email: str,
     otp_hash: str,
     expires_at: str,
     requested_ip: str = "",
-    request_id: str = ""
+    request_id: str = "",
+    resend_of: Optional[str] = None
 ) -> bool:
-    """Inserts a new single-use hashed email OTP challenge."""
+    """Inserts a new single-use hashed auth OTP challenge in PENDING state."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    return safe_execute(
+    ok = safe_execute(
+        """
+        INSERT INTO auth_otp_challenges (
+            id, user_id, purpose, recipient_email, otp_hash, status, provider,
+            provider_message_id, provider_status, created_at, expires_at, activated_at,
+            verified_at, attempt_count, last_attempt_at, resend_of, resend_count,
+            request_ip, request_id, used_at
+        ) VALUES (?, ?, ?, ?, ?, 'PENDING', 'resend', '', 'PENDING', ?, ?, NULL, NULL, 0, NULL, ?, 0, ?, ?, NULL)
+        """,
+        (challenge_id, user_id, purpose, recipient_email, otp_hash, now_iso, expires_at, resend_of or "", requested_ip, request_id)
+    )
+    # Also sync legacy email_otp_challenges table
+    safe_execute(
         """
         INSERT INTO email_otp_challenges (
             id, user_id, purpose, otp_hash, created_at, expires_at, used_at, attempt_count, requested_ip, request_id
@@ -10867,34 +10913,184 @@ def create_email_otp_challenge(
         """,
         (challenge_id, user_id, purpose, otp_hash, now_iso, expires_at, requested_ip, request_id)
     )
+    return ok
 
 
-def get_email_otp_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
-    """Fetches an email OTP challenge by ID."""
-    rows = safe_query("SELECT * FROM email_otp_challenges WHERE id = ?", (challenge_id,))
-    return rows[0] if rows else None
-
-
-def increment_email_otp_attempts(challenge_id: str) -> int:
-    """Increments the failed attempt counter for an OTP challenge and returns the new count."""
-    safe_execute("UPDATE email_otp_challenges SET attempt_count = attempt_count + 1 WHERE id = ?", (challenge_id,))
-    challenge = get_email_otp_challenge(challenge_id)
-    return challenge.get("attempt_count", 0) if challenge else 0
-
-
-def mark_email_otp_challenge_used(challenge_id: str) -> bool:
-    """Marks an email OTP challenge as permanently consumed."""
+def activate_auth_otp_challenge(
+    challenge_id: str,
+    user_id: str,
+    purpose: str,
+    provider_message_id: str = "",
+    provider_status: str = "SUBMITTED"
+) -> bool:
+    """
+    Atomically activates the newly dispatched OTP challenge and invalidates any previous ACTIVE challenge.
+    Enforces that exactly ONE challenge for (user_id, purpose) is ACTIVE.
+    """
     now_iso = datetime.now(timezone.utc).isoformat()
-    return safe_execute("UPDATE email_otp_challenges SET used_at = ? WHERE id = ?", (now_iso, challenge_id))
+    # 1. Invalidate all existing ACTIVE challenges for this user/purpose
+    safe_execute(
+        """
+        UPDATE auth_otp_challenges
+        SET status = 'INVALIDATED', used_at = ?
+        WHERE user_id = ? AND purpose = ? AND status = 'ACTIVE' AND id != ?
+        """,
+        (now_iso, user_id, purpose, challenge_id)
+    )
+    # 2. Mark this challenge ACTIVE
+    ok = safe_execute(
+        """
+        UPDATE auth_otp_challenges
+        SET status = 'ACTIVE',
+            provider_message_id = ?,
+            provider_status = ?,
+            activated_at = ?
+        WHERE id = ?
+        """,
+        (provider_message_id, provider_status, now_iso, challenge_id)
+    )
+    return ok
 
 
-def invalidate_user_otp_challenges(user_id: str, purpose: str) -> bool:
-    """Invalidates all prior active OTP challenges for a user with the given purpose."""
+def mark_auth_otp_challenge_send_failed(challenge_id: str, error_details: str = "") -> bool:
+    """Marks an OTP challenge as SEND_FAILED when provider dispatch fails."""
+    return safe_execute(
+        "UPDATE auth_otp_challenges SET status = 'SEND_FAILED', provider_status = 'FAILED' WHERE id = ?",
+        (challenge_id,)
+    )
+
+
+def get_auth_otp_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches an auth OTP challenge by ID."""
+    rows = safe_query("SELECT * FROM auth_otp_challenges WHERE id = ?", (challenge_id,))
+    if rows:
+        return rows[0]
+    # Fallback to legacy table if not yet migrated
+    legacy_rows = safe_query("SELECT * FROM email_otp_challenges WHERE id = ?", (challenge_id,))
+    if legacy_rows:
+        row = legacy_rows[0]
+        row.setdefault("status", "USED" if row.get("used_at") else "ACTIVE")
+        row.setdefault("recipient_email", "")
+        row.setdefault("provider_status", "SUBMITTED")
+        return row
+    return None
+
+
+def increment_auth_otp_attempts(challenge_id: str) -> int:
+    """Increments the failed attempt counter for an OTP challenge and invalidates if max attempts exceeded."""
     now_iso = datetime.now(timezone.utc).isoformat()
+    safe_execute(
+        "UPDATE auth_otp_challenges SET attempt_count = attempt_count + 1, last_attempt_at = ? WHERE id = ?",
+        (now_iso, challenge_id)
+    )
+    safe_execute(
+        "UPDATE email_otp_challenges SET attempt_count = attempt_count + 1 WHERE id = ?",
+        (challenge_id,)
+    )
+    challenge = get_auth_otp_challenge(challenge_id)
+    count = challenge.get("attempt_count", 0) if challenge else 0
+    if count >= 5:
+        safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
+    return count
+
+
+def mark_auth_otp_challenge_used(challenge_id: str) -> bool:
+    """Marks an auth OTP challenge as permanently consumed (USED)."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    ok1 = safe_execute(
+        "UPDATE auth_otp_challenges SET status = 'USED', used_at = ?, verified_at = ? WHERE id = ?",
+        (now_iso, now_iso, challenge_id)
+    )
+    ok2 = safe_execute("UPDATE email_otp_challenges SET used_at = ? WHERE id = ?", (now_iso, challenge_id))
+    return ok1 or ok2
+
+
+def invalidate_user_auth_otp_challenges(user_id: str, purpose: str) -> bool:
+    """Invalidates all prior active/pending OTP challenges for a user with the given purpose."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    safe_execute(
+        "UPDATE auth_otp_challenges SET status = 'INVALIDATED', used_at = ? WHERE user_id = ? AND purpose = ? AND status IN ('PENDING', 'ACTIVE')",
+        (now_iso, user_id, purpose)
+    )
     return safe_execute(
         "UPDATE email_otp_challenges SET used_at = ? WHERE user_id = ? AND purpose = ? AND used_at IS NULL",
         (now_iso, user_id, purpose)
     )
+
+
+def update_auth_otp_delivery_status(
+    provider_message_id: str,
+    provider_status: str,
+    recipient_email: Optional[str] = None
+) -> bool:
+    """Updates provider delivery status (DELIVERED, BOUNCED, FAILED) based on verified webhooks."""
+    if not provider_message_id:
+        return False
+    if recipient_email:
+        # Verify recipient match
+        rows = safe_query(
+            "SELECT id, recipient_email FROM auth_otp_challenges WHERE provider_message_id = ?",
+            (provider_message_id,)
+        )
+        if rows and rows[0].get("recipient_email"):
+            if rows[0]["recipient_email"].strip().lower() != recipient_email.strip().lower():
+                logger.warning(
+                    "[WEBHOOK_RECIPIENT_MISMATCH] provider_msg_id=%s expected=%s got=%s",
+                    provider_message_id, rows[0]["recipient_email"], recipient_email
+                )
+                return False
+
+    safe_execute(
+        "UPDATE auth_otp_challenges SET provider_status = ? WHERE provider_message_id = ?",
+        (provider_status, provider_message_id)
+    )
+    safe_execute(
+        "UPDATE email_delivery_events SET status = ? WHERE provider_message_id = ?",
+        (provider_status, provider_message_id)
+    )
+    return True
+
+
+# Legacy & compatibility wrappers
+def create_email_otp_challenge(
+    challenge_id: str,
+    user_id: str,
+    purpose: str,
+    otp_hash: str,
+    expires_at: str,
+    requested_ip: str = "",
+    request_id: str = "",
+    recipient_email: str = ""
+) -> bool:
+    if not recipient_email:
+        u = get_user_by_id(user_id)
+        recipient_email = u.get("email", "") if u else ""
+    return create_auth_otp_challenge(
+        challenge_id=challenge_id,
+        user_id=user_id,
+        purpose=purpose,
+        recipient_email=recipient_email,
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        requested_ip=requested_ip,
+        request_id=request_id
+    )
+
+
+def get_email_otp_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
+    return get_auth_otp_challenge(challenge_id)
+
+
+def increment_email_otp_attempts(challenge_id: str) -> int:
+    return increment_auth_otp_attempts(challenge_id)
+
+
+def mark_email_otp_challenge_used(challenge_id: str) -> bool:
+    return mark_auth_otp_challenge_used(challenge_id)
+
+
+def invalidate_user_otp_challenges(user_id: str, purpose: str) -> bool:
+    return invalidate_user_auth_otp_challenges(user_id, purpose)
 
 
 def record_email_delivery_event(

@@ -77,6 +77,10 @@ interface MarketGatewayContextValue {
   providerHealth: ProviderHealthEntry[];
   /** True when any provider has a non-LIVE status */
   hasProviderWarning: boolean;
+  /** Fast non-reactive quote getter */
+  getQuote: (symbol: string) => NormalizedQuote | null;
+  /** Targeted single-symbol quote listener: triggers ONLY when this symbol updates */
+  subscribeSymbolQuote: (symbol: string, callback: (quote: NormalizedQuote) => void) => () => void;
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -112,8 +116,11 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const lastHeartbeatRef = useRef<number>(Date.now());
   const heartbeatWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subRefsRef = useRef<Map<string, SubRef>>(new Map());
+  const quotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
+  const symbolListenersRef = useRef<Map<string, Set<(quote: NormalizedQuote) => void>>>(new Map());
   const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const batchFrameRef = useRef<number | null>(null);
+  const lastQuotesStateUpdateRef = useRef<number>(0);
 
   // Resolve optimal gateway WebSocket URL
   const getGatewayWsUrl = useCallback((): string => {
@@ -184,25 +191,53 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         const msg = JSON.parse(event.data);
         if (msg.type === "QUOTE" && msg.data) {
           const quote = msg.data as NormalizedQuote;
-          pendingQuotesRef.current.set(quote.symbol.toUpperCase(), quote);
+          const sym = quote.symbol.toUpperCase();
+          quotesRef.current.set(sym, quote);
+          pendingQuotesRef.current.set(sym, quote);
+
+          // Fast targeted notification to components listening specifically to this symbol
+          const symListeners = symbolListenersRef.current.get(sym);
+          if (symListeners && symListeners.size > 0) {
+            symListeners.forEach((fn) => {
+              try {
+                fn(quote);
+              } catch {}
+            });
+          }
+
           if (batchFrameRef.current === null) {
             batchFrameRef.current = requestAnimationFrame(() => {
               batchFrameRef.current = null;
               if (!mountedRef.current || pendingQuotesRef.current.size === 0) return;
-              const updates = new Map(pendingQuotesRef.current);
-              pendingQuotesRef.current.clear();
-              setQuotes((prev) => {
-                const next = new Map(prev);
-                updates.forEach((q, sym) => next.set(sym, q));
-                return next;
-              });
+              const now = Date.now();
+              // Throttle full Map state recreation to ~150ms to keep table views smooth without React thrashing
+              if (now - lastQuotesStateUpdateRef.current > 150) {
+                lastQuotesStateUpdateRef.current = now;
+                const updates = new Map(pendingQuotesRef.current);
+                pendingQuotesRef.current.clear();
+                setQuotes((prev) => {
+                  const next = new Map(prev);
+                  updates.forEach((q, s) => next.set(s, q));
+                  return next;
+                });
+              }
               setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
             });
           }
         } else if (msg.type === "SNAPSHOT" && msg.data) {
           const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
-          snapshotEntries.forEach(([sym, q]) => {
-            pendingQuotesRef.current.set(sym.toUpperCase(), q);
+          snapshotEntries.forEach(([rawSym, q]) => {
+            const sym = rawSym.toUpperCase();
+            quotesRef.current.set(sym, q);
+            pendingQuotesRef.current.set(sym, q);
+            const symListeners = symbolListenersRef.current.get(sym);
+            if (symListeners && symListeners.size > 0) {
+              symListeners.forEach((fn) => {
+                try {
+                  fn(q);
+                } catch {}
+              });
+            }
           });
           if (batchFrameRef.current === null) {
             batchFrameRef.current = requestAnimationFrame(() => {
@@ -448,6 +483,27 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }
   }, []);
 
+  const getQuote = useCallback((symbol: string): NormalizedQuote | null => {
+    if (!symbol) return null;
+    return quotesRef.current.get(symbol.toUpperCase().trim()) || null;
+  }, []);
+
+  const subscribeSymbolQuote = useCallback((symbol: string, callback: (quote: NormalizedQuote) => void) => {
+    if (!symbol) return () => {};
+    const sym = symbol.toUpperCase().trim();
+    if (!symbolListenersRef.current.has(sym)) {
+      symbolListenersRef.current.set(sym, new Set());
+    }
+    const set = symbolListenersRef.current.get(sym)!;
+    set.add(callback);
+    return () => {
+      set.delete(callback);
+      if (set.size === 0) {
+        symbolListenersRef.current.delete(sym);
+      }
+    };
+  }, []);
+
   const hasProviderWarning = providerHealth.some(
     (p) => p.status !== "LIVE" && p.status !== "OK" && p.status !== "NOT_CONFIGURED"
   );
@@ -461,6 +517,8 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         connectionStatus,
         providerHealth,
         hasProviderWarning,
+        getQuote,
+        subscribeSymbolQuote,
       }}
     >
       {children}

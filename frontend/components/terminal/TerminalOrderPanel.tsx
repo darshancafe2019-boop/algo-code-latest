@@ -130,6 +130,7 @@ export function TerminalOrderPanel() {
 
   // Submit Order Handler
   const handleOrderSubmit = async () => {
+    if (isSubmitting) return; // Single-click guard: drop duplicate submissions
     setIsSubmitting(true);
     setOrderFeedback(null);
 

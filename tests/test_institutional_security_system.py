@@ -260,35 +260,28 @@ def test_flask_security_endpoints_integration():
     })
 
     # 3. Login with valid credentials
-    login_resp = client.post(
-        "/api/auth/login",
-        json={"username": "admin", "password": "AlgoTrading@2026!"}
-    )
-    assert login_resp.status_code == 200
-    login_data = login_resp.get_json()
-    if login_data.get("status") == "EMAIL_OTP_REQUIRED":
-        challenge_id = login_data["challenge_id"]
-        otp_code = ""
-        outbox_file = config.DATA_DIR / "outbox.log"
-        if outbox_file.exists():
-            with open(outbox_file, "r", encoding="utf-8") as f:
-                for line in reversed(f.readlines()):
-                    if line.strip():
-                        try:
-                            rec = json.loads(line)
-                            import re
-                            m = re.search(r"\b(\d{6})\b", rec.get("text", ""))
-                            if m:
-                                otp_code = m.group(1)
-                                break
-                        except Exception:
-                            pass
-        otp_resp = client.post(
-            "/api/auth/email-otp/verify",
-            json={"challenge_id": challenge_id, "otp": otp_code}
+    captured_otp = []
+    def mock_send_login_otp(to_email, otp_code, username=None, user_id=None):
+        captured_otp.append(otp_code)
+        return True, None, "msg_test_security_otp"
+
+    from unittest.mock import patch
+    with patch("dashboard.global_email_service.send_login_otp", side_effect=mock_send_login_otp):
+        login_resp = client.post(
+            "/api/auth/login",
+            json={"username": "admin", "password": "AlgoTrading@2026!"}
         )
-        assert otp_resp.status_code == 200
-        login_data = otp_resp.get_json()
+        assert login_resp.status_code == 200
+        login_data = login_resp.get_json()
+        if login_data.get("status") == "EMAIL_OTP_REQUIRED":
+            challenge_id = login_data["challenge_id"]
+            otp_code = captured_otp[0] if captured_otp else ""
+            otp_resp = client.post(
+                "/api/auth/email-otp/verify",
+                json={"challenge_id": challenge_id, "otp": otp_code}
+            )
+            assert otp_resp.status_code == 200
+            login_data = otp_resp.get_json()
 
     assert login_data["status"] == "success"
 

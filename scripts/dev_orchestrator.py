@@ -493,6 +493,15 @@ class ServiceSupervisor:
         next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
         next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
         
+        # Clean stale .next compilation cache before launching dev server to prevent 500 chunk mismatch errors
+        next_cache = FRONTEND_DIR / ".next"
+        if next_cache.exists():
+            try:
+                import shutil
+                shutil.rmtree(next_cache, ignore_errors=True)
+            except Exception:
+                pass
+
         # Use direct node execution of Next.js binary for deterministic cross-platform execution
         if next_dist.exists():
             frontend_cmd = ["node", str(next_dist), "dev", "-p", str(FRONTEND_PORT)]
@@ -502,6 +511,7 @@ class ServiceSupervisor:
             frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
         else:
             frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
+
 
         self.services["FRONTEND"] = ManagedService(
             name="FRONTEND",

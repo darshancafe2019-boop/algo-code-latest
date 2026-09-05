@@ -4,12 +4,20 @@
  * Rules:
  * - Valid number -> formatted according to locale / precision
  * - Numeric string -> safely converted to float and formatted
- * - null / undefined / NaN / Infinity -> returns "N/A" (or custom fallback)
+ * - null / undefined / NaN / Infinity -> returns "—" (or custom fallback)
+ * - True numeric 0 -> correctly formatted as "$0.00", "0%", "0" (never confused with null/missing data)
  * - Micro-Price Precision: Assets with tiny fractional values (e.g. PEPE $0.00001234) format with up to 8 decimals, NEVER $0.00
  * - Non-Zero Prices: Never rounds non-zero prices to zero
  * - Volume Distinctions: Distinct quantity volume (12.4K) vs monetary notional volume ($12.4K)
- * - Never fabricates $0.00 or 0% when data is missing or undefined
+ * - Never fabricates $0.00 or 0% when data is missing, uninitialized, or null
  */
+
+/**
+ * Normalizes an API/store value to null when absent or undefined
+ */
+export function normalizeNullable<T>(value: T | undefined | null): T | null {
+  return value ?? null;
+}
 
 export function isNumeric(value: unknown): value is number {
   if (value === null || value === undefined) return false;
@@ -92,8 +100,9 @@ export function formatQuantity(
   fallback: string = "—"
 ): string {
   const num = toNumeric(value);
-  if (num === null || num === 0) return fallback;
+  if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
+  if (cleanNum === 0) return "0";
   const abs = Math.abs(cleanNum);
   const sign = cleanNum < 0 ? "-" : "";
 
@@ -121,8 +130,9 @@ export function formatVolume(
   fallback: string = "—"
 ): string {
   const num = toNumeric(value);
-  if (num === null || num === 0) return fallback;
+  if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
+  if (cleanNum === 0) return `${currency}0`;
   const abs = Math.abs(cleanNum);
   const sign = cleanNum < 0 ? "-" : "";
 

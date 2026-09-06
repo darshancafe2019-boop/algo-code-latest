@@ -87,15 +87,12 @@ def get_current_user_and_session(allow_dev_fallback: bool = False) -> Tuple[Opti
     if not token:
         token = request.cookies.get("algo_session_token", "")
 
-    if not token:
+    session = SessionManager.validate_session(token) if token else None
+    if not session:
         if allow_dev_fallback and request.headers.get("X-Unauthenticated") != "true":
             admin = db.get_user_by_username("admin")
             if admin:
                 return admin, {"session_id": "sess-local-dev", "device_name": "Localhost", "ip_address": "127.0.0.1"}
-        return None, None
-
-    session = SessionManager.validate_session(token)
-    if not session:
         return None, None
 
     user_id = session.get("user_id")

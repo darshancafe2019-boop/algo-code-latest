@@ -8,7 +8,6 @@ import { BuildSection } from "./sections/BuildSection";
 import { AnalyzeSection } from "./sections/AnalyzeSection";
 import { MonitorSection } from "./sections/MonitorSection";
 import { BacktestSection } from "./sections/BacktestSection";
-import { SystemSection } from "./sections/SystemSection";
 import {
   Layers,
   Activity,
@@ -57,7 +56,7 @@ export function MultiMarketOptionsWorkstation() {
         </div>
       )}
 
-      {/* 3. Streamlined 5 Primary Navigation Tabs */}
+      {/* 3. Streamlined Primary Navigation Tabs */}
       <div className="flex items-center gap-1.5 p-1.5 bg-[#080E1E] border border-slate-800 rounded-2xl font-mono text-xs overflow-x-auto shadow-xl">
         {[
           { id: "build", label: "Build", desc: "4-Step Strategy Builder", icon: Layers },
@@ -70,7 +69,6 @@ export function MultiMarketOptionsWorkstation() {
             badge: activeStrategies.length > 0 ? `${activeStrategies.length}` : undefined,
           },
           { id: "backtest", label: "Backtest", desc: "Walk-Forward OOS", icon: Compass },
-          { id: "system", label: "System", desc: "Providers & Audit", icon: Server },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSection === tab.id;
@@ -114,7 +112,6 @@ export function MultiMarketOptionsWorkstation() {
         {activeSection === "analyze" && <AnalyzeSection />}
         {activeSection === "monitor" && <MonitorSection />}
         {activeSection === "backtest" && <BacktestSection />}
-        {activeSection === "system" && <SystemSection />}
       </main>
 
       {/* 5. Sticky State-Aware Command Bar */}
@@ -122,3 +119,4 @@ export function MultiMarketOptionsWorkstation() {
     </div>
   );
 }
+

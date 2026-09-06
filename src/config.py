@@ -24,15 +24,19 @@ BINANCE_TESTNET_SECRET_KEY = os.getenv("BINANCE_TESTNET_SECRET_KEY", "")
 BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "") or BINANCE_TESTNET_API_KEY
 BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "") or BINANCE_TESTNET_SECRET_KEY
 
-# Indian Market & Upstox Integration
+# Indian Market & Broker Integration (Upstox / Dhan)
 UPSTOX_CLIENT_ID = os.getenv("UPSTOX_CLIENT_ID", "")
 UPSTOX_CLIENT_SECRET = os.getenv("UPSTOX_CLIENT_SECRET", "")
 UPSTOX_REDIRECT_URI = os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
 UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
+DHAN_CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "")
+DHAN_ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "")
+DHAN_CLOUD_TOKEN = os.getenv("DHAN_CLOUD_TOKEN", "")
+DHAN_TRADING_ENABLED = os.getenv("DHAN_TRADING_ENABLED", "false").lower() == "true"
 ENABLE_INDIA_MARKET = os.getenv("ENABLE_INDIA_MARKET", "true").lower() == "true"
 ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
 ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "true").lower() == "true"
-INDIA_BROKER = os.getenv("INDIA_BROKER", "UPSTOX")
+INDIA_BROKER = os.getenv("INDIA_BROKER", "DHAN")
 
 # Delta Exchange Options Integration
 DELTA_REST_URL = os.getenv("DELTA_REST_URL", "https://api.india.delta.exchange").rstrip("/")

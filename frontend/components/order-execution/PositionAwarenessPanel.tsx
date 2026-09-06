@@ -71,7 +71,7 @@ export function PositionAwarenessPanel({
         <div className="bg-[#0B111E] border border-slate-800 rounded-xl p-2.5">
           <div className="text-[10px] text-slate-400 uppercase">Current Position</div>
           <div className="text-sm font-bold text-white mt-0.5">
-            {hasPosition ? `${currentQty} ${position.symbol}` : "0.00 Units"}
+            {hasPosition ? `${currentQty} ${position?.symbol}` : "0.00 Units"}
           </div>
           {hasPosition && (
             <div className={`text-[10px] mt-0.5 ${pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>

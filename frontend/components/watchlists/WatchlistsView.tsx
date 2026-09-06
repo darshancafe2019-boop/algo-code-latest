@@ -158,7 +158,7 @@ export function WatchlistsView() {
     newOrder[index] = newOrder[targetIdx];
     newOrder[targetIdx] = temp;
 
-    const orderedIds = newOrder.map((i) => i.instrument_id || i.canonical_symbol || i.symbol);
+    const orderedIds = newOrder.map((i) => i.instrument_id || i.canonical_symbol || i.symbol).filter((id): id is string => !!id);
     reorderWatchlist(orderedIds);
   };
 
@@ -530,7 +530,7 @@ export function WatchlistsView() {
                     <tr
                       key={item.instrument_id || sym || idx}
                       className="hover:bg-[var(--theme-elevated)] transition-colors group cursor-pointer"
-                      onClick={() => setActiveSymbol(sym)}
+                      onClick={() => setActiveSymbol(sym || "")}
                     >
                       {/* Row Index */}
                       <td className="py-3.5 px-3.5 text-center text-[var(--theme-text-muted)] text-[11px]">
@@ -664,7 +664,7 @@ export function WatchlistsView() {
               return (
                 <div
                   key={item.instrument_id || sym || idx}
-                  onClick={() => setActiveSymbol(sym)}
+                  onClick={() => setActiveSymbol(sym || "")}
                   className="p-4 space-y-2.5 active:bg-[var(--theme-elevated)] transition-colors cursor-pointer"
                 >
                   <div className="flex items-center justify-between">

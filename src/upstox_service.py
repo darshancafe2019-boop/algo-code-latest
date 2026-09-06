@@ -445,6 +445,34 @@ class UpstoxService:
                 "message": "Invalid or expired access token (UDAPI100050). Please re-authenticate." if code == "UDAPI100050" else err_str,
             }
 
+    def get_ltp(self, symbol: str) -> Dict[str, Any]:
+        """Fetches real-time LTP for a symbol using Upstox V3 /v3/market-quote/ltp."""
+        ik = self.resolve_instrument_key(symbol) or symbol
+        if not self.is_authenticated:
+            return {
+                "status": "error",
+                "error": "AUTH_REQUIRED",
+                "error_code": "UDAPI100050",
+                "message": "Upstox access token expired or not configured. Please re-authenticate in Settings -> Brokers.",
+            }
+        try:
+            data = self._make_request("market-quote/ltp", params={"instrument_key": ik}, timeout=5.0)
+            if data.get("status") == "success" and "data" in data:
+                formatted_key = ik.replace("|", ":")
+                q_data = data["data"].get(formatted_key) or data["data"].get(ik) or {}
+                last_price = float(q_data.get("last_price") or 0.0)
+                return {
+                    "status": "success",
+                    "symbol": symbol,
+                    "instrument_key": ik,
+                    "last_price": last_price,
+                    "ltp": last_price,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+            return data
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
     def fetch_market_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
         """
         Fetches live market quotes for requested symbols using official Upstox REST API.
@@ -643,16 +671,65 @@ class UpstoxService:
                 logger.warning("Upstox orders query error: %s", e)
         return []
 
-    def get_trades(self) -> List[Dict[str, Any]]:
-        """Queries executed trades for the current session (V2)."""
-        if self.is_authenticated:
-            try:
-                res = self._make_request("order/trades/get-trades-for-day", api_version="v2")
-                if res.get("status") == "success" and "data" in res:
-                    return res["data"] or []
-            except Exception as e:
-                logger.warning("Upstox trades query error: %s", e)
-        return []
+    def get_option_chain(
+        self,
+        underlying: str = "NIFTY",
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Queries official Upstox Option Chain endpoint.
+        Endpoint: GET /v2/option/chain
+        """
+        if not self.is_authenticated:
+            return {"status": "error", "error": "UPSTOX_CREDENTIALS_MISSING", "message": "Upstox credentials not configured"}
+
+        # Map symbol to official Upstox instrument key
+        und_clean = underlying.upper().strip()
+        reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
+        instrument_key = reg_entry.get("instrument_key", f"NSE_INDEX|{und_clean}")
+
+        params = {"instrument_key": instrument_key}
+        if expiry:
+            params["expiry_date"] = expiry
+
+        try:
+            res = self._make_request("option/chain", params=params, api_version="v2")
+            return res
+        except Exception as e:
+            logger.warning("Upstox option chain query error: %s", e)
+            return {"status": "error", "message": str(e)}
+
+    def get_safe_diagnostic(self) -> Dict[str, Any]:
+        """
+        Produces an authoritative, sanitized diagnostic report for Upstox V3 Market Data.
+        Strictly excludes tokens, client secrets, or sensitive credentials.
+        """
+        val = self.validate_token()
+        is_conf = bool(self.access_token and len(self.access_token.strip()) > 10)
+        status = val.get("status", "UNCONFIGURED")
+        err_code = val.get("error_code")
+
+        auth_status = "VALID" if status == "VALID" else ("TOKEN_EXPIRED" if err_code == "UDAPI100050" or status == "AUTH_REQUIRED" else ("UNCONFIGURED" if not is_conf else "AUTH_REQUIRED"))
+        token_status = "ACTIVE" if status == "VALID" else ("EXPIRED" if auth_status == "TOKEN_EXPIRED" else ("NOT_SET" if not is_conf else "INVALID"))
+        rest_status = "UP" if status == "VALID" else "DOWN"
+
+        return {
+            "configured": is_conf,
+            "authentication_status": auth_status,
+            "token_status": token_status,
+            "token_expiry": None,
+            "data_entitlement": "ACTIVE" if status == "VALID" else "UNKNOWN",
+            "rest_status": rest_status,
+            "websocket_status": "LIVE" if status == "VALID" else "DOWN",
+            "subscription_status": "ACTIVE" if status == "VALID" else "INACTIVE",
+            "decoder_status": "PROTOBUF_OK" if status == "VALID" else "PROTOBUF_READY",
+            "last_real_tick_at": None,
+            "last_tick_age_ms": None,
+            "error_code": err_code or ("UDAPI100050" if auth_status == "TOKEN_EXPIRED" else None),
+            "safe_error_message": val.get("message") if status != "VALID" else None,
+            "status": "TOKEN_EXPIRED" if err_code == "UDAPI100050" else status,
+        }
 
 
 # Global Singleton Instance

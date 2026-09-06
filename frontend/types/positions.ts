@@ -7,8 +7,25 @@
 
 export type PositionDirection = "LONG" | "SHORT" | "BUY" | "SELL";
 export type PositionStatus = "OPEN" | "RUNNING" | "PARTIAL" | "CLOSED";
+export type PositionFeedStatus =
+  | "LIVE"
+  | "CONNECTING"
+  | "STALE"
+  | "DISCONNECTED"
+  | "AUTH REQUIRED"
+  | "NOT CONFIGURED"
+  | "RECONCILIATION_REQUIRED";
+export type PositionFreshnessStatus = "LIVE" | "STALE" | "DISCONNECTED" | "UNAVAILABLE";
 export type PositionViewMode = "table" | "cards" | "ladder" | "risk";
 export type PositionFilterCategory = "ALL" | "LONG" | "SHORT" | "PROFIT" | "LOSS";
+export type PositionBrokerFilter =
+  | "ALL"
+  | "PAPER_SIM"
+  | "BINANCE"
+  | "UPSTOX"
+  | "DHAN"
+  | "DELTA_INDIA"
+  | "DERIBIT";
 export type PositionSortKey =
   | "pnl_desc"
   | "pnl_asc"
@@ -21,6 +38,7 @@ export type BulkActionType = "MOVE_TO_BREAKEVEN" | "HARVEST_PROFITS" | "SQUARE_O
 
 export interface PositionRecord {
   id: number;
+  position_uid?: string; // provider + brokerAccountId + environment + positionId
   trade_id?: number | string;
   symbol: string;
   direction: string;
@@ -56,6 +74,26 @@ export interface PositionRecord {
   bot_name?: string;
   strategy?: string;
   execution_mode?: "PAPER" | "LIVE";
+  
+  // Explicit Source Identification
+  market_data_source: string;      // e.g. "Binance Official API", "Upstox Official API"
+  execution_broker: string;        // e.g. "Paper Simulator", "Upstox", "Dhan"
+  broker_account_id: string;       // e.g. "Paper-Binance-01", "Upstox-Paper-01"
+  broker_account_alias?: string;   // e.g. "Paper OMS (Binance Sim)"
+  exchange: string;                // e.g. "BINANCE", "NSE", "MCX", "DERIBIT", "DELTA_INDIA"
+  segment: string;                 // e.g. "PERPETUAL", "EQUITY", "INDEX_FUTURES", "OPTIONS"
+  asset_type: string;              // e.g. "CRYPTO_PERP", "EQUITY_CASH", "EQUITY_FUTURE", "INDEX_FUTURE", "OPTION"
+  instrument_key: string;          // e.g. "BINANCE:BTCUSDT:PERPETUAL", "NSE_EQ|INE002A01018"
+  currency?: string;               // e.g. "USD", "INR", "USDT"
+  
+  // Real-time Telemetry & Truthful Statuses
+  feed_status: PositionFeedStatus; // "LIVE", "STALE", "NOT CONFIGURED", etc.
+  freshness_status: PositionFreshnessStatus;
+  latency_ms: number;
+  data_age_ms: number;
+  last_update_utc?: string;
+  error_details?: string;
+
   risk_warnings?: string[];
   broker_status?: string;
   status?: PositionStatus;
@@ -76,10 +114,17 @@ export interface PositionsSummaryData {
   available_margin?: number;
   account_balance?: number;
   portfolio_risk_utilization_pct?: number;
+  portfolio_var_usd?: number;
   daily_loss?: number;
   daily_loss_limit?: number;
   total_planned_risk?: number;
   win_rate_estimate?: number;
+  scope?: string;
+  as_of_timestamp?: string;
+  currency?: string;
+  risk_gate_status?: string;
+  market_feed_status?: string;
+  broker_sync_status?: string;
 }
 
 export interface PositionProtectionPayload {

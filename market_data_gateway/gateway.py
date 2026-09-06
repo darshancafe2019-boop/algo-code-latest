@@ -29,6 +29,7 @@ from aiohttp import web
 from market_data_gateway.adapters.base import NormalizedQuote, ProviderHealth
 from market_data_gateway.adapters.binance_ws import BinanceWSAdapter
 from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
+from market_data_gateway.adapters.dhan_ws import DhanWSAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
@@ -58,6 +59,7 @@ class MarketDataGateway:
         self.adapters = {
             "binance_ws": BinanceWSAdapter(),
             "delta_options_ws": DeltaOptionsWSAdapter(),
+            "dhan_ws": DhanWSAdapter(),
             "upstox_ws": UpstoxWSAdapter(),
             "angelone": AngelOneAdapter(),
             "alpha_vantage": AlphaVantageAdapter(),
@@ -209,20 +211,39 @@ class MarketDataGateway:
 
         result: Dict[str, Any] = {}
         for sym in symbols:
-            # Check cache first
-            if sym in self._quote_cache:
-                q = self._quote_cache[sym]
-                q.mark_stale(STALE_THRESHOLD_SEC)
-                result[sym] = q.to_dict()
+            # Check cache first (direct and canonical alias)
+            aliases = [sym]
+            if "/" in sym:
+                aliases.append(sym.replace("/", ""))
+            elif sym.endswith("USDT") and len(sym) > 4:
+                aliases.append(f"{sym[:-4]}/USDT")
+            elif sym.endswith("USD") and len(sym) > 3:
+                aliases.append(f"{sym[:-3]}/USD")
+
+            matched_q: Optional[NormalizedQuote] = None
+            for a in aliases:
+                if a in self._quote_cache:
+                    matched_q = self._quote_cache[a]
+                    break
+
+            if matched_q:
+                matched_q.mark_stale(STALE_THRESHOLD_SEC)
+                result[sym] = matched_q.to_dict()
                 continue
 
-            # Try failover
+            # Try failover adapter snapshot
             adapter = self.failover.get_best_provider(sym)
             if adapter:
                 quotes = await adapter.get_snapshot([sym])
                 if sym in quotes:
                     result[sym] = quotes[sym].to_dict()
                     self._quote_cache[sym] = quotes[sym]
+                else:
+                    for a in aliases:
+                        if a in quotes:
+                            result[sym] = quotes[a].to_dict()
+                            self._quote_cache[a] = quotes[a]
+                            break
 
         return web.json_response({
             "timestamp": datetime.now(timezone.utc).isoformat(),

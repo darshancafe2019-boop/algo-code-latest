@@ -13,6 +13,7 @@ import { CreateBotWizardModal } from "./CreateBotWizardModal";
 import { DeleteBotModal } from "./DeleteBotModal";
 import { BulkDeleteBotsModal } from "./BulkDeleteBotsModal";
 import { MultiBotBulkActionBar } from "./MultiBotBulkActionBar";
+import { OrderDestinationModal } from "./OrderDestinationModal";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import {
@@ -33,6 +34,7 @@ export function BotControlTab() {
   const [viewMode, setViewMode] = useState<BotViewMode>("table");
   const [search, setSearch] = useState("");
   const [selectedMarket, setSelectedMarket] = useState("ALL");
+  const [selectedBroker, setSelectedBroker] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [envFilter, setEnvFilter] = useState("ALL");
   const [environment, setEnvironment] = useState<"PAPER" | "LIVE">("PAPER");
@@ -45,6 +47,11 @@ export function BotControlTab() {
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [isBulkStartModalOpen, setIsBulkStartModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Order Destination Modal State
+  const [orderDestinationBot, setOrderDestinationBot] = useState<BotRowItem | null>(null);
+  const [orderDestinationSide, setOrderDestinationSide] = useState<"BUY" | "SELL">("BUY");
+  const [isOrderDestinationModalOpen, setIsOrderDestinationModalOpen] = useState(false);
 
   // Delete Modals State
   const [botToDelete, setBotToDelete] = useState<BotRowItem | null>(null);
@@ -119,6 +126,16 @@ export function BotControlTab() {
         if (selectedMarket === "US_EQUITY" && !mkt.includes("US") && !mkt.includes("EQUITY")) return false;
       }
 
+      // Broker Source Filter
+      if (selectedBroker !== "ALL") {
+        const brk = (bot.execution_broker_id || bot.execution_broker || bot.market_data_source || "").toUpperCase();
+        if (selectedBroker === "PAPER" && !brk.includes("PAPER") && !brk.includes("SIM")) return false;
+        if (selectedBroker === "BINANCE" && !brk.includes("BINANCE")) return false;
+        if (selectedBroker === "UPSTOX" && !brk.includes("UPSTOX")) return false;
+        if (selectedBroker === "DHAN" && !brk.includes("DHAN")) return false;
+        if (selectedBroker === "DELTA_INDIA" && !brk.includes("DELTA")) return false;
+      }
+
       // Status filter
       if (statusFilter !== "ALL") {
         const st = (bot.status || bot.state || "").toUpperCase();
@@ -138,13 +155,16 @@ export function BotControlTab() {
           bot.name.toLowerCase().includes(q) ||
           bot.symbol.toLowerCase().includes(q) ||
           bot.strategy.toLowerCase().includes(q) ||
-          bot.id.toLowerCase().includes(q);
+          bot.id.toLowerCase().includes(q) ||
+          (bot.market_data_source && bot.market_data_source.toLowerCase().includes(q)) ||
+          (bot.execution_broker && bot.execution_broker.toLowerCase().includes(q)) ||
+          (bot.broker_account_id && bot.broker_account_id.toLowerCase().includes(q));
         if (!matches) return false;
       }
 
       return true;
     });
-  }, [rawBots, selectedMarket, statusFilter, envFilter, search]);
+  }, [rawBots, selectedMarket, selectedBroker, statusFilter, envFilter, search]);
 
   // Clean up selectedBotIds if bots were deleted
   useEffect(() => {
@@ -182,7 +202,7 @@ export function BotControlTab() {
   const handleBotAction = async (botId: string, action: string) => {
     const lockKey = `${action}:${botId}`;
     if (inFlightActionKeys.has(lockKey)) {
-      return; // Single-click lock: drop duplicate clicks while in-flight
+      return;
     }
 
     setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
@@ -212,6 +232,51 @@ export function BotControlTab() {
         return next;
       });
     }
+  };
+
+  // Set Execution Broker per bot
+  const handleSetBroker = async (botId: string, brokerId: string, accountId?: string) => {
+    const lockKey = `SET_BROKER:${botId}`;
+    if (inFlightActionKeys.has(lockKey)) return;
+
+    setInFlightActionKeys((prev) => new Set(prev).add(lockKey));
+    setActionError(null);
+    setActionSuccess(null);
+
+    try {
+      const res = await apiClient.post<any>(
+        `/api/bots/${botId}/broker`,
+        {
+          broker_id: brokerId,
+          broker_account_id: accountId,
+          requested_by: "TRADER_UI",
+        },
+        { timeoutMs: 8000 }
+      );
+
+      if (!res.ok) {
+        throw new Error(res.error?.message || "Failed to update execution broker");
+      }
+
+      setActionSuccess(res.data?.message || `Execution broker updated.`);
+      await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } catch (err: any) {
+      setActionError(err.message || "Failed to update broker");
+    } finally {
+      setInFlightActionKeys((prev) => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
+    }
+  };
+
+  // Open Order Destination Modal
+  const handleOpenOrderDestination = (bot: BotRowItem, side: "BUY" | "SELL") => {
+    setOrderDestinationBot(bot);
+    setOrderDestinationSide(side);
+    setIsOrderDestinationModalOpen(true);
   };
 
   // Open Single Delete Modal
@@ -570,8 +635,28 @@ export function BotControlTab() {
   // Export handlers
   const handleExportCsv = () => {
     try {
-      const headers = ["ID", "Name", "Symbol", "Asset Class", "Timeframe", "Strategy", "Mode", "Status", "Allocated Capital", "Today PnL"];
+      const headers = [
+        "UID",
+        "ID",
+        "Name",
+        "Symbol",
+        "Asset Class",
+        "Timeframe",
+        "Strategy",
+        "Mode",
+        "Market Data Source",
+        "Execution Broker",
+        "Broker Account",
+        "Exchange",
+        "Segment",
+        "Instrument Key",
+        "Feed Status",
+        "Status",
+        "Allocated Capital",
+        "Today PnL",
+      ];
       const rows = filteredBots.map((b) => [
+        b.bot_uid || b.id,
         b.id,
         `"${b.name}"`,
         b.symbol,
@@ -579,6 +664,13 @@ export function BotControlTab() {
         b.timeframe,
         b.strategy,
         b.execution_mode,
+        b.market_data_source || "Binance Official API",
+        b.execution_broker || "Paper Simulator",
+        b.broker_account_id || "Paper-Account-01",
+        b.exchange || "BINANCE",
+        b.segment || "CRYPTO_SPOT",
+        b.instrument_key || b.symbol,
+        b.feed_status || "LIVE",
         b.status,
         b.allocated_capital,
         b.pnl?.today ?? b.live_pnl ?? 0,
@@ -665,6 +757,8 @@ export function BotControlTab() {
         onSearchChange={setSearch}
         selectedMarket={selectedMarket}
         onSelectMarket={setSelectedMarket}
+        selectedBroker={selectedBroker}
+        onSelectBroker={setSelectedBroker}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         envFilter={envFilter}
@@ -685,6 +779,8 @@ export function BotControlTab() {
           onSelectBot={handleSelectBot}
           onBotAction={handleBotAction}
           onToggleMode={handleToggleBotMode}
+          onSetBroker={handleSetBroker}
+          onOpenOrderDestination={handleOpenOrderDestination}
           onDeleteBot={handleOpenDeleteModal}
           onCreateBot={() => setIsCreateModalOpen(true)}
           selectedMarket={selectedMarket}
@@ -730,11 +826,28 @@ export function BotControlTab() {
         onClose={() => setIsDetailsDrawerOpen(false)}
         onBotAction={handleBotAction}
         onToggleMode={handleToggleBotMode}
+        onSetBroker={handleSetBroker}
+        onOpenOrderDestination={handleOpenOrderDestination}
         onDeleteBot={handleOpenDeleteModal}
         onRefresh={refetch}
       />
 
-      {/* 6. Single Bot Delete Confirmation Modal */}
+      {/* 6. Order Destination Confirmation Modal */}
+      <OrderDestinationModal
+        isOpen={isOrderDestinationModalOpen}
+        bot={orderDestinationBot}
+        side={orderDestinationSide}
+        onClose={() => {
+          setIsOrderDestinationModalOpen(false);
+          setOrderDestinationBot(null);
+        }}
+        onOrderConfirmed={() => {
+          refetch();
+          queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+        }}
+      />
+
+      {/* 7. Single Bot Delete Confirmation Modal */}
       <DeleteBotModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -746,7 +859,7 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 7. Bulk Delete Confirmation Modal */}
+      {/* 8. Bulk Delete Confirmation Modal */}
       <BulkDeleteBotsModal
         isOpen={isBulkDeleteModalOpen}
         onClose={() => setIsBulkDeleteModalOpen(false)}
@@ -755,7 +868,7 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 8. Bulk Start Confirmation Modal */}
+      {/* 9. Bulk Start Confirmation Modal */}
       <BulkStartConfirmationModal
         isOpen={isBulkStartModalOpen}
         onClose={() => setIsBulkStartModalOpen(false)}
@@ -763,7 +876,7 @@ export function BotControlTab() {
         onConfirmStart={handleConfirmBulkStart}
       />
 
-      {/* 9. Create Bot Wizard Modal */}
+      {/* 10. Create Bot Wizard Modal */}
       <CreateBotWizardModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

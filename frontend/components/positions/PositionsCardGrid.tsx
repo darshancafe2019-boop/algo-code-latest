@@ -57,13 +57,28 @@ const PositionCardItem = React.memo(function PositionCardItem({
   const range = maxP - minP || 1;
   const entryPct = Math.min(100, Math.max(0, ((entryP - minP) / range) * 100));
   const currentPct = Math.min(100, Math.max(0, ((currP - minP) / range) * 100));
+  const currencySymbol = pos.currency === "INR" ? "₹" : "$";
+  const feedStatus = pos.feed_status || "LIVE";
+  const isFeedLive = feedStatus === "LIVE";
 
   return (
     <div
       onClick={() => onSelectPosition(pos)}
       className="p-4 sm:p-5 rounded-3xl bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] hover:border-[var(--theme-accent)]/50 transition-all shadow-xl flex flex-col justify-between space-y-4 cursor-pointer group"
     >
-      {/* Top Row: Symbol, Side & Floating P&L */}
+      {/* Top Source Identification Strip */}
+      <div className="flex items-center justify-between text-[10px] font-mono border-b border-[var(--theme-border-subtle)] pb-2 flex-wrap gap-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--theme-text-muted)] uppercase text-[9px]">DATA:</span>
+          <span className="font-bold text-[var(--theme-text-primary)]">{pos.market_data_source}</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[var(--theme-text-muted)] uppercase text-[9px]">EXEC:</span>
+          <span className="text-[var(--theme-text-secondary)]">{pos.execution_broker} • {pos.broker_account_id}</span>
+        </div>
+      </div>
+
+      {/* Symbol, Side, Exchange & Floating P&L */}
       <div className="flex items-start justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -79,6 +94,9 @@ const PositionCardItem = React.memo(function PositionCardItem({
             >
               {isLong ? "LONG" : "SHORT"} {lev}x
             </span>
+            <span className="text-[9px] font-mono text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] px-1.5 py-0.5 rounded border border-[var(--theme-border-subtle)]">
+              {pos.exchange} • {pos.segment}
+            </span>
           </div>
           <div className="text-xs text-[var(--theme-text-secondary)] mt-0.5 font-sans">
             {pos.bot_name || pos.bot_id || "Fleet Bot"} • {pos.strategy || "Strategy Engine"}
@@ -92,7 +110,7 @@ const PositionCardItem = React.memo(function PositionCardItem({
             }`}
           >
             {isProfit ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-            <span>{isProfit ? "+" : ""}${pos.unrealized_pnl.toFixed(2)}</span>
+            <span>{isProfit ? "+" : ""}{currencySymbol}{pos.unrealized_pnl.toFixed(2)}</span>
           </div>
           <div
             className={`text-xs font-bold ${

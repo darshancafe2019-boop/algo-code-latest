@@ -77,15 +77,30 @@ class FuturesQuote:
 
 
 @dataclass
+class OptionChainDiagnostics:
+    """Telemetry and deduplication counters for option chain processing."""
+    total_received: int = 0
+    accepted: int = 0
+    updated: int = 0
+    deduplicated: int = 0
+    rejected: int = 0
+    rejection_reasons: Dict[str, int] = field(default_factory=dict)
+    last_successful_update: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class OptionQuote:
-    """Canonical Normalized Option Contract Quote."""
+    """Canonical Normalized Option Contract Quote with strict broker segregation and provenance."""
     underlying: str
     expiry: str  # "YYYY-MM-DD"
     strike: float
     optionType: str  # "CE" or "PE"
     symbol: str
     exchange: str
-    provider: str
+    provider: str  # "DHAN", "UPSTOX", "DELTA_INDIA", "PAPER_SIMULATOR"
     lastPrice: float
     bid: float
     ask: float
@@ -105,6 +120,41 @@ class OptionQuote:
     rho: float = 0.0
     intrinsic_value: float = 0.0
     time_value: float = 0.0
+    # Mandatory 8-Tier Hierarchy & Metadata
+    customerId: str = "cust_default"
+    departmentId: str = "dept_quant_trading"
+    brokerId: str = "dhan"
+    brokerAccountId: str = "ba_dhan_primary"
+    brokerAccountAlias: str = "Primary Account"
+    environment: str = "PAPER"  # "PAPER" or "LIVE"
+    assetClass: str = "INDIAN_INDICES"
+    segment: str = "OPTIONS"
+    currency: str = "INR"
+    instrumentId: str = ""
+    sourceStreamId: str = ""
+    # Telemetry & Freshness
+    dataFeed: str = "REST"  # "REST" or "WEBSOCKET"
+    receivedTimestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    exchangeTimestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    lastUpdated: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    dataAgeMs: float = 0.0
+    latencyMs: float = 0.0
+    freshnessStatus: str = "CONNECTED"  # CONNECTED, CONNECTING, DISCONNECTED, STALE, ERROR, RECONCILIATION_REQUIRED, AUTHENTICATION_FAILED, RATE_LIMITED, PROVIDER_UNAVAILABLE
+    connectionStatus: str = "CONNECTED"
+    isExecutable: bool = True
+    rejectionReason: Optional[str] = None
+    contractKey: str = ""
+    streamKey: str = ""
+    markPrice: Optional[float] = None
+    change: Optional[float] = None
+    changePct: Optional[float] = None
+
+    def __post_init__(self):
+        if not self.streamKey:
+            self.streamKey = f"{self.provider}:{self.brokerAccountId}:{self.environment}:{self.exchange}:{self.segment}:{self.underlying}"
+        if not self.contractKey:
+            inst = self.instrumentId or self.symbol
+            self.contractKey = f"{self.provider}:{self.brokerAccountId}:{self.environment}:{self.exchange}:{self.segment}:{self.underlying}:{self.expiry}:{self.strike}:{self.optionType}:{inst}"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -131,7 +181,7 @@ class OptionStrikeRow:
 
 @dataclass
 class OptionChainSnapshot:
-    """Full Option Chain Snapshot with Market Analytics."""
+    """Full Option Chain Snapshot with Market Analytics, Telemetry, and Diagnostics."""
     underlying: str
     spot_price: float
     selected_expiry: str
@@ -148,6 +198,23 @@ class OptionChainSnapshot:
     resistance_zones: List[float] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: str = "LIVE"
+    provider: str = "DHAN"
+    brokerAccountId: str = "ba_dhan_primary"
+    brokerAccountAlias: str = "Primary Account"
+    environment: str = "PAPER"
+    dataFeed: str = "REST"
+    exchange: str = "NSE"
+    segment: str = "OPTIONS"
+    currency: str = "INR"
+    freshnessStatus: str = "CONNECTED"
+    latencyMs: float = 0.0
+    dataAgeMs: float = 0.0
+    diagnostics: Optional[OptionChainDiagnostics] = None
+    streamKey: str = ""
+
+    def __post_init__(self):
+        if not self.streamKey:
+            self.streamKey = f"{self.provider}:{self.brokerAccountId}:{self.environment}:{self.exchange}:{self.segment}:{self.underlying}"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -157,6 +224,7 @@ class OptionChainSnapshot:
             "selected_expiry": self.selected_expiry,
             "available_expiries": self.available_expiries,
             "strike_count": len(self.strikes),
+            "total_available_strikes": len(self.strikes),
             "max_pain": self.max_pain,
             "pcr": {
                 "pcr_oi": self.pcr_oi,
@@ -169,6 +237,19 @@ class OptionChainSnapshot:
             "support_zones": self.support_zones,
             "resistance_zones": self.resistance_zones,
             "timestamp": self.timestamp,
+            "provider": self.provider,
+            "brokerAccountId": self.brokerAccountId,
+            "brokerAccountAlias": self.brokerAccountAlias,
+            "environment": self.environment,
+            "dataFeed": self.dataFeed,
+            "exchange": self.exchange,
+            "segment": self.segment,
+            "currency": self.currency,
+            "freshnessStatus": self.freshnessStatus,
+            "latencyMs": self.latencyMs,
+            "dataAgeMs": self.dataAgeMs,
+            "streamKey": self.streamKey,
+            "diagnostics": self.diagnostics.to_dict() if self.diagnostics else None,
             "strikes": [s.to_dict() for s in self.strikes],
         }
 

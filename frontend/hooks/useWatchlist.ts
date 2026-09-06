@@ -178,7 +178,7 @@ export function useWatchlist(watchlistId: string = "wl_main") {
       if (!res.ok) throw new Error(res.error?.message || "Failed to add to watchlist");
       return res.data;
     },
-    onMutate: async ({ instrument, notes = "" }) => {
+    onMutate: async ({ instrument, notes = "" }: { instrument: Partial<MarketInstrument> | string; notes?: string }) => {
       await queryClient.cancelQueries({ queryKey: ["userWatchlistsMaster"] });
       const previousData = queryClient.getQueryData(["userWatchlistsMaster"]) as
         | { status: string; watchlists: UserWatchlist[] }

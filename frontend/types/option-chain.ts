@@ -1,5 +1,50 @@
 export type Moneyness = "ITM" | "ATM" | "OTM";
 
+export type OptionSource = "ALL" | "DHAN" | "UPSTOX" | "DELTA" | "DELTA_INDIA" | "BINANCE" | "PAPER_SIMULATOR";
+
+export interface OptionContract {
+  instrumentId: string;
+  provider: "DHAN" | "UPSTOX" | "DELTA" | "BINANCE" | "PAPER_SIMULATOR";
+  providerInstrumentId: string;
+  underlying: string;
+  expiry: string;
+  strike: number;
+  optionType: "CALL" | "PUT" | "CE" | "PE";
+  bid: number | null;
+  ask: number | null;
+  bidQty: number | null;
+  askQty: number | null;
+  last: number | null;
+  change: number | null;
+  changePercent: number | null;
+  volume: number | null;
+  openInterest: number | null;
+  oiChange: number | null;
+  impliedVolatility: number | null;
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null;
+  vega: number | null;
+  rho: number | null;
+  underlyingPrice: number | null;
+  exchangeTimestamp: number | null;
+  receivedTimestamp: number;
+  status: "LIVE" | "STALE" | "UNAVAILABLE";
+}
+
+export type FreshnessStatus =
+  | "CONNECTED"
+  | "CONNECTING"
+  | "DISCONNECTED"
+  | "STALE"
+  | "ERROR"
+  | "RECONCILIATION_REQUIRED"
+  | "AUTHENTICATION_FAILED"
+  | "RATE_LIMITED"
+  | "PROVIDER_UNAVAILABLE"
+  | "LIVE"
+  | "DEGRADED";
+
 export interface OptionContractQuote {
   ltp: number;
   bid: number;
@@ -17,6 +62,40 @@ export interface OptionContractQuote {
   volume: number;
   moneyness: Moneyness;
   in_the_money?: boolean;
+  strike?: number;
+  // 8-Tier Provenance & Identification
+  department?: string;
+  sourceName?: string;
+  instrumentId?: string;
+  instrument_id?: string;
+  symbol?: string;
+  underlying?: string;
+  expiry?: string;
+  provider?: string;
+  sourceProvider?: string;
+  brokerId?: string;
+  brokerAccountId?: string;
+  brokerAccountAlias?: string;
+  environment?: "PAPER" | "LIVE";
+  exchange?: string;
+  segment?: string;
+  currency?: string;
+  dataFeed?: "REST" | "WEBSOCKET";
+  receivedTimestamp?: string;
+  exchangeTimestamp?: string;
+  lastUpdated?: string;
+  dataAgeMs?: number;
+  latencyMs?: number;
+  freshnessStatus?: FreshnessStatus;
+  connectionStatus?: string;
+  isExecutable?: boolean;
+  rejectionReason?: string | null;
+  contractKey?: string;
+  streamKey?: string;
+  greeks_source?: "PROVIDER" | "CALCULATED";
+  markPrice?: number;
+  change?: number;
+  changePct?: number;
 }
 
 export interface OptionStrikeRow {
@@ -58,6 +137,28 @@ export interface NormalizedExpiryOption {
   raw: RawExpiryItem;
 }
 
+export interface OptionChainDiagnostics {
+  total_received: number;
+  accepted: number;
+  updated: number;
+  deduplicated: number;
+  rejected: number;
+  rejection_reasons: Record<string, number>;
+  last_successful_update: string;
+}
+
+export interface ProviderSourceStatus {
+  provider: OptionSource | string;
+  name: string;
+  account_alias: string;
+  exchange: string;
+  segment: string;
+  feed: string;
+  status: FreshnessStatus;
+  latency_ms: number;
+  last_update: string;
+}
+
 export interface OptionChainData {
   status: string;
   underlying: string;
@@ -70,8 +171,25 @@ export interface OptionChainData {
   max_pain: number;
   pcr: PCRMetrics;
   strikes: OptionStrikeRow[];
-  data_status?: "LIVE" | "STALE" | "DEGRADED" | "DISCONNECTED";
+  data_status?: FreshnessStatus;
+  freshnessStatus?: FreshnessStatus;
   latency_ms?: number;
+  latencyMs?: number;
+  dataAgeMs?: number;
+  provider?: string;
+  brokerAccountId?: string;
+  brokerAccountAlias?: string;
+  environment?: "PAPER" | "LIVE";
+  dataFeed?: "REST" | "WEBSOCKET";
+  exchange?: string;
+  segment?: string;
+  currency?: string;
+  streamKey?: string;
+  diagnostics?: OptionChainDiagnostics;
+  sources?: Record<string, OptionChainData>;
+  is_live?: boolean;
+  is_stale?: boolean;
+  atm_strike?: number;
 }
 
 export interface StrategyLeg {

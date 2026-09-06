@@ -57,14 +57,27 @@ STABLE_RUN_RESET_SECONDS = 30.0
 MAX_CONSECUTIVE_RESTARTS = 5
 
 # Cross-platform execution resolution
+import shutil
 if sys.platform == "win32":
     VENV_PYTHON = ROOT_DIR / ".venv" / "Scripts" / "python.exe"
-    NPM_EXEC = "npm.cmd"
+    NPM_EXEC = "npm.cmd" if shutil.which("npm.cmd") else "npm"
 else:
     VENV_PYTHON = ROOT_DIR / ".venv" / "bin" / "python"
     NPM_EXEC = "npm"
 
-PYTHON_EXEC = str(VENV_PYTHON) if VENV_PYTHON.exists() else sys.executable
+if VENV_PYTHON.exists():
+    PYTHON_EXEC = str(VENV_PYTHON)
+elif sys.executable and Path(sys.executable).exists() and not sys.executable.endswith("WindowsApps\\python.exe"):
+    PYTHON_EXEC = sys.executable
+else:
+    py_found = (
+        shutil.which("python") or
+        shutil.which("python3") or
+        str(Path(os.environ.get("LOCALAPPDATA", "")) / "Python" / "pythoncore-3.14-64" / "python.exe") or
+        sys.executable
+    )
+    PYTHON_EXEC = py_found if Path(py_found).exists() else sys.executable
+
 
 
 def log(tag: str, msg: str, color_code: str = "\033[94m"):

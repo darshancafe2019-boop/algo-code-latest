@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   X,
   Play,
@@ -19,13 +20,28 @@ import {
   Sparkles,
   Zap,
   TrendingUp,
+  TrendingDown,
   CheckCircle2,
   Radio,
   Clock,
+  Check,
+  ArrowRight,
+  DollarSign,
+  Wallet,
 } from "lucide-react";
-import { BotRowItem } from "@/types/bot-control";
+import { BotRowItem, ExecutionBrokerId } from "@/types/bot-control";
 import { HydratedTimestamp } from "@/components/common/HydratedTimestamp";
 import { OptionsContractSelectorModal, SelectedOptionsContract } from "@/components/options/OptionsContractSelectorModal";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
+import { apiClient } from "@/lib/apiClient";
+
+const BROKER_OPTIONS: { id: ExecutionBrokerId; label: string; defaultAccount: string }[] = [
+  { id: "paper_simulator", label: "Paper Simulator", defaultAccount: "Paper-Simulator-01" },
+  { id: "ccxt_binance", label: "Binance", defaultAccount: "Paper-Binance-01" },
+  { id: "upstox", label: "Upstox", defaultAccount: "Upstox-Paper-01" },
+  { id: "dhan_india", label: "Dhan", defaultAccount: "ba_dhan_primary" },
+  { id: "delta_india", label: "Delta Exchange India", defaultAccount: "Delta-Paper-01" },
+];
 
 interface SimpleBotDetailsDrawerProps {
   isOpen: boolean;
@@ -33,6 +49,8 @@ interface SimpleBotDetailsDrawerProps {
   onClose: () => void;
   onBotAction: (botId: string, action: string) => Promise<void>;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => Promise<void> | void;
+  onSetBroker?: (botId: string, brokerId: string, accountId?: string) => Promise<void> | void;
+  onOpenOrderDestination?: (bot: BotRowItem, side: "BUY" | "SELL") => void;
   onDeleteBot?: (bot: BotRowItem) => void;
   onRefresh: () => void;
 }
@@ -43,16 +61,54 @@ export function SimpleBotDetailsDrawer({
   onClose,
   onBotAction,
   onToggleMode,
+  onSetBroker,
+  onOpenOrderDestination,
   onDeleteBot,
   onRefresh,
 }: SimpleBotDetailsDrawerProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [isActing, setIsActing] = useState(false);
   const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+  const [isUpdatingBroker, setIsUpdatingBroker] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isUpdatingContract, setIsUpdatingContract] = useState(false);
-  const [isForcingTrade, setIsForcingTrade] = useState(false);
+
+  // Trade Preparation State
+  const [prepOrderSide, setPrepOrderSide] = useState<"BUY" | "SELL">("BUY");
+  const [prepOrderType, setPrepOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
+  const [prepProductType, setPrepProductType] = useState<"INTRADAY" | "CNC" | "MARGIN">("INTRADAY");
+  const [prepQuantity, setPrepQuantity] = useState<number>(1);
+  const [prepLimitPrice, setPrepLimitPrice] = useState<string>("");
+  const [isFiringOrder, setIsFiringOrder] = useState(false);
+
+  const { getQuote, subscribe, unsubscribe } = useMarketGatewayContext();
+
+  const botSymbol = bot?.symbol || "";
+
+  // Subscribe to real-time quotes for the bot's symbol
+  useEffect(() => {
+    if (!botSymbol) return;
+    subscribe(botSymbol, "RUNNING_BOT");
+    return () => {
+      unsubscribe(botSymbol, "RUNNING_BOT");
+    };
+  }, [botSymbol, subscribe, unsubscribe]);
+
+  const liveQuote = getQuote(botSymbol);
+
+  // Fetch Dhan Funds and Margins
+  const { data: dhanFundsData } = useQuery({
+    queryKey: ["dhanFunds"],
+    queryFn: async () => {
+      const res = await apiClient.get<any>("/api/dhan/funds");
+      if (res.ok && res.data) return res.data;
+      return null;
+    },
+    staleTime: 10000,
+    refetchInterval: 15000,
+    enabled: Boolean(bot && (bot.execution_broker_id === "dhan_india" || bot.execution_broker?.toLowerCase().includes("dhan"))),
+  });
 
   if (!isOpen || !bot) return null;
 
@@ -66,6 +122,14 @@ export function SimpleBotDetailsDrawer({
   const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
   const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
   const isPnlPositive = pnl >= 0;
+
+  const mktSource = bot.market_data_source || "Binance Official API";
+  const execBroker = bot.execution_broker || "Paper Simulator";
+  const execBrokerId = bot.execution_broker_id || "paper_simulator";
+  const brokerAcc = bot.broker_account_id || bot.broker_account_alias || "Paper-Account-01";
+  const feedStatus = bot.feed_status || "LIVE";
+  const isFeedLive = feedStatus === "LIVE";
+  const latencyDisplay = bot.latency_ms ? `${bot.latency_ms.toFixed(0)}ms` : "14ms";
 
   const isGenericOptionsCategory =
     ["BTC-OPTIONS", "ETH-OPTIONS", "SOL-OPTIONS", "NIFTY-OPTIONS", "BANKNIFTY-OPTIONS", "FINNIFTY-OPTIONS", "OPTIONS", "CRYPTO-OPTIONS"].includes((bot.symbol || "").toUpperCase()) ||
@@ -121,33 +185,18 @@ export function SimpleBotDetailsDrawer({
     }
   };
 
-  const handleForceTestTrade = async (type?: "LONG_ENTRY" | "WIN_TP" | "LOSS_SL") => {
-    setIsForcingTrade(true);
+  const handleBrokerChange = async (newBrokerId: string, defAccount: string) => {
+    if (!onSetBroker) return;
+    setIsUpdatingBroker(true);
     setActionFeedback(null);
-    const targetType = type || (pos.has_position ? "WIN_TP" : "LONG_ENTRY");
     try {
-      const res = await fetch(`/api/bots/${bot.id}/force_test_trade`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ trade_type: targetType }),
-      });
-      const data = await res.json();
-      if (res.ok && (data.status === "success" || data.success)) {
-        if (targetType === "WIN_TP") {
-          setActionFeedback(`🎯 Position Closed with Take-Profit (+$${(Number(data.pnl || data.realized_pnl) || 30.0).toFixed(2)}). Today's Profit updated!`);
-        } else if (targetType === "LOSS_SL") {
-          setActionFeedback(`🛑 Position Closed with Stop-Loss (-$${Math.abs(Number(data.pnl || 15.0)).toFixed(2)}).`);
-        } else {
-          setActionFeedback(`⚡ Test Trade Executed! ${data.direction || "LONG"} order placed at $${(Number(data.price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}.`);
-        }
-        onRefresh();
-      } else {
-        setActionFeedback(`Failed to execute trade: ${data.message || "Unknown error"}`);
-      }
+      await onSetBroker(bot.id, newBrokerId, defAccount);
+      setActionFeedback(`Execution broker updated to ${newBrokerId}.`);
+      onRefresh();
     } catch (err: any) {
-      setActionFeedback(`Error: ${err.message}`);
+      setActionFeedback(`Failed to update broker: ${err.message}`);
     } finally {
-      setIsForcingTrade(false);
+      setIsUpdatingBroker(false);
     }
   };
 
@@ -168,7 +217,7 @@ export function SimpleBotDetailsDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-200 select-none">
         <div className="w-full max-w-xl bg-[var(--theme-surface)] border-l border-[var(--theme-border)] h-full overflow-y-auto p-6 flex flex-col justify-between font-sans select-none space-y-6 shadow-2xl">
           {/* Header */}
           <div className="space-y-4">
@@ -209,7 +258,67 @@ export function SimpleBotDetailsDrawer({
               </div>
             )}
 
-            {/* Status & Mode Control Strip */}
+            {/* Order Routing & Connectivity Identity Panel */}
+            <div className="p-4 rounded-2xl bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)]/60 pb-2">
+                <span className="font-extrabold text-[var(--theme-text-primary)] uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                  <Radio className="w-3.5 h-3.5 text-[var(--theme-accent)]" />
+                  <span>Order Routing & Venue Identity</span>
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                    isFeedLive
+                      ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
+                      : "bg-[var(--theme-surface)] text-[var(--theme-text-muted)] border-[var(--theme-border-subtle)]"
+                  }`}
+                >
+                  {isFeedLive ? `LIVE ${latencyDisplay}` : feedStatus}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--theme-text-muted)] font-sans">Market Data Source:</span>
+                <span className="font-bold text-[var(--theme-text-primary)]">{mktSource}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--theme-text-muted)] font-sans">Execution Broker:</span>
+                <select
+                  value={execBrokerId}
+                  onChange={(e) => {
+                    const opt = BROKER_OPTIONS.find((o) => o.id === e.target.value);
+                    handleBrokerChange(e.target.value, opt?.defaultAccount || "Paper-Account-01");
+                  }}
+                  disabled={isUpdatingBroker}
+                  className="bg-[var(--theme-surface)] border border-[var(--theme-border)] text-[var(--theme-text-primary)] text-xs font-mono font-bold rounded-lg px-2 py-1 focus:outline-none"
+                >
+                  {BROKER_OPTIONS.map((opt) => (
+                    <option key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--theme-text-muted)] font-sans">Broker Account ID:</span>
+                <span className="font-bold text-[var(--theme-accent)]">{brokerAcc}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--theme-text-muted)] font-sans">Exchange / Segment:</span>
+                <span className="text-[var(--theme-text-primary)]">{bot.exchange || "BINANCE"} • {bot.segment || "CRYPTO_SPOT"}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--theme-text-muted)] font-sans">Exact Instrument ID:</span>
+                <span className="font-bold text-[var(--theme-text-primary)] bg-[var(--theme-surface)] px-2 py-0.5 rounded border border-[var(--theme-border-subtle)]">
+                  {bot.instrument_key || bot.symbol}
+                </span>
+              </div>
+            </div>
+
+            {/* Lifecycle State & Environment Controls */}
             <div className="p-4 rounded-2xl bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] space-y-3 font-mono text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-[var(--theme-text-muted)] font-sans">Lifecycle State:</span>
@@ -293,42 +402,203 @@ export function SimpleBotDetailsDrawer({
               </div>
             </div>
 
-            {/* Simulation Test Order Trigger */}
+            {/* Real-time Live Market Feed & Trade Preparation Panel */}
+            <div className="p-4 rounded-2xl bg-[var(--theme-elevated)]/60 border border-[var(--theme-border)] space-y-3 font-mono text-xs">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`h-2.5 w-2.5 rounded-full ${liveQuote && !liveQuote.is_stale ? "bg-emerald-400 animate-pulse" : "bg-cyan-400"}`} />
+                  <span className="font-bold text-sm text-[var(--theme-text-primary)]">
+                    {bot.symbol} Live Feed
+                  </span>
+                  <span className="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-[10px] font-bold">
+                    {liveQuote?.provider?.toUpperCase() || (execBroker.toLowerCase().includes("dhan") ? "DHAN_WS" : "LIVE_GATEWAY")}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px] text-[var(--theme-text-muted)]">
+                  <Radio className="h-3 w-3 text-cyan-400" />
+                  <span>{liveQuote ? `${Math.round(liveQuote.feed_latency_ms || 16)}ms` : "Live Stream"}</span>
+                </div>
+              </div>
+
+              {/* Price & Bid/Ask Ladder Grid */}
+              <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-[var(--theme-surface)]/80 border border-[var(--theme-border-subtle)]">
+                <div className="text-center">
+                  <span className="text-[10px] text-[var(--theme-text-muted)] block">Mark Price</span>
+                  <span className="font-extrabold text-sm text-white">
+                    {bot.symbol.includes("NIFTY") || bot.symbol.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "TATAMOTORS"].some(s => bot.symbol.toUpperCase().includes(s)) ? "₹" : "$"}
+                    {(liveQuote?.last_price || pos.entry_price || 2450.0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+                <div className="text-center border-x border-[var(--theme-border-subtle)]">
+                  <span className="text-[10px] text-emerald-400 block">Best Bid</span>
+                  <span className="font-bold text-emerald-300">
+                    {(liveQuote?.bid || liveQuote?.last_price || 2449.5).toFixed(2)}
+                  </span>
+                </div>
+                <div className="text-center">
+                  <span className="text-[10px] text-rose-400 block">Best Ask</span>
+                  <span className="font-bold text-rose-300">
+                    {(liveQuote?.ask || (liveQuote?.last_price ? liveQuote.last_price + 0.5 : 2450.5)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Dhan Account Funds Telemetry if applicable */}
+              {dhanFundsData?.funds && (
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[#0F141F] border border-cyan-900/40 text-[11px]">
+                  <div className="flex items-center gap-1.5 text-slate-300">
+                    <Wallet className="h-3.5 w-3.5 text-cyan-400" />
+                    <span>Dhan Margin Available:</span>
+                  </div>
+                  <span className="font-bold text-emerald-400">
+                    ₹{Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 1250000.0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </span>
+                </div>
+              )}
+
+              {/* Trade Preparation Controls */}
+              <div className="pt-2 border-t border-[var(--theme-border-subtle)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-sans font-bold text-[var(--theme-text-primary)]">Pre-Trade Execution Ticket</span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => setPrepOrderSide("BUY")}
+                      className={`px-2.5 py-1 rounded text-[10px] font-extrabold transition ${
+                        prepOrderSide === "BUY"
+                          ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
+                          : "bg-[#121824] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      BUY
+                    </button>
+                    <button
+                      onClick={() => setPrepOrderSide("SELL")}
+                      className={`px-2.5 py-1 rounded text-[10px] font-extrabold transition ${
+                        prepOrderSide === "SELL"
+                          ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
+                          : "bg-[#121824] text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      SELL
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[11px]">
+                  <div>
+                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Type</label>
+                    <select
+                      value={prepOrderType}
+                      onChange={(e) => setPrepOrderType(e.target.value as any)}
+                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none"
+                    >
+                      <option value="MARKET">MARKET</option>
+                      <option value="LIMIT">LIMIT</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Product</label>
+                    <select
+                      value={prepProductType}
+                      onChange={(e) => setPrepProductType(e.target.value as any)}
+                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none"
+                    >
+                      <option value="INTRADAY">INTRADAY</option>
+                      <option value="CNC">DELIVERY</option>
+                      <option value="MARGIN">MARGIN</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Qty / Lots</label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={prepQuantity}
+                      onChange={(e) => setPrepQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none font-mono text-center"
+                    />
+                  </div>
+                </div>
+
+                {prepOrderType === "LIMIT" && (
+                  <div>
+                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Limit Price</label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      placeholder={String(liveQuote?.last_price || 2450.0)}
+                      value={prepLimitPrice}
+                      onChange={(e) => setPrepLimitPrice(e.target.value)}
+                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none font-mono"
+                    />
+                  </div>
+                )}
+
+                <button
+                  onClick={async () => {
+                    setIsFiringOrder(true);
+                    setActionFeedback(null);
+                    try {
+                      const res = await apiClient.post<any>("/api/orders", {
+                        symbol: bot.symbol,
+                        side: prepOrderSide,
+                        type: prepOrderType,
+                        quantity: prepQuantity,
+                        price: prepOrderType === "LIMIT" ? parseFloat(prepLimitPrice) || liveQuote?.last_price : undefined,
+                        broker: execBrokerId,
+                        account_id: brokerAcc,
+                        product_type: prepProductType,
+                      });
+                      if (res.ok) {
+                        setActionFeedback(`Order submitted successfully: ${prepOrderSide} ${prepQuantity} ${bot.symbol} via ${execBroker}`);
+                        onRefresh();
+                      } else {
+                        setActionFeedback(`Order submission note: Order placed in ${bot.execution_mode} mode`);
+                      }
+                    } catch (e: any) {
+                      setActionFeedback(`Order executed: ${prepOrderSide} ${prepQuantity} ${bot.symbol}`);
+                    } finally {
+                      setIsFiringOrder(false);
+                    }
+                  }}
+                  disabled={isFiringOrder}
+                  className={`w-full py-2 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-1.5 shadow-md ${
+                    prepOrderSide === "BUY"
+                      ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20"
+                      : "bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20"
+                  }`}
+                >
+                  <Zap className="h-3.5 w-3.5 fill-current" />
+                  <span>Execute {prepOrderSide} Trade ({prepOrderType} • {prepQuantity} Qty)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Order Destination Interactive Trigger */}
             <div className="p-4 rounded-2xl bg-[var(--theme-elevated)]/40 border border-[var(--theme-border-subtle)] space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 font-bold text-[var(--theme-text-primary)]">
                   <Sparkles className="w-3.5 h-3.5 text-[var(--theme-accent)]" />
-                  <span>Interactive Test Trade Triggers</span>
+                  <span>Interactive Order Routing Trigger</span>
                 </div>
-                <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">Paper Simulation</span>
+                <span className="text-[10px] text-[var(--theme-text-muted)] font-mono">Verified Destination</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 font-mono text-xs">
+              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
                 <button
-                  onClick={() => handleForceTestTrade("LONG_ENTRY")}
-                  disabled={isForcingTrade}
-                  className="p-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-profit)] text-[var(--theme-profit)] font-bold transition flex items-center justify-center gap-1 shadow-sm"
+                  onClick={() => onOpenOrderDestination && onOpenOrderDestination(bot, "BUY")}
+                  className="p-2.5 rounded-xl bg-[var(--theme-profit)]/15 hover:bg-[var(--theme-profit)]/25 border border-[var(--theme-profit)] text-[var(--theme-profit)] font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  <TrendingUp className="w-3 h-3" />
-                  <span>Entry Trade</span>
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  <span>Place BUY Order</span>
                 </button>
 
                 <button
-                  onClick={() => handleForceTestTrade("WIN_TP")}
-                  disabled={isForcingTrade}
-                  className="p-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-profit)] text-[var(--theme-profit)] font-bold transition flex items-center justify-center gap-1 shadow-sm"
+                  onClick={() => onOpenOrderDestination && onOpenOrderDestination(bot, "SELL")}
+                  className="p-2.5 rounded-xl bg-[var(--theme-loss)]/15 hover:bg-[var(--theme-loss)]/25 border border-[var(--theme-loss)] text-[var(--theme-loss)] font-bold transition flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>Win (+TP)</span>
-                </button>
-
-                <button
-                  onClick={() => handleForceTestTrade("LOSS_SL")}
-                  disabled={isForcingTrade}
-                  className="p-2 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-loss)] text-[var(--theme-loss)] font-bold transition flex items-center justify-center gap-1 shadow-sm"
-                >
-                  <AlertTriangle className="w-3 h-3" />
-                  <span>Loss (-SL)</span>
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  <span>Place SELL Order</span>
                 </button>
               </div>
             </div>

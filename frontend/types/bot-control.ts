@@ -13,6 +13,56 @@ export type BotStatus =
   | "STALLED"
   | "DISCONNECTED";
 
+export type BotFeedStatus =
+  | "LIVE"
+  | "PAPER"
+  | "SNAPSHOT"
+  | "STALE"
+  | "MARKET CLOSED"
+  | "OFFLINE"
+  | "AUTH REQUIRED"
+  | "DATA SOURCE REQUIRED"
+  | "NOT CONFIGURED"
+  | "RECONCILIATION_REQUIRED"
+  | "ERROR";
+
+export type ExecutionBrokerId =
+  | "paper_simulator"
+  | "dhan_india"
+  | "upstox"
+  | "delta_india"
+  | "ccxt_binance"
+  | "deribit";
+
+export interface BrokerStatusItem {
+  id: string;
+  name: string;
+  status: "CONNECTED" | "NOT_CONFIGURED" | "AUTH_REQUIRED" | "DISCONNECTED";
+  auth_verified: boolean;
+  max_leverage: number;
+  latency_ms: number;
+  supported_orders: string[];
+  asset_classes: string[];
+}
+
+export interface OrderDestinationPreview {
+  broker: string;
+  broker_id: string;
+  account: string;
+  environment: "PAPER" | "LIVE";
+  exchange: string;
+  instrument: string;
+  side: "BUY" | "SELL";
+  quantity: number;
+  estimated_price: number;
+  estimated_margin: number;
+  estimated_notional: number;
+  leverage: number;
+  live_trading_enabled: boolean;
+  is_live_allowed: boolean;
+  safety_message: string;
+}
+
 export type BotExecutionMode = "PAPER" | "LIVE";
 
 export type BotViewMode = "table" | "cards" | "matrix";
@@ -39,6 +89,7 @@ export interface FleetMetrics {
 export interface BotRowItem {
   id: string;
   bot_id: string;
+  bot_uid?: string;
   name: string;
   symbol: string;
   asset_class: string;
@@ -47,10 +98,21 @@ export interface BotRowItem {
   strategy_id: string;
   strategy_version: string;
   execution_mode: string;
+  market_data_source?: string;
+  execution_broker?: string;
+  execution_broker_id?: string;
+  broker_account_id?: string;
+  broker_account_alias?: string;
+  exchange?: string;
+  segment?: string;
+  instrument_key?: string;
+  feed_type?: "REST" | "WebSocket";
+  feed_status?: BotFeedStatus | string;
+  latency_ms?: number;
+  data_age_ms?: number;
   customer_id?: string;
   department_id?: string;
   broker_folder_id?: string;
-  broker_account_id?: string;
   broker_provider?: string;
   currency?: string;
   capital_source?: string;
@@ -311,7 +373,7 @@ export type WizardAssetClass =
   | "ETF";
 
 export interface IndicatorParamConfig {
-  [key: string]: number | string | boolean;
+  [key: string]: number | string | boolean | undefined;
 }
 
 export interface IndicatorConfigItem {

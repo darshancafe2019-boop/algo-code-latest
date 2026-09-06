@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   TrendingUp,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { MarketContextData } from "@/types/bot-control";
 import { apiClient } from "@/lib/apiClient";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 
 interface MarketContextStripProps {
   symbol: string;
@@ -22,12 +23,26 @@ interface MarketContextStripProps {
 }
 
 export function MarketContextStrip({ symbol, contextData }: MarketContextStripProps) {
-  // Query live ticker from backend with controlled polling and request deduplication
+  const activeSymbol = symbol || "BTC/USDT";
+  const { getQuote, subscribe, unsubscribe, connectionStatus } = useMarketGatewayContext();
+
+  // Subscribe to live market gateway feed for active symbol
+  useEffect(() => {
+    if (!activeSymbol) return;
+    subscribe(activeSymbol, "RUNNING_BOT");
+    return () => {
+      unsubscribe(activeSymbol, "RUNNING_BOT");
+    };
+  }, [activeSymbol, subscribe, unsubscribe]);
+
+  const liveWsQuote = getQuote(activeSymbol);
+
+  // Query fallback live ticker from backend
   const { data: tickerData, isFetching } = useQuery({
-    queryKey: ["marketTicker", symbol || "BTC/USDT"],
-    queryFn: async ({ signal }) => {
+    queryKey: ["marketTicker", activeSymbol],
+    queryFn: async ({ signal }: { signal?: AbortSignal }) => {
       const res = await apiClient.get<any>(
-        `/api/ticker?symbol=${encodeURIComponent(symbol || "BTC/USDT")}`,
+        `/api/ticker?symbol=${encodeURIComponent(activeSymbol)}`,
         { signal, timeoutMs: 5000, retries: 1 }
       );
       if (res.ok && res.data) {
@@ -41,17 +56,23 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
   });
 
   const rawTicker = tickerData?.data || tickerData?.ticker || tickerData || {};
-  const price = Number(rawTicker.last || rawTicker.price || contextData?.price || 65420.0);
-  const changePct = rawTicker.change_pct !== undefined ? Number(rawTicker.change_pct) : (rawTicker.change_24h_pct !== undefined ? Number(rawTicker.change_24h_pct) : (contextData?.change_24h_pct ?? 1.45));
+  const isIndianAsset = activeSymbol.includes("NIFTY") || activeSymbol.includes("BANK") || ["RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK", "SBIN", "TATAMOTORS"].some(s => activeSymbol.toUpperCase().includes(s));
+  const currencySymbol = isIndianAsset ? "₹" : "$";
+
+  // Prioritize WebSocket live quote if available
+  const price = Number(liveWsQuote?.last_price || rawTicker.last || rawTicker.price || contextData?.price || (isIndianAsset ? 24500.0 : 65420.0));
+  const changePct = liveWsQuote?.change_pct !== null && liveWsQuote?.change_pct !== undefined
+    ? Number(liveWsQuote.change_pct)
+    : (rawTicker.change_pct !== undefined ? Number(rawTicker.change_pct) : (rawTicker.change_24h_pct !== undefined ? Number(rawTicker.change_24h_pct) : (contextData?.change_24h_pct ?? 1.45)));
   const isPositive = changePct >= 0;
 
   const regime = contextData?.trend_regime || "TRENDING_BULL";
   const atr = contextData?.volatility_atr || (price * 0.015);
   const funding = contextData?.funding_rate_pct !== undefined ? contextData.funding_rate_pct : 0.01;
-  const feedAgeMs = tickerData?.latency_ms || rawTicker.latency_ms || 35;
-  const isStale = Boolean(tickerData?.is_stale || rawTicker.is_stale || tickerData?.status === "warning");
-  const provider = rawTicker.provider || "binance";
-  const dataQuality = isStale ? "RECONNECTING" : feedAgeMs < 500 ? "HEALTHY" : "DEGRADED";
+  const feedAgeMs = liveWsQuote ? Math.round(liveWsQuote.feed_latency_ms || 18) : (tickerData?.latency_ms || rawTicker.latency_ms || 35);
+  const isStale = Boolean(liveWsQuote?.is_stale || (connectionStatus !== "LIVE" && (tickerData?.is_stale || rawTicker.is_stale)));
+  const provider = liveWsQuote?.provider || rawTicker.provider || (isIndianAsset ? "dhan_ws" : "binance");
+  const dataQuality = isStale ? "RECONNECTING" : feedAgeMs < 500 ? "LIVE" : "DEGRADED";
 
   return (
     <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-2.5 sm:p-3 shadow-lg select-none font-sans overflow-x-auto">
@@ -65,7 +86,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
 
           <div className="flex items-center gap-2 font-mono">
             <span className="text-sm font-bold text-white">
-              ${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currencySymbol}{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
             <span
               className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
@@ -98,7 +119,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
           <div className="flex items-center gap-1.5">
             <Waves className="h-3.5 w-3.5 text-purple-400" />
             <span className="text-slate-500">ATR (14):</span>
-            <span className="text-slate-200 font-bold">${(Number(atr) || 0).toFixed(1)}</span>
+            <span className="text-slate-200 font-bold">{currencySymbol}{(Number(atr) || 0).toFixed(1)}</span>
           </div>
 
           {/* Funding Rate */}

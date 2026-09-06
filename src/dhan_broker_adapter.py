@@ -173,11 +173,51 @@ class DhanBrokerAdapter(BrokerAdapter):
     # ACCOUNT & BALANCES
     # =========================================================================
 
+    def get_fund_limits(self) -> Dict[str, Any]:
+        """
+        Fetches live funds, collateral, and margin limits directly from Dhan HQ API v2.
+        Endpoint: GET /v2/fundlimit
+        """
+        if not self.is_authenticated:
+            return {"status": "error", "error": "DHAN_NOT_CONFIGURED", "message": "Dhan credentials not configured."}
+        resp = self._make_request("GET", "fundlimit")
+        return resp
+
+    def get_profile(self) -> Dict[str, Any]:
+        """
+        Fetches user profile details from Dhan HQ API v2.
+        Endpoint: GET /v2/profile
+        """
+        if not self.is_authenticated:
+            return {"status": "error", "error": "DHAN_NOT_CONFIGURED", "message": "Dhan credentials not configured."}
+        return self._make_request("GET", "profile")
+
+    def get_holdings(self) -> List[Dict[str, Any]]:
+        """
+        Fetches equity portfolio holdings from Dhan HQ API v2.
+        Gracefully catches DH-1111 ('No holdings available') and returns an empty list.
+        Endpoint: GET /v2/holdings
+        """
+        if not self.is_authenticated:
+            return []
+        resp = self._make_request("GET", "holdings")
+        if isinstance(resp, list):
+            return resp
+        if isinstance(resp, dict):
+            # Check for empty holdings response code DH-1111
+            err_code = resp.get("errorCode", "")
+            err_msg = str(resp.get("errorMessage", "")).lower()
+            if err_code == "DH-1111" or "no holdings" in err_msg or "not found" in err_msg:
+                return []
+            if "data" in resp and isinstance(resp["data"], list):
+                return resp["data"]
+        return []
+
     def get_account_summary(self) -> Dict[str, Any]:
         trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
         if trading_mode == "LIVE" and self.is_authenticated:
             funds_resp = self._make_request("GET", "fundlimit")
-            if funds_resp and "availabelBalance" in funds_resp or "availMargin" in funds_resp:
+            if funds_resp and ("availabelBalance" in funds_resp or "availMargin" in funds_resp):
                 avail = float(funds_resp.get("availMargin") or funds_resp.get("availabelBalance") or 0.0)
                 used = float(funds_resp.get("utilizedAmount") or 0.0)
                 total = avail + used
@@ -267,6 +307,84 @@ class DhanBrokerAdapter(BrokerAdapter):
             if isinstance(resp, dict) and "data" in resp:
                 return resp["data"]
         return list(self.orders.values())
+
+    def get_trades(self) -> List[Dict[str, Any]]:
+        """
+        Fetches trade execution history from Dhan HQ API v2.
+        Endpoint: GET /v2/trades
+        """
+        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        if trading_mode == "LIVE" and self.is_authenticated:
+            resp = self._make_request("GET", "trades")
+            if isinstance(resp, list):
+                return resp
+            if isinstance(resp, dict) and "data" in resp:
+                return resp["data"]
+        return []
+
+    def modify_order(
+        self,
+        order_id: str,
+        order_type: str = "LIMIT",
+        quantity: Optional[int] = None,
+        price: Optional[float] = None,
+        trigger_price: Optional[float] = None,
+        validity: str = "DAY"
+    ) -> Dict[str, Any]:
+        """
+        Modifies a pending order on Dhan HQ API v2.
+        Endpoint: PUT /v2/orders/{orderId}
+        """
+        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        if trading_mode == "LIVE" and self.is_authenticated:
+            payload = {
+                "dhanClientId": self.client_id,
+                "orderId": order_id,
+                "orderType": order_type.upper(),
+                "validity": validity.upper(),
+            }
+            if quantity is not None:
+                payload["quantity"] = int(quantity)
+            if price is not None:
+                payload["price"] = float(price)
+            if trigger_price is not None:
+                payload["triggerPrice"] = float(trigger_price)
+            return self._make_request("PUT", f"orders/{order_id}", payload)
+
+        if order_id in self.orders:
+            if price is not None:
+                self.orders[order_id]["price"] = price
+            if quantity is not None:
+                self.orders[order_id]["quantity"] = quantity
+            return {"status": "SUCCESS", "order_id": order_id, "mode": "PAPER"}
+        return {"status": "FAILED", "error": "ORDER_NOT_FOUND"}
+
+    def get_market_feed_ltp(self, instruments_map: Dict[str, List[int]]) -> Dict[str, Any]:
+        """
+        Fetches Last Traded Price (LTP) from Dhan HQ Marketfeed API.
+        Endpoint: POST /v2/marketfeed/ltp
+        Example: {"NSE_EQ": [1333, 11536]}
+        """
+        if not self.is_authenticated:
+            return {"status": "error", "message": "Dhan credentials not configured"}
+        return self._make_request("POST", "marketfeed/ltp", instruments_map)
+
+    def store_credentials_in_vault(self, client_id: str, access_token: str) -> Dict[str, Any]:
+        """
+        Securely encrypts and stores Dhan credentials in database vault.
+        """
+        self.client_id = client_id.strip()
+        self.access_token = access_token.strip()
+        res = self.secrets_mgr.store_credential(
+            provider_id="dhan",
+            account_name="Dhan HQ Primary",
+            api_key=self.client_id,
+            secret_key=self.access_token,
+            allow_read=True,
+            allow_trade=True,
+            allow_withdraw=False
+        )
+        return res
 
     def place_order(
         self,
@@ -402,8 +520,42 @@ class DhanBrokerAdapter(BrokerAdapter):
             pos = self.positions.pop(position_id)
             opp_side = "SELL" if pos.get("side", "").upper() == "BUY" else "BUY"
             res = self.place_order(symbol=pos.get("symbol", ""), side=opp_side, quantity=float(pos.get("quantity", 1)))
-            return {"success": True, "position_id": position_id, "status": "CLOSED", "close_order": res}
-        return {"success": False, "position_id": position_id, "error": "POSITION_NOT_FOUND"}
+    def get_option_chain(
+        self,
+        underlying: str = "NIFTY",
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Fetches official Option Chain data from Dhan HQ API v2.
+        Endpoint: POST /v2/optionchain
+        """
+        if not self.is_authenticated:
+            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan credentials not configured"}
+
+        # Map index/stock name to Dhan Scrip Master code
+        scrip_map = {
+            "NIFTY": {"scrip": 13, "seg": "IDX_I"},
+            "BANKNIFTY": {"scrip": 25, "seg": "IDX_I"},
+            "FINNIFTY": {"scrip": 27, "seg": "IDX_I"},
+            "SENSEX": {"scrip": 51, "seg": "IDX_I"},
+            "RELIANCE": {"scrip": 2885, "seg": "NSE_EQ"},
+            "TCS": {"scrip": 11536, "seg": "NSE_EQ"},
+            "INFY": {"scrip": 1594, "seg": "NSE_EQ"},
+            "HDFCBANK": {"scrip": 1333, "seg": "NSE_EQ"},
+        }
+        und_key = underlying.upper().replace(" ", "").replace(".NS", "")
+        scrip_info = scrip_map.get(und_key, {"scrip": 13, "seg": "IDX_I"})
+
+        payload = {
+            "UnderlyingScrip": scrip_info["scrip"],
+            "UnderlyingSeg": scrip_info["seg"],
+        }
+        if expiry:
+            payload["Expiry"] = expiry
+
+        resp = self._make_request("POST", "optionchain", data=payload)
+        return resp
 
 
 # Global singleton adapter

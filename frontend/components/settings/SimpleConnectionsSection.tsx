@@ -14,6 +14,7 @@ import {
   Check,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { DhanConnectionCard } from "./DhanConnectionCard";
 import { UpstoxConnectionCard } from "./UpstoxConnectionCard";
 import { BinanceConnectionCard } from "./BinanceConnectionCard";
 import { DeltaConnectionCard } from "./DeltaConnectionCard";
@@ -216,6 +217,7 @@ export function SimpleConnectionsSection() {
 
       {/* Dedicated Exchange & Broker Connection Cards */}
       <div className="space-y-4 pt-2">
+        <DhanConnectionCard />
         <BinanceConnectionCard />
         <DeltaConnectionCard />
         <UpstoxConnectionCard />

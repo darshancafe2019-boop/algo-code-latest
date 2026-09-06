@@ -208,8 +208,9 @@ class OptionChainEngine:
     def filter_strike_range(
         cls,
         strikes_data: List[Dict[str, Any]],
-        underlying_price: float,
+        underlying_price: float = 0.0,
         strike_count: Optional[int] = 20,
+        spot_price: Optional[float] = None,
     ) -> List[Dict[str, Any]]:
         """
         Filters option chain strikes to a specific count (e.g. 5, 10, 20, 50) centered at ATM.
@@ -217,14 +218,17 @@ class OptionChainEngine:
         if not strikes_data or not strike_count or strike_count <= 0 or strike_count >= len(strikes_data):
             return strikes_data
 
+        target_price = spot_price if spot_price is not None and spot_price > 0 else underlying_price
+
         # Sort strikes ascending
         sorted_strikes = sorted(strikes_data, key=lambda x: float(x.get("strike", 0)))
         
         # Find ATM index
         atm_idx = 0
         min_dist = float("inf")
-        for i, row in enumerate(sorted_strikes):
-            dist = abs(float(row.get("strike", 0)) - underlying_price)
+        for i, s in enumerate(sorted_strikes):
+            strike = float(s.get("strike", 0))
+            dist = abs(strike - target_price)
             if dist < min_dist:
                 min_dist = dist
                 atm_idx = i

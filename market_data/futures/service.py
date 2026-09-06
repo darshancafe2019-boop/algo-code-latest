@@ -1,13 +1,13 @@
 """
 Futures Market Unified Service
 ===============================
-Coordinates Quote, Funding, Basis, Liquidation, and Screener engines with in-memory caching.
+Coordinates Quote, Funding, Basis, Liquidation, Screener, and Provider Health engines with in-memory caching.
 """
 
 from __future__ import annotations
 import time
 from typing import Dict, Any, List, Optional
-from market_data.futures.models import CanonicalFuturesContract
+from market_data.futures.models import CanonicalFuturesContract, ProviderHealthReport
 from market_data.futures.quote_engine import FuturesQuoteEngine
 from market_data.futures.funding_engine import FundingRateEngine
 from market_data.futures.basis_engine import BasisEngine
@@ -44,6 +44,10 @@ class FuturesMarketService:
             self._cached_contracts = self.quote_engine.get_all_universe_contracts()
             self._last_cache_time = now
         return self._cached_contracts
+
+    def get_providers_health(self) -> List[ProviderHealthReport]:
+        """Returns provider diagnostic health reports."""
+        return self.quote_engine.get_providers_health()
 
     def get_contract_by_symbol(self, symbol: str) -> Optional[CanonicalFuturesContract]:
         contracts = self.get_all_contracts()

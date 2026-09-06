@@ -16,9 +16,24 @@ import {
   Minus,
   Bot,
   Zap,
+  ChevronDown,
+  Shield,
+  ShieldCheck,
+  ShieldAlert,
+  Radio,
+  ArrowRight,
+  TrendingUp,
 } from "lucide-react";
-import { BotRowItem } from "@/types/bot-control";
+import { BotRowItem, ExecutionBrokerId, BrokerStatusItem } from "@/types/bot-control";
 export type { BotRowItem };
+
+const BROKER_OPTIONS: { id: ExecutionBrokerId; label: string; defaultAccount: string }[] = [
+  { id: "paper_simulator", label: "Paper Simulator", defaultAccount: "Paper-Simulator-01" },
+  { id: "ccxt_binance", label: "Binance", defaultAccount: "Paper-Binance-01" },
+  { id: "upstox", label: "Upstox", defaultAccount: "Upstox-Paper-01" },
+  { id: "dhan_india", label: "Dhan", defaultAccount: "ba_dhan_primary" },
+  { id: "delta_india", label: "Delta Exchange India", defaultAccount: "Delta-Paper-01" },
+];
 
 interface SimpleBotTableProps {
   bots: BotRowItem[];
@@ -26,6 +41,8 @@ interface SimpleBotTableProps {
   onSelectBot: (bot: BotRowItem) => void;
   onBotAction: (botId: string, action: string) => Promise<void> | void;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
+  onSetBroker?: (botId: string, brokerId: string, accountId?: string) => Promise<void> | void;
+  onOpenOrderDestination?: (bot: BotRowItem, side: "BUY" | "SELL") => void;
   onDeleteBot: (bot: BotRowItem) => void;
   onCreateBot: () => void;
   selectedMarket: string;
@@ -40,6 +57,8 @@ export function SimpleBotTable({
   onSelectBot,
   onBotAction,
   onToggleMode,
+  onSetBroker,
+  onOpenOrderDestination,
   onDeleteBot,
   onCreateBot,
   selectedMarket,
@@ -50,22 +69,27 @@ export function SimpleBotTable({
   const [loadingActionBotId, setLoadingActionBotId] = useState<string | null>(null);
   const [togglingModeBotId, setTogglingModeBotId] = useState<string | null>(null);
   const [activeMenuBotId, setActiveMenuBotId] = useState<string | null>(null);
+  const [activeBrokerDropdownBotId, setActiveBrokerDropdownBotId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const brokerDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Close dropdown on outside click
+  // Close dropdowns on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActiveMenuBotId(null);
       }
+      if (brokerDropdownRef.current && !brokerDropdownRef.current.contains(event.target as Node)) {
+        setActiveBrokerDropdownBotId(null);
+      }
     }
-    if (activeMenuBotId) {
+    if (activeMenuBotId || activeBrokerDropdownBotId) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [activeMenuBotId]);
+  }, [activeMenuBotId, activeBrokerDropdownBotId]);
 
   const handleAction = async (e: React.MouseEvent, botId: string, action: string) => {
     e.stopPropagation();
@@ -90,6 +114,14 @@ export function SimpleBotTable({
     }
   };
 
+  const handleBrokerSelect = async (e: React.MouseEvent, botId: string, brokerId: string, defAccount: string) => {
+    e.stopPropagation();
+    setActiveBrokerDropdownBotId(null);
+    if (onSetBroker) {
+      await onSetBroker(botId, brokerId, defAccount);
+    }
+  };
+
   const handleDeleteClick = (e: React.MouseEvent, bot: BotRowItem) => {
     e.stopPropagation();
     setActiveMenuBotId(null);
@@ -100,6 +132,14 @@ export function SimpleBotTable({
     e.stopPropagation();
     setActiveMenuBotId(null);
     onSelectBot(bot);
+  };
+
+  const handleQuickTradeClick = (e: React.MouseEvent, bot: BotRowItem, side: "BUY" | "SELL") => {
+    e.stopPropagation();
+    setActiveMenuBotId(null);
+    if (onOpenOrderDestination) {
+      onOpenOrderDestination(bot, side);
+    }
   };
 
   const allFilteredSelected =
@@ -144,7 +184,7 @@ export function SimpleBotTable({
           <thead className="bg-[var(--theme-elevated)] text-[var(--theme-text-muted)] border-b border-[var(--theme-border-subtle)] text-[11px] font-mono select-none">
             <tr>
               {/* Checkbox Column */}
-              <th className="py-3.5 px-3.5 w-10 text-center">
+              <th className="py-3.5 px-3 w-10 text-center">
                 <button
                   type="button"
                   onClick={onToggleSelectAll}
@@ -161,14 +201,16 @@ export function SimpleBotTable({
                   {someFilteredSelected && <Minus className="w-3 h-3 stroke-[3]" />}
                 </button>
               </th>
-              <th className="py-3.5 px-4 font-bold">BOT INSTANCE</th>
-              <th className="py-3.5 px-4 font-bold">MARKET & TF</th>
-              <th className="py-3.5 px-4 font-bold text-center">MODE</th>
-              <th className="py-3.5 px-4 font-bold">LIFECYCLE STATUS</th>
-              <th className="py-3.5 px-4 font-bold">ACTIVE POSITION</th>
-              <th className="py-3.5 px-4 font-bold text-right">TODAY P&L</th>
-              <th className="py-3.5 px-4 font-bold text-center">HEALTH</th>
-              <th className="py-3.5 px-4 font-bold text-right w-20">ACTIONS</th>
+              <th className="py-3.5 px-3 font-bold">BOT INSTANCE</th>
+              <th className="py-3.5 px-3 font-bold">MARKET & TF</th>
+              <th className="py-3.5 px-3 font-bold">MARKET DATA SOURCE</th>
+              <th className="py-3.5 px-3 font-bold">EXECUTION BROKER</th>
+              <th className="py-3.5 px-3 font-bold">ACCOUNT & ENV</th>
+              <th className="py-3.5 px-3 font-bold">LIFECYCLE STATUS</th>
+              <th className="py-3.5 px-3 font-bold">ACTIVE POSITION</th>
+              <th className="py-3.5 px-3 font-bold text-right">TODAY P&L</th>
+              <th className="py-3.5 px-3 font-bold text-center">HEALTH</th>
+              <th className="py-3.5 px-3 font-bold text-right w-24">ACTIONS</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--theme-border-subtle)]/60 font-mono">
@@ -189,10 +231,19 @@ export function SimpleBotTable({
               const isActionLoading = loadingActionBotId === bot.id;
               const isSelected = selectedBotIds.includes(bot.id);
               const isMenuOpen = activeMenuBotId === bot.id;
+              const isBrokerDropdownOpen = activeBrokerDropdownBotId === bot.id;
+
+              const mktSource = bot.market_data_source || "Binance Official API";
+              const execBroker = bot.execution_broker || "Paper Simulator";
+              const brokerAcc = bot.broker_account_id || bot.broker_account_alias || "Paper-Account-01";
+              const feedStatus = bot.feed_status || "LIVE";
+              const isFeedLive = feedStatus === "LIVE";
+              const isFeedUnconfigured = feedStatus === "NOT CONFIGURED";
+              const latencyDisplay = bot.latency_ms ? `${bot.latency_ms.toFixed(0)}ms` : "14ms";
 
               return (
                 <tr
-                  key={bot.id}
+                  key={bot.bot_uid || bot.id}
                   onClick={() => onSelectBot(bot)}
                   className={`transition cursor-pointer group ${
                     isSelected
@@ -202,7 +253,7 @@ export function SimpleBotTable({
                 >
                   {/* Checkbox */}
                   <td
-                    className="py-3.5 px-3.5 text-center"
+                    className="py-3 px-3 text-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleSelectBot(bot.id);
@@ -220,45 +271,121 @@ export function SimpleBotTable({
                     </button>
                   </td>
 
-                  {/* 1. BOT */}
-                  <td className="py-3.5 px-4 font-sans">
+                  {/* 1. BOT INSTANCE */}
+                  <td className="py-3 px-3 font-sans">
                     <div className="font-extrabold text-[var(--theme-text-primary)] group-hover:text-[var(--theme-accent)] transition text-xs flex items-center gap-1.5">
                       <span>{bot.name}</span>
                     </div>
                     <div className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-xs mt-0.5">
-                      {bot.next_action || bot.strategy}
+                      ID: {bot.id} • {bot.strategy}
                     </div>
                   </td>
 
-                  {/* 2. MARKET */}
-                  <td className="py-3.5 px-4 font-mono">
+                  {/* 2. MARKET & TF */}
+                  <td className="py-3 px-3 font-mono">
                     <div className="font-bold text-[var(--theme-text-primary)] text-xs">{bot.symbol}</div>
                     <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
                       {bot.timeframe} • {bot.asset_class || "CRYPTO"}
                     </div>
                   </td>
 
-                  {/* 3. MODE (Interactive Live / Paper Switch) */}
-                  <td className="py-3.5 px-4 text-center">
-                    <button
-                      onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
-                      disabled={isTogglingMode}
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-extrabold font-mono transition-all border shadow-sm ${
-                        isLive
-                          ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40 hover:bg-[var(--theme-loss)]/25"
-                          : "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40 hover:bg-[var(--theme-accent)]/25"
-                      }`}
-                      title={isLive ? "Currently executing LIVE orders. Click to switch to PAPER simulation." : "Currently in PAPER mode. Click to switch to LIVE."}
-                    >
-                      <span className={`w-1.5 h-1.5 rounded-full ${isLive ? "bg-[var(--theme-loss)] animate-pulse" : "bg-[var(--theme-accent)]"}`} />
-                      <span>{isTogglingMode ? "SWITCH..." : isLive ? "LIVE" : "PAPER"}</span>
-                    </button>
+                  {/* 3. MARKET DATA SOURCE */}
+                  <td className="py-3 px-3 font-mono">
+                    <div className="text-[11px] font-bold text-[var(--theme-text-primary)] flex items-center gap-1.5">
+                      <Radio className="w-3 h-3 text-[var(--theme-accent)]" />
+                      <span>{mktSource}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold font-mono border ${
+                          isFeedLive
+                            ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
+                            : isFeedUnconfigured
+                            ? "bg-[var(--theme-surface)] text-[var(--theme-text-muted)] border-[var(--theme-border-subtle)]"
+                            : "bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border-[var(--theme-warning)]/30"
+                        }`}
+                      >
+                        {isFeedLive ? `LIVE ${latencyDisplay}` : feedStatus}
+                      </span>
+                      <span className="text-[9px] text-[var(--theme-text-muted)]">
+                        {bot.exchange || "BINANCE"}
+                      </span>
+                    </div>
                   </td>
 
-                  {/* 4. STATUS */}
-                  <td className="py-3.5 px-4">
+                  {/* 4. EXECUTION BROKER (Interactive Dropdown Selector) */}
+                  <td className="py-3 px-3 font-mono relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveBrokerDropdownBotId(isBrokerDropdownOpen ? null : bot.id);
+                        setActiveMenuBotId(null);
+                      }}
+                      className="px-2.5 py-1 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-accent)] text-[var(--theme-text-primary)] font-bold text-[11px] transition flex items-center justify-between gap-1.5 shadow-sm max-w-[155px]"
+                    >
+                      <span className="truncate">{execBroker}</span>
+                      <ChevronDown className="w-3 h-3 shrink-0 text-[var(--theme-text-muted)]" />
+                    </button>
+
+                    {/* Broker Selector Dropdown Popup */}
+                    {isBrokerDropdownOpen && (
+                      <div
+                        ref={brokerDropdownRef}
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-3 top-full mt-1 z-40 w-52 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                      >
+                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-[var(--theme-text-muted)] uppercase border-b border-[var(--theme-border-subtle)]">
+                          Select Execution Broker
+                        </div>
+                        {BROKER_OPTIONS.map((opt) => {
+                          const isCurrent = (bot.execution_broker_id || "").toLowerCase() === opt.id || execBroker.toLowerCase().includes(opt.label.toLowerCase());
+                          return (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={(e) => handleBrokerSelect(e, bot.id, opt.id, opt.defaultAccount)}
+                              className={`w-full px-3 py-2 text-left font-mono text-[11px] flex items-center justify-between transition ${
+                                isCurrent
+                                  ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold"
+                                  : "hover:bg-[var(--theme-elevated)] text-[var(--theme-text-primary)]"
+                              }`}
+                            >
+                              <span>{opt.label}</span>
+                              {isCurrent && <Check className="w-3 h-3 text-[var(--theme-accent)]" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </td>
+
+                  {/* 5. ACCOUNT & ENV */}
+                  <td className="py-3 px-3 font-mono">
+                    <div className="font-bold text-[var(--theme-text-primary)] text-[11px] truncate max-w-[130px]">
+                      {brokerAcc}
+                    </div>
+                    <div className="mt-0.5">
+                      <button
+                        onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
+                        disabled={isTogglingMode}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold font-mono border ${
+                          isLive
+                            ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40 hover:bg-[var(--theme-loss)]/25"
+                            : "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40 hover:bg-[var(--theme-accent)]/25"
+                        }`}
+                        title={isLive ? "LIVE mode active. Click to switch to PAPER." : "PAPER simulation. Click to toggle."}
+                      >
+                        <span className={`w-1 h-1 rounded-full ${isLive ? "bg-[var(--theme-loss)] animate-pulse" : "bg-[var(--theme-accent)]"}`} />
+                        <span>{isTogglingMode ? "..." : isLive ? "LIVE" : "PAPER"}</span>
+                      </button>
+                    </div>
+                  </td>
+
+                  {/* 6. STATUS */}
+                  <td className="py-3 px-3">
                     <span
-                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold font-mono border ${
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono border ${
                         isRunning
                           ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/40 animate-pulse"
                           : isPaused
@@ -274,8 +401,8 @@ export function SimpleBotTable({
                     </span>
                   </td>
 
-                  {/* 5. POSITION */}
-                  <td className="py-3.5 px-4">
+                  {/* 7. POSITION */}
+                  <td className="py-3 px-3">
                     {pos.has_position ? (
                       <div>
                         <span
@@ -294,8 +421,8 @@ export function SimpleBotTable({
                     )}
                   </td>
 
-                  {/* 6. TODAY P&L */}
-                  <td className="py-3.5 px-4 text-right">
+                  {/* 8. TODAY P&L */}
+                  <td className="py-3 px-3 text-right">
                     <div
                       className={`font-black text-xs ${
                         isPnlPositive ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
@@ -308,8 +435,8 @@ export function SimpleBotTable({
                     </div>
                   </td>
 
-                  {/* 7. HEALTH */}
-                  <td className="py-3.5 px-4 text-center">
+                  {/* 9. HEALTH */}
+                  <td className="py-3 px-3 text-center">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         bot.health === "HEALTHY"
@@ -323,14 +450,27 @@ export function SimpleBotTable({
                     </span>
                   </td>
 
-                  {/* 8. CONSOLIDATED KEBAB ACTION */}
-                  <td className="py-3.5 px-4 text-right relative">
-                    <div className="inline-flex items-center justify-end relative">
+                  {/* 10. ACTIONS (Quick Trade Destination Button + Consolidated Menu) */}
+                  <td className="py-3 px-3 text-right relative">
+                    <div className="inline-flex items-center justify-end gap-1.5 relative">
+                      {/* Order Destination Trigger Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickTradeClick(e, bot, "BUY")}
+                        className="px-2 py-1 rounded-lg bg-[var(--theme-profit)]/15 hover:bg-[var(--theme-profit)]/25 text-[var(--theme-profit)] border border-[var(--theme-profit)]/40 font-extrabold text-[10px] transition font-mono flex items-center gap-1 shadow-sm"
+                        title="Open Order Destination & Send Trade"
+                      >
+                        <Zap className="w-3 h-3 fill-current" />
+                        <span>Trade</span>
+                      </button>
+
+                      {/* Kebab Menu Button */}
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           setActiveMenuBotId(isMenuOpen ? null : bot.id);
+                          setActiveBrokerDropdownBotId(null);
                         }}
                         disabled={isActionLoading}
                         className={`p-1.5 rounded-lg border transition flex items-center justify-center ${
@@ -343,7 +483,7 @@ export function SimpleBotTable({
                         {isActionLoading ? (
                           <div className="w-3.5 h-3.5 border-2 border-[var(--theme-accent)] border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <MoreVertical className="w-4 h-4" />
+                          <MoreVertical className="w-3.5 h-3.5" />
                         )}
                       </button>
 
@@ -352,7 +492,7 @@ export function SimpleBotTable({
                         <div
                           ref={menuRef}
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-full mt-1.5 z-40 w-44 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1.5 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                          className="absolute right-0 top-full mt-1 z-40 w-44 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1.5 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
                         >
                           {/* Contextual Execution Controls */}
                           {isStopped && (
@@ -429,40 +569,27 @@ export function SimpleBotTable({
                             </>
                           )}
 
-                          {isRecovering && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleAction(e, bot.id, "STOP")}
-                              className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
-                            >
-                              <Square className="w-3.5 h-3.5 fill-current" />
-                              <span>Stop Bot</span>
-                            </button>
-                          )}
-
                           {/* View Details Option */}
-                          {!isError && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDetailsClick(e, bot)}
-                              className="w-full px-3.5 py-2 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)] flex items-center gap-2 font-medium transition"
-                            >
-                              <Eye className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
-                              <span>View Details</span>
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => handleDetailsClick(e, bot)}
+                            className="w-full px-3.5 py-2 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)] flex items-center gap-2 font-medium transition"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
+                            <span>View Details</span>
+                          </button>
 
                           {/* Divider */}
                           <div className="h-px bg-[var(--theme-border-subtle)] my-1" />
 
-                          {/* Delete / Force Delete Bot Option */}
+                          {/* Delete / Force Delete Option */}
                           <button
                             type="button"
                             onClick={(e) => handleDeleteClick(e, bot)}
                             className="w-full px-3.5 py-2 flex items-center gap-2 font-bold transition text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/20"
                           >
                             <Trash2 className="w-3.5 h-3.5 text-[var(--theme-loss)]" />
-                            <span>{isError || isRecovering ? "Force Delete Bot" : "Delete Bot"}</span>
+                            <span>{isError || isRecovering ? "Force Delete" : "Delete Bot"}</span>
                           </button>
                         </div>
                       )}

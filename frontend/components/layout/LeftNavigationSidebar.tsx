@@ -22,6 +22,7 @@ import {
   Sliders,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Terminal,
   Menu,
   X,
@@ -38,7 +39,14 @@ interface LeftNavigationSidebarProps {
   onTabSelect?: (tabId: string) => void;
 }
 
-interface NavItem {
+export interface NavChildItem {
+  id: string;
+  label: string;
+  path: string;
+  badge?: string;
+}
+
+export interface NavItem {
   id: string;
   label: string;
   subtitle?: string;
@@ -46,6 +54,7 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   badge?: string;
   shortcut?: string;
+  children?: NavChildItem[];
 }
 
 interface NavGroup {
@@ -62,6 +71,27 @@ export function LeftNavigationSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
+    options: true,
+    futures: true,
+  });
+
+  useEffect(() => {
+    if (pathname?.startsWith("/options")) {
+      setExpandedItems((prev) => ({ ...prev, options: true }));
+    }
+    if (pathname?.startsWith("/futures") || pathname?.startsWith("/crypto/futures")) {
+      setExpandedItems((prev) => ({ ...prev, futures: true }));
+    }
+  }, [pathname]);
+
+  const toggleExpand = (id: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setExpandedItems((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
 
   const navGroups: NavGroup[] = [
     {
@@ -78,8 +108,47 @@ export function LeftNavigationSidebar({
         { id: "terminal", label: "TERMINAL", path: "/terminal", icon: Terminal, shortcut: "⌘T" },
         { id: "bots", label: "BOTS", path: "/bots", icon: Bot, badge: "LIVE" },
         { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
-        { id: "futures", label: "FUTURES", path: "/crypto/futures", icon: TrendingUp },
-        { id: "options", label: "OPTIONS", path: "/options", icon: Zap },
+        {
+          id: "futures",
+          label: "FUTURES",
+          path: "/futures",
+          icon: TrendingUp,
+          children: [
+            { id: "futures-all", label: "All / Smart Futures", path: "/futures" },
+            { id: "futures-binance-usdm", label: "Binance USD-M", path: "/futures/binance-usdm", badge: "USD-M" },
+            { id: "futures-binance-coinm", label: "Binance COIN-M", path: "/futures/binance-coinm", badge: "COIN-M" },
+            { id: "futures-delta", label: "Delta Exchange", path: "/futures/delta", badge: "CRYPTO" },
+            { id: "futures-dhan", label: "Dhan Futures", path: "/futures/dhan", badge: "NSE" },
+            { id: "futures-upstox", label: "Upstox Futures", path: "/futures/upstox", badge: "NSE" },
+            { id: "futures-global", label: "CME / Global Futures", path: "/futures/global", badge: "CME" },
+            { id: "futures-funding", label: "Funding & Basis", path: "/futures/funding" },
+            { id: "futures-saved", label: "Saved Futures", path: "/futures/saved" },
+            { id: "futures-strategies", label: "Futures Strategies", path: "/futures/strategies" },
+            { id: "futures-positions", label: "Futures Positions", path: "/futures/positions" },
+            { id: "futures-health", label: "Futures Health", path: "/futures/health", badge: "HEALTH" },
+          ],
+        },
+        {
+          id: "options",
+          label: "OPTIONS",
+          path: "/options",
+          icon: Zap,
+          children: [
+            { id: "options-all", label: "All / Smart Options", path: "/options" },
+            { id: "options-chain", label: "Option Chain", path: "/options/chain" },
+            { id: "options-dhan", label: "Dhan Options", path: "/options/dhan", badge: "NSE" },
+            { id: "options-upstox", label: "Upstox Options", path: "/options/upstox", badge: "NSE" },
+            { id: "options-delta", label: "Delta Exchange Options", path: "/options/delta", badge: "CRYPTO" },
+            { id: "options-binance", label: "Binance Options", path: "/options/binance", badge: "CRYPTO" },
+            { id: "options-greeks", label: "Greeks & Volatility", path: "/options/greeks" },
+            { id: "options-flow", label: "OI & Market Flow", path: "/options/flow" },
+            { id: "options-strategies", label: "Strategy Studio", path: "/options/strategies" },
+            { id: "options-saved", label: "Saved Chains", path: "/options/saved" },
+            { id: "options-positions", label: "Options Positions", path: "/options/positions" },
+            { id: "options-orders", label: "Options Orders", path: "/options/orders" },
+            { id: "options-health", label: "Options Health", path: "/options/health", badge: "HEALTH" },
+          ],
+        },
         {
           id: "tax",
           label: "TAX INTELLIGENCE",
@@ -131,13 +200,13 @@ export function LeftNavigationSidebar({
         "/bots",
         "/markets",
         "/options",
+        "/futures",
         "/capital",
         "/pnl",
         "/positions",
         "/orders",
         "/risk",
         "/scanner",
-        "/crypto/futures",
         "/tax",
       ];
       paths.forEach((p) => {
@@ -163,12 +232,39 @@ export function LeftNavigationSidebar({
     setMobileDrawerOpen(false);
   };
 
+  const handleItemClick = (item: NavItem) => {
+    if (item.children && item.children.length > 0) {
+      if (isCollapsed) {
+        handleNavClick(item);
+      } else {
+        toggleExpand(item.id);
+        if (!pathname?.startsWith(item.path)) {
+          handleNavClick(item);
+        }
+      }
+    } else {
+      handleNavClick(item);
+    }
+  };
+
   const isItemActive = (item: NavItem) => {
     if (pathname === item.path) return true;
+    if (item.id === "futures" && (pathname?.startsWith("/futures") || pathname?.startsWith("/crypto/futures"))) return true;
+    if (item.children && item.children.some((c) => pathname === c.path || (c.path === "/options" && (pathname === "/options/all" || pathname === "/options")) || (c.path === "/futures" && (pathname === "/futures" || pathname === "/crypto/futures")))) return true;
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
     if (activeTab === item.id) return true;
     if (item.id === "capital-funds" && (activeTab === "capital" || activeTab === "funds" || activeTab === "capital-funds")) return true;
     return false;
+  };
+
+  const isChildActive = (child: NavChildItem) => {
+    if (child.path === "/options") {
+      return pathname === "/options" || pathname === "/options/all";
+    }
+    if (child.path === "/futures") {
+      return pathname === "/futures" || pathname === "/crypto/futures";
+    }
+    return pathname === child.path;
   };
 
   // Quick Mobile Bottom Bar Items
@@ -200,58 +296,112 @@ export function LeftNavigationSidebar({
               {group.items.map((item) => {
                 const Icon = item.icon;
                 const active = isItemActive(item);
+                const hasChildren = Boolean(item.children && item.children.length > 0);
+                const isExpanded = Boolean(expandedItems[item.id]);
 
                 return (
-                  <button
-                    key={item.id}
-                    onClick={() => handleNavClick(item)}
-                    onMouseEnter={() => {
-                      try {
-                        router.prefetch(item.path);
-                      } catch { }
-                    }}
-                    title={isCollapsed ? (item.subtitle ? `${item.label} (${item.subtitle})` : item.label) : undefined}
-                    aria-label={item.label}
-                    data-nav-id={item.id}
-                    data-nav-path={item.path}
-                    className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
-                      ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
-                      }`}
-                  >
-                    {/* Active Left Indicator Bar */}
-                    {active && (
-                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-sky-400 rounded-r-full shadow-[0_0_10px_rgba(56,189,248,0.9)]" />
-                    )}
-
-                    <Icon
-                      className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                  <div key={item.id} className="space-y-0.5">
+                    <button
+                      onClick={() => handleItemClick(item)}
+                      onMouseEnter={() => {
+                        try {
+                          router.prefetch(item.path);
+                        } catch { }
+                      }}
+                      title={isCollapsed ? (item.subtitle ? `${item.label} (${item.subtitle})` : item.label) : undefined}
+                      aria-label={item.label}
+                      aria-expanded={hasChildren ? isExpanded : undefined}
+                      data-nav-id={item.id}
+                      data-nav-path={item.path}
+                      className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
+                        ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
+                        : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
                         }`}
-                    />
+                    >
+                      {/* Active Left Indicator Bar */}
+                      {active && (
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-sky-400 rounded-r-full shadow-[0_0_10px_rgba(56,189,248,0.9)]" />
+                      )}
 
-                    {!isCollapsed && (
-                      <>
-                        <div className="hidden xl:flex flex-col flex-1 text-left min-w-0">
-                          <span className="tracking-wide truncate font-bold text-xs">{item.label}</span>
-                          {item.subtitle && (
-                            <span className="text-[9px] text-[#8BA596] truncate font-sans font-normal -mt-0.5">
-                              {item.subtitle}
+                      <Icon
+                        className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                          }`}
+                      />
+
+                      {!isCollapsed && (
+                        <>
+                          <div className="hidden xl:flex flex-col flex-1 text-left min-w-0">
+                            <span className="tracking-wide truncate font-bold text-xs">{item.label}</span>
+                            {item.subtitle && (
+                              <span className="text-[9px] text-[#8BA596] truncate font-sans font-normal -mt-0.5">
+                                {item.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          {item.badge && (
+                            <span className="hidden xl:inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
+                              {item.badge}
                             </span>
                           )}
-                        </div>
-                        {item.badge && (
-                          <span className="hidden xl:inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
-                            {item.badge}
-                          </span>
-                        )}
-                        {item.shortcut && (
-                          <kbd className="text-[9px] text-slate-500 font-mono hidden 2xl:inline">
-                            {item.shortcut}
-                          </kbd>
-                        )}
-                      </>
+                          {hasChildren && (
+                            <div
+                              onClick={(e) => toggleExpand(item.id, e)}
+                              className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition"
+                            >
+                              <ChevronDown
+                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-sky-400" : ""}`}
+                              />
+                            </div>
+                          )}
+                          {item.shortcut && !hasChildren && (
+                            <kbd className="text-[9px] text-slate-500 font-mono hidden 2xl:inline">
+                              {item.shortcut}
+                            </kbd>
+                          )}
+                        </>
+                      )}
+                    </button>
+
+                    {/* Children Dropdown (Desktop Expanded) */}
+                    {!isCollapsed && hasChildren && isExpanded && (
+                      <div className="hidden xl:flex flex-col pl-7 pr-1 py-1 space-y-0.5 animate-fadeIn border-l border-slate-800/80 ml-4 my-1">
+                        {item.children!.map((child) => {
+                          const childActive = isChildActive(child);
+                          return (
+                            <button
+                              key={child.id}
+                              onClick={() => {
+                                if (onTabSelect) onTabSelect(child.id);
+                                router.push(child.path);
+                                setMobileDrawerOpen(false);
+                              }}
+                              onMouseEnter={() => {
+                                try {
+                                  router.prefetch(child.path);
+                                } catch { }
+                              }}
+                              data-nav-child-id={child.id}
+                              data-nav-child-path={child.path}
+                              className={`w-full min-h-[30px] flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-150 relative cursor-pointer ${childActive
+                                ? "bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40 shadow-sm"
+                                : "text-slate-400 hover:text-slate-200 hover:bg-[var(--theme-elevated)]/60 border border-transparent"
+                                }`}
+                            >
+                              {childActive && (
+                                <span className="absolute -left-[17px] top-2 bottom-2 w-1 bg-sky-400 rounded-full" />
+                              )}
+                              <span className="truncate">{child.label}</span>
+                              {child.badge && (
+                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                  {child.badge}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     )}
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -309,37 +459,83 @@ export function LeftNavigationSidebar({
                   {group.items.map((item) => {
                     const Icon = item.icon;
                     const active = isItemActive(item);
+                    const hasChildren = Boolean(item.children && item.children.length > 0);
+                    const isExpanded = Boolean(expandedItems[item.id]);
+
                     return (
-                      <button
-                        key={item.id}
-                        onClick={() => handleNavClick(item)}
-                        onMouseEnter={() => {
-                          try {
-                            router.prefetch(item.path);
-                          } catch { }
-                        }}
-                        data-mobile-nav-id={item.id}
-                        data-mobile-nav-path={item.path}
-                        className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-mono transition-all ${active
-                          ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40"
-                          : "text-[var(--theme-text-secondary)] active:bg-[var(--theme-elevated)]"
-                          }`}
-                      >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <div className="flex flex-col flex-1 text-left min-w-0">
-                          <span className="font-bold text-xs">{item.label}</span>
-                          {item.subtitle && (
-                            <span className="text-[10px] text-[#8BA596] font-sans font-normal">
-                              {item.subtitle}
+                      <div key={item.id} className="space-y-1">
+                        <button
+                          onClick={() => handleItemClick(item)}
+                          onMouseEnter={() => {
+                            try {
+                              router.prefetch(item.path);
+                            } catch { }
+                          }}
+                          data-mobile-nav-id={item.id}
+                          data-mobile-nav-path={item.path}
+                          className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-mono transition-all ${active
+                            ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40"
+                            : "text-[var(--theme-text-secondary)] active:bg-[var(--theme-elevated)]"
+                            }`}
+                        >
+                          <Icon className="h-4 w-4 shrink-0" />
+                          <div className="flex flex-col flex-1 text-left min-w-0">
+                            <span className="font-bold text-xs">{item.label}</span>
+                            {item.subtitle && (
+                              <span className="text-[10px] text-[#8BA596] font-sans font-normal">
+                                {item.subtitle}
+                              </span>
+                            )}
+                          </div>
+                          {item.badge && (
+                            <span className="px-1.5 py-0.2 rounded bg-[var(--theme-elevated)] text-[var(--theme-accent)] text-[9px] font-bold border border-[var(--theme-border)]">
+                              {item.badge}
                             </span>
                           )}
-                        </div>
-                        {item.badge && (
-                          <span className="px-1.5 py-0.2 rounded bg-[var(--theme-elevated)] text-[var(--theme-accent)] text-[9px] font-bold border border-[var(--theme-border)]">
-                            {item.badge}
-                          </span>
+                          {hasChildren && (
+                            <div
+                              onClick={(e) => toggleExpand(item.id, e)}
+                              className="p-1.5 rounded bg-slate-800 text-slate-300"
+                            >
+                              <ChevronDown
+                                className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180 text-sky-400" : ""}`}
+                              />
+                            </div>
+                          )}
+                        </button>
+
+                        {/* Mobile Children List */}
+                        {hasChildren && isExpanded && (
+                          <div className="pl-6 space-y-1 my-1 border-l-2 border-slate-800 ml-4">
+                            {item.children!.map((child) => {
+                              const childActive = isChildActive(child);
+                              return (
+                                <button
+                                  key={child.id}
+                                  onClick={() => {
+                                    if (onTabSelect) onTabSelect(child.id);
+                                    router.push(child.path);
+                                    setMobileDrawerOpen(false);
+                                  }}
+                                  data-mobile-child-id={child.id}
+                                  data-mobile-child-path={child.path}
+                                  className={`w-full min-h-[38px] flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition-all ${childActive
+                                    ? "bg-sky-500/25 text-sky-300 font-bold border border-sky-500/40"
+                                    : "text-slate-400 active:bg-[var(--theme-elevated)]"
+                                    }`}
+                                >
+                                  <span>{child.label}</span>
+                                  {child.badge && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                      {child.badge}
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
                         )}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>

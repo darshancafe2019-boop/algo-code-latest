@@ -58,7 +58,7 @@ export const CANONICAL_UNDERLYINGS: NormalizedUnderlying[] = [
   { symbol: "CRUDE_OIL", name: "WTI Crude Oil Options", market: "Commodities", exchange: "NYMEX / CME", assetClass: "COMMODITY", spotPrice: 76.5, step: 0.5, lotSize: 1000, multiplier: 1000, currency: "USD", currencySymbol: "$" },
 ];
 
-export type WorkstationPrimarySection = "build" | "analyze" | "monitor" | "backtest" | "system";
+export type WorkstationPrimarySection = "build" | "analyze" | "monitor" | "backtest";
 export type StrategyWorkflowState = "DRAFT" | "READY" | "ACTIVE" | "PAUSED" | "ERROR";
 export type MarketDataFeedStatus = "LIVE" | "DELAYED" | "DISCONNECTED";
 export type BrokerAccountStatus = "CONNECTED" | "AUTH_REQUIRED" | "UNCONFIGURED";
@@ -206,7 +206,7 @@ export function OptionsMarketProvider({ children }: { children: React.ReactNode 
   }, [executionMode, market]);
 
   // Set market and auto-select first underlying in that market
-  const setMarket = useCallback((newMarket: "India" | "Global" | "Crypto") => {
+  const setMarket = useCallback((newMarket: "India" | "Global" | "Crypto" | "Commodities") => {
     setMarketState(newMarket);
     const firstInMarket = CANONICAL_UNDERLYINGS.find((u) => u.market === newMarket);
     if (firstInMarket) {

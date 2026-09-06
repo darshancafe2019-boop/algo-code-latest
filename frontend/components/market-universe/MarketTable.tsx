@@ -34,7 +34,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
   const handleToggleControl = async (inst: MarketInstrument, field: "paper" | "strategy" | "live", currentVal: boolean) => {
     try {
       const id = inst.canonical_symbol || inst.instrument_id || inst.symbol;
-      const res = await fetch(`/api/universe/instruments/${encodeURIComponent(id)}/controls`, {
+      const res = await fetch(`/api/universe/instruments/${encodeURIComponent(id || "")}/controls`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ [field]: !currentVal }),
@@ -81,8 +81,8 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
               {instruments.map((inst, idx) => {
                 const sym = inst.canonical_symbol || inst.symbol || inst.instrument_id;
                 const dispName = inst.company_name || inst.display_symbol || inst.display_name || sym;
-                const isBullish = inst.directional_bias === "BULLISH" || inst.change_24h > 0;
-                const isBearish = inst.directional_bias === "BEARISH" || inst.change_24h < 0;
+                const isBullish = inst.directional_bias === "BULLISH" || (inst.change_24h ?? 0) > 0;
+                const isBearish = inst.directional_bias === "BEARISH" || (inst.change_24h ?? 0) < 0;
 
                 const hasOptions =
                   inst.asset_class === "OPTIONS" ||
@@ -146,12 +146,12 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                     <td className="py-3 px-3 text-right">
                       <span
                         className={`font-bold flex items-center justify-end gap-0.5 ${
-                          inst.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"
+                          (inst.change_24h ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {inst.change_24h >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
-                        {inst.change_24h >= 0 ? "+" : ""}
-                        {inst.change_24h?.toFixed(2)}%
+                        {(inst.change_24h ?? 0) >= 0 ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
+                        {(inst.change_24h ?? 0) >= 0 ? "+" : ""}
+                        {(inst.change_24h ?? 0).toFixed(2)}%
                       </span>
                     </td>
 

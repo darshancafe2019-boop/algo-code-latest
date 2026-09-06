@@ -65,8 +65,8 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
     }
   };
 
-  const isBullish = instrument.directional_bias === "BULLISH" || instrument.change_24h > 0;
-  const isBearish = instrument.directional_bias === "BEARISH" || instrument.change_24h < 0;
+  const isBullish = instrument.directional_bias === "BULLISH" || (instrument.change_24h ?? 0) > 0;
+  const isBearish = instrument.directional_bias === "BEARISH" || (instrument.change_24h ?? 0) < 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
@@ -116,12 +116,12 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 </span>
                 <span
                   className={`text-sm font-bold flex items-center gap-1 ${
-                    instrument.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"
+                    (instrument.change_24h ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"
                   }`}
                 >
-                  {instrument.change_24h >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  {instrument.change_24h >= 0 ? "+" : ""}
-                  {instrument.change_24h}%
+                  {(instrument.change_24h ?? 0) >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                  {(instrument.change_24h ?? 0) >= 0 ? "+" : ""}
+                  {instrument.change_24h ?? 0}%
                 </span>
               </div>
             </div>

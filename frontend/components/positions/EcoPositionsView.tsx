@@ -22,6 +22,7 @@ import {
   PositionRecord,
   PositionViewMode,
   PositionFilterCategory,
+  PositionBrokerFilter,
   PositionSortKey,
   BulkActionType,
   PositionsSummaryData,
@@ -35,6 +36,7 @@ export function EcoPositionsView() {
   const [viewMode, setViewMode] = useState<PositionViewMode>("table");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<PositionFilterCategory>("ALL");
+  const [selectedBroker, setSelectedBroker] = useState<PositionBrokerFilter>("ALL");
   const [sortKey, setSortKey] = useState<PositionSortKey>("pnl_desc");
   const [selectedPosition, setSelectedPosition] = useState<PositionRecord | null>(null);
   const [modifyingPosition, setModifyingPosition] = useState<PositionRecord | null>(null);
@@ -199,6 +201,16 @@ export function EcoPositionsView() {
       .filter((p) => {
         const dir = (p.direction || p.side || "").toUpperCase();
         const pnlVal = p.unrealized_pnl || 0;
+        const marketSource = (p.market_data_source || "").toUpperCase();
+        const execBroker = (p.execution_broker || "").toUpperCase();
+
+        // Broker Source Filter
+        if (selectedBroker === "PAPER_SIM" && !execBroker.includes("PAPER")) return false;
+        if (selectedBroker === "BINANCE" && !marketSource.includes("BINANCE")) return false;
+        if (selectedBroker === "UPSTOX" && !marketSource.includes("UPSTOX")) return false;
+        if (selectedBroker === "DHAN" && !marketSource.includes("DHAN")) return false;
+        if (selectedBroker === "DELTA_INDIA" && !marketSource.includes("DELTA")) return false;
+        if (selectedBroker === "DERIBIT" && !marketSource.includes("DERIBIT")) return false;
 
         // Category Filter
         if (selectedCategory === "LONG" && dir !== "LONG" && dir !== "BUY") return false;
@@ -212,7 +224,9 @@ export function EcoPositionsView() {
           const matchSymbol = p.symbol?.toLowerCase().includes(q);
           const matchStrategy = (p as any).strategy?.toLowerCase().includes(q);
           const matchBot = (p as any).bot_name?.toLowerCase().includes(q);
-          if (!matchSymbol && !matchStrategy && !matchBot) return false;
+          const matchSource = p.market_data_source?.toLowerCase().includes(q);
+          const matchBroker = p.execution_broker?.toLowerCase().includes(q);
+          if (!matchSymbol && !matchStrategy && !matchBot && !matchSource && !matchBroker) return false;
         }
 
         return true;
@@ -242,7 +256,7 @@ export function EcoPositionsView() {
             return 0;
         }
       });
-  }, [rawPositions, selectedCategory, searchQuery, sortKey]);
+  }, [rawPositions, selectedCategory, selectedBroker, searchQuery, sortKey]);
 
   const handleSquareOffConfirm = (pos: PositionRecord) => {
     if (window.confirm(`Are you sure you want to close position #${pos.id} (${pos.symbol} ${pos.side || pos.direction}) at market price?`)) {
@@ -256,11 +270,38 @@ export function EcoPositionsView() {
 
   const handleExportCsv = () => {
     try {
-      const headers = ["ID", "Symbol", "Direction", "Entry Price", "Current Price", "Unrealized PnL", "Margin", "Leverage", "Stop Loss", "Take Profit"];
+      const headers = [
+        "ID",
+        "Symbol",
+        "Direction",
+        "Market Data Source",
+        "Execution Broker",
+        "Account",
+        "Exchange",
+        "Segment",
+        "Asset Type",
+        "Instrument Key",
+        "Entry Price",
+        "Current Price",
+        "Unrealized PnL",
+        "Margin Used",
+        "Leverage",
+        "Stop Loss",
+        "Take Profit",
+        "Feed Status",
+        "Latency (ms)",
+      ];
       const rows = processedPositions.map((p) => [
         p.id,
         p.symbol,
         p.direction || p.side,
+        p.market_data_source,
+        p.execution_broker,
+        p.broker_account_id,
+        p.exchange,
+        p.segment,
+        p.asset_type,
+        p.instrument_key,
         p.entry_price,
         p.current_price,
         p.unrealized_pnl,
@@ -268,6 +309,8 @@ export function EcoPositionsView() {
         p.leverage,
         p.stop_loss,
         p.take_profit,
+        p.feed_status,
+        p.latency_ms,
       ]);
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
       const encodedUri = encodeURI(csvContent);
@@ -339,6 +382,8 @@ export function EcoPositionsView() {
         onSearchChange={setSearchQuery}
         selectedCategory={selectedCategory}
         onCategoryChange={setSelectedCategory}
+        selectedBroker={selectedBroker}
+        onBrokerChange={setSelectedBroker}
         sortKey={sortKey}
         onSortChange={setSortKey}
         counts={counts}

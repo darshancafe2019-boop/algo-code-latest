@@ -56,7 +56,14 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         self._last_msg_time: float = 0.0
         self._quote_cache: Dict[str, NormalizedQuote] = {}
         self._raw_quote_cache: Dict[str, Dict[str, Any]] = {}
-        self._product_id_to_symbol: Dict[int, str] = {}
+        self._product_id_to_symbol: Dict[int, str] = {
+            27: "BTCUSD",
+            131: "ETHUSD",
+            139: "SOLUSD",
+            140: "XRPUSD",
+            141: "BNBUSD",
+            142: "DOGEUSD",
+        }
         self._chain_symbols: Set[str] = set()
 
     # ─── Lifecycle & Connection ───────────────────────────────────────────────
@@ -70,6 +77,21 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         self._running = True
         self._ws_task = asyncio.create_task(self._run_loop(), name="DeltaOptionsWS-Loop")
         self._logger.info("Delta Options WebSocket adapter started.")
+        # Preload Delta product catalogue in background
+        asyncio.create_task(self._preload_product_catalogue())
+
+    async def _preload_product_catalogue(self) -> None:
+        """Fetches product catalogue via REST to populate product_id -> symbol mapping."""
+        try:
+            prods = await asyncio.to_thread(global_delta_client.get_products)
+            for p in prods:
+                pid = p.get("id")
+                sym = p.get("symbol")
+                if pid and sym:
+                    self._product_id_to_symbol[int(pid)] = sym
+            self._logger.info(f"Loaded {len(self._product_id_to_symbol)} Delta product ID mappings.")
+        except Exception as e:
+            self._logger.debug(f"Delta product catalogue preload note: {e}")
 
     async def disconnect(self) -> None:
         self._running = False
@@ -129,7 +151,6 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             try:
                 await asyncio.sleep(25.0)
                 if self._ws and not self._ws.closed:
-                    # Delta supports standard ping or ping message
                     try:
                         await self._ws.send(json.dumps({"type": "ping"}))
                     except Exception:
@@ -234,13 +255,18 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         chain_symbol: Optional[str] = None
     ) -> None:
         try:
+            raw_pid = item.get("i") or item.get("product_id")
+            pid_int = int(raw_pid) if raw_pid is not None else None
+
             symbol = item.get("s") or item.get("symbol")
+            if not symbol and pid_int:
+                symbol = self._product_id_to_symbol.get(pid_int)
+
             if not symbol:
                 return
 
-            product_id = item.get("i") or item.get("product_id")
-            if product_id:
-                self._product_id_to_symbol[int(product_id)] = symbol
+            if pid_int:
+                self._product_id_to_symbol[pid_int] = symbol
 
             # Parse Mark Price
             mark_price = float(item.get("m") or item.get("mark_price") or 0.0)

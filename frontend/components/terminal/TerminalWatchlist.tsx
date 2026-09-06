@@ -122,7 +122,7 @@ export function TerminalWatchlist() {
             return (
               <div
                 key={inst.instrument_id || sym}
-                onClick={() => setActiveSymbol(sym)}
+                onClick={() => setActiveSymbol(sym || "")}
                 className={`p-2.5 flex items-center justify-between cursor-pointer transition-colors group ${
                   isSelected
                     ? "bg-[var(--theme-accent)]/15 border-l-2 border-[var(--theme-accent)]"

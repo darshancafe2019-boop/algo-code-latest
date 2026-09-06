@@ -179,7 +179,7 @@ export function AnalyticsLeaderboards() {
                         {b.risk_status}
                       </span>
                     </td>
-                    <td className="py-3.5 px-3 text-amber-400">${b.fees.toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-amber-400">${(b.fees ?? 0).toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-cyan-300 font-bold">{b.execution_quality}/100</td>
                     <td className="py-3.5 px-4 text-right">
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-[#55C98A] border border-emerald-800">

@@ -14932,6 +14932,58 @@ def api_pnl_summary_authoritative():
         })
 
 
+@app.route("/api/portfolio/pnl/dashboard", methods=["GET"])
+@app.route("/api/pnl/dashboard", methods=["GET"])
+def api_pnl_dashboard_authoritative():
+    """Returns comprehensive multi-broker trading journal and P&L analytics matching spreadsheet format."""
+    try:
+        from src.pnl_dashboard_engine import get_pnl_dashboard_payload
+        mode = request.args.get("mode", "ALL")
+        broker = request.args.get("broker", "ALL")
+        account = request.args.get("account", "ALL")
+        period = request.args.get("period", request.args.get("range", "ALL"))
+        asset = request.args.get("asset", "ALL")
+        market = request.args.get("market", "ALL")
+        strategy = request.args.get("strategy", request.args.get("strategy_id", "ALL"))
+        setup = request.args.get("setup", "ALL")
+        direction = request.args.get("direction", "ALL")
+        currency = request.args.get("currency", "INR")
+        limit = int(request.args.get("limit", 100))
+        offset = int(request.args.get("offset", 0))
+
+        payload = get_pnl_dashboard_payload(
+            mode=mode,
+            broker=broker,
+            account=account,
+            period=period,
+            asset=asset,
+            market=market,
+            strategy=strategy,
+            setup=setup,
+            direction=direction,
+            currency=currency,
+            limit=limit,
+            offset=offset,
+        )
+        return jsonify(payload)
+    except Exception as e:
+        logger.error(f"Error in /api/portfolio/pnl/dashboard: {e}", exc_info=True)
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "trade_summary": {},
+            "instrument_performance": [],
+            "open_positions": [],
+            "strategy_performance": [],
+            "market_performance": [],
+            "trade_distribution": [],
+            "multi_broker_performance": [],
+            "emotion_stats": [],
+            "trades": []
+        }), 500
+
+
+
 @app.route("/api/risk/summary", methods=["GET"])
 def api_risk_summary_authoritative():
     """Returns consolidated portfolio risk metrics."""

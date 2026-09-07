@@ -32,32 +32,21 @@ import {
   Scale,
 } from "lucide-react";
 
-import {
-  LivePnLCommandHeader,
-  CURRENCY_OPTIONS,
-  CurrencyOption,
-} from "./LivePnLCommandHeader";
-import { PortfolioSummaryKPIStrip } from "./PortfolioSummaryKPIStrip";
+import { JournalFilterBar, JournalFilterState, CURRENCY_OPTIONS } from "./JournalFilterBar";
+import { TradeSummaryPanel } from "./TradeSummaryPanel";
+import { PerformanceTopCenterSection } from "./PerformanceTopCenterSection";
+import { PerformanceAnalyticsSectionB } from "./PerformanceAnalyticsSectionB";
+import { SpreadsheetTradeLedgerTable } from "./SpreadsheetTradeLedgerTable";
+
 import { DailyProfitabilityBarChart } from "./DailyProfitabilityBarChart";
 import { PnLCalendarHeatmap } from "./PnLCalendarHeatmap";
 import { PnLDistributionHistogram } from "./PnLDistributionHistogram";
 import { MultiDimensionAttributionMatrix } from "./MultiDimensionAttributionMatrix";
 import { InteractiveEquityCurvePanel } from "./InteractiveEquityCurvePanel";
-import { AuditableTradeLedgerTable } from "./AuditableTradeLedgerTable";
 import { InstitutionalCapitalSegregationTab } from "./InstitutionalCapitalSegregationTab";
 import { DayAnalysisDrawer } from "./DayAnalysisDrawer";
 import { PnLStatementExporter } from "./PnLStatementExporter";
 import { DailyProfitabilityBar } from "@/types/pnl-analytics";
-
-type ActiveAnalyticsView =
-  | "OVERVIEW"
-  | "EQUITY_CURVE"
-  | "CALENDAR_HEATMAP"
-  | "DRAWDOWN"
-  | "DISTRIBUTION"
-  | "ATTRIBUTION"
-  | "LEDGER"
-  | "CAPITAL_SEGREGATION";
 
 export function PerformanceAnalytics() {
   const queryClient = useQueryClient();
@@ -73,438 +62,301 @@ export function PerformanceAnalytics() {
     setTradingMode,
   } = useGlobalData();
 
-  // Primary UI Controls
-  const [activeView, setActiveView] = useState<ActiveAnalyticsView>("OVERVIEW");
-  const [timeframe, setTimeframe] = useState<string>("ALL");
-  const [botFilter, setBotFilter] = useState<string>("ALL");
-  const [strategyFilter, setStrategyFilter] = useState<string>("ALL");
-  const [selectedCurrency, setSelectedCurrency] = useState<CurrencyOption>(CURRENCY_OPTIONS[0]);
+  // Active View Switcher
+  const [activeView, setActiveView] = useState<string>("JOURNAL");
   const [selectedDayDate, setSelectedDayDate] = useState<string | null>(null);
   const [isExporterOpen, setIsExporterOpen] = useState<boolean>(false);
-  const [audioChimesEnabled, setAudioChimesEnabled] = useState<boolean>(true);
 
-  // 1. Fetch Authoritative Daily Profitability Bars
+  // Filter State
+  const [filters, setFilters] = useState<JournalFilterState>({
+    period: "ALL",
+    broker: "ALL",
+    account: "ALL",
+    mode: "ALL",
+    asset: "ALL",
+    market: "ALL",
+    strategy: "ALL",
+    setup: "ALL",
+    direction: "ALL",
+    currency: "INR",
+  });
+
+  const handleChangeFilter = <K extends keyof JournalFilterState>(key: K, value: JournalFilterState[K]) => {
+    setFilters((prev) => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters({
+      period: "ALL",
+      broker: "ALL",
+      account: "ALL",
+      mode: "ALL",
+      asset: "ALL",
+      market: "ALL",
+      strategy: "ALL",
+      setup: "ALL",
+      direction: "ALL",
+      currency: "INR",
+    });
+  };
+
+  // Currency symbol resolution
+  const currencySymbol = useMemo(() => {
+    const c = CURRENCY_OPTIONS.find((opt) => opt.id === filters.currency);
+    return c ? c.symbol : "₹";
+  }, [filters.currency]);
+
+  // 1. Fetch Authoritative Multi-Broker Dashboard Payload
+  const {
+    data: dashboardData,
+    isLoading: isLoadingDashboard,
+    refetch: refetchDashboard,
+    isFetching: isFetchingDashboard,
+  } = useQuery({
+    queryKey: ["pnlDashboardPayload", filters],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        mode: filters.mode,
+        broker: filters.broker,
+        account: filters.account,
+        period: filters.period,
+        asset: filters.asset,
+        market: filters.market,
+        strategy: filters.strategy,
+        setup: filters.setup,
+        direction: filters.direction,
+        currency: filters.currency,
+        limit: "100",
+      });
+
+      const res = await apiClient.get<any>(`/api/portfolio/pnl/dashboard?${params.toString()}`, {
+        timeoutMs: 8000,
+      });
+      if (!res.ok || !res.data) return null;
+      return res.data;
+    },
+    staleTime: 5000,
+    refetchInterval: 10000,
+  });
+
+  // 2. Fetch Authoritative Daily Profitability Bars (for Calendar / Secondary Views)
   const {
     data: barsData,
     isLoading: isLoadingBars,
     refetch: refetchBars,
-    isFetching: isFetchingBars,
   } = useQuery<{ status: string; bars: DailyProfitabilityBar[] }>({
-    queryKey: ["profitabilityBars", tradingMode, timeframe, botFilter, strategyFilter],
+    queryKey: ["profitabilityBars", filters.mode, filters.period, filters.strategy],
     queryFn: async () => {
       const res = await apiClient.get<{ status: string; bars: DailyProfitabilityBar[] }>(
-        `/api/portfolio/performance/bars?mode=${tradingMode}&range=${timeframe}&timezone=UTC&bot_id=${botFilter}&strategy_id=${strategyFilter}`,
+        `/api/portfolio/performance/bars?mode=${filters.mode}&range=${filters.period}&timezone=UTC&strategy_id=${filters.strategy}`,
         { timeoutMs: 6000 }
       );
       if (!res.ok || !res.data) return { status: "success", bars: [] };
       return res.data;
     },
     staleTime: 5000,
-    refetchInterval: 8000,
-    placeholderData: (prev) => prev,
   });
 
-  // 2. Fetch Strategy & Bot Breakdown
-  const { data: analyticsData } = useQuery({
-    queryKey: ["analyticsBreakdown", tradingMode, timeframe],
-    queryFn: async () => {
-      const res = await apiClient.get<any>(
-        `/api/analytics?timeframe=${timeframe}&mode=${tradingMode}`,
-        { timeoutMs: 6000 }
-      );
-      if (!res.ok) return {};
-      return res.data;
-    },
-    staleTime: 10000,
-  });
-
-  // 3. Fetch Closed Trades
-  const { data: tradesData, refetch: refetchTrades } = useQuery({
-    queryKey: ["tradesList", tradingMode],
-    queryFn: async () => {
-      const res = await apiClient.get<any>(
-        `/api/trades?mode=${tradingMode}&limit=100`,
-        { timeoutMs: 5000 }
-      );
-      if (!res.ok) return { trades: [] };
-      return res.data;
-    },
-    staleTime: 5000,
-  });
-
-  // Manual Refresh
-  const handleRefresh = async () => {
-    await Promise.all([
-      refreshAll(),
-      refetchBars(),
-      refetchTrades(),
-      queryClient.invalidateQueries({ queryKey: ["tradesList"] }),
-    ]);
+  const handleRefreshAll = () => {
+    refetchDashboard();
+    refetchBars();
+    refreshAll();
   };
 
-  // Derive Canonical Financial Values
-  const equity = portfolioSnapshot?.equity ?? 50000.0;
-  const cashBalance = portfolioSnapshot?.cashBalance ?? 50000.0;
-  const netPnl = portfolioSnapshot?.netPnl ?? 0.0;
-  const dailyPnl = portfolioSnapshot?.dailyPnl ?? 0.0;
-  const realizedPnl = portfolioSnapshot?.netRealizedPnl ?? 0.0;
-  const unrealizedPnl = portfolioSnapshot?.unrealizedPnl ?? 0.0;
-  const availableMargin = portfolioSnapshot?.availableCapital ?? equity;
-  const usedMargin = portfolioSnapshot?.marginUsed ?? 0.0;
-  const totalFees = portfolioSnapshot?.fees ?? 0.0;
-  const maxDrawdownPct = portfolioSnapshot?.maxDrawdownPct ?? 1.8;
-  const winRate = portfolioSnapshot?.winRate ?? 70.8;
-  const profitFactor = portfolioSnapshot?.profitFactor ?? 2.85;
-  const totalTrades = portfolioSnapshot?.totalTradesCount ?? 25;
-  const winTrades = portfolioSnapshot?.winningTradesCount ?? 18;
-  const lossTrades = portfolioSnapshot?.losingTradesCount ?? 7;
+  const handleExportCsv = () => {
+    if (typeof window !== "undefined") {
+      window.open(`/api/trades/export-csv?mode=${filters.mode}&period=${filters.period}`, "_blank");
+    }
+  };
 
-  // Normalized bars
-  const bars = Array.isArray(barsData?.bars) && barsData.bars.length > 0
-    ? barsData.bars
-    : [
-        { date: "2026-08-31", displayDate: "Aug 31", dayOfWeek: "Mon", openingEquity: 49450, closingEquity: 50000, grossPnl: 560, realizedPnl: 550, unrealizedChange: 0, fees: 10, commissions: 0, funding: 0, deposits: 0, withdrawals: 0, netExternalCashFlow: 0, netPnl: 550, returnPct: 1.11, highWaterMark: 50000, drawdown: 0, drawdownPct: 0, trades: 4, wins: 3, losses: 1, winRate: 75, bestTrade: 320, worstTrade: -60, intensity: 0.8, status: "COMPLETE", reconciliationStatus: "RECONCILED" },
-        { date: "2026-08-30", displayDate: "Aug 30", dayOfWeek: "Sun", openingEquity: 49100, closingEquity: 49450, grossPnl: 360, realizedPnl: 350, unrealizedChange: 0, fees: 10, commissions: 0, funding: 0, deposits: 0, withdrawals: 0, netExternalCashFlow: 0, netPnl: 350, returnPct: 0.71, highWaterMark: 49450, drawdown: 0, drawdownPct: 0, trades: 3, wins: 2, losses: 1, winRate: 66.7, bestTrade: 280, worstTrade: -110, intensity: 0.6, status: "COMPLETE", reconciliationStatus: "RECONCILED" },
-        { date: "2026-08-29", displayDate: "Aug 29", dayOfWeek: "Sat", openingEquity: 48900, closingEquity: 49100, grossPnl: 210, realizedPnl: 200, unrealizedChange: 0, fees: 10, commissions: 0, funding: 0, deposits: 0, withdrawals: 0, netExternalCashFlow: 0, netPnl: 200, returnPct: 0.41, highWaterMark: 49100, drawdown: 0, drawdownPct: 0, trades: 2, wins: 2, losses: 0, winRate: 100, bestTrade: 150, worstTrade: 0, intensity: 0.4, status: "COMPLETE", reconciliationStatus: "RECONCILED" },
-        { date: "2026-08-28", displayDate: "Aug 28", dayOfWeek: "Fri", openingEquity: 49050, closingEquity: 48900, grossPnl: -140, realizedPnl: -150, unrealizedChange: 0, fees: 10, commissions: 0, funding: 0, deposits: 0, withdrawals: 0, netExternalCashFlow: 0, netPnl: -150, returnPct: -0.31, highWaterMark: 49050, drawdown: 150, drawdownPct: 0.31, trades: 3, wins: 1, losses: 2, winRate: 33.3, bestTrade: 85, worstTrade: -140, intensity: 0.3, status: "COMPLETE", reconciliationStatus: "RECONCILED" },
-        { date: "2026-08-27", displayDate: "Aug 27", dayOfWeek: "Thu", openingEquity: 48600, closingEquity: 49050, grossPnl: 460, realizedPnl: 450, unrealizedChange: 0, fees: 10, commissions: 0, funding: 0, deposits: 0, withdrawals: 0, netExternalCashFlow: 0, netPnl: 450, returnPct: 0.93, highWaterMark: 49050, drawdown: 0, drawdownPct: 0, trades: 4, wins: 3, losses: 1, winRate: 75, bestTrade: 450, worstTrade: -75, intensity: 0.7, status: "COMPLETE", reconciliationStatus: "RECONCILED" },
-      ];
+  // Safe destructuring of dashboard data
+  const summary = dashboardData?.trade_summary || {};
+  const instruments = dashboardData?.instrument_performance || [];
+  const openPositions = dashboardData?.open_positions || [];
+  const openPositionsBreakdown = dashboardData?.open_positions_breakdown || {
+    total_open: openPositions.length,
+    options: 0,
+    futures: 0,
+    equities: 0,
+    crypto: 0,
+    forex: 0,
+    commodities: 0,
+    long_count: 0,
+    short_count: 0,
+  };
+  const strategies = dashboardData?.strategy_performance || [];
+  const markets = dashboardData?.market_performance || [];
+  const distributions = dashboardData?.trade_distribution || [];
+  const brokers = dashboardData?.multi_broker_performance || [];
+  const emotions = dashboardData?.emotion_stats || [];
+  const trades = dashboardData?.trades || [];
 
-  const tradesList = Array.isArray(tradesData?.trades) && tradesData.trades.length > 0
-    ? tradesData.trades
-    : [];
+  const availableBarDates = useMemo(() => {
+    return barsData?.bars?.map((b) => b.date) || [];
+  }, [barsData?.bars]);
 
   return (
-    <div className="space-y-5 font-sans select-none max-w-7xl mx-auto pb-16">
-      {/* 1. TOP COMMAND & TELEMETRY HEADER */}
-      <LivePnLCommandHeader
-        timeframe={timeframe}
-        onChangeTimeframe={(tf) => setTimeframe(tf)}
-        botFilter={botFilter}
-        onChangeBotFilter={(bf) => setBotFilter(bf)}
-        strategyFilter={strategyFilter}
-        onChangeStrategyFilter={(sf) => setStrategyFilter(sf)}
-        tradingMode={tradingMode}
-        onToggleTradingMode={() => setTradingMode(tradingMode === "PAPER" ? "LIVE" : "PAPER")}
-        selectedCurrency={selectedCurrency}
-        onChangeCurrency={(c) => setSelectedCurrency(c)}
-        isFetching={isFetchingBars}
-        onRefresh={handleRefresh}
-        onOpenExporter={() => setIsExporterOpen(true)}
-        audioChimesEnabled={audioChimesEnabled}
-        onToggleAudioChimes={() => setAudioChimesEnabled(!audioChimesEnabled)}
+    <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1900px] mx-auto min-w-0 font-sans">
+      {/* 1. TOP FILTER BAR */}
+      <JournalFilterBar
+        filters={filters}
+        onChangeFilter={handleChangeFilter}
+        onResetFilters={handleResetFilters}
+        onRefresh={handleRefreshAll}
+        isFetching={isFetchingDashboard}
+        onExportCsv={handleExportCsv}
+        activeView={activeView}
+        onChangeView={setActiveView}
       />
 
-      {/* 2. CORE 8-CARD FINANCIAL HUD STRIP */}
-      <PortfolioSummaryKPIStrip
-        kpis={{
-          total_equity: equity,
-          starting_equity: 50000.0,
-          high_water_mark: Math.max(equity, 50000.0),
-          today_pnl: dailyPnl,
-          today_pnl_pct: (dailyPnl / (equity || 1)) * 100,
-          net_pnl: netPnl,
-          total_realized: realizedPnl,
-          total_unrealized: unrealizedPnl,
-          available_margin: availableMargin,
-          margin_utilization_pct: (usedMargin / (equity || 1)) * 100,
-          max_drawdown_pct: maxDrawdownPct,
-          current_drawdown_pct: 0.4,
-          total_fees: totalFees,
-        }}
-        currency={selectedCurrency.symbol}
-        currencyRate={selectedCurrency.rate}
-        dailyProfitTarget={1000.0}
-        dailyLossLimit={500.0}
-      />
-
-      {/* 2.5 Tax Summary Integration */}
-      <div
-        onClick={() => {
-          if (typeof window !== "undefined") {
-            window.location.href = "/tax";
-          }
-        }}
-        className="p-3.5 bg-[#09110E] border border-[#1F392D] hover:border-emerald-500/50 rounded-2xl flex flex-wrap items-center justify-between gap-3 cursor-pointer transition-all shadow-md group"
-      >
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20 transition-colors">
-            <Scale className="w-4 h-4" />
-          </div>
-          <div>
-            <div className="text-xs font-bold text-white flex items-center gap-1.5 font-sans">
-              TAX SUMMARY
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                FY 2025-26
-              </span>
-            </div>
-            <div className="text-[11px] text-[#8BA596] font-mono">
-              Click to open Tax Intelligence Dashboard
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-5 text-xs font-mono">
-          <div>
-            <span className="text-[#8BA596] text-[10px] block">EST. LIABILITY</span>
-            <span className="text-amber-400 font-bold">{selectedCurrency.symbol} 14,352</span>
-          </div>
-          <div>
-            <span className="text-[#8BA596] text-[10px] block">REALIZED TAX P&L</span>
-            <span className="text-emerald-400 font-bold">+{selectedCurrency.symbol} 27,000</span>
-          </div>
-          <div>
-            <span className="text-[#8BA596] text-[10px] block">TAX RESERVE</span>
-            <span className="text-cyan-400 font-bold">{selectedCurrency.symbol} 14,082</span>
-          </div>
-          <div>
-            <span className="text-[#8BA596] text-[10px] block">NEXT DEADLINE</span>
-            <span className="text-slate-300 font-medium">15-Jun-2026</span>
-          </div>
-          <div className="hidden sm:block">
-            <span className="text-[10px] font-mono px-2.5 py-1 rounded-lg bg-[#142B21] border border-[#1F392D] text-emerald-300 group-hover:border-emerald-500/40 transition-colors">
-              Open Intelligence →
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. MULTI-VIEW NAVIGATION TAB BAR */}
-      <div className="flex items-center gap-1.5 bg-[#0B111E] border border-[#1E293B] rounded-2xl p-1.5 overflow-x-auto text-xs font-mono font-extrabold shadow-xl">
-        <button
-          type="button"
-          onClick={() => setActiveView("OVERVIEW")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "OVERVIEW"
-              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>📊 Daily Profitability Bars</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("EQUITY_CURVE")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "EQUITY_CURVE"
-              ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <LineChart className="w-4 h-4" />
-          <span>📈 Equity Curve & HWM</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("CALENDAR_HEATMAP")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "CALENDAR_HEATMAP"
-              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <Calendar className="w-4 h-4" />
-          <span>📅 Bloomberg Calendar Heatmap</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("DISTRIBUTION")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "DISTRIBUTION"
-              ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <Zap className="w-4 h-4" />
-          <span>🎯 R-Multiple Distribution</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("ATTRIBUTION")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "ATTRIBUTION"
-              ? "bg-amber-500 text-slate-950 shadow-md shadow-amber-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>🧩 Multi-Axis Attribution</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("LEDGER")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "LEDGER"
-              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <FileText className="w-4 h-4" />
-          <span>📜 Audited Ledger</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveView("CAPITAL_SEGREGATION")}
-          className={`px-3.5 py-2 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap ${
-            activeView === "CAPITAL_SEGREGATION"
-              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-950/40"
-              : "text-slate-400 hover:text-white hover:bg-[#141E33]"
-          }`}
-        >
-          <Landmark className="w-4 h-4" />
-          <span>🏛️ Institutional Fund Segregation</span>
-        </button>
-      </div>
-
-      {/* 4. ACTIVE VIEW RENDER CANVAS */}
-
-      {/* VIEW 1: DAILY PROFITABILITY BARS */}
-      {activeView === "OVERVIEW" && (
-        <section className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#142B21] pb-3">
-            <div>
-              <h2 className="text-sm font-black text-white uppercase tracking-wider">
-                DAILY PROFIT & LOSS DISTRIBUTION
-              </h2>
-              <p className="text-xs text-[#8BA596]">
-                Authoritative day-by-day settled profits with dual reconciliation & click-to-analyze drawer
-              </p>
+      {/* 2. PRIMARY VIEW: SPREADSHEET TRADING JOURNAL DASHBOARD */}
+      {activeView === "JOURNAL" && (
+        <div className="space-y-4 animate-fadeIn">
+          {/* SECTION A: TOP SUMMARY (LEFT PANEL + TOP CENTER PERFORMANCE CARDS) */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">
+            {/* Left Panel: Trade Summary */}
+            <div className="xl:col-span-1">
+              <TradeSummaryPanel
+                summary={summary}
+                currencySymbol={currencySymbol}
+              />
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-mono text-[#55C98A]">
-              <ShieldCheck className="w-4 h-4" />
-              <span>SINGLE-SOURCE RECONCILED</span>
+            {/* Center / Right: Performance Analytics Cards */}
+            <div className="xl:col-span-2">
+              <PerformanceTopCenterSection
+                instruments={instruments}
+                openPositionsBreakdown={openPositionsBreakdown}
+                strategies={strategies}
+                winCount={summary.winning_trades}
+                lossCount={summary.losing_trades}
+                breakevenCount={summary.breakeven_trades}
+                winRate={summary.win_rate}
+                avgWin={summary.avg_win}
+                avgLoss={summary.avg_loss}
+                avgWinPct={summary.avg_win_pct}
+                avgLossPct={summary.avg_loss_pct}
+                maxGain={summary.max_gain}
+                maxLoss={summary.max_loss}
+                avgWinDurationMins={summary.avg_win_duration_mins}
+                avgLossDurationMins={summary.avg_loss_duration_mins}
+                currencySymbol={currencySymbol}
+              />
             </div>
           </div>
 
-          <DailyProfitabilityBarChart
-            bars={bars}
-            metric="NET_PNL"
-            viewMode="DAILY_BARS"
-            currency={selectedCurrency.symbol}
-            tradingMode={tradingMode}
-            selectedDate={selectedDayDate}
-            onSelectDate={(date) => setSelectedDayDate(date)}
-            startingEquity={50000.0 * selectedCurrency.rate}
+          {/* SECTION B: PERFORMANCE ANALYTICS (MARKETS, DISTRIBUTION, BROKERS, EMOTIONS) */}
+          <PerformanceAnalyticsSectionB
+            markets={markets}
+            distributions={distributions}
+            strategies={strategies}
+            brokers={brokers}
+            emotions={emotions}
+            currencySymbol={currencySymbol}
           />
-        </section>
+
+          {/* SECTION C: SPREADSHEET TRADE LEDGER TABLE */}
+          <SpreadsheetTradeLedgerTable
+            trades={trades}
+            openPositions={openPositions}
+            currencySymbol={currencySymbol}
+            isFetching={isFetchingDashboard}
+          />
+        </div>
       )}
 
-      {/* VIEW 2: CUMULATIVE EQUITY CURVE & HWM */}
+      {/* 3. SECONDARY VIEW: INTERACTIVE EQUITY CURVE */}
       {activeView === "EQUITY_CURVE" && (
-        <InteractiveEquityCurvePanel
-          initialRange={timeframe}
-          onSelectDateAcrossPage={(date) => setSelectedDayDate(date)}
-        />
+        <div className="space-y-4 animate-fadeIn">
+          <InteractiveEquityCurvePanel
+            initialRange={filters.period}
+            onSelectDateAcrossPage={(dayStr) => setSelectedDayDate(dayStr)}
+          />
+        </div>
       )}
 
-      {/* VIEW 3: BLOOMBERG CALENDAR HEATMAP */}
+      {/* 4. SECONDARY VIEW: CALENDAR HEATMAP */}
       {activeView === "CALENDAR_HEATMAP" && (
-        <PnLCalendarHeatmap
-          bars={bars}
-          currency={selectedCurrency.symbol}
-          currencyRate={selectedCurrency.rate}
-          selectedDate={selectedDayDate}
-          onSelectDate={(date) => setSelectedDayDate(date)}
-          tradingMode={tradingMode}
-        />
+        <div className="space-y-4 animate-fadeIn">
+          <PnLCalendarHeatmap
+            bars={barsData?.bars || []}
+            currency={currencySymbol}
+            currencyRate={1.0}
+            selectedDate={selectedDayDate}
+            onSelectDate={(dayStr) => setSelectedDayDate(dayStr)}
+            tradingMode={filters.mode === "LIVE" ? "LIVE" : "PAPER"}
+          />
+          <DailyProfitabilityBarChart
+            bars={barsData?.bars || []}
+            currency={currencySymbol}
+            selectedDate={selectedDayDate}
+            onSelectDate={(dayStr) => setSelectedDayDate(dayStr)}
+            tradingMode={filters.mode === "LIVE" ? "LIVE" : "PAPER"}
+          />
+        </div>
       )}
 
-      {/* VIEW 4: R-MULTIPLE RETURN DISTRIBUTION HISTOGRAM */}
-      {activeView === "DISTRIBUTION" && (
-        <PnLDistributionHistogram
-          trades={tradesList}
-          currency={selectedCurrency.symbol}
-          currencyRate={selectedCurrency.rate}
-        />
-      )}
-
-      {/* VIEW 5: MULTI-DIMENSIONAL ATTRIBUTION */}
+      {/* 5. SECONDARY VIEW: ATTRIBUTION MATRIX */}
       {activeView === "ATTRIBUTION" && (
-        <MultiDimensionAttributionMatrix
-          botsData={analyticsData?.bot_comparison || []}
-          strategiesData={analyticsData?.strategy_comparison || []}
-          currency={selectedCurrency.symbol}
-          currencyRate={selectedCurrency.rate}
-        />
+        <div className="space-y-4 animate-fadeIn">
+          <MultiDimensionAttributionMatrix
+            botsData={[]}
+            strategiesData={strategies}
+            currency={currencySymbol}
+            currencyRate={1.0}
+          />
+          <PnLDistributionHistogram
+            trades={trades}
+            currency={currencySymbol}
+            currencyRate={1.0}
+          />
+        </div>
       )}
 
-      {/* VIEW 6: AUDITABLE TRADE LEDGER */}
-      {activeView === "LEDGER" && (
-        <AuditableTradeLedgerTable
-          trades={tradesList}
-          currency={selectedCurrency.symbol}
-          currencyRate={selectedCurrency.rate}
-        />
-      )}
-
-      {/* VIEW 7: INSTITUTIONAL FUND SEGREGATION & CAPITAL LEDGERS */}
+      {/* 6. SECONDARY VIEW: INSTITUTIONAL CAPITAL SEGREGATION */}
       {activeView === "CAPITAL_SEGREGATION" && (
-        <InstitutionalCapitalSegregationTab />
-      )}
-
-      {/* PERSISTENT INSTITUTIONAL FUND SEGREGATION & BROKER FOLDERS (BELOW P&L) */}
-      {activeView !== "CAPITAL_SEGREGATION" && (
-        <div className="pt-6 border-t border-[#1F392D] space-y-3">
-          <div className="flex items-center justify-between pb-1">
-            <div className="flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-[#55C98A]" />
-              <h2 className="text-xs font-mono font-black text-slate-200 uppercase tracking-wider">
-                Institutional Fund Segregation & Broker Folders
-              </h2>
-            </div>
-            <span className="text-[10px] font-mono text-[#8BA596]">
-              Authoritative 9-Tier Capital Accounting & Ledgers
-            </span>
-          </div>
+        <div className="space-y-4 animate-fadeIn">
           <InstitutionalCapitalSegregationTab />
         </div>
       )}
 
-      {/* 5. CLICK-TO-ANALYZE DAY DEEP-DIVE DRAWER */}
+      {/* Day Details Drawer (if user clicks on specific day in calendar/equity) */}
       <DayAnalysisDrawer
+        date={selectedDayDate}
         isOpen={Boolean(selectedDayDate)}
         onClose={() => setSelectedDayDate(null)}
-        date={selectedDayDate}
-        onSelectDate={(date) => setSelectedDayDate(date)}
-        allAvailableDates={bars.map((b) => b.date)}
-        mode={tradingMode}
+        onSelectDate={(dayStr) => setSelectedDayDate(dayStr)}
+        allAvailableDates={availableBarDates}
+        mode={filters.mode === "LIVE" ? "LIVE" : "PAPER"}
         timezone="UTC"
-        currency={selectedCurrency.symbol}
+        currency={currencySymbol}
       />
 
-      {/* 6. INSTITUTIONAL STATEMENT & CSV EXPORTER MODAL */}
+      {/* PnL Statement Exporter Modal */}
       <PnLStatementExporter
         isOpen={isExporterOpen}
         onClose={() => setIsExporterOpen(false)}
         summary={{
-          equity,
-          cashBalance,
-          netPnl,
-          realizedPnl,
-          unrealizedPnl,
-          fees: totalFees,
-          winRate,
-          profitFactor,
-          totalTrades,
-          winningTrades: winTrades,
-          losingTrades: lossTrades,
-          maxDrawdownPct,
-          sharpeRatio: 2.45,
-          sortinoRatio: 3.12,
+          equity: summary.current_balance || 100000,
+          cashBalance: summary.total_capital || 100000,
+          netPnl: summary.net_pnl || 0,
+          realizedPnl: summary.gross_pnl || 0,
+          unrealizedPnl: 0,
+          fees: summary.fees || 0,
+          winRate: summary.win_rate || 0,
+          profitFactor: summary.profit_factor || 1.0,
+          totalTrades: summary.total_trades || 0,
+          winningTrades: summary.winning_trades || 0,
+          losingTrades: summary.losing_trades || 0,
+          maxDrawdownPct: 2.85,
         }}
-        trades={tradesList}
-        timeframe={timeframe}
-        tradingMode={tradingMode}
-        currency={selectedCurrency.symbol}
-        currencyRate={selectedCurrency.rate}
+        trades={trades}
+        timeframe={filters.period}
+        currency={currencySymbol}
+        currencyRate={1.0}
       />
     </div>
   );

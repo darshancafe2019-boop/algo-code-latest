@@ -78,7 +78,7 @@ export function OptionsUniverseView({
   const [activeTab, setActiveTab] = useState<OptionsTab>(initialTab);
   const [selectedSource, setSelectedSource] = useState<OptionSource>(initialSource);
   const [selectedRegion, setSelectedRegion] = useState<OptionRegion>("ALL");
-  const [environment, setEnvironment] = useState<"PAPER" | "SHADOW" | "LIVE">("PAPER");
+  const [environment, setEnvironment] = useState<"PAPER" | "LIVE">("PAPER");
 
   // Underlying selection
   const defaultUnderlying =

@@ -8,63 +8,83 @@
  * Design Tokens & Semantic CSS Variables
  * ---------------------------------------------------------------------- */
 :root {
-  /* Dynamic Institutional Theme Colors (Default: Obsidian Slate) */
-  --theme-bg: #080C14;
-  --theme-surface: #0D1526;
-  --theme-elevated: #142138;
-  --theme-border: #1E2C44;
+  /* Quant.OS Midnight Institutional Pro Core Tokens */
+  --q-bg: #070B14;
+  --q-workspace: #0A101C;
+  --q-surface: #0E1624;
+  --q-elevated: #121C2C;
+  --q-card: #101827;
+  --q-border: #213047;
+  --q-border-hover: #31445E;
+  --q-text: #F4F7FA;
+  --q-text-secondary: #94A3B8;
+  --q-muted: #64748B;
+  
+  --q-accent: #22C7E8;
+  --q-strategy: #9B7BFF;
+  --q-positive: #22C983;
+  --q-negative: #F2556A;
+  --q-warning: #F2B84B;
+  --q-info: #4EA1FF;
+
+  /* Backward-Compatible Dynamic Institutional Theme Colors */
+  --theme-bg: var(--q-bg);
+  --theme-surface: var(--q-surface);
+  --theme-elevated: var(--q-elevated);
+  --theme-border: var(--q-border);
   --theme-border-subtle: #121C2E;
-  --theme-text-primary: #F8FAFC;
-  --theme-text-secondary: #94A3B8;
-  --theme-text-muted: #64748B;
+  --theme-text-primary: var(--q-text);
+  --theme-text-secondary: var(--q-text-secondary);
+  --theme-text-muted: var(--q-muted);
   
   /* Financial & Status Semantics */
-  --theme-accent: #38BDF8;
-  --theme-profit: #10B981;
-  --theme-loss: #F43F5E;
-  --theme-warning: #F59E0B;
-  --theme-info: #38BDF8;
-  --theme-live: #10B981;
-  --theme-paper: #38BDF8;
-  --theme-halted: #F43F5E;
-  --theme-neutral: #64748B;
+  --theme-accent: var(--q-accent);
+  --theme-profit: var(--q-positive);
+  --theme-loss: var(--q-negative);
+  --theme-warning: var(--q-warning);
+  --theme-info: var(--q-info);
+  --theme-live: var(--q-positive);
+  --theme-paper: var(--q-accent);
+  --theme-halted: var(--q-negative);
+  --theme-neutral: var(--q-muted);
 
   /* Chart & Canvas Styling */
-  --theme-chart-bg: #080C14;
-  --theme-chart-grid: #1E2C44;
+  --theme-chart-bg: var(--q-bg);
+  --theme-chart-grid: var(--q-border);
   --theme-chart-grid-opacity: 0.25;
-  --theme-chart-candle-up: #10B981;
-  --theme-chart-candle-down: #F43F5E;
+  --theme-chart-candle-up: var(--q-positive);
+  --theme-chart-candle-down: var(--q-negative);
   --theme-chart-line-thickness: 2px;
-  --theme-radius: 16px;
-  --theme-radius-sm: 8px;
-  --theme-radius-lg: 20px;
+  --theme-radius: 10px;
+  --theme-radius-sm: 6px;
+  --theme-radius-lg: 12px;
 
   /* Typography & Density Variables */
   --theme-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --theme-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --theme-font-scale: 1.0;
-  --theme-base-font-size: 14px;
-  --theme-density-padding-y: 0.6rem;
-  --theme-density-padding-x: 0.85rem;
-  --theme-density-gap: 0.625rem;
-  --theme-table-row-height: 2.5rem;
+  --theme-base-font-size: 13px;
+  --theme-density-padding-y: 0.5rem;
+  --theme-density-padding-x: 0.75rem;
+  --theme-density-gap: 0.5rem;
+  --theme-table-row-height: 2.25rem;
 
   /* Legacy Backward-Compatibility Mappings */
-  --background: var(--theme-bg);
-  --foreground: var(--theme-text-primary);
-  --panel-bg: var(--theme-surface);
-  --panel-elevated: var(--theme-elevated);
-  --panel-border: var(--theme-border);
+  --background: var(--q-bg);
+  --foreground: var(--q-text);
+  --panel-bg: var(--q-surface);
+  --panel-elevated: var(--q-elevated);
+  --panel-border: var(--q-border);
   --panel-border-subtle: var(--theme-border-subtle);
-  --accent-leaf: var(--theme-accent);
-  --trading-profit: var(--theme-profit);
-  --trading-loss: var(--theme-loss);
-  --trading-warning: var(--theme-warning);
-  --trading-info: var(--theme-info);
-  --trading-live: var(--theme-live);
-  --trading-paper: var(--theme-paper);
-  --trading-halted: var(--theme-halted);
+  --accent-leaf: var(--q-accent);
+  --trading-profit: var(--q-positive);
+  --trading-loss: var(--q-negative);
+  --trading-warning: var(--q-warning);
+  --trading-info: var(--q-info);
+  --trading-live: var(--q-positive);
+  --trading-paper: var(--q-accent);
+  --trading-halted: var(--q-negative);
+  
   /* Safe Area & Viewport Insets */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);

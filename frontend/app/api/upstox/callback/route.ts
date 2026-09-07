@@ -133,7 +133,7 @@ export async function GET(req: NextRequest) {
     return buildErrorResponse(
       "MISSING_ENVIRONMENT",
       "Server configuration error: UPSTOX_API_KEY or UPSTOX_API_SECRET is not configured.",
-      500
+      400
     );
   }
 

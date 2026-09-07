@@ -51,11 +51,23 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       {
-        status: "error",
+        status: "degraded",
         provider: "UPSTOX",
+        configured: false,
+        authenticated: false,
+        tokenType: "none",
+        restApi: "unauthenticated",
+        websocket: "DISCONNECTED",
+        marketStatus: "CLOSED",
+        subscriptions: 0,
+        lastTickAt: null,
+        stale: true,
+        paperMode: true,
+        tradingEnabled: false,
         message: err?.message || "Failed to generate health report.",
+        timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

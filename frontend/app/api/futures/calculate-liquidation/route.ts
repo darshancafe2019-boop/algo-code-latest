@@ -43,8 +43,8 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     return NextResponse.json(
-      { status: "ERROR", message: err.message },
-      { status: 500 }
+      { status: "ERROR", message: err.message || "Invalid liquidation calculation parameters" },
+      { status: 400 }
     );
   }
 }

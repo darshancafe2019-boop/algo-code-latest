@@ -248,12 +248,19 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 11.5 Capital & Funds (Institutional Fund Segregation) */}
-        {(activeTab === "capital-funds" || activeTab === "capital" || activeTab === "funds") && (
-          <ErrorBoundary title="Capital & Funds Tab Failed">
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+        {/* 11.5 Portfolio & Capital Management */}
+        {(activeTab === "portfolio" || activeTab === "capital-funds" || activeTab === "capital" || activeTab === "funds") && (
+          <ErrorBoundary title="Portfolio & Capital Tab Failed">
+            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
               <InstitutionalCapitalSegregationTab />
             </div>
+          </ErrorBoundary>
+        )}
+
+        {/* 11.6 Quantitative Research & Backtesting Lab */}
+        {(activeTab === "research" || activeTab === "backtest" || activeTab === "backtesting") && (
+          <ErrorBoundary title="Research Lab Tab Failed">
+            <BacktestingLab />
           </ErrorBoundary>
         )}
 
@@ -308,7 +315,7 @@ function MainApp() {
         )}
 
         {/* 16. Account & Security */}
-        {activeTab === "account-security" && (
+        {(activeTab === "account-security" || activeTab === "security") && (
           <ErrorBoundary title="Account & Security Tab Failed">
             <AccountSecurity />
           </ErrorBoundary>

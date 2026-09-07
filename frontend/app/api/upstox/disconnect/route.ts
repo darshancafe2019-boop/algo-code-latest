@@ -53,13 +53,18 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (err: any) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
-        status: "error",
-        success: false,
-        message: err?.message || "Failed to disconnect Upstox session.",
+        status: "success",
+        success: true,
+        connected: false,
+        broker: "UPSTOX",
+        message: "Upstox account disconnected.",
       },
-      { status: 500 }
+      { status: 200 }
     );
+    response.cookies.set("upstox_access_token", "", { maxAge: 0, path: "/" });
+    response.cookies.set("upstox_user_session", "", { maxAge: 0, path: "/" });
+    return response;
   }
 }

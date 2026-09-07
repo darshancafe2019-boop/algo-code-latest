@@ -11,6 +11,24 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        q: {
+          bg: "var(--q-bg)",
+          workspace: "var(--q-workspace)",
+          surface: "var(--q-surface)",
+          elevated: "var(--q-elevated)",
+          card: "var(--q-card)",
+          border: "var(--q-border)",
+          borderHover: "var(--q-border-hover)",
+          text: "var(--q-text)",
+          textSecondary: "var(--q-text-secondary)",
+          muted: "var(--q-muted)",
+          accent: "var(--q-accent)",
+          strategy: "var(--q-strategy)",
+          positive: "var(--q-positive)",
+          negative: "var(--q-negative)",
+          warning: "var(--q-warning)",
+          info: "var(--q-info)",
+        },
         theme: {
           bg: "var(--theme-bg)",
           surface: "var(--theme-surface)",

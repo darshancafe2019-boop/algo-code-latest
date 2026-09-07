@@ -7,14 +7,6 @@ const backendUrl =
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
-  async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination: `${backendUrl}/api/:path*`,
-      },
-    ];
-  },
   webpack(config, { isServer, dev }) {
     if (!isServer) {
       config.resolve.fallback = {

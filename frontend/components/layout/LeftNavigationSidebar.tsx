@@ -30,6 +30,7 @@ import {
   History,
   Landmark,
   Scale,
+  ShieldCheck,
 } from "lucide-react";
 
 interface LeftNavigationSidebarProps {
@@ -95,86 +96,64 @@ export function LeftNavigationSidebar({
 
   const navGroups: NavGroup[] = [
     {
-      groupName: "OVERVIEW",
+      groupName: "CORE TERMINAL",
       items: [
-        { id: "home", label: "HOME", path: "/", icon: LayoutDashboard },
-        { id: "markets", label: "MARKETS", path: "/markets", icon: LineChart },
-        { id: "scanner", label: "INDICATORS", path: "/scanner", icon: Radar, shortcut: "⌘S" },
-      ],
-    },
-    {
-      groupName: "TRADING",
-      items: [
-        { id: "bots", label: "BOTS", path: "/bots", icon: Bot, badge: "LIVE" },
-        { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
-        {
-          id: "futures",
-          label: "FUTURES",
-          path: "/futures",
-          icon: TrendingUp,
-          children: [
-            { id: "futures-all", label: "All Futures", path: "/futures" },
-            { id: "futures-binance", label: "Binance", path: "/futures/binance", badge: "CRYPTO" },
-            { id: "futures-delta", label: "Delta Exchange", path: "/futures/delta", badge: "INDIA" },
-            { id: "futures-dhan", label: "Dhan", path: "/futures/dhan", badge: "NSE" },
-            { id: "futures-upstox", label: "Upstox", path: "/futures/upstox", badge: "NSE" },
-            { id: "futures-global", label: "CME / Global", path: "/futures/global", badge: "GLOBAL" },
-            { id: "futures-other", label: "Other Providers", path: "/futures/other", badge: "MORE" },
-          ],
-        },
+        { id: "dashboard", label: "DASHBOARD", subtitle: "Executive Summary", path: "/", icon: LayoutDashboard },
+        { id: "markets", label: "MARKETS", subtitle: "Spot & Indices Discovery", path: "/markets", icon: LineChart },
         {
           id: "options",
           label: "OPTIONS",
+          subtitle: "Chains, Greeks & Spreads",
           path: "/options",
           icon: Zap,
           children: [
-            { id: "options-all", label: "All Options", path: "/options" },
-            { id: "options-dhan", label: "Dhan", path: "/options/dhan", badge: "NSE" },
-            { id: "options-upstox", label: "Upstox", path: "/options/upstox", badge: "NSE" },
+            { id: "options-all", label: "All Options Overview", path: "/options" },
+            { id: "options-dhan", label: "Dhan Options", path: "/options/dhan", badge: "NSE" },
+            { id: "options-upstox", label: "Upstox Options", path: "/options/upstox", badge: "NSE" },
             { id: "options-delta", label: "Delta Exchange", path: "/options/delta", badge: "CRYPTO" },
             { id: "options-binance", label: "Binance Options", path: "/options/binance", badge: "CRYPTO" },
             { id: "options-other", label: "Other Providers", path: "/options/other", badge: "MORE" },
           ],
         },
         {
-          id: "tax",
-          label: "TAX INTELLIGENCE",
-          path: "/tax",
-          icon: Scale,
+          id: "futures",
+          label: "FUTURES",
+          subtitle: "Perpetuals & Term Structure",
+          path: "/futures",
+          icon: TrendingUp,
+          children: [
+            { id: "futures-all", label: "All Futures Universe", path: "/futures" },
+            { id: "futures-binance", label: "Binance Futures", path: "/futures/binance", badge: "CRYPTO" },
+            { id: "futures-delta", label: "Delta Exchange", path: "/futures/delta", badge: "INDIA" },
+            { id: "futures-dhan", label: "Dhan Futures", path: "/futures/dhan", badge: "NSE" },
+            { id: "futures-upstox", label: "Upstox Futures", path: "/futures/upstox", badge: "NSE" },
+            { id: "futures-global", label: "CME / Global", path: "/futures/global", badge: "GLOBAL" },
+            { id: "futures-other", label: "Other Providers", path: "/futures/other", badge: "MORE" },
+          ],
         },
       ],
     },
     {
-      groupName: "PORTFOLIO",
+      groupName: "ALGO ENGINES",
       items: [
-        { id: "positions", label: "POSITIONS", path: "/positions", icon: CheckCircle2, shortcut: "⌘P" },
-        { id: "orders", label: "ORDERS", path: "/orders", icon: Send, shortcut: "⌘O" },
-        { id: "pnl", label: "P&L", path: "/pnl", icon: DollarSign },
-        {
-          id: "capital-funds",
-          label: " FUNDS",
-          path: "/capital",
-          icon: Landmark,
-        },
-
+        { id: "strategies", label: "STRATEGIES", subtitle: "Signal & Execution Logic", path: "/strategies", icon: Code },
+        { id: "bots", label: "BOTS", subtitle: "Runtime Machine Fleet", path: "/bots", icon: Bot, badge: "LIVE" },
       ],
     },
     {
-      groupName: "RISK & RECORDS",
+      groupName: "FINANCIAL LEDGER",
       items: [
-        { id: "risk", label: "RISK", path: "/risk", icon: Shield, shortcut: "⌘R" },
-        { id: "trade-journal", label: "JOURNAL", path: "/trade-journal", icon: BookOpen },
-        { id: "alerts", label: "ALERTS", path: "/alerts", icon: Bell },
+        { id: "portfolio", label: "PORTFOLIO", subtitle: "Capital, Margin & Positions", path: "/portfolio", icon: Landmark, shortcut: "⌘P" },
+        { id: "pnl", label: "P&L JOURNAL", subtitle: "Trade Ledger & Attribution", path: "/pnl", icon: DollarSign },
       ],
     },
     {
-      groupName: "MORE",
+      groupName: "CONTROL & GOVERNANCE",
       items: [
-        { id: "logs", label: "AUDIT LOGS", path: "/logs", icon: History },
-        { id: "system-health", label: "SYSTEM HEALTH", path: "/system-health", icon: Activity },
-        { id: "providers", label: "PROVIDERS", path: "/providers", icon: Cpu },
-        { id: "settings", label: "SETTINGS", path: "/settings", icon: Sliders },
-
+        { id: "research", label: "RESEARCH", subtitle: "Backtest & Monte Carlo", path: "/research", icon: Brain },
+        { id: "risk", label: "RISK", subtitle: "Exposure & Kill Switch", path: "/risk", icon: Shield, shortcut: "⌘R" },
+        { id: "security", label: "SECURITY", subtitle: "Auth, Sessions & RBAC", path: "/security", icon: ShieldCheck },
+        { id: "settings", label: "SETTINGS", subtitle: "Brokers, Feeds & Config", path: "/settings", icon: Sliders },
       ],
     },
   ];
@@ -240,7 +219,9 @@ export function LeftNavigationSidebar({
     if (item.children && item.children.some((c) => pathname === c.path || (c.path === "/options" && (pathname === "/options/all" || pathname === "/options")) || (c.path === "/futures" && (pathname === "/futures" || pathname === "/crypto/futures")))) return true;
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
     if (activeTab === item.id) return true;
-    if (item.id === "capital-funds" && (activeTab === "capital" || activeTab === "funds" || activeTab === "capital-funds")) return true;
+    if (item.id === "portfolio" && (activeTab === "positions" || activeTab === "orders" || activeTab === "capital" || activeTab === "funds" || activeTab === "capital-funds" || pathname === "/positions" || pathname === "/orders" || pathname === "/capital")) return true;
+    if (item.id === "pnl" && (activeTab === "trade-journal" || activeTab === "tax" || pathname === "/trade-journal" || pathname === "/tax")) return true;
+    if (item.id === "research" && (activeTab === "backtest" || pathname === "/backtest")) return true;
     return false;
   };
 

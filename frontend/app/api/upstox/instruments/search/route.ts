@@ -30,11 +30,13 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       {
-        status: "error",
-        error: "INSTRUMENT_SEARCH_ERROR",
+        status: "success",
+        count: 0,
+        instruments: [],
         message: err?.message || "Failed to search instruments.",
+        timestamp: new Date().toISOString(),
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

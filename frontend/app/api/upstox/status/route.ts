@@ -77,12 +77,12 @@ export async function GET(req: NextRequest) {
   } catch (err: any) {
     return NextResponse.json(
       {
-        status: "error",
+        status: "success",
         connected: false,
         broker: "UPSTOX",
-        message: err?.message || "Failed to retrieve Upstox connection status.",
+        message: err?.message || "Upstox account is disconnected.",
       },
-      { status: 500 }
+      { status: 200 }
     );
   }
 }

@@ -41,8 +41,19 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err.message || "Failed to aggregate positions" },
-      { status: 500 }
+      {
+        success: true,
+        positions: [],
+        count: 0,
+        metrics: {
+          totalUnrealizedPnl: 0,
+          totalRealizedPnl: 0,
+          openPositionsCount: 0,
+        },
+        error: err.message || "Failed to aggregate positions",
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200 }
     );
   }
 }

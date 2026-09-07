@@ -8,7 +8,12 @@ export default function DeltaFuturesPage() {
   return (
     <DirectPageLayout activeTab="futures">
       <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
-        <FuturesUniverseView initialSource="DELTA_INDIA" initialTab="UNIVERSE" />
+        <FuturesUniverseView
+          initialSource="DELTA_INDIA"
+          initialTab="UNIVERSE"
+          lockSource={true}
+          providerTitle="Delta Exchange India Futures"
+        />
       </div>
     </DirectPageLayout>
   );

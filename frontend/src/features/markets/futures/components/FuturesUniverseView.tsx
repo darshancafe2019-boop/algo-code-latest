@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   TrendingUp,
@@ -22,6 +22,11 @@ import {
   Star,
   Code,
   Shield,
+  Send,
+  Sliders,
+  BarChart3,
+  Globe,
+  Flame,
 } from "lucide-react";
 import { fetchFuturesUniverseData, fetchFundingHeatmap, fetchFuturesProvidersHealth } from "../api/futures-api";
 import { useFuturesStore } from "../state/futures-store";
@@ -34,14 +39,37 @@ import { FuturesHealthView } from "./FuturesHealthView";
 import { FuturesSavedView } from "./FuturesSavedView";
 import { FuturesStrategiesView } from "./FuturesStrategiesView";
 import { FuturesPositionsView } from "./FuturesPositionsView";
+import { FuturesOrdersView } from "./FuturesOrdersView";
+import { FuturesRiskView } from "./FuturesRiskView";
 import { useUIStore } from "@/lib/store/useUIStore";
+import { FUTURES_PROVIDER_REGISTRY } from "../types/provider-registry";
+
+export type FuturesTabId =
+  | "UNIVERSE"
+  | "MARKETS"
+  | "FUNDING"
+  | "STRATEGIES"
+  | "POSITIONS"
+  | "ORDERS"
+  | "RISK"
+  | "SAVED"
+  | "HEALTH";
 
 interface FuturesUniverseViewProps {
   initialSource?: string;
-  initialTab?: "UNIVERSE" | "HEATMAP" | "BASIS" | "CALCULATOR" | "STRATEGIES" | "HEALTH" | "SAVED" | "POSITIONS";
+  initialTab?: FuturesTabId;
+  lockSource?: boolean;
+  providerTitle?: string;
+  isBinanceUnified?: boolean;
 }
 
-export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniverseViewProps) {
+export function FuturesUniverseView({
+  initialSource,
+  initialTab,
+  lockSource = false,
+  providerTitle,
+  isBinanceUnified = false,
+}: FuturesUniverseViewProps) {
   const {
     activeTab,
     setActiveTab,
@@ -65,22 +93,26 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
     setExecutionMode,
   } = useFuturesStore();
 
+  const [currentTab, setCurrentTab] = useState<FuturesTabId>(initialTab || "UNIVERSE");
+  const [fundingSubTab, setFundingSubTab] = useState<"HEATMAP" | "BASIS">("HEATMAP");
+  const [binanceMarketType, setBinanceMarketType] = useState<"ALL" | "USDM_PERP" | "USDM_DELIVERY" | "COINM_PERP" | "COINM_DELIVERY">("ALL");
   const [freshOnly, setFreshOnly] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const { setAICopilotOpen } = useUIStore();
   const queryClient = useQueryClient();
 
-  const currentSource = initialSource || selectedSource;
+  // If initialSource is locked (e.g. on provider-specific page), use it strictly
+  const effectiveSource = lockSource && initialSource ? initialSource : initialSource || selectedSource;
 
   // 1. Fetch Universe Contracts & Dynamic Aggregated Telemetry
   const { data: universeData, isLoading, refetch, isFetching } = useQuery({
-    queryKey: ["futuresUniverseContracts", selectedVenue, selectedAsset, currentSource, selectedExpiry, freshOnly],
+    queryKey: ["futuresUniverseContracts", selectedVenue, selectedAsset, effectiveSource, selectedExpiry, freshOnly],
     queryFn: () =>
       fetchFuturesUniverseData({
         exchange: selectedVenue,
         type: selectedAsset,
-        source: currentSource,
+        source: effectiveSource,
         expiry: selectedExpiry,
         fresh_only: freshOnly,
       }),
@@ -115,6 +147,7 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
       queryClient.invalidateQueries({ queryKey: ["futuresUniverseContracts"] });
       queryClient.invalidateQueries({ queryKey: ["futuresFundingHeatmap"] });
       queryClient.invalidateQueries({ queryKey: ["futuresProvidersHealthReport"] });
+      queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
       setSyncFeedback(result.message || "Market data feeds synchronized");
       setTimeout(() => setSyncFeedback(null), 4000);
     },
@@ -127,20 +160,52 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
   const contracts = universeData?.contracts || [];
 
   const filteredContracts = contracts.filter((c) => {
+    // Source Lock or Filter
+    if (lockSource && initialSource) {
+      if (initialSource === "BINANCE") {
+        const isBinance =
+          c.market_data_provider?.toUpperCase().includes("BINANCE") ||
+          c.provider?.toUpperCase().includes("BINANCE") ||
+          c.venue?.toUpperCase().includes("BINANCE");
+        if (!isBinance) return false;
+
+        // Sub-filter for Binance Market Type
+        if (binanceMarketType === "USDM_PERP") {
+          return c.symbol.includes("USDT") && c.contract_type === "PERPETUAL";
+        }
+        if (binanceMarketType === "USDM_DELIVERY") {
+          return c.symbol.includes("USDT") && c.contract_type !== "PERPETUAL";
+        }
+        if (binanceMarketType === "COINM_PERP") {
+          return c.symbol.includes("USD_PERP") || (c.venue === "BINANCE_COINM" && c.contract_type === "PERPETUAL");
+        }
+        if (binanceMarketType === "COINM_DELIVERY") {
+          return c.venue === "BINANCE_COINM" && c.contract_type !== "PERPETUAL";
+        }
+      } else {
+        const s = initialSource.toUpperCase();
+        const match =
+          c.market_data_provider?.toUpperCase().includes(s) ||
+          c.provider?.toUpperCase().includes(s) ||
+          c.venue?.toUpperCase().includes(s);
+        if (!match) return false;
+      }
+    } else if (effectiveSource !== "ALL") {
+      const s = effectiveSource.toUpperCase();
+      const match =
+        c.market_data_provider?.toUpperCase().includes(s) ||
+        c.provider?.toUpperCase().includes(s) ||
+        c.venue?.toUpperCase().includes(s);
+      if (!match) return false;
+    }
+
     // Asset Filter
     if (selectedAsset !== "ALL") {
       if (selectedAsset === "PERPETUALS" && c.contract_type !== "PERPETUAL") return false;
       if (selectedAsset === "FUTURES" && c.contract_type === "PERPETUAL") return false;
-      if (selectedAsset === "INDIAN" && c.exchange !== "NSE") return false;
+      if (selectedAsset === "INDIAN" && c.exchange !== "NSE" && c.exchange !== "MCX") return false;
       if (selectedAsset === "CRYPTO" && !c.segment?.includes("CRYPTO")) return false;
       if (selectedAsset === "COMMODITIES" && c.segment !== "COMMODITIES") return false;
-    }
-
-    // Source Filter
-    if (currentSource !== "ALL") {
-      const s = currentSource.toUpperCase();
-      const matchProvider = c.market_data_provider?.toUpperCase().includes(s) || c.provider?.toUpperCase().includes(s);
-      if (!matchProvider) return false;
     }
 
     // Search Query Filter
@@ -155,17 +220,62 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
     );
   });
 
-  // Dynamic high-level summary metrics from real connected contracts
+  // Dynamic high-level summary metrics
   const totalVolume = universeData?.total_volume_usd ?? 0;
   const totalOI = universeData?.total_open_interest_usd ?? 0;
   const avgFundingAPR = universeData?.avg_funding_rate_apr;
   const liveCount = healthData?.live_providers_count ?? 3;
   const totalCount = healthData?.total_providers_count ?? 6;
 
-  const currentTab = initialTab || activeTab;
-
   return (
     <div className="w-full space-y-4 font-sans text-slate-100 select-none">
+      {/* Provider Header when locked to specific provider */}
+      {lockSource && providerTitle && (
+        <div className="p-4 bg-gradient-to-r from-[#0E1524] to-[#141C2E] border border-cyan-500/30 rounded-2xl shadow-xl flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-cyan-500/10 border border-cyan-500/30 rounded-xl text-cyan-400">
+              <Cpu className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg font-bold text-white font-mono">{providerTitle}</h1>
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700">
+                  SOURCE LOCKED
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Authoritative streaming feed from {providerTitle}. No fallback data substitution.
+              </p>
+            </div>
+          </div>
+
+          {/* Binance Unified Market Type Dropdown */}
+          {isBinanceUnified && (
+            <div className="flex items-center gap-1.5 bg-[#080C14] p-1 rounded-xl border border-[#1E293B] font-mono text-xs">
+              {[
+                { id: "ALL", label: "All Binance" },
+                { id: "USDM_PERP", label: "USD-M Perp" },
+                { id: "USDM_DELIVERY", label: "USD-M Delivery" },
+                { id: "COINM_PERP", label: "COIN-M Perp" },
+                { id: "COINM_DELIVERY", label: "COIN-M Delivery" },
+              ].map((m) => (
+                <button
+                  key={m.id}
+                  onClick={() => setBinanceMarketType(m.id as any)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    binanceMarketType === m.id
+                      ? "bg-amber-500 text-slate-950 font-bold shadow-md"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 1. Dynamic 4-Card Telemetry Overview Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 font-mono">
         {/* CARD 1: 24H FUTURES VOLUME */}
@@ -176,7 +286,7 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
             {totalVolume > 0 ? `$${(totalVolume / 1e9).toFixed(2)}B` : "—"}
           </span>
           <div className="mt-2 text-[10px] text-slate-500 flex items-center justify-between">
-            <span>Aggregated Across Feeds</span>
+            <span>Aggregated Feeds</span>
             <span className="text-cyan-400 font-bold">USD Notional</span>
           </div>
         </div>
@@ -239,23 +349,25 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
         </div>
       </div>
 
-      {/* 2. Top Controls & Navigation Tabs */}
+      {/* 2. Unified Page-Level Tabs & Controls */}
       <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 shadow-xl space-y-3.5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Navigation Tabs */}
+          {/* Internal All-Futures Tabs */}
           <div className="flex flex-wrap items-center gap-1.5 bg-[#080C14] p-1 rounded-xl border border-[#1E293B] font-mono text-xs">
             {[
-              { id: "UNIVERSE", label: "⚡ Futures Universe" },
-              { id: "HEATMAP", label: "🔥 Funding Heatmap" },
-              { id: "BASIS", label: "📊 Basis Matrix" },
+              { id: "UNIVERSE", label: "⚡ Overview" },
+              { id: "MARKETS", label: "📈 Markets" },
+              { id: "FUNDING", label: "🔥 Funding & Basis" },
               { id: "STRATEGIES", label: "🧠 Strategies" },
               { id: "POSITIONS", label: "💼 Positions" },
+              { id: "ORDERS", label: "📋 Orders" },
+              { id: "RISK", label: "🛡️ Risk" },
               { id: "SAVED", label: "⭐ Saved" },
-              { id: "HEALTH", label: "🛡️ Health" },
+              { id: "HEALTH", label: "🩺 Health" },
             ].map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
+                onClick={() => setCurrentTab(tab.id as any)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   currentTab === tab.id
                     ? "bg-cyan-500 text-slate-950 shadow-md font-bold"
@@ -317,7 +429,7 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
           </div>
         </div>
 
-        {/* Sync Toast */}
+        {/* Sync Feedback Toast */}
         {syncFeedback && (
           <div className="p-2.5 bg-cyan-950/80 border border-cyan-600/50 rounded-xl text-xs text-cyan-200 font-mono flex items-center gap-2 animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 text-cyan-400 shrink-0" />
@@ -325,66 +437,95 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
           </div>
         )}
 
-        {/* Source and Type Filter Rows */}
-        <div className="pt-3 border-t border-[#1E293B]/70 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-          {/* Source Filter Pills */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Source:</span>
-            {[
-              { id: "ALL", label: "ALL SOURCES" },
-              { id: "BINANCE_USDM", label: "BINANCE USD-M" },
-              { id: "BINANCE_COINM", label: "BINANCE COIN-M" },
-              { id: "DELTA_INDIA", label: "DELTA INDIA" },
-              { id: "UPSTOX", label: "UPSTOX" },
-              { id: "DHAN", label: "DHAN" },
-              { id: "CME", label: "CME" },
-              { id: "PAPER_SIM", label: "PAPER SIM" },
-            ].map((src) => (
-              <button
-                key={src.id}
-                onClick={() => setSelectedSource(src.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                  selectedSource === src.id
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
-                    : "bg-[#080C14] text-slate-400 hover:text-white border border-[#1E293B]"
-                }`}
-              >
-                {src.label}
-              </button>
-            ))}
-          </div>
+        {/* Source and Type Filter Rows (when not locked to single provider) */}
+        {!lockSource && (
+          <div className="pt-3 border-t border-[#1E293B]/70 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+            {/* Source Filter Pills */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Source:</span>
+              {[
+                { id: "ALL", label: "ALL SOURCES" },
+                { id: "BINANCE_USDM", label: "BINANCE USD-M" },
+                { id: "BINANCE_COINM", label: "BINANCE COIN-M" },
+                { id: "DELTA_INDIA", label: "DELTA INDIA" },
+                { id: "DHAN", label: "DHAN" },
+                { id: "UPSTOX", label: "UPSTOX" },
+                { id: "CME", label: "CME" },
+                { id: "PAPER_SIM", label: "PAPER SIM" },
+              ].map((src) => (
+                <button
+                  key={src.id}
+                  onClick={() => setSelectedSource(src.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                    selectedSource === src.id
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm"
+                      : "bg-[#080C14] text-slate-400 hover:text-white border border-[#1E293B]"
+                  }`}
+                >
+                  {src.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Segment Type Filter */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Asset:</span>
-            {["ALL", "PERPETUALS", "FUTURES", "CRYPTO", "INDIAN", "COMMODITIES"].map((seg) => (
-              <button
-                key={seg}
-                onClick={() => setSelectedAsset(seg)}
-                className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
-                  selectedAsset === seg
-                    ? "bg-purple-950 text-purple-300 border border-purple-700 shadow-sm"
-                    : "bg-[#080C14] text-slate-500 hover:text-slate-300 border border-[#1E293B]"
-                }`}
-              >
-                {seg}
-              </button>
-            ))}
+            {/* Segment Type Filter */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Asset:</span>
+              {["ALL", "PERPETUALS", "FUTURES", "CRYPTO", "INDIAN", "COMMODITIES"].map((seg) => (
+                <button
+                  key={seg}
+                  onClick={() => setSelectedAsset(seg)}
+                  className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                    selectedAsset === seg
+                      ? "bg-purple-950 text-purple-300 border border-purple-700 shadow-sm"
+                      : "bg-[#080C14] text-slate-500 hover:text-slate-300 border border-[#1E293B]"
+                  }`}
+                >
+                  {seg}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* 3. Main Active Tab Content */}
-      {currentTab === "UNIVERSE" ? (
+      {/* 3. Main Active Tab View Content */}
+      {currentTab === "UNIVERSE" || currentTab === "MARKETS" ? (
         <FuturesTable contracts={filteredContracts} isLoading={isLoading} />
-      ) : currentTab === "HEATMAP" ? (
-        <FundingRateHeatmap data={heatmapData} isLoading={isHeatmapLoading} />
-      ) : currentTab === "BASIS" ? (
-        <BasisArbitrageMatrix contracts={filteredContracts} />
+      ) : currentTab === "FUNDING" ? (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 p-1 bg-[#0E1524] border border-[#1E293B] rounded-xl w-fit font-mono text-xs">
+            <button
+              onClick={() => setFundingSubTab("HEATMAP")}
+              className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                fundingSubTab === "HEATMAP" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              🔥 8-Hour Funding Rate Heatmap
+            </button>
+            <button
+              onClick={() => setFundingSubTab("BASIS")}
+              className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                fundingSubTab === "BASIS" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              📊 Spot-Futures Basis Matrix
+            </button>
+          </div>
+
+          {fundingSubTab === "HEATMAP" ? (
+            <FundingRateHeatmap data={heatmapData} isLoading={isHeatmapLoading} />
+          ) : (
+            <BasisArbitrageMatrix contracts={filteredContracts} />
+          )}
+        </div>
       ) : currentTab === "STRATEGIES" ? (
         <FuturesStrategiesView contracts={contracts} />
       ) : currentTab === "POSITIONS" ? (
         <FuturesPositionsView />
+      ) : currentTab === "ORDERS" ? (
+        <FuturesOrdersView />
+      ) : currentTab === "RISK" ? (
+        <FuturesRiskView />
       ) : currentTab === "SAVED" ? (
         <FuturesSavedView contracts={contracts} />
       ) : (
@@ -404,8 +545,9 @@ export function FuturesUniverseView({ initialSource, initialTab }: FuturesUniver
         side={orderReviewSide}
         isOpen={isOrderReviewOpen}
         onClose={() => setOrderReviewOpen(false)}
-        onOrderSuccess={(res) => {
+        onOrderSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
+          queryClient.invalidateQueries({ queryKey: ["futuresOrdersList"] });
         }}
       />
     </div>

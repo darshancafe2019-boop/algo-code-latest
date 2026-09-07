@@ -328,7 +328,20 @@ class DhanService:
     instrument resolution, and fund limits.
     """
 
-    DHAN_BASE_URL = "https://api.dhan.co/v2"
+    @property
+    def base_url(self) -> str:
+        env_url = (os.getenv("DHAN_BASE_URL") or getattr(config, "DHAN_BASE_URL", "") or "").strip()
+        if env_url:
+            return env_url.rstrip("/")
+        is_sandbox = (
+            os.getenv("DHAN_SANDBOX", "").lower() in ("true", "1", "yes")
+            or os.getenv("DHAN_ENV", "").upper() == "SANDBOX"
+            or getattr(config, "DHAN_SANDBOX", False)
+        )
+        if is_sandbox:
+            return "https://sandbox.dhan.co/v2"
+        return "https://api.dhan.co/v2"
+
     DHAN_FEED_URL = "wss://api-feed.dhan.co"
 
     def __init__(
@@ -338,8 +351,8 @@ class DhanService:
         timeout_sec: float = 8.0,
     ):
         self.secrets_mgr = SecretsManager()
-        self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "")).strip()
-        self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "")).strip()
+        self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+        self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
         self.timeout_sec = float(timeout_sec)
         self._auth_status = "INITIAL"
         self._last_auth_check = 0.0
@@ -349,7 +362,7 @@ class DhanService:
 
     def _load_credentials_from_vault(self) -> None:
         """Loads encrypted API credentials from SQLite broker_credentials if available."""
-        if self.client_id and self.access_token:
+        if self.access_token:
             return
         try:
             creds = db.safe_query(
@@ -367,11 +380,11 @@ class DhanService:
 
     @property
     def is_authenticated(self) -> bool:
-        return bool(self.client_id and self.access_token)
+        return bool(self.access_token)
 
     def validate_token(self, force: bool = False) -> Dict[str, Any]:
         """
-        Validates Dhan credentials via GET /v2/profile or /v2/fundlimit.
+        Validates Dhan credentials via GET /v2/profile, /v2/fundlimit, or /v2/orders.
         Caches result for 60 seconds to avoid hitting rate limits.
         """
         now = time.monotonic()
@@ -383,7 +396,7 @@ class DhanService:
             res = {
                 "valid": False,
                 "status": "NOT_CONFIGURED",
-                "message": "Dhan Client ID or Access Token not configured in .env or vault.",
+                "message": "Dhan Access Token not configured in .env or vault.",
                 "client_id": self.client_id[:4] + "****" if self.client_id else "",
             }
             self._auth_cached_result = res
@@ -391,7 +404,23 @@ class DhanService:
             return res
 
         try:
-            profile = self._make_request("GET", "profile")
+            # First try profile or orders
+            profile = self._make_request("GET", "orders" if "sandbox" in self.base_url.lower() else "profile")
+            if isinstance(profile, list):
+                # /orders returned order list (sandbox / live success)
+                self._auth_status = "CONNECTED"
+                res = {
+                    "valid": True,
+                    "status": "CONNECTED",
+                    "client_id": self.client_id or "SANDBOX_USER",
+                    "data_plan": "ACTIVE",
+                    "environment": "SANDBOX" if "sandbox" in self.base_url.lower() else "LIVE",
+                    "message": "Dhan API connection authenticated successfully",
+                }
+                self._auth_cached_result = res
+                self._last_auth_check = now
+                return res
+
             # Check for Dhan error formats
             is_error = False
             error_code = None
@@ -399,7 +428,7 @@ class DhanService:
 
             if not profile or not isinstance(profile, dict):
                 is_error = True
-                error_msg = "Empty or invalid response from Dhan profile API"
+                error_msg = "Empty or invalid response from Dhan API"
             elif profile.get("errorType") or profile.get("errorCode") or profile.get("status") in ("error", "failed"):
                 is_error = True
                 error_code = profile.get("errorCode") or profile.get("errorType")
@@ -440,6 +469,7 @@ class DhanService:
                         "client_id": self.client_id,
                         "data_plan": data_plan or "ACTIVE",
                         "profile": profile,
+                        "environment": "SANDBOX" if "sandbox" in self.base_url.lower() else "LIVE",
                         "message": "Dhan HQ API v2 authenticated successfully",
                     }
         except Exception as exc:
@@ -460,17 +490,18 @@ class DhanService:
         path: str,
         data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Makes an authenticated HTTP request to Dhan HQ API v2."""
+        """Makes an authenticated HTTP request to Dhan HQ API v2 / Sandbox."""
         if not self.is_authenticated:
-            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan credentials not configured."}
+            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan access token not configured."}
 
-        url = f"{self.DHAN_BASE_URL}/{path.lstrip('/')}"
+        url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {
             "access-token": self.access_token,
-            "client-id": self.client_id,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
+        if self.client_id:
+            headers["client-id"] = self.client_id
 
         body_bytes = None
         if data is not None and method.upper() in ["POST", "PUT", "PATCH"]:

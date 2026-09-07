@@ -158,7 +158,6 @@ export function Navbar({
     { id: "home", label: "🏠 Home", icon: Activity },
     { id: "markets", label: "🌐 Markets", icon: Globe },
     { id: "command-center", label: "⚡ Command Center", icon: Terminal },
-    { id: "terminal", label: "🖥️ Terminal", icon: Activity },
     { id: "crypto-derivatives", label: "🪙 Crypto Hub", icon: Zap },
     { id: "crypto-futures", label: "📈 Crypto Futures", icon: TrendingUp },
     { id: "crypto-options-chain", label: "⚡ Crypto Options", icon: Layers },

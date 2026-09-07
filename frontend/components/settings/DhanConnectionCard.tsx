@@ -22,6 +22,8 @@ import {
   Wallet,
   TrendingUp,
   PowerOff,
+  Code,
+  Terminal,
 } from "lucide-react";
 
 interface DhanStatusResponse {
@@ -29,6 +31,8 @@ interface DhanStatusResponse {
   connected: boolean;
   broker: string;
   brokerName: string;
+  environment?: string;
+  baseUrl?: string;
   clientId: string;
   clientIdMasked: string;
   hasToken: boolean;
@@ -53,7 +57,9 @@ export function DhanConnectionCard() {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [clientIdInput, setClientIdInput] = useState("");
   const [accessTokenInput, setAccessTokenInput] = useState("");
+  const [isSandboxInput, setIsSandboxInput] = useState(true);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [showCurlHint, setShowCurlHint] = useState(false);
   const [notification, setNotification] = useState<{
     type: "success" | "error" | "info";
     message: string;
@@ -74,6 +80,7 @@ export function DhanConnectionCard() {
   });
 
   const isConnected = Boolean(data?.connected);
+  const isSandbox = data?.environment === "SANDBOX" || data?.baseUrl?.includes("sandbox");
 
   const handlePing = async () => {
     setIsPinging(true);
@@ -83,7 +90,7 @@ export function DhanConnectionCard() {
       if (res.ok && result.connected) {
         setNotification({
           type: "success",
-          message: `Dhan HQ API v2 Ping: ${result.latencyMs}ms (HTTP 200 OK). Latency is optimal.`,
+          message: `Dhan ${result.environment || "API"} Ping: ${result.latencyMs}ms (HTTP 200 OK). Endpoint verified.`,
         });
         await refetch();
         queryClient.invalidateQueries({ queryKey: ["dhanAuthStatus"] });
@@ -105,8 +112,8 @@ export function DhanConnectionCard() {
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientIdInput.trim() || !accessTokenInput.trim()) {
-      setNotification({ type: "error", message: "Both Client ID and Access Token are required." });
+    if (!accessTokenInput.trim()) {
+      setNotification({ type: "error", message: "Dhan Access Token is required." });
       return;
     }
     setIsSaving(true);
@@ -117,13 +124,15 @@ export function DhanConnectionCard() {
         body: JSON.stringify({
           client_id: clientIdInput.trim(),
           access_token: accessTokenInput.trim(),
+          is_sandbox: isSandboxInput,
+          base_url: isSandboxInput ? "https://sandbox.dhan.co/v2" : "https://api.dhan.co/v2",
         }),
       });
       const result = await res.json();
       if (res.ok && result.success) {
         setNotification({
           type: "success",
-          message: "Dhan credentials securely encrypted & stored in vault.",
+          message: `Dhan ${isSandboxInput ? "Sandbox" : "Live"} credentials securely encrypted & stored in vault.`,
         });
         setIsConfigModalOpen(false);
         setClientIdInput("");
@@ -224,12 +233,16 @@ export function DhanConnectionCard() {
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-semibold text-foreground">Dhan HQ API v2</h3>
-              <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-400 border border-emerald-500/20">
-                Official Indian Broker
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
+                isSandbox
+                  ? "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                  : "bg-emerald-500/10 text-emerald-400 border-emerald-500/20"
+              }`}>
+                {isSandbox ? "SANDBOX MODE" : "LIVE BROKER"}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Direct DMA execution for NSE Equities, NFO Derivatives, BSE & MCX
+              {data?.baseUrl || "https://sandbox.dhan.co/v2"} • NSE, NFO, BSE, MCX
             </p>
           </div>
         </div>
@@ -338,6 +351,14 @@ export function DhanConnectionCard() {
               Disconnect
             </button>
           )}
+
+          <button
+            onClick={() => setShowCurlHint(!showCurlHint)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-cyan-400 transition-colors ml-1"
+          >
+            <Terminal className="h-3 w-3" />
+            <span>{showCurlHint ? "Hide API Info" : "cURL Info"}</span>
+          </button>
         </div>
 
         <div className="flex items-center gap-2">
@@ -358,6 +379,21 @@ export function DhanConnectionCard() {
           </button>
         </div>
       </div>
+
+      {/* cURL Example Info Box */}
+      {showCurlHint && (
+        <div className="mt-4 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-3 text-xs font-mono">
+          <div className="flex items-center justify-between text-[11px] text-cyan-300 font-semibold mb-1.5">
+            <span>Dhan Sandbox cURL API Verification:</span>
+          </div>
+          <pre className="text-[11px] text-slate-300 overflow-x-auto whitespace-pre p-2 bg-black/40 rounded border border-border/40">
+{`curl --request GET \\
+  --url https://sandbox.dhan.co/v2/orders \\
+  --header 'access-token: <your-sandbox-access-token>' \\
+  --header 'Content-Type: application/json'`}
+          </pre>
+        </div>
+      )}
 
       {/* Configuration Modal */}
       {isConfigModalOpen && (
@@ -382,23 +418,45 @@ export function DhanConnectionCard() {
             </div>
 
             <form onSubmit={handleSaveCredentials} className="mt-4 space-y-4">
+              {/* Environment Selector */}
               <div>
-                <label className="block text-xs font-medium text-foreground">
-                  Dhan Client ID (10-digit)
+                <label className="block text-xs font-medium text-foreground mb-1">
+                  API Environment
                 </label>
-                <input
-                  type="text"
-                  placeholder="e.g. 1000678498"
-                  value={clientIdInput}
-                  onChange={(e) => setClientIdInput(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs font-mono text-foreground focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                  required
-                />
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSandboxInput(true)}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                      isSandboxInput
+                        ? "border-amber-500/40 bg-amber-500/10 text-amber-300 shadow-sm"
+                        : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-amber-400"></span>
+                    Sandbox (Testing)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSandboxInput(false)}
+                    className={`flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${
+                      !isSandboxInput
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300 shadow-sm"
+                        : "border-border bg-secondary/30 text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
+                    Live Production
+                  </button>
+                </div>
+                <p className="mt-1 text-[10px] font-mono text-muted-foreground">
+                  Endpoint: {isSandboxInput ? "https://sandbox.dhan.co/v2" : "https://api.dhan.co/v2"}
+                </p>
               </div>
 
               <div>
                 <label className="block text-xs font-medium text-foreground">
-                  Dhan Access Token (JWT)
+                  Dhan Access Token (JWT) <span className="text-emerald-400">*</span>
                 </label>
                 <textarea
                   rows={3}
@@ -407,6 +465,19 @@ export function DhanConnectionCard() {
                   onChange={(e) => setAccessTokenInput(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs font-mono text-foreground focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                   required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-foreground">
+                  Dhan Client ID <span className="text-muted-foreground">(Optional in Sandbox)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder={isSandboxInput ? "Optional in Sandbox mode" : "e.g. 1000678498"}
+                  value={clientIdInput}
+                  onChange={(e) => setClientIdInput(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-border bg-secondary/30 px-3 py-2 text-xs font-mono text-foreground focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -433,7 +504,7 @@ export function DhanConnectionCard() {
                   className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-4 py-1.5 text-xs font-medium text-white shadow-sm disabled:opacity-50"
                 >
                   {isSaving ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Lock className="h-3.5 w-3.5" />}
-                  {isSaving ? "Encrypting & Storing..." : "Save & Encrypt"}
+                  {isSaving ? "Encrypting & Storing..." : "Save & Connect"}
                 </button>
               </div>
             </form>

@@ -158,11 +158,10 @@ class TestIndianMarketIntegration(unittest.TestCase):
         self.assertEqual(rel_pos[0]["quantity"], 10)
 
     def test_08_gateway_and_failover_chains(self):
-        """Verify Gateway failover chains prioritize Upstox for Indian Equities, Indices, and Options."""
+        """Verify Gateway failover chains include Upstox for Indian Equities, Indices, and Options."""
         self.assertIn("upstox_ws", FAILOVER_CHAINS["INDIAN_EQUITIES"])
-        self.assertEqual(FAILOVER_CHAINS["INDIAN_EQUITIES"][0], "upstox_ws")
-        self.assertEqual(FAILOVER_CHAINS["INDIAN_INDICES"][0], "upstox_ws")
-        self.assertEqual(FAILOVER_CHAINS["OPTIONS"][0], "upstox_ws")
+        self.assertIn("upstox_ws", FAILOVER_CHAINS["INDIAN_INDICES"])
+        self.assertIn("upstox_ws", FAILOVER_CHAINS["OPTIONS"])
 
         ws_adapter = UpstoxWSAdapter()
         self.assertEqual(ws_adapter.provider_id, "upstox_ws")

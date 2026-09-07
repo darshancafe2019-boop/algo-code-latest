@@ -384,7 +384,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
             # Enrich raw dictionary for option chain consumers
             raw_dict = {
-                "product_id": product_id,
+                "product_id": pid_int,
                 "symbol": symbol,
                 "mark_price": mark_price,
                 "spot_price": spot_price,
@@ -414,8 +414,8 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
             self._quote_cache[symbol] = norm_quote
             self._raw_quote_cache[symbol] = raw_dict
-            if product_id:
-                self._raw_quote_cache[str(product_id)] = raw_dict
+            if pid_int:
+                self._raw_quote_cache[str(pid_int)] = raw_dict
 
             # Emit canonical tick to gateway listeners
             self._emit(norm_quote)

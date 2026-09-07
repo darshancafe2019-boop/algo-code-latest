@@ -109,6 +109,8 @@ class ConsoleLogEmailProvider(BaseEmailProvider):
             "from": sender,
             "to": to_email,
             "subject": subject,
+            "text": text_content,
+            "html": html_content,
         }
 
         try:

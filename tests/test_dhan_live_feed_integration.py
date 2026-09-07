@@ -131,3 +131,30 @@ def test_dashboard_dhan_endpoints():
     assert inst_data["count"] >= 20
     assert "RELIANCE" in inst_data["instruments"]
     assert "NIFTY" in inst_data["instruments"]
+
+
+def test_dhan_sandbox_api_connection():
+    from src.dhan_broker_adapter import DhanBrokerAdapter
+    adapter = DhanBrokerAdapter(access_token="sandbox_test_token_jwt_123")
+    assert adapter.is_authenticated is True
+    assert "sandbox.dhan.co" in adapter.base_url or "api.dhan.co" in adapter.base_url
+
+
+def test_dhan_sandbox_credentials_post():
+    from dashboard import app
+    client = app.test_client()
+
+    resp = client.post("/api/dhan/credentials", json={
+        "access_token": "test_sandbox_jwt_token",
+        "is_sandbox": True
+    })
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data["success"] is True
+
+    status_resp = client.get("/api/dhan/status")
+    status_data = status_resp.get_json()
+    assert status_data["connected"] is True
+    assert status_data["environment"] == "SANDBOX"
+    assert "https://sandbox.dhan.co/v2" in status_data["baseUrl"]
+

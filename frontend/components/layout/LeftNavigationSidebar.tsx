@@ -105,7 +105,6 @@ export function LeftNavigationSidebar({
     {
       groupName: "TRADING",
       items: [
-        { id: "terminal", label: "TERMINAL", path: "/terminal", icon: Terminal, shortcut: "⌘T" },
         { id: "bots", label: "BOTS", path: "/bots", icon: Bot, badge: "LIVE" },
         { id: "strategies", label: "STRATEGIES", path: "/strategies", icon: Code },
         {

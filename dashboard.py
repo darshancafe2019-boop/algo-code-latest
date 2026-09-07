@@ -7870,6 +7870,7 @@ def execute_permanent_bot_deletion(bot_id: str, force: bool = False) -> Dict[str
             # Note: trades_log records remain untouched with original trade history and open status preserved
 
         # 4. Remove bot instance from database
+        conn.execute("DELETE FROM bot_config_versions WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM bot_indicator_profiles WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
         conn.commit()
@@ -8015,7 +8016,8 @@ def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False)
         if preserved_open_trades > 0:
             logger.info(f"Preserving {preserved_open_trades} open trade(s) across bulk-deleted bots without closing.")
 
-        # Delete indicator profile links and bot instances in one transaction
+        # Delete indicator profile links, config versions, and bot instances in one transaction
+        cursor.execute(f"DELETE FROM bot_config_versions WHERE bot_id IN ({placeholders})", tuple(clean_ids))
         cursor.execute(f"DELETE FROM bot_indicator_profiles WHERE bot_id IN ({placeholders})", tuple(clean_ids))
         cursor.execute(f"DELETE FROM bot_instances WHERE id IN ({placeholders})", tuple(clean_ids))
         conn.commit()
@@ -11201,10 +11203,41 @@ def api_incidents_summary():
 
 @app.route("/api/system/health", methods=["GET"])
 def api_system_health():
-    """Returns comprehensive multi-subsystem health telemetry and self-healing status."""
-    from src.self_healing_manager import global_self_healing_manager
-    health = global_self_healing_manager.get_system_health_status()
-    return jsonify({"status": "success", "health": health})
+    """Returns comprehensive multi-subsystem health telemetry and multi-broker status."""
+    try:
+        from src.self_healing_manager import global_self_healing_manager
+        from src.dhan_broker_adapter import dhan_broker_adapter
+        from src.upstox_broker_adapter import upstox_broker_adapter
+        from src.delta_exchange_adapter import delta_exchange_adapter
+
+        health = global_self_healing_manager.get_system_health_status()
+        return jsonify({
+            "status": "success",
+            "app": "healthy",
+            "database": "healthy",
+            "trading_mode": getattr(config, "TRADING_MODE", "PAPER"),
+            "kill_switch_active": getattr(config, "GLOBAL_KILL_SWITCH", False),
+            "dhan": {
+                "auth": "connected" if dhan_broker_adapter.is_authenticated else "not_configured",
+                "marketData": "live" if dhan_broker_adapter.is_authenticated else "ready",
+                "trading": "ready",
+                "environment": "SANDBOX" if "sandbox" in dhan_broker_adapter.base_url.lower() else "LIVE"
+            },
+            "upstox": {
+                "auth": "connected" if upstox_broker_adapter.is_authenticated else "not_configured",
+                "marketData": "live" if upstox_broker_adapter.is_authenticated else "ready",
+                "trading": "ready"
+            },
+            "delta": {
+                "auth": "connected" if delta_exchange_adapter.is_authenticated else "not_configured",
+                "marketData": "live" if delta_exchange_adapter.is_authenticated else "ready",
+                "trading": "ready"
+            },
+            "health": health
+        }), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/system/health: {e}")
+        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 @app.route("/api/incidents/<incident_id>", methods=["GET"])
@@ -11578,6 +11611,23 @@ def api_auth_login():
                 "message": "Account is inactive. Please contact your administrator.",
                 "request_id": request_id
             }), 403
+
+        # If user has TOTP 2FA explicitly enabled, issue 2FA challenge
+        if user.get("is_2fa_enabled") == 1:
+            challenge_id = f"chall_2fa_{secrets.token_urlsafe(24)}"
+            expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+            db.create_temp_auth_challenge(
+                challenge_id=challenge_id,
+                user_id=user["id"],
+                ip_address=client_ip,
+                expires_at=expires_at
+            )
+            return jsonify({
+                "status": "2fa_required",
+                "challenge_id": challenge_id,
+                "message": "Two-factor authentication required.",
+                "request_id": request_id
+            }), 200
 
         # Resolve authoritative operator email address strictly server-side
         user_email = (user.get("email") or "").strip()
@@ -12356,13 +12406,20 @@ def api_auth_password_forgot():
                 details={"challenge_id": challenge_id}
             )
 
-    return jsonify({
+    response_payload = {
         "status": "success",
         "message": generic_msg,
         "challenge_id": challenge_id,
         "destination": masked_dest,
         "request_id": request_id
-    }), 200
+    }
+    is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+    no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
+    if no_real_provider and user:
+        response_payload["dev_otp"] = otp_code
+        response_payload["dev_mode"] = True
+
+    return jsonify(response_payload), 200
 
 
 @app.route("/api/auth/password/verify-reset-otp", methods=["POST"])
@@ -12478,6 +12535,7 @@ def api_auth_password_verify_reset_otp():
     return jsonify({
         "status": "success",
         "reset_token": raw_reset_token,
+        "token": raw_reset_token,
         "message": "Code verified. Please set your new password.",
         "request_id": request_id
     }), 200
@@ -16867,12 +16925,14 @@ def api_delta_save_credentials():
 # ============================================================================
 @app.route("/api/dhan/status", methods=["GET"])
 def api_dhan_get_status():
-    """Returns authoritative status and connectivity of Dhan HQ API v2."""
+    """Returns authoritative status and connectivity of Dhan HQ API v2 / Sandbox."""
     try:
         from src.dhan_broker_adapter import dhan_broker_adapter
         is_auth = dhan_broker_adapter.is_authenticated
         cid = dhan_broker_adapter.client_id
-        cid_masked = (cid[:4] + "..." + cid[-4:]) if len(cid) >= 8 else (cid if cid else "NOT_CONFIGURED")
+        cid_masked = (cid[:4] + "..." + cid[-4:]) if len(cid) >= 8 else (cid if cid else "SANDBOX" if is_auth else "NOT_CONFIGURED")
+        base_url = dhan_broker_adapter.base_url
+        env_mode = "SANDBOX" if "sandbox" in base_url.lower() else "LIVE"
 
         funds_summary = {
             "available": 0.0,
@@ -16883,7 +16943,7 @@ def api_dhan_get_status():
         if is_auth:
             try:
                 fl = dhan_broker_adapter.get_fund_limits()
-                if isinstance(fl, dict) and "dhanClientId" in fl:
+                if isinstance(fl, dict) and ("dhanClientId" in fl or "availMargin" in fl or "availabelBalance" in fl):
                     funds_summary["available"] = float(fl.get("availMargin") or fl.get("availabelBalance") or 0.0)
                     funds_summary["utilized"] = float(fl.get("utilizedAmount") or 0.0)
                     funds_summary["collateral"] = float(fl.get("collateralAmount") or 0.0)
@@ -16895,7 +16955,9 @@ def api_dhan_get_status():
             "status": "success",
             "connected": is_auth,
             "broker": "DHAN",
-            "brokerName": "Dhan HQ API v2",
+            "brokerName": f"Dhan HQ API v2 ({env_mode})",
+            "environment": env_mode,
+            "baseUrl": base_url,
             "clientId": cid,
             "clientIdMasked": cid_masked,
             "hasToken": bool(dhan_broker_adapter.access_token),
@@ -16913,34 +16975,44 @@ def api_dhan_get_status():
 
 @app.route("/api/dhan/ping", methods=["POST"])
 def api_dhan_ping():
-    """Diagnostic ping endpoint for Dhan HQ API v2."""
+    """Diagnostic ping endpoint for Dhan HQ API v2 / Sandbox."""
     try:
         from src.dhan_broker_adapter import dhan_broker_adapter
         if not dhan_broker_adapter.is_authenticated:
             return jsonify({
                 "success": False,
                 "connected": False,
-                "message": "Dhan credentials not configured. Please enter your Client ID and Access Token."
+                "message": "Dhan Access Token not configured. Please enter your Access Token in Settings -> Brokers."
             }), 400
 
         t0 = time.perf_counter()
-        resp = dhan_broker_adapter.get_fund_limits()
+        # Diagnostic check: Try orders endpoint (canonical sandbox check) then fund limits
+        resp = dhan_broker_adapter._make_request("GET", "orders")
+        if not isinstance(resp, list) and isinstance(resp, dict) and resp.get("status") == "error":
+            resp = dhan_broker_adapter.get_fund_limits()
         latency_ms = round((time.perf_counter() - t0) * 1000, 1)
 
-        if isinstance(resp, dict) and "dhanClientId" in resp:
+        is_success = isinstance(resp, list) or (isinstance(resp, dict) and not resp.get("error") and not resp.get("status") == "error") or ("dhanClientId" in resp if isinstance(resp, dict) else False)
+        env_mode = "SANDBOX" if "sandbox" in dhan_broker_adapter.base_url.lower() else "LIVE"
+
+        if is_success:
             return jsonify({
                 "success": True,
                 "connected": True,
                 "latencyMs": latency_ms,
+                "environment": env_mode,
+                "baseUrl": dhan_broker_adapter.base_url,
                 "clientId": dhan_broker_adapter.client_id,
-                "message": f"Dhan HQ API v2 ping successful ({latency_ms}ms). Account {dhan_broker_adapter.client_id} verified active."
+                "message": f"Dhan HQ {env_mode} API ping successful ({latency_ms}ms). Endpoint {dhan_broker_adapter.base_url} verified active."
             }), 200
         else:
-            err_msg = str(resp.get("message") or resp.get("errorMessage") or "Unexpected response")
+            err_msg = str(resp.get("message") or resp.get("errorMessage") or resp.get("error") or "Unexpected response")
             return jsonify({
                 "success": False,
                 "connected": False,
                 "latencyMs": latency_ms,
+                "environment": env_mode,
+                "baseUrl": dhan_broker_adapter.base_url,
                 "message": f"Dhan API returned: {err_msg}"
             }), 400
     except Exception as e:
@@ -16950,20 +17022,27 @@ def api_dhan_ping():
 
 @app.route("/api/dhan/credentials", methods=["POST"])
 def api_dhan_save_credentials():
-    """Securely stores encrypted Dhan HQ client ID and access token."""
+    """Securely stores encrypted Dhan HQ access token and client ID."""
     try:
         from src.dhan_broker_adapter import dhan_broker_adapter
         data = request.get_json() or {}
-        client_id = str(data.get("client_id", "")).strip()
         access_token = str(data.get("access_token", "")).strip()
+        client_id = str(data.get("client_id", "")).strip()
+        base_url = str(data.get("base_url", "")).strip()
+        is_sandbox = data.get("is_sandbox")
 
-        if not client_id or not access_token:
-            return jsonify({"success": False, "message": "Dhan Client ID and Access Token are required."}), 400
+        if not access_token:
+            return jsonify({"success": False, "message": "Dhan Access Token is required."}), 400
 
-        res = dhan_broker_adapter.store_credentials_in_vault(client_id=client_id, access_token=access_token)
+        res = dhan_broker_adapter.store_credentials_in_vault(
+            client_id=client_id,
+            access_token=access_token,
+            base_url=base_url or None,
+            is_sandbox=is_sandbox,
+        )
         return jsonify({
             "success": True,
-            "message": "Dhan HQ credentials securely saved and encrypted in vault.",
+            "message": "Dhan credentials securely saved and encrypted in vault.",
             "credential": res
         }), 200
     except Exception as e:

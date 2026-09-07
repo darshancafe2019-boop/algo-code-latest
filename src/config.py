@@ -92,6 +92,17 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
 # ==========================================
+# DHAN HQ BROKER & SANDBOX API CONFIGURATION
+# ==========================================
+DHAN_CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "")
+DHAN_ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "")
+DHAN_SANDBOX = os.getenv("DHAN_SANDBOX", "false").lower() in ("true", "1", "yes")
+DHAN_BASE_URL = os.getenv(
+    "DHAN_BASE_URL",
+    "https://sandbox.dhan.co/v2" if DHAN_SANDBOX else "https://api.dhan.co/v2"
+)
+
+# ==========================================
 # BOT IDENTIFICATION & EXECUTION SAFETY FLAGS
 # ==========================================
 BOT_NAME = os.getenv("BOT_NAME", "BTC Trading Bot")

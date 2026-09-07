@@ -94,6 +94,8 @@ class TestCompletePlatformE2E:
         assert res_stop.get_json()["status"] == "success"
 
         # Clean up
+        db.safe_execute("DELETE FROM bot_config_versions WHERE bot_id = ?", (created_id,))
+        db.safe_execute("DELETE FROM bot_indicator_profiles WHERE bot_id = ?", (created_id,))
         db.safe_execute("DELETE FROM bot_instances WHERE id = ?", (created_id,))
 
     def test_02_trading_safety_gates_and_kill_switch(self, client):

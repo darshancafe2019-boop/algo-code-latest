@@ -52,7 +52,19 @@ class DhanBrokerAdapter(BrokerAdapter):
     Authoritative broker adapter for Dhan HQ API v2.
     """
 
-    DHAN_BASE_URL = "https://api.dhan.co/v2"
+    @property
+    def base_url(self) -> str:
+        env_url = (os.getenv("DHAN_BASE_URL") or getattr(config, "DHAN_BASE_URL", "") or "").strip()
+        if env_url:
+            return env_url.rstrip("/")
+        is_sandbox = (
+            os.getenv("DHAN_SANDBOX", "").lower() in ("true", "1", "yes")
+            or os.getenv("DHAN_ENV", "").upper() == "SANDBOX"
+            or getattr(config, "DHAN_SANDBOX", False)
+        )
+        if is_sandbox:
+            return "https://sandbox.dhan.co/v2"
+        return "https://api.dhan.co/v2"
 
     def __init__(
         self,
@@ -73,8 +85,8 @@ class DhanBrokerAdapter(BrokerAdapter):
         self.orders: Dict[str, Dict[str, Any]] = {}
 
         self.secrets_mgr = SecretsManager()
-        self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or "").strip()
-        self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or "").strip()
+        self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+        self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
         self._load_credentials_from_vault()
 
         self._capability = BrokerCapability(
@@ -104,7 +116,7 @@ class DhanBrokerAdapter(BrokerAdapter):
 
     def _load_credentials_from_vault(self) -> None:
         """Loads encrypted API credentials from SQLite broker_credentials if available."""
-        if self.client_id and self.access_token:
+        if self.access_token:
             return
         try:
             creds = db.safe_query(
@@ -122,7 +134,7 @@ class DhanBrokerAdapter(BrokerAdapter):
 
     @property
     def is_authenticated(self) -> bool:
-        return bool(self.client_id and self.access_token)
+        return bool(self.access_token)
 
     def get_capability(self) -> BrokerCapability:
         self._capability.last_heartbeat_utc = datetime.now(timezone.utc).isoformat()
@@ -136,18 +148,19 @@ class DhanBrokerAdapter(BrokerAdapter):
         data: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Makes an authenticated HTTP request to Dhan HQ API v2.
+        Makes an authenticated HTTP request to Dhan HQ API v2 / Sandbox.
         """
         if not self.is_authenticated:
-            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan client ID or access token not configured."}
+            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan access token not configured."}
 
-        url = f"{self.DHAN_BASE_URL}/{path.lstrip('/')}"
+        url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {
             "access-token": self.access_token,
-            "client-id": self.client_id,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
+        if self.client_id:
+            headers["client-id"] = self.client_id
 
         body_bytes = None
         if data is not None and method.upper() in ["POST", "PUT", "PATCH"]:
@@ -369,16 +382,32 @@ class DhanBrokerAdapter(BrokerAdapter):
             return {"status": "error", "message": "Dhan credentials not configured"}
         return self._make_request("POST", "marketfeed/ltp", instruments_map)
 
-    def store_credentials_in_vault(self, client_id: str, access_token: str) -> Dict[str, Any]:
+    def store_credentials_in_vault(
+        self,
+        client_id: str = "",
+        access_token: str = "",
+        base_url: Optional[str] = None,
+        is_sandbox: Optional[bool] = None,
+    ) -> Dict[str, Any]:
         """
         Securely encrypts and stores Dhan credentials in database vault.
         """
-        self.client_id = client_id.strip()
-        self.access_token = access_token.strip()
+        self.client_id = (client_id or "").strip()
+        self.access_token = (access_token or "").strip()
+        if is_sandbox is not None:
+            os.environ["DHAN_SANDBOX"] = "true" if is_sandbox else "false"
+            setattr(config, "DHAN_SANDBOX", bool(is_sandbox))
+        if base_url:
+            os.environ["DHAN_BASE_URL"] = base_url.strip()
+            setattr(config, "DHAN_BASE_URL", base_url.strip())
+        elif is_sandbox:
+            os.environ["DHAN_BASE_URL"] = "https://sandbox.dhan.co/v2"
+            setattr(config, "DHAN_BASE_URL", "https://sandbox.dhan.co/v2")
+
         res = self.secrets_mgr.store_credential(
             provider_id="dhan",
-            account_name="Dhan HQ Primary",
-            api_key=self.client_id,
+            account_name="Dhan HQ Sandbox" if "sandbox" in self.base_url.lower() else "Dhan HQ Primary",
+            api_key=self.client_id or "DHAN_CLIENT",
             secret_key=self.access_token,
             allow_read=True,
             allow_trade=True,

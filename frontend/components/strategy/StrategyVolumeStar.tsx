@@ -688,7 +688,7 @@ export function StrategyVolumeStar() {
                 <div className="flex items-center gap-2">
                   <Info className="h-4 w-4 text-cyan-400" />
                   <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    "WHY TRADE / WHY NO TRADE?" DETERMINISTIC DIAGNOSTIC
+                    &quot;WHY TRADE / WHY NO TRADE?&quot; DETERMINISTIC DIAGNOSTIC
                   </h3>
                 </div>
                 <span className="text-[10px] font-mono text-slate-400">
@@ -1067,7 +1067,7 @@ export function StrategyVolumeStar() {
               </div>
             ) : (
               <div className="p-12 text-center text-xs text-slate-500 font-mono">
-                No backtest results yet. Click "Rerun Backtest" to execute high-fidelity simulation.
+                No backtest results yet. Click &quot;Rerun Backtest&quot; to execute high-fidelity simulation.
               </div>
             )}
           </div>

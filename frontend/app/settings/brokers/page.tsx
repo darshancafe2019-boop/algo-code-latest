@@ -2,7 +2,6 @@
 
 import React, { Suspense } from "react";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { UpstoxConnectionCard } from "@/components/settings/UpstoxConnectionCard";
 import { SimpleConnectionsSection } from "@/components/settings/SimpleConnectionsSection";
 
 export default function BrokerSettingsPage() {

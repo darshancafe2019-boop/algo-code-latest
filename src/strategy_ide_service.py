@@ -50,6 +50,94 @@ SUPPORTED_OPERATORS = {
 
 BUILTIN_STRATEGY_TEMPLATES = [
     {
+        "strategy_id": "volume-star-v1",
+        "version": "1.0.0",
+        "name": "Volume Star Strategy",
+        "description": "5M Market Structure (HH/HL or LH/LL) + Fixed Range Volume Profile (50 rows, 70% VA) + Deterministic LVN Rejection Confirmation.",
+        "status": "APPROVED",
+        "market_type": "equity",
+        "symbol": "NIFTY",
+        "base_timeframe": "5m",
+        "direction": "LONG",
+        "category": "Market Flow / Volume Profile",
+        "entry": {
+            "setup": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-setup-ms",
+                        "timeframe": "5m",
+                        "left": "market_structure",
+                        "leftLabel": "5M Market Structure",
+                        "op": "==",
+                        "right": "BULLISH",
+                        "rightLabel": "Bullish (HH/HL)",
+                        "category": "TREND",
+                        "enabled": True,
+                        "description": "5M Confirmed Market Flow / Trend"
+                    }
+                ]
+            },
+            "confirmation": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-confirm-frvp-lvn",
+                        "timeframe": "5m",
+                        "left": "close",
+                        "leftLabel": "Price Retrace",
+                        "op": "in_range",
+                        "right": "lvn_zone",
+                        "rightLabel": "Primary LVN Zone",
+                        "category": "VOLUME",
+                        "enabled": True,
+                        "description": "FRVP Low Volume Node Retracement"
+                    }
+                ]
+            },
+            "trigger": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-trig-lvn-reject",
+                        "timeframe": "5m",
+                        "left": "rejection_wick",
+                        "leftLabel": "Wick Rejection",
+                        "op": "==",
+                        "right": "BULLISH_CONFIRM",
+                        "rightLabel": "Bullish Close Reclaim",
+                        "category": "VOLATILITY",
+                        "enabled": True,
+                        "description": "LVN Wick Penetration & Bullish Close Rejection"
+                    }
+                ]
+            }
+        },
+        "exit": {
+            "stop_loss_type": "REJECTION_WICK",
+            "stop_loss_value": 1.0,
+            "take_profit_type": "RR_RATIO",
+            "take_profit_value": 2.0,
+            "trailing_stop_enabled": False,
+            "multi_target": [
+                {"ratio": 1.0, "pct": 50},
+                {"ratio": 2.0, "pct": 50}
+            ]
+        },
+        "risk": {
+            "capital": 10000.0,
+            "risk_per_trade_pct": 1.0,
+            "max_position_size_pct": 25.0,
+            "max_daily_loss": 500.0,
+            "max_drawdown_pct": 5.0,
+            "max_open_positions": 2,
+            "leverage": 1.0,
+            "cooldown_bars": 3
+        },
+        "author": "System",
+        "created_at": "2026-09-01T00:00:00Z"
+    },
+    {
         "strategy_id": "template-trend-confluence",
         "version": "1.0.0",
         "name": "Multi-Timeframe Trend Confluence Strategy",

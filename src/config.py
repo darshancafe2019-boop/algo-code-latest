@@ -55,14 +55,15 @@ UPSTOX_CLIENT_ID = os.getenv("UPSTOX_CLIENT_ID", "")
 UPSTOX_CLIENT_SECRET = os.getenv("UPSTOX_CLIENT_SECRET", "")
 UPSTOX_REDIRECT_URI = os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
 UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
-DHAN_CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "")
-DHAN_ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "")
-DHAN_CLOUD_TOKEN = os.getenv("DHAN_CLOUD_TOKEN", "")
-DHAN_TRADING_ENABLED = os.getenv("DHAN_TRADING_ENABLED", "false").lower() == "true"
 ENABLE_INDIA_MARKET = os.getenv("ENABLE_INDIA_MARKET", "true").lower() == "true"
 ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
 ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "true").lower() == "true"
 INDIA_BROKER = os.getenv("INDIA_BROKER", "DHAN")
+FYERS_APP_ID = os.getenv("FYERS_APP_ID", "")
+FYERS_CLIENT_ID = os.getenv("FYERS_CLIENT_ID", FYERS_APP_ID)
+FYERS_SECRET_ID = os.getenv("FYERS_SECRET_ID", os.getenv("FYERS_SECRET_KEY", ""))
+FYERS_REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI", "http://localhost:3100/api/fyers/callback")
+FYERS_ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN", "")
 
 # Delta Exchange Options Integration
 DELTA_REST_URL = os.getenv("DELTA_REST_URL", "https://api.india.delta.exchange").rstrip("/")
@@ -118,15 +119,27 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
 # ==========================================
-# DHAN HQ BROKER & SANDBOX API CONFIGURATION
+# DHAN HQ BROKER & DATA FEED CONFIGURATION
 # ==========================================
-DHAN_CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "")
-DHAN_ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "")
+DHAN_ENABLED = os.getenv("DHAN_ENABLED", "true").lower() == "true"
+DHAN_CLIENT_ID = os.getenv("DHAN_CLIENT_ID", "").strip()
+DHAN_ACCESS_TOKEN = os.getenv("DHAN_ACCESS_TOKEN", "").strip()
+DHAN_FEED_ENABLED = os.getenv("DHAN_FEED_ENABLED", "true").lower() == "true"
+DHAN_DATA_API_ENABLED = os.getenv("DHAN_DATA_API_ENABLED", "true").lower() == "true"
+DHAN_TRADING_ENABLED = os.getenv("DHAN_TRADING_ENABLED", "false").lower() == "true"
+DHAN_PAPER_MODE = os.getenv("DHAN_PAPER_MODE", "true").lower() == "true"
 DHAN_SANDBOX = os.getenv("DHAN_SANDBOX", "false").lower() in ("true", "1", "yes")
 DHAN_BASE_URL = os.getenv(
     "DHAN_BASE_URL",
     "https://sandbox.dhan.co/v2" if DHAN_SANDBOX else "https://api.dhan.co/v2"
 )
+DHAN_FEED_URL = os.getenv("DHAN_FEED_URL", "wss://api-feed.dhan.co")
+
+# Emergency Diagnostic & Isolation Mode
+DHAN_ONLY_DIAGNOSTIC_MODE = os.getenv("DHAN_ONLY_DIAGNOSTIC_MODE", "true").lower() == "true"
+DHAN_TEST_EXCHANGE_SEGMENT = os.getenv("DHAN_TEST_EXCHANGE_SEGMENT", "NSE_EQ").strip()
+DHAN_TEST_SECURITY_ID = os.getenv("DHAN_TEST_SECURITY_ID", "2885").strip()
+PAPER_TRADING = os.getenv("PAPER_TRADING", "true").lower() == "true"
 
 # ==========================================
 # BOT IDENTIFICATION & EXECUTION SAFETY FLAGS

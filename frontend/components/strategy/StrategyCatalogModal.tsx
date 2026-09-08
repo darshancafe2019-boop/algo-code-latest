@@ -40,7 +40,7 @@ export function StrategyCatalogModal({
 
   if (!isOpen) return null;
 
-  const filters = ["ALL", "TREND", "MOMENTUM", "OPTIONS", "FUTURES", "BREAKOUT"];
+  const filters = ["ALL", "TREND", "VOLUME_PROFILE", "MOMENTUM", "OPTIONS", "FUTURES", "BREAKOUT"];
 
   const filteredCatalog = catalog.filter((item) => {
     const matchesSearch =
@@ -49,7 +49,8 @@ export function StrategyCatalogModal({
     if (!matchesSearch) return false;
 
     if (selectedFilter === "ALL") return true;
-    if (selectedFilter === "TREND") return item.name?.toLowerCase().includes("trend") || item.name?.toLowerCase().includes("ema");
+    if (selectedFilter === "VOLUME_PROFILE") return item.category?.toLowerCase().includes("volume") || item.name?.toLowerCase().includes("volume") || item.name?.toLowerCase().includes("lvn") || item.id === "volume-star-v1";
+    if (selectedFilter === "TREND") return item.name?.toLowerCase().includes("trend") || item.name?.toLowerCase().includes("ema") || item.id === "volume-star-v1";
     if (selectedFilter === "OPTIONS") return item.direction === "OPTIONS_MULTI_LEG" || item.name?.toLowerCase().includes("condor");
     if (selectedFilter === "FUTURES") return item.direction === "FUTURES" || item.name?.toLowerCase().includes("perp");
     if (selectedFilter === "MOMENTUM") return item.name?.toLowerCase().includes("rsi") || item.name?.toLowerCase().includes("momentum");

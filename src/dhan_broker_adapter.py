@@ -348,8 +348,14 @@ class DhanBrokerAdapter(BrokerAdapter):
         Modifies a pending order on Dhan HQ API v2.
         Endpoint: PUT /v2/orders/{orderId}
         """
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
-        if trading_mode == "LIVE" and self.is_authenticated:
+        is_live_allowed = (
+            getattr(config, "TRADING_MODE", "PAPER").upper() == "LIVE"
+            and getattr(config, "LIVE_TRADING_ENABLED", False) is True
+            and getattr(config, "DHAN_TRADING_ENABLED", False) is True
+            and not getattr(config, "DHAN_PAPER_MODE", True)
+            and self.is_authenticated
+        )
+        if is_live_allowed:
             payload = {
                 "dhanClientId": self.client_id,
                 "orderId": order_id,
@@ -431,11 +437,19 @@ class DhanBrokerAdapter(BrokerAdapter):
         """
         Executes order routing. Enforces PAPER mode by default.
         """
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
         order_id = client_order_id or f"DHAN-{uuid.uuid4().hex[:8].upper()}"
         now_str = datetime.now(timezone.utc).isoformat()
 
-        if trading_mode == "LIVE" and self.is_authenticated:
+        # Strict safety guard: Live broker execution is locked unless all live flags are explicitly True
+        is_live_allowed = (
+            getattr(config, "TRADING_MODE", "PAPER").upper() == "LIVE"
+            and getattr(config, "LIVE_TRADING_ENABLED", False) is True
+            and getattr(config, "DHAN_TRADING_ENABLED", False) is True
+            and not getattr(config, "DHAN_PAPER_MODE", True)
+            and self.is_authenticated
+        )
+
+        if is_live_allowed:
             payload = {
                 "dhanClientId": self.client_id,
                 "correlationId": order_id,
@@ -506,8 +520,14 @@ class DhanBrokerAdapter(BrokerAdapter):
         return order_record
 
     def cancel_order(self, order_id: str) -> Dict[str, Any]:
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
-        if trading_mode == "LIVE" and self.is_authenticated:
+        is_live_allowed = (
+            getattr(config, "TRADING_MODE", "PAPER").upper() == "LIVE"
+            and getattr(config, "LIVE_TRADING_ENABLED", False) is True
+            and getattr(config, "DHAN_TRADING_ENABLED", False) is True
+            and not getattr(config, "DHAN_PAPER_MODE", True)
+            and self.is_authenticated
+        )
+        if is_live_allowed:
             res = self._make_request("DELETE", f"orders/{order_id}")
             success = bool(res.get("orderStatus") == "CANCELLED" or res.get("status") == "success")
             return {"success": success, "order_id": order_id, "status": "CANCELLED" if success else "FAILED", "raw": res}
@@ -520,7 +540,13 @@ class DhanBrokerAdapter(BrokerAdapter):
         """
         Executes multileg options/spread order on Dhan or simulator.
         """
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        is_live_allowed = (
+            getattr(config, "TRADING_MODE", "PAPER").upper() == "LIVE"
+            and getattr(config, "LIVE_TRADING_ENABLED", False) is True
+            and getattr(config, "DHAN_TRADING_ENABLED", False) is True
+            and not getattr(config, "DHAN_PAPER_MODE", True)
+            and self.is_authenticated
+        )
         basket_id = f"DHAN-BASKET-{uuid.uuid4().hex[:8].upper()}"
         legs = order_payload.get("legs", [])
         results = []

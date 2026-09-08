@@ -332,6 +332,44 @@ class CandleEngine:
 
         return df
 
+    def update_forming_candle(
+        self,
+        current_candle: Optional[Dict[str, Any]],
+        tick_price: float,
+        tick_volume: float = 0.0,
+        timeframe_seconds: int = 60,
+        tick_time: Optional[datetime] = None
+    ) -> Dict[str, Any]:
+        """
+        Updates or rolls over a forming candle from an incoming live tick.
+        """
+        now = tick_time or datetime.now(timezone.utc)
+        bucket_ts = int(now.timestamp() // timeframe_seconds) * timeframe_seconds
+        bucket_dt = datetime.fromtimestamp(bucket_ts, tz=timezone.utc)
+
+        if not current_candle or current_candle.get("bucket_ts") != bucket_ts:
+            return {
+                "bucket_ts": bucket_ts,
+                "timestamp": bucket_dt.isoformat(),
+                "open": tick_price,
+                "high": tick_price,
+                "low": tick_price,
+                "close": tick_price,
+                "volume": tick_volume,
+                "is_closed": False,
+            }
+
+        return {
+            "bucket_ts": bucket_ts,
+            "timestamp": current_candle["timestamp"],
+            "open": current_candle["open"],
+            "high": max(current_candle["high"], tick_price),
+            "low": min(current_candle["low"], tick_price),
+            "close": tick_price,
+            "volume": current_candle.get("volume", 0.0) + tick_volume,
+            "is_closed": False,
+        }
+
 
 # Global singleton instance
 candle_engine = CandleEngine()

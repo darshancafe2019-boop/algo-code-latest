@@ -61,7 +61,7 @@ async function runVerification() {
       payload: { symbol: "NIFTY", marketType: "INDIAN_EQUITIES", toolMode: "OPTIONS_ARCHITECT" },
     },
     {
-      name: "4. US Tech (AAPL - Alpha Vantage) -> News & Sentiment",
+      name: "4. US Tech (AAPL) -> News & Sentiment",
       payload: { symbol: "AAPL", marketType: "US_EQUITIES", toolMode: "SENTIMENT" },
     },
     {

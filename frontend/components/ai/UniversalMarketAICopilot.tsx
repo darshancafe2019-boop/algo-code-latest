@@ -272,7 +272,7 @@ export function UniversalMarketAICopilot() {
             { id: "CRYPTO_OPTIONS", label: "⚡ Crypto Options (BTC/ETH)", defaultSym: "BTC-OPTIONS" },
             { id: "CRYPTO_SPOT", label: "🪙 Crypto Spot & Futures", defaultSym: "BTC/USDT" },
             { id: "INDIAN_EQUITIES", label: "🇮🇳 Indian Equities/F&O (NIFTY)", defaultSym: "NIFTY" },
-            { id: "US_EQUITIES", label: "🇺🇸 US Tech (Alpha Vantage)", defaultSym: "AAPL" },
+            { id: "US_EQUITIES", label: "🇺🇸 US Equities & ETFs", defaultSym: "AAPL" },
             { id: "FOREX_COMMODITIES", label: "💱 Forex & Gold", defaultSym: "EURUSD" },
           ].map((univ) => (
             <button
@@ -468,14 +468,14 @@ export function UniversalMarketAICopilot() {
                     {data?.sentiment.label.toUpperCase()}
                   </div>
                   <div>
-                    <span className="text-sm font-bold text-white font-mono">Alpha Vantage News Sentiment Engine</span>
+                    <span className="text-sm font-bold text-white font-mono">Institutional News & Sentiment Engine</span>
                     <p className="text-[11px] text-slate-400 font-sans mt-0.5">
                       Sentiment Composite Score: <strong className="text-blue-400">+{data?.sentiment.score} / 1.0</strong>
                     </p>
                   </div>
                 </div>
                 <span className="px-2.5 py-1 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 font-mono">
-                  ALPHA VANTAGE REST ACTIVE
+                  SENTIMENT FEED ACTIVE
                 </span>
               </div>
 
@@ -575,7 +575,7 @@ export function UniversalMarketAICopilot() {
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-2 border-t border-slate-800 text-[11px] text-slate-500 font-mono shrink-0">
-          <span>Active Universe: {selectedUniverse} • Live quotes &amp; Alpha Vantage fed</span>
+          <span>Active Universe: {selectedUniverse} • Real-time Multi-Market Intelligence</span>
           <span>Shortcut: ⌘J / Ctrl+J</span>
         </div>
       </div>

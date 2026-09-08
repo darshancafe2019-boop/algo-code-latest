@@ -37,13 +37,13 @@ export const CANONICAL_UNDERLYINGS: NormalizedUnderlying[] = [
   { symbol: "ICICIBANK", name: "ICICI Bank Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1150.0, step: 10, lotSize: 700, multiplier: 700, currency: "INR", currencySymbol: "₹" },
   { symbol: "INFY", name: "Infosys Ltd Options", market: "India", exchange: "NSE", assetClass: "STOCK", spotPrice: 1820.0, step: 10, lotSize: 400, multiplier: 400, currency: "INR", currencySymbol: "₹" },
 
-  // Global / US (Alpha Vantage / CBOE / NASDAQ / OPRA)
-  { symbol: "SPY", name: "SPDR S&P 500 ETF Options", market: "Global", exchange: "NYSE / Alpha Vantage", assetClass: "ETF", spotPrice: 562.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "QQQ", name: "Invesco QQQ Trust Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "ETF", spotPrice: 485.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "AAPL", name: "Apple Inc. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 316.85, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "NVDA", name: "NVIDIA Corp. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 125.5, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "MSFT", name: "Microsoft Corp. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 418.2, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
-  { symbol: "TSLA", name: "Tesla Inc. Options", market: "Global", exchange: "NASDAQ / Alpha Vantage", assetClass: "STOCK", spotPrice: 215.0, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  // Global / US (CBOE / NASDAQ / OPRA)
+  { symbol: "SPY", name: "SPDR S&P 500 ETF Options", market: "Global", exchange: "NYSE / CBOE", assetClass: "ETF", spotPrice: 562.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "QQQ", name: "Invesco QQQ Trust Options", market: "Global", exchange: "NASDAQ / CBOE", assetClass: "ETF", spotPrice: 485.0, step: 1, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "AAPL", name: "Apple Inc. Options", market: "Global", exchange: "NASDAQ / OPRA", assetClass: "STOCK", spotPrice: 316.85, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "NVDA", name: "NVIDIA Corp. Options", market: "Global", exchange: "NASDAQ / OPRA", assetClass: "STOCK", spotPrice: 125.5, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "MSFT", name: "Microsoft Corp. Options", market: "Global", exchange: "NASDAQ / OPRA", assetClass: "STOCK", spotPrice: 418.2, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
+  { symbol: "TSLA", name: "Tesla Inc. Options", market: "Global", exchange: "NASDAQ / OPRA", assetClass: "STOCK", spotPrice: 215.0, step: 2.5, lotSize: 100, multiplier: 100, currency: "USD", currencySymbol: "$" },
 
   // Crypto Options (Delta Exchange / Deribit)
   { symbol: "BTC-OPTIONS", name: "Bitcoin Options Chain", market: "Crypto", exchange: "Delta Exchange / Deribit", assetClass: "CRYPTO_PERP", spotPrice: 78520.0, step: 500, lotSize: 0.1, multiplier: 1, currency: "USD", currencySymbol: "$" },

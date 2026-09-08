@@ -33,7 +33,6 @@ from market_data_gateway.adapters.dhan_ws import DhanWSAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
-from market_data_gateway.adapters.alphavantage import AlphaVantageAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
@@ -55,37 +54,44 @@ STALE_THRESHOLD_SEC = 10.0
 
 class MarketDataGateway:
     def __init__(self):
-        # Initialize adapters
-        self.adapters = {
-            "binance_ws": BinanceWSAdapter(),
-            "delta_options_ws": DeltaOptionsWSAdapter(),
-            "dhan_ws": DhanWSAdapter(),
-            "upstox_ws": UpstoxWSAdapter(),
-            "angelone": AngelOneAdapter(),
-            "alpha_vantage": AlphaVantageAdapter(),
-            "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
-            # Stub adapters for providers that need credentials
-            "twelve_data": NotConfiguredAdapter(
-                "twelve_data", "Twelve Data",
-                ["GLOBAL_EQUITIES", "FOREX", "INDICES"],
-                "Set TWELVE_DATA_API_KEY in .env to activate",
-            ),
-            "polygon": NotConfiguredAdapter(
-                "polygon", "Polygon.io",
-                ["GLOBAL_EQUITIES", "OPTIONS", "INDICES"],
-                "Set POLYGON_API_KEY in .env to activate",
-            ),
-            "databento": NotConfiguredAdapter(
-                "databento", "Databento",
-                ["FUTURES", "OPTIONS"],
-                "Set DATABENTO_API_KEY in .env to activate",
-            ),
-            "trading_economics": NotConfiguredAdapter(
-                "trading_economics", "Trading Economics",
-                ["MACRO"],
-                "Set TRADING_ECONOMICS_API_KEY in .env to activate",
-            ),
-        }
+        dhan_diagnostic_mode = os.environ.get("DHAN_ONLY_DIAGNOSTIC_MODE", "true").lower() == "true"
+        
+        if dhan_diagnostic_mode:
+            logger.info("[DHAN_ONLY_DIAGNOSTIC_MODE] Initializing Dhan adapter only. Upstox, Delta, Binance kept inactive.")
+            self.adapters = {
+                "dhan_ws": DhanWSAdapter(),
+            }
+        else:
+            # Initialize adapters
+            self.adapters = {
+                "binance_ws": BinanceWSAdapter(),
+                "delta_options_ws": DeltaOptionsWSAdapter(),
+                "dhan_ws": DhanWSAdapter(),
+                "upstox_ws": UpstoxWSAdapter(),
+                "angelone": AngelOneAdapter(),
+                "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
+                # Stub adapters for providers that need credentials
+                "twelve_data": NotConfiguredAdapter(
+                    "twelve_data", "Twelve Data",
+                    ["GLOBAL_EQUITIES", "FOREX", "INDICES"],
+                    "Set TWELVE_DATA_API_KEY in .env to activate",
+                ),
+                "polygon": NotConfiguredAdapter(
+                    "polygon", "Polygon.io",
+                    ["GLOBAL_EQUITIES", "OPTIONS", "INDICES"],
+                    "Set POLYGON_API_KEY in .env to activate",
+                ),
+                "databento": NotConfiguredAdapter(
+                    "databento", "Databento",
+                    ["FUTURES", "OPTIONS"],
+                    "Set DATABENTO_API_KEY in .env to activate",
+                ),
+                "trading_economics": NotConfiguredAdapter(
+                    "trading_economics", "Trading Economics",
+                    ["MACRO"],
+                    "Set TRADING_ECONOMICS_API_KEY in .env to activate",
+                ),
+            }
 
         self.failover = FailoverManager(self.adapters)
         # Quote cache: symbol -> NormalizedQuote (latest from any active provider)
@@ -98,6 +104,39 @@ class MarketDataGateway:
             """Called by any adapter when a new quote arrives."""
             self._quote_cache[quote.symbol] = quote
             asyncio.ensure_future(self._broadcast_quote(quote))
+
+        # Bridge DhanFeedManager singleton ticks directly into gateway quote cache
+        try:
+            from src.dhan_feed_manager import global_dhan_feed_manager
+            def _on_dhan_tick(tick: Dict[str, Any]) -> None:
+                sym = tick.get("symbol", "NIFTY")
+                last_p = float(tick.get("last_price", 0.0))
+                if last_p <= 0:
+                    return
+                quote = NormalizedQuote(
+                    symbol=sym,
+                    exchange=tick.get("exchange_segment", "NSE_EQ"),
+                    provider="dhan",
+                    last_price=last_p,
+                    bid=float(tick.get("bid_price") or last_p),
+                    ask=float(tick.get("ask_price") or last_p),
+                    volume=float(tick.get("volume") or 0.0),
+                    open=float(tick.get("open")) if tick.get("open") else None,
+                    high=float(tick.get("high")) if tick.get("high") else None,
+                    low=float(tick.get("low")) if tick.get("low") else None,
+                    close=float(tick.get("previous_close")) if tick.get("previous_close") else None,
+                    oi=float(tick.get("open_interest")) if tick.get("open_interest") else None,
+                    event_timestamp=tick.get("event_time") or datetime.now(timezone.utc).isoformat(),
+                    received_timestamp=tick.get("received_at") or datetime.now(timezone.utc).isoformat(),
+                    feed_latency_ms=float(tick.get("freshness_ms") or 0.0),
+                    data_mode="REAL_TIME",
+                )
+                self._quote_cache[sym] = quote
+                asyncio.ensure_future(self._broadcast_quote(quote))
+
+            global_dhan_feed_manager.add_callback(_on_dhan_tick)
+        except Exception as bridge_err:
+            logger.debug("DhanFeedManager direct bridge note: %s", bridge_err)
 
         self.subscription_registry = SubscriptionRegistry(
             add_callback=lambda sym: asyncio.ensure_future(self._on_new_subscription(sym)),

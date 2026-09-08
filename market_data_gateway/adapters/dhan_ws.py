@@ -91,6 +91,11 @@ class DhanWSAdapter(BaseProviderAdapter):
         self._ticks_received = 0
         self._auth_error_reason: Optional[str] = None
         self._feed_state = "DISCONNECTED"
+        # Dhan REST quote protection: WebSocket is primary; REST is fallback only.
+        self._rest_poll_lock = asyncio.Lock()
+        self._last_rest_poll_time: float = 0.0
+        self._rest_block_until: float = 0.0
+        self._rest_min_interval_sec: float = 1.10
 
         # Pre-populate security ID lookup from registry
         for sym, meta in OFFICIAL_DHAN_KEYS.items():
@@ -174,17 +179,15 @@ class DhanWSAdapter(BaseProviderAdapter):
                     f"?version=2&token={access_token}&clientId={client_id}&authType=2"
                 )
 
-                extra_headers = {
-                    "access-token": access_token,
-                    "client-id": client_id,
-                }
-
-                logger.info("DhanWS: Opening socket to %s", global_dhan_service.DHAN_FEED_URL)
+                logger.info(
+                    "DhanWS: Opening authenticated Dhan v2 market feed "
+                    "(clientId=%s, token=REDACTED)",
+                    client_id,
+                )
                 start_conn_time = time.monotonic()
 
                 async with websockets.connect(
                     ws_url,
-                    extra_headers=extra_headers,
                     ping_interval=20,
                     ping_timeout=10,
                     close_timeout=5,
@@ -383,11 +386,24 @@ class DhanWSAdapter(BaseProviderAdapter):
         """
         while self._running:
             try:
-                await asyncio.sleep(5.0)
+                # WebSocket is the primary live-data source. REST is only a safety fallback.
+                await asyncio.sleep(10.0)
+
                 if not global_dhan_service.is_authenticated:
                     continue
 
-                symbols_to_poll = list(self._subscribed_symbols) or ["NIFTY", "BANKNIFTY", "RELIANCE", "HDFCBANK"]
+                # Never poll arbitrary default symbols just because the gateway is running.
+                # Only fall back for instruments that a consumer actually subscribed to.
+                if not self._subscribed_symbols:
+                    continue
+
+                # When WebSocket traffic is fresh, REST polling is unnecessary.
+                if self._status == "CONNECTED" and self._last_msg_time > 0:
+                    tick_age_sec = time.monotonic() - self._last_msg_time
+                    if tick_age_sec < 10.0:
+                        continue
+
+                symbols_to_poll = list(self._subscribed_symbols)
                 await self._poll_rest_quotes(symbols_to_poll)
             except asyncio.CancelledError:
                 break
@@ -395,67 +411,90 @@ class DhanWSAdapter(BaseProviderAdapter):
                 logger.debug("Dhan REST poll fallback note: %s", exc)
 
     async def _poll_rest_quotes(self, symbols: List[str]) -> None:
-        """Queries Dhan REST quote API for symbols and updates cache."""
-        req_map: Dict[str, List[int]] = {}
-        sym_by_sec_id: Dict[int, str] = {}
-
-        for sym in symbols:
-            meta = global_dhan_service.resolve_symbol(sym)
-            if meta:
-                sec_id = int(meta["security_id"])
-                seg = meta.get("exchange_segment", "NSE_EQ")
-                req_map.setdefault(seg, []).append(sec_id)
-                sym_by_sec_id[sec_id] = sym
-
-        if not req_map:
+        """Queries Dhan REST quote API for symbols and updates cache, with rate protection."""
+        if not symbols:
             return
 
-        loop = asyncio.get_event_loop()
-        resp = await loop.run_in_executor(None, global_dhan_service.get_market_quote, req_map)
+        async with self._rest_poll_lock:
+            now_mono = time.monotonic()
 
-        if not resp or not isinstance(resp, dict) or "data" not in resp:
-            return
+            # Back off after Dhan HTTP 429 / error 805 to avoid account blocking.
+            if now_mono < self._rest_block_until:
+                return
 
-        data_seg = resp.get("data", {})
-        now_iso = datetime.now(timezone.utc).isoformat()
+            elapsed = now_mono - self._last_rest_poll_time
+            if elapsed < self._rest_min_interval_sec:
+                await asyncio.sleep(self._rest_min_interval_sec - elapsed)
 
-        for seg, items in data_seg.items():
-            if not isinstance(items, dict):
-                continue
-            for sec_id_str, q_data in items.items():
-                try:
-                    sec_id_int = int(sec_id_str)
-                    symbol = sym_by_sec_id.get(sec_id_int) or self._sec_id_to_symbol.get(sec_id_str, f"DHAN_{sec_id_str}")
-                    ltp = float(q_data.get("last_price") or q_data.get("ltp") or 0.0)
-                    if ltp <= 0:
-                        continue
+            req_map: Dict[str, List[int]] = {}
+            sym_by_sec_id: Dict[int, str] = {}
 
-                    open_p = float(q_data.get("open") or 0.0) or None
-                    high_p = float(q_data.get("high") or 0.0) or None
-                    low_p = float(q_data.get("low") or 0.0) or None
-                    close_p = float(q_data.get("close") or 0.0) or None
-                    vol = float(q_data.get("volume") or 0.0)
-                    chg_pct = float(q_data.get("net_change_percentage") or q_data.get("change_percentage") or 0.0)
+            for sym in symbols:
+                meta = global_dhan_service.resolve_symbol(sym)
+                if meta:
+                    sec_id = int(meta["security_id"])
+                    seg = meta.get("exchange_segment", "NSE_EQ")
+                    req_map.setdefault(seg, []).append(sec_id)
+                    sym_by_sec_id[sec_id] = sym
 
-                    quote = NormalizedQuote(
-                        symbol=symbol,
-                        exchange="NSE",
-                        provider="dhan_ws",
-                        last_price=round(ltp, 2),
-                        open=round(open_p, 2) if open_p else None,
-                        high=round(high_p, 2) if high_p else None,
-                        low=round(low_p, 2) if low_p else None,
-                        close=round(close_p, 2) if close_p else None,
-                        volume=vol,
-                        change_pct=round(chg_pct, 2),
-                        data_mode="REAL_TIME" if self._status == "CONNECTED" else "CACHED",
-                        event_timestamp=now_iso,
-                        received_timestamp=now_iso,
-                    )
-                    self._quote_cache[symbol] = quote
-                    self._emit(quote)
-                except Exception as e:
-                    logger.debug("Dhan REST item parse note: %s", e)
+            if not req_map:
+                return
+
+            loop = asyncio.get_event_loop()
+            resp = await loop.run_in_executor(None, global_dhan_service.get_market_quote, req_map)
+            self._last_rest_poll_time = time.monotonic()
+
+            if isinstance(resp, dict) and resp.get("_http_status") == 429:
+                self._rest_block_until = time.monotonic() + 60.0
+                logger.warning(
+                    "Dhan REST quote rate-limited (HTTP 429 / 805). "
+                    "Backing off REST fallback for 60 seconds; WebSocket remains primary."
+                )
+                return
+
+            if not resp or not isinstance(resp, dict) or "data" not in resp:
+                return
+
+            data_seg = resp.get("data", {})
+            now_iso = datetime.now(timezone.utc).isoformat()
+
+            for seg, items in data_seg.items():
+                if not isinstance(items, dict):
+                    continue
+                for sec_id_str, q_data in items.items():
+                    try:
+                        sec_id_int = int(sec_id_str)
+                        symbol = sym_by_sec_id.get(sec_id_int) or self._sec_id_to_symbol.get(sec_id_str, f"DHAN_{sec_id_str}")
+                        ltp = float(q_data.get("last_price") or q_data.get("ltp") or 0.0)
+                        if ltp <= 0:
+                            continue
+
+                        open_p = float(q_data.get("open") or 0.0) or None
+                        high_p = float(q_data.get("high") or 0.0) or None
+                        low_p = float(q_data.get("low") or 0.0) or None
+                        close_p = float(q_data.get("close") or 0.0) or None
+                        vol = float(q_data.get("volume") or 0.0)
+                        chg_pct = float(q_data.get("net_change_percentage") or q_data.get("change_percentage") or 0.0)
+
+                        quote = NormalizedQuote(
+                            symbol=symbol,
+                            exchange="NSE",
+                            provider="dhan_ws",
+                            last_price=round(ltp, 2),
+                            open=round(open_p, 2) if open_p else None,
+                            high=round(high_p, 2) if high_p else None,
+                            low=round(low_p, 2) if low_p else None,
+                            close=round(close_p, 2) if close_p else None,
+                            volume=vol,
+                            change_pct=round(chg_pct, 2),
+                            data_mode="REAL_TIME" if self._status == "CONNECTED" else "CACHED",
+                            event_timestamp=now_iso,
+                            received_timestamp=now_iso,
+                        )
+                        self._quote_cache[symbol] = quote
+                        self._emit(quote)
+                    except Exception as e:
+                        logger.debug("Dhan REST item parse note: %s", e)
 
     # ─── Subscriptions ───────────────────────────────────────────────────────
 
@@ -467,8 +506,14 @@ class DhanWSAdapter(BaseProviderAdapter):
         if new_syms and self._ws and self._status == "CONNECTED":
             await self._send_subscription(list(self._subscribed_symbols))
         
-        # Trigger immediate REST poll for fast response
-        if new_syms:
+        # Only use an immediate REST snapshot when WebSocket isn't healthy yet.
+        # Avoid duplicate REST traffic when the live feed is already connected.
+        ws_is_fresh = (
+            self._status == "CONNECTED"
+            and self._last_msg_time > 0
+            and (time.monotonic() - self._last_msg_time) < 10.0
+        )
+        if new_syms and not ws_is_fresh:
             asyncio.create_task(self._poll_rest_quotes(new_syms))
 
     async def unsubscribe(self, symbols: List[str]) -> None:
@@ -495,17 +540,23 @@ class DhanWSAdapter(BaseProviderAdapter):
         if not instruments:
             return
 
-        payload = {
-            "RequestCode": 16,  # 16 = Quote Feed (LTP + OHLC + Volume)
-            "InstrumentCount": len(instruments),
-            "InstrumentList": instruments,
-        }
+        # Dhan v2 feed request codes:
+        # 17 = Subscribe Quote Packet (LTP + OHLC + Volume; OI arrives separately for derivatives).
+        # Dhan permits at most 100 instruments per subscription message, so chunk requests.
+        for start in range(0, len(instruments), 100):
+            batch = instruments[start:start + 100]
+            payload = {
+                "RequestCode": 17,
+                "InstrumentCount": len(batch),
+                "InstrumentList": batch,
+            }
 
-        try:
-            await self._ws.send(json.dumps(payload))
-            logger.info("DhanWS: Subscribed to %d instruments", len(instruments))
-        except Exception as exc:
-            logger.warning("DhanWS send subscription failed: %s", exc)
+            try:
+                await self._ws.send(json.dumps(payload))
+                logger.info("DhanWS: Subscribed to %d quote instrument(s)", len(batch))
+            except Exception as exc:
+                logger.warning("DhanWS send subscription failed: %s", exc)
+                break
 
     # ─── Base Adapter Methods ────────────────────────────────────────────────
 

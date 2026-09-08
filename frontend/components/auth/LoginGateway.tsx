@@ -137,14 +137,9 @@ export function LoginGateway() {
     }
   };
 
-  // Optional Quick Fill helper strictly for local dev mode
+  // Quick Fill disabled for institutional security
   const handleQuickFill = () => {
-    if (!isQuickFillAvailable) return;
-    const demoUser = process.env.NEXT_PUBLIC_DEMO_USERNAME || "";
-    const demoPass = process.env.NEXT_PUBLIC_DEMO_PASSWORD || "";
-    setUsername(demoUser);
-    setPassword(demoPass);
-    setErrorMessage(null);
+    // Demo credentials removed per institutional security policy
   };
 
   // Submit Primary Credentials (Step 1)

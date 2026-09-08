@@ -49,15 +49,15 @@ const MARKET_PRESETS: MarketItem[] = [
   { symbol: "INFY", displayName: "Infosys Ltd", category: "INDIAN_EQUITIES", tag: "Equity", exchange: "NSE / BSE", defaultTimeframe: "15m", refPrice: "₹1,880", changePct: "+0.90%" },
 
   // 🇺🇸 US Tech & Benchmark ETFs
-  { symbol: "AAPL", displayName: "Apple Inc.", category: "US_EQUITIES", tag: "US Tech", exchange: "NASDAQ / Alpha Vantage", defaultTimeframe: "1d", refPrice: "$316.85", changePct: "+1.35%", isPopular: true },
-  { symbol: "MSFT", displayName: "Microsoft Corp.", category: "US_EQUITIES", tag: "US Tech", exchange: "NASDAQ / Alpha Vantage", defaultTimeframe: "1d", refPrice: "$418.20", changePct: "+0.88%" },
-  { symbol: "NVDA", displayName: "NVIDIA Corp.", category: "US_EQUITIES", tag: "AI / Tech", exchange: "NASDAQ / Alpha Vantage", defaultTimeframe: "1d", refPrice: "$128.40", changePct: "+3.45%", isPopular: true },
-  { symbol: "SPY", displayName: "SPDR S&P 500 ETF Trust", category: "US_EQUITIES", tag: "US Index", exchange: "NYSE / Alpha Vantage", defaultTimeframe: "1d", refPrice: "$562.80", changePct: "+0.52%" },
-  { symbol: "QQQ", displayName: "Invesco QQQ Trust (Nasdaq 100)", category: "US_EQUITIES", tag: "US Tech ETF", exchange: "NASDAQ / Alpha Vantage", defaultTimeframe: "1d", refPrice: "$478.40", changePct: "+0.95%" },
+  { symbol: "AAPL", displayName: "Apple Inc.", category: "US_EQUITIES", tag: "US Tech", exchange: "NASDAQ / US Equities", defaultTimeframe: "1d", refPrice: "$316.85", changePct: "+1.35%", isPopular: true },
+  { symbol: "MSFT", displayName: "Microsoft Corp.", category: "US_EQUITIES", tag: "US Tech", exchange: "NASDAQ / US Equities", defaultTimeframe: "1d", refPrice: "$418.20", changePct: "+0.88%" },
+  { symbol: "NVDA", displayName: "NVIDIA Corp.", category: "US_EQUITIES", tag: "AI / Tech", exchange: "NASDAQ / US Equities", defaultTimeframe: "1d", refPrice: "$128.40", changePct: "+3.45%", isPopular: true },
+  { symbol: "SPY", displayName: "SPDR S&P 500 ETF Trust", category: "US_EQUITIES", tag: "US Index", exchange: "NYSE / US Equities", defaultTimeframe: "1d", refPrice: "$562.80", changePct: "+0.52%" },
+  { symbol: "QQQ", displayName: "Invesco QQQ Trust (Nasdaq 100)", category: "US_EQUITIES", tag: "US Tech ETF", exchange: "NASDAQ / US Equities", defaultTimeframe: "1d", refPrice: "$478.40", changePct: "+0.95%" },
 
   // 💱 Forex & Commodities
-  { symbol: "EURUSD", displayName: "Euro / US Dollar", category: "FOREX_COMMODITIES", tag: "Forex", exchange: "Alpha Vantage FX", defaultTimeframe: "15m", refPrice: "1.0850", changePct: "+0.15%" },
-  { symbol: "GBPUSD", displayName: "British Pound / US Dollar", category: "FOREX_COMMODITIES", tag: "Forex", exchange: "Alpha Vantage FX", defaultTimeframe: "15m", refPrice: "1.2950", changePct: "+0.22%" },
+  { symbol: "EURUSD", displayName: "Euro / US Dollar", category: "FOREX_COMMODITIES", tag: "Forex", exchange: "OANDA / Global FX", defaultTimeframe: "15m", refPrice: "1.0850", changePct: "+0.15%" },
+  { symbol: "GBPUSD", displayName: "British Pound / US Dollar", category: "FOREX_COMMODITIES", tag: "Forex", exchange: "OANDA / Global FX", defaultTimeframe: "15m", refPrice: "1.2950", changePct: "+0.22%" },
   { symbol: "XAU/USD", displayName: "Gold Spot / US Dollar", category: "FOREX_COMMODITIES", tag: "Metals", exchange: "Global Spot", defaultTimeframe: "15m", refPrice: "$2,510", changePct: "+0.75%" },
 ];
 
@@ -75,7 +75,7 @@ export function QuickMarketSwitcherModal() {
     { id: "CRYPTO_OPTIONS", label: "⚡ Crypto Options" },
     { id: "CRYPTO_SPOT", label: "🪙 Crypto Spot" },
     { id: "INDIAN_EQUITIES", label: "🇮🇳 Indian Equities/F&O" },
-    { id: "US_EQUITIES", label: "🇺🇸 US Tech (Alpha Vantage)" },
+    { id: "US_EQUITIES", label: "🇺🇸 US Equities & ETFs" },
     { id: "FOREX_COMMODITIES", label: "💱 Forex & Gold" },
   ];
 

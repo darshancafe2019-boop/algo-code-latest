@@ -35,6 +35,27 @@ export class DhanOrders {
   }
 
   public async placeOrder(order: NormalizedOrder): Promise<OrderResult> {
+    const isLiveAllowed =
+      process.env.TRADING_MODE === "LIVE" &&
+      process.env.LIVE_TRADING_ENABLED === "true" &&
+      process.env.DHAN_TRADING_ENABLED === "true" &&
+      process.env.DHAN_PAPER_MODE !== "true";
+
+    if (!isLiveAllowed) {
+      // High-Fidelity Paper Simulation
+      const simulatedOrderId = `SIM-DHAN-${Date.now().toString(36).toUpperCase()}`;
+      return {
+        success: true,
+        clientOrderId: order.clientOrderId,
+        brokerOrderId: simulatedOrderId,
+        status: "FILLED",
+        filledQuantity: order.quantity,
+        averageFillPrice: order.price || 1000.0,
+        message: "Paper order executed successfully in Dhan simulation sandbox.",
+        timestamp: Date.now(),
+      };
+    }
+
     const payload = {
       dhanClientId: process.env.DHAN_CLIENT_ID || "",
       correlationId: order.clientOrderId,
@@ -82,6 +103,23 @@ export class DhanOrders {
   }
 
   public async modifyOrder(orderId: string, changes: OrderModification): Promise<OrderResult> {
+    const isLiveAllowed =
+      process.env.TRADING_MODE === "LIVE" &&
+      process.env.LIVE_TRADING_ENABLED === "true" &&
+      process.env.DHAN_TRADING_ENABLED === "true" &&
+      process.env.DHAN_PAPER_MODE !== "true";
+
+    if (!isLiveAllowed) {
+      return {
+        success: true,
+        clientOrderId: `MOD-${orderId}`,
+        brokerOrderId: orderId,
+        status: "SUBMITTED",
+        message: "Paper order modified in simulation.",
+        timestamp: Date.now(),
+      };
+    }
+
     const payload: Record<string, any> = {
       orderId,
     };
@@ -101,8 +139,8 @@ export class DhanOrders {
         success: true,
         clientOrderId: `MOD-${orderId}`,
         brokerOrderId: orderId,
-        status: "OPEN",
-        message: "Order successfully modified on Dhan",
+        status: "SUBMITTED",
+        message: resp.message || "Order modified on Dhan",
         timestamp: Date.now(),
       };
     } catch (err: any) {
@@ -110,7 +148,8 @@ export class DhanOrders {
         success: false,
         clientOrderId: `MOD-${orderId}`,
         brokerOrderId: orderId,
-        status: "FAILED",
+        status: "REJECTED",
+        errorCode: err.dhanErrorCode || "MODIFY_ERROR",
         message: err.message || "Failed to modify order on Dhan",
         timestamp: Date.now(),
       };
@@ -118,6 +157,22 @@ export class DhanOrders {
   }
 
   public async cancelOrder(orderId: string): Promise<OrderResult> {
+    const isLiveAllowed =
+      process.env.TRADING_MODE === "LIVE" &&
+      process.env.LIVE_TRADING_ENABLED === "true" &&
+      process.env.DHAN_TRADING_ENABLED === "true" &&
+      process.env.DHAN_PAPER_MODE !== "true";
+
+    if (!isLiveAllowed) {
+      return {
+        success: true,
+        clientOrderId: `CANCEL-${orderId}`,
+        brokerOrderId: orderId,
+        status: "CANCELLED",
+        message: "Paper order cancelled.",
+        timestamp: Date.now(),
+      };
+    }
     try {
       await this.client.request({
         method: "DELETE",

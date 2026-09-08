@@ -101,7 +101,7 @@ class FailoverManager:
             if adapter is None:
                 continue
             status = adapter.get_status()
-            if status in ("LIVE", "DELAYED", "STALE"):
+            if status in ("LIVE", "DELAYED", "STALE", "CONNECTED"):
                 # Record transition if provider changed
                 prev = self._active_provider.get(symbol)
                 if prev and prev != provider_id:

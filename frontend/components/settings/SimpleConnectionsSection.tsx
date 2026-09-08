@@ -18,7 +18,7 @@ import { DhanConnectionCard } from "./DhanConnectionCard";
 import { UpstoxConnectionCard } from "./UpstoxConnectionCard";
 import { BinanceConnectionCard } from "./BinanceConnectionCard";
 import { DeltaConnectionCard } from "./DeltaConnectionCard";
-import { AlphaVantageConnectionCard } from "./AlphaVantageConnectionCard";
+import { FyersConnectionCard } from "./FyersConnectionCard";
 
 interface BrokerCredential {
   credential_id: string;
@@ -189,14 +189,14 @@ export function SimpleConnectionsSection() {
         {/* Indian / Institutional Broker */}
         <div className="p-3.5 bg-slate-900/80 border border-slate-800 rounded-xl space-y-1.5">
           <div className="flex items-center justify-between text-slate-400 text-[11px] font-sans">
-            <span>Domestic Broker (Upstox / NSE)</span>
+            <span>Domestic Broker (Dhan / Fyers / Upstox)</span>
             <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />
           </div>
           <div className="text-sm font-bold text-white font-mono">
-            OAuth2 Enabled
+            API v2/v3 Active
           </div>
           <div className="text-[10px] text-slate-500 font-sans">
-            NSE / BSE Derivatives Ready
+            NSE / BSE / MCX Derivatives Ready
           </div>
         </div>
 
@@ -218,10 +218,10 @@ export function SimpleConnectionsSection() {
       {/* Dedicated Exchange & Broker Connection Cards */}
       <div className="space-y-4 pt-2">
         <DhanConnectionCard />
+        <FyersConnectionCard />
         <BinanceConnectionCard />
         <DeltaConnectionCard />
         <UpstoxConnectionCard />
-        <AlphaVantageConnectionCard />
       </div>
 
       {/* Manage Connections Modal */}

@@ -29,6 +29,18 @@ SUPPORTED_OPERATORS = {
 
 DEFAULT_STRATEGY_TEMPLATES = [
     {
+        "id": "volume-star-v1",
+        "name": "Volume Star Strategy",
+        "description": "5M Market Structure (HH/HL or LH/LL) + Fixed Range Volume Profile (50 rows, 70% VA) + Deterministic LVN Rejection Confirmation.",
+        "target_signal": "BUY",
+        "conjunction": "AND",
+        "rules": [
+            {"left": "market_structure", "op": "==", "right": "BULLISH"},
+            {"left": "close", "op": "in_range", "right": "lvn_zone"},
+            {"left": "rejection_wick", "op": "==", "right": "BULLISH_CONFIRM"}
+        ]
+    },
+    {
         "id": "strat-golden-cross",
         "name": "EMA Golden Cross & RSI Filter",
         "description": "Trend-following strategy entering long when EMA 9 crosses above EMA 21 with RSI > 50.",

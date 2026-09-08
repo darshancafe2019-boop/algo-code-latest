@@ -479,7 +479,7 @@ class GlobalSymbolMaster:
                 timezone="UTC",
                 trading_session="24/5",
                 feed_status=FeedClassification.DELAYED,
-                provider="alpha_vantage_fx",
+                provider="oanda",
                 aliases=["EURUSD", "EUR/USD", "EUR-USD", "FX:EURUSD"],
             ),
             CanonicalInstrument(

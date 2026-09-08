@@ -111,6 +111,10 @@ const TaxIntelligenceTab = dynamic(
   () => import("@/components/tax-intelligence/TaxIntelligenceTab").then((m) => m.TaxIntelligenceTab),
   { ssr: false, loading: () => null }
 );
+const DhanLiveMarketFeed = dynamic(
+  () => import("@/components/live/DhanLiveMarketFeed").then((m) => m.DhanLiveMarketFeed),
+  { ssr: false, loading: () => null }
+);
 
 
 function MainApp() {
@@ -134,6 +138,7 @@ function MainApp() {
       import("@/components/logs/LogsDebugging");
       import("@/src/features/markets/futures");
       import("@/components/tax-intelligence/TaxIntelligenceTab");
+      import("@/components/live/DhanLiveMarketFeed");
     };
 
     if (typeof window !== "undefined") {
@@ -154,6 +159,15 @@ function MainApp() {
         {activeTab === "home" && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
+          </ErrorBoundary>
+        )}
+
+        {/* 0.5 Real-Time Live Feed */}
+        {(activeTab === "live" || activeTab === "live-feed" || activeTab === "live-data") && (
+          <ErrorBoundary title="Live Market Feed Failed">
+            <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+              <DhanLiveMarketFeed />
+            </div>
           </ErrorBoundary>
         )}
 

@@ -378,6 +378,26 @@ class DhanService:
         except Exception as e:
             logger.debug(f"Dhan vault load note: {e}")
 
+    def validate_client_id(self, client_id: Optional[str] = None) -> Tuple[bool, Optional[str]]:
+        """Validates that Dhan Client ID is non-empty, non-placeholder, and valid."""
+        cid = (self.client_id if client_id is None else client_id).strip()
+        if not cid:
+            return False, "INVALID_DHAN_CLIENT_ID: Dhan Client ID is missing."
+        if any(c.isspace() for c in cid) or cid.lower() in ("your_client_id", "placeholder", "placeholder_user", "none", "null"):
+            return False, f"INVALID_DHAN_CLIENT_ID: Configured Client ID '{cid}' is malformed or a placeholder."
+        return True, None
+
+    def validate_instrument(self, exchange_segment: str, security_id: str | int) -> Tuple[bool, Optional[str]]:
+        """Validates instrument parameters against Dhan rules."""
+        seg_str = str(exchange_segment).strip().upper()
+        sec_str = str(security_id).strip()
+        valid_segs = ("NSE_EQ", "IDX_I", "NSE_FNO", "BSE_EQ", "MCX_COMM", "BSE_FNO", "NSE_CURRENCY", "BSE_CURRENCY")
+        if seg_str not in valid_segs:
+            return False, f"INVALID_INSTRUMENT_CONFIGURATION: Unknown exchange segment '{seg_str}'."
+        if not sec_str or not sec_str.isdigit():
+            return False, f"INVALID_INSTRUMENT_CONFIGURATION: Security ID '{sec_str}' must be numeric integer."
+        return True, None
+
     @property
     def is_authenticated(self) -> bool:
         return bool(self.access_token)
@@ -391,11 +411,25 @@ class DhanService:
         if not force and self._auth_cached_result and (now - self._last_auth_check < 60.0):
             return self._auth_cached_result
 
+        cid_ok, cid_err = self.validate_client_id()
+        if not cid_ok:
+            res = {
+                "valid": False,
+                "status": "INVALID_DHAN_CLIENT_ID",
+                "error_code": "INVALID_DHAN_CLIENT_ID",
+                "client_id": self.client_id[:4] + "****" if self.client_id else "",
+                "message": cid_err,
+            }
+            self._auth_cached_result = res
+            self._last_auth_check = now
+            return res
+
         if not self.is_authenticated:
             self._auth_status = "CREDENTIALS_MISSING"
             res = {
                 "valid": False,
                 "status": "NOT_CONFIGURED",
+                "error_code": "DH-901",
                 "message": "Dhan Access Token not configured in .env or vault.",
                 "client_id": self.client_id[:4] + "****" if self.client_id else "",
             }
@@ -404,7 +438,7 @@ class DhanService:
             return res
 
         try:
-            # First try profile or orders
+            # First try profile
             profile = self._make_request("GET", "orders" if "sandbox" in self.base_url.lower() else "profile")
             if isinstance(profile, list):
                 # /orders returned order list (sandbox / live success)
@@ -425,28 +459,44 @@ class DhanService:
             is_error = False
             error_code = None
             error_msg = ""
+            http_status = profile.get("_http_status", 200) if isinstance(profile, dict) else 0
 
             if not profile or not isinstance(profile, dict):
                 is_error = True
                 error_msg = "Empty or invalid response from Dhan API"
-            elif profile.get("errorType") or profile.get("errorCode") or profile.get("status") in ("error", "failed"):
-                is_error = True
-                error_code = profile.get("errorCode") or profile.get("errorType")
-                error_msg = profile.get("errorMessage") or profile.get("message") or "Authentication failed"
-            elif profile.get("http_code") in (401, 403):
-                is_error = True
-                error_code = "DH-901"
-                error_msg = profile.get("message") or "Unauthorized or expired token"
+                error_code = "DH-905"
+            elif profile.get("data") and isinstance(profile.get("data"), dict):
+                # Format: {"data": {"808": "Authentication Failed - Client ID or Token invalid"}, "status": "failed"}
+                for k, v in profile["data"].items():
+                    if str(k).isdigit() or str(k).startswith("DH-") or "error" in str(k).lower():
+                        is_error = True
+                        error_code = str(k)
+                        error_msg = str(v)
+                        break
+            
+            if not is_error and isinstance(profile, dict):
+                if profile.get("errorType") or profile.get("errorCode") or profile.get("status") in ("error", "failed") or http_status >= 400:
+                    is_error = True
+                    error_code = profile.get("errorCode") or profile.get("errorType") or (f"HTTP-{http_status}" if http_status >= 400 else "DH-905")
+                    error_msg = profile.get("errorMessage") or profile.get("message") or "Authentication failed"
 
             if is_error:
-                status_code = "TOKEN_EXPIRED" if (error_code == "DH-901" or "expired" in error_msg.lower() or "invalid" in error_msg.lower()) else "AUTH_REQUIRED"
+                if error_code in ("808", "807", "809", "810", "DH-901", "401", "Invalid_Authentication", "HTTP-401") or "expired" in error_msg.lower() or "invalid" in error_msg.lower():
+                    status_code = "AUTH_REQUIRED"
+                elif error_code in ("805", "DH-902", "403", "HTTP-403"):
+                    status_code = "DATA_API_UNAVAILABLE"
+                else:
+                    status_code = "ERROR"
+
                 self._auth_status = status_code
                 res = {
                     "valid": False,
                     "status": status_code,
                     "error_code": error_code or "DH-901",
+                    "http_status": http_status,
                     "client_id": self.client_id[:4] + "****" if self.client_id else "",
-                    "message": f"Dhan authentication failed ({error_code or '401'}): {error_msg}. Please update your Dhan access token in Settings -> Brokers.",
+                    "message": f"Dhan authentication error ({error_code or http_status}): {error_msg}. Please update your Dhan access token in Settings -> Brokers.",
+                    "raw_response": {k: v for k, v in profile.items() if k not in ("access-token", "token", "secret")} if isinstance(profile, dict) else {},
                 }
             else:
                 # Check dataPlan entitlement if provided by profile
@@ -511,17 +561,23 @@ class DhanService:
         try:
             with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
                 resp_text = resp.read().decode("utf-8")
-                return json.loads(resp_text)
+                res = json.loads(resp_text)
+                if isinstance(res, dict):
+                    res["_http_status"] = resp.status
+                return res
         except urllib.error.HTTPError as he:
             err_body = he.read().decode("utf-8") if he.fp else ""
             logger.error(f"Dhan API HTTP {he.code} for {url}: {err_body}")
             try:
-                return json.loads(err_body)
+                res = json.loads(err_body)
+                if isinstance(res, dict):
+                    res["_http_status"] = he.code
+                return res
             except Exception:
-                return {"status": "error", "http_code": he.code, "message": str(he)}
+                return {"status": "failed", "_http_status": he.code, "message": str(he), "raw_body": err_body}
         except Exception as exc:
             logger.error(f"Dhan API request failed: {exc}")
-            return {"status": "error", "message": str(exc)}
+            return {"status": "error", "_http_status": 0, "message": str(exc)}
 
     # ─── Instrument Resolution ────────────────────────────────────────────────
 
@@ -578,9 +634,9 @@ class DhanService:
         Fetches historical daily/intraday candle data via POST /v2/charts/historical.
         """
         if not from_date:
-            from_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d")
+            from_date = (datetime.now(timezone.utc) - timedelta(days=30)).strftime("%Y-%m-%d %H:%M:%S")
         if not to_date:
-            to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            to_date = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
         payload = {
             "securityId": str(security_id),
@@ -591,6 +647,175 @@ class DhanService:
             "toDate": to_date,
         }
         return self._make_request("POST", "charts/historical", data=payload)
+
+    def get_option_chain(
+        self,
+        underlying_security_id: int | str,
+        underlying_segment: str = "IDX_I",
+        expiry: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Fetches Dhan option chain via POST /v2/optionchain.
+        """
+        payload: Dict[str, Any] = {
+            "UnderlyingScrip": int(underlying_security_id),
+            "UnderlyingSeg": underlying_segment,
+        }
+        if expiry:
+            payload["Expiry"] = expiry
+        return self._make_request("POST", "optionchain", data=payload)
+
+    def get_expiry_list(
+        self,
+        underlying_security_id: int | str,
+        underlying_segment: str = "IDX_I",
+    ) -> Dict[str, Any]:
+        """
+        Fetches available expiry dates for an underlying via POST /v2/optionchain/expirylist.
+        """
+        payload = {
+            "UnderlyingScrip": int(underlying_security_id),
+            "UnderlyingSeg": underlying_segment,
+        }
+        return self._make_request("POST", "optionchain/expirylist", data=payload)
+
+    def test_rest_connection(self, security_id: int | str = 2885, exchange_segment: str = "NSE_EQ") -> Dict[str, Any]:
+        """
+        Server-side REST smoke test against POST /v2/marketfeed/ltp.
+        Strictly follows Section 1 & Section 7 contract.
+        """
+        cid_ok, cid_err = self.validate_client_id()
+        if not cid_ok:
+            return {
+                "success": False,
+                "status": "INVALID_DHAN_CLIENT_ID",
+                "http_status": 0,
+                "error_code": "INVALID_DHAN_CLIENT_ID",
+                "error_message": cid_err,
+                "message": cid_err,
+                "latency_ms": 0.0,
+                "raw_response": {"status": "failed", "error": "INVALID_DHAN_CLIENT_ID", "message": cid_err},
+            }
+
+        inst_ok, inst_err = self.validate_instrument(exchange_segment, security_id)
+        if not inst_ok:
+            return {
+                "success": False,
+                "status": "INVALID_INSTRUMENT_CONFIGURATION",
+                "http_status": 0,
+                "error_code": "INVALID_INSTRUMENT_CONFIGURATION",
+                "error_message": inst_err,
+                "message": inst_err,
+                "latency_ms": 0.0,
+                "raw_response": {"status": "failed", "error": "INVALID_INSTRUMENT_CONFIGURATION", "message": inst_err},
+            }
+
+        if not self.is_authenticated:
+            return {
+                "success": False,
+                "status": "AUTH_REQUIRED",
+                "http_status": 0,
+                "error_code": "DH-901",
+                "error_message": "Dhan credentials not configured. Please set DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN.",
+                "message": "Dhan credentials not configured. Please set DHAN_CLIENT_ID and DHAN_ACCESS_TOKEN.",
+                "latency_ms": 0.0,
+                "raw_response": {"status": "failed", "error": "DH-901", "message": "Credentials missing"},
+            }
+
+        t0 = time.monotonic()
+        req_body = {str(exchange_segment): [int(security_id)]}
+        resp = self.get_ltp(req_body)
+        latency_ms = round((time.monotonic() - t0) * 1000.0, 1)
+
+        http_status = resp.get("_http_status", 200) if isinstance(resp, dict) else 0
+
+        if not resp or not isinstance(resp, dict):
+            return {
+                "success": False,
+                "status": "ERROR",
+                "http_status": http_status,
+                "error_code": "DH-905",
+                "error_message": "Empty or invalid response from Dhan REST API.",
+                "message": "Empty or invalid response from Dhan REST API.",
+                "latency_ms": latency_ms,
+                "raw_response": {},
+            }
+
+        # Check for Dhan error response
+        is_error = False
+        err_code = None
+        err_msg = None
+
+        if resp.get("data") and isinstance(resp.get("data"), dict):
+            for k, v in resp["data"].items():
+                if str(k).isdigit() or str(k).startswith("DH-") or "error" in str(k).lower():
+                    is_error = True
+                    err_code = str(k)
+                    err_msg = str(v)
+                    break
+
+        if not is_error:
+            if resp.get("status") in ("error", "failed") or resp.get("errorType") or resp.get("errorCode") or http_status >= 400:
+                is_error = True
+                err_code = resp.get("errorCode") or resp.get("errorType") or (f"HTTP-{http_status}" if http_status >= 400 else "DH-905")
+                err_msg = resp.get("errorMessage") or resp.get("message") or "Dhan API returned error."
+
+        sanitized_resp = {k: v for k, v in resp.items() if k not in ("access-token", "token", "secret", "password")}
+
+        if is_error:
+            if err_code in ("808", "807", "809", "810", "DH-901", "401", "Invalid_Authentication", "HTTP-401") or (err_msg and ("expired" in err_msg.lower() or "invalid" in err_msg.lower())):
+                status_cat = "AUTH_REQUIRED"
+            elif err_code in ("805", "DH-902", "403", "HTTP-403"):
+                status_cat = "DATA_API_UNAVAILABLE"
+            elif err_code in ("813", "DH-813") or "instrument" in (err_msg or "").lower():
+                status_cat = "INVALID_INSTRUMENT_CONFIGURATION"
+            else:
+                status_cat = "ERROR"
+
+            return {
+                "success": False,
+                "status": status_cat,
+                "http_status": http_status,
+                "error_code": err_code or "DH-901",
+                "error_message": err_msg or "Dhan API error",
+                "message": err_msg or "Dhan API error",
+                "latency_ms": latency_ms,
+                "raw_response": sanitized_resp,
+            }
+
+        data_obj = resp.get("data", {})
+        seg_data = data_obj.get(exchange_segment, {}) if isinstance(data_obj, dict) else {}
+        sec_quote = seg_data.get(str(security_id), {}) if isinstance(seg_data, dict) else {}
+        last_price = sec_quote.get("last_price") or sec_quote.get("ltp")
+
+        if last_price is not None:
+            return {
+                "success": True,
+                "status": "SUCCESS",
+                "http_status": http_status,
+                "provider": "DHAN",
+                "exchange_segment": exchange_segment,
+                "security_id": str(security_id),
+                "last_price": float(last_price),
+                "latency_ms": latency_ms,
+                "raw_response": sanitized_resp,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "message": f"Dhan HQ v2 REST LTP successfully received for {exchange_segment}:{security_id} ({latency_ms}ms).",
+            }
+        else:
+            return {
+                "success": True,
+                "status": "SUCCESS_EMPTY_TICK",
+                "http_status": http_status,
+                "provider": "DHAN",
+                "exchange_segment": exchange_segment,
+                "security_id": str(security_id),
+                "last_price": None,
+                "latency_ms": latency_ms,
+                "raw_response": sanitized_resp,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "message": f"Dhan HQ v2 REST responded HTTP 200, awaiting live market ticks ({latency_ms}ms).",
+            }
 
     def get_safe_diagnostic(self) -> Dict[str, Any]:
         """

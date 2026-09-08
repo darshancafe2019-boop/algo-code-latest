@@ -166,7 +166,9 @@ class DeltaOptionsClient:
             try:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
                 start_ts = time.time()
-                with urllib.request.urlopen(req, timeout=self.timeout_sec) as response:
+                from src.ssl_util import get_ssl_context
+                ssl_ctx = get_ssl_context()
+                with urllib.request.urlopen(req, timeout=self.timeout_sec, context=ssl_ctx) as response:
                     status_code = response.status
                     latency_ms = (time.time() - start_ts) * 1000.0
                     raw_data = response.read().decode("utf-8")

@@ -11685,30 +11685,27 @@ def save_delta_chain_snapshot(data: Dict[str, Any]) -> int:
     chain_json = data.get("chain_data_json", "[]")
     if isinstance(chain_json, (list, dict)):
         chain_json = json.dumps(chain_json)
-    with get_db_transaction() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO delta_option_chain_snapshots (
-                underlying_symbol, expiry_date, settlement_time, snapshot_timestamp,
-                spot_price, atm_strike, pcr_oi, pcr_vol, max_pain_strike, chain_data_json, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                data["underlying_symbol"].upper().strip(),
-                data["expiry_date"],
-                data["settlement_time"],
-                data.get("snapshot_timestamp", now_iso),
-                float(data.get("spot_price", 0.0)),
-                float(data.get("atm_strike", 0.0)),
-                float(data.get("pcr_oi", 1.0)),
-                float(data.get("pcr_vol", 1.0)),
-                float(data.get("max_pain_strike", 0.0)),
-                chain_json,
-                now_iso,
-            ),
-        )
-        return cursor.lastrowid or 0
+    sql = """
+        INSERT INTO delta_option_chain_snapshots (
+            underlying_symbol, expiry_date, settlement_time, snapshot_timestamp,
+            spot_price, atm_strike, pcr_oi, pcr_vol, max_pain_strike, chain_data_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (
+        data["underlying_symbol"].upper().strip(),
+        data["expiry_date"],
+        data["settlement_time"],
+        data.get("snapshot_timestamp", now_iso),
+        float(data.get("spot_price", 0.0)),
+        float(data.get("atm_strike", 0.0)),
+        float(data.get("pcr_oi", 1.0)),
+        float(data.get("pcr_vol", 1.0)),
+        float(data.get("max_pain_strike", 0.0)),
+        chain_json,
+        now_iso,
+    )
+    safe_execute(sql, params)
+    return 1
 
 
 def get_latest_delta_chain_snapshot(underlying: str, expiry: str) -> Optional[Dict[str, Any]]:
@@ -11717,7 +11714,7 @@ def get_latest_delta_chain_snapshot(underlying: str, expiry: str) -> Optional[Di
         """
         SELECT * FROM delta_option_chain_snapshots
         WHERE underlying_symbol = ? AND (expiry_date = ? OR settlement_time LIKE ?)
-        ORDER BY snapshot_timestamp DESC LIMIT 1
+        ORDER BY snapshot_timestamp DESC, id DESC LIMIT 1
         """,
         (underlying.upper().strip(), expiry, f"{expiry}%"),
     )
@@ -11734,17 +11731,14 @@ def log_delta_ingestion_event(
 ) -> int:
     """Logs an ingestion audit event."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    with get_db_transaction() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT INTO delta_ingestion_events (
-                event_type, status, contracts_discovered, quotes_updated, latency_ms, error_message, timestamp
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            (event_type, status, int(contracts_discovered), int(quotes_updated), float(latency_ms), error_message, now_iso),
-        )
-        return cursor.lastrowid or 0
+    sql = """
+        INSERT INTO delta_ingestion_events (
+            event_type, status, contracts_discovered, quotes_updated, latency_ms, error_message, timestamp
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """
+    params = (event_type, status, int(contracts_discovered), int(quotes_updated), float(latency_ms), error_message, now_iso)
+    safe_execute(sql, params)
+    return 1
 
 
 def get_recent_delta_ingestion_events(limit: int = 20) -> List[Dict[str, Any]]:

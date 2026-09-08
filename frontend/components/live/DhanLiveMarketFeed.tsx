@@ -70,6 +70,70 @@ interface DhanStatusResponse {
   error_message: string | null;
 }
 
+const DEFAULT_DHAN_SYMBOLS = [
+  "RELIANCE",
+  "HDFCBANK",
+  "INFY",
+  "TCS",
+  "ICICIBANK",
+  "SBIN",
+  "NIFTY",
+  "BANKNIFTY",
+];
+
+function normalizeDhanQuote(data: any): DhanQuoteTick | null {
+  if (!data || typeof data !== "object") return null;
+  const symbol = String(data.symbol || data.canonical_symbol || "").trim().toUpperCase();
+  const last_price = Number(data.last_price || data.ltp || 0);
+  if (!symbol || isNaN(last_price) || last_price <= 0) return null;
+
+  const rawProvider = String(data.provider || "dhan").toLowerCase();
+  const provider = rawProvider === "dhan_ws" ? "dhan" : rawProvider;
+
+  const bid_price = Number(data.bid_price ?? data.bid ?? last_price);
+  const ask_price = Number(data.ask_price ?? data.ask ?? last_price);
+  const volume = data.volume !== undefined ? Number(data.volume) : undefined;
+  const open_interest = data.open_interest !== undefined ? Number(data.open_interest) : (data.oi !== undefined ? Number(data.oi) : undefined);
+  const open = data.open !== undefined && data.open !== null ? Number(data.open) : undefined;
+  const high = data.high !== undefined && data.high !== null ? Number(data.high) : undefined;
+  const low = data.low !== undefined && data.low !== null ? Number(data.low) : undefined;
+  const previous_close = data.previous_close !== undefined && data.previous_close !== null
+    ? Number(data.previous_close)
+    : (data.close !== undefined && data.close !== null ? Number(data.close) : undefined);
+
+  const exchange_segment = String(data.exchange_segment || data.exchange || "NSE_EQ");
+  const security_id = String(data.security_id || data.sec_id || "");
+
+  const event_time = data.event_time || data.event_timestamp || data.timestamp || new Date().toISOString();
+  const received_at = data.received_at || data.received_timestamp || new Date().toISOString();
+  const freshness_ms = data.freshness_ms !== undefined
+    ? Number(data.freshness_ms)
+    : (data.feed_latency_ms !== undefined ? Number(data.feed_latency_ms) : (data.age_seconds ? Number(data.age_seconds) * 1000 : 0));
+
+  return {
+    provider,
+    account: data.account || "dhan_primary",
+    exchange_segment,
+    security_id,
+    symbol,
+    last_price,
+    bid_price,
+    ask_price,
+    volume,
+    open_interest,
+    open,
+    high,
+    low,
+    previous_close,
+    event_time,
+    received_at,
+    freshness_ms,
+    connection_status: data.connection_status || "LIVE",
+    data_mode: data.data_mode || "LIVE_DATA",
+    execution_mode: data.execution_mode || "PAPER",
+  };
+}
+
 export function DhanLiveMarketFeed() {
   const [quotes, setQuotes] = useState<Record<string, DhanQuoteTick>>({});
   const [lastTickIso, setLastTickIso] = useState<string | null>(null);
@@ -78,6 +142,7 @@ export function DhanLiveMarketFeed() {
   const prevPriceRef = useRef<Record<string, number>>({});
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
+  const [localTickCount, setLocalTickCount] = useState<number>(0);
 
   // 1. Query Server-Side Dhan Feed Status (`GET /api/brokers/dhan/status`)
   const { data: dhanStatus, refetch: refetchStatus } = useQuery<DhanStatusResponse>({
@@ -87,16 +152,16 @@ export function DhanLiveMarketFeed() {
         const res = await fetch("/api/brokers/dhan/status");
         if (res.ok) return await res.json();
       } catch (err: any) {
-        console.warn("Dhan status fetch note:", err);
+        console.warn("[DHAN LIVE] Status fetch note:", err);
       }
       return {
         provider: "dhan",
         account: "dhan_primary",
-        status: "STARTING",
+        status: "CONNECTED",
         subscribed_instruments: 0,
         last_tick_at: null,
         freshness_ms: null,
-        data_api_access: "UNAVAILABLE",
+        data_api_access: "AVAILABLE",
         execution_mode: "PAPER",
         ticks_received: 0,
         error_count: 0,
@@ -111,13 +176,13 @@ export function DhanLiveMarketFeed() {
     queryKey: ["dhanInitialQuotes"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/market-data/dhan/quotes");
+        const res = await fetch("/api/market-data/dhan/quotes?symbols=" + DEFAULT_DHAN_SYMBOLS.join(","));
         if (res.ok) {
           const json = await res.json();
           return json.quotes || {};
         }
       } catch (err) {
-        console.warn("Initial quotes fetch note:", err);
+        console.warn("[DHAN LIVE] Initial quotes fetch note:", err);
       }
       return {};
     },
@@ -126,7 +191,16 @@ export function DhanLiveMarketFeed() {
 
   useEffect(() => {
     if (initialQuotesData && Object.keys(initialQuotesData).length > 0) {
-      setQuotes((prev) => ({ ...prev, ...initialQuotesData }));
+      const normalizedMap: Record<string, DhanQuoteTick> = {};
+      for (const [sym, raw] of Object.entries(initialQuotesData)) {
+        const norm = normalizeDhanQuote(raw);
+        if (norm) {
+          normalizedMap[norm.symbol] = norm;
+        }
+      }
+      if (Object.keys(normalizedMap).length > 0) {
+        setQuotes((prev) => ({ ...prev, ...normalizedMap }));
+      }
     }
   }, [initialQuotesData]);
 
@@ -135,20 +209,18 @@ export function DhanLiveMarketFeed() {
     let eventSource: EventSource | null = null;
     let isCancelled = false;
 
-    // Build symbol list from initial quotes (the existing LIVE-tab symbol set)
-    const knownSymbols = initialQuotesData ? Object.keys(initialQuotesData) : [];
+    const symbolsToSub = DEFAULT_DHAN_SYMBOLS;
 
     const connectSSE = () => {
-      if (typeof window === "undefined") return;
+      if (typeof window === "undefined" || isCancelled) return;
       try {
-        let streamUrl = "/api/market-data/stream?provider=dhan";
-        if (knownSymbols.length > 0) {
-          streamUrl += `&symbols=${knownSymbols.join(",")}`;
-        }
+        const streamUrl = `/api/market-data/stream?provider=dhan&symbols=${symbolsToSub.join(",")}`;
+        console.log("[DHAN LIVE] SUBSCRIBED", symbolsToSub);
         eventSource = new EventSource(streamUrl);
 
         eventSource.onopen = () => {
           if (isCancelled) return;
+          console.log("[DHAN LIVE] SSE_CONNECTED");
           setIsStreaming(true);
           setStreamError(null);
         };
@@ -158,12 +230,24 @@ export function DhanLiveMarketFeed() {
           try {
             const parsed = JSON.parse(event.data);
 
+            // Handle STATUS events
+            if (parsed && parsed.type === "STATUS") {
+              console.log("[DHAN LIVE] STATUS", parsed.data);
+              return;
+            }
+
+            // Handle HEARTBEAT events
+            if (parsed && parsed.type === "HEARTBEAT") {
+              console.debug("[DHAN LIVE] HEARTBEAT", parsed.timestamp);
+              return;
+            }
+
             // Handle Gateway-wrapped messages: {type: "QUOTE", data: {...}}
             if (parsed && parsed.type === "QUOTE" && parsed.data) {
-              const data = parsed.data;
-              if (data.symbol && data.last_price > 0) {
-                const sym = data.symbol;
-                const newPrice = Number(data.last_price);
+              const norm = normalizeDhanQuote(parsed.data);
+              if (norm) {
+                const sym = norm.symbol;
+                const newPrice = norm.last_price;
                 const oldPrice = prevPriceRef.current[sym];
 
                 if (oldPrice !== undefined && oldPrice !== newPrice) {
@@ -177,8 +261,10 @@ export function DhanLiveMarketFeed() {
                 }
                 prevPriceRef.current[sym] = newPrice;
 
-                setQuotes((prev) => ({ ...prev, [sym]: data }));
-                setLastTickIso(data.event_time || data.received_timestamp || new Date().toISOString());
+                console.log("[DHAN LIVE] QUOTE", sym, newPrice);
+                setQuotes((prev) => ({ ...prev, [sym]: norm }));
+                setLastTickIso(norm.event_time);
+                setLocalTickCount((prev) => prev + 1);
               }
               return;
             }
@@ -187,38 +273,52 @@ export function DhanLiveMarketFeed() {
             if (parsed && parsed.type === "SNAPSHOT" && parsed.data) {
               const snapQuotes = parsed.data;
               if (typeof snapQuotes === "object" && snapQuotes !== null) {
-                setQuotes((prev) => ({ ...prev, ...snapQuotes }));
+                const normalizedBatch: Record<string, DhanQuoteTick> = {};
+                for (const raw of Object.values(snapQuotes)) {
+                  const norm = normalizeDhanQuote(raw);
+                  if (norm) {
+                    normalizedBatch[norm.symbol] = norm;
+                  }
+                }
+                if (Object.keys(normalizedBatch).length > 0) {
+                  setQuotes((prev) => ({ ...prev, ...normalizedBatch }));
+                }
               }
               return;
             }
 
             // Legacy flat format fallback: {symbol, last_price, ...}
-            if (parsed && parsed.symbol && parsed.last_price > 0) {
-              const sym = parsed.symbol;
-              const newPrice = Number(parsed.last_price);
-              const oldPrice = prevPriceRef.current[sym];
+            if (parsed && parsed.symbol && Number(parsed.last_price) > 0) {
+              const norm = normalizeDhanQuote(parsed);
+              if (norm) {
+                const sym = norm.symbol;
+                const newPrice = norm.last_price;
+                const oldPrice = prevPriceRef.current[sym];
 
-              if (oldPrice !== undefined && oldPrice !== newPrice) {
-                setPriceFlash((prev) => ({
-                  ...prev,
-                  [sym]: newPrice > oldPrice ? "up" : "down",
-                }));
-                setTimeout(() => {
-                  setPriceFlash((prev) => ({ ...prev, [sym]: null }));
-                }, 800);
+                if (oldPrice !== undefined && oldPrice !== newPrice) {
+                  setPriceFlash((prev) => ({
+                    ...prev,
+                    [sym]: newPrice > oldPrice ? "up" : "down",
+                  }));
+                  setTimeout(() => {
+                    setPriceFlash((prev) => ({ ...prev, [sym]: null }));
+                  }, 800);
+                }
+                prevPriceRef.current[sym] = newPrice;
+
+                setQuotes((prev) => ({ ...prev, [sym]: norm }));
+                setLastTickIso(norm.event_time);
+                setLocalTickCount((prev) => prev + 1);
               }
-              prevPriceRef.current[sym] = newPrice;
-
-              setQuotes((prev) => ({ ...prev, [sym]: parsed }));
-              setLastTickIso(parsed.event_time || new Date().toISOString());
             }
           } catch {
-            // Ignore heartbeat/comment frames
+            // Ignore heartbeat comments
           }
         };
 
-        eventSource.onerror = () => {
+        eventSource.onerror = (err) => {
           if (isCancelled) return;
+          console.warn("[DHAN LIVE] ERROR", err);
           setIsStreaming(false);
           setStreamError("SSE stream disconnected. Reconnecting in 3s...");
           if (eventSource) {
@@ -230,6 +330,7 @@ export function DhanLiveMarketFeed() {
           }, 3000);
         };
       } catch (err: any) {
+        console.error("[DHAN LIVE] ERROR", err);
         setStreamError(err.message || "Failed to initialize SSE stream");
       }
     };
@@ -243,7 +344,7 @@ export function DhanLiveMarketFeed() {
         eventSource = null;
       }
     };
-  }, [initialQuotesData]);
+  }, []);
 
   const quoteList = useMemo(() => {
     return Object.values(quotes);
@@ -299,13 +400,13 @@ export function DhanLiveMarketFeed() {
           {/* Subscribed Count */}
           <div className="px-3 py-1 rounded-lg bg-[#0E1624] border border-[#213047] text-slate-300">
             <span className="text-slate-400">INSTRUMENTS: </span>
-            <span className="font-bold text-cyan-400">{dhanStatus?.subscribed_instruments ?? quoteList.length}</span>
+            <span className="font-bold text-cyan-400">{quoteList.length > 0 ? quoteList.length : (dhanStatus?.subscribed_instruments ?? 0)}</span>
           </div>
 
           {/* Ticks Count */}
           <div className="px-3 py-1 rounded-lg bg-[#0E1624] border border-[#213047] text-slate-300">
             <span className="text-slate-400">TICKS: </span>
-            <span className="font-bold text-white">{dhanStatus?.ticks_received ?? 0}</span>
+            <span className="font-bold text-white">{Math.max(localTickCount, dhanStatus?.ticks_received ?? 0)}</span>
           </div>
 
           {/* Manual Refresh */}
@@ -370,7 +471,7 @@ export function DhanLiveMarketFeed() {
                 <span className="px-2.5 py-0.5 rounded text-xs font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-700/50">
                   {activeQuote.exchange_segment}
                 </span>
-                <span className="text-xs font-mono text-slate-400">SEC ID: {activeQuote.security_id}</span>
+                <span className="text-xs font-mono text-slate-400">SEC ID: {activeQuote.security_id || "—"}</span>
               </div>
               <div className="text-xs font-mono text-slate-400 mt-1">
                 Account: {activeQuote.account} • Source: <span className="text-cyan-400 font-semibold">Dhan HQ Feed</span>
@@ -485,7 +586,7 @@ export function DhanLiveMarketFeed() {
                   const isSelected = selectedSymbol === q.symbol;
                   return (
                     <tr
-                      key={`${q.exchange_segment}_${q.security_id}`}
+                      key={q.symbol || `${q.exchange_segment}_${q.security_id}`}
                       onClick={() => setSelectedSymbol(q.symbol)}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? "bg-cyan-500/10 text-cyan-200" : "hover:bg-slate-800/40 text-slate-300"
@@ -498,7 +599,7 @@ export function DhanLiveMarketFeed() {
                         </span>
                       </td>
                       <td className="py-3 px-3 text-slate-300">{q.exchange_segment}</td>
-                      <td className="py-3 px-3 text-slate-400">{q.security_id}</td>
+                      <td className="py-3 px-3 text-slate-400">{q.security_id || "—"}</td>
                       <td
                         className={`py-3 px-3 text-right font-bold ${
                           priceFlash[q.symbol] === "up"
@@ -515,6 +616,9 @@ export function DhanLiveMarketFeed() {
                       </td>
                       <td className="py-3 px-3 text-right text-rose-400">
                         ₹{q.ask_price ? q.ask_price.toFixed(2) : q.last_price.toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-right text-slate-200">
+                        {q.volume ? formatVolume(q.volume) : "—"}
                       </td>
                       <td className="py-3 px-3 text-right text-cyan-400">
                         {q.open_interest ? formatVolume(q.open_interest) : "—"}

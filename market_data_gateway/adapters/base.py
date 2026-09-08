@@ -67,6 +67,37 @@ class NormalizedQuote:
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["age_seconds"] = round(self.age_seconds, 2)
+        
+        # Requirement 6 & 7: Canonical provider normalization
+        if d.get("provider") == "dhan_ws":
+            d["raw_provider"] = "dhan_ws"
+            d["provider"] = "dhan"
+        
+        # Compatibility fields for table rendering
+        if d.get("bid") is not None and "bid_price" not in d:
+            d["bid_price"] = d["bid"]
+        if d.get("ask") is not None and "ask_price" not in d:
+            d["ask_price"] = d["ask"]
+        if d.get("oi") is not None and "open_interest" not in d:
+            d["open_interest"] = d["oi"]
+        if d.get("close") is not None and "previous_close" not in d:
+            d["previous_close"] = d["close"]
+        if d.get("event_timestamp") and "event_time" not in d:
+            d["event_time"] = d["event_timestamp"]
+        if d.get("received_timestamp") and "received_at" not in d:
+            d["received_at"] = d["received_timestamp"]
+        if d.get("feed_latency_ms") is not None and "freshness_ms" not in d:
+            d["freshness_ms"] = d["feed_latency_ms"]
+
+        if d.get("provider") in ("dhan", "dhan_ws"):
+            try:
+                from src.dhan_service import global_dhan_service
+                meta = global_dhan_service.resolve_symbol(self.symbol)
+                if meta:
+                    d.setdefault("security_id", str(meta.get("security_id", "")))
+                    d.setdefault("exchange_segment", meta.get("exchange_segment", self.exchange or "NSE_EQ"))
+            except Exception:
+                pass
         return d
 
 

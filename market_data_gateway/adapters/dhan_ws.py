@@ -186,8 +186,12 @@ class DhanWSAdapter(BaseProviderAdapter):
                 )
                 start_conn_time = time.monotonic()
 
+                from src.ssl_util import get_ssl_context
+                ssl_ctx = get_ssl_context()
+
                 async with websockets.connect(
                     ws_url,
+                    ssl=ssl_ctx,
                     ping_interval=20,
                     ping_timeout=10,
                     close_timeout=5,
@@ -259,8 +263,8 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange="NSE",
-                    provider="dhan_ws",
+                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    provider="dhan",
                     last_price=round(float(ltp), 2),
                     volume=0.0,
                     data_mode="REAL_TIME",
@@ -289,8 +293,8 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange="NSE",
-                    provider="dhan_ws",
+                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    provider="dhan",
                     last_price=ltp_f,
                     volume=float(volume),
                     open=round(float(open_price), 2) if open_price > 0 else None,
@@ -343,8 +347,8 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange="NSE",
-                    provider="dhan_ws",
+                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    provider="dhan",
                     last_price=ltp_f,
                     bid=best_bid or ltp_f,
                     ask=best_ask or ltp_f,
@@ -530,12 +534,32 @@ class DhanWSAdapter(BaseProviderAdapter):
 
         instruments: List[Dict[str, str]] = []
         for sym in symbols:
-            meta = global_dhan_service.resolve_symbol(sym)
+            clean_sym = sym.strip().upper()
+            meta = global_dhan_service.resolve_symbol(clean_sym)
+            if not meta:
+                try:
+                    from src.symbol_master import symbol_master
+                    c_inst = symbol_master.resolve(clean_sym)
+                    if c_inst:
+                        meta = global_dhan_service.resolve_symbol(c_inst.display_symbol)
+                except Exception:
+                    pass
+
             if meta:
+                sec_id = str(meta["security_id"])
+                seg = meta.get("exchange_segment", "NSE_EQ")
+                self._sec_id_to_symbol[sec_id] = clean_sym
+                self._sec_id_to_symbol[f"{seg}:{sec_id}"] = clean_sym
                 instruments.append({
-                    "ExchangeSegment": meta.get("exchange_segment", "NSE_EQ"),
-                    "SecurityId": str(meta["security_id"]),
+                    "ExchangeSegment": seg,
+                    "SecurityId": sec_id,
                 })
+                # Keep DhanFeedManager registry in sync
+                try:
+                    from src.dhan_feed_manager import global_dhan_feed_manager
+                    global_dhan_feed_manager.register_symbol_meta(clean_sym, seg, sec_id)
+                except Exception:
+                    pass
 
         if not instruments:
             return

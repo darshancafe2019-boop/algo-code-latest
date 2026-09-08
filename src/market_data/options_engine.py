@@ -591,7 +591,7 @@ class UniversalOptionsEngine:
                 segment="OPTIONS",
                 currency="INR",
                 underlying=und,
-                spot_price=spot_price,
+                spot_price=float(raw_dhan_chain.get("spot_price") or spot_price),
                 selected_expiry=expiry or raw_dhan_chain.get("selected_expiry", ""),
                 latency_ms=24.0,
                 freshness_status=freshness,
@@ -1077,13 +1077,18 @@ class UniversalOptionsEngine:
             pcr_oi = round(total_put_oi / max(1.0, total_call_oi), 2)
             pcr_vol = round(total_put_vol / max(1.0, total_call_vol), 2)
 
+        calc_max_pain = float(raw_chain.get("max_pain") or 0.0)
+        if calc_max_pain <= 0 and raw_strikes:
+            from src.option_chain_engine import OptionChainEngine
+            calc_max_pain = OptionChainEngine.calculate_max_pain(raw_strikes)
+
         return OptionChainSnapshot(
             underlying=underlying,
             spot_price=spot_price,
             selected_expiry=selected_expiry,
-            available_expiries=raw_chain.get("available_expiries") or [selected_expiry],
+            available_expiries=raw_chain.get("available_expiries") or raw_chain.get("expiry_dates") or [selected_expiry],
             strikes=strike_rows,
-            max_pain=float(raw_chain.get("max_pain") or 0.0),
+            max_pain=calc_max_pain,
             pcr_oi=pcr_oi,
             pcr_volume=pcr_vol,
             total_call_oi=total_call_oi,

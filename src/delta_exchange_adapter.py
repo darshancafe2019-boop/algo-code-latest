@@ -140,7 +140,9 @@ class DeltaExchangeAdapter:
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+            from src.ssl_util import get_ssl_context
+            ssl_ctx = get_ssl_context()
+            with urllib.request.urlopen(req, timeout=self.timeout_sec, context=ssl_ctx) as resp:
                 raw_bytes = resp.read()
                 return json.loads(raw_bytes.decode("utf-8"))
         except urllib.error.HTTPError as he:

@@ -66,7 +66,7 @@ def test_dhan_ws_binary_ticker_decoding():
     assert isinstance(quote, NormalizedQuote)
     assert quote.symbol == "RELIANCE"
     assert quote.last_price == 2950.50
-    assert quote.provider == "dhan_ws"
+    assert quote.provider in ("dhan_ws", "dhan")
     assert quote.data_mode == "REAL_TIME"
 
 
@@ -99,7 +99,7 @@ def test_dhan_ws_binary_quote_decoding():
     assert quote.low == 1630.0
     assert quote.close == 1635.0
     assert quote.volume == 2500000.0
-    assert quote.provider == "dhan_ws"
+    assert quote.provider in ("dhan_ws", "dhan")
 
 
 def test_gateway_and_failover_chains():

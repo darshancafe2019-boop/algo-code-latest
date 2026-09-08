@@ -228,11 +228,13 @@ class BinanceWSAdapter(BaseProviderAdapter):
             logger.info("Connecting to Binance WS with %d streams (attempt %d)",
                         len(stream_names), self._retry_count + 1)
             try:
+                from src.ssl_util import get_ssl_context
                 async with websockets.connect(
                     ws_url,
                     ping_interval=20,
                     ping_timeout=10,
                     close_timeout=5,
+                    ssl=get_ssl_context(),
                 ) as ws:
                     self._ws = ws
                     self._retry_count = 0

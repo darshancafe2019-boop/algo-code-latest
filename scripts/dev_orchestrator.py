@@ -48,7 +48,8 @@ if hasattr(sys.stdout, "reconfigure"):
     except Exception:
         pass
 
-BACKEND_PORT = int(os.getenv("PORT", 5050))
+_raw_backend_port = int(os.getenv("BACKEND_PORT", os.getenv("PORT", 5050)))
+BACKEND_PORT = 5050 if _raw_backend_port == 3100 else _raw_backend_port
 GATEWAY_PORT = int(os.getenv("MARKET_GATEWAY_PORT", 5051))
 FRONTEND_PORT = int(os.getenv("FRONTEND_PORT", 3100))
 

@@ -559,7 +559,9 @@ class DhanService:
 
         req = urllib.request.Request(url, data=body_bytes, headers=headers, method=method.upper())
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+            from src.ssl_util import get_ssl_context
+            ssl_ctx = get_ssl_context()
+            with urllib.request.urlopen(req, timeout=self.timeout_sec, context=ssl_ctx) as resp:
                 resp_text = resp.read().decode("utf-8")
                 res = json.loads(resp_text)
                 if isinstance(res, dict):

@@ -239,8 +239,12 @@ class DhanFeedManager:
                 conn_start = time.monotonic()
                 self._status = "SOCKET_CONNECTING"
 
+                from src.ssl_util import get_ssl_context
+                ssl_ctx = get_ssl_context()
+
                 async with websockets.connect(
                     feed_url,
+                    ssl=ssl_ctx,
                     extra_headers=extra_headers,
                     ping_interval=20,
                     ping_timeout=10,
@@ -431,6 +435,37 @@ class DhanFeedManager:
             pass
 
     # ─── Subscriptions & Control ─────────────────────────────────────────────
+
+    def register_symbol_meta(self, symbol: str, exchange_segment: str, security_id: str) -> None:
+        """Registers symbol mapping in the feed manager."""
+        sec_id_str = str(security_id).strip()
+        seg_str = str(exchange_segment).strip().upper()
+        self._sec_id_to_symbol[sec_id_str] = symbol
+        self._sec_id_to_symbol[f"{seg_str}:{sec_id_str}"] = symbol
+        self._subscribed_instruments.add((seg_str, sec_id_str))
+
+    async def subscribe_symbols(self, symbols: List[str], req_code: int = 17) -> None:
+        """Resolves symbols to Dhan instruments and subscribes."""
+        instruments: List[Tuple[str, str]] = []
+        for sym in symbols:
+            clean_sym = sym.strip().upper()
+            meta = global_dhan_service.resolve_symbol(clean_sym)
+            if not meta:
+                try:
+                    from src.symbol_master import symbol_master
+                    c_inst = symbol_master.resolve(clean_sym)
+                    if c_inst:
+                        meta = global_dhan_service.resolve_symbol(c_inst.display_symbol)
+                except Exception:
+                    pass
+            if meta:
+                sec_id = str(meta["security_id"])
+                seg = meta.get("exchange_segment", "NSE_EQ")
+                self.register_symbol_meta(clean_sym, seg, sec_id)
+                instruments.append((seg, sec_id))
+
+        if instruments:
+            await self.subscribe_instruments(instruments, req_code=req_code)
 
     async def subscribe_instruments(self, instruments: List[Tuple[str, str]], req_code: int = 17) -> None:
         """

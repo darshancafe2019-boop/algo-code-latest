@@ -112,7 +112,9 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         while self._running:
             try:
                 self._logger.info(f"Connecting to Delta Options WebSocket: {self._ws_url}")
-                async with websockets.connect(self._ws_url, ping_interval=20, ping_timeout=15) as ws:
+                from src.ssl_util import get_ssl_context
+                ssl_ctx = get_ssl_context()
+                async with websockets.connect(self._ws_url, ping_interval=20, ping_timeout=15, ssl=ssl_ctx) as ws:
                     self._ws = ws
                     self._retry_count = 0
                     self._record_success()
@@ -197,18 +199,30 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         if not self._ws or self._ws.closed:
             return
 
+        # Expand base tickers (e.g. BTC -> BTC, BTCUSD, BTCUSDT) for complete exchange coverage
+        expanded_symbols = set()
+        for sym in symbols:
+            s_up = sym.strip().upper()
+            expanded_symbols.add(s_up)
+            if s_up in ("BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"):
+                expanded_symbols.add(f"{s_up}USD")
+                expanded_symbols.add(f"{s_up}USDT")
+            elif s_up.endswith("USD") and len(s_up) in (6, 7):
+                expanded_symbols.add(s_up[:-3])
+
+        sub_list = list(expanded_symbols)
         # Delta supports batched symbol subscriptions
         sub_msg = {
             "type": "subscribe",
             "payload": {
                 "channels": [
-                    {"name": "ticker", "symbols": symbols}
+                    {"name": "ticker", "symbols": sub_list}
                 ]
             }
         }
         try:
             await self._ws.send(json.dumps(sub_msg))
-            self._logger.info(f"Sent Delta WS subscription for {len(symbols)} symbols: {symbols[:5]}...")
+            self._logger.info(f"Sent Delta WS subscription for {len(sub_list)} symbols: {sub_list[:5]}...")
         except Exception as e:
             self._logger.error(f"Error sending subscription to Delta WS: {e}")
 
@@ -419,6 +433,33 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
             # Emit canonical tick to gateway listeners
             self._emit(norm_quote)
+
+            # Also alias USD perps to bare tickers (BTCUSD -> BTC) for seamless multi-asset subscriptions
+            if symbol.endswith("USD") and len(symbol) in (6, 7):
+                base_sym = symbol[:-3]
+                if base_sym in ("BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"):
+                    alias_quote = NormalizedQuote(
+                        symbol=base_sym,
+                        exchange="DELTA",
+                        provider="delta_options_ws",
+                        last_price=norm_quote.last_price,
+                        bid=norm_quote.bid,
+                        ask=norm_quote.ask,
+                        volume=norm_quote.volume,
+                        high=norm_quote.high,
+                        low=norm_quote.low,
+                        open=norm_quote.open,
+                        close=norm_quote.close,
+                        change_pct=norm_quote.change_pct,
+                        oi=norm_quote.oi,
+                        event_timestamp=norm_quote.event_timestamp,
+                        received_timestamp=norm_quote.received_timestamp,
+                        data_mode="REAL_TIME",
+                        is_stale=False,
+                    )
+                    self._quote_cache[base_sym] = alias_quote
+                    self._raw_quote_cache[base_sym] = raw_dict
+                    self._emit(alias_quote)
 
         except Exception as e:
             self._logger.debug(f"Error normalizing Delta ticker: {e}")

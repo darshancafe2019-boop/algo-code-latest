@@ -123,6 +123,13 @@ class ConsoleLogEmailProvider(BaseEmailProvider):
         return True, None, mock_id
 
 
+def normalize_email(email: Optional[str]) -> str:
+    """Trims whitespace and converts email address to lowercase."""
+    if not email:
+        return ""
+    return email.strip().lower()
+
+
 class ResendEmailProvider(BaseEmailProvider):
     """Production provider integrating the Resend REST API."""
 
@@ -143,41 +150,64 @@ class ResendEmailProvider(BaseEmailProvider):
             logger.error("[RESEND_API_KEY_MISSING] Cannot send email because RESEND_API_KEY is not configured.")
             return False, "RESEND_API_KEY is not configured.", None
 
+        clean_to = normalize_email(to_email)
+        if not clean_to or "@" not in clean_to:
+            logger.error("[RESEND_INVALID_RECIPIENT] Invalid or empty recipient email: %s", clean_to)
+            return False, "Invalid recipient email address.", None
+
         sender = from_email or config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or config.RESEND_FROM_EMAIL or "onboarding@resend.dev"
 
         # In testing mode with sandbox test domains (.test, .invalid, .example), return sandbox success
-        if any(to_email.endswith(d) for d in (".test", ".invalid", ".example")):
+        if any(clean_to.endswith(d) for d in (".test", ".invalid", ".example")):
             mock_id = f"sandbox_{uuid.uuid4().hex[:12]}"
-            logger.info("Local test recipient '%s' simulated sandbox delivery", mask_email_address(to_email))
+            logger.info("[OTP] Local test recipient '%s' simulated sandbox delivery [ID: %s]", mask_email_address(clean_to), mock_id)
             return True, None, mock_id
 
         try:
             import resend
             resend.api_key = self.api_key
 
+            logger.info("[OTP] Dispatching email to Resend for recipient: %s", mask_email_address(clean_to))
+
             params: resend.Emails.SendParams = {
                 "from": sender,
-                "to": [to_email],
+                "to": [clean_to],
                 "subject": subject,
                 "html": html_content,
                 "text": text_content,
             }
             resp = resend.Emails.send(params)
-            msg_id = resp.get("id") if isinstance(resp, dict) else getattr(resp, "id", "sent")
-            logger.info("[EMAIL_SENT] Email dispatched successfully via Resend to %s [Message ID: %s]", mask_email_address(to_email), msg_id)
+
+            # Robust response inspection: ensure msg_id is present and no error dict was returned
+            msg_id = None
+            if isinstance(resp, dict):
+                if resp.get("error") or (resp.get("statusCode") and int(resp.get("statusCode", 200)) >= 400):
+                    err_msg = str(resp.get("error") or resp.get("message") or "Resend returned error status")
+                    logger.error("[OTP] [RESEND_PROVIDER_ERROR] Resend API error response: %s", err_msg)
+                    return False, err_msg, None
+                msg_id = resp.get("id")
+            else:
+                msg_id = getattr(resp, "id", None)
+
+            if not msg_id:
+                logger.error("[OTP] [RESEND_NO_MESSAGE_ID] Resend response did not contain a valid message ID: %s", resp)
+                return False, "Resend did not return a valid message ID.", None
+
+            logger.info("[OTP] Resend message ID: %s", msg_id)
+            logger.info("[OTP] Email accepted by Resend for recipient: %s", mask_email_address(clean_to))
             return True, None, str(msg_id)
         except Exception as e:
             err_str = str(e).lower()
             if "api key" in err_str or "unauthorized" in err_str or "401" in err_str:
-                logger.error("[RESEND_INVALID_API_KEY] Resend delivery failed: Invalid or unauthorized API key")
+                logger.error("[OTP] [RESEND_INVALID_API_KEY] Resend delivery failed: Invalid or unauthorized API key")
             elif "unverified" in err_str or "domain" in err_str or "422" in err_str or "from" in err_str:
-                logger.error("[RESEND_DOMAIN_NOT_VERIFIED] Resend delivery failed: Unverified sender domain. Verify SPF/DKIM in Resend dashboard or configure OTP_FROM_EMAIL.")
+                logger.error("[OTP] [RESEND_DOMAIN_NOT_VERIFIED] Resend delivery failed: Unverified sender domain (%s). Verify domain in Resend dashboard or use verified sender.", sender)
             elif "recipient" in err_str or "restricted" in err_str or "403" in err_str:
-                logger.error("[RESEND_RECIPIENT_RESTRICTED] Resend delivery failed: In sandbox mode, emails can only be sent to the verified account owner.")
+                logger.error("[OTP] [RESEND_RECIPIENT_RESTRICTED] Resend delivery failed: In sandbox mode, emails can only be sent to the verified account owner.")
             elif "rate" in err_str or "429" in err_str:
-                logger.error("[RESEND_RATE_LIMITED] Resend delivery failed: Rate limit exceeded")
+                logger.error("[OTP] [RESEND_RATE_LIMITED] Resend delivery failed: Rate limit exceeded")
             else:
-                logger.error("[RESEND_REQUEST_FAILED] Resend API delivery failure: %s (%s)", type(e).__name__, e)
+                logger.error("[OTP] [RESEND_REQUEST_FAILED] Resend API delivery failure: %s (%s)", type(e).__name__, e)
             return False, str(e), None
 
 
@@ -353,21 +383,19 @@ class EmailService:
         Dispatches 6-digit Login Verification Code.
         Enforces that admin challenges strictly deliver to ashishparadkar1999@gmail.com.
         """
-        resolved_recipient = to_email.strip()
+        clean_recipient = normalize_email(to_email)
         if username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
-            resolved_recipient = TARGET_ADMIN_EMAIL
+            clean_recipient = TARGET_ADMIN_EMAIL
 
-        subject = "Your Quant.OS security code"
+        subject = "Your Quant.OS verification code"
 
-        text_content = f"""QUANT.OS SECURITY
+        text_content = f"""Quant.OS
 
-Your verification code:
-
-{otp_code}
+Your verification code is: {otp_code}
 
 This code expires in 5 minutes.
 
-If you did not request this code, do not share it with anyone.
+If you did not request this code, ignore this email.
 """
 
         html_content = f"""<!DOCTYPE html>
@@ -375,33 +403,33 @@ If you did not request this code, do not share it with anyone.
 <head>
   <meta charset="utf-8">
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background-color: #060913; color: #f1f5f9; padding: 24px; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #060913; color: #f1f5f9; padding: 24px; }}
     .card {{ max-width: 520px; margin: 0 auto; background-color: #0b132b; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; }}
-    .header {{ font-family: monospace; font-size: 12px; letter-spacing: 2px; color: #00f0ff; text-transform: uppercase; margin-bottom: 8px; }}
-    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; font-family: monospace; }}
+    .header {{ font-family: monospace; font-size: 13px; letter-spacing: 2px; color: #00f0ff; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }}
+    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; }}
     p {{ font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 8px 0; }}
     .otp-container {{ text-align: center; margin: 28px 0; }}
-    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #00f0ff; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #00f0ff; box-shadow: 0 0 20px rgba(0, 240, 255, 0.2); }}
-    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; font-family: monospace; }}
+    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #00f0ff; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #00f0ff; }}
+    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; }}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="header">Quant.OS Security</div>
+    <div class="header">Quant.OS</div>
     <h1>Two-Step Login Verification</h1>
-    <p>Your verification code:</p>
+    <p>Your verification code is:</p>
     <div class="otp-container">
-      <div class="otp-box">{otp_code}</div>
+      <div class="otp-box"><strong>{otp_code}</strong></div>
     </div>
     <p>This code expires in <strong>5 minutes</strong>.</p>
-    <p>If you did not request this code, do not share it with anyone.</p>
+    <p>If you did not request this code, you can safely ignore this email.</p>
     <div class="footer">Quant.OS Algorithmic Trading Systems · Security Gateway</div>
   </div>
 </body>
 </html>"""
 
         return self._dispatch_and_record(
-            to_email=resolved_recipient,
+            to_email=clean_recipient,
             subject=subject,
             html_content=html_content,
             text_content=text_content,
@@ -420,17 +448,15 @@ If you did not request this code, do not share it with anyone.
         Dispatches 6-digit Password Reset Verification Code.
         Enforces that admin password recovery strictly delivers to ashishparadkar1999@gmail.com.
         """
-        resolved_recipient = to_email.strip()
+        clean_recipient = normalize_email(to_email)
         if username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
-            resolved_recipient = TARGET_ADMIN_EMAIL
+            clean_recipient = TARGET_ADMIN_EMAIL
 
         subject = "Your Quant.OS password reset code"
 
-        text_content = f"""QUANT.OS SECURITY
+        text_content = f"""Quant.OS
 
-Your password reset verification code:
-
-{otp_code}
+Your password reset verification code is: {otp_code}
 
 This code expires in 5 minutes.
 
@@ -442,23 +468,23 @@ If you did not request a password reset, ignore this email.
 <head>
   <meta charset="utf-8">
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background-color: #060913; color: #f1f5f9; padding: 24px; }}
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #060913; color: #f1f5f9; padding: 24px; }}
     .card {{ max-width: 520px; margin: 0 auto; background-color: #0b132b; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; }}
-    .header {{ font-family: monospace; font-size: 12px; letter-spacing: 2px; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; }}
-    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; font-family: monospace; }}
+    .header {{ font-family: monospace; font-size: 13px; letter-spacing: 2px; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }}
+    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; }}
     p {{ font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 8px 0; }}
     .otp-container {{ text-align: center; margin: 28px 0; }}
-    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #f59e0b; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #fbbf24; box-shadow: 0 0 20px rgba(245, 158, 11, 0.2); }}
-    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; font-family: monospace; }}
+    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #f59e0b; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #fbbf24; }}
+    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; }}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="header">Quant.OS Security</div>
+    <div class="header">Quant.OS</div>
     <h1>Password Reset Authorization</h1>
-    <p>Your password reset verification code:</p>
+    <p>Your password reset verification code is:</p>
     <div class="otp-container">
-      <div class="otp-box">{otp_code}</div>
+      <div class="otp-box"><strong>{otp_code}</strong></div>
     </div>
     <p>This code expires in <strong>5 minutes</strong>.</p>
     <p>If you did not request a password reset, ignore this email.</p>
@@ -468,7 +494,7 @@ If you did not request a password reset, ignore this email.
 </html>"""
 
         return self._dispatch_and_record(
-            to_email=resolved_recipient,
+            to_email=clean_recipient,
             subject=subject,
             html_content=html_content,
             text_content=text_content,

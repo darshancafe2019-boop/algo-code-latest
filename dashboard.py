@@ -169,6 +169,8 @@ def enforce_server_side_security():
             "/api/auth/me",
             "/api/auth/email-otp/verify",
             "/api/auth/email-otp/resend",
+            "/api/auth/send-otp",
+            "/api/auth/verify-otp",
             "/api/auth/2fa/verify",
             "/api/auth/password/forgot",
             "/api/auth/password/verify-reset-otp",
@@ -11735,10 +11737,12 @@ def api_auth_login():
 
 
 @app.route("/api/auth/email-otp/verify", methods=["POST"])
+@app.route("/api/auth/verify-otp", methods=["POST"])
 def api_auth_email_otp_verify():
     """
     Stage 2 of Authentication:
     Verifies the 6-digit Email OTP submitted by the user.
+    Accepts challenge_id or normalized email.
     Enforces ACTIVE state, 5-minute expiration, single-use consumption, maximum 5 attempts,
     creates the authenticated session, and sets the HttpOnly session cookie.
     """
@@ -11747,38 +11751,64 @@ def api_auth_email_otp_verify():
 
     data = request.get_json(silent=True) or {}
     challenge_id = (data.get("challenge_id") or "").strip()
+    email_input = (data.get("email") or data.get("identifier") or "").strip().lower()
     code = (data.get("otp") or data.get("code") or data.get("totp_code") or "").strip()
     device_name = data.get("device_name") or "Browser"
 
-    if not challenge_id or not code:
+    if not code or (not challenge_id and not email_input):
         return jsonify({
             "status": "error",
+            "success": False,
             "error_code": "MISSING_PARAMETERS",
-            "message": "Challenge ID and 6-digit verification code are required.",
+            "message": "Verification code and challenge ID or email are required.",
             "request_id": request_id
         }), 400
 
-    challenge = db.get_auth_otp_challenge(challenge_id)
+    challenge = None
+    if challenge_id:
+        challenge = db.get_auth_otp_challenge(challenge_id)
+    elif email_input:
+        challenge = db.get_active_auth_otp_challenge_by_email(email_input, "LOGIN")
+
     if not challenge or challenge.get("purpose") != "LOGIN":
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge not found or purpose mismatch for request_id=%s", request_id)
         return jsonify({
             "status": "error",
+            "success": False,
             "error_code": "CHALLENGE_INVALID",
             "message": "Authentication challenge invalid or expired. Please sign in again.",
             "request_id": request_id
         }), 400
 
+    actual_challenge_id = challenge["id"]
     chal_status = challenge.get("status", "ACTIVE")
-    if chal_status == "USED" or challenge.get("used_at"):
+    attempts = challenge.get("attempt_count", 0)
+    if attempts >= 5 or (chal_status == "INVALIDATED" and attempts >= 5):
+        db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (actual_challenge_id,))
+        logger.warning("[OTP] [MAX_ATTEMPTS_EXCEEDED] Challenge %s reached max 5 attempts", actual_challenge_id)
         return jsonify({
             "status": "error",
+            "success": False,
+            "error_code": "MAX_ATTEMPTS_EXCEEDED",
+            "message": "Maximum verification attempts exceeded. Please request a new code.",
+            "request_id": request_id
+        }), 429
+
+    if chal_status == "USED" or challenge.get("used_at"):
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge already used: %s", actual_challenge_id)
+        return jsonify({
+            "status": "error",
+            "success": False,
             "error_code": "CHALLENGE_ALREADY_USED",
             "message": "This verification code has already been used. Please request a new code.",
             "request_id": request_id
         }), 400
 
     if chal_status != "ACTIVE":
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Challenge status is %s (not ACTIVE): %s", chal_status, actual_challenge_id)
         return jsonify({
             "status": "error",
+            "success": False,
             "error_code": "CHALLENGE_INVALID",
             "message": "Authentication challenge invalid or expired. Please sign in again.",
             "request_id": request_id
@@ -11789,9 +11819,11 @@ def api_auth_email_otp_verify():
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
         if exp < datetime.now(timezone.utc):
-            safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
+            db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (actual_challenge_id,))
+            logger.info("[OTP] [OTP_EXPIRED] Challenge expired at %s [ID: %s]", challenge["expires_at"], actual_challenge_id)
             return jsonify({
                 "status": "error",
+                "success": False,
                 "error_code": "CHALLENGE_EXPIRED",
                 "message": "Verification code has expired. Please request a new code.",
                 "request_id": request_id
@@ -11799,20 +11831,11 @@ def api_auth_email_otp_verify():
     except Exception:
         pass
 
-    attempts = challenge.get("attempt_count", 0)
-    if attempts >= 5:
-        safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
-        return jsonify({
-            "status": "error",
-            "error_code": "MAX_ATTEMPTS_EXCEEDED",
-            "message": "Maximum verification attempts exceeded. Please request a new code.",
-            "request_id": request_id
-        }), 429
-
     user = db.get_user_by_id(challenge["user_id"])
     if not user or not user.get("is_active"):
         return jsonify({
             "status": "error",
+            "success": False,
             "error_code": "USER_NOT_FOUND",
             "message": "Associated user account not found or inactive.",
             "request_id": request_id
@@ -11821,25 +11844,38 @@ def api_auth_email_otp_verify():
     # Constant-time comparison of SHA-256 hash
     code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
     if not hmac.compare_digest(code_hash, challenge["otp_hash"]):
-        new_attempts = db.increment_auth_otp_attempts(challenge_id)
+        new_attempts = db.increment_auth_otp_attempts(actual_challenge_id)
         remaining = max(0, 5 - new_attempts)
         db.log_security_audit_event(
             action="LOGIN_EMAIL_OTP_FAILED",
             actor_user_id=user["id"],
             result="DENIED",
             ip_address=client_ip,
-            details={"challenge_id": challenge_id, "attempt": new_attempts}
+            details={"challenge_id": actual_challenge_id, "attempt": new_attempts}
         )
+        logger.warning("[OTP] [OTP_VERIFICATION_FAILED] Incorrect OTP attempt %d/5 for user=%s [Challenge ID: %s]", new_attempts, user["username"], actual_challenge_id)
+        if new_attempts >= 5:
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "error_code": "MAX_ATTEMPTS_EXCEEDED",
+                "message": "Maximum verification attempts exceeded. Please request a new code.",
+                "remaining_attempts": 0,
+                "request_id": request_id
+            }), 429
+
         return jsonify({
             "status": "error",
+            "success": False,
             "error_code": "INVALID_OTP",
             "message": f"Incorrect verification code. {remaining} attempt(s) remaining.",
             "remaining_attempts": remaining,
             "request_id": request_id
         }), 401
 
-    # Mark challenge permanently used
-    db.mark_auth_otp_challenge_used(challenge_id)
+    # Mark challenge permanently used (consumed)
+    db.mark_auth_otp_challenge_used(actual_challenge_id)
+    logger.info("[OTP] Verification successful for user=%s [Challenge ID: %s]", user["username"], actual_challenge_id)
 
     # Issue Authenticated Session
     raw_token, session_dict = SessionManager.create_session(
@@ -11862,6 +11898,7 @@ def api_auth_email_otp_verify():
     is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
     resp = make_response(jsonify({
         "status": "success",
+        "success": True,
         "message": "Authentication successful.",
         "user": {
             "id": user["id"],
@@ -11888,9 +11925,11 @@ def api_auth_email_otp_verify():
 
 
 @app.route("/api/auth/email-otp/resend", methods=["POST"])
+@app.route("/api/auth/send-otp", methods=["POST"])
 def api_auth_email_otp_resend():
     """
-    Resends a fresh 6-digit Email OTP with a strict 60-second cooldown rate limit.
+    Dispatches / Resends a fresh 6-digit Email OTP with a strict 60-second cooldown rate limit.
+    Accepts challenge_id OR email.
     Enforces atomic PENDING -> Resend -> ACTIVE state machine and invalidates the prior challenge.
     """
     request_id = f"req_{secrets.token_hex(6)}"
@@ -11898,43 +11937,95 @@ def api_auth_email_otp_resend():
 
     data = request.get_json(silent=True) or {}
     challenge_id = (data.get("challenge_id") or "").strip()
+    email_input = (data.get("email") or data.get("identifier") or "").strip().lower()
 
-    if not challenge_id:
-        return jsonify({"status": "error", "message": "Challenge ID required.", "request_id": request_id}), 400
-
-    challenge = db.get_auth_otp_challenge(challenge_id)
-    if not challenge:
-        return jsonify({"status": "error", "message": "Challenge not found.", "request_id": request_id}), 404
-
-    # Enforce 60s cooldown per challenge/IP
-    rate_key = f"resend_otp:{challenge_id}:{client_ip}"
-    allowed, retry_after = RateLimiter.is_allowed(rate_key, max_requests=1, window_seconds=60)
-    if not allowed:
+    if not challenge_id and not email_input:
         return jsonify({
             "status": "error",
+            "success": False,
+            "message": "Challenge ID or email is required.",
+            "request_id": request_id
+        }), 400
+
+    user = None
+    purpose = "LOGIN"
+    user_email = ""
+
+    if challenge_id:
+        challenge = db.get_auth_otp_challenge(challenge_id)
+        if not challenge:
+            return jsonify({
+                "status": "error",
+                "success": False,
+                "message": "Challenge not found.",
+                "request_id": request_id
+            }), 404
+        user = db.get_user_by_id(challenge["user_id"])
+        purpose = challenge.get("purpose", "LOGIN")
+        user_email = challenge.get("recipient_email", "")
+    elif email_input:
+        # Resolve user by email or username
+        if email_input == "admin" or email_input == "ashishparadkar1999@gmail.com":
+            user = db.get_user_by_username("admin")
+            user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip().lower()
+        else:
+            user = db.get_user_by_username(email_input)
+            if not user:
+                # Lookup by email
+                users = db.safe_query("SELECT * FROM users WHERE LOWER(TRIM(email)) = ? AND is_active = 1", (email_input,))
+                if users:
+                    user = users[0]
+            if user:
+                user_email = (user.get("email") or "").strip().lower()
+
+    # Rate limiting: 60s cooldown per recipient email / IP
+    rate_identifier = user_email or email_input or challenge_id
+    rate_key = f"resend_otp:{rate_identifier}:{client_ip}"
+    allowed, retry_after = RateLimiter.is_allowed(rate_key, max_requests=1, window_seconds=60)
+    if not allowed:
+        logger.warning("[OTP] Rate limit exceeded for %s from IP %s", _mask_email_address(rate_identifier), client_ip)
+        return jsonify({
+            "status": "error",
+            "success": False,
             "error_code": "RATE_LIMITED",
             "message": f"Please wait {retry_after} seconds before requesting another code.",
             "retry_after": retry_after,
+            "cooldown_seconds": retry_after,
             "request_id": request_id
         }), 429
 
-    user = db.get_user_by_id(challenge["user_id"])
+    # If user not found on generic send-otp endpoint, return safe generic success to prevent enumeration
     if not user or not user.get("is_active"):
-        return jsonify({"status": "error", "message": "User not active.", "request_id": request_id}), 404
+        if request.path == "/api/auth/send-otp":
+            return jsonify({
+                "status": "success",
+                "success": True,
+                "message": "If the email is eligible, a verification code has been sent.",
+                "request_id": request_id
+            }), 200
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "message": "User not active.",
+            "request_id": request_id
+        }), 404
 
-    user_email = (user.get("email") or "").strip()
     if user.get("username") == "admin":
-        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip().lower()
+    elif not user_email:
+        user_email = (user.get("email") or "").strip().lower()
 
-    # Generate new OTP
-    purpose = challenge.get("purpose", "LOGIN")
+    # Generate fresh cryptographically secure 6-digit OTP
     expiry_mins = 10 if purpose == "PASSWORD_RESET" else 5
     otp_code = f"{secrets.randbelow(1_000_000):06d}"
     otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
     new_challenge_id = f"chall_{secrets.token_urlsafe(24)}"
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=expiry_mins)).isoformat()
 
-    # Create new challenge in PENDING state
+    logger.info("[OTP] Request received: purpose=%s for recipient=%s", purpose, _mask_email_address(user_email))
+    logger.info("[OTP] OTP generated (6 digits) [New Challenge ID: %s]", new_challenge_id)
+
+    # Insert new challenge in PENDING state
     db.create_auth_otp_challenge(
         challenge_id=new_challenge_id,
         user_id=user["id"],
@@ -11944,9 +12035,12 @@ def api_auth_email_otp_resend():
         expires_at=expires_at,
         requested_ip=client_ip,
         request_id=request_id,
-        resend_of=challenge_id
+        resend_of=challenge_id or None
     )
+    logger.info("[OTP] OTP stored in PENDING status")
 
+    # Send email through Resend
+    logger.info("[OTP] Sending email via configured provider")
     if purpose == "PASSWORD_RESET":
         sent, err, msg_id = global_email_service.send_password_reset_otp(user_email, otp_code, user["username"], user_id=user["id"])
     else:
@@ -11954,13 +12048,16 @@ def api_auth_email_otp_resend():
 
     if not sent:
         db.mark_auth_otp_challenge_send_failed(new_challenge_id, error_details=str(err or ""))
+        logger.error("[OTP] [EMAIL_PROVIDER_ERROR] Failed delivering OTP email to %s: %s", _mask_email_address(user_email), err)
         return jsonify({
             "status": "EMAIL_DELIVERY_FAILED",
+            "success": False,
+            "error_code": "EMAIL_DELIVERY_FAILED",
             "message": "We couldn't deliver the verification code. Please request a new code.",
             "request_id": request_id
         }), 502
 
-    # Activate new challenge and invalidate previous challenge atomically
+    # Atomically activate new challenge and invalidate all prior challenges for this user/purpose
     db.activate_auth_otp_challenge(
         challenge_id=new_challenge_id,
         user_id=user["id"],
@@ -11968,6 +12065,7 @@ def api_auth_email_otp_resend():
         provider_message_id=msg_id or "",
         provider_status="SUBMITTED"
     )
+    logger.info("[OTP] Email accepted by provider [Message ID: %s] | Challenge activated", msg_id)
 
     masked_dest = _mask_email_address(user_email)
 
@@ -11976,9 +12074,10 @@ def api_auth_email_otp_resend():
     no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
     resend_payload = {
         "status": "success",
+        "success": True,
         "challenge_id": new_challenge_id,
         "destination": masked_dest,
-        "message": "Verification code sent.",
+        "message": "If the email is eligible, a verification code has been sent.",
         "cooldown_seconds": 60,
         "request_id": request_id
     }

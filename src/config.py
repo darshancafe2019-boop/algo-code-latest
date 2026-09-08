@@ -1,6 +1,29 @@
 import os
 from pathlib import Path
-from dotenv import load_dotenv
+
+def _load_env_fallback(file_path: Path):
+    """Simple parser for KEY=VALUE pairs when python-dotenv is not present."""
+    if not file_path.is_file():
+        return
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip("'\"")
+                if k and k not in os.environ:
+                    os.environ[k] = v
+    except Exception:
+        pass
+
+try:
+    from dotenv import load_dotenv
+    _has_dotenv = True
+except ImportError:
+    _has_dotenv = False
 
 # ==========================================
 # LOAD ENVIRONMENT VARIABLES
@@ -14,7 +37,10 @@ for _env_file in [
     BASE_DIR / "frontend" / ".env",
 ]:
     if _env_file.is_file():
-        load_dotenv(dotenv_path=_env_file, override=False)
+        if _has_dotenv:
+            load_dotenv(dotenv_path=_env_file, override=False)
+        else:
+            _load_env_fallback(_env_file)
 
 # ==========================================
 # EXCHANGE & TELEGRAM KEYS

@@ -10932,10 +10932,10 @@ def activate_auth_otp_challenge(
     safe_execute(
         """
         UPDATE auth_otp_challenges
-        SET status = 'INVALIDATED', used_at = ?
+        SET status = 'INVALIDATED'
         WHERE user_id = ? AND purpose = ? AND status = 'ACTIVE' AND id != ?
         """,
-        (now_iso, user_id, purpose, challenge_id)
+        (user_id, purpose, challenge_id)
     )
     # 2. Mark this challenge ACTIVE
     ok = safe_execute(
@@ -10973,6 +10973,22 @@ def get_auth_otp_challenge(challenge_id: str) -> Optional[Dict[str, Any]]:
         row.setdefault("recipient_email", "")
         row.setdefault("provider_status", "SUBMITTED")
         return row
+    return None
+
+
+def get_active_auth_otp_challenge_by_email(email: str, purpose: str = "LOGIN") -> Optional[Dict[str, Any]]:
+    """Fetches the currently ACTIVE auth OTP challenge for a given normalized email and purpose."""
+    clean_email = email.strip().lower()
+    rows = safe_query(
+        """
+        SELECT * FROM auth_otp_challenges 
+        WHERE LOWER(TRIM(recipient_email)) = ? AND purpose = ? AND status = 'ACTIVE'
+        ORDER BY created_at DESC LIMIT 1
+        """,
+        (clean_email, purpose)
+    )
+    if rows:
+        return rows[0]
     return None
 
 

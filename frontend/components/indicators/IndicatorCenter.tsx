@@ -261,9 +261,30 @@ export function IndicatorCenter() {
       <AddIndicatorDrawer
         isOpen={isAddDrawerOpen}
         onClose={() => setIsAddDrawerOpen(false)}
-        allIndicators={indicators}
+        activeIndicatorIds={indicators.filter((i) => i.enabled).map((i) => i.indicator_id || i.id)}
         onAddIndicator={(id) => {
           toggleEnableMutation.mutate({ indicatorId: id, enabled: true });
+        }}
+        onRemoveIndicator={(id) => {
+          toggleEnableMutation.mutate({ indicatorId: id, enabled: false });
+        }}
+        onConfigureIndicator={(indDef) => {
+          const matching = indicators.find((i) => (i.indicator_id || i.id) === indDef.id);
+          setSelectedIndicator(
+            matching || {
+              id: indDef.id,
+              indicator_id: indDef.id,
+              name: indDef.name,
+              category: indDef.category as any,
+              enabled: true,
+              weight: 15,
+              timeframe: selectedTimeframe,
+              status: "LIVE",
+              parameters: Object.fromEntries(Object.entries(indDef.parameters).map(([k, v]) => [k, v.default])),
+            }
+          );
+          setIsAddDrawerOpen(false);
+          setIsConfigDrawerOpen(true);
         }}
         isSaving={toggleEnableMutation.isPending}
       />

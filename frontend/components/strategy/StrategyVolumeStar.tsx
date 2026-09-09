@@ -304,34 +304,12 @@ export function StrategyVolumeStar() {
 
   return (
     <div className="flex flex-col h-full bg-[#080B11] text-slate-100 select-none overflow-y-auto custom-scrollbar font-sans">
-      {/* Top Banner & Strategy Identification Bar */}
-      <div className="p-4 sm:p-5 border-b border-[#1A2333] bg-[#0E1524] flex flex-wrap items-center justify-between gap-4 shadow-xl">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 rounded-xl bg-cyan-950/80 border border-cyan-500/30 text-cyan-400 shadow-md">
-            <Layers className="h-6 w-6" />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-base sm:text-lg font-black text-white tracking-wider uppercase font-mono">
-                VOLUME STAR STRATEGY
-              </h1>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-cyan-950 text-cyan-400 border border-cyan-700">
-                5M BASE TF
-              </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold font-mono uppercase bg-purple-950 text-purple-400 border border-purple-800">
-                MARKET FLOW + FRVP LVN
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Market Structure (HH/HL) • Fixed Range Volume Profile (50 Rows / 70% VA) • LVN Retrace & Rejection Confirmation
-            </p>
-          </div>
-        </div>
-
-        {/* Global Controls: Symbol, Provider, Mode, Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5">
+      {/* Top Trading Controls Bar */}
+      <div className="px-4 py-2.5 border-b border-[#1A2333] bg-[#0E1524] flex flex-wrap items-center justify-between gap-3">
+        {/* Market / Symbol Controls */}
+        <div className="flex flex-wrap items-center gap-2">
           {/* Symbol Selector */}
-          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-xl px-2.5 py-1 text-xs">
+          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs">
             <span className="text-[10px] font-mono text-slate-400">SYM:</span>
             <select
               value={symbol}
@@ -347,7 +325,7 @@ export function StrategyVolumeStar() {
           </div>
 
           {/* Provider Selector */}
-          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-xl px-2.5 py-1 text-xs">
+          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs">
             <span className="text-[10px] font-mono text-slate-400">FEED:</span>
             <select
               value={provider}
@@ -361,13 +339,22 @@ export function StrategyVolumeStar() {
             </select>
           </div>
 
+          {/* Live Price Tag */}
+          <div className="hidden sm:flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs font-mono">
+            <span className="text-[10px] text-slate-400">LTP:</span>
+            <span className="font-bold text-emerald-400">{curPrice.toLocaleString()}</span>
+          </div>
+        </div>
+
+        {/* Global Controls: Mode, Refresh */}
+        <div className="flex items-center gap-2">
           {/* Execution Mode Selector */}
-          <div className="flex items-center p-0.5 rounded-xl bg-[#121927] border border-[#1E293B] text-xs font-mono font-bold">
+          <div className="flex items-center p-0.5 rounded-lg bg-[#121927] border border-[#1E293B] text-xs font-mono font-bold">
             {(["PAPER", "SHADOW", "LIVE"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-1 rounded-lg transition-all ${
+                className={`px-2.5 py-1 rounded-md transition-all ${
                   mode === m
                     ? m === "LIVE"
                       ? "bg-red-600 text-white shadow-lg"
@@ -386,7 +373,7 @@ export function StrategyVolumeStar() {
           <button
             onClick={fetchLiveState}
             disabled={isRefreshing}
-            className="p-2 rounded-xl bg-[#121927] border border-[#1E293B] hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all shadow-sm"
+            className="p-1.5 rounded-lg bg-[#121927] border border-[#1E293B] hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all shadow-sm"
             title="Refresh Live State"
           >
             <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin text-cyan-400" : ""}`} />
@@ -1079,7 +1066,7 @@ export function StrategyVolumeStar() {
             <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
               <div>
                 <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                  VOLUME STAR MULTI-ASSET SCANNER
+                  MULTI-ASSET SCANNER
                 </h3>
                 <p className="text-xs text-slate-400">
                   Realtime Market Structure & LVN Setup Discovery across Indian Equities, Indices, Crypto, and Forex
@@ -1163,7 +1150,7 @@ export function StrategyVolumeStar() {
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-cyan-400" />
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                  VOLUME STAR ORDER REVIEW
+                  ORDER REVIEW & SUBMISSION
                 </h3>
               </div>
               <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded border border-emerald-800">

@@ -17911,6 +17911,61 @@ def api_delta_save_credentials():
         return jsonify({"success": False, "error": str(e)}), 500
 
 
+@app.route("/api/delta/orderbook", methods=["GET"])
+def api_delta_orderbook():
+    """Returns real-time or snapshot L2 orderbook for a Delta symbol."""
+    try:
+        symbol = request.args.get("symbol", "BTCUSD").upper().strip()
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+        ob = delta_options_ws_adapter.get_orderbook(symbol)
+        if ob:
+            return jsonify({"success": True, "source": "WEBSOCKET", "orderbook": ob.to_dict()}), 200
+
+        from src.delta_options_client import global_delta_client
+        raw_ob = global_delta_client.get_l2_orderbook(symbol)
+        return jsonify({"success": True, "source": "REST_SNAPSHOT", "orderbook": raw_ob}), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/orderbook: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/delta/trades", methods=["GET"])
+def api_delta_trades():
+    """Returns recent public trades and flow for a Delta symbol."""
+    try:
+        symbol = request.args.get("symbol", "BTCUSD").upper().strip()
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+        trades = delta_options_ws_adapter.get_recent_trades(symbol)
+        if trades:
+            return jsonify({"success": True, "source": "WEBSOCKET", "trades": [t.to_dict() for t in trades]}), 200
+
+        from src.delta_options_client import global_delta_client
+        raw_trades = global_delta_client.get_recent_trades(symbol)
+        return jsonify({"success": True, "source": "REST_SNAPSHOT", "trades": raw_trades}), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/trades: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route("/api/delta/candles", methods=["GET"])
+def api_delta_candles():
+    """Returns live or historical candles for a Delta symbol."""
+    try:
+        symbol = request.args.get("symbol", "BTCUSD").upper().strip()
+        resolution = request.args.get("resolution", "1m")
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+        candles = delta_options_ws_adapter.get_candles(symbol, resolution)
+        if candles:
+            return jsonify({"success": True, "source": "WEBSOCKET", "candles": [c.to_dict() for c in candles]}), 200
+
+        from src.delta_options_client import global_delta_client
+        raw_candles = global_delta_client.get_candles(symbol, resolution=resolution)
+        return jsonify({"success": True, "source": "REST_SNAPSHOT", "candles": raw_candles}), 200
+    except Exception as e:
+        logger.error(f"Error in GET /api/delta/candles: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 # ============================================================================
 # DHAN HQ API V2 BROKER & MARKET DATA ENDPOINTS
 # ============================================================================

@@ -101,25 +101,25 @@ class OptionQuote:
     symbol: str
     exchange: str
     provider: str  # "DHAN", "UPSTOX", "DELTA_INDIA", "PAPER_SIMULATOR"
-    lastPrice: float
-    bid: float
-    ask: float
-    volume: float
-    OI: float
-    OIChange: float
-    timestamp: str
+    lastPrice: Optional[float] = None
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    volume: Optional[float] = None
+    OI: Optional[float] = None
+    OIChange: Optional[float] = None
+    timestamp: str = ""
     status: str = "LIVE"
     data_quality: str = DataQuality.VALID.value
     provenance: str = DataProvenance.PROVIDER_DATA.value
     greeks_source: str = "CALCULATED"  # "PROVIDER" or "CALCULATED"
-    IV: float = 0.0
-    delta: float = 0.0
-    gamma: float = 0.0
-    theta: float = 0.0
-    vega: float = 0.0
-    rho: float = 0.0
-    intrinsic_value: float = 0.0
-    time_value: float = 0.0
+    IV: Optional[float] = None
+    delta: Optional[float] = None
+    gamma: Optional[float] = None
+    theta: Optional[float] = None
+    vega: Optional[float] = None
+    rho: Optional[float] = None
+    intrinsic_value: Optional[float] = None
+    time_value: Optional[float] = None
     # Mandatory 8-Tier Hierarchy & Metadata
     customerId: str = "cust_default"
     departmentId: str = "dept_quant_trading"

@@ -359,13 +359,15 @@ export function OptionsUniverseView({
           {/* Compact Summary Metrics Strip */}
           <OptionsCompactMetricsBar
             spotPrice={spotPrice}
-            atmStrike={atmStrike}
-            maxPain={data?.max_pain || atmStrike}
+            atmStrike={data?.atm_strike || atmStrike}
+            maxPain={data?.max_pain}
             pcr={data?.pcr}
-            atmIV={14.8}
-            callResistanceStrike={atmStrike + stepSize * 2}
-            putSupportStrike={atmStrike - stepSize * 2}
+            atmIV={data?.atm_iv}
+            callResistanceStrike={data?.call_wall}
+            putSupportStrike={data?.put_wall}
             currency={currencySymbol}
+            dataStatus={data?.data_status || data?.freshnessStatus || "LIVE"}
+            latencyMs={data?.latency_ms || data?.latencyMs || 16}
           />
 
           {/* Option Chain Table (Single Source or Consolidated) */}

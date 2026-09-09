@@ -954,6 +954,22 @@ class UniversalOptionsEngine:
             ce_inst = str(ce_raw.get("instrument_id") or ce_raw.get("instrument_key") or ce_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_CE")
             pe_inst = str(pe_raw.get("instrument_id") or pe_raw.get("instrument_key") or pe_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_PE")
 
+            def _clean_num(raw_val: Any) -> Optional[float]:
+                if raw_val is None:
+                    return None
+                try:
+                    f = float(raw_val)
+                    return f if f > 0 else (0.0 if f == 0 else None)
+                except (ValueError, TypeError):
+                    return None
+
+            ce_last = _clean_num(ce_raw.get("ltp") or ce_raw.get("last_price") or ce_raw.get("mark_price"))
+            ce_bid = _clean_num(ce_raw.get("bid") or ce_raw.get("best_bid"))
+            ce_ask = _clean_num(ce_raw.get("ask") or ce_raw.get("best_ask"))
+            ce_iv = _clean_num(ce_raw.get("iv") or ce_raw.get("mark_iv"))
+            ce_oi = _clean_num(ce_raw.get("open_interest") or ce_raw.get("oi")) or 0.0
+            ce_vol = _clean_num(ce_raw.get("volume") or ce_raw.get("volume_24h")) or 0.0
+
             ce_quote = OptionQuote(
                 underlying=underlying,
                 expiry=selected_expiry,
@@ -962,23 +978,23 @@ class UniversalOptionsEngine:
                 symbol=str(ce_raw.get("symbol") or f"{underlying} {selected_expiry} {int(k)} CE"),
                 exchange=exchange,
                 provider=provider,
-                lastPrice=float(ce_raw.get("ltp") or ce_raw.get("last_price") or ce_raw.get("mark_price") or 0.0),
-                bid=float(ce_raw.get("bid") or ce_raw.get("best_bid") or 0.0),
-                ask=float(ce_raw.get("ask") or ce_raw.get("best_ask") or 0.0),
-                volume=float(ce_raw.get("volume") or ce_raw.get("volume_24h") or 0.0),
-                OI=float(ce_raw.get("open_interest") or ce_raw.get("oi") or 0.0),
+                lastPrice=ce_last,
+                bid=ce_bid,
+                ask=ce_ask,
+                volume=ce_vol,
+                OI=ce_oi,
                 OIChange=float(ce_raw.get("oi_change") or ce_raw.get("oi_change_pct") or 0.0),
                 timestamp=now_iso,
                 status="LIVE",
                 data_quality=DataQuality.VALID.value,
                 provenance=DataProvenance.PROVIDER_DATA.value,
                 greeks_source="PROVIDER" if ce_raw.get("delta") is not None else "CALCULATED",
-                IV=float(ce_raw.get("iv") or ce_raw.get("mark_iv") or 0.0),
-                delta=float(ce_raw.get("delta") or 0.0),
-                gamma=float(ce_raw.get("gamma") or 0.0),
-                theta=float(ce_raw.get("theta") or 0.0),
-                vega=float(ce_raw.get("vega") or 0.0),
-                rho=float(ce_raw.get("rho") or 0.0),
+                IV=ce_iv,
+                delta=float(ce_raw["delta"]) if ce_raw.get("delta") is not None else None,
+                gamma=float(ce_raw["gamma"]) if ce_raw.get("gamma") is not None else None,
+                theta=float(ce_raw["theta"]) if ce_raw.get("theta") is not None else None,
+                vega=float(ce_raw["vega"]) if ce_raw.get("vega") is not None else None,
+                rho=float(ce_raw["rho"]) if ce_raw.get("rho") is not None else None,
                 customerId="cust_default",
                 departmentId="dept_quant_trading",
                 brokerId=provider.lower(),
@@ -999,8 +1015,15 @@ class UniversalOptionsEngine:
                 freshnessStatus=freshness_status,
                 connectionStatus="CONNECTED",
                 isExecutable=freshness_status == "CONNECTED",
-                markPrice=float(ce_raw.get("mark_price") or ce_raw.get("ltp") or 0.0),
+                markPrice=_clean_num(ce_raw.get("mark_price") or ce_raw.get("ltp")),
             )
+
+            pe_last = _clean_num(pe_raw.get("ltp") or pe_raw.get("last_price") or pe_raw.get("mark_price"))
+            pe_bid = _clean_num(pe_raw.get("bid") or pe_raw.get("best_bid"))
+            pe_ask = _clean_num(pe_raw.get("ask") or pe_raw.get("best_ask"))
+            pe_iv = _clean_num(pe_raw.get("iv") or pe_raw.get("mark_iv"))
+            pe_oi = _clean_num(pe_raw.get("open_interest") or pe_raw.get("oi")) or 0.0
+            pe_vol = _clean_num(pe_raw.get("volume") or pe_raw.get("volume_24h")) or 0.0
 
             pe_quote = OptionQuote(
                 underlying=underlying,
@@ -1010,23 +1033,23 @@ class UniversalOptionsEngine:
                 symbol=str(pe_raw.get("symbol") or f"{underlying} {selected_expiry} {int(k)} PE"),
                 exchange=exchange,
                 provider=provider,
-                lastPrice=float(pe_raw.get("ltp") or pe_raw.get("last_price") or pe_raw.get("mark_price") or 0.0),
-                bid=float(pe_raw.get("bid") or pe_raw.get("best_bid") or 0.0),
-                ask=float(pe_raw.get("ask") or pe_raw.get("best_ask") or 0.0),
-                volume=float(pe_raw.get("volume") or pe_raw.get("volume_24h") or 0.0),
-                OI=float(pe_raw.get("open_interest") or pe_raw.get("oi") or 0.0),
+                lastPrice=pe_last,
+                bid=pe_bid,
+                ask=pe_ask,
+                volume=pe_vol,
+                OI=pe_oi,
                 OIChange=float(pe_raw.get("oi_change") or pe_raw.get("oi_change_pct") or 0.0),
                 timestamp=now_iso,
                 status="LIVE",
                 data_quality=DataQuality.VALID.value,
                 provenance=DataProvenance.PROVIDER_DATA.value,
                 greeks_source="PROVIDER" if pe_raw.get("delta") is not None else "CALCULATED",
-                IV=float(pe_raw.get("iv") or pe_raw.get("mark_iv") or 0.0),
-                delta=float(pe_raw.get("delta") or 0.0),
-                gamma=float(pe_raw.get("gamma") or 0.0),
-                theta=float(pe_raw.get("theta") or 0.0),
-                vega=float(pe_raw.get("vega") or 0.0),
-                rho=float(pe_raw.get("rho") or 0.0),
+                IV=pe_iv,
+                delta=float(pe_raw["delta"]) if pe_raw.get("delta") is not None else None,
+                gamma=float(pe_raw["gamma"]) if pe_raw.get("gamma") is not None else None,
+                theta=float(pe_raw["theta"]) if pe_raw.get("theta") is not None else None,
+                vega=float(pe_raw["vega"]) if pe_raw.get("vega") is not None else None,
+                rho=float(pe_raw["rho"]) if pe_raw.get("rho") is not None else None,
                 customerId="cust_default",
                 departmentId="dept_quant_trading",
                 brokerId=provider.lower(),
@@ -1047,7 +1070,7 @@ class UniversalOptionsEngine:
                 freshnessStatus=freshness_status,
                 connectionStatus="CONNECTED",
                 isExecutable=freshness_status == "CONNECTED",
-                markPrice=float(pe_raw.get("mark_price") or pe_raw.get("ltp") or 0.0),
+                markPrice=_clean_num(pe_raw.get("mark_price") or pe_raw.get("ltp")),
             )
 
             total_call_oi += ce_quote.OI

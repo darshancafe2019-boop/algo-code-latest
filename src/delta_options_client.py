@@ -1,9 +1,9 @@
 """
-Delta Exchange Cryptocurrency Options REST Client
-=================================================
+Delta Exchange Cryptocurrency Options REST Client & Rate Limiter
+=================================================================
 Production-grade, rate-limited, fault-tolerant REST API client for Delta Exchange.
 Fetches official product catalogues, active option chains, tickers, spot indices,
-and contract specifications with Decimal precision and circuit-breaker protection.
+orderbooks, trades, and candles with Decimal precision and circuit-breaker protection.
 """
 
 import time
@@ -11,6 +11,7 @@ import json
 import hmac
 import hashlib
 import logging
+import threading
 import urllib.request
 import urllib.error
 import urllib.parse
@@ -26,6 +27,38 @@ logger = logging.getLogger("DeltaOptionsClient")
 class CircuitBreakerOpenException(Exception):
     """Raised when the Delta API circuit breaker is currently open."""
     pass
+
+
+class DeltaRateLimiter:
+    """
+    Token-bucket and endpoint-weight rate limiter for Delta Exchange REST APIs.
+    Protects against 429 errors and bursts.
+    """
+
+    def __init__(self, max_tokens: float = 20.0, refill_rate_per_sec: float = 10.0):
+        self._max_tokens = float(max_tokens)
+        self._tokens = float(max_tokens)
+        self._refill_rate = float(refill_rate_per_sec)
+        self._last_refill = time.monotonic()
+        self._lock = threading.Lock()
+        self._request_counts: Dict[str, int] = {}
+
+    def acquire(self, endpoint: str, weight: float = 1.0) -> None:
+        with self._lock:
+            now = time.monotonic()
+            elapsed = now - self._last_refill
+            self._tokens = min(self._max_tokens, self._tokens + (elapsed * self._refill_rate))
+            self._last_refill = now
+
+            if self._tokens < weight:
+                wait_sec = (weight - self._tokens) / self._refill_rate
+                time.sleep(max(0.01, wait_sec))
+                self._tokens = 0.0
+                self._last_refill = time.monotonic()
+            else:
+                self._tokens -= weight
+
+            self._request_counts[endpoint] = self._request_counts.get(endpoint, 0) + 1
 
 
 class DeltaOptionsClient:
@@ -48,10 +81,8 @@ class DeltaOptionsClient:
         self.api_secret = api_secret if api_secret is not None else getattr(config, "DELTA_API_SECRET", "")
         self.timeout_sec = float(timeout_sec)
         self.max_retries = int(max_retries)
-        self.min_request_interval = 1.0 / max(1.0, float(rate_limit_per_sec))
-        
-        self._last_request_time = 0.0
-        
+        self.rate_limiter = DeltaRateLimiter(max_tokens=20.0, refill_rate_per_sec=rate_limit_per_sec)
+
         # Circuit Breaker state
         self._failure_count = 0
         self._consecutive_success_count = 0
@@ -60,12 +91,12 @@ class DeltaOptionsClient:
         self._circuit_cooldown_sec = 15.0
         self._failure_threshold = 5
 
-        # In-memory short TTL cache for catalogue
+        # In-memory short TTL cache for catalogue & products
         self._cache: Dict[str, Tuple[float, Any]] = {}
-        self._default_cache_ttl = 30.0  # 30 seconds cache for full catalogue
+        self._default_cache_ttl = 30.0
 
     # --------------------------------------------------------------------------
-    # CIRCUIT BREAKER & RATE LIMITING
+    # CIRCUIT BREAKER
     # --------------------------------------------------------------------------
 
     def _check_circuit_breaker(self):
@@ -101,13 +132,6 @@ class DeltaOptionsClient:
                 f"[CIRCUIT_BREAKER] Delta API failure threshold ({self._failure_threshold}) reached: {error}. Circuit OPENED."
             )
 
-    def _throttle(self):
-        now = time.time()
-        elapsed = now - self._last_request_time
-        if elapsed < self.min_request_interval:
-            time.sleep(self.min_request_interval - elapsed)
-        self._last_request_time = time.time()
-
     # --------------------------------------------------------------------------
     # LOW-LEVEL HTTP REQUEST DISPATCHER
     # --------------------------------------------------------------------------
@@ -120,9 +144,10 @@ class DeltaOptionsClient:
         headers: Optional[Dict[str, str]] = None,
         use_cache: bool = False,
         cache_ttl: Optional[float] = None,
+        weight: float = 1.0,
     ) -> Dict[str, Any]:
         """
-        Dispatches an HTTP request with caching, throttling, bounded retries, and rate limit protection.
+        Dispatches an HTTP request with caching, token-bucket throttling, bounded retries, and circuit breaker.
         """
         clean_endpoint = endpoint if endpoint.startswith("/") else f"/{endpoint}"
         query_str = f"?{urllib.parse.urlencode(params)}" if params else ""
@@ -142,7 +167,7 @@ class DeltaOptionsClient:
 
         url = f"{self.base_url}{clean_endpoint}{query_str}"
         req_headers = {
-            "User-Agent": "QuantOS-DeltaEngine/1.0",
+            "User-Agent": "QuantOS-DeltaEngine/2.0",
             "Accept": "application/json",
             "Content-Type": "application/json",
         }
@@ -162,15 +187,13 @@ class DeltaOptionsClient:
         last_err: Optional[Exception] = None
 
         for attempt in range(1, self.max_retries + 1):
-            self._throttle()
+            self.rate_limiter.acquire(clean_endpoint, weight=weight)
             try:
                 req = urllib.request.Request(url, headers=req_headers, method=method)
                 start_ts = time.time()
                 from src.ssl_util import get_ssl_context
                 ssl_ctx = get_ssl_context()
                 with urllib.request.urlopen(req, timeout=self.timeout_sec, context=ssl_ctx) as response:
-                    status_code = response.status
-                    latency_ms = (time.time() - start_ts) * 1000.0
                     raw_data = response.read().decode("utf-8")
                     parsed = json.loads(raw_data)
 
@@ -255,14 +278,13 @@ class DeltaOptionsClient:
             "/v2/products",
             method="GET",
             use_cache=not force_refresh,
-            cache_ttl=60.0,  # 1 min cache for products catalogue
+            cache_ttl=60.0,
+            weight=1.5,
         )
 
         raw_products = res.get("result", [])
         if not isinstance(raw_products, list):
             return []
-
-        now_iso = datetime.now(timezone.utc).isoformat()
 
         discovered: List[Dict[str, Any]] = []
         for p in raw_products:
@@ -284,7 +306,7 @@ class DeltaOptionsClient:
                     if settle_dt.tzinfo is None:
                         settle_dt = settle_dt.replace(tzinfo=timezone.utc)
                     if settle_dt < datetime.now(timezone.utc):
-                        continue  # Expired contract
+                        continue
                 except Exception:
                     pass
 
@@ -313,7 +335,7 @@ class DeltaOptionsClient:
         if expiry_date:
             params["expiry_date"] = expiry_date
 
-        res = self._request("/v2/tickers", params=params, method="GET", use_cache=False)
+        res = self._request("/v2/tickers", params=params, method="GET", use_cache=False, weight=1.0)
         result = res.get("result", [])
         return result if isinstance(result, list) else []
 
@@ -322,9 +344,6 @@ class DeltaOptionsClient:
         underlying_symbol: str,
         expiry_date_ddmmyyyy: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Fetches all option tickers for a specific underlying and optional expiry date.
-        """
         und = underlying_symbol.upper().strip()
         tickers = self.get_tickers(
             underlying_asset_symbols=[und],
@@ -334,41 +353,49 @@ class DeltaOptionsClient:
         return tickers
 
     def get_spot_indices(self) -> List[Dict[str, Any]]:
-        """
-        Fetches spot price indices from /v2/indices.
-        """
-        res = self._request("/v2/indices", method="GET", use_cache=True, cache_ttl=15.0)
+        res = self._request("/v2/indices", method="GET", use_cache=True, cache_ttl=15.0, weight=1.0)
+        result = res.get("result", [])
+        return result if isinstance(result, list) else []
+
+    def get_l2_orderbook(self, symbol: str) -> Dict[str, Any]:
+        """Fetches L2 orderbook snapshot for a symbol."""
+        res = self._request(f"/v2/l2orderbook/{symbol}", method="GET", use_cache=False, weight=1.0)
+        return res.get("result", {})
+
+    def get_recent_trades(self, symbol: str) -> List[Dict[str, Any]]:
+        """Fetches recent public trades for a symbol."""
+        res = self._request(f"/v2/trades/{symbol}", method="GET", use_cache=False, weight=1.0)
+        result = res.get("result", [])
+        return result if isinstance(result, list) else []
+
+    def get_candles(
+        self,
+        symbol: str,
+        resolution: str = "1m",
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+    ) -> List[Dict[str, Any]]:
+        """Fetches OHLC candles from /v2/history/candles."""
+        params: Dict[str, Any] = {"symbol": symbol, "resolution": resolution}
+        if start_time:
+            params["start"] = start_time
+        if end_time:
+            params["end"] = end_time
+        res = self._request("/v2/history/candles", params=params, method="GET", use_cache=True, cache_ttl=10.0, weight=1.5)
         result = res.get("result", [])
         return result if isinstance(result, list) else []
 
     def get_product_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
-        """
-        Fetches detailed product definition by product ID.
-        """
         try:
-            res = self._request(f"/v2/products/{product_id}", method="GET", use_cache=True, cache_ttl=120.0)
+            res = self._request(f"/v2/products/{product_id}", method="GET", use_cache=True, cache_ttl=120.0, weight=1.0)
             return res.get("result")
         except Exception:
             return None
 
-    def get_server_time(self) -> str:
-        """
-        Returns exchange server timestamp or current UTC ISO.
-        """
-        try:
-            # Check products head or lightweight endpoint
-            res = self._request("/v2/indices", method="GET", use_cache=False)
-            return datetime.now(timezone.utc).isoformat()
-        except Exception:
-            return datetime.now(timezone.utc).isoformat()
-
     def health_check(self) -> Dict[str, Any]:
-        """
-        Performs a rapid probe against Delta API to determine connectivity, latency, and status.
-        """
         start_t = time.time()
         try:
-            res = self._request("/v2/indices", method="GET", use_cache=False)
+            res = self._request("/v2/indices", method="GET", use_cache=False, weight=1.0)
             latency = (time.time() - start_t) * 1000.0
             return {
                 "status": "HEALTHY",

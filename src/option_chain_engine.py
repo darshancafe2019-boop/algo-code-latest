@@ -160,7 +160,7 @@ class OptionChainEngine:
         if not strikes_data:
             return 0.0
 
-        all_strikes = [float(s["strike"]) for s in strikes_data if "strike" in s]
+        all_strikes = [float(s["strike"]) for s in strikes_data if "strike" in s and s.get("strike") is not None]
         if not all_strikes:
             return 0.0
 
@@ -170,9 +170,11 @@ class OptionChainEngine:
         for test_strike in all_strikes:
             total_payout = 0.0
             for row in strikes_data:
-                k = float(row.get("strike", 0))
-                call_oi = float(row.get("ce", {}).get("open_interest", 0))
-                put_oi = float(row.get("pe", {}).get("open_interest", 0))
+                k = float(row.get("strike", 0) or 0.0)
+                ce_obj = row.get("ce") or {}
+                pe_obj = row.get("pe") or {}
+                call_oi = float(ce_obj.get("open_interest") or 0.0)
+                put_oi = float(pe_obj.get("open_interest") or 0.0)
 
                 call_loss = max(0.0, test_strike - k) * call_oi
                 put_loss = max(0.0, k - test_strike) * put_oi
@@ -187,10 +189,10 @@ class OptionChainEngine:
     @classmethod
     def calculate_pcr(cls, strikes_data: List[Dict[str, Any]]) -> Dict[str, float]:
         """Calculates Put-Call Ratio (PCR) for Open Interest and Volume."""
-        total_call_oi = sum(float(r.get("ce", {}).get("open_interest", 0)) for r in strikes_data)
-        total_put_oi = sum(float(r.get("pe", {}).get("open_interest", 0)) for r in strikes_data)
-        total_call_vol = sum(float(r.get("ce", {}).get("volume", 0)) for r in strikes_data)
-        total_put_vol = sum(float(r.get("pe", {}).get("volume", 0)) for r in strikes_data)
+        total_call_oi = sum(float((r.get("ce") or {}).get("open_interest") or 0.0) for r in strikes_data)
+        total_put_oi = sum(float((r.get("pe") or {}).get("open_interest") or 0.0) for r in strikes_data)
+        total_call_vol = sum(float((r.get("ce") or {}).get("volume") or 0.0) for r in strikes_data)
+        total_put_vol = sum(float((r.get("pe") or {}).get("volume") or 0.0) for r in strikes_data)
 
         pcr_oi = round(total_put_oi / total_call_oi, 3) if total_call_oi > 0 else 1.0
         pcr_vol = round(total_put_vol / total_call_vol, 3) if total_call_vol > 0 else 1.0

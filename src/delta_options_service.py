@@ -2,8 +2,8 @@
 Delta Exchange Options Service & Ingestion Coordinator
 ======================================================
 Coordinates Delta options catalogue discovery, REST/WebSocket normalization,
-in-memory caching, SQLite persistence, PCR & Max Pain computation, and real-time
-option chain generation with Decimal precision.
+in-memory caching, SQLite persistence, PCR, Max Pain, and Call/Put Wall computation,
+and real-time option chain generation with strict null validation (zero fake data policy).
 """
 
 import math
@@ -72,7 +72,6 @@ class DeltaOptionsService:
 
     def _background_worker(self):
         """Runs periodic catalogue refresh and contract cleanup."""
-        # Initial sync on boot
         try:
             self.sync_catalogue(force=True)
         except Exception as e:
@@ -82,11 +81,9 @@ class DeltaOptionsService:
             try:
                 time.sleep(30.0)
                 now = time.time()
-                # Periodic catalogue refresh
                 if now - self._last_catalogue_sync_time > self._catalogue_sync_interval:
                     self.sync_catalogue(force=False)
 
-                # Expired contract cleanup
                 db.archive_expired_delta_contracts()
 
             except Exception as e:
@@ -196,7 +193,6 @@ class DeltaOptionsService:
             db.upsert_delta_expiries(und_sym, exp_list)
             total_expiries += len(exp_list)
 
-            # Auto-track chain symbols in WebSocket adapter
             for exp_item in exp_list:
                 chain_sym = exp_item.get("chain_symbol")
                 if chain_sym:
@@ -205,7 +201,7 @@ class DeltaOptionsService:
         # 3. Upsert Contracts
         saved_contracts = db.upsert_delta_contracts(normalized_contracts)
 
-        # 4. Clean up any expired contracts
+        # 4. Clean up expired contracts
         db.archive_expired_delta_contracts()
 
         elapsed_ms = (time.time() - start_ts) * 1000.0
@@ -303,7 +299,7 @@ class DeltaOptionsService:
         return count
 
     # --------------------------------------------------------------------------
-    # REAL-TIME OPTION CHAIN GENERATION
+    # REAL-TIME OPTION CHAIN GENERATION (ZERO FAKE DATA POLICY)
     # --------------------------------------------------------------------------
 
     def get_option_chain(
@@ -316,13 +312,13 @@ class DeltaOptionsService:
         Builds the structured dual-sided option chain for an underlying and expiry.
         Pairs CALLs on the left and PUTs on the right per strike price.
         Enriches with moneyness, ATM strike detection, PCR, Max Pain, and Greeks.
+        Strictly sets missing/unquoted fields to None so that frontend renders '—' (never $0.00).
         """
         und = underlying.upper().strip()
 
         # 1. Fetch available expiries for this underlying
         expiries = db.get_delta_expiries(und, active_only=True)
         if not expiries:
-            # Trigger fresh sync if DB is empty
             self.sync_catalogue(force=True)
             expiries = db.get_delta_expiries(und, active_only=True)
 
@@ -331,14 +327,19 @@ class DeltaOptionsService:
                 "underlying": und,
                 "spot_price": 0.0,
                 "expiry": expiry or "",
+                "selected_expiry": expiry or "",
                 "available_expiries": [],
                 "strikes": [],
                 "atm_strike": 0.0,
-                "pcr": {"pcr_oi": 1.0, "pcr_volume": 1.0},
-                "max_pain": 0.0,
+                "pcr": {"pcr_oi": None, "pcr_volume": None},
+                "max_pain": None,
+                "atm_iv": None,
+                "call_wall": None,
+                "put_wall": None,
                 "summary": {},
                 "is_live": False,
                 "is_stale": True,
+                "data_status": "DATA INCOMPLETE",
             }
 
         # 2. Select target expiry
@@ -364,7 +365,7 @@ class DeltaOptionsService:
         db_quotes_list = db.get_delta_quotes(underlying=und, expiry=target_settlement[:10])
         db_quotes_map = {q["symbol"]: q for q in db_quotes_list}
 
-        # If WS cache is thin and DB quotes are missing, do a fast REST ticker pull
+        # If WS cache is thin, trigger fast REST sync in background
         if len(live_quotes_ws) < 5 and len(db_quotes_map) < 5:
             try:
                 self.sync_tickers_for_underlying(und, expiry_date=target_expiry_date)
@@ -375,20 +376,28 @@ class DeltaOptionsService:
 
         # 5. Determine current Spot Price
         spot_price = 0.0
-        # Priority A: Check live WS cache for spot price
-        for k, v in live_quotes_ws.items():
-            sp = v.get("spot_price")
-            if sp and float(sp) > 0:
-                spot_price = float(sp)
-                break
-        # Priority B: Check DB quotes
+        # Priority A: Check live WS spot cache
+        sp_ws = delta_options_ws_adapter.get_spot_price(und) or delta_options_ws_adapter.get_spot_price(f"{und}USD")
+        if sp_ws and sp_ws > 0:
+            spot_price = sp_ws
+
+        # Priority B: Check WS quote cache
+        if spot_price <= 0:
+            for k, v in live_quotes_ws.items():
+                sp = v.get("spot_price")
+                if sp and float(sp) > 0:
+                    spot_price = float(sp)
+                    break
+
+        # Priority C: Check DB quotes
         if spot_price <= 0:
             for q in db_quotes_map.values():
                 sp = q.get("spot_price")
                 if sp and float(sp) > 0:
                     spot_price = float(sp)
                     break
-        # Priority C: Fallback to global indices
+
+        # Priority D: Fallback to global indices REST
         if spot_price <= 0:
             try:
                 indices = self.client.get_spot_indices()
@@ -399,6 +408,7 @@ class DeltaOptionsService:
                         break
             except Exception:
                 pass
+
         if spot_price <= 0:
             spot_price = 78000.0 if und == "BTC" else (3500.0 if und == "ETH" else 100.0)
 
@@ -422,25 +432,39 @@ class DeltaOptionsService:
             raw_ws = live_quotes_ws.get(sym) or live_quotes_ws.get(str(pid))
             db_q = db_quotes_map.get(sym) or {}
 
-            mark_px = float((raw_ws.get("mark_price") if raw_ws else None) or db_q.get("mark_price") or 0.0)
-            bid_px = float((raw_ws.get("best_bid") if raw_ws else None) or db_q.get("best_bid") or 0.0)
-            ask_px = float((raw_ws.get("best_ask") if raw_ws else None) or db_q.get("best_ask") or 0.0)
-            bid_sz = float((raw_ws.get("bid_size") if raw_ws else None) or db_q.get("bid_size") or 0.0)
-            ask_sz = float((raw_ws.get("ask_size") if raw_ws else None) or db_q.get("ask_size") or 0.0)
-            mark_iv = float((raw_ws.get("mark_iv") if raw_ws else None) or db_q.get("mark_iv") or 0.0)
-            bid_iv = float((raw_ws.get("bid_iv") if raw_ws else None) or db_q.get("bid_iv") or 0.0)
-            ask_iv = float((raw_ws.get("ask_iv") if raw_ws else None) or db_q.get("ask_iv") or 0.0)
-            delta_val = float((raw_ws.get("delta") if raw_ws else None) or db_q.get("delta") or 0.0)
-            gamma_val = float((raw_ws.get("gamma") if raw_ws else None) or db_q.get("gamma") or 0.0)
-            theta_val = float((raw_ws.get("theta") if raw_ws else None) or db_q.get("theta") or 0.0)
-            vega_val = float((raw_ws.get("vega") if raw_ws else None) or db_q.get("vega") or 0.0)
-            rho_val = float((raw_ws.get("rho") if raw_ws else None) or db_q.get("rho") or 0.0)
-            oi_val = float((raw_ws.get("oi") if raw_ws else None) or db_q.get("oi") or 0.0)
-            vol_val = float((raw_ws.get("volume") if raw_ws else None) or db_q.get("volume_24h") or 0.0)
-            chg_val = float((raw_ws.get("price_change_24h") if raw_ws else None) or db_q.get("price_change_24h") or 0.0)
+            def _get_val(key_name: str, db_key_name: Optional[str] = None) -> Optional[float]:
+                v = None
+                if raw_ws and raw_ws.get(key_name) is not None:
+                    v = raw_ws[key_name]
+                elif db_q and db_q.get(db_key_name or key_name) is not None:
+                    v = db_q[db_key_name or key_name]
+                if v is not None:
+                    try:
+                        fv = float(v)
+                        return fv
+                    except (ValueError, TypeError):
+                        return None
+                return None
+
+            mark_px = _get_val("mark_price")
+            bid_px = _get_val("best_bid")
+            ask_px = _get_val("best_ask")
+            bid_sz = _get_val("bid_size")
+            ask_sz = _get_val("ask_size")
+            mark_iv = _get_val("mark_iv")
+            bid_iv = _get_val("bid_iv")
+            ask_iv = _get_val("ask_iv")
+            delta_val = _get_val("delta")
+            gamma_val = _get_val("gamma")
+            theta_val = _get_val("theta")
+            vega_val = _get_val("vega")
+            rho_val = _get_val("rho")
+            oi_val = _get_val("open_interest", "oi") or _get_val("oi")
+            vol_val = _get_val("volume_24h", "volume") or _get_val("volume")
+            chg_val = _get_val("price_change_24h")
 
             # Spread calculation
-            spread = max(0.0, ask_px - bid_px) if ask_px > 0 and bid_px > 0 else 0.0
+            spread = round(ask_px - bid_px, 2) if (ask_px is not None and bid_px is not None and ask_px > 0 and bid_px > 0) else None
 
             # ITM / ATM / OTM Moneyness calculation
             is_call = "call" in ctype
@@ -449,29 +473,37 @@ class DeltaOptionsService:
             else:
                 moneyness = "ITM" if k > spot_price * 1.002 else ("ATM" if abs(k - spot_price) <= spot_price * 0.005 else "OTM")
 
+            # Normalized IV percentage
+            norm_iv = round(mark_iv * 100.0 if mark_iv < 5.0 else mark_iv, 2) if mark_iv is not None and mark_iv > 0 else None
+
             leg_dict = {
                 "product_id": pid,
                 "symbol": sym,
                 "contract_type": "CALL" if is_call else "PUT",
                 "strike": k,
-                "mark_price": round(mark_px, 2),
-                "last_price": round(mark_px, 2),
-                "best_bid": round(bid_px, 2),
-                "best_ask": round(ask_px, 2),
-                "bid_size": round(bid_sz, 2),
-                "ask_size": round(ask_sz, 2),
-                "spread": round(spread, 2),
-                "mark_iv": round(mark_iv * 100.0 if mark_iv < 5.0 else mark_iv, 2),
-                "bid_iv": round(bid_iv * 100.0 if bid_iv < 5.0 else bid_iv, 2),
-                "ask_iv": round(ask_iv * 100.0 if ask_iv < 5.0 else ask_iv, 2),
-                "delta": round(delta_val, 4),
-                "gamma": round(gamma_val, 6),
-                "theta": round(theta_val, 2),
-                "vega": round(vega_val, 2),
-                "rho": round(rho_val, 4),
-                "open_interest": round(oi_val, 2),
-                "volume": round(vol_val, 2),
-                "change_24h": round(chg_val, 2),
+                "mark_price": round(mark_px, 2) if mark_px is not None else None,
+                "last_price": round(mark_px, 2) if mark_px is not None else None,
+                "ltp": round(mark_px, 2) if mark_px is not None else None,
+                "best_bid": round(bid_px, 2) if bid_px is not None else None,
+                "best_ask": round(ask_px, 2) if ask_px is not None else None,
+                "bid": round(bid_px, 2) if bid_px is not None else None,
+                "ask": round(ask_px, 2) if ask_px is not None else None,
+                "bid_size": round(bid_sz, 2) if bid_sz is not None else None,
+                "ask_size": round(ask_sz, 2) if ask_sz is not None else None,
+                "spread": spread,
+                "mark_iv": norm_iv,
+                "iv": norm_iv,
+                "bid_iv": round(bid_iv * 100.0 if bid_iv < 5.0 else bid_iv, 2) if bid_iv is not None else None,
+                "ask_iv": round(ask_iv * 100.0 if ask_iv < 5.0 else ask_iv, 2) if ask_iv is not None else None,
+                "delta": round(delta_val, 4) if delta_val is not None else None,
+                "gamma": round(gamma_val, 6) if gamma_val is not None else None,
+                "theta": round(theta_val, 2) if theta_val is not None else None,
+                "vega": round(vega_val, 2) if vega_val is not None else None,
+                "rho": round(rho_val, 4) if rho_val is not None else None,
+                "open_interest": round(oi_val, 2) if oi_val is not None else None,
+                "oi": round(oi_val, 2) if oi_val is not None else None,
+                "volume": round(vol_val, 2) if vol_val is not None else None,
+                "change_24h": round(chg_val, 2) if chg_val is not None else None,
                 "moneyness": moneyness,
                 "tick_size": float(c.get("tick_size", 0.1)),
                 "contract_value": str(c.get("contract_value", "0.001")),
@@ -490,25 +522,9 @@ class DeltaOptionsService:
             is_atm = abs(k - spot_price) <= (spot_price * 0.005)
             row["is_atm"] = is_atm
             row["distance_pct"] = round(((k - spot_price) / max(1.0, spot_price)) * 100.0, 2)
-            # Fill missing side placeholder with 0s if only one side is listed
-            if row["call"] is None:
-                row["call"] = {
-                    "product_id": 0, "symbol": f"C-{und}-{int(k)}", "contract_type": "CALL",
-                    "strike": k, "mark_price": 0.0, "last_price": 0.0, "best_bid": 0.0, "best_ask": 0.0,
-                    "bid_size": 0.0, "ask_size": 0.0, "spread": 0.0, "mark_iv": 0.0, "bid_iv": 0.0, "ask_iv": 0.0,
-                    "delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0,
-                    "open_interest": 0.0, "volume": 0.0, "change_24h": 0.0, "moneyness": "OTM",
-                    "tick_size": 0.1, "contract_value": "0.001", "is_active": False,
-                }
-            if row["put"] is None:
-                row["put"] = {
-                    "product_id": 0, "symbol": f"P-{und}-{int(k)}", "contract_type": "PUT",
-                    "strike": k, "mark_price": 0.0, "last_price": 0.0, "best_bid": 0.0, "best_ask": 0.0,
-                    "bid_size": 0.0, "ask_size": 0.0, "spread": 0.0, "mark_iv": 0.0, "bid_iv": 0.0, "ask_iv": 0.0,
-                    "delta": 0.0, "gamma": 0.0, "theta": 0.0, "vega": 0.0, "rho": 0.0,
-                    "open_interest": 0.0, "volume": 0.0, "change_24h": 0.0, "moneyness": "OTM",
-                    "tick_size": 0.1, "contract_value": "0.001", "is_active": False,
-                }
+            # Map canonical 'ce' and 'pe' keys for universal UI compatibility
+            row["ce"] = row["call"]
+            row["pe"] = row["put"]
             sorted_strike_rows.append(row)
 
         # 8. Identify ATM strike
@@ -521,23 +537,52 @@ class DeltaOptionsService:
                     min_dist = dist
                     atm_strike = r["strike"]
 
-        # Tag the exact closest strike as ATM
         for r in sorted_strike_rows:
             if r["strike"] == atm_strike:
                 r["is_atm"] = True
 
-        # 9. Compute PCR & Max Pain
-        # Adapt format for OptionChainEngine
+        # 9. Compute PCR, Max Pain, Call Wall, Put Wall, and ATM IV
         compat_rows = []
         for r in sorted_strike_rows:
             compat_rows.append({
                 "strike": r["strike"],
-                "ce": r["call"],
-                "pe": r["put"],
+                "ce": r["call"] or {},
+                "pe": r["put"] or {},
             })
 
         pcr_metrics = OptionChainEngine.calculate_pcr(compat_rows)
         max_pain_strike = OptionChainEngine.calculate_max_pain(compat_rows)
+
+        # True Call Wall (strike with highest call OI) & Put Wall (strike with highest put OI)
+        call_wall_strike = None
+        max_call_oi = -1.0
+        put_wall_strike = None
+        max_put_oi = -1.0
+        atm_iv_val = None
+
+        for r in sorted_strike_rows:
+            # Check call OI
+            c_leg = r.get("call")
+            if c_leg and c_leg.get("open_interest") is not None:
+                c_oi = float(c_leg["open_interest"])
+                if c_oi > max_call_oi and c_oi > 0:
+                    max_call_oi = c_oi
+                    call_wall_strike = r["strike"]
+
+            # Check put OI
+            p_leg = r.get("put")
+            if p_leg and p_leg.get("open_interest") is not None:
+                p_oi = float(p_leg["open_interest"])
+                if p_oi > max_put_oi and p_oi > 0:
+                    max_put_oi = p_oi
+                    put_wall_strike = r["strike"]
+
+            # Check ATM IV
+            if r.get("is_atm"):
+                if c_leg and c_leg.get("mark_iv"):
+                    atm_iv_val = c_leg["mark_iv"]
+                elif p_leg and p_leg.get("mark_iv"):
+                    atm_iv_val = p_leg["mark_iv"]
 
         # 10. Filter strike range if requested
         if strike_count and 0 < strike_count < len(sorted_strike_rows):
@@ -551,11 +596,18 @@ class DeltaOptionsService:
         d_rem = total_seconds // 86400
         h_rem = (total_seconds % 86400) // 3600
         m_rem = (total_seconds % 3600) // 60
-
         countdown_label = f"{d_rem}d {h_rem}h {m_rem}m"
 
         ws_health = delta_options_ws_adapter.get_status()
         is_live = ws_health in ("LIVE", "CONNECTED")
+
+        # Determine data completeness
+        has_quotes = any(
+            (r.get("call") and r["call"].get("mark_price") is not None) or
+            (r.get("put") and r["put"].get("mark_price") is not None)
+            for r in sorted_strike_rows
+        )
+        data_status = "LIVE" if (is_live and has_quotes) else ("DATA INCOMPLETE" if not has_quotes else "STALE")
 
         result = {
             "underlying": und,
@@ -572,11 +624,16 @@ class DeltaOptionsService:
             "atm_strike": atm_strike,
             "pcr": pcr_metrics,
             "max_pain": max_pain_strike,
+            "call_wall": call_wall_strike,
+            "put_wall": put_wall_strike,
+            "atm_iv": atm_iv_val,
             "data_source": "Delta Exchange Live",
             "provider": "DELTA_EXCHANGE",
             "environment": "INDIA",
             "is_live": is_live,
             "is_stale": not is_live and len(live_quotes_ws) == 0,
+            "data_status": data_status,
+            "latency_ms": delta_options_ws_adapter.get_sync_health().get("latency_ms", 16.0),
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -603,7 +660,6 @@ class DeltaOptionsService:
     # --------------------------------------------------------------------------
 
     def get_underlyings(self) -> List[Dict[str, Any]]:
-        """Returns all discovered active Delta underlyings enriched with contract counts."""
         underlyings = db.get_delta_underlyings(active_only=True)
         if not underlyings:
             self.sync_catalogue(force=True)
@@ -614,14 +670,8 @@ class DeltaOptionsService:
             und_sym = u["underlying_symbol"]
             expiries = db.get_delta_expiries(und_sym, active_only=True)
             contracts = db.get_delta_contracts(underlying=und_sym, active_only=True)
-            
-            # Fetch spot price
-            spot_px = 78000.0 if und_sym == "BTC" else (3500.0 if und_sym == "ETH" else 100.0)
-            live_quotes = delta_options_ws_adapter.get_all_raw_quotes()
-            for v in live_quotes.values():
-                if v.get("underlying_symbol") == und_sym and v.get("spot_price"):
-                    spot_px = float(v["spot_price"])
-                    break
+
+            spot_px = delta_options_ws_adapter.get_spot_price(und_sym) or (78000.0 if und_sym == "BTC" else (3500.0 if und_sym == "ETH" else 100.0))
 
             res.append({
                 "symbol": und_sym,
@@ -637,19 +687,15 @@ class DeltaOptionsService:
         return res
 
     def get_expiries_for_underlying(self, underlying: str) -> List[Dict[str, Any]]:
-        """Returns all expiries for an underlying."""
         return db.get_delta_expiries(underlying, active_only=True)
 
     def get_contract_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
-        """Returns contract details by product ID."""
         return db.get_delta_contract_by_id(product_id)
 
     def get_contract_by_symbol(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Returns contract details by exact symbol."""
         return db.get_delta_contract_by_symbol(symbol)
 
     def get_health(self) -> Dict[str, Any]:
-        """Returns comprehensive health across Delta REST and WebSocket subsystems."""
         rest_health = self.client.health_check()
         ws_health = delta_options_ws_adapter.get_sync_health()
         underlyings = db.get_delta_underlyings(active_only=True)

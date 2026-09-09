@@ -2,7 +2,6 @@
 
 import React, { useMemo } from "react";
 import { OptionStrikeRow, OptionContractQuote } from "@/types/option-chain";
-import { Target, Zap, Plus, ArrowUpRight, ArrowDownRight } from "lucide-react";
 
 interface SimpleLiveOptionChainTableProps {
   strikes: OptionStrikeRow[];
@@ -24,7 +23,7 @@ interface SimpleLiveOptionChainTableProps {
 }
 
 function formatVolumeOrOI(val: number | undefined | null): string {
-  if (val === undefined || val === null || isNaN(val) || val === 0) return "—";
+  if (val === undefined || val === null || isNaN(val) || val <= 0) return "—";
   if (val >= 10_000_000) return `${(val / 10_000_000).toFixed(2)}Cr`;
   if (val >= 100_000) return `${(val / 100_000).toFixed(1)}L`;
   if (val >= 1_000) return `${(val / 1_000).toFixed(0)}K`;
@@ -32,12 +31,12 @@ function formatVolumeOrOI(val: number | undefined | null): string {
 }
 
 function formatPrice(val: number | undefined | null, symbol: string = "₹"): string {
-  if (val === undefined || val === null || isNaN(val)) return "—";
+  if (val === undefined || val === null || isNaN(val) || val <= 0) return "—";
   return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatGreek(val: number | undefined | null, decimals: number = 2): string {
-  if (val === undefined || val === null || isNaN(val)) return "—";
+  if (val === undefined || val === null || isNaN(val) || val === 0) return "—";
   return val.toFixed(decimals);
 }
 
@@ -45,13 +44,13 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
   strikes,
   spotPrice,
   currency = "₹",
-  sourceName = "Dhan",
+  sourceName = "Delta Exchange",
   brokerAccountAlias = "Primary Account",
   environment = "PAPER",
-  dataFeed = "REST",
-  freshnessStatus = "CONNECTED",
+  dataFeed = "WEBSOCKET",
+  freshnessStatus = "LIVE",
   dataAgeMs = 0,
-  latencyMs = 24,
+  latencyMs = 16,
   filterMoneyness = "ALL",
   showAdvancedColumns = false,
   selectedStrike,
@@ -92,7 +91,9 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
     return (
       <div className="bg-[#0A1020] border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs space-y-2">
         <div className="text-sm font-bold text-white">CONNECTING TO {sourceName.toUpperCase()} OPTION FEED...</div>
-        <p className="text-slate-500">Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}${spotPrice}` : "underlying"}...</p>
+        <p className="text-slate-500">
+          Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}${spotPrice.toLocaleString()}` : "underlying"}...
+        </p>
       </div>
     );
   }
@@ -107,7 +108,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
             {/* Top Category Split */}
             <tr className="border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-center">
               <th
-                colSpan={showAdvancedColumns ? 5 : 2}
+                colSpan={showAdvancedColumns ? 7 : 4}
                 className="py-1.5 bg-rose-950/20 text-rose-300 border-r border-slate-800"
               >
                 CALLS (CE)
@@ -116,7 +117,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                 STRIKE
               </th>
               <th
-                colSpan={showAdvancedColumns ? 5 : 2}
+                colSpan={showAdvancedColumns ? 7 : 4}
                 className="py-1.5 bg-emerald-950/20 text-emerald-300"
               >
                 PUTS (PE)
@@ -130,6 +131,8 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
               {showAdvancedColumns && <th className="p-2 text-right">Vol</th>}
               {showAdvancedColumns && <th className="p-2 text-right">IV%</th>}
               {showAdvancedColumns && <th className="p-2 text-right text-cyan-400">Δ Delta</th>}
+              <th className="p-2 text-right text-slate-400">Bid</th>
+              <th className="p-2 text-right text-slate-400">Ask</th>
               <th className="p-2 text-right font-bold text-white border-r border-slate-800">LTP</th>
 
               {/* Center Strike Column */}
@@ -138,7 +141,9 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
               </th>
 
               {/* Put Columns */}
-              <th className="p-2 text-left font-bold text-white border-r border-slate-800/60">LTP</th>
+              <th className="p-2 text-left font-bold text-white">LTP</th>
+              <th className="p-2 text-left text-slate-400">Bid</th>
+              <th className="p-2 text-left text-slate-400 border-r border-slate-800/60">Ask</th>
               {showAdvancedColumns && <th className="p-2 text-left text-cyan-400">Δ Delta</th>}
               {showAdvancedColumns && <th className="p-2 text-left">IV%</th>}
               {showAdvancedColumns && <th className="p-2 text-left">Vol</th>}
@@ -149,23 +154,29 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
           {/* Table Body */}
           <tbody className="divide-y divide-slate-800/50">
             {filteredStrikes.map((row) => {
-              const isATM = row.is_atm;
-              const ce: OptionContractQuote = row.ce || (row as any).call;
-              const pe: OptionContractQuote = row.pe || (row as any).put;
+              const isATM = Boolean(row.is_atm);
+              const ce = (row.ce || (row as any).call || {}) as OptionContractQuote;
+              const pe = (row.pe || (row as any).put || {}) as OptionContractQuote;
 
               const ceITM = ce?.moneyness === "ITM" || (ce?.strike ? ce.strike < spotPrice : row.strike < spotPrice);
               const peITM = pe?.moneyness === "ITM" || (pe?.strike ? pe.strike > spotPrice : row.strike > spotPrice);
 
-              const ceLtp = ce?.ltp ?? ce?.markPrice ?? 0;
-              const peLtp = pe?.ltp ?? pe?.markPrice ?? 0;
-              const ceOI = ce?.open_interest ?? 0;
-              const peOI = pe?.open_interest ?? 0;
-              const ceVol = ce?.volume ?? 0;
-              const peVol = pe?.volume ?? 0;
-              const ceIV = ce?.iv ?? 0;
-              const peIV = pe?.iv ?? 0;
-              const ceDelta = ce?.delta ?? 0;
-              const peDelta = pe?.delta ?? 0;
+              const ceLtp = ce?.ltp ?? ce?.markPrice ?? (ce as any)?.last_price ?? (ce as any)?.mark_price ?? null;
+              const peLtp = pe?.ltp ?? pe?.markPrice ?? (pe as any)?.last_price ?? (pe as any)?.mark_price ?? null;
+
+              const ceBid = ce?.bid ?? (ce as any)?.best_bid ?? null;
+              const ceAsk = ce?.ask ?? (ce as any)?.best_ask ?? null;
+              const peBid = pe?.bid ?? (pe as any)?.best_bid ?? null;
+              const peAsk = pe?.ask ?? (pe as any)?.best_ask ?? null;
+
+              const ceOI = ce?.open_interest ?? (ce as any)?.oi ?? null;
+              const peOI = pe?.open_interest ?? (pe as any)?.oi ?? null;
+              const ceVol = ce?.volume ?? null;
+              const peVol = pe?.volume ?? null;
+              const ceIV = ce?.iv ?? (ce as any)?.mark_iv ?? null;
+              const peIV = pe?.iv ?? (pe as any)?.mark_iv ?? null;
+              const ceDelta = ce?.delta ?? null;
+              const peDelta = pe?.delta ?? null;
 
               const isCeSelected = selectedStrike === row.strike && selectedOptionType === "CE";
               const isPeSelected = selectedStrike === row.strike && selectedOptionType === "PE";
@@ -206,7 +217,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                         ceITM ? "bg-rose-950/15" : ""
                       }`}
                     >
-                      {ceIV > 0 ? `${ceIV.toFixed(1)}%` : "—"}
+                      {ceIV !== null && ceIV > 0 ? `${ceIV.toFixed(1)}%` : "—"}
                     </td>
                   )}
 
@@ -217,9 +228,19 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                         ceITM ? "bg-rose-950/15" : ""
                       }`}
                     >
-                      {ceDelta !== 0 ? formatGreek(ceDelta, 2) : "—"}
+                      {formatGreek(ceDelta, 2)}
                     </td>
                   )}
+
+                  {/* CALLS: Bid */}
+                  <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+                    {formatPrice(ceBid, currency)}
+                  </td>
+
+                  {/* CALLS: Ask */}
+                  <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+                    {formatPrice(ceAsk, currency)}
+                  </td>
 
                   {/* CALLS: LTP (Clickable) */}
                   <td
@@ -246,7 +267,11 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                     }`}
                   >
                     <div className="flex items-center justify-center gap-1">
-                      {isATM && <span className="text-[9px] px-1 rounded bg-amber-500 text-slate-950 font-black">ATM</span>}
+                      {isATM && (
+                        <span className="text-[9px] px-1 rounded bg-amber-500 text-slate-950 font-black">
+                          ATM
+                        </span>
+                      )}
                       <span>{row.strike.toLocaleString()}</span>
                     </div>
                   </td>
@@ -254,7 +279,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                   {/* PUTS: LTP (Clickable) */}
                   <td
                     onClick={() => onSelectOption(row.strike, "PE", pe)}
-                    className={`p-2 text-left border-r border-slate-800/60 cursor-pointer transition ${
+                    className={`p-2 text-left cursor-pointer transition ${
                       peITM ? "bg-emerald-950/20" : ""
                     } ${
                       isPeSelected
@@ -267,6 +292,20 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                     </div>
                   </td>
 
+                  {/* PUTS: Bid */}
+                  <td className={`p-2 text-left text-slate-400 font-mono text-[10px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+                    {formatPrice(peBid, currency)}
+                  </td>
+
+                  {/* PUTS: Ask */}
+                  <td
+                    className={`p-2 text-left text-slate-400 font-mono text-[10px] border-r border-slate-800/60 ${
+                      peITM ? "bg-emerald-950/15" : ""
+                    }`}
+                  >
+                    {formatPrice(peAsk, currency)}
+                  </td>
+
                   {/* PUTS: Delta (Advanced) */}
                   {showAdvancedColumns && (
                     <td
@@ -274,7 +313,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                         peITM ? "bg-emerald-950/15" : ""
                       }`}
                     >
-                      {peDelta !== 0 ? formatGreek(peDelta, 2) : "—"}
+                      {formatGreek(peDelta, 2)}
                     </td>
                   )}
 
@@ -285,7 +324,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                         peITM ? "bg-emerald-950/15" : ""
                       }`}
                     >
-                      {peIV > 0 ? `${peIV.toFixed(1)}%` : "—"}
+                      {peIV !== null && peIV > 0 ? `${peIV.toFixed(1)}%` : "—"}
                     </td>
                   )}
 

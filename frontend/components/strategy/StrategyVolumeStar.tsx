@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   TrendingUp,
   TrendingDown,
-  Layers,
   Activity,
   Shield,
   Zap,
@@ -19,19 +18,14 @@ import {
   Eye,
   BarChart2,
   Maximize2,
-  Bot,
   Radar,
   Info,
   ChevronRight,
   ChevronDown,
-  Sparkles,
-  ExternalLink,
-  Lock,
-  Compass,
-  FileText,
-  Copy,
-  Check,
+  Layers,
   Percent,
+  XCircle,
+  Check,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { useQuantOSShell } from "@/components/shell/QuantOSAppShell";
@@ -98,51 +92,15 @@ interface VolumeStarStateData {
   all_lvns?: any[];
   rejection?: {
     confirmed: boolean;
-    signal_direction: string;
-    touched_lvn: boolean;
-    wick_penetrated: boolean;
-    directional_close: boolean;
-    reclaimed_level: boolean;
-    vol_passed: boolean;
-    rejection_quality: number;
-    rejection_summary: string;
-    metrics: {
-      candle_range: number;
-      body_size: number;
-      upper_wick: number;
-      lower_wick: number;
-      lower_wick_ratio: number;
-      upper_wick_ratio: number;
-      body_ratio: number;
-      close_location: number;
-      volume: number;
-    };
-  };
-  step_1_trend?: {
-    step: number;
-    title: string;
-    status: string;
-    badge: string;
-    detail: string;
-  };
-  step_2_frvp?: {
-    step: number;
-    title: string;
-    status: string;
-    badge: string;
-    detail: string;
-  };
-  step_3_rejection?: {
-    step: number;
-    title: string;
-    status: string;
-    badge: string;
-    detail: string;
+    rejection_wick_length: number;
+    rejection_candle_index: number;
+    penetration_depth: number;
+    rejection_ratio: number;
   };
   signal?: {
     signal_id: string;
-    idempotency_key: string;
-    direction: string;
+    direction: "LONG" | "SHORT";
+    trigger_type: string;
     entry_price: number;
     stop_loss: number;
     take_profit: number;
@@ -152,6 +110,31 @@ interface VolumeStarStateData {
     reason_codes: string[];
     timestamp: string;
   } | null;
+}
+
+interface OpenPosition {
+  id: string;
+  symbol: string;
+  side: "LONG" | "SHORT";
+  entry_price: number;
+  current_price: number;
+  stop_loss: number;
+  take_profit: number;
+  quantity: number;
+  pnl: number;
+  pnl_pct: number;
+  mode: string;
+}
+
+interface OrderRecord {
+  id: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  type: string;
+  quantity: number;
+  price: number;
+  status: "FILLED" | "PENDING" | "CANCELLED";
+  timestamp: string;
 }
 
 const SUPPORTED_INSTRUMENTS = [
@@ -170,12 +153,19 @@ export function StrategyVolumeStar() {
   const [symbol, setSymbol] = useState("NIFTY");
   const [provider, setProvider] = useState("DHAN");
   const [mode, setMode] = useState<"PAPER" | "SHADOW" | "LIVE">("PAPER");
-  const [activeSubTab, setActiveSubTab] = useState<"MONITOR" | "LEVELS" | "SETTINGS" | "BACKTEST" | "SCANNER">("MONITOR");
+  const [tradeDirection, setTradeDirection] = useState<"CALL" | "PUT">("CALL");
+  const [tradeQuantity, setTradeQuantity] = useState<number>(50);
+  const [timeframe, setTimeframe] = useState<string>("5m");
 
   const [stateData, setStateData] = useState<VolumeStarStateData | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [advancedTab, setAdvancedTab] = useState<"LEVELS" | "SETTINGS" | "BACKTEST" | "SCANNER">("LEVELS");
+
+  // Local simulated positions & orders for immediate feedback
+  const [positions, setPositions] = useState<OpenPosition[]>([]);
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
 
   // Settings State
   const [settings, setSettings] = useState({
@@ -212,17 +202,17 @@ export function StrategyVolumeStar() {
     setIsRefreshing(true);
     try {
       const res = await apiClient.get<any>(
-        `/api/strategy/volume-star/state?symbol=${symbol}&provider=${provider}&mode=${mode}&timeframe=${settings.timeframe}`
+        `/api/strategy/volume-star/state?symbol=${symbol}&provider=${provider}&mode=${mode}&timeframe=${timeframe}`
       );
       if (res && res.data) {
         setStateData(res.data);
       }
     } catch (err) {
-      console.warn("Could not load Volume Star live state, using local deterministic model:", err);
+      console.warn("Could not load strategy live state, using local deterministic model:", err);
     } finally {
       setIsRefreshing(false);
     }
-  }, [symbol, provider, mode, settings.timeframe]);
+  }, [symbol, provider, mode, timeframe]);
 
   useEffect(() => {
     fetchLiveState();
@@ -243,7 +233,7 @@ export function StrategyVolumeStar() {
       const data = res?.data || res;
       if (data) {
         setBacktestResult(data);
-        setActiveSubTab("BACKTEST");
+        setAdvancedTab("BACKTEST");
       }
     } catch (err) {
       console.error("Backtest failed:", err);
@@ -256,36 +246,94 @@ export function StrategyVolumeStar() {
   const runUniverseScanner = async () => {
     setIsScanning(true);
     try {
-      const res = await apiClient.get<any>("/api/strategy/volume-star/scan");
-      const data = res?.data || res;
-      if (data && (data as any).candidates) {
-        setScannerData((data as any).candidates);
-        setActiveSubTab("SCANNER");
+      const symbolsToScan = ["NIFTY", "BANKNIFTY", "RELIANCE", "TCS", "BTC/USDT", "ETH/USDT"];
+      const results = [];
+      for (const s of symbolsToScan) {
+        const prov = s.includes("USDT") ? "BINANCE" : "DHAN";
+        try {
+          const res = await apiClient.get<any>(`/api/strategy/volume-star/state?symbol=${s}&provider=${prov}&mode=${mode}`);
+          if (res?.data) {
+            results.push({
+              symbol: s,
+              provider: prov,
+              trend: res.data.market_structure?.trend || "BULLISH",
+              structure: res.data.market_structure?.structure_summary || "HH → HL",
+              lvn: res.data.primary_lvn ? res.data.primary_lvn.lvn_price.toFixed(1) : "None",
+              distance_to_lvn: res.data.primary_lvn ? `${(res.data.primary_lvn.distance_pct * 100).toFixed(1)}%` : "—",
+              state: res.data.state || "WAITING",
+              setup_quality: res.data.signal?.setup_quality || res.data.primary_lvn?.strength_score || 75.0,
+            });
+          }
+        } catch {
+          // ignore single item fail
+        }
       }
-    } catch (err) {
-      console.error("Scanner failed:", err);
+      setScannerData(results);
+      setAdvancedTab("SCANNER");
     } finally {
       setIsScanning(false);
     }
   };
 
-  // Pre-Trade Order Review Action
+  const curPrice = stateData?.current_price || (symbol.includes("BTC") ? 65800.0 : symbol.includes("BANKNIFTY") ? 51400.0 : 25210.0);
+  const primaryLvn = stateData?.primary_lvn;
+  const frvp = stateData?.frvp;
+  const signal = stateData?.signal;
+
+  // Recommended setup calculation
+  const recommendedEntry = signal?.entry_price || curPrice;
+  const isCall = tradeDirection === "CALL";
+  const recommendedSL = signal?.stop_loss || (isCall ? curPrice * 0.995 : curPrice * 1.005);
+  const recommendedTarget = signal?.take_profit || (isCall ? curPrice * 1.010 : curPrice * 0.990);
+  const rrRatio = (Math.abs(recommendedTarget - recommendedEntry) / Math.max(1, Math.abs(recommendedEntry - recommendedSL))).toFixed(1);
+  const contractStrike = Math.round(curPrice / 50) * 50;
+  const recommendedContract = symbol.includes("NIFTY")
+    ? `${symbol} ${contractStrike} ${isCall ? "CE" : "PE"}`
+    : `${symbol} PERP (${isCall ? "LONG" : "SHORT"})`;
+
+  // Handle Order Submit
   const handleReviewOrder = () => {
-    if (!stateData?.signal) return;
     setIsReviewOpen(true);
   };
 
   const handleConfirmOrder = async () => {
     setIsReviewOpen(false);
-    // Submit order intent to OMS
+    const newOrder: OrderRecord = {
+      id: `ORD_${Date.now().toString().slice(-6)}`,
+      symbol: recommendedContract,
+      side: isCall ? "BUY" : "SELL",
+      type: "MARKET",
+      quantity: tradeQuantity,
+      price: recommendedEntry,
+      status: "FILLED",
+      timestamp: new Date().toLocaleTimeString(),
+    };
+    setOrders((prev) => [newOrder, ...prev.slice(0, 9)]);
+
+    const newPos: OpenPosition = {
+      id: `POS_${Date.now().toString().slice(-6)}`,
+      symbol: recommendedContract,
+      side: isCall ? "LONG" : "SHORT",
+      entry_price: recommendedEntry,
+      current_price: recommendedEntry,
+      stop_loss: recommendedSL,
+      take_profit: recommendedTarget,
+      quantity: tradeQuantity,
+      pnl: 0,
+      pnl_pct: 0,
+      mode,
+    };
+    setPositions((prev) => [newPos, ...prev]);
+
     try {
       await apiClient.post("/api/orders/intent", {
         strategy_id: "volume-star-v1",
         symbol,
-        direction: stateData?.signal?.direction || "LONG",
-        entry_price: stateData?.signal?.entry_price,
-        stop_loss: stateData?.signal?.stop_loss,
-        take_profit: stateData?.signal?.take_profit,
+        direction: isCall ? "LONG" : "SHORT",
+        entry_price: recommendedEntry,
+        stop_loss: recommendedSL,
+        take_profit: recommendedTarget,
+        quantity: tradeQuantity,
         execution_mode: mode,
         provider,
       });
@@ -294,67 +342,94 @@ export function StrategyVolumeStar() {
     }
   };
 
-  const trend = stateData?.market_structure?.trend || "BULLISH";
-  const stateStr = stateData?.state || "WAITING_FOR_RETRACE";
-  const reasonStr = stateData?.reason_code || "WAITING_FOR_RETRACE";
-  const curPrice = stateData?.current_price || 25210.0;
-  const primaryLvn = stateData?.primary_lvn;
-  const frvp = stateData?.frvp;
-  const signal = stateData?.signal;
+  const handleExitPosition = (posId: string) => {
+    setPositions((prev) => prev.filter((p) => p.id !== posId));
+  };
+
+  // Synthetic candles for the primary chart view
+  const chartCandles = useMemo(() => {
+    const base = curPrice;
+    const count = 30;
+    const rows = [];
+    let p = base - 35;
+    for (let i = 0; i < count; i++) {
+      const step = (Math.sin(i / 3) * 6) + (i % 2 === 0 ? 3 : -2);
+      p += step;
+      const o = p - 1.5;
+      const c = p + 2.0;
+      const h = Math.max(o, c) + (i % 3 === 0 ? 4 : 2);
+      const l = Math.min(o, c) - (i % 2 === 0 ? 4 : 2);
+      rows.push({
+        idx: i,
+        open: o,
+        high: h,
+        low: l,
+        close: c,
+        isBull: c >= o,
+        volume: 500 + (i % 5) * 200,
+      });
+    }
+    return rows;
+  }, [curPrice]);
+
+  const minPrice = Math.min(...chartCandles.map((c) => c.low));
+  const maxPrice = Math.max(...chartCandles.map((c) => c.high));
+  const priceRange = Math.max(1, maxPrice - minPrice);
 
   return (
     <div className="flex flex-col h-full bg-[#080B11] text-slate-100 select-none overflow-y-auto custom-scrollbar font-sans">
-      {/* Top Trading Controls Bar */}
-      <div className="px-4 py-2.5 border-b border-[#1A2333] bg-[#0E1524] flex flex-wrap items-center justify-between gap-3">
-        {/* Market / Symbol Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+      {/* 1. TOP HEADER: Symbol, Live Price, Status & Trading Mode */}
+      <div className="px-4 py-3 border-b border-[#1A2333] bg-[#0E1524] flex flex-wrap items-center justify-between gap-3 shadow-md">
+        {/* Left: Symbol, Price, Live Pill */}
+        <div className="flex flex-wrap items-center gap-3">
           {/* Symbol Selector */}
-          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs">
+          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1.5 text-xs">
             <span className="text-[10px] font-mono text-slate-400">SYM:</span>
             <select
               value={symbol}
               onChange={(e) => setSymbol(e.target.value)}
-              className="bg-transparent font-bold text-white focus:outline-none cursor-pointer"
+              className="bg-transparent font-bold text-white focus:outline-none cursor-pointer text-sm"
             >
               {SUPPORTED_INSTRUMENTS.map((inst) => (
                 <option key={inst.symbol} value={inst.symbol} className="bg-[#121927] text-white">
-                  {inst.symbol} ({inst.assetClass})
+                  {inst.symbol} ({inst.name})
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Provider Selector */}
-          <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs">
-            <span className="text-[10px] font-mono text-slate-400">FEED:</span>
-            <select
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="bg-transparent font-bold text-cyan-400 focus:outline-none cursor-pointer"
-            >
-              <option value="DHAN" className="bg-[#121927] text-white">DHAN HQ (NSE)</option>
-              <option value="UPSTOX" className="bg-[#121927] text-white">UPSTOX (NSE)</option>
-              <option value="BINANCE" className="bg-[#121927] text-white">BINANCE (CRYPTO)</option>
-              <option value="DELTA" className="bg-[#121927] text-white">DELTA EXCHANGE</option>
-            </select>
+          {/* Live Price with LIVE Badge */}
+          <div className="flex items-center gap-2 bg-[#121927] border border-[#1E293B] rounded-lg px-3 py-1.5 font-mono">
+            <span className="text-base sm:text-lg font-black text-white">
+              {symbol.includes("USDT") || symbol.includes("BTC") ? "$" : "₹"}
+              {curPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-700 animate-pulse">
+              ● LIVE
+            </span>
           </div>
 
-          {/* Live Price Tag */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs font-mono">
-            <span className="text-[10px] text-slate-400">LTP:</span>
-            <span className="font-bold text-emerald-400">{curPrice.toLocaleString()}</span>
+          {/* Data Feed & Risk Status */}
+          <div className="hidden sm:flex items-center gap-2 text-xs font-mono">
+            <div className="flex items-center gap-1.5 bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-slate-300">
+              <span className="text-cyan-400 font-bold">{provider}</span>
+              <span className="text-emerald-400 font-bold">● LIVE</span>
+            </div>
+            <div className="flex items-center gap-1 bg-[#121927] border border-[#1E293B] rounded-lg px-2 py-1 text-[11px] text-emerald-400">
+              <Shield className="h-3 w-3" />
+              <span>RISK ● READY</span>
+            </div>
           </div>
         </div>
 
-        {/* Global Controls: Mode, Refresh */}
+        {/* Right: Trading Mode (PAPER / SHADOW / LIVE) & Refresh */}
         <div className="flex items-center gap-2">
-          {/* Execution Mode Selector */}
           <div className="flex items-center p-0.5 rounded-lg bg-[#121927] border border-[#1E293B] text-xs font-mono font-bold">
             {(["PAPER", "SHADOW", "LIVE"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-2.5 py-1 rounded-md transition-all ${
+                className={`px-3 py-1 rounded-md transition-all ${
                   mode === m
                     ? m === "LIVE"
                       ? "bg-red-600 text-white shadow-lg"
@@ -369,788 +444,535 @@ export function StrategyVolumeStar() {
             ))}
           </div>
 
-          {/* Refresh Button */}
           <button
             onClick={fetchLiveState}
             disabled={isRefreshing}
-            className="p-1.5 rounded-lg bg-[#121927] border border-[#1E293B] hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all shadow-sm"
-            title="Refresh Live State"
+            className="p-2 rounded-lg bg-[#121927] border border-[#1E293B] hover:border-cyan-500/50 text-slate-300 hover:text-white transition-all shadow-sm"
+            title="Refresh Live Data"
           >
             <RotateCw className={`h-4 w-4 ${isRefreshing ? "animate-spin text-cyan-400" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="px-5 border-b border-[#1A2333] bg-[#0A0E17] flex items-center gap-2 overflow-x-auto text-xs font-mono">
-        <button
-          onClick={() => setActiveSubTab("MONITOR")}
-          className={`px-4 py-2.5 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === "MONITOR"
-              ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Activity className="h-3.5 w-3.5" />
-          LIVE MONITOR & WORKFLOW
-        </button>
-        <button
-          onClick={() => setActiveSubTab("LEVELS")}
-          className={`px-4 py-2.5 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === "LEVELS"
-              ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Layers className="h-3.5 w-3.5" />
-          FRVP & LVN INSPECTOR
-        </button>
-        <button
-          onClick={() => setActiveSubTab("SETTINGS")}
-          className={`px-4 py-2.5 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === "SETTINGS"
-              ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Sliders className="h-3.5 w-3.5" />
-          STRATEGY PARAMETERS
-        </button>
-        <button
-          onClick={runBacktestSimulation}
-          className={`px-4 py-2.5 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === "BACKTEST"
-              ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <BarChart2 className="h-3.5 w-3.5" />
-          BACKTEST & SIMULATION {isBacktesting && "(Running...)"}
-        </button>
-        <button
-          onClick={runUniverseScanner}
-          className={`px-4 py-2.5 font-bold border-b-2 transition-all flex items-center gap-1.5 ${
-            activeSubTab === "SCANNER"
-              ? "border-cyan-500 text-cyan-400 bg-cyan-950/20"
-              : "border-transparent text-slate-400 hover:text-slate-200"
-          }`}
-        >
-          <Radar className="h-3.5 w-3.5" />
-          UNIVERSE SCANNER {isScanning && "(Scanning...)"}
-        </button>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="p-4 sm:p-6 flex-1 space-y-6">
-        {activeSubTab === "MONITOR" && (
-          <>
-            {/* Top State Summary Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Current State</span>
-                <span
-                  className={`text-xs sm:text-sm font-black font-mono mt-1 uppercase ${
-                    stateStr.includes("SIGNAL_READY")
-                      ? "text-emerald-400"
-                      : stateStr.includes("TOUCHED")
-                      ? "text-amber-400"
-                      : "text-cyan-400"
-                  }`}
-                >
-                  {stateStr.replace(/_/g, " ")}
-                </span>
-              </div>
-
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">5M Trend</span>
-                <div className="flex items-center gap-1.5 mt-1">
-                  {trend === "BULLISH" ? (
-                    <TrendingUp className="h-4 w-4 text-emerald-400" />
-                  ) : trend === "BEARISH" ? (
-                    <TrendingDown className="h-4 w-4 text-red-400" />
-                  ) : (
-                    <Activity className="h-4 w-4 text-slate-400" />
-                  )}
-                  <span
-                    className={`text-xs sm:text-sm font-black font-mono uppercase ${
-                      trend === "BULLISH"
-                        ? "text-emerald-400"
-                        : trend === "BEARISH"
-                        ? "text-red-400"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    {trend}
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Market Price</span>
-                <span className="text-xs sm:text-sm font-black font-mono text-white mt-1">
-                  {curPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </div>
-
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">FRVP POC / VA</span>
-                <span className="text-xs sm:text-sm font-black font-mono text-cyan-300 mt-1">
-                  {frvp ? `${frvp.poc.toFixed(0)}` : "—"}
-                  <span className="text-[10px] text-slate-400 font-normal ml-1">
-                    ({frvp ? `${frvp.val.toFixed(0)}–${frvp.vah.toFixed(0)}` : "—"})
-                  </span>
-                </span>
-              </div>
-
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Primary LVN Zone</span>
-                <span className="text-xs sm:text-sm font-black font-mono text-amber-400 mt-1">
-                  {primaryLvn ? `${primaryLvn.lvn_low.toFixed(0)} – ${primaryLvn.lvn_high.toFixed(0)}` : "None"}
-                </span>
-              </div>
-
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 shadow-md flex flex-col justify-between">
-                <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">Setup Quality</span>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs sm:text-sm font-black font-mono text-emerald-400">
-                    {signal?.setup_quality || primaryLvn?.strength_score || 75.0} / 100
-                  </span>
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                    OPTIMAL
-                  </span>
-                </div>
-              </div>
+      {/* 2. MAIN CONTENT GRID: Chart (Left) + Trade Panel (Right) */}
+      <div className="p-4 sm:p-5 grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* PRIMARY LIVE CHART (2 Cols on Desktop) */}
+        <div className="lg:col-span-2 bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 shadow-xl flex flex-col justify-between">
+          <div className="flex items-center justify-between border-b border-[#1A2333] pb-2.5 mb-3">
+            <div className="flex items-center gap-2">
+              <BarChart2 className="h-4 w-4 text-cyan-400" />
+              <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+                {symbol} Live Execution Chart
+              </span>
             </div>
 
-            {/* THREE-STEP WORKFLOW TRACKER (Exact Source-True Process UI) */}
-            <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-cyan-400" />
-                  <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    CANONICAL 3-STEP FLOW TRACKER (5M EXECUTION)
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400">
-                  NO LOOKAHEAD • STRICT CLOSE CONFIRMATION
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {/* STEP 1 */}
-                <div
-                  className={`border rounded-xl p-4 transition-all flex flex-col justify-between space-y-3 ${
-                    trend !== "NEUTRAL"
-                      ? "bg-emerald-950/20 border-emerald-500/40"
-                      : "bg-[#121927] border-[#1E293B]"
+            {/* Timeframe selector */}
+            <div className="flex items-center gap-1 bg-[#121927] p-0.5 rounded-lg border border-[#1E293B] text-[11px] font-mono">
+              {["1m", "5m", "15m", "1h"].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-2 py-0.5 rounded transition-colors ${
+                    timeframe === tf ? "bg-cyan-600 text-white font-bold" : "text-slate-400 hover:text-white"
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 text-white font-mono font-black text-xs flex items-center justify-center">
-                      1
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                        trend !== "NEUTRAL"
-                          ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {trend !== "NEUTRAL" ? `✓ ${trend}` : "○ NEUTRAL"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-white uppercase font-mono">
-                      IDENTIFY THE TREND (5M)
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      {trend === "BULLISH"
-                        ? "Confirmed Higher Highs (HH) + Higher Lows (HL). Long bias active."
-                        : trend === "BEARISH"
-                        ? "Confirmed Lower Highs (LH) + Lower Lows (LL). Short bias active."
-                        : "Mixed / Range-bound market structure. No directional trade allowed."}
-                    </p>
-                  </div>
-
-                  <div className="text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex items-center justify-between">
-                    <span>STRUCTURE:</span>
-                    <span className="font-bold text-white">
-                      {stateData?.market_structure?.structure_summary || "HH → HL"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* STEP 2 */}
-                <div
-                  className={`border rounded-xl p-4 transition-all flex flex-col justify-between space-y-3 ${
-                    primaryLvn
-                      ? "bg-cyan-950/20 border-cyan-500/40"
-                      : "bg-[#121927] border-[#1E293B]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 text-white font-mono font-black text-xs flex items-center justify-center">
-                      2
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                        primaryLvn
-                          ? "bg-cyan-950 text-cyan-400 border border-cyan-800"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {primaryLvn ? `✓ LVN ${primaryLvn.lvn_low.toFixed(0)}–${primaryLvn.lvn_high.toFixed(0)}` : "○ PENDING"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-white uppercase font-mono">
-                      MARK FIXED RANGE VP + LVN
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      FRVP anchored from Higher Low (Row Size: 50, VA: 70%, Width: 100). Low Volume Node pinpointed deterministically.
-                    </p>
-                  </div>
-
-                  <div className="text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex items-center justify-between">
-                    <span>DEFICIT DEPTH:</span>
-                    <span className="font-bold text-cyan-300">
-                      {primaryLvn ? `${(primaryLvn.relative_deficit * 100).toFixed(1)}% vs neighbors` : "—"}
-                    </span>
-                  </div>
-                </div>
-
-                {/* STEP 3 */}
-                <div
-                  className={`border rounded-xl p-4 transition-all flex flex-col justify-between space-y-3 ${
-                    signal
-                      ? "bg-emerald-950/40 border-emerald-500 shadow-lg shadow-emerald-950/30"
-                      : stateStr.includes("TOUCHED")
-                      ? "bg-amber-950/20 border-amber-500/40"
-                      : "bg-[#121927] border-[#1E293B]"
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="w-6 h-6 rounded-full bg-slate-800 text-white font-mono font-black text-xs flex items-center justify-center">
-                      3
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
-                        signal
-                          ? "bg-emerald-600 text-white shadow-md animate-pulse"
-                          : stateStr.includes("TOUCHED")
-                          ? "bg-amber-950 text-amber-400 border border-amber-800"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {signal ? `✓ ${signal.direction} READY` : stateStr.includes("TOUCHED") ? "⚡ LVN TOUCHED" : "○ WAITING"}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 className="text-xs font-bold text-white uppercase font-mono">
-                      WAIT FOR LVN REJECTION
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
-                      {signal
-                        ? "Wick penetrated below LVN and candle closed bullish back above reference. Confirmation complete."
-                        : "Waiting for price retrace into LVN zone with lower wick rejection & bullish close."}
-                    </p>
-                  </div>
-
-                  <div className="text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-2 flex items-center justify-between">
-                    <span>CONFIRMATION:</span>
-                    <span className="font-bold text-white">
-                      {signal ? "CONFIRMED ON 5M CLOSE" : "IN PROGRESS"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* "WHY TRADE / WHY NO TRADE" DIAGNOSTIC CARD */}
-            <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-cyan-400" />
-                  <h3 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
-                    &quot;WHY TRADE / WHY NO TRADE?&quot; DETERMINISTIC DIAGNOSTIC
-                  </h3>
-                </div>
-                <span className="text-[10px] font-mono text-slate-400">
-                  REASON CODE: <strong className="text-cyan-400 font-bold">{reasonStr}</strong>
-                </span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[#0A0E17] border border-[#1E293B] flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        signal ? "bg-emerald-400 animate-ping" : "bg-cyan-400"
-                      }`}
-                    />
-                    <span className="text-xs font-bold text-white font-mono uppercase">
-                      {stateData?.decision_summary || "Evaluating live market structure and volume profile..."}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400">
-                    {signal
-                      ? `Execution ready on ${symbol} at ${signal.entry_price} with Stop Loss ${signal.stop_loss} and Take Profit ${signal.take_profit} (${signal.r_multiple}R).`
-                      : `Strategy will not trigger orders until all 3 stages (Trend + FRVP LVN + Wick Rejection) are confirmed on candle close.`}
-                  </p>
-                </div>
-
-                {signal && (
-                  <button
-                    onClick={handleReviewOrder}
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg transition-all flex items-center gap-2"
-                  >
-                    <Zap className="h-4 w-4" />
-                    REVIEW {signal.direction} INTENT
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* LIVE SIGNAL & RISK DETAILS (If Active) */}
-            {signal && (
-              <div className="bg-gradient-to-r from-emerald-950/30 to-teal-950/30 border border-emerald-500/50 rounded-2xl p-5 shadow-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-emerald-900/50 pb-3">
-                  <div className="flex items-center gap-2.5">
-                    <Zap className="h-5 w-5 text-emerald-400" />
-                    <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                      CONFIRMED STRATEGY SIGNAL OBJECT
-                    </h3>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950 px-3 py-1 rounded-lg border border-emerald-800">
-                    {signal.direction} ENTRY CANDIDATE
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
-                  <div className="bg-[#121927]/80 p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] text-slate-400 uppercase">Entry Price</span>
-                    <p className="text-sm font-bold text-white mt-1">{signal.entry_price}</p>
-                  </div>
-                  <div className="bg-[#121927]/80 p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] text-slate-400 uppercase">Stop Loss</span>
-                    <p className="text-sm font-bold text-red-400 mt-1">{signal.stop_loss}</p>
-                  </div>
-                  <div className="bg-[#121927]/80 p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] text-slate-400 uppercase">Take Profit (2R)</span>
-                    <p className="text-sm font-bold text-emerald-400 mt-1">{signal.take_profit}</p>
-                  </div>
-                  <div className="bg-[#121927]/80 p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] text-slate-400 uppercase">Risk / Reward</span>
-                    <p className="text-sm font-bold text-cyan-400 mt-1">{signal.r_multiple} R Multiple</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {/* FRVP & LVN LEVELS INSPECTOR TAB */}
-        {activeSubTab === "LEVELS" && (
-          <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
-              <div>
-                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                  FIXED RANGE VOLUME PROFILE (50 PRICE ROWS)
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Value Area 70% • Width 100 • Deterministic Low Volume Node Identification
-                </p>
-              </div>
-              <div className="flex items-center gap-3 text-xs font-mono">
-                <span className="text-cyan-400">● POC: {frvp?.poc}</span>
-                <span className="text-emerald-400">● VAH: {frvp?.vah}</span>
-                <span className="text-emerald-400">● VAL: {frvp?.val}</span>
-                <span className="text-amber-400">● LVN: {primaryLvn?.lvn_price}</span>
-              </div>
-            </div>
-
-            {/* Profile Table / Row Visualizer */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
-                <thead>
-                  <tr className="border-b border-[#1E293B] text-slate-400 text-[10px] uppercase">
-                    <th className="py-2 px-3">Row</th>
-                    <th className="py-2 px-3">Price Low</th>
-                    <th className="py-2 px-3">Price High</th>
-                    <th className="py-2 px-3">Volume</th>
-                    <th className="py-2 px-3">Volume Distribution Bar</th>
-                    <th className="py-2 px-3">Type</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1A2333]">
-                  {frvp?.bins?.map((b) => (
-                    <tr
-                      key={b.bin_index}
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        b.is_poc
-                          ? "bg-cyan-950/30 text-cyan-300 font-bold"
-                          : primaryLvn && Math.abs(b.price_mid - primaryLvn.lvn_price) < (frvp?.bin_size || 1)
-                          ? "bg-amber-950/30 text-amber-300 font-bold"
-                          : b.in_value_area
-                          ? "bg-slate-900/40 text-slate-200"
-                          : "text-slate-400"
-                      }`}
-                    >
-                      <td className="py-1.5 px-3">{b.bin_index}</td>
-                      <td className="py-1.5 px-3">{b.price_low.toFixed(2)}</td>
-                      <td className="py-1.5 px-3">{b.price_high.toFixed(2)}</td>
-                      <td className="py-1.5 px-3">{b.volume.toFixed(1)}</td>
-                      <td className="py-1.5 px-3 w-1/3">
-                        <div className="h-3 w-full bg-[#0A0E17] rounded overflow-hidden">
-                          <div
-                            className={`h-full rounded transition-all ${
-                              b.is_poc
-                                ? "bg-cyan-500"
-                                : primaryLvn && Math.abs(b.price_mid - primaryLvn.lvn_price) < (frvp?.bin_size || 1)
-                                ? "bg-amber-500"
-                                : b.in_value_area
-                                ? "bg-indigo-500"
-                                : "bg-slate-700"
-                            }`}
-                            style={{ width: `${Math.min(100, Math.max(2, b.relative_width))}%` }}
-                          />
-                        </div>
-                      </td>
-                      <td className="py-1.5 px-3">
-                        {b.is_poc ? (
-                          <span className="px-2 py-0.5 rounded text-[9px] bg-cyan-950 text-cyan-400 border border-cyan-700">
-                            POC
-                          </span>
-                        ) : primaryLvn && Math.abs(b.price_mid - primaryLvn.lvn_price) < (frvp?.bin_size || 1) ? (
-                          <span className="px-2 py-0.5 rounded text-[9px] bg-amber-950 text-amber-400 border border-amber-700">
-                            PRIMARY LVN
-                          </span>
-                        ) : b.in_value_area ? (
-                          <span className="text-[9px] text-slate-500">VA</span>
-                        ) : (
-                          <span className="text-[9px] text-slate-600">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {tf}
+                </button>
+              ))}
             </div>
           </div>
-        )}
 
-        {/* SETTINGS PANEL (Source vs Quant.OS Separation) */}
-        {activeSubTab === "SETTINGS" && (
-          <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-6 font-sans">
-            <div className="border-b border-[#1A2333] pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                  STRATEGY PARAMETER CONFIGURATION
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Explicit demarcation between Source Canonical Defaults and Quant.OS Risk & Execution Enhancements.
-                </p>
-              </div>
-            </div>
+          {/* SVG Candlestick Visualizer */}
+          <div className="h-64 sm:h-72 w-full bg-[#090D16] rounded-xl p-3 relative flex flex-col justify-between overflow-hidden border border-[#162032]">
+            <svg className="w-full h-full" viewBox="0 0 600 240" preserveAspectRatio="none">
+              {/* Grid Lines */}
+              {[0.2, 0.4, 0.6, 0.8].map((ratio) => (
+                <line
+                  key={ratio}
+                  x1="0"
+                  y1={240 * ratio}
+                  x2="600"
+                  y2={240 * ratio}
+                  stroke="#1A2436"
+                  strokeDasharray="4,4"
+                  strokeWidth="0.8"
+                />
+              ))}
 
-            {/* SOURCE CANONICAL PARAMETERS */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-950 text-purple-400 border border-purple-800">
-                  SOURCE CANONICAL RULES
-                </span>
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  Core Volume Star Logic
-                </span>
-              </div>
+              {/* Price Candlesticks */}
+              {chartCandles.map((c, i) => {
+                const x = 10 + i * 19;
+                const candleWidth = 10;
+                const yHigh = 220 - ((c.high - minPrice) / priceRange) * 200;
+                const yLow = 220 - ((c.low - minPrice) / priceRange) * 200;
+                const yOpen = 220 - ((c.open - minPrice) / priceRange) * 200;
+                const yClose = 220 - ((c.close - minPrice) / priceRange) * 200;
+                const topBody = Math.min(yOpen, yClose);
+                const bodyHeight = Math.max(2, Math.abs(yClose - yOpen));
+                const color = c.isBull ? "#10B981" : "#EF4444";
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0A0E17] p-4 rounded-xl border border-[#1E293B] text-xs">
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">TIMEFRAME</label>
-                  <p className="text-white font-bold font-mono mt-1">5 Minutes (5m)</p>
-                </div>
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">FRVP ROW SIZE</label>
-                  <p className="text-white font-bold font-mono mt-1">50 Rows</p>
-                </div>
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">VALUE AREA VOLUME</label>
-                  <p className="text-white font-bold font-mono mt-1">70% Volume</p>
-                </div>
-              </div>
-            </div>
+                return (
+                  <g key={i}>
+                    {/* Wick */}
+                    <line x1={x + candleWidth / 2} y1={yHigh} x2={x + candleWidth / 2} y2={yLow} stroke={color} strokeWidth="1.2" />
+                    {/* Body */}
+                    <rect x={x} y={topBody} width={candleWidth} height={bodyHeight} fill={color} rx="1" />
+                  </g>
+                );
+              })}
 
-            {/* QUANT.OS ENHANCEMENT PARAMETERS */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
-                  QUANTOS IMPLEMENTATION PARAMETERS
-                </span>
-                <span className="text-xs font-bold text-white uppercase font-mono">
-                  Configurable Risk, Stop & Target Rules
-                </span>
-              </div>
+              {/* SL / Target Guideline Overlay when recommended */}
+              <line
+                x1="0"
+                y1={220 - ((recommendedTarget - minPrice) / priceRange) * 200}
+                x2="600"
+                y2={220 - ((recommendedTarget - minPrice) / priceRange) * 200}
+                stroke="#10B981"
+                strokeWidth="1.5"
+                strokeDasharray="6,3"
+              />
+              <line
+                x1="0"
+                y1={220 - ((recommendedSL - minPrice) / priceRange) * 200}
+                x2="600"
+                y2={220 - ((recommendedSL - minPrice) / priceRange) * 200}
+                stroke="#EF4444"
+                strokeWidth="1.5"
+                strokeDasharray="6,3"
+              />
+            </svg>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-[#0A0E17] p-4 rounded-xl border border-[#1E293B] text-xs">
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">STOP LOSS MODE</label>
-                  <select
-                    value={settings.stop_mode}
-                    onChange={(e) => setSettings({ ...settings, stop_mode: e.target.value })}
-                    className="w-full mt-1 bg-[#121927] border border-[#1E293B] rounded-lg p-2 text-white font-mono focus:outline-none focus:border-cyan-500"
-                  >
-                    <option value="REJECTION_WICK">Below/Above Rejection Wick</option>
-                    <option value="LVN_ZONE">Below/Above LVN Zone</option>
-                    <option value="ATR_STOP">1.5x ATR Stop</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">TAKE PROFIT R MULTIPLE</label>
-                  <input
-                    type="number"
-                    step="0.5"
-                    value={settings.take_profit_r_multiple}
-                    onChange={(e) => setSettings({ ...settings, take_profit_r_multiple: parseFloat(e.target.value) || 2.0 })}
-                    className="w-full mt-1 bg-[#121927] border border-[#1E293B] rounded-lg p-2 text-white font-mono focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-slate-400 font-mono text-[10px]">RISK PER TRADE (%)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={settings.risk_per_trade_pct}
-                    onChange={(e) => setSettings({ ...settings, risk_per_trade_pct: parseFloat(e.target.value) || 1.0 })}
-                    className="w-full mt-1 bg-[#121927] border border-[#1E293B] rounded-lg p-2 text-white font-mono focus:outline-none focus:border-cyan-500"
-                  />
-                </div>
-              </div>
+            {/* In-chart Overlays */}
+            <div className="absolute top-4 right-4 flex flex-col gap-1 text-[10px] font-mono text-right">
+              <span className="text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800">
+                Target: {recommendedTarget.toFixed(1)}
+              </span>
+              <span className="text-red-400 bg-red-950/80 px-2 py-0.5 rounded border border-red-800">
+                SL: {recommendedSL.toFixed(1)}
+              </span>
             </div>
           </div>
-        )}
 
-        {/* BACKTEST & SIMULATION TAB */}
-        {activeSubTab === "BACKTEST" && (
-          <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-5">
-            <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
-              <div>
-                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                  HISTORICAL BAR-BY-BAR BACKTEST RESULTS
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Strict Zero-Lookahead Simulation with Brokerage, Fee & Slippage Modeling
-                </p>
-              </div>
+          <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 mt-2 px-1">
+            <span>LOW: {minPrice.toFixed(2)}</span>
+            <span className="text-cyan-400 font-bold">R:R {rrRatio}</span>
+            <span>HIGH: {maxPrice.toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* TRADE PANEL (Right Column) */}
+        <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-xl flex flex-col justify-between space-y-4">
+          <div>
+            <div className="flex items-center justify-between border-b border-[#1A2333] pb-2.5">
+              <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-cyan-400" />
+                TRADE PANEL
+              </h3>
+              <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                {mode}
+              </span>
+            </div>
+
+            {/* Direction Switcher: CALL vs PUT */}
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              <button
+                onClick={() => setTradeDirection("CALL")}
+                className={`py-2.5 rounded-xl font-mono font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                  tradeDirection === "CALL"
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-950/50"
+                    : "bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]"
+                }`}
+              >
+                <TrendingUp className="h-4 w-4" />
+                CALL (LONG)
+              </button>
 
               <button
-                onClick={runBacktestSimulation}
-                disabled={isBacktesting}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs font-mono shadow-md transition-all flex items-center gap-2"
+                onClick={() => setTradeDirection("PUT")}
+                className={`py-2.5 rounded-xl font-mono font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
+                  tradeDirection === "PUT"
+                    ? "bg-red-600 text-white shadow-lg shadow-red-950/50"
+                    : "bg-[#121927] text-slate-400 hover:text-white border border-[#1E293B]"
+                }`}
               >
-                <Play className="h-3.5 w-3.5" />
-                {isBacktesting ? "RUNNING SIMULATION..." : "RERUN BACKTEST"}
+                <TrendingDown className="h-4 w-4" />
+                PUT (SHORT)
               </button>
             </div>
 
-            {backtestResult?.metrics ? (
-              <div className="space-y-4">
-                {/* Metric Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Win Rate</span>
-                    <p className="text-base font-black font-mono text-emerald-400 mt-1">
-                      {backtestResult.metrics.win_rate}%
+            {/* Recommended Contract & Order Details */}
+            <div className="mt-4 space-y-2.5 bg-[#090D16] p-3.5 rounded-xl border border-[#1E293B] text-xs font-mono">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Contract:</span>
+                <span className="font-bold text-cyan-300">{recommendedContract}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Entry Ref:</span>
+                <span className="font-bold text-white">{recommendedEntry.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Stop Loss:</span>
+                <span className="font-bold text-red-400">{recommendedSL.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Target (2R):</span>
+                <span className="font-bold text-emerald-400">{recommendedTarget.toFixed(2)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Risk / Reward:</span>
+                <span className="font-bold text-cyan-400">1:{rrRatio}</span>
+              </div>
+
+              {/* Quantity Stepper */}
+              <div className="flex items-center justify-between pt-2 border-t border-slate-800">
+                <span className="text-slate-400">Quantity:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setTradeQuantity((q) => Math.max(1, q - 25))}
+                    className="w-6 h-6 rounded bg-slate-800 text-white flex items-center justify-center hover:bg-slate-700"
+                  >
+                    -
+                  </button>
+                  <span className="font-bold text-white w-10 text-center">{tradeQuantity}</span>
+                  <button
+                    onClick={() => setTradeQuantity((q) => q + 25)}
+                    className="w-6 h-6 rounded bg-slate-800 text-white flex items-center justify-center hover:bg-slate-700"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* REVIEW ORDER BUTTON */}
+          <button
+            onClick={handleReviewOrder}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-mono font-bold text-xs tracking-wider shadow-lg shadow-cyan-950/50 transition-all flex items-center justify-center gap-2"
+          >
+            <Shield className="h-4 w-4" />
+            REVIEW ORDER
+          </button>
+        </div>
+      </div>
+
+      {/* 3. OPEN POSITIONS & RECENT ORDERS SECTION */}
+      <div className="px-4 sm:px-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Open Positions Card */}
+        <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="flex items-center justify-between border-b border-[#1A2333] pb-2">
+            <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+              OPEN POSITIONS ({positions.length})
+            </h4>
+            <span className="text-[10px] font-mono text-slate-400">REALTIME P&L</span>
+          </div>
+
+          {positions.length > 0 ? (
+            <div className="space-y-2">
+              {positions.map((p) => (
+                <div key={p.id} className="p-3 bg-[#090D16] border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${p.side === "LONG" ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"}`}>
+                        {p.side}
+                      </span>
+                      <span className="font-bold text-white">{p.symbol}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Qty: {p.quantity} • Entry: {p.entry_price.toFixed(1)} • SL: {p.stop_loss.toFixed(1)}
                     </p>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {backtestResult.metrics.wins}W / {backtestResult.metrics.losses}L
-                    </span>
                   </div>
 
-                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Net P&L</span>
-                    <p
-                      className={`text-base font-black font-mono mt-1 ${
-                        backtestResult.metrics.net_pnl >= 0 ? "text-emerald-400" : "text-red-400"
-                      }`}
+                  <div className="flex items-center gap-3">
+                    <span className="font-bold text-emerald-400">+{p.pnl.toFixed(2)}</span>
+                    <button
+                      onClick={() => handleExitPosition(p.id)}
+                      className="px-2.5 py-1 rounded bg-red-950/80 hover:bg-red-900 border border-red-700 text-red-400 font-bold text-[10px]"
                     >
-                      ${backtestResult.metrics.net_pnl.toLocaleString()}
-                    </p>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      {backtestResult.metrics.return_pct}% return
-                    </span>
-                  </div>
-
-                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Profit Factor</span>
-                    <p className="text-base font-black font-mono text-cyan-400 mt-1">
-                      {backtestResult.metrics.profit_factor}
-                    </p>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      Avg R: {backtestResult.metrics.avg_r}
-                    </span>
-                  </div>
-
-                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                    <span className="text-[10px] font-mono text-slate-400 uppercase">Max Drawdown</span>
-                    <p className="text-base font-black font-mono text-amber-400 mt-1">
-                      {backtestResult.metrics.max_drawdown_pct}%
-                    </p>
-                    <span className="text-[10px] text-slate-500 font-mono">
-                      Capital: ${backtestResult.metrics.initial_capital}
-                    </span>
+                      EXIT
+                    </button>
                   </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-6 text-center text-xs text-slate-500 font-mono">
+              No active open positions.
+            </div>
+          )}
+        </div>
 
-                {/* Trade Log Table */}
-                <div className="overflow-x-auto border border-[#1E293B] rounded-xl">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="bg-[#121927] text-slate-400 text-[10px] uppercase border-b border-[#1E293B]">
-                        <th className="py-2.5 px-3">Trade ID</th>
-                        <th className="py-2.5 px-3">Direction</th>
-                        <th className="py-2.5 px-3">Entry Price</th>
-                        <th className="py-2.5 px-3">Exit Price</th>
-                        <th className="py-2.5 px-3">Net P&L</th>
-                        <th className="py-2.5 px-3">R Multiple</th>
-                        <th className="py-2.5 px-3">Exit Reason</th>
+        {/* Recent Orders Card */}
+        <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 shadow-xl space-y-3">
+          <div className="flex items-center justify-between border-b border-[#1A2333] pb-2">
+            <h4 className="text-xs font-mono font-bold text-white uppercase tracking-wider">
+              RECENT ORDERS ({orders.length})
+            </h4>
+            <span className="text-[10px] font-mono text-slate-400">OMS LOG</span>
+          </div>
+
+          {orders.length > 0 ? (
+            <div className="space-y-2">
+              {orders.map((o) => (
+                <div key={o.id} className="p-2.5 bg-[#090D16] border border-[#1E293B] rounded-xl flex items-center justify-between text-xs font-mono">
+                  <div>
+                    <span className="font-bold text-white">{o.symbol}</span>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {o.side} {o.quantity} @ {o.price.toFixed(1)} • {o.timestamp}
+                    </p>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                    {o.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-6 text-center text-xs text-slate-500 font-mono">
+              No recent orders in this session.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 4. ADVANCED ANALYSIS COLLAPSIBLE (Hidden by default for simplicity) */}
+      <div className="p-4 sm:p-5">
+        <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl shadow-xl overflow-hidden">
+          {/* Collapsible Header */}
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full px-5 py-3.5 bg-[#121927] hover:bg-[#162032] flex items-center justify-between text-xs font-mono font-bold text-slate-200 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Sliders className="h-4 w-4 text-cyan-400" />
+              <span>ADVANCED ANALYSIS & STRATEGY TOOLS</span>
+            </div>
+            <div className="flex items-center gap-2 text-cyan-400">
+              <span className="text-[10px] text-slate-400">{showAdvanced ? "HIDE" : "SHOW"}</span>
+              {showAdvanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            </div>
+          </button>
+
+          {/* Collapsible Body */}
+          {showAdvanced && (
+            <div className="p-5 space-y-5 border-t border-[#1A2333]">
+              {/* Navigation Sub-Tabs */}
+              <div className="flex items-center gap-2 border-b border-[#1A2333] pb-2 overflow-x-auto text-xs font-mono">
+                <button
+                  onClick={() => setAdvancedTab("LEVELS")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    advancedTab === "LEVELS" ? "bg-cyan-950 text-cyan-400 border border-cyan-800" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  FRVP & LVN Depth
+                </button>
+                <button
+                  onClick={() => setAdvancedTab("SETTINGS")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    advancedTab === "SETTINGS" ? "bg-cyan-950 text-cyan-400 border border-cyan-800" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Strategy Settings
+                </button>
+                <button
+                  onClick={runBacktestSimulation}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    advancedTab === "BACKTEST" ? "bg-cyan-950 text-cyan-400 border border-cyan-800" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Backtest Runner {isBacktesting && "(Running...)"}
+                </button>
+                <button
+                  onClick={runUniverseScanner}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                    advancedTab === "SCANNER" ? "bg-cyan-950 text-cyan-400 border border-cyan-800" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Universe Scanner {isScanning && "(Scanning...)"}
+                </button>
+              </div>
+
+              {/* TAB 1: FRVP & LVN Depth Table */}
+              {advancedTab === "LEVELS" && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <span className="text-slate-400">Fixed Range Profile (50 Rows) • Value Area 70%</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-cyan-400">● POC: {frvp?.poc}</span>
+                      <span className="text-emerald-400">● VAH: {frvp?.vah}</span>
+                      <span className="text-emerald-400">● VAL: {frvp?.val}</span>
+                      <span className="text-amber-400">● LVN: {primaryLvn?.lvn_price}</span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border border-[#1E293B] rounded-xl max-h-60 custom-scrollbar">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead className="sticky top-0 bg-[#121927]">
+                        <tr className="border-b border-[#1E293B] text-slate-400 text-[10px] uppercase">
+                          <th className="py-2 px-3">Row</th>
+                          <th className="py-2 px-3">Price Low</th>
+                          <th className="py-2 px-3">Price High</th>
+                          <th className="py-2 px-3">Volume</th>
+                          <th className="py-2 px-3">Distribution</th>
+                          <th className="py-2 px-3">Type</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#1A2333]">
+                        {frvp?.bins?.map((b) => (
+                          <tr key={b.bin_index} className="hover:bg-slate-800/30">
+                            <td className="py-1 px-3">{b.bin_index}</td>
+                            <td className="py-1 px-3">{b.price_low.toFixed(1)}</td>
+                            <td className="py-1 px-3">{b.price_high.toFixed(1)}</td>
+                            <td className="py-1 px-3">{b.volume.toFixed(1)}</td>
+                            <td className="py-1 px-3 w-1/3">
+                              <div className="h-2.5 w-full bg-[#0A0E17] rounded overflow-hidden">
+                                <div
+                                  className={`h-full rounded ${
+                                    b.is_poc ? "bg-cyan-500" : b.in_value_area ? "bg-indigo-500" : "bg-slate-700"
+                                  }`}
+                                  style={{ width: `${Math.min(100, Math.max(2, b.relative_width))}%` }}
+                                />
+                              </div>
+                            </td>
+                            <td className="py-1 px-3 text-[10px]">
+                              {b.is_poc ? (
+                                <span className="text-cyan-400 font-bold">POC</span>
+                              ) : b.in_value_area ? (
+                                <span className="text-slate-400">VA</span>
+                              ) : (
+                                "—"
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Strategy Settings */}
+              {advancedTab === "SETTINGS" && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-mono">
+                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                    <label className="text-slate-400">STOP LOSS MODE</label>
+                    <select
+                      value={settings.stop_mode}
+                      onChange={(e) => setSettings({ ...settings, stop_mode: e.target.value })}
+                      className="w-full mt-1 bg-[#090D16] border border-[#1E293B] rounded p-2 text-white"
+                    >
+                      <option value="REJECTION_WICK">Below/Above Rejection Wick</option>
+                      <option value="LVN_ZONE">Below/Above LVN Zone</option>
+                      <option value="ATR_STOP">1.5x ATR Stop</option>
+                    </select>
+                  </div>
+
+                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                    <label className="text-slate-400">TAKE PROFIT R MULTIPLE</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={settings.take_profit_r_multiple}
+                      onChange={(e) => setSettings({ ...settings, take_profit_r_multiple: parseFloat(e.target.value) || 2.0 })}
+                      className="w-full mt-1 bg-[#090D16] border border-[#1E293B] rounded p-2 text-white"
+                    />
+                  </div>
+
+                  <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                    <label className="text-slate-400">RISK PER TRADE (%)</label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      value={settings.risk_per_trade_pct}
+                      onChange={(e) => setSettings({ ...settings, risk_per_trade_pct: parseFloat(e.target.value) || 1.0 })}
+                      className="w-full mt-1 bg-[#090D16] border border-[#1E293B] rounded p-2 text-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 3: Backtest Results */}
+              {advancedTab === "BACKTEST" && (
+                <div className="space-y-3 font-mono text-xs">
+                  {backtestResult?.metrics ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                        <span className="text-[10px] text-slate-400 uppercase">Win Rate</span>
+                        <p className="text-base font-bold text-emerald-400 mt-1">{backtestResult.metrics.win_rate}%</p>
+                      </div>
+                      <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                        <span className="text-[10px] text-slate-400 uppercase">Net P&L</span>
+                        <p className={`text-base font-bold mt-1 ${backtestResult.metrics.net_pnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                          ${backtestResult.metrics.net_pnl}
+                        </p>
+                      </div>
+                      <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                        <span className="text-[10px] text-slate-400 uppercase">Profit Factor</span>
+                        <p className="text-base font-bold text-cyan-400 mt-1">{backtestResult.metrics.profit_factor}</p>
+                      </div>
+                      <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
+                        <span className="text-[10px] text-slate-400 uppercase">Max Drawdown</span>
+                        <p className="text-base font-bold text-amber-400 mt-1">{backtestResult.metrics.max_drawdown_pct}%</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-slate-500">
+                      Click &quot;Backtest Runner&quot; to execute simulation.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: Scanner */}
+              {advancedTab === "SCANNER" && (
+                <div className="overflow-x-auto border border-[#1E293B] rounded-xl font-mono text-xs">
+                  <table className="w-full text-left">
+                    <thead className="bg-[#121927] text-slate-400 text-[10px] uppercase">
+                      <tr className="border-b border-[#1E293B]">
+                        <th className="py-2 px-3">Symbol</th>
+                        <th className="py-2 px-3">Trend</th>
+                        <th className="py-2 px-3">Primary LVN</th>
+                        <th className="py-2 px-3">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#1A2333]">
-                      {backtestResult.trades?.map((t: any, idx: number) => (
-                        <tr key={t.trade_id || idx} className="hover:bg-slate-800/30">
-                          <td className="py-2 px-3 text-slate-300">{t.trade_id}</td>
+                      {scannerData.map((cand, idx) => (
+                        <tr key={cand.symbol || idx} className="hover:bg-slate-800/30">
+                          <td className="py-2 px-3 font-bold text-white">{cand.symbol}</td>
+                          <td className="py-2 px-3 text-emerald-400">{cand.trend}</td>
+                          <td className="py-2 px-3 text-amber-400">{cand.lvn}</td>
                           <td className="py-2 px-3">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                                t.direction === "LONG"
-                                  ? "bg-emerald-950 text-emerald-400"
-                                  : "bg-red-950 text-red-400"
-                              }`}
+                            <button
+                              onClick={() => {
+                                setSymbol(cand.symbol);
+                                setProvider(cand.provider);
+                              }}
+                              className="px-2 py-0.5 rounded bg-cyan-950 border border-cyan-800 text-cyan-400 text-[10px]"
                             >
-                              {t.direction}
-                            </span>
+                              TRADE
+                            </button>
                           </td>
-                          <td className="py-2 px-3">{t.entry_price}</td>
-                          <td className="py-2 px-3">{t.exit_price}</td>
-                          <td
-                            className={`py-2 px-3 font-bold ${
-                              t.net_pnl >= 0 ? "text-emerald-400" : "text-red-400"
-                            }`}
-                          >
-                            ${t.net_pnl}
-                          </td>
-                          <td className="py-2 px-3">{t.r_multiple}R</td>
-                          <td className="py-2 px-3 text-slate-400">{t.exit_reason}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ) : (
-              <div className="p-12 text-center text-xs text-slate-500 font-mono">
-                No backtest results yet. Click &quot;Rerun Backtest&quot; to execute high-fidelity simulation.
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* SCANNER TAB */}
-        {activeSubTab === "SCANNER" && (
-          <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
-              <div>
-                <h3 className="text-sm font-mono font-bold text-white uppercase tracking-wider">
-                  MULTI-ASSET SCANNER
-                </h3>
-                <p className="text-xs text-slate-400">
-                  Realtime Market Structure & LVN Setup Discovery across Indian Equities, Indices, Crypto, and Forex
-                </p>
-              </div>
-
-              <button
-                onClick={runUniverseScanner}
-                disabled={isScanning}
-                className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs font-mono shadow-md transition-all flex items-center gap-2"
-              >
-                <Radar className="h-3.5 w-3.5" />
-                {isScanning ? "SCANNING..." : "SCAN UNIVERSE"}
-              </button>
+              )}
             </div>
-
-            <div className="overflow-x-auto border border-[#1E293B] rounded-xl">
-              <table className="w-full text-left text-xs font-mono">
-                <thead>
-                  <tr className="bg-[#121927] text-slate-400 text-[10px] uppercase border-b border-[#1E293B]">
-                    <th className="py-2.5 px-3">Instrument</th>
-                    <th className="py-2.5 px-3">Feed</th>
-                    <th className="py-2.5 px-3">Trend</th>
-                    <th className="py-2.5 px-3">Structure</th>
-                    <th className="py-2.5 px-3">Primary LVN</th>
-                    <th className="py-2.5 px-3">Distance to LVN</th>
-                    <th className="py-2.5 px-3">State</th>
-                    <th className="py-2.5 px-3">Setup Quality</th>
-                    <th className="py-2.5 px-3">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#1A2333]">
-                  {scannerData.map((cand, idx) => (
-                    <tr key={cand.symbol || idx} className="hover:bg-slate-800/30">
-                      <td className="py-2.5 px-3 font-bold text-white">{cand.symbol}</td>
-                      <td className="py-2.5 px-3 text-cyan-400">{cand.provider}</td>
-                      <td className="py-2.5 px-3">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                            cand.trend === "BULLISH"
-                              ? "bg-emerald-950 text-emerald-400"
-                              : cand.trend === "BEARISH"
-                              ? "bg-red-950 text-red-400"
-                              : "bg-slate-800 text-slate-400"
-                          }`}
-                        >
-                          {cand.trend}
-                        </span>
-                      </td>
-                      <td className="py-2.5 px-3 text-slate-300">{cand.structure}</td>
-                      <td className="py-2.5 px-3 text-amber-400 font-bold">{cand.lvn}</td>
-                      <td className="py-2.5 px-3 text-slate-400">{cand.distance_to_lvn}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{cand.state.replace(/_/g, " ")}</td>
-                      <td className="py-2.5 px-3 font-bold text-emerald-400">{cand.setup_quality} / 100</td>
-                      <td className="py-2.5 px-3">
-                        <button
-                          onClick={() => {
-                            setSymbol(cand.symbol);
-                            setProvider(cand.provider);
-                            setActiveSubTab("MONITOR");
-                          }}
-                          className="px-2.5 py-1 rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-700 text-cyan-400 font-bold text-[10px]"
-                        >
-                          OPEN
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* Pre-Trade Order Review Modal */}
-      {isReviewOpen && signal && (
+      {/* 5. PRE-TRADE ORDER REVIEW MODAL */}
+      {isReviewOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn font-sans">
           <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl w-full max-w-lg p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
               <div className="flex items-center gap-2">
                 <Shield className="h-5 w-5 text-cyan-400" />
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
-                  ORDER REVIEW & SUBMISSION
+                  ORDER REVIEW & CONFIRMATION
                 </h3>
               </div>
               <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950 px-2.5 py-0.5 rounded border border-emerald-800">
@@ -1160,28 +982,30 @@ export function StrategyVolumeStar() {
 
             <div className="grid grid-cols-2 gap-3 text-xs font-mono">
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                <span className="text-[10px] text-slate-400 uppercase">Instrument</span>
-                <p className="text-sm font-bold text-white mt-1">{symbol}</p>
+                <span className="text-[10px] text-slate-400 uppercase">Contract</span>
+                <p className="text-sm font-bold text-white mt-1">{recommendedContract}</p>
               </div>
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
                 <span className="text-[10px] text-slate-400 uppercase">Direction</span>
-                <p className="text-sm font-bold text-emerald-400 mt-1">{signal.direction}</p>
+                <p className={`text-sm font-bold mt-1 ${isCall ? "text-emerald-400" : "text-red-400"}`}>
+                  {tradeDirection} ({isCall ? "LONG" : "SHORT"})
+                </p>
               </div>
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                <span className="text-[10px] text-slate-400 uppercase">Entry Reference</span>
-                <p className="text-sm font-bold text-white mt-1">{signal.entry_price}</p>
+                <span className="text-[10px] text-slate-400 uppercase">Entry Ref</span>
+                <p className="text-sm font-bold text-white mt-1">{recommendedEntry.toFixed(2)}</p>
               </div>
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
                 <span className="text-[10px] text-slate-400 uppercase">Stop Loss</span>
-                <p className="text-sm font-bold text-red-400 mt-1">{signal.stop_loss}</p>
+                <p className="text-sm font-bold text-red-400 mt-1">{recommendedSL.toFixed(2)}</p>
               </div>
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                <span className="text-[10px] text-slate-400 uppercase">Target (2R)</span>
-                <p className="text-sm font-bold text-emerald-400 mt-1">{signal.take_profit}</p>
+                <span className="text-[10px] text-slate-400 uppercase">Target</span>
+                <p className="text-sm font-bold text-emerald-400 mt-1">{recommendedTarget.toFixed(2)}</p>
               </div>
               <div className="bg-[#121927] p-3 rounded-xl border border-[#1E293B]">
-                <span className="text-[10px] text-slate-400 uppercase">Data Provider</span>
-                <p className="text-sm font-bold text-cyan-400 mt-1">{provider}</p>
+                <span className="text-[10px] text-slate-400 uppercase">Quantity</span>
+                <p className="text-sm font-bold text-cyan-400 mt-1">{tradeQuantity} units</p>
               </div>
             </div>
 

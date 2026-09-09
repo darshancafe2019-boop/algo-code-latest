@@ -31,6 +31,7 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 import pandas as pd
+import numpy as np
 
 from flask import Flask, jsonify, render_template, request, Response, send_file, send_from_directory, make_response
 
@@ -4061,12 +4062,13 @@ def api_options_order_intent():
     # 3. LIVE Mode Gate
     if mode == "LIVE":
         # Check Live Trading Readiness
-        from src.security.trade_guard import trade_guard
-        if not trade_guard.is_live_trading_allowed():
+        from src.live_authorization_manager import global_live_auth_manager
+        authorized, reason = global_live_auth_manager.validate_bot_live_authorization(payload.get("bot_id") or "default_bot", mode)
+        if not authorized:
             return jsonify({
                 "status": "error",
                 "error_code": "LIVE_TRADING_LOCKED",
-                "message": "LIVE trading is safely disabled. System is in PAPER / SHADOW mode only.",
+                "message": reason or "LIVE trading is safely disabled. System is in PAPER / SHADOW mode only.",
             }), 403
 
     return jsonify({
@@ -12802,7 +12804,7 @@ def api_auth_password_verify_reset_otp():
         if exp.tzinfo is None:
             exp = exp.replace(tzinfo=timezone.utc)
         if exp < datetime.now(timezone.utc):
-            safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
+            db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
             return jsonify({
                 "status": "error",
                 "error_code": "EXPIRED",
@@ -12814,7 +12816,7 @@ def api_auth_password_verify_reset_otp():
 
     attempts = challenge.get("attempt_count", 0)
     if attempts >= 5:
-        safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
+        db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
         return jsonify({
             "status": "error",
             "error_code": "MAX_ATTEMPTS",

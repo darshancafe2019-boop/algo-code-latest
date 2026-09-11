@@ -225,14 +225,26 @@ class DhanWSAdapter(BaseProviderAdapter):
                 break
             except Exception as exc:
                 self._error_count += 1
-                self._status = "DISCONNECTED"
-                self._retry_count += 1
-                backoff = min(MAX_BACKOFF_SEC, 2.0 ** min(self._retry_count, 5))
-                logger.warning(
-                    "DhanWS connection error: %s (attempt %d). Retrying in %.1fs...",
-                    exc, self._retry_count, backoff,
-                )
-                await asyncio.sleep(backoff)
+                exc_str = str(exc)
+                if "401" in exc_str or "Unauthorized" in exc_str or "403" in exc_str:
+                    self._status = "AUTH_FAILED"
+                    self._auth_error_reason = "DHAN_AUTH_FAILED: Dhan API returned 401 Unauthorized. Feed and trading locked."
+                    try:
+                        from src.dhan_broker_adapter import dhan_broker_adapter
+                        dhan_broker_adapter._auth_failed = True
+                    except Exception:
+                        pass
+                    logger.error("DhanWS: Authentication failed with 401 Unauthorized. Re-authentication required.")
+                    await asyncio.sleep(30.0)
+                else:
+                    self._status = "DISCONNECTED"
+                    self._retry_count += 1
+                    backoff = min(MAX_BACKOFF_SEC, 2.0 ** min(self._retry_count, 5))
+                    logger.warning(
+                        "DhanWS connection error: %s (attempt %d). Retrying in %.1fs...",
+                        exc, self._retry_count, backoff,
+                    )
+                    await asyncio.sleep(backoff)
 
     # ─── Binary Packet Decoding ──────────────────────────────────────────────
 

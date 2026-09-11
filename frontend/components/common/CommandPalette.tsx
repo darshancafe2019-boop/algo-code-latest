@@ -239,37 +239,100 @@ export function CommandPalette({
         },
       },
 
-      // 3. Market Switch
+      // 3. Multi-Broker Instruments & Markets
+      {
+        id: "sym-nifty",
+        category: "MARKET SWITCH",
+        title: "NIFTY 50 (NSE_INDEX)",
+        subtitle: "India Benchmark Index • Data: Dhan/Upstox • Exec: Paper/Dhan",
+        icon: Globe,
+        action: () => {
+          setActiveSymbol("NIFTY 50");
+          onNavigateTab("charts");
+          onClose();
+        },
+      },
+      {
+        id: "sym-banknifty",
+        category: "MARKET SWITCH",
+        title: "BANKNIFTY (NSE_INDEX)",
+        subtitle: "Banking Index • Data: Dhan/Upstox • Exec: Paper/Dhan",
+        icon: Globe,
+        action: () => {
+          setActiveSymbol("BANKNIFTY");
+          onNavigateTab("charts");
+          onClose();
+        },
+      },
+      {
+        id: "sym-reliance",
+        category: "MARKET SWITCH",
+        title: "RELIANCE (NSE_EQ)",
+        subtitle: "Reliance Industries • Data: Dhan/Upstox • Exec: Dhan/Upstox/Paper",
+        icon: Globe,
+        action: () => {
+          setActiveSymbol("RELIANCE");
+          onNavigateTab("charts");
+          onClose();
+        },
+      },
+      {
+        id: "sym-hdfcbank",
+        category: "MARKET SWITCH",
+        title: "HDFCBANK (NSE_EQ)",
+        subtitle: "HDFC Bank Ltd • Data: Dhan/Upstox • Exec: Dhan/Upstox/Paper",
+        icon: Globe,
+        action: () => {
+          setActiveSymbol("HDFCBANK");
+          onNavigateTab("charts");
+          onClose();
+        },
+      },
+      {
+        id: "sym-tcs",
+        category: "MARKET SWITCH",
+        title: "TCS (NSE_EQ)",
+        subtitle: "Tata Consultancy Services • Data: Dhan/Upstox • Exec: Dhan/Upstox/Paper",
+        icon: Globe,
+        action: () => {
+          setActiveSymbol("TCS");
+          onNavigateTab("charts");
+          onClose();
+        },
+      },
       {
         id: "sym-btc",
         category: "MARKET SWITCH",
-        title: "Switch Symbol to BTC/USDT",
-        subtitle: "Load Bitcoin spot market into Chart & Context",
+        title: "BTC/USDT (Crypto Spot & Perp)",
+        subtitle: "Bitcoin • Data: Delta/Binance • Exec: Delta/Paper",
         icon: Zap,
         action: () => {
           setActiveSymbol("BTC/USDT");
+          onNavigateTab("charts");
           onClose();
         },
       },
       {
         id: "sym-eth",
         category: "MARKET SWITCH",
-        title: "Switch Symbol to ETH/USDT",
-        subtitle: "Load Ethereum spot market into Chart & Context",
+        title: "ETH/USDT (Crypto Spot & Perp)",
+        subtitle: "Ethereum • Data: Delta/Binance • Exec: Delta/Paper",
         icon: Zap,
         action: () => {
           setActiveSymbol("ETH/USDT");
+          onNavigateTab("charts");
           onClose();
         },
       },
       {
         id: "sym-sol",
         category: "MARKET SWITCH",
-        title: "Switch Symbol to SOL/USDT",
-        subtitle: "Load Solana spot market into Chart & Context",
+        title: "SOL/USDT (Crypto Spot & Perp)",
+        subtitle: "Solana • Data: Delta/Binance • Exec: Delta/Paper",
         icon: Zap,
         action: () => {
           setActiveSymbol("SOL/USDT");
+          onNavigateTab("charts");
           onClose();
         },
       },

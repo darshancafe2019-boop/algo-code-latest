@@ -60,17 +60,22 @@ def _audit_writer_worker():
                     clean_items.append(clean_it)
 
                 if getattr(config, "IS_POSTGRES", False):
-                    from src.db import get_pg_connection, _pg_pool, translate_sqlite_sql_to_postgres
+                    from src.db import get_db_pool, translate_sqlite_sql_to_postgres
                     pg_sql = translate_sqlite_sql_to_postgres(insert_sql)
-                    conn = get_pg_connection()
-                    try:
-                        with conn.cursor() as cur:
-                            cur.executemany(pg_sql, clean_items)
-                        conn.commit()
-                    finally:
-                        if _pg_pool:
-                            _pg_pool.putconn(conn)
-                        else:
+                    pool = get_db_pool()
+                    if pool is not None:
+                        with pool.connection() as conn:
+                            with conn.transaction():
+                                with conn.cursor() as cur:
+                                    cur.executemany(pg_sql, clean_items)
+                    else:
+                        import psycopg
+                        conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+                        try:
+                            with conn.transaction():
+                                with conn.cursor() as cur:
+                                    cur.executemany(pg_sql, clean_items)
+                        finally:
                             conn.close()
                 else:
                     with get_db_transaction() as conn:

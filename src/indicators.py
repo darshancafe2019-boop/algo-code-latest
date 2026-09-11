@@ -1573,3 +1573,261 @@ def generate_indicators(df: pd.DataFrame, timeframe: Optional[str] = None, use_c
             latest['vah'],
         )
     return df
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# UNIVERSAL CENTRALIZED INDICATOR ENGINE
+# ─────────────────────────────────────────────────────────────────────────────
+
+class UniversalIndicatorEngine:
+    """
+    Centralized quantitative indicator computation engine.
+    Ensures zero disparate recalculations across components with strict data sufficiency rules.
+    """
+
+    SUPPORTED_TIMEFRAMES = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1D", "1W"]
+    REQUIRED_CANDLES = {
+        "rsi": 15,
+        "ema_9": 10,
+        "ema_20": 21,
+        "ema_50": 51,
+        "ema_200": 201,
+        "macd": 35,
+        "atr": 15,
+        "adx": 28,
+        "bollinger": 21,
+        "supertrend": 15,
+        "stochastic": 15,
+        "vwap": 5,
+    }
+
+    @classmethod
+    def compute_suite(
+        cls,
+        symbol: str,
+        timeframe: str,
+        df: pd.DataFrame,
+        data_source: str = "BROKER_PROVIDED",
+    ) -> Dict[str, Any]:
+        """
+        Computes canonical technical indicators from OHLCV dataframe.
+        Returns fully attributed results with required candle checks and factual interpretations.
+        """
+        now_iso = pd.Timestamp.now(tz="UTC").isoformat()
+        candle_count = len(df) if df is not None and not df.empty else 0
+
+        result: Dict[str, Any] = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "timestamp": now_iso,
+            "candle_count": candle_count,
+            "data_source": data_source,
+            "status": "CALCULATED" if candle_count >= 20 else "INSUFFICIENT_DATA",
+            "indicators": {},
+            "interpretations": [],
+        }
+
+        if df is None or df.empty or candle_count < 5:
+            result["status"] = "INSUFFICIENT_DATA"
+            result["message"] = f"Insufficient candle history ({candle_count} candles provided, minimum 5 required)."
+            return result
+
+        # Ensure numeric columns
+        for col in ["open", "high", "low", "close", "volume"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+
+        df = df.dropna(subset=["close"])
+        if len(df) < 5:
+            result["status"] = "INSUFFICIENT_DATA"
+            return result
+
+        current_close = float(df["close"].iloc[-1])
+        interpretations: List[str] = []
+
+        # 1. EMAs
+        for length, key in [(9, "ema_9"), (20, "ema_20"), (50, "ema_50"), (200, "ema_200")]:
+            req = cls.REQUIRED_CANDLES[key]
+            if len(df) >= req:
+                ema_s = df["close"].ewm(span=length, adjust=False).mean()
+                val = round(float(ema_s.iloc[-1]), 2)
+                result["indicators"][key] = {
+                    "value": val,
+                    "status": "CALCULATED",
+                    "required_candles": req,
+                }
+            else:
+                result["indicators"][key] = {
+                    "value": None,
+                    "status": "INSUFFICIENT_DATA",
+                    "required_candles": req,
+                }
+
+        # EMA Trend Interpretation
+        ema20 = (result["indicators"].get("ema_20") or {}).get("value")
+        ema50 = (result["indicators"].get("ema_50") or {}).get("value")
+        ema200 = (result["indicators"].get("ema_200") or {}).get("value")
+        if ema20 is not None and ema50 is not None:
+            if ema20 > ema50:
+                interpretations.append(f"Short-term bullish alignment (EMA20 {ema20} > EMA50 {ema50})")
+            else:
+                interpretations.append(f"Short-term bearish alignment (EMA20 {ema20} < EMA50 {ema50})")
+        if ema200 is not None:
+            if current_close > ema200:
+                interpretations.append(f"Price above 200 EMA ({ema200}) - long term bull bias")
+            else:
+                interpretations.append(f"Price below 200 EMA ({ema200}) - long term bear bias")
+
+        # 2. RSI (14)
+        if len(df) >= cls.REQUIRED_CANDLES["rsi"]:
+            delta = df["close"].diff()
+            gain = (delta.where(delta > 0, 0.0)).rolling(window=14).mean()
+            loss = (-delta.where(delta < 0, 0.0)).rolling(window=14).mean()
+            rs = gain / (loss + 1e-10)
+            rsi_series = 100.0 - (100.0 / (1.0 + rs))
+            rsi_val = round(float(rsi_series.iloc[-1]), 2)
+            result["indicators"]["rsi_14"] = {
+                "value": rsi_val,
+                "status": "CALCULATED",
+                "required_candles": 14,
+            }
+            if rsi_val >= 70:
+                interpretations.append(f"RSI elevated / overbought ({rsi_val})")
+            elif rsi_val <= 30:
+                interpretations.append(f"RSI depressed / oversold ({rsi_val})")
+            else:
+                interpretations.append(f"RSI neutral ({rsi_val})")
+        else:
+            result["indicators"]["rsi_14"] = {
+                "value": None,
+                "status": "INSUFFICIENT_DATA",
+                "required_candles": 15,
+            }
+
+        # 3. MACD (12, 26, 9)
+        if len(df) >= cls.REQUIRED_CANDLES["macd"]:
+            ema12 = df["close"].ewm(span=12, adjust=False).mean()
+            ema26 = df["close"].ewm(span=26, adjust=False).mean()
+            macd_line = ema12 - ema26
+            signal_line = macd_line.ewm(span=9, adjust=False).mean()
+            hist = macd_line - signal_line
+            m_val = round(float(macd_line.iloc[-1]), 4)
+            s_val = round(float(signal_line.iloc[-1]), 4)
+            h_val = round(float(hist.iloc[-1]), 4)
+            result["indicators"]["macd"] = {
+                "macd_line": m_val,
+                "signal_line": s_val,
+                "histogram": h_val,
+                "status": "CALCULATED",
+                "required_candles": 35,
+            }
+            if h_val > 0:
+                interpretations.append(f"MACD histogram positive (+{h_val})")
+            else:
+                interpretations.append(f"MACD histogram negative ({h_val})")
+        else:
+            result["indicators"]["macd"] = {
+                "macd_line": None,
+                "signal_line": None,
+                "histogram": None,
+                "status": "INSUFFICIENT_DATA",
+                "required_candles": 35,
+            }
+
+        # 4. ATR (14)
+        if len(df) >= cls.REQUIRED_CANDLES["atr"]:
+            high_low = df["high"] - df["low"]
+            high_close = (df["high"] - df["close"].shift()).abs()
+            low_close = (df["low"] - df["close"].shift()).abs()
+            tr = pd.concat([high_low, high_close, low_close], axis=1).max(axis=1)
+            atr_val = round(float(tr.rolling(14).mean().iloc[-1]), 2)
+            result["indicators"]["atr_14"] = {
+                "value": atr_val,
+                "status": "CALCULATED",
+                "required_candles": 14,
+            }
+            atr_pct = round((atr_val / current_close) * 100.0, 2)
+            interpretations.append(f"ATR volatility at {atr_val} ({atr_pct}% of price)")
+        else:
+            result["indicators"]["atr_14"] = {
+                "value": None,
+                "status": "INSUFFICIENT_DATA",
+                "required_candles": 15,
+            }
+
+        # 5. ADX (14)
+        if len(df) >= cls.REQUIRED_CANDLES["adx"]:
+            try:
+                adx_df = calculate_adx(df.copy(), length=14)
+                adx_val = round(float(adx_df["adx"].iloc[-1]), 2)
+                result["indicators"]["adx_14"] = {
+                    "value": adx_val,
+                    "status": "CALCULATED",
+                    "required_candles": 28,
+                }
+                if adx_val > 25:
+                    interpretations.append(f"Strong trend strength (ADX {adx_val} > 25)")
+                else:
+                    interpretations.append(f"Weak/range-bound trend (ADX {adx_val} < 25)")
+            except Exception:
+                result["indicators"]["adx_14"] = {"value": None, "status": "INSUFFICIENT_DATA"}
+        else:
+            result["indicators"]["adx_14"] = {"value": None, "status": "INSUFFICIENT_DATA", "required_candles": 28}
+
+        # 6. Bollinger Bands (20, 2.0)
+        if len(df) >= cls.REQUIRED_CANDLES["bollinger"]:
+            sma20 = df["close"].rolling(20).mean()
+            std20 = df["close"].rolling(20).std()
+            upper_bb = round(float((sma20 + 2.0 * std20).iloc[-1]), 2)
+            lower_bb = round(float((sma20 - 2.0 * std20).iloc[-1]), 2)
+            mid_bb = round(float(sma20.iloc[-1]), 2)
+            result["indicators"]["bollinger_bands"] = {
+                "upper": upper_bb,
+                "middle": mid_bb,
+                "lower": lower_bb,
+                "bandwidth_pct": round(((upper_bb - lower_bb) / mid_bb) * 100.0, 2) if mid_bb > 0 else 0.0,
+                "status": "CALCULATED",
+                "required_candles": 20,
+            }
+        else:
+            result["indicators"]["bollinger_bands"] = {"upper": None, "middle": None, "lower": None, "status": "INSUFFICIENT_DATA"}
+
+        # 7. VWAP
+        if "volume" in df.columns and df["volume"].sum() > 0:
+            typical_price = (df["high"] + df["low"] + df["close"]) / 3.0
+            cum_vol = df["volume"].cumsum()
+            cum_tp_vol = (typical_price * df["volume"]).cumsum()
+            vwap_val = round(float((cum_tp_vol / (cum_vol + 1e-10)).iloc[-1]), 2)
+            result["indicators"]["vwap"] = {
+                "value": vwap_val,
+                "status": "CALCULATED",
+                "required_candles": 1,
+            }
+            if current_close > vwap_val:
+                interpretations.append(f"Trading above VWAP ({vwap_val}) - intraday bullish")
+            else:
+                interpretations.append(f"Trading below VWAP ({vwap_val}) - intraday bearish")
+        else:
+            result["indicators"]["vwap"] = {"value": None, "status": "INSUFFICIENT_DATA"}
+
+        # 8. Supertrend
+        try:
+            st_df = calculate_supertrend(df.copy(), period=10, multiplier=3.0)
+            st_val = round(float(st_df["supertrend"].iloc[-1]), 2)
+            st_dir = "BULLISH" if bool(st_df["supertrend_dir"].iloc[-1] > 0) else "BEARISH"
+            result["indicators"]["supertrend"] = {
+                "value": st_val,
+                "direction": st_dir,
+                "status": "CALCULATED",
+                "required_candles": 15,
+            }
+            interpretations.append(f"Supertrend (10, 3) is {st_dir} ({st_val})")
+        except Exception:
+            result["indicators"]["supertrend"] = {"value": None, "direction": None, "status": "INSUFFICIENT_DATA"}
+
+        result["interpretations"] = interpretations
+        return result
+
+
+global_indicator_engine = UniversalIndicatorEngine()
+

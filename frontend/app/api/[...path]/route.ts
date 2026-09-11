@@ -214,52 +214,30 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
     }
   }
 
-  // Generate candidate target URLs to permanently eliminate 404 prefix mismatches
-  const candidateUrls: string[] = [
-    `${BACKEND_URL}/api/${subPath}${url.search}`,
-    `${BACKEND_URL}/${subPath}${url.search}`,
-  ];
-
-  // If subPath ends with a slash or does not, test alternate variant
-  if (subPath.endsWith("/")) {
-    candidateUrls.push(`${BACKEND_URL}/api/${subPath.slice(0, -1)}${url.search}`);
-  } else {
-    candidateUrls.push(`${BACKEND_URL}/api/${subPath}/${url.search}`);
-  }
+  // Canonical upstream target URL (no waterfall probing)
+  const canonicalPath = subPath.startsWith("api/") ? subPath : `api/${subPath}`;
+  const targetUrl = `${BACKEND_URL}/${canonicalPath}${url.search}`;
 
   let finalResponse: Response | null = null;
   let lastError: any = null;
 
-  for (const targetUrl of candidateUrls) {
-    const controller = new AbortController();
-    const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
+  const controller = new AbortController();
+  const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-      const backendRes = await fetch(targetUrl, {
-        method: req.method,
-        headers: forwardHeaders,
-        body: bodyData,
-        signal: controller.signal,
-        cache: "no-store",
-      });
+  try {
+    const backendRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: forwardHeaders,
+      body: bodyData,
+      signal: controller.signal,
+      cache: "no-store",
+    });
 
-      clearTimeout(timeoutTimer);
-
-      // If response is NOT 404, we found the right route
-      if (backendRes.status !== 404) {
-        finalResponse = backendRes;
-        break;
-      }
-
-      // If it returned 404, keep candidate response as fallback if other candidates fail
-      finalResponse = backendRes;
-    } catch (err: any) {
-      clearTimeout(timeoutTimer);
-      lastError = err;
-      if (err.name === "AbortError") {
-        break;
-      }
-    }
+    clearTimeout(timeoutTimer);
+    finalResponse = backendRes;
+  } catch (err: any) {
+    clearTimeout(timeoutTimer);
+    lastError = err;
   }
 
   const latencyMs = Math.round(performance.now() - startTime);

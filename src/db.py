@@ -100,18 +100,65 @@ def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: flo
 
 
 _pg_pool = None
+_pg_pool_lock = threading.Lock()
+
+
+def get_db_pool():
+    """Returns the single central PostgreSQL ConnectionPool."""
+    global _pg_pool
+    if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
+        with _pg_pool_lock:
+            if _pg_pool is None:
+                try:
+                    from psycopg_pool import ConnectionPool
+                    _pg_pool = ConnectionPool(
+                        conninfo=config.DATABASE_URL,
+                        min_size=1,
+                        max_size=10,
+                        timeout=5.0,
+                        open=True,
+                    )
+                    logger.info("Initialized central PostgreSQL ConnectionPool (min=1, max=10)")
+                except Exception as e:
+                    logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
+                    _pg_pool = None
+    return _pg_pool
+
+
+def get_db_pool_stats() -> Dict[str, Any]:
+    """Exposes safe pool statistics without leaking credentials or database URLs."""
+    pool = get_db_pool()
+    if pool is None:
+        return {
+            "configured": False,
+            "engine": "sqlite" if not getattr(config, "IS_POSTGRES", False) else "postgres_no_pool",
+            "status": "IDLE",
+        }
+    try:
+        stats = pool.get_stats() if hasattr(pool, "get_stats") else {}
+        return {
+            "configured": True,
+            "engine": "postgresql",
+            "pool_min": stats.get("pool_min", 1),
+            "pool_max": stats.get("pool_max", 10),
+            "pool_size": stats.get("pool_size", 0),
+            "pool_available": stats.get("pool_available", 0),
+            "requests_waiting": stats.get("requests_waiting", 0),
+            "requests_queued": stats.get("requests_queued", stats.get("requests_waiting", 0)),
+            "connection_errors": stats.get("errors", 0),
+            "usage_ms": stats.get("usage_ms", 0),
+        }
+    except Exception as e:
+        return {"configured": True, "error": str(e)}
+
 
 def get_pg_connection():
-    """Returns a PostgreSQL connection, using a connection pool if available."""
-    global _pg_pool
-    if _pg_pool is None:
-        try:
-            from psycopg_pool import ConnectionPool
-            _pg_pool = ConnectionPool(config.DATABASE_URL, min_size=0, max_size=5, timeout=2.0)
-        except Exception:
-            import psycopg
-            return psycopg.connect(config.DATABASE_URL, connect_timeout=2)
-    return _pg_pool.getconn(timeout=2.0)
+    """Legacy compatibility: returns a PostgreSQL connection from the pool."""
+    pool = get_db_pool()
+    if pool is not None:
+        return pool.getconn(timeout=5.0)
+    import psycopg
+    return psycopg.connect(config.DATABASE_URL, connect_timeout=5)
 
 
 def get_connection() -> sqlite3.Connection:
@@ -155,25 +202,47 @@ def get_db_transaction():
 
 @with_db_retry(max_retries=5)
 def safe_execute(sql: str, params: tuple = ()) -> bool:
-    """Execute a mutating statement (INSERT, UPDATE, DELETE) inside a committed transaction."""
+    """Execute a mutating statement (INSERT, UPDATE, DELETE) inside an explicit committed transaction."""
+    t0 = time.perf_counter()
     pg_ok = False
+    req_id = ""
+    try:
+        from flask import g
+        req_id = getattr(g, "request_id", "")
+    except Exception:
+        pass
+
     if getattr(config, "IS_POSTGRES", False):
-        try:
-            import psycopg
+        pool = get_db_pool()
+        if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            conn = get_pg_connection()
             try:
-                with conn.cursor() as cur:
-                    cur.execute(pg_sql, params)
-                conn.commit()
+                with pool.connection() as conn:
+                    with conn.transaction():
+                        with conn.cursor() as cur:
+                            cur.execute(pg_sql, params)
                 pg_ok = True
-            finally:
-                if _pg_pool:
-                    _pg_pool.putconn(conn)
-                else:
+            except Exception as e:
+                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+                logger.exception(
+                    "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                    type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                )
+        else:
+            try:
+                import psycopg
+                pg_sql = translate_sqlite_sql_to_postgres(sql)
+                conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+                try:
+                    with conn.transaction():
+                        with conn.cursor() as cur:
+                            cur.execute(pg_sql, params)
+                    pg_ok = True
+                finally:
                     conn.close()
-        except Exception as e:
-            logger.debug("safe_execute postgres exception (%s), falling back to SQLite", e)
+            except Exception as e:
+                logger.exception("Direct PostgreSQL execute failed: %s", e)
 
     # Maintain SQLite database in sync
     try:
@@ -183,31 +252,63 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
     except Exception as sqlite_err:
         if not pg_ok:
             raise sqlite_err
+
+    duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+    if duration_ms > 250.0:
+        logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+
     return True
 
 
 @with_db_retry(max_retries=5)
 def safe_query(sql: str, params: tuple = ()) -> list:
-    """Execute a read-only query safely and return dict rows."""
+    """Execute a read-only query safely and return dict rows without leaving open transactions."""
+    t0 = time.perf_counter()
+    req_id = ""
+    try:
+        from flask import g
+        req_id = getattr(g, "request_id", "")
+    except Exception:
+        pass
+
     if getattr(config, "IS_POSTGRES", False):
-        try:
-            import psycopg
-            from psycopg.rows import dict_row
+        pool = get_db_pool()
+        if pool is not None:
             pg_sql = translate_sqlite_sql_to_postgres(sql)
-            conn = get_pg_connection()
             try:
-                with conn.cursor(row_factory=dict_row) as cur:
-                    cur.execute(pg_sql, params)
-                    res = list(cur.fetchall())
-                    if res:
-                        return res
-            finally:
-                if _pg_pool:
-                    _pg_pool.putconn(conn)
-                else:
+                from psycopg.rows import dict_row
+                with pool.connection() as conn:
+                    with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute(pg_sql, params)
+                        res = list(cur.fetchall())
+                    conn.commit()
+                    duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                    if duration_ms > 250.0:
+                        logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+                    return res
+            except Exception as e:
+                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
+                logger.exception(
+                    "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
+                    type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
+                )
+        else:
+            try:
+                import psycopg
+                from psycopg.rows import dict_row
+                pg_sql = translate_sqlite_sql_to_postgres(sql)
+                conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+                try:
+                    with conn.cursor(row_factory=dict_row) as cur:
+                        cur.execute(pg_sql, params)
+                        res = list(cur.fetchall())
+                    conn.commit()
+                    return res
+                finally:
                     conn.close()
-        except Exception as e:
-            logger.debug("safe_query postgres error (%s), falling back to SQLite", e)
+            except Exception as e:
+                logger.exception("Direct PostgreSQL query failed: %s", e)
 
     conn = None
     try:
@@ -215,6 +316,9 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         cursor = conn.cursor()
         cursor.execute(sql, params)
         rows = [dict(r) for r in cursor.fetchall()]
+        duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+        if duration_ms > 250.0:
+            logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
         return rows
     except Exception as e:
         logger.error("safe_query error: %s", e)
@@ -243,91 +347,92 @@ def init_db(force: bool = False) -> None:
         if getattr(config, "IS_POSTGRES", False):
             logger.info("Initializing & verifying authoritative PostgreSQL connection...")
             try:
-                conn = get_pg_connection()
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1;")
-                    critical_tables = [
-                        "users", "user_sessions", "password_reset_tokens", "temp_auth_challenges", "email_otp_challenges", "email_delivery_events",
-                        "trades_log", "positions", "derivative_orders", "bot_instances", "strategies", "security_audit_events"
-                    ]
-                    cur.execute(
-                        "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(%s);",
-                        (critical_tables,)
-                    )
-                    found = {r[0] for r in cur.fetchall()}
-                    missing = set(critical_tables) - found
-                    if missing:
-                        err_msg = f"PostgreSQL database missing critical tables: {missing}. Run scripts/migrate_sqlite_to_postgres.py"
-                        logger.critical("DATABASE_STARTUP_CRITICAL_FAILURE: %s", err_msg)
-                        raise RuntimeError(err_msg)
-                    # Attempt to create or ensure bot_config_versions and bot_drafts in PostgreSQL if permissions permit
-                    try:
-                        cur.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS bot_config_versions (
-                                id SERIAL PRIMARY KEY,
-                                bot_id VARCHAR(128) NOT NULL,
-                                version INTEGER NOT NULL,
-                                config_hash VARCHAR(64) NOT NULL,
-                                config_json TEXT NOT NULL,
-                                created_by VARCHAR(64) DEFAULT 'Trader',
-                                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                change_reason TEXT DEFAULT ''
-                            );
-                            """
-                        )
-                    except Exception as ddl_err:
-                        logger.debug("PostgreSQL bot_config_versions DDL notice: %s", ddl_err)
+                pool = get_db_pool()
+                if pool is not None:
+                    with pool.connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT 1;")
+                            critical_tables = [
+                                "users", "user_sessions", "password_reset_tokens", "temp_auth_challenges", "email_otp_challenges", "email_delivery_events",
+                                "trades_log", "positions", "derivative_orders", "bot_instances", "strategies", "security_audit_events"
+                            ]
+                            cur.execute(
+                                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = ANY(%s);",
+                                (critical_tables,)
+                            )
+                            found = {r[0] for r in cur.fetchall()}
+                            missing = set(critical_tables) - found
+                            if missing:
+                                err_msg = f"PostgreSQL database missing critical tables: {missing}. Run scripts/migrate_sqlite_to_postgres.py"
+                                logger.warning(err_msg)
+                            else:
+                                logger.info("PostgreSQL database verified with all required tables: %s", found)
 
-                    try:
-                        cur.execute(
-                            """
-                            CREATE TABLE IF NOT EXISTS bot_drafts (
-                                id VARCHAR(128) PRIMARY KEY,
-                                name VARCHAR(128) NOT NULL,
-                                draft_json TEXT NOT NULL,
-                                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                                owner_id VARCHAR(64) DEFAULT 'primary_trader'
-                            );
-                            """
-                        )
-                    except Exception as ddl_err:
-                        logger.debug("PostgreSQL bot_drafts DDL notice: %s", ddl_err)
+                            # Attempt to create or ensure bot_config_versions and bot_drafts in PostgreSQL if permissions permit
+                            try:
+                                cur.execute(
+                                    """
+                                    CREATE TABLE IF NOT EXISTS bot_config_versions (
+                                        id SERIAL PRIMARY KEY,
+                                        bot_id VARCHAR(128) NOT NULL,
+                                        version INTEGER NOT NULL,
+                                        config_hash VARCHAR(64) NOT NULL,
+                                        config_json TEXT NOT NULL,
+                                        created_by VARCHAR(64) DEFAULT 'Trader',
+                                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                        change_reason TEXT DEFAULT ''
+                                    );
+                                    """
+                                )
+                            except Exception as ddl_err:
+                                logger.debug("PostgreSQL bot_config_versions DDL notice: %s", ddl_err)
 
-                    # Ensure new columns exist on bot_instances in PostgreSQL
-                    for col_def in [
-                        "slug VARCHAR(128)",
-                        "config_version INTEGER DEFAULT 1",
-                        "data_provider_id VARCHAR(64) DEFAULT 'ccxt_binance'",
-                        "broker_id VARCHAR(64) DEFAULT 'paper_simulator'",
-                        "canonical_instrument_id VARCHAR(128) DEFAULT ''",
-                        "config_hash VARCHAR(64) DEFAULT ''"
-                    ]:
-                        try:
-                            cur.execute(f"ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS {col_def};")
-                        except Exception:
-                            pass
-                    # Ensure critical composite indexes exist in PostgreSQL
-                    pg_indexes = [
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_user_sessions_lookup" ON "user_sessions"("token_hash", "is_revoked", "expires_at");',
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_trades_log_query" ON "trades_log"("execution_mode", "status", "timestamp" DESC);',
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_query" ON "bot_instances"("execution_mode", "status");',
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_config_versions" ON "bot_config_versions"("bot_id", "version" DESC);',
-                        'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_slug" ON "bot_instances"("slug");',
-                    ]
-                    for idx_sql in pg_indexes:
-                        try:
-                            cur.execute(idx_sql)
-                        except Exception:
-                            pass
-                    conn.commit()
-                if _pg_pool:
-                    _pg_pool.putconn(conn)
-                else:
-                    conn.close()
-                logger.info("[OK] PostgreSQL database connection & critical tables verified.")
+                            try:
+                                cur.execute(
+                                    """
+                                    CREATE TABLE IF NOT EXISTS bot_drafts (
+                                        id VARCHAR(128) PRIMARY KEY,
+                                        name VARCHAR(128) NOT NULL,
+                                        draft_json TEXT NOT NULL,
+                                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                                        owner_id VARCHAR(64) DEFAULT 'primary_trader'
+                                    );
+                                    """
+                                )
+                            except Exception as ddl_err:
+                                logger.debug("PostgreSQL bot_drafts DDL notice: %s", ddl_err)
+
+                            # Ensure new columns exist on bot_instances in PostgreSQL
+                            for col_def in [
+                                "slug VARCHAR(128)",
+                                "config_version INTEGER DEFAULT 1",
+                                "data_provider_id VARCHAR(64) DEFAULT 'ccxt_binance'",
+                                "broker_id VARCHAR(64) DEFAULT 'paper_simulator'",
+                                "canonical_instrument_id VARCHAR(128) DEFAULT ''",
+                                "config_hash VARCHAR(64) DEFAULT ''"
+                            ]:
+                                try:
+                                    cur.execute(f"ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS {col_def};")
+                                except Exception:
+                                    pass
+
+                            # Ensure critical composite indexes exist in PostgreSQL
+                            pg_indexes = [
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_user_sessions_lookup" ON "user_sessions"("token_hash", "is_revoked", "expires_at");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_trades_log_query" ON "trades_log"("execution_mode", "status", "timestamp" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_query" ON "bot_instances"("execution_mode", "status");',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_system_health_ts" ON "system_health"("last_updated" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_bot_config_versions" ON "bot_config_versions"("bot_id", "version" DESC);',
+                                'CREATE INDEX IF NOT EXISTS "idx_pg_bot_instances_slug" ON "bot_instances"("slug");',
+                            ]
+                            for idx_sql in pg_indexes:
+                                try:
+                                    cur.execute(idx_sql)
+                                except Exception:
+                                    pass
+                        conn.commit()
+                    logger.info("[OK] PostgreSQL database connection & critical tables verified.")
             except Exception as e:
                 logger.warning("PostgreSQL verification notice: %s", e)
 

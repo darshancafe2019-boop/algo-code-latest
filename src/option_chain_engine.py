@@ -318,3 +318,281 @@ class OptionChainEngine:
             })
 
         return enriched
+
+    @classmethod
+    def calculate_market_intelligence(
+        cls,
+        strikes_data: List[Dict[str, Any]],
+        underlying_price: float,
+        expiry_days: int = 7,
+    ) -> Dict[str, Any]:
+        """
+        Computes comprehensive, trustworthy option market intelligence metrics.
+        All computed metrics are strictly marked with their calculation provenance.
+        """
+        if not strikes_data or underlying_price <= 0:
+            return {
+                "status": "DATA_UNAVAILABLE",
+                "pcr_oi": None,
+                "pcr_volume": None,
+                "max_pain": None,
+                "atm_iv": None,
+                "iv_skew": None,
+                "top_call_oi_strikes": [],
+                "top_put_oi_strikes": [],
+                "top_volume_strikes": [],
+                "expected_move": None,
+            }
+
+        pcr = cls.calculate_pcr(strikes_data)
+        max_pain_val = cls.calculate_max_pain(strikes_data)
+
+        # Sort strikes for ATM search
+        sorted_by_dist = sorted(
+            strikes_data,
+            key=lambda x: abs(float(x.get("strike", 0) or 0) - underlying_price),
+        )
+        atm_row = sorted_by_dist[0] if sorted_by_dist else {}
+        atm_strike = float(atm_row.get("strike", underlying_price) or underlying_price)
+        ce_atm_iv = float((atm_row.get("ce") or {}).get("iv", 0) or 0)
+        pe_atm_iv = float((atm_row.get("pe") or {}).get("iv", 0) or 0)
+        atm_iv = round((ce_atm_iv + pe_atm_iv) / 2.0, 2) if (ce_atm_iv > 0 and pe_atm_iv > 0) else (ce_atm_iv or pe_atm_iv or 18.0)
+
+        # Expected Move methodology: Underlying * ATM_IV% * sqrt(days/365)
+        t_years = max(1, expiry_days) / 365.0
+        expected_move = round(underlying_price * (atm_iv / 100.0) * math.sqrt(t_years), 2)
+        expected_upper = round(underlying_price + expected_move, 2)
+        expected_lower = round(underlying_price - expected_move, 2)
+
+        # Top Call & Put OI Strikes
+        call_oi_sorted = sorted(
+            strikes_data,
+            key=lambda x: float((x.get("ce") or {}).get("open_interest", 0) or 0),
+            reverse=True,
+        )
+        put_oi_sorted = sorted(
+            strikes_data,
+            key=lambda x: float((x.get("pe") or {}).get("open_interest", 0) or 0),
+            reverse=True,
+        )
+        vol_sorted = sorted(
+            strikes_data,
+            key=lambda x: (float((x.get("ce") or {}).get("volume", 0) or 0) + float((x.get("pe") or {}).get("volume", 0) or 0)),
+            reverse=True,
+        )
+
+        top_call_oi = [
+            {"strike": float(s.get("strike", 0)), "oi": float((s.get("ce") or {}).get("open_interest", 0)), "ltp": float((s.get("ce") or {}).get("ltp", 0))}
+            for s in call_oi_sorted[:3]
+        ]
+        top_put_oi = [
+            {"strike": float(s.get("strike", 0)), "oi": float((s.get("pe") or {}).get("open_interest", 0)), "ltp": float((s.get("pe") or {}).get("ltp", 0))}
+            for s in put_oi_sorted[:3]
+        ]
+        top_vol = [
+            {"strike": float(s.get("strike", 0)), "total_volume": float((s.get("ce") or {}).get("volume", 0) or 0) + float((s.get("pe") or {}).get("volume", 0) or 0)}
+            for s in vol_sorted[:3]
+        ]
+
+        # IV Skew: 25-Delta / OTM Put IV minus OTM Call IV
+        otm_puts = [s for s in strikes_data if float(s.get("strike", 0)) < underlying_price]
+        otm_calls = [s for s in strikes_data if float(s.get("strike", 0)) > underlying_price]
+        avg_otm_put_iv = sum(float((s.get("pe") or {}).get("iv", 0) or 0) for s in otm_puts) / max(1, len(otm_puts))
+        avg_otm_call_iv = sum(float((s.get("ce") or {}).get("iv", 0) or 0) for s in otm_calls) / max(1, len(otm_calls))
+        iv_skew = round(avg_otm_put_iv - avg_otm_call_iv, 2)
+
+        return {
+            "status": "CALCULATED",
+            "pcr_oi": pcr["pcr_oi"],
+            "pcr_volume": pcr["pcr_volume"],
+            "total_call_oi": pcr["total_call_oi"],
+            "total_put_oi": pcr["total_put_oi"],
+            "max_pain": {
+                "strike": max_pain_val,
+                "label": "CALCULATED ANALYTIC",
+                "methodology": "Minimum cash payout to option buyers across all strikes",
+            },
+            "atm_strike": atm_strike,
+            "atm_iv": atm_iv,
+            "iv_skew": iv_skew,
+            "skew_bias": "PUT_PREMIUM_ELEVATED" if iv_skew > 1.5 else ("CALL_PREMIUM_ELEVATED" if iv_skew < -1.5 else "BALANCED"),
+            "expected_move": {
+                "move_points": expected_move,
+                "upper_range": expected_upper,
+                "lower_range": expected_lower,
+                "label": "CALCULATED ANALYTIC",
+                "formula": "Underlying * ATM_IV * sqrt(days/365)",
+            },
+            "top_call_oi_strikes": top_call_oi,
+            "top_put_oi_strikes": top_put_oi,
+            "top_volume_strikes": top_vol,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-LEG OPTION STRATEGY ANALYZER
+# ─────────────────────────────────────────────────────────────────────────────
+
+class OptionStrategyAnalyzer:
+    """
+    Analyzes, prices, and risk-profiles 20+ multi-leg option combinations.
+    Strictly separates quantitative analytics from execution.
+    """
+
+    STRATEGY_TEMPLATES = [
+        "LONG_CALL", "LONG_PUT", "COVERED_CALL", "PROTECTIVE_PUT",
+        "BULL_CALL_SPREAD", "BEAR_PUT_SPREAD", "BULL_PUT_SPREAD", "BEAR_CALL_SPREAD",
+        "LONG_STRADDLE", "SHORT_STRADDLE", "LONG_STRANGLE", "SHORT_STRANGLE",
+        "IRON_CONDOR", "IRON_BUTTERFLY", "CALENDAR_SPREAD", "DIAGONAL_SPREAD",
+        "RATIO_SPREAD", "BUTTERFLY", "SYNTHETIC_LONG", "SYNTHETIC_SHORT", "CUSTOM"
+    ]
+
+    @classmethod
+    def analyze_strategy(
+        cls,
+        name: str,
+        underlying: str,
+        spot_price: float,
+        legs: List[Dict[str, Any]],
+        lot_size: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        Analyzes a multi-leg strategy.
+        Each leg is a dict with:
+          - option_type: 'CALL' | 'PUT' | 'SPOT'
+          - strike: float (for options)
+          - expiry: str
+          - side: 'BUY' | 'SELL'
+          - quantity: int
+          - entry_price: float
+          - current_price: float
+          - delta, gamma, theta, vega (optional Greeks)
+        """
+        if not legs or spot_price <= 0:
+            return {
+                "name": name,
+                "underlying": underlying,
+                "status": "DATA_UNAVAILABLE",
+                "legs_count": len(legs),
+            }
+
+        net_entry_cost = 0.0
+        net_current_value = 0.0
+        net_delta = 0.0
+        net_gamma = 0.0
+        net_theta = 0.0
+        net_vega = 0.0
+        estimated_margin = 0.0
+
+        for leg in legs:
+            qty = int(leg.get("quantity", 1) or 1)
+            side = str(leg.get("side", "BUY")).upper()
+            mult = 1 if side == "BUY" else -1
+            ep = float(leg.get("entry_price", 0.0) or 0.0)
+            cp = float(leg.get("current_price", ep) or ep)
+
+            net_entry_cost += mult * ep * qty * lot_size
+            net_current_value += mult * cp * qty * lot_size
+
+            # Aggregate Greeks
+            opt_type = str(leg.get("option_type", "CALL")).upper()
+            greeks = leg.get("greeks") or {}
+            raw_d = float(leg.get("delta") if leg.get("delta") is not None else greeks.get("delta", 0.0) or 0.0)
+            raw_g = float(leg.get("gamma") if leg.get("gamma") is not None else greeks.get("gamma", 0.0) or 0.0)
+            raw_t = float(leg.get("theta") if leg.get("theta") is not None else greeks.get("theta", 0.0) or 0.0)
+            raw_v = float(leg.get("vega") if leg.get("vega") is not None else greeks.get("vega", 0.0) or 0.0)
+
+            # Natural Greek sign
+            if opt_type in ("CALL", "CE"):
+                d = abs(raw_d)
+            elif opt_type in ("PUT", "PE"):
+                d = -abs(raw_d)
+            else:
+                d = raw_d
+
+            g = abs(raw_g)
+            t = -abs(raw_t) if raw_t != 0 else 0.0
+            v = abs(raw_v)
+
+            net_delta += mult * d * qty * lot_size
+            net_gamma += mult * g * qty * lot_size
+            net_theta += mult * t * qty * lot_size
+            net_vega += mult * v * qty * lot_size
+
+            # Estimated Margin requirement (Indian/Crypto derivative approximation)
+            opt_type = str(leg.get("option_type", "CALL")).upper()
+            if side == "SELL" and opt_type in ("CALL", "PUT"):
+                # Short option margin approx 15% of contract value + premium
+                strike = float(leg.get("strike", spot_price) or spot_price)
+                estimated_margin += (0.15 * strike + cp) * qty * lot_size
+            elif side == "BUY":
+                # Long option margin is premium paid
+                estimated_margin += cp * qty * lot_size
+
+        current_pnl = round(net_current_value - net_entry_cost, 2)
+
+        # Break-even and Max Profit/Loss calculations based on strategy structure
+        strikes = sorted([float(l.get("strike", 0)) for l in legs if l.get("strike")])
+        min_k = strikes[0] if strikes else spot_price
+        max_k = strikes[-1] if strikes else spot_price
+
+        max_profit = "UNDEFINED / UNLIMITED"
+        max_loss = "UNDEFINED / UNLIMITED"
+        break_evens = []
+
+        upper_name = name.upper()
+        if "BULL_CALL_SPREAD" in upper_name and len(strikes) >= 2:
+            spread_width = max_k - min_k
+            net_debit = abs(net_entry_cost) / max(1, lot_size)
+            max_profit = round((spread_width - net_debit) * lot_size, 2)
+            max_loss = round(-net_debit * lot_size, 2)
+            break_evens = [round(min_k + net_debit, 2)]
+        elif "BEAR_PUT_SPREAD" in upper_name and len(strikes) >= 2:
+            spread_width = max_k - min_k
+            net_debit = abs(net_entry_cost) / max(1, lot_size)
+            max_profit = round((spread_width - net_debit) * lot_size, 2)
+            max_loss = round(-net_debit * lot_size, 2)
+            break_evens = [round(max_k - net_debit, 2)]
+        elif "IRON_CONDOR" in upper_name and len(strikes) >= 4:
+            net_credit = abs(net_entry_cost) / max(1, lot_size)
+            wing_width = strikes[1] - strikes[0]
+            max_profit = round(net_credit * lot_size, 2)
+            max_loss = round(-(wing_width - net_credit) * lot_size, 2)
+            break_evens = [round(strikes[1] - net_credit, 2), round(strikes[2] + net_credit, 2)]
+        elif "LONG_STRADDLE" in upper_name and strikes:
+            net_debit = abs(net_entry_cost) / max(1, lot_size)
+            max_loss = round(-net_debit * lot_size, 2)
+            break_evens = [round(strikes[0] - net_debit, 2), round(strikes[0] + net_debit, 2)]
+        elif "SHORT_STRADDLE" in upper_name and strikes:
+            net_credit = abs(net_entry_cost) / max(1, lot_size)
+            max_profit = round(net_credit * lot_size, 2)
+            break_evens = [round(strikes[0] - net_credit, 2), round(strikes[0] + net_credit, 2)]
+
+        return {
+            "name": name,
+            "underlying": underlying,
+            "spot_price": spot_price,
+            "legs_count": len(legs),
+            "legs": legs,
+            "net_premium": round(net_entry_cost, 2),
+            "current_value": round(net_current_value, 2),
+            "pnl": current_pnl,
+            "max_profit": max_profit,
+            "max_loss": max_loss,
+            "break_evens": break_evens,
+            "greeks": {
+                "net_delta": round(net_delta, 4),
+                "net_gamma": round(net_gamma, 6),
+                "net_theta": round(net_theta, 2),
+                "net_vega": round(net_vega, 2),
+            },
+            "estimated_margin": round(estimated_margin, 2),
+            "status": "ACTIVE",
+            "risk_classification": "DEFINED_RISK" if max_loss != "UNDEFINED / UNLIMITED" else "UNDEFINED_RISK",
+            "disclaimer": "Analytics only. Past and theoretical calculations are not guaranteed profit indications.",
+        }
+
+
+global_option_chain_engine = OptionChainEngine()
+global_strategy_analyzer = OptionStrategyAnalyzer()
+

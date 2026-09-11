@@ -76,8 +76,8 @@ class SubscriptionRegistry:
         """Register a subscription for a symbol with a given reason and mode."""
         sym = symbol.upper()
         if reason not in VALID_REASONS:
-            logger.warning("Unknown subscription reason '%s' for %s — default to WATCHLIST", reason, sym)
-            reason = "WATCHLIST"
+            logger.warning("Unknown subscription reason '%s' for %s - rejected", reason, sym)
+            return
 
         clean_mode = mode.lower() if mode.lower() in MODE_PRIORITY else "full"
 
@@ -94,12 +94,18 @@ class SubscriptionRegistry:
                 self._active_modes[sym] = new_mode
                 logger.info("New subscription: %s (mode=%s, reason=%s, source=%s)", sym, new_mode, reason, source)
                 if self._add_callback:
-                    self._add_callback(sym, new_mode)
+                    try:
+                        self._add_callback(sym, new_mode)
+                    except TypeError:
+                        self._add_callback(sym)
             elif old_mode != new_mode:
                 self._active_modes[sym] = new_mode
                 logger.info("Mode upgraded/downgraded for %s: %s -> %s", sym, old_mode, new_mode)
                 if self._mode_change_callback:
-                    self._mode_change_callback(sym, new_mode)
+                    try:
+                        self._mode_change_callback(sym, new_mode)
+                    except TypeError:
+                        self._mode_change_callback(sym)
             else:
                 logger.debug("Added reason %s for existing subscription %s (mode=%s)", reason, sym, new_mode)
 

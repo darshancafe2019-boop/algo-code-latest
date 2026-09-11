@@ -69,6 +69,10 @@ class LiveMarketDataService:
         Probes all registered provider adapters and constructs the authoritative
         Provider Capability & Entitlements Matrix.
         """
+        now_ts = time.time()
+        if hasattr(self, "_providers_cache") and self._providers_cache and (now_ts - self._providers_cache[0] < 3.0):
+            return list(self._providers_cache[1])
+
         now_dt = datetime.now(timezone.utc)
         now_iso = now_dt.isoformat()
 
@@ -328,7 +332,7 @@ class LiveMarketDataService:
                 "category": "DERIVATIVES",
             },
         ]
-
+        self._providers_cache = (now_ts, list(matrix))
         return matrix
 
     # =========================================================================

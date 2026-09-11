@@ -32,6 +32,7 @@ import {
   Scale,
   ShieldCheck,
   Radio,
+  FileText,
 } from "lucide-react";
 
 interface LeftNavigationSidebarProps {
@@ -101,6 +102,7 @@ export function LeftNavigationSidebar({
       items: [
         { id: "dashboard", label: "DASHBOARD", subtitle: "Executive Summary", path: "/", icon: LayoutDashboard },
         { id: "live", label: "LIVE FEED", subtitle: "Dhan HQ Real-Time", path: "/live", icon: Radio, badge: "DHAN" },
+        { id: "reports", label: "REPORTS & INTEL", subtitle: "Global Intelligence", path: "/reports", icon: FileText, badge: "LIVE" },
         { id: "markets", label: "MARKETS", subtitle: "Spot & Indices Discovery", path: "/markets", icon: LineChart },
         {
           id: "options",

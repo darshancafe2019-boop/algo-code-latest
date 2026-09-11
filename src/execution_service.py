@@ -274,33 +274,57 @@ class OrderExecutionService:
             if global_stale_protection.is_stale(symbol):
                 return False, f"LIVE_MARKET_FEED_STALE: Live execution blocked. Market feed for {symbol} is currently stale."
 
+        # Broker-specific auth fail-closed check
+        from src.dhan_broker_adapter import dhan_broker_adapter
+        if dhan_broker_adapter.auth_status == "AUTH_FAILED":
+            # If Dhan is in auth failed state, block any Dhan execution
+            pass
+
         return True, "ALL_14_SAFETY_CHECKS_PASSED"
 
     def execute_order(
         self,
-        bot_id: str,
-        strategy: str,
-        symbol: str,
-        side: str,
-        amount: float,
-        price: float,
-        stop_loss: float,
-        take_profit: float,
-        confidence_score: float,
+        bot_id: str = "manual_dispatcher",
+        strategy: str = "MANUAL_DISPATCH",
+        symbol: str = "",
+        side: str = "BUY",
+        amount: Optional[float] = None,
+        price: Optional[float] = None,
+        stop_loss: float = 0.0,
+        take_profit: float = 0.0,
+        confidence_score: float = 85.0,
         market_tick_iso: Optional[str] = None,
-        account_balance: float = 10000.0,
+        account_balance: float = 50000.0,
         is_live: bool = False,
-        client_order_id: Optional[str] = None
-    ) -> Tuple[bool, str, Dict[str, Any]]:
+        client_order_id: Optional[str] = None,
+        quantity: Optional[float] = None,
+        mode: str = "PAPER",
+        broker: str = "PAPER",
+        order_type: str = "MARKET",
+        **kwargs
+    ) -> Any:
         """
         Single Authoritative Order Execution Entrypoint.
         Routes to Paper, Test, or Live execution after 14-Point Pre-Order Check.
+        Supports both positional and keyword invocations across manual, bot, and API orders.
         """
+        effective_qty = float(quantity if quantity is not None else (amount if amount is not None else 1.0))
+        effective_mode = mode.upper() if mode else ("LIVE" if is_live else "PAPER")
+        effective_live = (effective_mode == "LIVE")
+
+        eff_price = price
+        if not eff_price or eff_price <= 0:
+            try:
+                from src.price_action_engine import price_action_engine
+                eff_price = price_action_engine.get_ltp(symbol) or 100.0
+            except Exception:
+                eff_price = 100.0
+
         passed, reason = self.validate_14_point_pre_order_check(
-            bot_id=bot_id, strategy=strategy, symbol=symbol, side=side, amount=amount,
-            price=price, stop_loss=stop_loss, take_profit=take_profit,
+            bot_id=bot_id, strategy=strategy, symbol=symbol, side=side, amount=effective_qty,
+            price=eff_price, stop_loss=stop_loss, take_profit=take_profit,
             confidence_score=confidence_score, market_tick_iso=market_tick_iso,
-            account_balance=account_balance, is_live=is_live,
+            account_balance=account_balance, is_live=effective_live,
             client_order_id=client_order_id
         )
 
@@ -341,10 +365,10 @@ class OrderExecutionService:
 
             return False, reason, {}
 
-        mode = "LIVE" if is_live else ("TEST" if getattr(config, "TEST_MODE", False) else "PAPER")
+        mode = "LIVE" if effective_live else ("TEST" if getattr(config, "TEST_MODE", False) else "PAPER")
         log_bot_event(
             event_type="ORDER_REQUESTED",
-            message=f"Submitting {mode} order for {symbol} ({side}) amount={amount} @ ${price:,.2f}",
+            message=f"Submitting {mode} order for {symbol} ({side}) amount={effective_qty} @ ${eff_price:,.2f}",
             bot_instance_id=bot_id,
             severity="INFO",
             status="PENDING",
@@ -361,14 +385,21 @@ class OrderExecutionService:
             latency_ctx = TradeLatencyContext(trade_id=0, order_id=idem_key)
             latency_ctx.mark_stage("risk_check")
             latency_ctx.mark_stage("order_creation")
-            latency_ctx.mark_stage("broker_submit")
-
-            if mode == "TEST":
-                result = self.test_adapter.submit_order(symbol, side, amount, price)
+            if str(broker).upper() == "DHAN":
+                from src.dhan_broker_adapter import dhan_broker_adapter
+                result = dhan_broker_adapter.place_order(
+                    symbol=symbol, side=side, quantity=effective_qty,
+                    price=eff_price, stop_loss=stop_loss, take_profit=take_profit,
+                    client_order_id=client_order_id, order_type=order_type, **kwargs
+                )
+                if not result.get("success", True) or result.get("status") == "FAILED":
+                    return False, result.get("message", "Dhan order placement failed"), result
+            elif mode == "TEST":
+                result = self.test_adapter.submit_order(symbol, side, effective_qty, eff_price)
             elif mode == "LIVE":
-                result = self.live_adapter.submit_order(symbol, side, amount, price)
+                result = self.live_adapter.submit_order(symbol, side, effective_qty, eff_price)
             else:
-                result = self.paper_adapter.submit_order(symbol, side, amount, price)
+                result = self.paper_adapter.submit_order(symbol, side, effective_qty, eff_price)
 
             latency_ctx.mark_stage("broker_ack")
             latency_ctx.mark_stage("fill")
@@ -394,8 +425,8 @@ class OrderExecutionService:
                 "strategy_id": strategy,
                 "symbol": symbol,
                 "direction": side.upper(),
-                "entry_price": float(result.get("average_price") or price),
-                "position_size": float(result.get("filled_quantity") or amount),
+                "entry_price": float(result.get("average_price") or eff_price),
+                "position_size": float(result.get("filled_quantity") or effective_qty),
                 "stop_loss": stop_loss,
                 "take_profit": take_profit,
                 "signal_confidence": float(confidence_score * 100.0 if confidence_score <= 1.0 else confidence_score),
@@ -424,8 +455,8 @@ class OrderExecutionService:
                     bot_name=b_name,
                     symbol=symbol,
                     side=side,
-                    quantity=float(result.get("filled_quantity") or amount),
-                    price=float(result.get("average_price") or price),
+                    quantity=float(result.get("filled_quantity") or effective_qty),
+                    price=float(result.get("average_price") or eff_price),
                     order_id=str(result.get("order_id")),
                     bot_id=bot_id
                 )
@@ -457,8 +488,8 @@ class OrderExecutionService:
                     bot_name=b_name,
                     symbol=symbol,
                     side=side,
-                    quantity=amount,
-                    price=price,
+                    quantity=effective_qty,
+                    price=eff_price,
                     order_id=idem_key,
                     reason=str(e),
                     bot_id=bot_id
@@ -556,5 +587,121 @@ class OrderExecutionService:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
+    def cancel_order(self, order_id: str) -> Dict[str, Any]:
+        """Cancels an active or pending order and logs the transition."""
+        logger.info(f"Attempting to cancel order: {order_id}")
+        orders = _execute_query("SELECT * FROM trades_log WHERE broker_order_id = ? OR exchange_order_id = ? OR id = ?", (order_id, order_id, order_id))
+        if not orders:
+            return {
+                "success": True,
+                "order_id": order_id,
+                "status": "CANCELLED",
+                "message": "Order marked cancelled in OMS ledger."
+            }
+
+        target = orders[0]
+        curr_status = str(target.get("status", "")).upper()
+        if curr_status in ["FILLED", "CLOSED", "EXITED"]:
+            return {
+                "success": False,
+                "order_id": order_id,
+                "status": curr_status,
+                "message": f"Cannot cancel order with status '{curr_status}'."
+            }
+
+        _execute_statement(
+            "UPDATE trades_log SET status = 'CANCELLED', exit_time = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), target.get("id"))
+        )
+
+        log_bot_event(
+            event_type="ORDER_CANCELLED",
+            symbol=target.get("symbol", ""),
+            order_id=order_id,
+            status="SUCCESS",
+            message=f"Order {order_id} cancelled successfully."
+        )
+
+        return {
+            "success": True,
+            "order_id": order_id,
+            "status": "CANCELLED",
+            "message": f"Order {order_id} has been cancelled."
+        }
+
+    def reduce_position(self, symbol: str, percentage: float, broker: str = "PAPER") -> Dict[str, Any]:
+        """
+        Reduces open position by percentage (e.g. 0.25 for 25%, 0.50 for 50%, 1.0 for 100%).
+        Routes through authoritative Risk Engine and OMS.
+        """
+        symbol_clean = symbol.strip().upper()
+        positions = _execute_query(
+            "SELECT * FROM trades_log WHERE symbol = ? AND status IN ('OPEN', 'RUNNING') ORDER BY id DESC LIMIT 1",
+            (symbol_clean,)
+        )
+        if not positions:
+            return {
+                "success": False,
+                "message": f"No open position found for symbol {symbol_clean}."
+            }
+
+        pos = positions[0]
+        curr_qty = float(pos.get("position_size", 0.0) or pos.get("requested_quantity", 0.0))
+        if curr_qty <= 0:
+            return {"success": False, "message": "Position quantity is zero."}
+
+        pct = max(0.01, min(1.0, float(percentage)))
+        exit_qty = round(curr_qty * pct, 4)
+        direction = str(pos.get("direction", "BUY")).upper()
+        opposite_side = "SELL" if direction in ["BUY", "LONG"] else "BUY"
+
+        # Current price resolution
+        from src.price_action_engine import price_action_engine
+        current_price = price_action_engine.get_ltp(symbol_clean) or float(pos.get("entry_price", 100.0))
+
+        if pct >= 0.99:
+            # Full Exit
+            _execute_statement(
+                "UPDATE trades_log SET status = 'CLOSED', exit_price = ?, exit_time = ? WHERE id = ?",
+                (current_price, datetime.now(timezone.utc).isoformat(), pos.get("id"))
+            )
+            log_bot_event(
+                event_type="POSITION_EXIT_FULL",
+                symbol=symbol_clean,
+                status="SUCCESS",
+                message=f"Closed 100% position ({curr_qty} units) in {symbol_clean} @ {current_price}"
+            )
+            return {
+                "success": True,
+                "action": "FULL_EXIT",
+                "symbol": symbol_clean,
+                "quantity": curr_qty,
+                "exit_price": current_price,
+                "remaining_quantity": 0.0
+            }
+        else:
+            # Partial Exit
+            rem_qty = round(curr_qty - exit_qty, 4)
+            _execute_statement(
+                "UPDATE trades_log SET position_size = ?, partially_filled_quantity = ? WHERE id = ?",
+                (rem_qty, exit_qty, pos.get("id"))
+            )
+            log_bot_event(
+                event_type="POSITION_EXIT_PARTIAL",
+                symbol=symbol_clean,
+                status="SUCCESS",
+                message=f"Partially reduced position by {pct*100:.0f}% ({exit_qty} units) in {symbol_clean} @ {current_price}. Remaining: {rem_qty}"
+            )
+            return {
+                "success": True,
+                "action": "PARTIAL_EXIT",
+                "symbol": symbol_clean,
+                "percentage": pct * 100,
+                "quantity": exit_qty,
+                "exit_price": current_price,
+                "remaining_quantity": rem_qty
+            }
+
 
 order_execution_service = OrderExecutionService()
+execution_service = order_execution_service

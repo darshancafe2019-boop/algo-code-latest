@@ -58,7 +58,7 @@ def place_order():
 
     # 3. Execution Routing
     mode = str(validated.get("mode", "PAPER")).upper()
-    order_result = execution_service.execute_order(
+    exec_res = execution_service.execute_order(
         symbol=validated["symbol"],
         side=validated["side"],
         quantity=float(validated["quantity"]),
@@ -66,13 +66,22 @@ def place_order():
         price=validated.get("price"),
         mode=mode,
         broker=validated.get("broker", "DELTA"),
-        strategy=validated.get("strategy", "MANUAL_DISPATCH")
+        strategy=validated.get("strategy", "MANUAL_DISPATCH"),
+        client_order_id=idempotency_key
     )
+
+    if isinstance(exec_res, tuple):
+        success, message, order_dict = exec_res
+        order_result = order_dict if isinstance(order_dict, dict) else {"success": success, "message": message}
+        order_result["success"] = success
+        order_result["message"] = message
+    else:
+        order_result = exec_res or {}
 
     now_iso = datetime.now(timezone.utc).isoformat()
     response_payload = {
-        "success": True,
-        "status": "SUBMITTED",
+        "success": bool(order_result.get("success", True)),
+        "status": order_result.get("status", "SUBMITTED"),
         "orderId": order_result.get("order_id", f"ord_{uuid.uuid4().hex[:10]}"),
         "order": order_result,
         "riskDecision": risk_decision,
@@ -95,3 +104,32 @@ def cancel_order(order_id: str):
         "result": res,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
+
+
+@orders_bp.route("/api/positions/<path:symbol>/reduce", methods=["POST"])
+def reduce_position(symbol: str):
+    """Partially reduces open position (e.g. 25%, 50%)."""
+    data = request.get_json() or {}
+    percentage = float(data.get("percentage", 0.50))
+    broker = str(data.get("broker", "PAPER")).upper()
+    res = execution_service.reduce_position(symbol=symbol, percentage=percentage, broker=broker)
+    status_code = 200 if res.get("success", False) else 400
+    return jsonify({
+        "success": res.get("success", False),
+        "result": res,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), status_code
+
+
+@orders_bp.route("/api/positions/<path:symbol>/exit", methods=["POST"])
+def exit_position(symbol: str):
+    """Completely exits an open position (100%)."""
+    data = request.get_json() or {}
+    broker = str(data.get("broker", "PAPER")).upper()
+    res = execution_service.reduce_position(symbol=symbol, percentage=1.0, broker=broker)
+    status_code = 200 if res.get("success", False) else 400
+    return jsonify({
+        "success": res.get("success", False),
+        "result": res,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), status_code

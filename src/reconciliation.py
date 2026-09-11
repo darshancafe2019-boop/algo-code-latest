@@ -104,6 +104,27 @@ class PositionReconciler:
         except Exception as e:
             adapter_status["delta"] = f"DEGRADED: {e}"
 
+        # 4. Dhan HQ
+        try:
+            from src.dhan_broker_adapter import dhan_broker_adapter
+            if dhan_broker_adapter.is_authenticated:
+                dhan_pos = dhan_broker_adapter.get_positions()
+                for p in dhan_pos:
+                    qty = float(p.get("netQty") or p.get("quantity") or 0.0)
+                    if abs(qty) > 0:
+                        active_pos.append({
+                            "venue": "DHAN",
+                            "symbol": p.get("tradingSymbol") or p.get("symbol") or str(p.get("securityId")),
+                            "side": "BUY" if qty > 0 else "SELL",
+                            "amount": abs(qty),
+                            "entry_price": float(p.get("buyAvg") or p.get("costPrice") or 0.0)
+                        })
+                adapter_status["dhan"] = "HEALTHY"
+            else:
+                adapter_status["dhan"] = "NOT_AUTHENTICATED"
+        except Exception as e:
+            adapter_status["dhan"] = f"DEGRADED: {e}"
+
         return active_pos, adapter_status
 
     def reconcile_on_startup(self) -> Tuple[bool, str, List[Dict[str, Any]]]:

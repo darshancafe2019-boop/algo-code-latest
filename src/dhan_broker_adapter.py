@@ -89,6 +89,8 @@ class DhanBrokerAdapter(BrokerAdapter):
         self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
         self._load_credentials_from_vault()
 
+        self._auth_failed = False
+
         self._capability = BrokerCapability(
             broker_id=self.broker_id,
             broker_name=self.broker_name,
@@ -111,7 +113,7 @@ class DhanBrokerAdapter(BrokerAdapter):
             required_subscriptions=[],
             last_heartbeat_utc=datetime.now(timezone.utc).isoformat(),
             last_quote_utc=datetime.now(timezone.utc).isoformat(),
-            status=ProviderStatus.LIVE if self.is_authenticated else ProviderStatus.PAPER_ONLY,
+            status=ProviderStatus.LIVE if (self.is_authenticated and not self._auth_failed) else ProviderStatus.PAPER_ONLY,
         )
 
     def _load_credentials_from_vault(self) -> None:
@@ -134,7 +136,13 @@ class DhanBrokerAdapter(BrokerAdapter):
 
     @property
     def is_authenticated(self) -> bool:
-        return bool(self.access_token)
+        return bool(self.access_token) and not getattr(self, "_auth_failed", False)
+
+    @property
+    def auth_status(self) -> str:
+        if getattr(self, "_auth_failed", False):
+            return "AUTH_FAILED"
+        return "AUTHENTICATED" if bool(self.access_token) else "NOT_CONFIGURED"
 
     def get_capability(self) -> BrokerCapability:
         self._capability.last_heartbeat_utc = datetime.now(timezone.utc).isoformat()
@@ -150,8 +158,10 @@ class DhanBrokerAdapter(BrokerAdapter):
         """
         Makes an authenticated HTTP request to Dhan HQ API v2 / Sandbox.
         """
-        if not self.is_authenticated:
+        if not self.access_token:
             return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan access token not configured."}
+        if getattr(self, "_auth_failed", False):
+            return {"status": "error", "error": "AUTH_FAILED", "message": "Dhan authentication failed previously. Live execution locked."}
 
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {
@@ -176,10 +186,22 @@ class DhanBrokerAdapter(BrokerAdapter):
         except urllib.error.HTTPError as he:
             err_body = he.read().decode("utf-8") if he.fp else ""
             logger.error(f"Dhan API HTTP error {he.code} for {url}: {err_body}")
+            if he.code in [401, 403]:
+                self._auth_failed = True
+                log_bot_event(
+                    event_type="DHAN_AUTH_FAILED",
+                    status="FAILED",
+                    severity="CRITICAL",
+                    message=f"Dhan API returned HTTP {he.code} Unauthorized. Broker state locked to AUTH_FAILED."
+                )
             try:
-                return json.loads(err_body)
+                err_json = json.loads(err_body)
+                err_json["http_code"] = he.code
+                if he.code in [401, 403]:
+                    err_json["broker_status"] = "AUTH_FAILED"
+                return err_json
             except Exception:
-                return {"status": "error", "http_code": he.code, "message": str(he)}
+                return {"status": "error", "http_code": he.code, "message": str(he), "broker_status": "AUTH_FAILED" if he.code in [401, 403] else "ERROR"}
         except Exception as exc:
             logger.error(f"Dhan API request failed: {exc}")
             return {"status": "error", "message": str(exc)}
@@ -423,6 +445,55 @@ class DhanBrokerAdapter(BrokerAdapter):
         )
         return res
 
+    def reauthenticate(
+        self,
+        client_id: str,
+        access_token: str,
+        base_url: Optional[str] = None,
+        is_sandbox: Optional[bool] = None,
+    ) -> Dict[str, Any]:
+        """
+        Re-authenticates Dhan credentials, tests connectivity with Dhan HQ,
+        and clears AUTH_FAILED lock on success.
+        """
+        self.client_id = (client_id or "").strip()
+        self.access_token = (access_token or "").strip()
+        self._auth_failed = False
+
+        if is_sandbox is not None:
+            os.environ["DHAN_SANDBOX"] = "true" if is_sandbox else "false"
+            setattr(config, "DHAN_SANDBOX", bool(is_sandbox))
+        if base_url:
+            os.environ["DHAN_BASE_URL"] = base_url.strip()
+            setattr(config, "DHAN_BASE_URL", base_url.strip())
+
+        # Test credentials against profile endpoint
+        test_res = self._make_request("GET", "profile")
+        if test_res.get("status") == "error" or test_res.get("broker_status") == "AUTH_FAILED" or test_res.get("http_code") in (401, 403):
+            self._auth_failed = True
+            return {
+                "success": False,
+                "status": "AUTH_FAILED",
+                "message": test_res.get("message", "Dhan authentication failed with HTTP 401 Unauthorized."),
+                "error": "AUTH_FAILED"
+            }
+
+        # Store in vault
+        self.store_credentials_in_vault(self.client_id, self.access_token, base_url, is_sandbox)
+        self._auth_failed = False
+        log_bot_event(
+            event_type="DHAN_REAUTHENTICATED",
+            status="SUCCESS",
+            severity="INFO",
+            message="Dhan credentials validated and re-authenticated successfully. Trading unlocked."
+        )
+        return {
+            "success": True,
+            "status": "AUTHENTICATED",
+            "message": "Dhan credentials validated and re-authenticated successfully.",
+            "profile": test_res
+        }
+
     def place_order(
         self,
         symbol: str,
@@ -441,6 +512,17 @@ class DhanBrokerAdapter(BrokerAdapter):
         """
         order_id = client_order_id or f"DHAN-{uuid.uuid4().hex[:8].upper()}"
         now_str = datetime.now(timezone.utc).isoformat()
+
+        # Fail-closed guard: Dhan authentication failed
+        if getattr(self, "_auth_failed", False):
+            return {
+                "success": False,
+                "status": "FAILED",
+                "error": "DHAN_AUTH_FAILED",
+                "code": "AUTH_FAILED",
+                "message": "Dhan authentication required. Previous API call returned 401 Unauthorized. Trading is locked.",
+                "order_id": order_id
+            }
 
         # Strict safety guard: Live broker execution is locked unless all live flags are explicitly True
         is_live_allowed = (

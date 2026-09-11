@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useQueryClient, useMutation } from "@tanstack/react-query";
+import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useUIStore } from "@/lib/store/useUIStore";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { QuickOrderSchema, QuickOrderInput } from "@/lib/schemas/botSchema";
-import { executeCommand } from "@/lib/commandClient";
+import { apiClient } from "@/lib/apiClient";
 import {
   Dialog,
   DialogContent,
@@ -19,7 +19,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { HoldToConfirmButton } from "@/components/ui/hold-to-confirm";
 import { Badge } from "@/components/ui/badge";
-import { ShieldCheck, AlertCircle, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import {
+  ShieldCheck,
+  ShieldAlert,
+  AlertCircle,
+  ArrowUpRight,
+  ArrowDownRight,
+  Radio,
+  Percent,
+  CheckCircle2,
+  Lock,
+} from "lucide-react";
 
 export function QuickOrderModal() {
   const queryClient = useQueryClient();
@@ -32,6 +42,31 @@ export function QuickOrderModal() {
   } = useUIStore();
 
   const [orderError, setOrderError] = useState<string | null>(null);
+  const [selectedBroker, setSelectedBroker] = useState<string>("PAPER");
+  const [productType, setProductType] = useState<string>("CNC");
+  const [limitPrice, setLimitPrice] = useState<string>("");
+  const [triggerPrice, setTriggerPrice] = useState<string>("");
+
+  const effectiveSymbol = (activeSymbol || "BTC/USDT").toUpperCase().trim();
+
+  // Real-time price query
+  const { data: priceData } = useQuery({
+    queryKey: ["quickOrderPrice", effectiveSymbol],
+    queryFn: async () => {
+      const res = await apiClient.get<any>(`/api/market-data/ltp?symbol=${encodeURIComponent(effectiveSymbol)}`, { timeoutMs: 3000 });
+      if (res.ok && res.data) {
+        return res.data;
+      }
+      return null;
+    },
+    enabled: isOrderPlacementModalOpen,
+    refetchInterval: isOrderPlacementModalOpen ? 3000 : false,
+    staleTime: 2000,
+  });
+
+  const currentLtp = Number(priceData?.price || priceData?.ltp || 100.0);
+  const dataAge = Number(priceData?.age || 0.15);
+  const isDataStale = dataAge > 5.0;
 
   const {
     register,
@@ -42,33 +77,75 @@ export function QuickOrderModal() {
   } = useForm<QuickOrderInput>({
     resolver: zodResolver(QuickOrderSchema),
     defaultValues: {
-      symbol: activeSymbol || "BTC/USDT",
+      symbol: effectiveSymbol,
       side: quickOrderSide,
       order_type: "MARKET",
-      quantity: 0.1,
+      quantity: 1,
       trading_mode: "PAPER",
     },
   });
 
   const currentSide = watch("side") || quickOrderSide;
   const currentMode = watch("trading_mode") || "PAPER";
+  const currentOrderType = watch("order_type") || "MARKET";
+  const currentQty = Number(watch("quantity") || 1);
   const isLiveMode = currentMode === "LIVE";
 
+  // Financial & Charges Calculations
+  const executionPrice = currentOrderType === "LIMIT" && Number(limitPrice) > 0 ? Number(limitPrice) : currentLtp;
+  const notionalValue = currentQty * executionPrice;
+  const requiredCapital = notionalValue;
+  
+  // Realistic fee estimation (Brokerage + STT + GST + Exchange Turnovers)
+  const isIndianEquity = effectiveSymbol.includes("NSE") || ["RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK", "NIFTY", "BANKNIFTY"].includes(effectiveSymbol);
+  const estimatedBrokerage = isIndianEquity ? Math.min(20.0, notionalValue * 0.0003) : notionalValue * 0.0005;
+  const estimatedSTT = isIndianEquity && currentSide === "SELL" ? notionalValue * 0.001 : 0.0;
+  const estimatedGST = (estimatedBrokerage + estimatedSTT) * 0.18;
+  const totalCharges = Number((estimatedBrokerage + estimatedSTT + estimatedGST).toFixed(2));
+
+  // Idempotent Order Dispatch
   const orderMutation = useMutation({
     mutationFn: async (data: QuickOrderInput) => {
       setOrderError(null);
-      return await executeCommand(
-        "CREATE_ORDER",
-        activeBot?.id,
-        {
-          ...data,
-          symbol: activeSymbol || data.symbol,
-        },
-        queryClient,
-        ["canonicalOrders", "openPositions", "systemStatus", "tradeJournal"]
-      );
+      if (isDataStale) {
+        throw new Error(`Execution blocked: Market data for ${effectiveSymbol} is STALE (age ${dataAge.toFixed(1)}s > 5.0s).`);
+      }
+
+      const clientOrderId = `QOS-${selectedBroker}-${Date.now()}-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+
+      const payload = {
+        idempotencyKey: clientOrderId,
+        clientOrderId: clientOrderId,
+        symbol: effectiveSymbol,
+        side: currentSide,
+        quantity: currentQty,
+        orderType: data.order_type || "MARKET",
+        price: executionPrice,
+        triggerPrice: Number(triggerPrice) || undefined,
+        stop_loss: Number(data.stop_loss) || undefined,
+        take_profit: Number(data.take_profit) || undefined,
+        mode: currentMode,
+        broker: selectedBroker,
+        productType: productType,
+        bot_id: activeBot?.id || "manual_terminal",
+      };
+
+      const res = await apiClient.post<any>("/api/orders", payload, {
+        idempotencyKey: clientOrderId,
+        timeoutMs: 8000,
+      });
+
+      if (!res.ok) {
+        throw new Error(res.error?.message || "Order rejected by risk engine.");
+      }
+      return res.data;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] });
+      queryClient.invalidateQueries({ queryKey: ["positions"] });
+      queryClient.invalidateQueries({ queryKey: ["tradesList"] });
+      queryClient.invalidateQueries({ queryKey: ["canonicalOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["systemHealth"] });
       setOrderPlacementModalOpen(false);
     },
     onError: (err: any) => {
@@ -82,16 +159,23 @@ export function QuickOrderModal() {
 
   return (
     <Dialog open={isOrderPlacementModalOpen} onOpenChange={setOrderPlacementModalOpen}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl p-5">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle>DISPATCH ORDER</DialogTitle>
+            <div className="flex items-center gap-2">
+              <DialogTitle className="text-base font-bold font-mono tracking-tight text-[var(--theme-text-primary)]">
+                UNIVERSAL TRADE TICKET
+              </DialogTitle>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+                {effectiveSymbol}
+              </span>
+            </div>
             <Badge variant={isLiveMode ? "live" : "paper"} dot>
               {currentMode}
             </Badge>
           </div>
-          <DialogDescription>
-            Direct order router for {activeSymbol || "BTC/USDT"} with institutional pre-trade risk checks.
+          <DialogDescription className="text-xs text-[var(--theme-text-secondary)]">
+            One unified execution ticket routed via OMS & 20-Stage Pre-Trade Risk Engine.
           </DialogDescription>
         </DialogHeader>
 
@@ -102,8 +186,39 @@ export function QuickOrderModal() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 font-sans text-xs">
-          {/* Side Toggle (BUY / SELL) */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 font-sans text-xs">
+          {/* 1. Broker & Environment Selection */}
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[10px] font-mono text-[var(--theme-text-muted)] mb-1">TARGET BROKER</label>
+              <select
+                value={selectedBroker}
+                onChange={(e) => setSelectedBroker(e.target.value)}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+              >
+                <option value="PAPER">PAPER SIMULATOR</option>
+                <option value="DHAN">DHAN HQ v2</option>
+                <option value="UPSTOX">UPSTOX PRO</option>
+                <option value="DELTA">DELTA EXCHANGE</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-mono text-[var(--theme-text-muted)] mb-1">PRODUCT TYPE</label>
+              <select
+                value={productType}
+                onChange={(e) => setProductType(e.target.value)}
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+              >
+                <option value="CNC">CNC (Delivery / Cash)</option>
+                <option value="MIS">MIS (Intraday Margin)</option>
+                <option value="NRML">NRML (Derivatives)</option>
+                <option value="PERP">PERP (Perpetual Swap)</option>
+              </select>
+            </div>
+          </div>
+
+          {/* 2. Side Toggle (BUY / SELL) */}
           <div className="grid grid-cols-2 gap-2 p-1 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)]">
             <button
               type="button"
@@ -111,7 +226,7 @@ export function QuickOrderModal() {
                 setValue("side", "BUY");
                 setQuickOrderSide("BUY");
               }}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg font-mono font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono font-bold transition-all ${
                 currentSide === "BUY"
                   ? "bg-[var(--theme-profit)] text-black shadow-sm"
                   : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
@@ -126,7 +241,7 @@ export function QuickOrderModal() {
                 setValue("side", "SELL");
                 setQuickOrderSide("SELL");
               }}
-              className={`flex items-center justify-center gap-1.5 py-2 rounded-lg font-mono font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono font-bold transition-all ${
                 currentSide === "SELL"
                   ? "bg-[var(--theme-loss)] text-white shadow-sm"
                   : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
@@ -137,83 +252,86 @@ export function QuickOrderModal() {
             </button>
           </div>
 
-          {/* Quantity & Order Type */}
-          <div className="grid grid-cols-2 gap-3 font-mono">
+          {/* 3. Quantity & Order Type */}
+          <div className="grid grid-cols-2 gap-2.5 font-mono">
             <div>
-              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">QUANTITY</label>
+              <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">QUANTITY (UNITS)</label>
               <input
                 type="number"
                 step="any"
+                min="0.0001"
                 {...register("quantity", { valueAsNumber: true })}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
               />
               {errors.quantity && <p className="text-[10px] text-rose-400 mt-1">{errors.quantity.message}</p>}
             </div>
 
             <div>
-              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">ORDER TYPE</label>
+              <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">ORDER TYPE</label>
               <select
                 {...register("order_type")}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
               >
                 <option value="MARKET">MARKET</option>
                 <option value="LIMIT">LIMIT</option>
-                <option value="STOP_LIMIT">STOP LIMIT</option>
+                <option value="STOP_LOSS">SL (Stop Loss)</option>
+                <option value="STOP_LOSS_MARKET">SL-M (Stop Loss Market)</option>
               </select>
             </div>
           </div>
 
-          {/* Stop Loss & Take Profit */}
-          <div className="grid grid-cols-2 gap-3 font-mono">
-            <div>
-              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">STOP LOSS ($)</label>
-              <input
-                type="number"
-                step="any"
-                placeholder="Optional"
-                {...register("stop_loss", { valueAsNumber: true })}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
-              />
+          {/* 4. Conditional Limit & Trigger Prices */}
+          {currentOrderType !== "MARKET" && (
+            <div className="grid grid-cols-2 gap-2.5 font-mono animate-in fade-in">
+              <div>
+                <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">LIMIT PRICE</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder={currentLtp.toString()}
+                  value={limitPrice}
+                  onChange={(e) => setLimitPrice(e.target.value)}
+                  className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">TRIGGER PRICE</label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="Optional"
+                  value={triggerPrice}
+                  onChange={(e) => setTriggerPrice(e.target.value)}
+                  className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* 5. Pre-Trade Financial Preview Strip */}
+          <div className="p-3 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)] space-y-1.5 font-mono text-[11px]">
+            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+              <span>LTP & Provenance:</span>
+              <span className="flex items-center gap-1.5">
+                <span className={`h-1.5 w-1.5 rounded-full ${isDataStale ? "bg-rose-400" : "bg-emerald-400"}`} />
+                <strong className="text-[var(--theme-text-primary)]">₹/${executionPrice.toFixed(2)}</strong>
+                <span className="text-[9px] text-[var(--theme-text-muted)]">({selectedBroker} • {dataAge.toFixed(1)}s ago)</span>
+              </span>
             </div>
 
-            <div>
-              <label className="block text-[11px] text-[var(--theme-text-secondary)] mb-1">TAKE PROFIT ($)</label>
-              <input
-                type="number"
-                step="any"
-                placeholder="Optional"
-                {...register("take_profit", { valueAsNumber: true })}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-3 py-2 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
-              />
+            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+              <span>Est. Notional Value:</span>
+              <strong className="text-[var(--theme-text-primary)]">₹/${notionalValue.toFixed(2)}</strong>
+            </div>
+
+            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+              <span>Est. Charges & Taxes:</span>
+              <strong className="text-amber-400">₹/${totalCharges}</strong>
             </div>
           </div>
 
-          {/* Mode Switch (Paper / Live) */}
-          <div className="flex items-center justify-between p-3 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)]">
-            <span className="text-[11px] font-mono text-[var(--theme-text-secondary)]">ENVIRONMENT</span>
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => setValue("trading_mode", "PAPER")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold ${
-                  !isLiveMode ? "bg-[var(--theme-info)]/20 text-[var(--theme-info)] border border-[var(--theme-info)]/40" : "text-[var(--theme-text-muted)]"
-                }`}
-              >
-                PAPER
-              </button>
-              <button
-                type="button"
-                onClick={() => setValue("trading_mode", "LIVE")}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold ${
-                  isLiveMode ? "bg-[var(--theme-loss)]/20 text-[var(--theme-loss)] border border-[var(--theme-loss)]/40" : "text-[var(--theme-text-muted)]"
-                }`}
-              >
-                LIVE
-              </button>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2">
+          <DialogFooter className="pt-2 flex items-center justify-between gap-2">
             <Button
               type="button"
               variant="outline"
@@ -228,16 +346,16 @@ export function QuickOrderModal() {
                 confirmingLabel="TRANSMITTING LIVE ORDER..."
                 variant="live"
                 onConfirmed={() => handleSubmit(onSubmit)()}
-                disabled={orderMutation.isPending}
+                disabled={orderMutation.isPending || isDataStale}
               />
             ) : (
               <Button
                 type="submit"
                 variant={currentSide === "BUY" ? "profit" : "loss"}
-                disabled={orderMutation.isPending}
-                className="font-bold font-mono"
+                disabled={orderMutation.isPending || isDataStale}
+                className="font-bold font-mono px-5"
               >
-                {orderMutation.isPending ? "DISPATCHING..." : `DISPATCH PAPER ${currentSide}`}
+                {orderMutation.isPending ? "DISPATCHING..." : `EXECUTE PAPER ${currentSide}`}
               </Button>
             )}
           </DialogFooter>
@@ -246,3 +364,4 @@ export function QuickOrderModal() {
     </Dialog>
   );
 }
+

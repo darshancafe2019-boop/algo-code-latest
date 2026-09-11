@@ -21,31 +21,73 @@ logger = logging.getLogger("MDGateway.Base")
 
 @dataclass
 class NormalizedQuote:
-    """Single source of truth for a market price tick."""
-    symbol: str                    # canonical symbol  e.g. "BTC/USDT", "NIFTY", "AAPL"
-    exchange: str                  # e.g. "BINANCE", "NSE", "XNAS"
-    provider: str                  # adapter id e.g. "binance_ws", "angelone"
+    """Single source of truth for a market price tick across all asset domains."""
+    symbol: str                    # canonical symbol  e.g. "BTC/USDT", "NIFTY", "RELIANCE", "NIFTY24DEC25000CE"
+    exchange: str                  # e.g. "BINANCE", "NSE", "BSE", "DELTA", "XNAS"
+    provider: str                  # adapter id e.g. "dhan", "upstox", "delta_options_ws", "binance_ws"
     last_price: float
+    
+    # Core Quote Fields
     bid: Optional[float] = None
     ask: Optional[float] = None
+    spread: Optional[float] = None
     volume: Optional[float] = None
+    turnover: Optional[float] = None
     high: Optional[float] = None
     low: Optional[float] = None
     open: Optional[float] = None
     close: Optional[float] = None
     change_pct: Optional[float] = None
     vwap: Optional[float] = None
+    high_52w: Optional[float] = None
+    low_52w: Optional[float] = None
+    
+    # Asset Classification & Metadata
+    market: str = "STOCKS"         # STOCKS | STOCK_FUTURES | STOCK_OPTIONS | CRYPTO | CRYPTO_FUTURES | CRYPTO_OPTIONS | INDICES | INDEX_FUTURES | INDEX_OPTIONS
+    instrument_type: str = "SPOT"  # SPOT | FUTURES | OPTIONS_CALL | OPTIONS_PUT | INDEX
+    company_name: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    base_asset: Optional[str] = None
+    quote_asset: Optional[str] = None
+    
+    # Derivatives / Futures Specific
+    underlying: Optional[str] = None
+    expiry: Optional[str] = None
+    expiry_days: Optional[int] = None
+    spot_price: Optional[float] = None
+    future_price: Optional[float] = None
+    mark_price: Optional[float] = None
+    index_price: Optional[float] = None
+    basis: Optional[float] = None
+    basis_pct: Optional[float] = None
     oi: Optional[float] = None
+    oi_change: Optional[float] = None
     funding_rate: Optional[float] = None
-    depth: Optional[Dict[str, Any]] = None
-    greeks: Optional[Dict[str, Any]] = None
-    # Provenance
-    event_timestamp: str = ""      # ISO-8601 UTC — from the provider
-    received_timestamp: str = ""   # ISO-8601 UTC — when we received it
+    next_funding_time: Optional[str] = None
+    lot_size: Optional[int] = None
+    margin: Optional[float] = None
+    available_leverage: Optional[float] = None
+    
+    # Options Specific
+    strike: Optional[float] = None
+    option_type: Optional[str] = None       # CALL | PUT | CE | PE
+    moneyness: Optional[str] = None         # ITM | ATM | OTM
+    intrinsic_value: Optional[float] = None
+    time_value: Optional[float] = None
+    iv: Optional[float] = None
+    greeks: Optional[Dict[str, Any]] = None  # {delta, gamma, theta, vega, rho}
+    
+    # Provenance & Data Quality
+    event_timestamp: str = ""              # ISO-8601 UTC from provider
+    received_timestamp: str = ""           # ISO-8601 UTC when received
     feed_latency_ms: float = 0.0
-    data_mode: str = "REAL_TIME"   # REAL_TIME | DELAYED | EOD | CACHED
+    data_mode: str = "REAL_TIME"           # REAL_TIME | DELAYED | EOD | CACHED
+    status: str = "LIVE"                   # LIVE | PRE_OPEN | OPEN | CLOSED | AFTER_HOURS | HALTED | STALE | DISCONNECTED | UNAVAILABLE
     is_stale: bool = False
     sequence: Optional[int] = None
+    calculation_source: str = "BROKER_PROVIDED"  # BROKER_PROVIDED | EXCHANGE_PROVIDED | CALCULATED | DERIVED | ESTIMATED
+    depth: Optional[Dict[str, Any]] = None
 
     def __post_init__(self):
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -53,6 +95,17 @@ class NormalizedQuote:
             self.received_timestamp = now_iso
         if not self.event_timestamp:
             self.event_timestamp = now_iso
+        
+        # Auto-compute spread if bid and ask exist
+        if self.bid is not None and self.ask is not None and self.spread is None:
+            self.spread = round(max(0.0, float(self.ask) - float(self.bid)), 4)
+            
+        # Auto-compute basis if spot and future price exist
+        if self.spot_price and (self.future_price or self.last_price) and self.basis is None:
+            fp = self.future_price if self.future_price is not None else self.last_price
+            self.basis = round(fp - self.spot_price, 4)
+            if self.spot_price > 0:
+                self.basis_pct = round((self.basis / self.spot_price) * 100.0, 4)
 
     @property
     def age_seconds(self) -> float:
@@ -64,13 +117,15 @@ class NormalizedQuote:
 
     def mark_stale(self, threshold_sec: float = 10.0) -> "NormalizedQuote":
         self.is_stale = self.age_seconds > threshold_sec
+        if self.is_stale and self.status == "LIVE":
+            self.status = "STALE"
         return self
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
         d["age_seconds"] = round(self.age_seconds, 2)
         
-        # Requirement 6 & 7: Canonical provider normalization
+        # Canonical provider normalization
         if d.get("provider") == "dhan_ws":
             d["raw_provider"] = "dhan_ws"
             d["provider"] = "dhan"
@@ -144,6 +199,9 @@ class CanonicalInstrument:
     expiry: Optional[str] = None
     strike: Optional[float] = None
     option_type: Optional[str] = None
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    underlying: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -161,6 +219,10 @@ class ProviderHealth:
     error_count: int = 0
     last_tick_time: Optional[str] = None
     message: str = ""
+    auth_status: str = "HEALTHY"
+    rest_status: str = "HEALTHY"
+    stream_status: str = "CONNECTED"
+    capabilities: Dict[str, bool] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

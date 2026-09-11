@@ -244,6 +244,16 @@ class ResilientTickerService:
                         self._in_flight[symbol].set()
                         del self._in_flight[symbol]
 
+    def get_spot_price(self, raw_symbol: Optional[str] = None) -> Optional[float]:
+        """Convenience method to retrieve spot price as a float."""
+        try:
+            ticker = self.get_ticker(raw_symbol)
+            if ticker and (ticker.get("last") or ticker.get("price")):
+                return float(ticker.get("last") or ticker.get("price"))
+        except Exception as e:
+            logger.debug("Failed to get spot price for %s: %s", raw_symbol, e)
+        return None
+
     def _fetch_from_providers(self, symbol: str, start_perf: float) -> Dict[str, Any]:
         """Tries configured exchanges in priority order with circuit breaker protection."""
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -395,25 +405,40 @@ class ResilientTickerService:
                 "timestamp": now_iso
             }
 
-        # Check baseline catalog
-        cat = self._fallback_catalog.get(symbol, self._fallback_catalog.get("BTC/USDT", {}))
-        last_p = cat.get("last", 0.0)
+        # Check baseline catalog for known major symbols only
+        cat = self._fallback_catalog.get(symbol)
+        if cat:
+            last_p = cat.get("last", 0.0)
+            return {
+                "status": "warning",
+                "message": f"Cold start fallback: Live exchange reconnecting for {symbol}.",
+                "symbol": symbol,
+                "last": last_p,
+                "price": last_p,
+                "high": cat.get("high"),
+                "low": cat.get("low"),
+                "volume": cat.get("volume"),
+                "change_pct": cat.get("change_pct"),
+                "change_val": cat.get("change_val"),
+                "bid": None,
+                "ask": None,
+                "provider": "catalog_anchor",
+                "is_stale": True,
+                "data_status": "COLD_FALLBACK",
+                "latency_ms": latency_ms,
+                "timestamp": now_iso
+            }
+
+        # Symbol unknown and not found across any provider
         return {
-            "status": "warning",
-            "message": f"Cold start fallback: Live exchange reconnecting for {symbol}.",
+            "status": "error",
+            "message": f"Instrument {symbol} not found across configured providers.",
             "symbol": symbol,
-            "last": last_p,
-            "price": last_p,
-            "high": cat.get("high"),
-            "low": cat.get("low"),
-            "volume": cat.get("volume"),
-            "change_pct": cat.get("change_pct"),
-            "change_val": cat.get("change_val"),
-            "bid": None,
-            "ask": None,
-            "provider": "catalog_anchor",
+            "last": None,
+            "price": None,
+            "provider": "UNAVAILABLE",
             "is_stale": True,
-            "data_status": "COLD_FALLBACK",
+            "data_status": "UNAVAILABLE",
             "latency_ms": latency_ms,
             "timestamp": now_iso
         }

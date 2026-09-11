@@ -776,9 +776,20 @@ def evaluate_trade_precheck(
 
     # Stage 1: Authentication & Authorization
     is_auth = trade_request.get("authenticated", True)
+    req_broker = str(trade_request.get("broker", "")).upper()
     if not is_auth:
         blocks.append("Stage 1 (Auth): Unauthorized trade request. Missing or invalid signature.")
         stage_results["1_auth"] = "FAILED"
+    elif req_broker == "DHAN":
+        try:
+            from src.dhan_broker_adapter import dhan_broker_adapter
+            if dhan_broker_adapter.auth_status == "AUTH_FAILED":
+                blocks.append("Stage 1 (Auth): Dhan authentication required. Previous API call returned 401 Unauthorized. Trading is locked.")
+                stage_results["1_auth"] = "FAILED"
+            else:
+                stage_results["1_auth"] = "PASSED"
+        except Exception:
+            stage_results["1_auth"] = "PASSED"
     else:
         stage_results["1_auth"] = "PASSED"
 
@@ -939,6 +950,16 @@ def evaluate_trade_precheck(
     if not broker_connected:
         blocks.append("Stage 18 (Broker Health): Execution broker/router is disconnected or in degraded state.")
         stage_results["18_broker_status"] = "FAILED"
+    elif req_broker == "DHAN":
+        try:
+            from src.dhan_broker_adapter import dhan_broker_adapter
+            if dhan_broker_adapter.auth_status == "AUTH_FAILED":
+                blocks.append("Stage 18 (Broker Health): Dhan broker state is AUTH_FAILED. Re-authentication required.")
+                stage_results["18_broker_status"] = "FAILED"
+            else:
+                stage_results["18_broker_status"] = "PASSED"
+        except Exception:
+            stage_results["18_broker_status"] = "PASSED"
     else:
         stage_results["18_broker_status"] = "PASSED"
 
@@ -1048,7 +1069,10 @@ def evaluate_pre_trade_risk(
     stop_loss: float = 0.0,
     take_profit: float = 0.0,
     confidence: float = 0.85,
-    is_live: bool = False
+    is_live: bool = False,
+    broker: str = "",
+    account_state: Optional[Dict[str, Any]] = None,
+    risk_limits: Optional[Dict[str, Any]] = None
 ) -> Tuple[bool, str, Dict[str, Any]]:
     """
     Convenience wrapper executing the authoritative 20-stage trade pre-check for commands and order validation.
@@ -1071,16 +1095,186 @@ def evaluate_pre_trade_risk(
         "stop_loss": stop_loss,
         "take_profit": take_profit,
         "confidence": confidence,
-        "is_live": is_live
+        "is_live": is_live,
+        "broker": broker
     }
+    acc_state = account_state or {"balance": 50000.0, "equity": 50000.0, "daily_loss": 0.0}
+    r_limits = risk_limits or {"risk_per_trade_pct": 2.0, "max_drawdown_pct": 10.0}
     decision = evaluate_trade_precheck(
         trade_request=trade_request,
-        account_state={"balance": 50000.0, "equity": 50000.0, "daily_loss": 0.0},
+        account_state=acc_state,
         portfolio_positions=[],
-        risk_limits={"risk_per_trade_pct": 2.0, "max_drawdown_pct": 10.0}
+        risk_limits=r_limits
     )
     is_approved = decision.get("is_approved", False) or decision.get("status") in ["APPROVED", "PASSED", "WARNING"]
     reason = ", ".join(decision.get("rejection_reasons", [])) if not is_approved else "Trade complies with all risk stages."
     return is_approved, reason, decision
+
+
+class UniversalRiskEngine:
+    """
+    Authoritative Centralized Pre-Trade Risk Engine.
+    Evaluates order intent across 20 validation stages, mode checks, and broker constraints.
+    """
+
+    def evaluate_order_intent(self, order_intent: Dict[str, Any], account_state: Optional[Dict[str, Any]] = None, risk_limits: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Validates an incoming order intent from UI, Bot, Strategy, Option Chain, or API.
+        Returns structured decision:
+        {
+            "allowed": bool,
+            "status": "APPROVED" | "REJECTED",
+            "code": str,
+            "message": str,
+            "stages": dict,
+            "details": dict
+        }
+        """
+        # 1. Global Kill Switch Check
+        if config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_KILL_SWITCH", False) or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False):
+            return {
+                "allowed": False,
+                "status": "REJECTED",
+                "code": "KILL_SWITCH_ACTIVE",
+                "message": "Order blocked because the Global Trading Kill Switch is ACTIVATED.",
+                "stages": {"16_kill_switch": "FAILED"},
+                "details": {"stage": "01_kill_switch", "timestamp": datetime.now(timezone.utc).isoformat()}
+            }
+
+        # Broker-specific Fail-Closed Auth Validation
+        broker = str(order_intent.get("broker", "")).upper()
+        if broker == "DHAN":
+            try:
+                from src.dhan_broker_adapter import dhan_broker_adapter
+                if dhan_broker_adapter.auth_status == "AUTH_FAILED":
+                    return {
+                        "allowed": False,
+                        "status": "REJECTED",
+                        "code": "DHAN_AUTH_FAILED",
+                        "message": "Order rejected: Dhan authentication required. Previous API call returned 401 Unauthorized. Trading is locked.",
+                        "stages": {"1_auth": "FAILED", "18_broker_status": "FAILED"},
+                        "details": {"stage": "01_auth_broker", "broker": "DHAN"}
+                    }
+            except Exception:
+                pass
+
+        # 2. Mode Protection & Armed Checks
+        mode = str(order_intent.get("mode", getattr(config, "TRADING_MODE", "PAPER"))).upper()
+        if mode == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
+                return {
+                    "allowed": False,
+                    "status": "REJECTED",
+                    "code": "LIVE_TRADING_DISABLED",
+                    "message": "Live order rejected: LIVE_TRADING_ENABLED is False.",
+                    "stages": {"1_auth": "FAILED"},
+                    "details": {"stage": "02_execution_mode"}
+                }
+            if not getattr(config, "LIVE_TRADING_ARMED", False):
+                return {
+                    "allowed": False,
+                    "status": "REJECTED",
+                    "code": "LIVE_TRADING_DISARMED",
+                    "message": "Live order rejected: Live trading has not been explicitly armed.",
+                    "stages": {"1_auth": "FAILED"},
+                    "details": {"stage": "02_execution_mode"}
+                }
+
+        # 3. Parameters Validation
+        symbol = str(order_intent.get("symbol", "")).strip().upper()
+        if not symbol:
+            return {
+                "allowed": False,
+                "status": "REJECTED",
+                "code": "INVALID_SYMBOL",
+                "message": "Order rejected: Symbol is required.",
+                "stages": {"2_instrument": "FAILED"},
+                "details": {"stage": "03_symbol_spec"}
+            }
+
+        side = str(order_intent.get("side", order_intent.get("direction", "BUY"))).strip().upper()
+        if side not in ["BUY", "SELL", "LONG", "SHORT"]:
+            return {
+                "allowed": False,
+                "status": "REJECTED",
+                "code": "INVALID_SIDE",
+                "message": f"Order rejected: Invalid side '{side}'. Must be BUY or SELL.",
+                "stages": {"2_instrument": "FAILED"},
+                "details": {"stage": "03_order_spec"}
+            }
+
+        try:
+            qty = float(order_intent.get("quantity", 0.0))
+            if qty <= 0:
+                return {
+                    "allowed": False,
+                    "status": "REJECTED",
+                    "code": "INVALID_QUANTITY",
+                    "message": "Order rejected: Quantity must be greater than zero.",
+                    "stages": {"5_price_sanity": "FAILED"},
+                    "details": {"stage": "04_quantity_check"}
+                }
+        except (ValueError, TypeError):
+            return {
+                "allowed": False,
+                "status": "REJECTED",
+                "code": "INVALID_QUANTITY",
+                "message": "Order rejected: Quantity must be a valid number.",
+                "stages": {"5_price_sanity": "FAILED"},
+                "details": {"stage": "04_quantity_check"}
+            }
+
+        price = float(order_intent.get("price", 0.0) or 0.0)
+        sl = float(order_intent.get("stop_loss", order_intent.get("stopLoss", 0.0)) or 0.0)
+        tp = float(order_intent.get("take_profit", order_intent.get("takeProfit", 0.0)) or 0.0)
+
+        # 4. Multi-Stage Evaluation
+        bot_id = order_intent.get("bot_id", "manual_dispatcher")
+        is_approved, reason, decision = evaluate_pre_trade_risk(
+            bot_id=bot_id,
+            symbol=symbol,
+            side=side,
+            quantity=qty,
+            price=price if price > 0 else 100.0,
+            stop_loss=sl,
+            take_profit=tp,
+            is_live=(mode == "LIVE"),
+            broker=broker,
+            account_state=account_state,
+            risk_limits=risk_limits
+        )
+
+        stages = decision.get("risk_checks", {})
+
+        if not is_approved:
+            return {
+                "allowed": False,
+                "status": "REJECTED",
+                "code": "RISK_VALIDATION_FAILED",
+                "message": reason,
+                "stages": stages,
+                "details": decision
+            }
+
+        return {
+            "allowed": True,
+            "status": "APPROVED",
+            "code": "RISK_APPROVED",
+            "message": "Order passed all pre-trade risk checks.",
+            "stages": stages,
+            "details": decision
+        }
+
+    def calculate_position_size(self, *args, **kwargs):
+        return calculate_universal_position_size(*args, **kwargs)
+
+    def apply_risk_profile(self, *args, **kwargs):
+        return apply_risk_profile(*args, **kwargs)
+
+    def is_kill_switch_active(self) -> bool:
+        return bool(config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_KILL_SWITCH", False) or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False))
+
+
+universal_risk_engine = UniversalRiskEngine()
 
 

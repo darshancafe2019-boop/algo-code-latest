@@ -54,7 +54,7 @@ STALE_THRESHOLD_SEC = 10.0
 
 class MarketDataGateway:
     def __init__(self):
-        dhan_diagnostic_mode = os.environ.get("DHAN_ONLY_DIAGNOSTIC_MODE", "true").lower() == "true"
+        dhan_diagnostic_mode = os.environ.get("DHAN_ONLY_DIAGNOSTIC_MODE", "false").lower() == "true"
         
         if dhan_diagnostic_mode:
             logger.info("[DHAN_ONLY_DIAGNOSTIC_MODE] Initializing Dhan adapter only. Upstox, Delta, Binance kept inactive.")
@@ -290,6 +290,111 @@ class MarketDataGateway:
             "missing": [s for s in symbols if s not in result],
         })
 
+    async def handle_ltp(self, request: web.Request) -> web.Response:
+        """
+        Canonical single-symbol real-time LTP endpoint.
+        Returns authoritative price, provider source, freshness, and age without fallbacks.
+        """
+        raw_sym = request.rel_url.query.get("symbol", "").strip()
+        if not raw_sym:
+            return web.json_response({
+                "ok": False,
+                "code": "INVALID_SYMBOL",
+                "symbol": "",
+                "message": "Query parameter 'symbol' is required."
+            }, status=400)
+
+        sym = raw_sym.upper()
+        aliases = [sym]
+        if "/" in sym:
+            aliases.append(sym.replace("/", ""))
+        elif sym.endswith("USDT") and len(sym) > 4:
+            aliases.append(f"{sym[:-4]}/USDT")
+        elif sym.endswith("USD") and len(sym) > 3:
+            aliases.append(f"{sym[:-3]}/USD")
+
+        matched_q: Optional[NormalizedQuote] = None
+        for a in aliases:
+            if a in self._quote_cache:
+                matched_q = self._quote_cache[a]
+                break
+
+        if not matched_q:
+            adapter = self.failover.get_best_provider(sym)
+            if adapter:
+                try:
+                    quotes = await asyncio.wait_for(adapter.get_snapshot([sym]), timeout=3.0)
+                    if sym in quotes:
+                        matched_q = quotes[sym]
+                        self._quote_cache[sym] = matched_q
+                    else:
+                        for a in aliases:
+                            if a in quotes:
+                                matched_q = quotes[a]
+                                self._quote_cache[a] = matched_q
+                                break
+                except asyncio.TimeoutError:
+                    return web.json_response({
+                        "ok": False,
+                        "code": "SOURCE_TIMEOUT",
+                        "symbol": sym,
+                        "source": adapter.provider_id.upper(),
+                        "message": f"Timeout querying quote from {adapter.provider_id}."
+                    }, status=504)
+                except Exception as ex:
+                    logger.warning("Error querying snapshot from adapter %s for %s: %s", adapter.provider_id, sym, ex)
+
+        if matched_q:
+            matched_q.mark_stale(STALE_THRESHOLD_SEC)
+            try:
+                dt = datetime.fromisoformat(matched_q.received_timestamp.replace("Z", "+00:00"))
+                ts_ms = int(dt.timestamp() * 1000)
+                age_ms = max(0, int((datetime.now(timezone.utc).timestamp() - dt.timestamp()) * 1000))
+            except Exception:
+                ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+                age_ms = 0
+
+            return web.json_response({
+                "ok": True,
+                "symbol": sym,
+                "price": matched_q.last_price,
+                "source": (matched_q.provider or "GATEWAY").upper(),
+                "status": "LIVE" if not matched_q.is_stale else "STALE",
+                "timestamp": ts_ms,
+                "ageMs": age_ms,
+                "bid": matched_q.bid,
+                "ask": matched_q.ask,
+                "volume": matched_q.volume,
+            }, status=200)
+
+        adapter = self.failover.get_best_provider(sym)
+        if not adapter:
+            return web.json_response({
+                "ok": False,
+                "code": "SOURCE_NOT_CONFIGURED",
+                "symbol": sym,
+                "source": "UNKNOWN",
+                "message": f"No configured market data adapter for {sym}."
+            }, status=409)
+
+        status = adapter.get_status()
+        if status in ("DISCONNECTED", "ERROR", "NOT_CONFIGURED"):
+            return web.json_response({
+                "ok": False,
+                "code": "SOURCE_DISCONNECTED",
+                "symbol": sym,
+                "source": adapter.provider_id.upper(),
+                "message": f"Configured market data source {adapter.provider_id} is {status.lower()}."
+            }, status=503)
+
+        return web.json_response({
+            "ok": False,
+            "code": "INSTRUMENT_NOT_FOUND",
+            "symbol": sym,
+            "source": adapter.provider_id.upper(),
+            "message": f"No quote found for {sym}."
+        }, status=404)
+
     async def handle_history(self, request: web.Request) -> web.Response:
         symbol = request.rel_url.query.get("symbol", "").upper()
         timeframe = request.rel_url.query.get("tf", "1d")
@@ -469,6 +574,8 @@ def create_app() -> tuple:
     app.router.add_get("/api/health/ready", gateway.handle_health)
     app.router.add_get("/providers/health", gateway.handle_health)
     app.router.add_get("/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/ltp", gateway.handle_ltp)
+    app.router.add_get("/api/market-data/ltp", gateway.handle_ltp)
     app.router.add_get("/history", gateway.handle_history)
     app.router.add_get("/search", gateway.handle_search)
     app.router.add_get("/ws", gateway.handle_ws)

@@ -8,31 +8,31 @@
  * Design Tokens & Semantic CSS Variables
  * ---------------------------------------------------------------------- */
 :root {
-  /* Quant.OS Midnight Institutional Pro Core Tokens */
-  --q-bg: #070B14;
-  --q-workspace: #0A101C;
-  --q-surface: #0E1624;
-  --q-elevated: #121C2C;
-  --q-card: #101827;
-  --q-border: #213047;
-  --q-border-hover: #31445E;
-  --q-text: #F4F7FA;
+  /* Futuristic Dark AI Trading Terminal Pro Core Tokens */
+  --q-bg: #030712;
+  --q-workspace: #050B18;
+  --q-surface: #07101F;
+  --q-elevated: #0A1426;
+  --q-card: #081224;
+  --q-border: #162238;
+  --q-border-hover: #1F3150;
+  --q-text: #F1F5F9;
   --q-text-secondary: #94A3B8;
   --q-muted: #64748B;
   
-  --q-accent: #22C7E8;
-  --q-strategy: #9B7BFF;
-  --q-positive: #22C983;
-  --q-negative: #F2556A;
-  --q-warning: #F2B84B;
-  --q-info: #4EA1FF;
+  --q-accent: #00E5FF;
+  --q-strategy: #8B5CF6;
+  --q-positive: #10B981;
+  --q-negative: #F43F5E;
+  --q-warning: #F59E0B;
+  --q-info: #38BDF8;
 
   /* Backward-Compatible Dynamic Institutional Theme Colors */
   --theme-bg: var(--q-bg);
   --theme-surface: var(--q-surface);
   --theme-elevated: var(--q-elevated);
   --theme-border: var(--q-border);
-  --theme-border-subtle: #121C2E;
+  --theme-border-subtle: #0E1A2C;
   --theme-text-primary: var(--q-text);
   --theme-text-secondary: var(--q-text-secondary);
   --theme-text-muted: var(--q-muted);
@@ -51,23 +51,23 @@
   /* Chart & Canvas Styling */
   --theme-chart-bg: var(--q-bg);
   --theme-chart-grid: var(--q-border);
-  --theme-chart-grid-opacity: 0.25;
+  --theme-chart-grid-opacity: 0.2;
   --theme-chart-candle-up: var(--q-positive);
   --theme-chart-candle-down: var(--q-negative);
   --theme-chart-line-thickness: 2px;
-  --theme-radius: 10px;
+  --theme-radius: 8px;
   --theme-radius-sm: 6px;
-  --theme-radius-lg: 12px;
+  --theme-radius-lg: 10px;
 
   /* Typography & Density Variables */
   --theme-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  --theme-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --theme-font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --theme-font-scale: 1.0;
   --theme-base-font-size: 13px;
-  --theme-density-padding-y: 0.5rem;
-  --theme-density-padding-x: 0.75rem;
-  --theme-density-gap: 0.5rem;
-  --theme-table-row-height: 2.25rem;
+  --theme-density-padding-y: 0.4rem;
+  --theme-density-padding-x: 0.65rem;
+  --theme-density-gap: 0.45rem;
+  --theme-table-row-height: 2.15rem;
 
   /* Legacy Backward-Compatibility Mappings */
   --background: var(--q-bg);
@@ -113,8 +113,13 @@ html {
 
 body {
   color: var(--theme-text-primary);
-  background-color: var(--theme-bg);
-  background-image: radial-gradient(1200px circle at 50% -100px, rgba(56, 189, 248, 0.08), transparent 70%);
+  background-color: #030712;
+  background-image: 
+    radial-gradient(1000px circle at 50% -120px, rgba(0, 229, 255, 0.06), transparent 60%),
+    linear-gradient(rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 100% 100%, 48px 48px, 48px 48px;
+  background-position: center top, center center, center center;
   background-attachment: fixed;
   font-family: var(--theme-font-sans);
   height: 100%;
@@ -193,60 +198,96 @@ body {
 }
 
 .theme-card {
-  background-color: var(--theme-surface);
-  border: 1px solid var(--theme-border);
-  border-radius: var(--theme-radius);
+  background-color: #07101F;
+  border: 1px solid #162238;
+  border-radius: 8px;
 }
 
 .theme-border {
-  border-color: var(--theme-border);
+  border-color: #162238;
 }
 
 .theme-border-subtle {
-  border-color: var(--theme-border-subtle);
+  border-color: #0E1A2C;
+}
+
+/* Futuristic Terminal Panels */
+.terminal-panel {
+  background: #07101F;
+  border: 1px solid #162238;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.terminal-panel-elevated {
+  background: #0A1426;
+  border: 1px solid #1F3150;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.6);
+  position: relative;
+}
+
+.terminal-panel-interactive {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.terminal-panel-interactive:hover {
+  border-color: rgba(0, 229, 255, 0.35);
+  box-shadow: 0 0 16px -2px rgba(0, 229, 255, 0.12), 0 8px 24px -4px rgba(0, 0, 0, 0.6);
 }
 
 /* Glassmorphism Surface with Theme Variables */
 .glass-panel {
-  background: rgba(13, 21, 38, 0.75);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--theme-border);
+  background: rgba(7, 16, 31, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid #162238;
 }
 
 .glass-panel-elevated {
-  background: rgba(20, 33, 56, 0.85);
+  background: rgba(10, 20, 38, 0.9);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--theme-border);
+  border: 1px solid #1F3150;
 }
 
 /* Eye-Friendly Specular Cards & Glow Effects */
 .card-specular {
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 24px -4px rgba(0, 0, 0, 0.4);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.05), 0 4px 16px -2px rgba(0, 0, 0, 0.5);
 }
 
 .card-interactive {
-  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
 
 .card-interactive:hover {
-  transform: translateY(-1.5px);
-  border-color: rgba(56, 189, 248, 0.35);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.12), 0 12px 28px -6px rgba(0, 0, 0, 0.5), 0 0 20px -4px rgba(56, 189, 248, 0.15);
+  border-color: rgba(0, 229, 255, 0.3);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.08), 0 8px 24px -4px rgba(0, 0, 0, 0.6), 0 0 16px -2px rgba(0, 229, 255, 0.1);
 }
 
 .glow-profit {
-  box-shadow: 0 0 20px -4px rgba(16, 185, 129, 0.3);
+  box-shadow: 0 0 16px -2px rgba(16, 185, 129, 0.25);
 }
 
 .glow-loss {
-  box-shadow: 0 0 20px -4px rgba(244, 63, 94, 0.3);
+  box-shadow: 0 0 16px -2px rgba(244, 63, 94, 0.25);
 }
 
 .glow-accent {
-  box-shadow: 0 0 20px -4px rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 16px -2px rgba(0, 229, 255, 0.25);
 }
+
+/* Terminal Header Accent Notch */
+.terminal-notch {
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  height: 2px;
+  width: 48px;
+  background: linear-gradient(90deg, #00E5FF, transparent);
+}
+
 
 /* ----------------------------------------------------------------------
  * Theme-Aware Thin Scrollbars

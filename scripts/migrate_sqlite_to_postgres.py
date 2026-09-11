@@ -238,19 +238,54 @@ def build_pg_table_ddl(sqlite_conn: sqlite3.Connection, table_name: str) -> str:
 
 
 def create_pg_tables(sqlite_conn: sqlite3.Connection, pg_conn, tables: List[str]):
-    """Creates all corresponding tables in PostgreSQL with autocommit."""
+    """Creates all corresponding tables in PostgreSQL and ensures all columns exist using fast metadata inspection."""
     with pg_conn.cursor() as pg_cur:
+        # 1. Fetch all existing tables and columns in 1 single roundtrip
+        pg_cur.execute("SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public';")
+        existing_cols = {(r[0], r[1]) for r in pg_cur.fetchall()}
+        pg_cur.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+        existing_tables = {r[0] for r in pg_cur.fetchall()}
+
         created = 0
         for t in tables:
-            ddl = build_pg_table_ddl(sqlite_conn, t)
+            if t not in existing_tables:
+                ddl = build_pg_table_ddl(sqlite_conn, t)
+                try:
+                    pg_cur.execute(ddl)
+                    created += 1
+                except Exception as e:
+                    logger.warning(f"DDL creation note on table '{t}': {e}")
+                    pg_conn.rollback()
+
+        # 2. Add any missing columns across existing tables
+        alter_statements = []
+        for t in tables:
+            sq_cur = sqlite_conn.cursor()
+            sq_cur.execute(f'PRAGMA table_info("{t}");')
+            cols = sq_cur.fetchall()
+            for col in cols:
+                _, name, col_type, notnull, dflt_val, pk = col
+                if (t, name) not in existing_cols:
+                    col_type_upper = col_type.upper() if col_type else "TEXT"
+                    if "INT" in col_type_upper:
+                        pg_type = "BIGINT"
+                    elif any(f in col_type_upper for f in ("REAL", "FLOAT", "DOUBLE", "NUMERIC")):
+                        pg_type = "DOUBLE PRECISION"
+                    elif "BLOB" in col_type_upper:
+                        pg_type = "BYTEA"
+                    else:
+                        pg_type = "TEXT"
+                    alter_statements.append(f'ALTER TABLE "{t}" ADD COLUMN IF NOT EXISTS "{name}" {pg_type};')
+
+        for stmt in alter_statements:
             try:
-                pg_cur.execute(ddl)
-                created += 1
-            except Exception as e:
-                logger.warning(f"DDL creation note on table '{t}': {e}")
+                pg_cur.execute(stmt)
+            except Exception as ex:
+                logger.debug(f"Column sync notice: {ex}")
                 pg_conn.rollback()
+
         pg_conn.commit()
-        logger.info(f"Verified/Created {created} tables in PostgreSQL.")
+        logger.info(f"Verified/Created {created} new tables and added {len(alter_statements)} missing columns in PostgreSQL.")
 
 
 

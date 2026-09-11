@@ -884,3 +884,5 @@ class DeltaOptionsService:
 
 # Singleton service instance
 delta_options_service = DeltaOptionsService(region="INDIA")
+global_delta_options_service = delta_options_service
+

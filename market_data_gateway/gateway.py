@@ -57,9 +57,10 @@ class MarketDataGateway:
         dhan_diagnostic_mode = os.environ.get("DHAN_ONLY_DIAGNOSTIC_MODE", "false").lower() == "true"
         
         if dhan_diagnostic_mode:
-            logger.info("[DHAN_ONLY_DIAGNOSTIC_MODE] Initializing Dhan adapter only. Upstox, Delta, Binance kept inactive.")
+            logger.info("[DHAN_ONLY_DIAGNOSTIC_MODE] Initializing Dhan and Delta adapters.")
             self.adapters = {
                 "dhan_ws": DhanWSAdapter(),
+                "delta_options_ws": DeltaOptionsWSAdapter(),
             }
         else:
             # Initialize adapters
@@ -542,6 +543,47 @@ class MarketDataGateway:
             "subscriptions": self.subscription_registry.dump(),
         })
 
+    async def handle_options_chain(self, request: web.Request) -> web.Response:
+        """
+        Canonical Option Chain HTTP Snapshot Endpoint.
+        Supports Delta Exchange India / Global for BTC, ETH, SOL, etc.
+        """
+        und = request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "BTC"
+        expiry = request.rel_url.query.get("expiry") or None
+        strike_count_str = request.rel_url.query.get("strike_count") or "40"
+        strike_count = int(strike_count_str) if strike_count_str.isdigit() else 40
+
+        delta_adapter = self.adapters.get("delta_options_ws")
+        if delta_adapter and hasattr(delta_adapter, "get_normalized_option_chain"):
+            try:
+                res = await delta_adapter.get_normalized_option_chain(
+                    underlying=und,
+                    expiry=expiry,
+                    strike_count=strike_count,
+                )
+                return web.json_response(res)
+            except Exception as ex:
+                logger.error(f"Error fetching Delta option chain: {ex}", exc_info=True)
+                return web.json_response({
+                    "success": False,
+                    "error": str(ex),
+                    "source": "DELTA_EXCHANGE",
+                    "broker": "DELTA",
+                    "underlying": und,
+                    "rows": [],
+                    "strikes": [],
+                }, status=500)
+
+        return web.json_response({
+            "success": False,
+            "error": "Delta options adapter not configured on gateway",
+            "source": "DELTA_EXCHANGE",
+            "broker": "DELTA",
+            "underlying": und,
+            "rows": [],
+            "strikes": [],
+        }, status=503)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ENTRYPOINT
@@ -580,6 +622,10 @@ def create_app() -> tuple:
     app.router.add_get("/search", gateway.handle_search)
     app.router.add_get("/ws", gateway.handle_ws)
     app.router.add_post("/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_get("/api/options/chain", gateway.handle_options_chain)
+    app.router.add_get("/api/options/delta/chain", gateway.handle_options_chain)
+    app.router.add_get("/options/chain", gateway.handle_options_chain)
+    app.router.add_get("/api/market-data/options", gateway.handle_options_chain)
 
     async def _on_startup(app_):
         await gateway.startup()

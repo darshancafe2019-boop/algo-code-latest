@@ -22,6 +22,7 @@ import { apiClient } from "@/lib/apiClient";
 import { OptionChainData, OptionContractQuote, MultiLegPayoff, OptionSource } from "@/types/option-chain";
 
 // Sleek Redesigned Options Gateway Components
+import { OptionChainTerminal } from "@/components/options/terminal/OptionChainTerminal";
 import { OptionsProviderHealthStrip } from "@/components/options/OptionsProviderHealthStrip";
 import { OptionsGatewayControlBar } from "@/components/options/OptionsGatewayControlBar";
 import { OptionsCompactMetricsBar } from "@/components/options/OptionsCompactMetricsBar";
@@ -241,28 +242,13 @@ export function OptionsUniverseView({
   const sourcesMap: Record<string, OptionChainData> = data?.sources || {};
 
   return (
-    <div className="flex flex-col gap-3 text-slate-100 font-sans w-full max-w-[1650px] mx-auto min-w-0">
-      {/* 1. Top Real-Time Provider Health Strip */}
-      <OptionsProviderHealthStrip
-        activeProvider={selectedSource}
-        onSelectProvider={(p) => {
-          if (!isSourceLocked) {
-            setSelectedSource(p);
-            if (p === "DELTA_INDIA" || p === "BINANCE") {
-              setUnderlying("BTC");
-            } else if (p === "DHAN" || p === "UPSTOX") {
-              setUnderlying("NIFTY");
-            }
-          }
-        }}
-      />
-
-      {/* 2. Compact Navigation Bar */}
+    <div className="flex flex-col gap-3 text-slate-100 font-sans w-full max-w-[1700px] mx-auto min-w-0">
+      {/* Top Navigation Tab Bar */}
       <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-slate-800/80 overflow-x-auto">
         <div className="flex items-center gap-1 min-w-0">
           {[
             { id: "CHAIN", label: "Option Chain", icon: Layers },
-            { id: "ANALYTICS", label: "Analytics", icon: BarChart2 },
+            { id: "ANALYTICS", label: "Analytics & Flow", icon: BarChart2 },
             { id: "STRATEGIES", label: "Strategies", icon: Sliders },
             { id: "TRADING", label: "Trading", icon: Send },
             { id: "PORTFOLIO", label: "Positions & Orders", icon: Activity },
@@ -293,7 +279,7 @@ export function OptionsUniverseView({
         {/* Source indicator */}
         <div className="hidden sm:flex items-center pr-1 flex-shrink-0">
           <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-            Active: <strong className="text-cyan-300">{selectedSource}</strong>
+            Active Provider: <strong className="text-cyan-300">{selectedSource}</strong>
           </span>
         </div>
       </div>
@@ -323,159 +309,13 @@ export function OptionsUniverseView({
         </div>
       )}
 
-      {/* 3. TAB: OPTION CHAIN (The Main Streamlined Terminal) */}
+      {/* 3. TAB: OPTION CHAIN (The Full Production Terminal) */}
       {activeTab === "CHAIN" && (
-        <div className="flex flex-col gap-3">
-          {/* Central High-Density Control Bar */}
-          <OptionsGatewayControlBar
-            underlying={underlying}
-            onChangeUnderlying={(u) => {
-              setUnderlying(u);
-              setSelectedExpiry("");
-            }}
-            selectedSource={selectedSource}
-            onChangeSource={(src) => !isSourceLocked && setSelectedSource(src)}
-            isSourceLocked={isSourceLocked}
-            environment={environment}
-            onChangeEnvironment={(env) => setEnvironment(env)}
-            selectedExpiry={currentExpiry}
-            onChangeExpiry={(exp) => setSelectedExpiry(exp)}
-            availableExpiries={expiriesList}
-            spotPrice={spotPrice}
-            spotChange24h={data?.spot_change_24h || 0.45}
-            strikeRange={strikeRange}
-            onChangeStrikeRange={(r) => setStrikeRange(r)}
-            moneynessFilter={moneynessFilter}
-            onChangeMoneynessFilter={(m) => setMoneynessFilter(m)}
-            showAdvancedColumns={showAdvancedColumns}
-            onToggleAdvancedColumns={() => setShowAdvancedColumns(!showAdvancedColumns)}
-            dataStatus={data?.freshnessStatus || data?.data_status || "LIVE"}
-            latencyMs={data?.latencyMs || data?.latency_ms || 20}
-            dataAgeMs={data?.dataAgeMs || 0}
-            isFetching={isFetching}
-            onRefresh={() => refetch()}
-          />
-
-          {/* Compact Summary Metrics Strip */}
-          <OptionsCompactMetricsBar
-            spotPrice={spotPrice}
-            atmStrike={data?.atm_strike || atmStrike}
-            maxPain={data?.max_pain}
-            pcr={data?.pcr}
-            atmIV={data?.atm_iv}
-            callResistanceStrike={data?.call_wall}
-            putSupportStrike={data?.put_wall}
-            currency={currencySymbol}
-            dataStatus={data?.data_status || data?.freshnessStatus || "LIVE"}
-            latencyMs={data?.latency_ms || data?.latencyMs || 16}
-          />
-
-          {/* Option Chain Table (Single Source or Consolidated) */}
-          {selectedSource === "ALL" && Object.entries(sourcesMap).length > 0 ? (
-            <div className="space-y-4">
-              {Object.entries(sourcesMap).map(([srcKey, rawSrcData]) => {
-                const srcData = rawSrcData as OptionChainData;
-                const srcStrikes = srcData?.strikes || [];
-                const srcProvider = srcData?.provider || srcKey;
-                const srcAccount = srcData?.brokerAccountAlias || srcData?.brokerAccountId || "Primary Account";
-                const srcFeed = srcData?.dataFeed || "REST";
-                const srcStatus = srcData?.freshnessStatus || srcData?.status || "CONNECTED";
-                const srcAge = srcData?.dataAgeMs || 0;
-                const srcLat = srcData?.latencyMs || 20;
-
-                const friendlyName =
-                  srcProvider === "DHAN"
-                    ? "Dhan"
-                    : srcProvider === "UPSTOX"
-                    ? "Upstox"
-                    : srcProvider === "DELTA_INDIA"
-                    ? "Delta Exchange India"
-                    : srcProvider === "BINANCE"
-                    ? "Binance"
-                    : "Paper Simulator";
-
-                return (
-                  <div key={srcKey} className="space-y-1.5">
-                    <div className="flex items-center justify-between px-2 text-xs font-mono text-slate-400">
-                      <span className="font-bold text-white flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-cyan-400 inline-block" />
-                        {friendlyName} ({srcAccount})
-                      </span>
-                      <span>Feed: {srcFeed} • {srcLat}ms</span>
-                    </div>
-                    <SimpleLiveOptionChainTable
-                      strikes={srcStrikes}
-                      spotPrice={spotPrice}
-                      currency={srcProvider === "DELTA_INDIA" || srcProvider === "BINANCE" ? "$" : "₹"}
-                      sourceName={friendlyName}
-                      brokerAccountAlias={srcAccount}
-                      environment={environment}
-                      dataFeed={srcFeed}
-                      freshnessStatus={srcStatus}
-                      dataAgeMs={srcAge}
-                      latencyMs={srcLat}
-                      filterMoneyness={moneynessFilter}
-                      showAdvancedColumns={showAdvancedColumns}
-                      selectedStrike={selectedStrike}
-                      selectedOptionType={selectedOptionType}
-                      onSelectOption={(k, type, quote) => {
-                        setSelectedStrike(k);
-                        setSelectedOptionType(type);
-                        setSelectedQuote(quote);
-                        setIsDrawerOpen(true);
-                      }}
-                      onQuickTrade={(k, type, side, ltp) => {
-                        singleOptionMutation.mutate({ side, lots: 1, strike: k, type, price: ltp });
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <SimpleLiveOptionChainTable
-              strikes={strikesList}
-              spotPrice={spotPrice}
-              currency={currencySymbol}
-              sourceName={selectedSource}
-              brokerAccountAlias={data?.brokerAccountAlias || data?.brokerAccountId || "Primary Account"}
-              environment={data?.environment || environment}
-              dataFeed={data?.dataFeed || "REST"}
-              freshnessStatus={data?.freshnessStatus || data?.data_status || "CONNECTED"}
-              dataAgeMs={data?.dataAgeMs || 0}
-              latencyMs={data?.latencyMs || data?.latency_ms || 20}
-              filterMoneyness={moneynessFilter}
-              showAdvancedColumns={showAdvancedColumns}
-              selectedStrike={selectedStrike}
-              selectedOptionType={selectedOptionType}
-              onSelectOption={(k, type, quote) => {
-                setSelectedStrike(k);
-                setSelectedOptionType(type);
-                setSelectedQuote(quote);
-                setIsDrawerOpen(true);
-              }}
-              onQuickTrade={(k, type, side, ltp) => {
-                singleOptionMutation.mutate({ side, lots: 1, strike: k, type, price: ltp });
-              }}
-            />
-          )}
-
-          {/* 4. Collapsible Advanced Section: Greeks, OI Heatmap, Strategies, Scanner */}
-          <OptionsAdvancedCollapsible
-            strikes={strikesList}
-            spotPrice={spotPrice}
-            atmStrike={atmStrike}
-            selectedExpiry={currentExpiry}
-            currency={currencySymbol}
-            environment={environment}
-            onSelectOption={(k, type, quote) => {
-              setSelectedStrike(k);
-              setSelectedOptionType(type);
-              setSelectedQuote(quote);
-              setIsDrawerOpen(true);
-            }}
-          />
-        </div>
+        <OptionChainTerminal
+          initialUnderlying={underlying}
+          initialSource={selectedSource}
+          isSourceLocked={isSourceLocked}
+        />
       )}
 
       {/* 4. TAB: ANALYTICS (Greeks & Flow) */}

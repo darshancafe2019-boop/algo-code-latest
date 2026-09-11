@@ -23,10 +23,17 @@ def get_options_chain():
     Returns live option chain with Black-Scholes Greeks, IV, PCR, and Max Pain.
     Strict Zero-Fabrication: If unquoted, values remain strict null.
     """
-    provider = request.args.get("provider", "DELTA").upper()
-    underlying = request.args.get("underlying", "BTC").upper()
+    provider = (request.args.get("provider") or request.args.get("source") or "DELTA").upper()
+    underlying = (request.args.get("underlying") or request.args.get("symbol") or "BTC").upper()
     expiry = request.args.get("expiry")
     mode = request.args.get("mode", "LIVE").upper()
+    strike_count = int(request.args.get("strike_count", 25))
+
+    is_delta = "DELTA" in provider or underlying in ["BTC", "ETH", "SOL", "XRP", "XAUT"]
+
+    if is_delta:
+        res = delta_options_ws_adapter.get_normalized_option_chain(underlying, expiry, strike_count)
+        return jsonify(res), 200
 
     snapshot = global_options_engine.get_option_chain(
         provider_name=provider,
@@ -36,6 +43,7 @@ def get_options_chain():
     )
 
     return jsonify(snapshot.to_dict()), 200
+
 
 
 @options_bp.route("/api/options/workstation/overview", methods=["GET"])

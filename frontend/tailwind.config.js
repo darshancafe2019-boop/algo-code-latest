@@ -11,6 +11,25 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        terminal: {
+          bg: "#030712",
+          surface: "#07101F",
+          elevated: "#0A1426",
+          card: "#081224",
+          border: "#162238",
+          borderSubtle: "#0E1A2C",
+          borderActive: "#00E5FF",
+          borderHover: "#1F3150",
+          textPrimary: "#F1F5F9",
+          textSecondary: "#94A3B8",
+          textMuted: "#64748B",
+          cyan: "#00E5FF",
+          blue: "#38BDF8",
+          purple: "#8B5CF6",
+          green: "#10B981",
+          red: "#F43F5E",
+          amber: "#F59E0B",
+        },
         q: {
           bg: "var(--q-bg)",
           workspace: "var(--q-workspace)",

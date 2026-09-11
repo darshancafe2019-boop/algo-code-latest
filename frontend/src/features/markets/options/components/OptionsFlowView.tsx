@@ -4,73 +4,90 @@ import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
-  Shield,
   Layers,
   RefreshCw,
-  Zap,
+  BarChart2,
   TrendingUp,
-  Info,
-  Scale,
-  ArrowUpRight,
-  ArrowDownRight,
+  Sparkles,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
-import {
-  formatPrice,
-  formatNumber,
-  formatInteger,
-} from "@/lib/formatters/numbers";
+import { OptionTerminalSnapshot } from "@/types/option-terminal";
+import { OptionFlowTable } from "@/components/options/terminal/OptionFlowTable";
+import { OptionAnalyticsPanel } from "@/components/options/terminal/OptionAnalyticsPanel";
+import { formatIndianCurrency, formatIndianQuantity } from "@/lib/options/options-analytics-engine";
 
 export function OptionsFlowView() {
   const [underlying, setUnderlying] = useState("NIFTY");
   const [source, setSource] = useState("DHAN");
+  const [subView, setSubView] = useState<"FLOW" | "ANALYTICS">("FLOW");
 
-  const { data, isLoading, isFetching, refetch } = useQuery<any>({
-    queryKey: ["optionsFlow", underlying, source],
+  const { data: snapshotData, isLoading, isFetching, refetch } = useQuery<{ success: boolean; data: OptionTerminalSnapshot }>({
+    queryKey: ["optionsFlowSnapshot", underlying, source],
     queryFn: async () => {
       const params = new URLSearchParams({
         underlying,
         provider: source,
+        strike_count: "25",
       });
       const res = await apiClient.get<any>(`/api/options/flow?${params.toString()}`);
       if (!res.ok || !res.data) throw new Error("Failed to load options flow analytics");
-      return res.data.data || res.data;
+      return res.data;
     },
-    staleTime: 5000,
+    staleTime: 4000,
+    refetchInterval: 5000,
   });
 
-  const strikes = data?.strikes || [];
-  const spotPrice = typeof data?.spot_price === "number" && !isNaN(data.spot_price) ? data.spot_price : null;
-  const totalCallOi = typeof data?.total_call_oi === "number" ? data.total_call_oi : null;
-  const totalPutOi = typeof data?.total_put_oi === "number" ? data.total_put_oi : null;
-  const pcr = typeof data?.pcr_oi === "number" && !isNaN(data.pcr_oi) ? data.pcr_oi : null;
-  const maxCallOiStrike = data?.max_call_oi_strike ?? null;
-  const maxPutOiStrike = data?.max_put_oi_strike ?? null;
-  const maxPain = data?.max_pain ?? null;
-
+  const snapshot = snapshotData?.data || null;
   const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || source === "DELTA_INDIA" || source === "BINANCE";
   const currency = isCrypto ? "$" : "₹";
 
+  const pcr = snapshot?.pcr;
+  const flow = snapshot?.flowSummary;
+
   return (
-    <div className="space-y-5 text-slate-100 font-sans">
+    <div className="space-y-4 text-slate-100 font-sans">
       {/* Top Header Controls Bar */}
-      <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 backdrop-blur-md flex flex-wrap items-center justify-between gap-4">
+      <div className="p-3.5 rounded-2xl bg-[#090E17] border border-slate-800/90 flex flex-wrap items-center justify-between gap-3 font-mono">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30">
-            <Layers className="h-5 w-5" />
+          <div className="p-2 rounded-xl bg-purple-500/15 text-purple-400 border border-purple-500/30">
+            <Activity className="h-4 w-4" />
           </div>
           <div>
-            <h1 className="text-base font-bold font-mono text-slate-100 flex items-center gap-2">
-              OPEN INTEREST & INSTITUTIONAL MARKET FLOW
+            <h1 className="text-sm font-bold text-white flex items-center gap-2">
+              REAL-TIME OPTIONS ORDER FLOW & DERIVATIVES INTELLIGENCE
             </h1>
-            <p className="text-xs text-slate-400">
-              Source-attributed Open Interest distribution, PCR, and strike concentration
+            <p className="text-[11px] text-slate-400">
+              Live trade-by-trade flow classification, sentiment scoring, and open interest distribution
             </p>
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-2 flex-wrap">
+        {/* Filters & Sub-view toggle */}
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          {/* Sub-view switcher */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5">
+            <button
+              type="button"
+              onClick={() => setSubView("FLOW")}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 ${
+                subView === "FLOW" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Order Flow Stream</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSubView("ANALYTICS")}
+              className={`px-2.5 py-1 rounded-md text-xs font-bold transition flex items-center gap-1 ${
+                subView === "ANALYTICS" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>Derivatives Analytics</span>
+            </button>
+          </div>
+
           <select
             value={underlying}
             onChange={(e) => {
@@ -82,11 +99,13 @@ export function OptionsFlowView() {
                 setSource("DHAN");
               }
             }}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono font-bold text-slate-200 outline-none focus:border-purple-500"
+            className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-bold text-cyan-300 outline-none cursor-pointer"
           >
             <option value="NIFTY">NIFTY 50 (NSE)</option>
             <option value="BANKNIFTY">BANKNIFTY (NSE)</option>
             <option value="FINNIFTY">FINNIFTY (NSE)</option>
+            <option value="MIDCPNIFTY">MIDCPNIFTY (NSE)</option>
+            <option value="SENSEX">SENSEX (BSE)</option>
             <option value="RELIANCE">RELIANCE (NSE)</option>
             <option value="BTC">BTC (Crypto)</option>
             <option value="ETH">ETH (Crypto)</option>
@@ -96,7 +115,7 @@ export function OptionsFlowView() {
           <select
             value={source}
             onChange={(e) => setSource(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-700 text-xs font-mono font-bold text-purple-400 outline-none focus:border-purple-500"
+            className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-xs font-bold text-purple-300 outline-none cursor-pointer"
           >
             {["BTC", "ETH", "SOL"].includes(underlying) ? (
               <>
@@ -106,163 +125,74 @@ export function OptionsFlowView() {
             ) : (
               <>
                 <option value="DHAN">Dhan HQ API v2</option>
-                <option value="UPSTOX">Upstox API v2/v3</option>
+                <option value="UPSTOX">Upstox API v3</option>
               </>
             )}
           </select>
 
           <button
+            type="button"
             onClick={() => refetch()}
             disabled={isFetching}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
             title="Refresh Flow Data"
           >
-            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin text-purple-400" : ""}`} />
+            <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
           </button>
         </div>
       </div>
 
       {/* 4 Flow Telemetry Metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-          <span className="text-[10px] text-slate-400 uppercase block">PUT / CALL RATIO (PCR)</span>
-          <div className={`text-xl font-bold mt-1 ${pcr !== null && pcr >= 1.0 ? "text-emerald-400" : "text-amber-400"}`}>
-            {formatNumber(pcr, 2)}
+      {snapshot && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+          <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
+            <span className="text-[10px] text-slate-400 uppercase block">PUT / CALL RATIO (PCR)</span>
+            <div className={`text-lg font-bold mt-0.5 ${pcr?.pcrOI && pcr.pcrOI >= 1.0 ? "text-emerald-400" : "text-amber-400"}`}>
+              {pcr?.pcrOI !== null && pcr?.pcrOI !== undefined ? pcr.pcrOI.toFixed(2) : "N/A"}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              {pcr?.pcrOI ? (pcr.pcrOI >= 1.2 ? "Bullish Sentiment" : pcr.pcrOI <= 0.8 ? "Bearish Sentiment" : "Neutral Positioning") : "Awaiting Data"}
+            </span>
           </div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {pcr !== null ? (pcr >= 1.2 ? "Bullish Positioning" : pcr <= 0.8 ? "Bearish Positioning" : "Neutral Range") : "Awaiting Data"}
-          </span>
-        </div>
 
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-          <span className="text-[10px] text-slate-400 uppercase block">HIGHEST CALL OI (RESISTANCE)</span>
-          <div className="text-xl font-bold text-rose-400 mt-1">{maxCallOiStrike !== null ? maxCallOiStrike : "—"}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Major Ceiling Strike</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-          <span className="text-[10px] text-slate-400 uppercase block">HIGHEST PUT OI (SUPPORT)</span>
-          <div className="text-xl font-bold text-emerald-400 mt-1">{maxPutOiStrike !== null ? maxPutOiStrike : "—"}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Major Floor Strike</span>
-        </div>
-
-        <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
-          <span className="text-[10px] text-slate-400 uppercase block">MAX PAIN LEVEL</span>
-          <div className="text-xl font-bold text-sky-400 mt-1">{maxPain !== null ? maxPain : "—"}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Theoretical Expiry Anchor</span>
-        </div>
-      </div>
-
-      {/* OI Distribution Ladder Table */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
-        <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
-          <div className="text-xs font-mono font-bold text-slate-200 flex items-center gap-2">
-            <Activity className="h-4 w-4 text-purple-400" />
-            STRIKE OI DISTRIBUTION & ORDER FLOW LADDER
+          <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
+            <span className="text-[10px] text-slate-400 uppercase block">HIGHEST CALL OI (RESISTANCE)</span>
+            <div className="text-lg font-bold text-rose-400 mt-0.5">
+              {snapshot.resistanceZone?.strike ? snapshot.resistanceZone.strike.toLocaleString("en-IN") : "—"}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              Call OI: {formatIndianQuantity(snapshot.resistanceZone?.oi)}
+            </span>
           </div>
-          <div className="text-[11px] font-mono text-slate-400">
-            Spot: <span className="text-slate-100 font-bold">{formatPrice(spotPrice, currency, 2)}</span>
+
+          <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
+            <span className="text-[10px] text-slate-400 uppercase block">HIGHEST PUT OI (SUPPORT)</span>
+            <div className="text-lg font-bold text-emerald-400 mt-0.5">
+              {snapshot.supportZone?.strike ? snapshot.supportZone.strike.toLocaleString("en-IN") : "—"}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              Put OI: {formatIndianQuantity(snapshot.supportZone?.oi)}
+            </span>
+          </div>
+
+          <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
+            <span className="text-[10px] text-slate-400 uppercase block">MAX PAIN ANCHOR</span>
+            <div className="text-lg font-bold text-cyan-400 mt-0.5">
+              {snapshot.maxPain !== null && snapshot.maxPain !== undefined ? snapshot.maxPain.toLocaleString("en-IN") : "—"}
+            </div>
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
+              Spot: {formatIndianCurrency(snapshot.spotPrice, currency)}
+            </span>
           </div>
         </div>
+      )}
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono">
-            <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/60 text-[10px] text-slate-400 uppercase tracking-wider">
-                {/* Calls */}
-                <th className="py-2.5 px-3 text-right text-rose-400">Call OI</th>
-                <th className="py-2.5 px-3 text-right text-rose-400">Call OI Chg</th>
-                <th className="py-2.5 px-3 text-right text-rose-400">Call Vol</th>
-                <th className="py-2.5 px-3 text-right text-rose-400">Call LTP</th>
-
-                {/* Strike */}
-                <th className="py-2.5 px-4 text-center bg-slate-900 text-purple-300 font-bold border-x border-slate-800">
-                  STRIKE
-                </th>
-
-                {/* Puts */}
-                <th className="py-2.5 px-3 text-left text-emerald-400">Put LTP</th>
-                <th className="py-2.5 px-3 text-left text-emerald-400">Put Vol</th>
-                <th className="py-2.5 px-3 text-left text-emerald-400">Put OI Chg</th>
-                <th className="py-2.5 px-3 text-left text-emerald-400">Put OI</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {strikes.length === 0 ? (
-                <tr>
-                  <td colSpan={9} className="py-8 text-center text-slate-500 font-mono text-xs">
-                    {isLoading ? "Loading flow and open interest data..." : "No active strikes available."}
-                  </td>
-                </tr>
-              ) : (
-                strikes.map((r: any) => {
-                  const isMaxCall = maxCallOiStrike && r.strike === maxCallOiStrike;
-                  const isMaxPut = maxPutOiStrike && r.strike === maxPutOiStrike;
-
-                  return (
-                    <tr
-                      key={r.strike}
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        r.is_atm ? "bg-purple-500/10 font-bold" : ""
-                      }`}
-                    >
-                      {/* Call Metrics */}
-                      <td className="py-2 px-3 text-right text-slate-200 font-bold">
-                        <div className="flex items-center justify-end gap-1.5">
-                          {isMaxCall && (
-                            <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                              RES
-                            </span>
-                          )}
-                          <span>{formatInteger(r.call_oi)}</span>
-                        </div>
-                      </td>
-                      <td className={`py-2 px-3 text-right ${r.call_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {r.call_oi_change !== undefined && r.call_oi_change !== null
-                          ? `${r.call_oi_change >= 0 ? "+" : ""}${formatInteger(r.call_oi_change)}`
-                          : "—"}
-                      </td>
-                      <td className="py-2 px-3 text-right text-slate-400">{formatInteger(r.call_volume)}</td>
-                      <td className="py-2 px-3 text-right text-slate-300 font-bold">{formatPrice(r.call_ltp, currency, 2)}</td>
-
-                      {/* Center Strike */}
-                      <td className="py-2 px-4 text-center bg-slate-900/90 font-bold text-slate-100 border-x border-slate-800">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span>{r.strike}</span>
-                          {r.is_atm && (
-                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-purple-500/30 text-purple-300 border border-purple-400/40">
-                              ATM
-                            </span>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Put Metrics */}
-                      <td className="py-2 px-3 text-left text-slate-300 font-bold">{formatPrice(r.put_ltp, currency, 2)}</td>
-                      <td className="py-2 px-3 text-left text-slate-400">{formatInteger(r.put_volume)}</td>
-                      <td className={`py-2 px-3 text-left ${r.put_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {r.put_oi_change !== undefined && r.put_oi_change !== null
-                          ? `${r.put_oi_change >= 0 ? "+" : ""}${formatInteger(r.put_oi_change)}`
-                          : "—"}
-                      </td>
-                      <td className="py-2 px-3 text-left text-slate-200 font-bold">
-                        <div className="flex items-center justify-start gap-1.5">
-                          <span>{formatInteger(r.put_oi)}</span>
-                          {isMaxPut && (
-                            <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                              SUP
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Main View Display */}
+      {subView === "FLOW" ? (
+        <OptionFlowTable flowTrades={snapshot?.flowTrades || []} currency={currency} />
+      ) : (
+        snapshot && <OptionAnalyticsPanel snapshot={snapshot} currency={currency} />
+      )}
     </div>
   );
 }

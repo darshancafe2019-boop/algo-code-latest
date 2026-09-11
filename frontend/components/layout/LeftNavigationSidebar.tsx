@@ -102,7 +102,6 @@ export function LeftNavigationSidebar({
       items: [
         { id: "dashboard", label: "DASHBOARD", subtitle: "Executive Summary", path: "/", icon: LayoutDashboard },
         { id: "live", label: "LIVE FEED", subtitle: "Dhan HQ Real-Time", path: "/live", icon: Radio, badge: "DHAN" },
-        { id: "reports", label: "REPORTS & INTEL", subtitle: "Global Intelligence", path: "/reports", icon: FileText, badge: "LIVE" },
         { id: "markets", label: "MARKETS", subtitle: "Spot & Indices Discovery", path: "/markets", icon: LineChart },
         {
           id: "options",
@@ -252,7 +251,7 @@ export function LeftNavigationSidebar({
     <>
       {/* Desktop & Tablet Adaptive Sidebar */}
       <aside
-        className={`hidden md:flex flex-col bg-[var(--theme-surface)]/95 border-r border-[var(--theme-border)] transition-all duration-200 select-none z-20 shrink-0 ${isCollapsed ? "w-16" : "w-16 xl:w-60"
+        className={`hidden md:flex flex-col bg-[#050B18]/95 backdrop-blur-md border-r border-[#162238] transition-all duration-200 select-none z-20 shrink-0 ${isCollapsed ? "w-16" : "w-16 xl:w-60"
           }`}
       >
         {/* Navigation Groups */}
@@ -260,7 +259,7 @@ export function LeftNavigationSidebar({
           {navGroups.map((group) => (
             <div key={group.groupName} className="space-y-1">
               {!isCollapsed && (
-                <span className="hidden xl:block px-3 text-[10px] font-mono font-bold tracking-widest text-slate-400 uppercase mb-2">
+                <span className="hidden xl:block px-3 text-[9px] font-mono font-bold tracking-widest text-[#64748B] uppercase mb-2">
                   {group.groupName}
                 </span>
               )}
@@ -285,48 +284,48 @@ export function LeftNavigationSidebar({
                       aria-expanded={hasChildren ? isExpanded : undefined}
                       data-nav-id={item.id}
                       data-nav-path={item.path}
-                      className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
-                        ? "bg-sky-500/15 text-sky-400 font-bold border border-sky-500/35 shadow-sm shadow-sky-500/15"
-                        : "text-slate-400 hover:text-slate-100 hover:bg-[var(--theme-elevated)]/80 border border-transparent"
+                      className={`w-full min-h-[38px] flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
+                        ? "bg-[#00E5FF]/10 text-[#00E5FF] font-semibold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.12)]"
+                        : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#0A1426] border border-transparent"
                         }`}
                     >
                       {/* Active Left Indicator Bar */}
                       {active && (
-                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-sky-400 rounded-r-full shadow-[0_0_10px_rgba(56,189,248,0.9)]" />
+                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#00E5FF] rounded-r-full shadow-[0_0_8px_#00E5FF]" />
                       )}
 
                       <Icon
-                        className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-sky-400" : "text-slate-400 group-hover:text-slate-200"
+                        className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-[#00E5FF]" : "text-[#64748B] group-hover:text-[#94A3B8]"
                           }`}
                       />
 
                       {!isCollapsed && (
                         <>
                           <div className="hidden xl:flex flex-col flex-1 text-left min-w-0">
-                            <span className="tracking-wide truncate font-bold text-xs">{item.label}</span>
+                            <span className="tracking-wide truncate font-semibold text-xs">{item.label}</span>
                             {item.subtitle && (
-                              <span className="text-[9px] text-[#8BA596] truncate font-sans font-normal -mt-0.5">
+                              <span className="text-[9px] text-[#64748B] truncate font-sans font-normal -mt-0.5">
                                 {item.subtitle}
                               </span>
                             )}
                           </div>
                           {item.badge && (
-                            <span className="hidden xl:inline-block px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold border border-emerald-500/30">
+                            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-[#00E5FF]/10 text-[#00E5FF] text-[8px] font-bold tracking-wider border border-[#00E5FF]/30 font-mono">
                               {item.badge}
                             </span>
                           )}
                           {hasChildren && (
                             <div
                               onClick={(e) => toggleExpand(item.id, e)}
-                              className="p-1 rounded hover:bg-slate-700/50 text-slate-400 hover:text-slate-200 transition"
+                              className="p-1 rounded hover:bg-[#162238] text-[#64748B] hover:text-[#F8FAFC] transition"
                             >
                               <ChevronDown
-                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-sky-400" : ""}`}
+                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-[#00E5FF]" : ""}`}
                               />
                             </div>
                           )}
                           {item.shortcut && !hasChildren && (
-                            <kbd className="text-[9px] text-slate-500 font-mono hidden 2xl:inline">
+                            <kbd className="text-[9px] text-[#475569] font-mono hidden 2xl:inline bg-[#0A1426] px-1 py-0.5 rounded border border-[#162238]">
                               {item.shortcut}
                             </kbd>
                           )}
@@ -336,7 +335,7 @@ export function LeftNavigationSidebar({
 
                     {/* Children Dropdown (Desktop Expanded) */}
                     {!isCollapsed && hasChildren && isExpanded && (
-                      <div className="hidden xl:flex flex-col pl-7 pr-1 py-1 space-y-0.5 animate-fadeIn border-l border-slate-800/80 ml-4 my-1">
+                      <div className="hidden xl:flex flex-col pl-7 pr-1 py-1 space-y-0.5 animate-fadeIn border-l border-[#162238] ml-4 my-1">
                         {item.children!.map((child) => {
                           const childActive = isChildActive(child);
                           return (
@@ -354,17 +353,17 @@ export function LeftNavigationSidebar({
                               }}
                               data-nav-child-id={child.id}
                               data-nav-child-path={child.path}
-                              className={`w-full min-h-[30px] flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-mono transition-all duration-150 relative cursor-pointer ${childActive
-                                ? "bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40 shadow-sm"
-                                : "text-slate-400 hover:text-slate-200 hover:bg-[var(--theme-elevated)]/60 border border-transparent"
+                              className={`w-full min-h-[30px] flex items-center justify-between px-2.5 py-1 rounded text-[11px] font-mono transition-all duration-150 relative cursor-pointer ${childActive
+                                ? "bg-[#00E5FF]/15 text-[#00E5FF] font-semibold border border-[#00E5FF]/30 shadow-sm"
+                                : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#0A1426] border border-transparent"
                                 }`}
                             >
                               {childActive && (
-                                <span className="absolute -left-[17px] top-2 bottom-2 w-1 bg-sky-400 rounded-full" />
+                                <span className="absolute -left-[17px] top-2 bottom-2 w-1 bg-[#00E5FF] rounded-full shadow-[0_0_6px_#00E5FF]" />
                               )}
                               <span className="truncate">{child.label}</span>
                               {child.badge && (
-                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
+                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-[#0A1426] text-[#94A3B8] border border-[#162238]">
                                   {child.badge}
                                 </span>
                               )}
@@ -381,21 +380,21 @@ export function LeftNavigationSidebar({
         </div>
 
         {/* Bottom Collapse Toggle Footer */}
-        <div className="p-3 border-t border-[var(--theme-border)] flex items-center justify-between">
+        <div className="p-3 border-t border-[#162238] bg-[#030712]/50 flex items-center justify-between">
           {!isCollapsed && (
-            <div className="hidden xl:flex items-center gap-2 text-[10px] font-mono text-[var(--theme-text-muted)]">
-              <span className="w-2 h-2 rounded-full bg-[var(--theme-profit)] animate-pulse" />
-              <span>ENGINES LIVE</span>
+            <div className="hidden xl:flex items-center gap-2 text-[10px] font-mono text-[#64748B]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shadow-[0_0_8px_#10B981]" />
+              <span className="tracking-wider">CORE SYNCED</span>
             </div>
           )}
 
           <button
             onClick={onToggleCollapse}
-            className="min-w-[36px] min-h-[36px] flex items-center justify-center p-1.5 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] border border-[var(--theme-border)] transition-all ml-auto"
+            className="min-w-[32px] min-h-[32px] flex items-center justify-center p-1 rounded-lg bg-[#0A1426] hover:bg-[#0E1A30] text-[#94A3B8] hover:text-[#00E5FF] border border-[#162238] hover:border-[#00E5FF]/40 transition-all ml-auto cursor-pointer"
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
             aria-label={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+            {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
           </button>
         </div>
       </aside>
@@ -404,28 +403,28 @@ export function LeftNavigationSidebar({
       {mobileDrawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex font-sans">
           <div
-            className="fixed inset-0 bg-[var(--theme-bg)]/80 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-[#030712]/80 backdrop-blur-sm transition-opacity"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          <div className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-[var(--theme-surface)] border-r border-[var(--theme-border)] p-4 flex flex-col z-50 text-[var(--theme-text-primary)] shadow-2xl overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[var(--theme-border)] pb-3 mb-4 shrink-0">
+          <div className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-[#050B18] border-r border-[#162238] p-4 flex flex-col z-50 text-[#F8FAFC] shadow-2xl overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-[#162238] pb-3 mb-4 shrink-0">
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[var(--theme-accent)] animate-pulse" />
-                <span className="text-xs font-mono font-bold text-[var(--theme-accent)]">QUANT.OS NAVIGATION</span>
+                <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse shadow-[0_0_8px_#00E5FF]" />
+                <span className="text-xs font-mono font-bold text-[#00E5FF] tracking-wider">QUANT.OS NAVIGATION</span>
               </div>
               <button
                 onClick={() => setMobileDrawerOpen(false)}
-                className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[var(--theme-elevated)] text-[var(--theme-text-secondary)] active:scale-95"
+                className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg bg-[#0A1426] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#162238] active:scale-95"
                 aria-label="Close Menu"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             <div className="flex-1 space-y-4">
               {navGroups.map((group) => (
                 <div key={group.groupName} className="space-y-1">
-                  <span className="text-[9px] font-mono text-[var(--theme-text-muted)] uppercase block px-2">
+                  <span className="text-[9px] font-mono text-[#64748B] uppercase tracking-wider block px-2">
                     {group.groupName}
                   </span>
                   {group.items.map((item) => {
@@ -445,32 +444,32 @@ export function LeftNavigationSidebar({
                           }}
                           data-mobile-nav-id={item.id}
                           data-mobile-nav-path={item.path}
-                          className={`w-full min-h-[44px] flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-mono transition-all ${active
-                            ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold border border-[var(--theme-accent)]/40"
-                            : "text-[var(--theme-text-secondary)] active:bg-[var(--theme-elevated)]"
+                          className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-mono transition-all ${active
+                            ? "bg-[#00E5FF]/15 text-[#00E5FF] font-semibold border border-[#00E5FF]/35 shadow-[0_0_10px_rgba(0,229,255,0.1)]"
+                            : "text-[#94A3B8] active:bg-[#0A1426]"
                             }`}
                         >
                           <Icon className="h-4 w-4 shrink-0" />
                           <div className="flex flex-col flex-1 text-left min-w-0">
-                            <span className="font-bold text-xs">{item.label}</span>
+                            <span className="font-semibold text-xs">{item.label}</span>
                             {item.subtitle && (
-                              <span className="text-[10px] text-[#8BA596] font-sans font-normal">
+                              <span className="text-[10px] text-[#64748B] font-sans font-normal">
                                 {item.subtitle}
                               </span>
                             )}
                           </div>
                           {item.badge && (
-                            <span className="px-1.5 py-0.2 rounded bg-[var(--theme-elevated)] text-[var(--theme-accent)] text-[9px] font-bold border border-[var(--theme-border)]">
+                            <span className="px-1.5 py-0.2 rounded bg-[#0A1426] text-[#00E5FF] text-[8px] font-bold border border-[#00E5FF]/30 font-mono">
                               {item.badge}
                             </span>
                           )}
                           {hasChildren && (
                             <div
                               onClick={(e) => toggleExpand(item.id, e)}
-                              className="p-1.5 rounded bg-slate-800 text-slate-300"
+                              className="p-1 rounded bg-[#0A1426] text-[#94A3B8]"
                             >
                               <ChevronDown
-                                className={`h-4 w-4 transition-transform duration-200 ${isExpanded ? "rotate-180 text-sky-400" : ""}`}
+                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-[#00E5FF]" : ""}`}
                               />
                             </div>
                           )}
@@ -478,7 +477,7 @@ export function LeftNavigationSidebar({
 
                         {/* Mobile Children List */}
                         {hasChildren && isExpanded && (
-                          <div className="pl-6 space-y-1 my-1 border-l-2 border-slate-800 ml-4">
+                          <div className="pl-6 space-y-1 my-1 border-l border-[#162238] ml-4">
                             {item.children!.map((child) => {
                               const childActive = isChildActive(child);
                               return (
@@ -491,14 +490,14 @@ export function LeftNavigationSidebar({
                                   }}
                                   data-mobile-child-id={child.id}
                                   data-mobile-child-path={child.path}
-                                  className={`w-full min-h-[38px] flex items-center justify-between px-3 py-2 rounded-lg text-xs font-mono transition-all ${childActive
-                                    ? "bg-sky-500/25 text-sky-300 font-bold border border-sky-500/40"
-                                    : "text-slate-400 active:bg-[var(--theme-elevated)]"
+                                  className={`w-full min-h-[34px] flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-mono transition-all ${childActive
+                                    ? "bg-[#00E5FF]/20 text-[#00E5FF] font-semibold border border-[#00E5FF]/40"
+                                    : "text-[#94A3B8] active:bg-[#0A1426]"
                                     }`}
                                 >
                                   <span>{child.label}</span>
                                   {child.badge && (
-                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+                                    <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-[#0A1426] text-[#94A3B8] border border-[#162238]">
                                       {child.badge}
                                     </span>
                                   )}
@@ -518,7 +517,7 @@ export function LeftNavigationSidebar({
       )}
 
       {/* Mobile Bottom Quick Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--theme-surface)]/95 backdrop-blur-xl border-t border-[var(--theme-border)] flex items-center justify-around px-2 py-1 select-none pb-[calc(0.25rem+var(--safe-bottom))]">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#050B18]/95 backdrop-blur-xl border-t border-[#162238] flex items-center justify-around px-2 py-1 select-none pb-[calc(0.25rem+var(--safe-bottom))]">
         {mobileBarItems.map((barItem) => {
           const Icon = barItem.icon;
           const active = barItem.isMenu ? false : (pathname === barItem.path || (barItem.path !== "/" && pathname?.startsWith(barItem.path)));
@@ -544,12 +543,12 @@ export function LeftNavigationSidebar({
                 }
               }}
               className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-xl font-mono text-[10px] transition-all active:scale-95 ${active
-                ? "text-[var(--theme-accent)] font-bold"
-                : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
+                ? "text-[#00E5FF] font-semibold"
+                : "text-[#64748B] hover:text-[#F8FAFC]"
                 }`}
               aria-label={barItem.label}
             >
-              <Icon className={`h-4 w-4 ${active ? "text-[var(--theme-accent)]" : "text-[var(--theme-text-muted)]"}`} />
+              <Icon className={`h-4 w-4 ${active ? "text-[#00E5FF]" : "text-[#64748B]"}`} />
               <span className="truncate">{barItem.label}</span>
             </button>
           );

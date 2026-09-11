@@ -76,29 +76,29 @@ export const GlobalHeader = memo(function GlobalHeader({
   const totalEquity = portfolioSnapshot?.equity ?? statusData?.health?.balance ?? 1000000;
 
   return (
-    <header className="h-12 bg-[#070B14] border-b border-[#213047] px-3 sm:px-4 flex items-center justify-between gap-2 select-none z-30 font-sans shrink-0 sticky top-0">
+    <header className="h-12 bg-[#030712] border-b border-[#162238] px-3 sm:px-4 flex items-center justify-between gap-2 select-none z-30 font-sans shrink-0 sticky top-0 backdrop-blur-xl">
       {/* ── LEFT SECTION: BRAND + ACTIVE SYMBOL ──────────────────────── */}
       <div className="flex items-center gap-3 shrink-0">
         <Link
           href="/"
           className="flex items-center gap-2 group hover:opacity-90 transition-opacity"
         >
-          <div className="h-7 w-7 rounded bg-[#22C7E8]/10 border border-[#22C7E8]/40 flex items-center justify-center text-[#22C7E8] font-mono font-bold text-xs shadow-[0_0_10px_rgba(34,199,232,0.2)]">
+          <div className="h-7 w-7 rounded bg-cyan-500/10 border border-cyan-400/40 flex items-center justify-center text-cyan-400 font-mono font-bold text-xs shadow-[0_0_10px_rgba(0,229,255,0.25)]">
             <Terminal className="h-4 w-4" />
           </div>
           <div className="flex flex-col">
-            <span className="text-xs font-bold font-mono tracking-wider text-[#F4F7FA] group-hover:text-[#22C7E8] transition-colors leading-none">
-              QUANT<span className="text-[#22C7E8]">.OS</span>
+            <span className="text-xs font-bold font-mono tracking-wider text-slate-100 group-hover:text-cyan-400 transition-colors leading-none">
+              QUANT<span className="text-cyan-400">.OS</span>
             </span>
-            <span className="text-[9px] font-mono tracking-widest text-[#64748B] uppercase leading-tight mt-0.5 hidden sm:inline">
-              INSTITUTIONAL TERMINAL
+            <span className="text-[9px] font-mono tracking-widest text-slate-500 uppercase leading-tight mt-0.5 hidden sm:inline">
+              AI TRADING TERMINAL
             </span>
           </div>
         </Link>
 
         {activeSymbol && (
-          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0E1624] border border-[#213047] font-mono text-[11px] text-[#F4F7FA]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22C983]" />
+          <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#07101F] border border-[#162238] font-mono text-[11px] text-slate-200">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="font-semibold">{activeSymbol}</span>
           </div>
         )}
@@ -109,13 +109,13 @@ export const GlobalHeader = memo(function GlobalHeader({
         <button
           type="button"
           onClick={onOpenSearch}
-          className="w-full flex items-center justify-between px-3 py-1 bg-[#0E1624] hover:bg-[#121C2C] border border-[#213047] hover:border-[#31445E] rounded-md text-xs font-mono text-[#94A3B8] transition-colors cursor-pointer"
+          className="w-full flex items-center justify-between px-3 py-1 bg-[#07101F] hover:bg-[#0A1426] border border-[#162238] hover:border-cyan-500/40 rounded-md text-xs font-mono text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
         >
           <span className="flex items-center gap-2">
-            <Search className="h-3.5 w-3.5 text-[#64748B]" />
+            <Search className="h-3.5 w-3.5 text-slate-500" />
             <span>Search symbols, orders, bots...</span>
           </span>
-          <span className="text-[10px] bg-[#101827] px-1.5 py-0.5 rounded border border-[#213047] text-[#64748B]">
+          <span className="text-[10px] bg-[#0A1426] px-1.5 py-0.5 rounded border border-[#162238] text-slate-400">
             ⌘K
           </span>
         </button>
@@ -133,9 +133,9 @@ export const GlobalHeader = memo(function GlobalHeader({
           <button
             type="button"
             onClick={() => onOpenDetailDrawer?.("providers")}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#0E1624] border border-[#213047] hover:border-[#22C7E8] text-[#94A3B8] transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#07101F] border border-[#162238] hover:border-cyan-500/40 text-slate-300 transition-colors cursor-pointer"
           >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22C983]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>DATA {liveProvidersCount}/{totalProvidersCount} LIVE</span>
           </button>
 
@@ -145,36 +145,22 @@ export const GlobalHeader = memo(function GlobalHeader({
             className={cn(
               "flex items-center gap-1 px-2 py-0.5 rounded border transition-colors cursor-pointer",
               isKillSwitchActive
-                ? "bg-[#F2556A]/15 border-[#F2556A]/40 text-[#F2556A]"
-                : "bg-[#0E1624] border-[#213047] hover:border-[#22C983] text-[#94A3B8]"
+                ? "bg-rose-500/20 border-rose-500/50 text-rose-300"
+                : "bg-[#07101F] border-[#162238] hover:border-emerald-500/40 text-slate-300"
             )}
           >
-            <span
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                isKillSwitchActive ? "bg-[#F2556A] animate-ping" : "bg-[#22C983]"
-              )}
-            />
-            <span>RISK {isKillSwitchActive ? "HALTED" : "READY"}</span>
+            <Shield className={cn("h-3 w-3", isKillSwitchActive ? "text-rose-400" : "text-emerald-400")} />
+            <span>{isKillSwitchActive ? "KILL SWITCH" : "RISK GATE"}</span>
           </button>
-
-          <div className="hidden 2xl:flex items-center gap-1 px-2 py-0.5 rounded bg-[#0E1624] border border-[#213047] text-[#94A3B8]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#22C983]" />
-            <span>OMS READY</span>
-          </div>
-
-          <div className="hidden 2xl:flex items-center gap-1 px-2 py-0.5 rounded bg-[#0E1624] border border-[#213047] text-[#64748B]">
-            <span>ba_primary</span>
-          </div>
         </div>
 
         {/* P&L Display */}
-        <div className="hidden sm:flex items-center gap-2 px-2.5 py-0.5 rounded bg-[#0E1624] border border-[#213047] font-mono text-xs">
-          <span className="text-[10px] text-[#64748B] uppercase">P&L:</span>
+        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded bg-[#07101F] border border-[#162238] font-mono text-xs">
+          <span className="text-[10px] text-slate-500 uppercase">P&L:</span>
           <span
             className={cn(
               "font-bold tabular-nums",
-              todaysPnl >= 0 ? "text-[#22C983]" : "text-[#F2556A]"
+              todaysPnl >= 0 ? "text-emerald-400" : "text-rose-400"
             )}
           >
             {todaysPnl >= 0 ? `+₹${Math.round(todaysPnl).toLocaleString()}` : `-₹${Math.round(Math.abs(todaysPnl)).toLocaleString()}`}

@@ -52,8 +52,10 @@ from src.delta_options_client import global_delta_client
 
 logger = logging.getLogger("MDGateway.DeltaOptionsWS")
 
-DELTA_PUBLIC_WS_DEFAULT = "wss://public-socket.india.delta.exchange"
-DELTA_PUBLIC_WS_FALLBACK = "wss://socket.india.delta.exchange"
+from src.delta_region_adapter import DeltaRegionAdapter, DeltaRegion
+
+DELTA_PUBLIC_WS_DEFAULT = DeltaRegionAdapter.get_ws_url("INDIA")
+DELTA_PUBLIC_WS_FALLBACK = DeltaRegionAdapter.get_ws_fallback_url("INDIA")
 MAX_BACKOFF_SEC = 30.0
 
 
@@ -160,7 +162,7 @@ class DeltaCandle:
 # ─── Delta Subscription Manager ──────────────────────────────────────────────
 
 class DeltaSubscriptionManager:
-    """Manages active channel subscriptions and ensures clean targeted dispatch."""
+    """Manages active channel subscriptions with reference counting and ensures clean targeted dispatch."""
 
     def __init__(self):
         self.ticker_symbols: Set[str] = set()
@@ -173,11 +175,25 @@ class DeltaSubscriptionManager:
         self.funding_symbols: Set[str] = set()
         self.candle_subscriptions: Dict[str, Set[str]] = {}  # resolution -> set of symbols
         self.chain_symbols: Set[str] = set()
+        self._ref_counts: Dict[str, int] = {}
 
     def add_ticker(self, symbol: str):
-        self.ticker_symbols.add(symbol.upper().strip())
+        s = symbol.upper().strip()
+        self.ticker_symbols.add(s)
+        self._ref_counts[f"ticker:{s}"] = self._ref_counts.get(f"ticker:{s}", 0) + 1
 
-    def add_orderbook(self, symbol: str, level: str = "l2"):
+    def remove_ticker(self, symbol: str) -> bool:
+        s = symbol.upper().strip()
+        k = f"ticker:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                self.ticker_symbols.discard(s)
+                return True
+        return False
+
+    def add_orderbook(self, symbol: str, level: str = "l1"):
         s = symbol.upper().strip()
         if level == "l1":
             self.ob_l1_symbols.add(s)
@@ -185,18 +201,63 @@ class DeltaSubscriptionManager:
             self.ob_updates_symbols.add(s)
         else:
             self.ob_l2_symbols.add(s)
+        self._ref_counts[f"ob_{level}:{s}"] = self._ref_counts.get(f"ob_{level}:{s}", 0) + 1
+
+    def remove_orderbook(self, symbol: str, level: str = "l1") -> bool:
+        s = symbol.upper().strip()
+        k = f"ob_{level}:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                if level == "l1":
+                    self.ob_l1_symbols.discard(s)
+                elif level == "updates":
+                    self.ob_updates_symbols.discard(s)
+                else:
+                    self.ob_l2_symbols.discard(s)
+                return True
+        return False
 
     def add_trades(self, symbol: str):
-        self.trades_symbols.add(symbol.upper().strip())
+        s = symbol.upper().strip()
+        self.trades_symbols.add(s)
+        self._ref_counts[f"trades:{s}"] = self._ref_counts.get(f"trades:{s}", 0) + 1
+
+    def remove_trades(self, symbol: str) -> bool:
+        s = symbol.upper().strip()
+        k = f"trades:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                self.trades_symbols.discard(s)
+                return True
+        return False
 
     def add_mark_price(self, symbol: str):
-        self.mark_price_symbols.add(symbol.upper().strip())
+        s = symbol.upper().strip()
+        self.mark_price_symbols.add(s)
+        self._ref_counts[f"mark:{s}"] = self._ref_counts.get(f"mark:{s}", 0) + 1
+
+    def remove_mark_price(self, symbol: str) -> bool:
+        s = symbol.upper().strip()
+        k = f"mark:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                self.mark_price_symbols.discard(s)
+                return True
+        return False
 
     def add_spot_price(self, symbol: str):
-        self.spot_price_symbols.add(symbol.upper().strip())
+        s = symbol.upper().strip()
+        self.spot_price_symbols.add(s)
 
     def add_funding(self, symbol: str):
-        self.funding_symbols.add(symbol.upper().strip())
+        s = symbol.upper().strip()
+        self.funding_symbols.add(s)
 
     def add_candles(self, symbol: str, resolution: str = "1m"):
         s = symbol.upper().strip()
@@ -204,7 +265,20 @@ class DeltaSubscriptionManager:
         res_list.add(s)
 
     def add_chain(self, chain_symbol: str):
-        self.chain_symbols.add(chain_symbol.upper().strip())
+        s = chain_symbol.upper().strip()
+        self.chain_symbols.add(s)
+        self._ref_counts[f"chain:{s}"] = self._ref_counts.get(f"chain:{s}", 0) + 1
+
+    def remove_chain(self, chain_symbol: str) -> bool:
+        s = chain_symbol.upper().strip()
+        k = f"chain:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                self.chain_symbols.discard(s)
+                return True
+        return False
 
     def build_subscription_payload(self) -> Dict[str, Any]:
         channels = []
@@ -312,6 +386,44 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             self.sub_mgr.add_spot_price(sym)
             self.sub_mgr.add_funding(sym)
 
+    def start_background_thread(self) -> None:
+        """Starts the WebSocket adapter event loop in a dedicated background daemon thread."""
+        if self._running or (hasattr(self, "_bg_thread") and self._bg_thread and self._bg_thread.is_alive()):
+            return
+
+        def _runner():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            self._loop = loop
+            try:
+                loop.run_until_complete(self.connect())
+                loop.run_forever()
+            except Exception as ex:
+                self._logger.error(f"Delta WS background runner terminated: {ex}")
+
+        self._bg_thread = threading.Thread(target=_runner, name="DeltaWS-BackgroundThread", daemon=True)
+        self._bg_thread.start()
+        self._logger.info("Delta Public WS background worker thread started.")
+
+    def _schedule_coro(self, coro):
+        """Thread-safe coroutine dispatcher onto the WebSocket loop."""
+        if hasattr(self, "_loop") and self._loop and self._loop.is_running():
+            try:
+                curr_loop = asyncio.get_running_loop()
+            except RuntimeError:
+                curr_loop = None
+            if curr_loop is self._loop:
+                asyncio.create_task(coro)
+            else:
+                asyncio.run_coroutine_threadsafe(coro, self._loop)
+        else:
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    asyncio.create_task(coro)
+            except Exception:
+                pass
+
     # ─── Lifecycle & Connection ───────────────────────────────────────────────
 
     async def connect(self) -> None:
@@ -408,12 +520,21 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                     )
                     await asyncio.sleep(backoff)
 
+    def _is_ws_open(self) -> bool:
+        if self._ws is None or not self._running:
+            return False
+        if hasattr(self._ws, "closed"):
+            return not self._ws.closed
+        if hasattr(self._ws, "close_code"):
+            return self._ws.close_code is None
+        return True
+
     async def _ping_loop(self) -> None:
         """Sends periodic application-level heartbeats every 25 seconds."""
         while self._running and self._ws:
             try:
                 await asyncio.sleep(25.0)
-                if self._ws and not self._ws.closed:
+                if self._is_ws_open():
                     try:
                         await self._ws.send(json.dumps({"type": "ping"}))
                     except Exception:
@@ -429,7 +550,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         for s in symbols:
             self.sub_mgr.add_ticker(s)
             self._subscribed_symbols.add(s.upper().strip())
-        if self._ws and not self._ws.closed and self._running:
+        if self._is_ws_open():
             await self._send_all_subscriptions()
 
     async def unsubscribe(self, symbols: List[str]) -> None:
@@ -437,7 +558,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             s_up = s.upper().strip()
             self.sub_mgr.ticker_symbols.discard(s_up)
             self._subscribed_symbols.discard(s_up)
-        if self._ws and not self._ws.closed and self._running:
+        if self._is_ws_open():
             unsub_msg = {
                 "type": "unsubscribe",
                 "payload": {
@@ -455,7 +576,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         """Registers a chain symbol (e.g. BTC-250926) for automatic options feed subscription."""
         clean = chain_symbol.upper().strip()
         self.sub_mgr.add_chain(clean)
-        if self._ws and not self._ws.closed and self._running:
+        if self._is_ws_open():
             sub_msg = {
                 "type": "subscribe",
                 "payload": {
@@ -464,59 +585,120 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                     ]
                 }
             }
-            asyncio.create_task(self._safe_send(sub_msg))
+            self._schedule_coro(self._safe_send(sub_msg))
+
+    def subscribe_option_chain(self, chain_symbol: str):
+        self.track_chain_symbol(chain_symbol)
+
+    def unsubscribe_option_chain(self, chain_symbol: str):
+        clean = chain_symbol.upper().strip()
+        if self.sub_mgr.remove_chain(clean):
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": "ticker", "symbols": [clean]}]}
+                }))
+
+    def subscribe_l1(self, symbol: str):
+        self.subscribe_orderbook(symbol, level="l1")
+
+    def unsubscribe_l1(self, symbol: str):
+        s = symbol.upper().strip()
+        if self.sub_mgr.remove_orderbook(s, level="l1"):
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": "ob_l1", "symbols": [s]}]}
+                }))
 
     def subscribe_ticker(self, symbol: str):
         self.sub_mgr.add_ticker(symbol)
-        if self._ws and not self._ws.closed and self._running:
-            asyncio.create_task(self._safe_send({
+        if self._is_ws_open():
+            self._schedule_coro(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": "ticker", "symbols": [symbol]}]}
             }))
 
+    def unsubscribe_ticker(self, symbol: str):
+        s = symbol.upper().strip()
+        if self.sub_mgr.remove_ticker(s):
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": "ticker", "symbols": [s]}]}
+                }))
+
     def subscribe_orderbook(self, symbol: str, level: str = "l2"):
         self.sub_mgr.add_orderbook(symbol, level=level)
         ch_name = "ob_l1" if level == "l1" else ("ob_updates" if level == "updates" else "ob_l2")
-        if self._ws and not self._ws.closed and self._running:
-            asyncio.create_task(self._safe_send({
+        if self._is_ws_open():
+            self._schedule_coro(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": ch_name, "symbols": [symbol]}]}
             }))
 
+    def unsubscribe_orderbook(self, symbol: str, level: str = "l2"):
+        s = symbol.upper().strip()
+        if self.sub_mgr.remove_orderbook(s, level=level):
+            ch_name = "ob_l1" if level == "l1" else ("ob_updates" if level == "updates" else "ob_l2")
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": ch_name, "symbols": [s]}]}
+                }))
+
     def subscribe_trades(self, symbol: str):
         self.sub_mgr.add_trades(symbol)
-        if self._ws and not self._ws.closed and self._running:
-            asyncio.create_task(self._safe_send({
+        if self._is_ws_open():
+            self._schedule_coro(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": "trades", "symbols": [symbol]}]}
             }))
 
+    def unsubscribe_trades(self, symbol: str):
+        s = symbol.upper().strip()
+        if self.sub_mgr.remove_trades(s):
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": "trades", "symbols": [s]}]}
+                }))
+
     def subscribe_mark_price(self, symbol: str):
         self.sub_mgr.add_mark_price(symbol)
-        if self._ws and not self._ws.closed and self._running:
-            asyncio.create_task(self._safe_send({
+        if self._is_ws_open():
+            self._schedule_coro(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": "mark_price", "symbols": [symbol]}]}
             }))
 
+    def unsubscribe_mark_price(self, symbol: str):
+        s = symbol.upper().strip()
+        if self.sub_mgr.remove_mark_price(s):
+            if self._is_ws_open():
+                self._schedule_coro(self._safe_send({
+                    "type": "unsubscribe",
+                    "payload": {"channels": [{"name": "mark_price", "symbols": [s]}]}
+                }))
+
     def subscribe_candles(self, symbol: str, resolution: str = "1m"):
         self.sub_mgr.add_candles(symbol, resolution)
-        if self._ws and not self._ws.closed and self._running:
-            asyncio.create_task(self._safe_send({
+        if self._is_ws_open():
+            self._schedule_coro(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": "candlesticks", "symbols": [symbol], "resolution": resolution}]}
             }))
 
     def subscribe_funding(self, symbol: str):
         self.sub_mgr.add_funding(symbol)
-        if self._ws and not self._ws.closed and self._running:
+        if self._is_ws_open():
             asyncio.create_task(self._safe_send({
                 "type": "subscribe",
                 "payload": {"channels": [{"name": "funding_rate", "symbols": [symbol]}]}
             }))
 
     async def _safe_send(self, payload: Dict[str, Any]) -> None:
-        if self._ws and not self._ws.closed:
+        if self._is_ws_open():
             try:
                 await self._ws.send(json.dumps(payload))
             except Exception as e:

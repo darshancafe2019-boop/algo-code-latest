@@ -9,12 +9,15 @@ import { OpenInterestHeatmapView } from "./OpenInterestHeatmapView";
 import { ImpliedVolatilitySkewView } from "./ImpliedVolatilitySkewView";
 import { MultiLegStrategyBuilder } from "./MultiLegStrategyBuilder";
 import { OptionsScannerView } from "./OptionsScannerView";
+import { DeltaOptionChainDiagnosticsPanel } from "./DeltaOptionChainDiagnosticsPanel";
 
 interface OptionsAdvancedCollapsibleProps {
   strikes: OptionStrikeRow[];
   spotPrice: number;
   atmStrike: number;
   selectedExpiry: string;
+  underlying?: string;
+  region?: string;
   currency?: string;
   environment: "PAPER" | "LIVE";
   onSelectOption: (strike: number, type: "CE" | "PE", quote: any) => void;
@@ -26,13 +29,15 @@ export function OptionsAdvancedCollapsible({
   spotPrice,
   atmStrike,
   selectedExpiry,
+  underlying = "BTC",
+  region = "INDIA",
   currency = "₹",
   environment,
   onSelectOption,
   isOpenDefault = false,
 }: OptionsAdvancedCollapsibleProps) {
   const [isOpen, setIsOpen] = useState(isOpenDefault);
-  const [activeTab, setActiveTab] = useState<"HEATMAP" | "SKEW" | "STRATEGY" | "SCANNER">("HEATMAP");
+  const [activeTab, setActiveTab] = useState<"HEATMAP" | "SKEW" | "STRATEGY" | "SCANNER" | "DIAGNOSTICS">("HEATMAP");
 
   return (
     <div className="bg-[#080E1C] border border-slate-800 rounded-2xl overflow-hidden font-mono text-xs">
@@ -45,7 +50,7 @@ export function OptionsAdvancedCollapsible({
         <div className="flex items-center gap-2">
           <span className="text-cyan-400 font-black">ADVANCED ANALYTICS & STRATEGIES</span>
           <span className="text-[10px] text-slate-500 font-normal hidden sm:inline">
-            (OI Heatmap • IV Skew • 18+ Strategy Presets • Scanner)
+            (OI Heatmap • IV Skew • 18+ Strategy Presets • Scanner • Diagnostics)
           </span>
         </div>
 
@@ -65,6 +70,7 @@ export function OptionsAdvancedCollapsible({
               { id: "SKEW", label: "IV Smile & Skew", icon: BarChart2 },
               { id: "STRATEGY", label: "Strategy Builder", icon: Sliders },
               { id: "SCANNER", label: "Options Scanner", icon: Activity },
+              { id: "DIAGNOSTICS", label: "Pipeline Diagnostics", icon: Cpu },
             ].map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
@@ -114,6 +120,14 @@ export function OptionsAdvancedCollapsible({
                 spotPrice={spotPrice}
                 currency={currency}
                 onSelectOption={onSelectOption}
+              />
+            )}
+
+            {activeTab === "DIAGNOSTICS" && (
+              <DeltaOptionChainDiagnosticsPanel
+                underlying={underlying}
+                expiry={selectedExpiry}
+                region={region}
               />
             )}
           </div>

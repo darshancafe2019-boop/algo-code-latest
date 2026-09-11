@@ -16,6 +16,7 @@ STRICT TRUTH-IN-DATA POLICY:
 from __future__ import annotations
 
 import os
+import ssl
 import time
 import json
 import logging
@@ -25,6 +26,12 @@ import urllib.parse
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple, Union
 import pandas as pd
+
+try:
+    import certifi
+    _ssl_context = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    _ssl_context = ssl.create_default_context()
 
 from src import config
 
@@ -257,6 +264,14 @@ class UpstoxService:
             and not self._circuit_breaker_open
         )
 
+    def get_masked_access_token(self) -> str:
+        """Returns masked access token for safe logging (never outputs raw secret)."""
+        if not self._access_token:
+            return "MISSING"
+        if len(self._access_token) <= 8:
+            return "********"
+        return f"********{self._access_token[-4:]}"
+
     def set_access_token(self, new_token: str) -> None:
         """Updates the access token and resets circuit breaker state."""
         self.access_token = new_token
@@ -372,7 +387,7 @@ class UpstoxService:
 
         req = urllib.request.Request(url, data=encoded_data, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=timeout, context=_ssl_context) as resp:
                 raw = resp.read().decode("utf-8")
                 return json.loads(raw)
         except urllib.error.HTTPError as he:

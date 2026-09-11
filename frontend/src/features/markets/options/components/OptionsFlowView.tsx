@@ -15,6 +15,11 @@ import {
   ArrowDownRight,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import {
+  formatPrice,
+  formatNumber,
+  formatInteger,
+} from "@/lib/formatters/numbers";
 
 export function OptionsFlowView() {
   const [underlying, setUnderlying] = useState("NIFTY");
@@ -35,13 +40,16 @@ export function OptionsFlowView() {
   });
 
   const strikes = data?.strikes || [];
-  const spotPrice = data?.spot_price || 22500.0;
-  const totalCallOi = data?.total_call_oi || 0;
-  const totalPutOi = data?.total_put_oi || 0;
-  const pcr = data?.pcr_oi || 1.0;
-  const maxCallOiStrike = data?.max_call_oi_strike || 0;
-  const maxPutOiStrike = data?.max_put_oi_strike || 0;
-  const maxPain = data?.max_pain || 0;
+  const spotPrice = typeof data?.spot_price === "number" && !isNaN(data.spot_price) ? data.spot_price : null;
+  const totalCallOi = typeof data?.total_call_oi === "number" ? data.total_call_oi : null;
+  const totalPutOi = typeof data?.total_put_oi === "number" ? data.total_put_oi : null;
+  const pcr = typeof data?.pcr_oi === "number" && !isNaN(data.pcr_oi) ? data.pcr_oi : null;
+  const maxCallOiStrike = data?.max_call_oi_strike ?? null;
+  const maxPutOiStrike = data?.max_put_oi_strike ?? null;
+  const maxPain = data?.max_pain ?? null;
+
+  const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || source === "DELTA_INDIA" || source === "BINANCE";
+  const currency = isCrypto ? "$" : "₹";
 
   return (
     <div className="space-y-5 text-slate-100 font-sans">
@@ -61,7 +69,7 @@ export function OptionsFlowView() {
           </div>
         </div>
 
-        {/* Source & Underlying Selectors */}
+        {/* Filters */}
         <div className="flex items-center gap-2 flex-wrap">
           <select
             value={underlying}
@@ -82,6 +90,7 @@ export function OptionsFlowView() {
             <option value="RELIANCE">RELIANCE (NSE)</option>
             <option value="BTC">BTC (Crypto)</option>
             <option value="ETH">ETH (Crypto)</option>
+            <option value="SOL">SOL (Crypto)</option>
           </select>
 
           <select
@@ -91,8 +100,8 @@ export function OptionsFlowView() {
           >
             {["BTC", "ETH", "SOL"].includes(underlying) ? (
               <>
-                <option value="DELTA_INDIA">Delta Exchange India</option>
-                <option value="BINANCE">Binance Options</option>
+                <option value="DELTA_INDIA">Delta Exchange India (LIVE)</option>
+                <option value="BINANCE">Binance European Options (LIVE)</option>
               </>
             ) : (
               <>
@@ -117,29 +126,29 @@ export function OptionsFlowView() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">PUT / CALL RATIO (PCR)</span>
-          <div className={`text-xl font-bold mt-1 ${pcr >= 1.0 ? "text-emerald-400" : "text-amber-400"}`}>
-            {pcr ? pcr.toFixed(2) : "—"}
+          <div className={`text-xl font-bold mt-1 ${pcr !== null && pcr >= 1.0 ? "text-emerald-400" : "text-amber-400"}`}>
+            {formatNumber(pcr, 2)}
           </div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">
-            {pcr >= 1.2 ? "Bullish Positioning" : pcr <= 0.8 ? "Bearish Positioning" : "Neutral Range"}
+            {pcr !== null ? (pcr >= 1.2 ? "Bullish Positioning" : pcr <= 0.8 ? "Bearish Positioning" : "Neutral Range") : "Awaiting Data"}
           </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">HIGHEST CALL OI (RESISTANCE)</span>
-          <div className="text-xl font-bold text-rose-400 mt-1">{maxCallOiStrike || "—"}</div>
+          <div className="text-xl font-bold text-rose-400 mt-1">{maxCallOiStrike !== null ? maxCallOiStrike : "—"}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Major Ceiling Strike</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">HIGHEST PUT OI (SUPPORT)</span>
-          <div className="text-xl font-bold text-emerald-400 mt-1">{maxPutOiStrike || "—"}</div>
+          <div className="text-xl font-bold text-emerald-400 mt-1">{maxPutOiStrike !== null ? maxPutOiStrike : "—"}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Major Floor Strike</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">MAX PAIN LEVEL</span>
-          <div className="text-xl font-bold text-sky-400 mt-1">{maxPain || "—"}</div>
+          <div className="text-xl font-bold text-sky-400 mt-1">{maxPain !== null ? maxPain : "—"}</div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Theoretical Expiry Anchor</span>
         </div>
       </div>
@@ -149,10 +158,10 @@ export function OptionsFlowView() {
         <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
           <div className="text-xs font-mono font-bold text-slate-200 flex items-center gap-2">
             <Activity className="h-4 w-4 text-purple-400" />
-            STRIKE OPEN INTEREST & VOLUME BREAKDOWN
+            STRIKE OI DISTRIBUTION & ORDER FLOW LADDER
           </div>
           <div className="text-[11px] font-mono text-slate-400">
-            Total Calls: <span className="text-emerald-400 font-bold">{totalCallOi.toLocaleString()}</span> | Total Puts: <span className="text-rose-400 font-bold">{totalPutOi.toLocaleString()}</span>
+            Spot: <span className="text-slate-100 font-bold">{formatPrice(spotPrice, currency, 2)}</span>
           </div>
         </div>
 
@@ -160,81 +169,96 @@ export function OptionsFlowView() {
           <table className="w-full text-left text-xs font-mono">
             <thead>
               <tr className="border-b border-slate-800 bg-slate-950/60 text-[10px] text-slate-400 uppercase tracking-wider">
-                <th className="py-2.5 px-3 text-right text-emerald-400">Call OI</th>
-                <th className="py-2.5 px-3 text-right text-emerald-400">Call OI Δ</th>
-                <th className="py-2.5 px-3 text-right text-emerald-400">Call Vol</th>
-                <th className="py-2.5 px-3 text-right text-emerald-400">LTP</th>
+                {/* Calls */}
+                <th className="py-2.5 px-3 text-right text-rose-400">Call OI</th>
+                <th className="py-2.5 px-3 text-right text-rose-400">Call OI Chg</th>
+                <th className="py-2.5 px-3 text-right text-rose-400">Call Vol</th>
+                <th className="py-2.5 px-3 text-right text-rose-400">Call LTP</th>
 
+                {/* Strike */}
                 <th className="py-2.5 px-4 text-center bg-slate-900 text-purple-300 font-bold border-x border-slate-800">
                   STRIKE
                 </th>
 
-                <th className="py-2.5 px-3 text-left text-rose-400">LTP</th>
-                <th className="py-2.5 px-3 text-left text-rose-400">Put Vol</th>
-                <th className="py-2.5 px-3 text-left text-rose-400">Put OI Δ</th>
-                <th className="py-2.5 px-3 text-left text-rose-400">Put OI</th>
+                {/* Puts */}
+                <th className="py-2.5 px-3 text-left text-emerald-400">Put LTP</th>
+                <th className="py-2.5 px-3 text-left text-emerald-400">Put Vol</th>
+                <th className="py-2.5 px-3 text-left text-emerald-400">Put OI Chg</th>
+                <th className="py-2.5 px-3 text-left text-emerald-400">Put OI</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {strikes.map((r: any) => {
-                const isMaxCall = r.strike === maxCallOiStrike;
-                const isMaxPut = r.strike === maxPutOiStrike;
+              {strikes.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-slate-500 font-mono text-xs">
+                    {isLoading ? "Loading flow and open interest data..." : "No active strikes available."}
+                  </td>
+                </tr>
+              ) : (
+                strikes.map((r: any) => {
+                  const isMaxCall = maxCallOiStrike && r.strike === maxCallOiStrike;
+                  const isMaxPut = maxPutOiStrike && r.strike === maxPutOiStrike;
 
-                return (
-                  <tr
-                    key={r.strike}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      r.is_atm ? "bg-purple-500/10 font-bold" : ""
-                    }`}
-                  >
-                    {/* Call Metrics */}
-                    <td className="py-2 px-3 text-right text-slate-200 font-bold">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {isMaxCall && (
-                          <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
-                            RES
-                          </span>
-                        )}
-                        <span>{r.call_oi ? r.call_oi.toLocaleString() : "—"}</span>
-                      </div>
-                    </td>
-                    <td className={`py-2 px-3 text-right ${r.call_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {r.call_oi_change !== undefined ? `${r.call_oi_change >= 0 ? "+" : ""}${r.call_oi_change.toLocaleString()}` : "—"}
-                    </td>
-                    <td className="py-2 px-3 text-right text-slate-400">{r.call_volume ? r.call_volume.toLocaleString() : "—"}</td>
-                    <td className="py-2 px-3 text-right text-slate-300 font-bold">₹{r.call_ltp ? r.call_ltp.toFixed(2) : "—"}</td>
+                  return (
+                    <tr
+                      key={r.strike}
+                      className={`hover:bg-slate-800/40 transition-colors ${
+                        r.is_atm ? "bg-purple-500/10 font-bold" : ""
+                      }`}
+                    >
+                      {/* Call Metrics */}
+                      <td className="py-2 px-3 text-right text-slate-200 font-bold">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {isMaxCall && (
+                            <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30">
+                              RES
+                            </span>
+                          )}
+                          <span>{formatInteger(r.call_oi)}</span>
+                        </div>
+                      </td>
+                      <td className={`py-2 px-3 text-right ${r.call_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {r.call_oi_change !== undefined && r.call_oi_change !== null
+                          ? `${r.call_oi_change >= 0 ? "+" : ""}${formatInteger(r.call_oi_change)}`
+                          : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-right text-slate-400">{formatInteger(r.call_volume)}</td>
+                      <td className="py-2 px-3 text-right text-slate-300 font-bold">{formatPrice(r.call_ltp, currency, 2)}</td>
 
-                    {/* Center Strike */}
-                    <td className="py-2 px-4 text-center bg-slate-900/90 font-bold text-slate-100 border-x border-slate-800">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span>{r.strike}</span>
-                        {r.is_atm && (
-                          <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-purple-500/30 text-purple-300 border border-purple-400/40">
-                            ATM
-                          </span>
-                        )}
-                      </div>
-                    </td>
+                      {/* Center Strike */}
+                      <td className="py-2 px-4 text-center bg-slate-900/90 font-bold text-slate-100 border-x border-slate-800">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>{r.strike}</span>
+                          {r.is_atm && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-purple-500/30 text-purple-300 border border-purple-400/40">
+                              ATM
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                    {/* Put Metrics */}
-                    <td className="py-2 px-3 text-left text-slate-300 font-bold">₹{r.put_ltp ? r.put_ltp.toFixed(2) : "—"}</td>
-                    <td className="py-2 px-3 text-left text-slate-400">{r.put_volume ? r.put_volume.toLocaleString() : "—"}</td>
-                    <td className={`py-2 px-3 text-left ${r.put_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {r.put_oi_change !== undefined ? `${r.put_oi_change >= 0 ? "+" : ""}${r.put_oi_change.toLocaleString()}` : "—"}
-                    </td>
-                    <td className="py-2 px-3 text-left text-slate-200 font-bold">
-                      <div className="flex items-center justify-start gap-1.5">
-                        <span>{r.put_oi ? r.put_oi.toLocaleString() : "—"}</span>
-                        {isMaxPut && (
-                          <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                            SUP
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      {/* Put Metrics */}
+                      <td className="py-2 px-3 text-left text-slate-300 font-bold">{formatPrice(r.put_ltp, currency, 2)}</td>
+                      <td className="py-2 px-3 text-left text-slate-400">{formatInteger(r.put_volume)}</td>
+                      <td className={`py-2 px-3 text-left ${r.put_oi_change >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                        {r.put_oi_change !== undefined && r.put_oi_change !== null
+                          ? `${r.put_oi_change >= 0 ? "+" : ""}${formatInteger(r.put_oi_change)}`
+                          : "—"}
+                      </td>
+                      <td className="py-2 px-3 text-left text-slate-200 font-bold">
+                        <div className="flex items-center justify-start gap-1.5">
+                          <span>{formatInteger(r.put_oi)}</span>
+                          {isMaxPut && (
+                            <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                              SUP
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

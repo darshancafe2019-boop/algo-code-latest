@@ -46,20 +46,20 @@ export type FreshnessStatus =
   | "DEGRADED";
 
 export interface OptionContractQuote {
-  ltp: number;
-  bid: number;
-  ask: number;
-  spread: number;
-  iv: number;
-  delta: number;
-  gamma: number;
-  theta: number;
-  vega: number;
-  rho?: number;
-  open_interest: number;
-  oi_change?: number;
-  oi_change_pct?: number;
-  volume: number;
+  ltp: number | null;
+  bid: number | null;
+  ask: number | null;
+  spread: number | null;
+  iv: number | null;
+  delta: number | null;
+  gamma: number | null;
+  theta: number | null;
+  vega: number | null;
+  rho?: number | null;
+  open_interest: number | null;
+  oi_change?: number | null;
+  oi_change_pct?: number | null;
+  volume: number | null;
   moneyness: Moneyness;
   in_the_money?: boolean;
   strike?: number;

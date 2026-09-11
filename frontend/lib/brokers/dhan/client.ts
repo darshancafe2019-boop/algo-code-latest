@@ -1,6 +1,14 @@
 /**
  * Dhan HQ API v2 Typed Client (Sandbox & Live)
+ * Features:
+ * - Dynamic token resolution from DhanTokenManager
+ * - Structured Dhan error code mappings
+ * - Rate limit & timeout protection
+ * - Zero token leakage in error dumps
  */
+
+import { dhanTokenManager } from "./token-manager";
+import { DhanAuthError } from "./types";
 
 export interface DhanRequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
@@ -14,12 +22,12 @@ export interface DhanRequestOptions {
 
 export class DhanClient {
   private baseUrl: string;
-  private accessToken: string;
-  private clientId: string;
+  private overrideToken?: string;
+  private overrideClientId?: string;
 
   constructor(accessToken?: string, clientId?: string, baseUrl?: string) {
-    this.accessToken = accessToken || process.env.DHAN_ACCESS_TOKEN || "";
-    this.clientId = clientId || process.env.DHAN_CLIENT_ID || "";
+    this.overrideToken = accessToken;
+    this.overrideClientId = clientId;
     const isSandbox =
       process.env.DHAN_SANDBOX === "true" ||
       process.env.DHAN_ENV?.toUpperCase() === "SANDBOX";
@@ -30,8 +38,8 @@ export class DhanClient {
   }
 
   public setCredentials(accessToken: string, clientId?: string, baseUrl?: string) {
-    this.accessToken = accessToken.trim();
-    if (clientId !== undefined) this.clientId = clientId.trim();
+    this.overrideToken = accessToken.trim();
+    if (clientId !== undefined) this.overrideClientId = clientId.trim();
     if (baseUrl) this.baseUrl = baseUrl.trim();
   }
 
@@ -44,18 +52,26 @@ export class DhanClient {
   }
 
   public hasToken(): boolean {
-    return Boolean(this.accessToken);
+    return Boolean(this.getAccessToken());
+  }
+
+  public getClientId(): string {
+    return this.overrideClientId || dhanTokenManager.getClientId() || process.env.DHAN_CLIENT_ID || "";
+  }
+
+  public getAccessToken(): string {
+    return this.overrideToken || dhanTokenManager.getAccessToken() || process.env.DHAN_ACCESS_TOKEN || "";
   }
 
   public async request<T = any>(options: DhanRequestOptions): Promise<T> {
-    const token = options.accessToken || this.accessToken;
-    const cid = options.clientId || this.clientId;
+    const token = options.accessToken || this.getAccessToken();
+    const cid = options.clientId || this.getClientId();
     const base = options.baseUrl || this.baseUrl;
     const method = options.method || "GET";
     const timeoutMs = options.timeoutMs || 8000;
 
     if (!token) {
-      throw new Error("DHAN_AUTH_REQUIRED: Dhan Access Token is not configured.");
+      throw new DhanAuthError("DHAN_AUTH_REQUIRED", "Dhan Access Token is not configured.", 401);
     }
 
     const cleanPath = options.path.replace(/^\//, "");
@@ -90,28 +106,32 @@ export class DhanClient {
         try {
           errBody = await response.json();
         } catch {
-          errBody = { message: await response.text() };
+          errBody = { message: `HTTP ${response.status}` };
         }
-        const errorMsg =
-          errBody?.errorMessage ||
-          errBody?.message ||
-          errBody?.error ||
-          `Dhan HTTP ${response.status}`;
-        const err = new Error(errorMsg) as any;
-        err.statusCode = response.status;
-        err.dhanErrorCode = errBody?.errorCode || errBody?.errorType;
-        err.raw = errBody;
-        throw err;
+
+        const rawCode = errBody?.errorCode || errBody?.errorType || errBody?.code || `HTTP_${response.status}`;
+        const rawMsg = errBody?.errorMessage || errBody?.message || errBody?.error || `Dhan API error (${response.status})`;
+
+        if (response.status === 401 || response.status === 403 || rawCode === "DH-901" || rawCode === "807") {
+          dhanTokenManager.invalidateToken("Dhan API returned 401/403 Unauthorized");
+        }
+
+        throw new DhanAuthError(rawCode, rawMsg, response.status, response.status >= 500);
       }
 
       const resJson = await response.json();
       return resJson as T;
     } catch (error: any) {
       clearTimeout(timer);
-      if (error.name === "AbortError") {
-        throw new Error(`DHAN_TIMEOUT: Request to Dhan timed out after ${timeoutMs}ms.`);
+      if (error instanceof DhanAuthError) {
+        throw error;
       }
-      throw error;
+      if (error.name === "AbortError") {
+        throw new DhanAuthError("DHAN_TIMEOUT", `Request to Dhan timed out after ${timeoutMs}ms.`, 408, true);
+      }
+      throw new DhanAuthError("DHAN_NETWORK_ERROR", error.message || "Failed to reach Dhan API", 500, true);
     }
   }
 }
+
+export const dhanClient = new DhanClient();

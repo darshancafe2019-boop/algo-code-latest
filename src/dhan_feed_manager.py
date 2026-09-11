@@ -242,14 +242,23 @@ class DhanFeedManager:
                 from src.ssl_util import get_ssl_context
                 ssl_ctx = get_ssl_context()
 
+                ws_kwargs: Dict[str, Any] = {
+                    "ssl": ssl_ctx,
+                    "ping_interval": 20,
+                    "ping_timeout": 10,
+                    "close_timeout": 5,
+                    "max_size": 10 * 1024 * 1024,
+                }
+                import inspect
+                sig = inspect.signature(websockets.connect)
+                if "additional_headers" in sig.parameters:
+                    ws_kwargs["additional_headers"] = extra_headers
+                elif "extra_headers" in sig.parameters:
+                    ws_kwargs["extra_headers"] = extra_headers
+
                 async with websockets.connect(
                     feed_url,
-                    ssl=ssl_ctx,
-                    extra_headers=extra_headers,
-                    ping_interval=20,
-                    ping_timeout=10,
-                    close_timeout=5,
-                    max_size=10 * 1024 * 1024,
+                    **ws_kwargs,
                 ) as ws:
                     self._ws = ws
                     self._is_socket_connected = True

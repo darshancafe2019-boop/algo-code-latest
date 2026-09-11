@@ -597,53 +597,48 @@ class UniversalOptionsEngine:
                 freshness_status=freshness,
             )
 
-        # Baseline fallback with Dhan branding & official Dhan strike ladder
-        base_snapshot = self.generate_paper_option_chain(
+        if environment == "PAPER":
+            paper_snap = self.generate_paper_option_chain(
+                underlying=und,
+                spot_price=spot_price,
+                expiry=expiry,
+                strike_count=strike_count,
+            )
+            paper_snap.provider = "DHAN"
+            paper_snap.brokerAccountId = "ba_dhan_paper"
+            paper_snap.brokerAccountAlias = "Dhan Paper"
+            return paper_snap
+
+        # In LIVE mode without valid provider data, strictly return NO_DATA (never invent fake options)
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return OptionChainSnapshot(
             underlying=und,
             spot_price=spot_price,
-            expiry=expiry,
-            strike_count=strike_count,
+            selected_expiry=expiry or "",
+            available_expiries=[],
+            strikes=[],
+            max_pain=None,
+            pcr_oi=None,
+            pcr_volume=None,
+            total_call_oi=0.0,
+            total_put_oi=0.0,
+            total_call_volume=0.0,
+            total_put_volume=0.0,
+            timestamp=now_iso,
+            status="NO_DATA",
+            provider="DHAN",
+            brokerAccountId="ba_dhan_primary",
+            brokerAccountAlias="Dhan Primary",
+            environment=environment,
+            dataFeed="REST",
+            exchange="NSE",
+            segment="OPTIONS",
+            currency="INR",
+            freshnessStatus="PROVIDER_UNAVAILABLE",
+            latencyMs=None,
+            dataAgeMs=0.0,
+            diagnostics=self.diagnostics,
         )
-        base_snapshot.provider = "DHAN"
-        base_snapshot.brokerAccountId = "ba_dhan_primary"
-        base_snapshot.brokerAccountAlias = "Dhan Primary Account"
-        base_snapshot.environment = environment
-        base_snapshot.exchange = "NSE"
-        base_snapshot.segment = "OPTIONS"
-        base_snapshot.currency = "INR"
-        base_snapshot.dataFeed = "REST"
-        base_snapshot.freshnessStatus = freshness
-        base_snapshot.latencyMs = 24.0
-
-        for r in base_snapshot.strikes:
-            r.ce.provider = "DHAN"
-            r.ce.brokerId = "dhan"
-            r.ce.brokerAccountId = "ba_dhan_primary"
-            r.ce.brokerAccountAlias = "Dhan Primary Account"
-            r.ce.environment = environment
-            r.ce.exchange = "NSE"
-            r.ce.instrumentId = f"DHAN_NSE_{und}_{int(r.strike)}_CE"
-            r.ce.contractKey = f"DHAN:ba_dhan_primary:{environment}:NSE:OPTIONS:{und}:{base_snapshot.selected_expiry}:{r.strike}:CE:{r.ce.instrumentId}"
-            r.ce.streamKey = f"DHAN:ba_dhan_primary:{environment}:NSE:OPTIONS:{und}"
-            r.ce.freshnessStatus = freshness
-            r.ce.latencyMs = 24.0
-
-            r.pe.provider = "DHAN"
-            r.pe.brokerId = "dhan"
-            r.pe.brokerAccountId = "ba_dhan_primary"
-            r.pe.brokerAccountAlias = "Dhan Primary Account"
-            r.pe.environment = environment
-            r.pe.exchange = "NSE"
-            r.pe.instrumentId = f"DHAN_NSE_{und}_{int(r.strike)}_PE"
-            r.pe.contractKey = f"DHAN:ba_dhan_primary:{environment}:NSE:OPTIONS:{und}:{base_snapshot.selected_expiry}:{r.strike}:PE:{r.pe.instrumentId}"
-            r.pe.streamKey = f"DHAN:ba_dhan_primary:{environment}:NSE:OPTIONS:{und}"
-            r.pe.freshnessStatus = freshness
-            r.pe.latencyMs = 24.0
-
-            self.upsert_quote(r.ce)
-            self.upsert_quote(r.pe)
-
-        return base_snapshot
 
     def fetch_upstox_option_chain(
         self,
@@ -689,52 +684,47 @@ class UniversalOptionsEngine:
                 freshness_status=freshness,
             )
 
-        base_snapshot = self.generate_paper_option_chain(
+        if environment == "PAPER":
+            paper_snap = self.generate_paper_option_chain(
+                underlying=und,
+                spot_price=spot_price,
+                expiry=expiry,
+                strike_count=strike_count,
+            )
+            paper_snap.provider = "UPSTOX"
+            paper_snap.brokerAccountId = "ba_upstox_paper"
+            paper_snap.brokerAccountAlias = "Upstox Paper"
+            return paper_snap
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return OptionChainSnapshot(
             underlying=und,
             spot_price=spot_price,
-            expiry=expiry,
-            strike_count=strike_count,
+            selected_expiry=expiry or "",
+            available_expiries=[],
+            strikes=[],
+            max_pain=None,
+            pcr_oi=None,
+            pcr_volume=None,
+            total_call_oi=0.0,
+            total_put_oi=0.0,
+            total_call_volume=0.0,
+            total_put_volume=0.0,
+            timestamp=now_iso,
+            status="NO_DATA",
+            provider="UPSTOX",
+            brokerAccountId="ba_upstox_primary",
+            brokerAccountAlias="Upstox Primary",
+            environment=environment,
+            dataFeed="REST",
+            exchange="NSE",
+            segment="OPTIONS",
+            currency="INR",
+            freshnessStatus="PROVIDER_UNAVAILABLE",
+            latencyMs=None,
+            dataAgeMs=0.0,
+            diagnostics=self.diagnostics,
         )
-        base_snapshot.provider = "UPSTOX"
-        base_snapshot.brokerAccountId = "ba_upstox_primary"
-        base_snapshot.brokerAccountAlias = "Upstox Primary Account"
-        base_snapshot.environment = environment
-        base_snapshot.exchange = "NSE"
-        base_snapshot.segment = "OPTIONS"
-        base_snapshot.currency = "INR"
-        base_snapshot.dataFeed = "REST"
-        base_snapshot.freshnessStatus = freshness
-        base_snapshot.latencyMs = 28.0
-
-        for r in base_snapshot.strikes:
-            r.ce.provider = "UPSTOX"
-            r.ce.brokerId = "upstox"
-            r.ce.brokerAccountId = "ba_upstox_primary"
-            r.ce.brokerAccountAlias = "Upstox Primary Account"
-            r.ce.environment = environment
-            r.ce.exchange = "NSE"
-            r.ce.instrumentId = f"NSE_FO|{und}_{int(r.strike)}_CE"
-            r.ce.contractKey = f"UPSTOX:ba_upstox_primary:{environment}:NSE:OPTIONS:{und}:{base_snapshot.selected_expiry}:{r.strike}:CE:{r.ce.instrumentId}"
-            r.ce.streamKey = f"UPSTOX:ba_upstox_primary:{environment}:NSE:OPTIONS:{und}"
-            r.ce.freshnessStatus = freshness
-            r.ce.latencyMs = 28.0
-
-            r.pe.provider = "UPSTOX"
-            r.pe.brokerId = "upstox"
-            r.pe.brokerAccountId = "ba_upstox_primary"
-            r.pe.brokerAccountAlias = "Upstox Primary Account"
-            r.pe.environment = environment
-            r.pe.exchange = "NSE"
-            r.pe.instrumentId = f"NSE_FO|{und}_{int(r.strike)}_PE"
-            r.pe.contractKey = f"UPSTOX:ba_upstox_primary:{environment}:NSE:OPTIONS:{und}:{base_snapshot.selected_expiry}:{r.strike}:PE:{r.pe.instrumentId}"
-            r.pe.streamKey = f"UPSTOX:ba_upstox_primary:{environment}:NSE:OPTIONS:{und}"
-            r.pe.freshnessStatus = freshness
-            r.pe.latencyMs = 28.0
-
-            self.upsert_quote(r.ce)
-            self.upsert_quote(r.pe)
-
-        return base_snapshot
 
     def fetch_delta_option_chain(
         self,
@@ -745,11 +735,11 @@ class UniversalOptionsEngine:
         environment: str = "PAPER",
     ) -> OptionChainSnapshot:
         """
-        Fetches official Delta Exchange India option chain via REST / WebSocket.
-        Strictly segregated under SOURCE: Delta Exchange India.
+        Fetches official Delta Exchange option chain via DeltaOptionsService.
+        Strictly segregated under SOURCE: Delta Exchange (India / Global).
+        Zero fake or synthetic fallback data.
         """
         und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
-        # For Delta, map indices to BTC or ETH if Indian stock requested, or use native crypto
         crypto_und = "BTC" if und in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "RELIANCE"] else und
 
         try:
@@ -772,59 +762,39 @@ class UniversalOptionsEngine:
                 underlying=crypto_und,
                 spot_price=float(raw_chain.get("spot_price") or spot_price),
                 selected_expiry=expiry or raw_chain.get("expiry") or raw_chain.get("selected_expiry", ""),
-                latency_ms=16.0,
-                freshness_status="CONNECTED" if raw_chain.get("is_live", True) else "STALE",
+                latency_ms=raw_chain.get("latency_ms", 16.0),
+                freshness_status=raw_chain.get("data_status", "CONNECTED"),
             )
 
-        # Baseline fallback with Delta India branding
-        base_snapshot = self.generate_paper_option_chain(
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return OptionChainSnapshot(
             underlying=crypto_und,
-            spot_price=spot_price if spot_price > 1000 else 78500.0,
-            expiry=expiry,
-            strike_count=strike_count,
+            spot_price=spot_price,
+            selected_expiry=expiry or "",
+            available_expiries=[],
+            strikes=[],
+            max_pain=None,
+            pcr_oi=None,
+            pcr_volume=None,
+            total_call_oi=0.0,
+            total_put_oi=0.0,
+            total_call_volume=0.0,
+            total_put_volume=0.0,
+            timestamp=now_iso,
+            status="NO_DATA",
+            provider="DELTA_INDIA",
+            brokerAccountId="ba_delta_primary",
+            brokerAccountAlias="Delta India Primary",
+            environment=environment,
+            dataFeed="WEBSOCKET",
+            exchange="DELTA_INDIA",
+            segment="OPTIONS",
+            currency="USD",
+            freshnessStatus="NO_DATA",
+            latencyMs=None,
+            dataAgeMs=0.0,
+            diagnostics=self.diagnostics,
         )
-        base_snapshot.provider = "DELTA_INDIA"
-        base_snapshot.brokerAccountId = "ba_delta_primary"
-        base_snapshot.brokerAccountAlias = "Delta India Primary"
-        base_snapshot.environment = environment
-        base_snapshot.exchange = "DELTA_INDIA"
-        base_snapshot.segment = "OPTIONS"
-        base_snapshot.currency = "USD"
-        base_snapshot.dataFeed = "WEBSOCKET"
-        base_snapshot.freshnessStatus = "CONNECTED"
-        base_snapshot.latencyMs = 16.0
-
-        for r in base_snapshot.strikes:
-            r.ce.provider = "DELTA_INDIA"
-            r.ce.brokerId = "delta_india"
-            r.ce.brokerAccountId = "ba_delta_primary"
-            r.ce.brokerAccountAlias = "Delta India Primary"
-            r.ce.environment = environment
-            r.ce.exchange = "DELTA_INDIA"
-            r.ce.currency = "USD"
-            r.ce.instrumentId = f"DELTA_IND_{crypto_und}_{int(r.strike)}_C"
-            r.ce.contractKey = f"DELTA_INDIA:ba_delta_primary:{environment}:DELTA_INDIA:OPTIONS:{crypto_und}:{base_snapshot.selected_expiry}:{r.strike}:CE:{r.ce.instrumentId}"
-            r.ce.streamKey = f"DELTA_INDIA:ba_delta_primary:{environment}:DELTA_INDIA:OPTIONS:{crypto_und}"
-            r.ce.freshnessStatus = "CONNECTED"
-            r.ce.latencyMs = 16.0
-
-            r.pe.provider = "DELTA_INDIA"
-            r.pe.brokerId = "delta_india"
-            r.pe.brokerAccountId = "ba_delta_primary"
-            r.pe.brokerAccountAlias = "Delta India Primary"
-            r.pe.environment = environment
-            r.pe.exchange = "DELTA_INDIA"
-            r.pe.currency = "USD"
-            r.pe.instrumentId = f"DELTA_IND_{crypto_und}_{int(r.strike)}_P"
-            r.pe.contractKey = f"DELTA_INDIA:ba_delta_primary:{environment}:DELTA_INDIA:OPTIONS:{crypto_und}:{base_snapshot.selected_expiry}:{r.strike}:PE:{r.pe.instrumentId}"
-            r.pe.streamKey = f"DELTA_INDIA:ba_delta_primary:{environment}:DELTA_INDIA:OPTIONS:{crypto_und}"
-            r.pe.freshnessStatus = "CONNECTED"
-            r.pe.latencyMs = 16.0
-
-            self.upsert_quote(r.ce)
-            self.upsert_quote(r.pe)
-
-        return base_snapshot
 
     def fetch_binance_option_chain(
         self,
@@ -866,54 +836,46 @@ class UniversalOptionsEngine:
                 freshness_status="CONNECTED",
             )
 
-        base_snapshot = self.generate_paper_option_chain(
+        if environment == "PAPER":
+            paper_snap = self.generate_paper_option_chain(
+                underlying=crypto_und,
+                spot_price=spot_price,
+                expiry=expiry,
+                strike_count=strike_count,
+            )
+            paper_snap.provider = "BINANCE"
+            paper_snap.brokerAccountId = "ba_binance_paper"
+            paper_snap.brokerAccountAlias = "Binance Options Paper"
+            return paper_snap
+
+        now_iso = datetime.now(timezone.utc).isoformat()
+        return OptionChainSnapshot(
             underlying=crypto_und,
-            spot_price=spot_price if spot_price > 1000 else 78500.0,
-            expiry=expiry,
-            strike_count=strike_count,
+            spot_price=spot_price,
+            selected_expiry=expiry or "",
+            available_expiries=[],
+            strikes=[],
+            max_pain=None,
+            pcr_oi=None,
+            pcr_volume=None,
+            total_call_oi=0.0,
+            total_put_oi=0.0,
+            total_call_volume=0.0,
+            total_put_volume=0.0,
+            timestamp=now_iso,
+            status="NO_DATA",
+            provider="BINANCE",
+            brokerAccountId="ba_binance_primary",
+            brokerAccountAlias="Binance Options Primary",
+            environment=environment,
+            exchange="BINANCE",
+            segment="OPTIONS",
+            currency="USDT",
+            freshnessStatus="NO_DATA",
+            latencyMs=None,
+            dataAgeMs=0.0,
+            diagnostics=self.diagnostics,
         )
-        base_snapshot.provider = "BINANCE"
-        base_snapshot.brokerAccountId = "ba_binance_primary"
-        base_snapshot.brokerAccountAlias = "Binance Options Primary"
-        base_snapshot.environment = environment
-        base_snapshot.exchange = "BINANCE"
-        base_snapshot.segment = "OPTIONS"
-        base_snapshot.currency = "USDT"
-        base_snapshot.dataFeed = "REST"
-        base_snapshot.freshnessStatus = "CONNECTED"
-        base_snapshot.latencyMs = 20.0
-
-        for r in base_snapshot.strikes:
-            r.ce.provider = "BINANCE"
-            r.ce.brokerId = "binance"
-            r.ce.brokerAccountId = "ba_binance_primary"
-            r.ce.brokerAccountAlias = "Binance Options Primary"
-            r.ce.environment = environment
-            r.ce.exchange = "BINANCE"
-            r.ce.currency = "USDT"
-            r.ce.instrumentId = f"BINANCE_EOPT_{crypto_und}_{int(r.strike)}_C"
-            r.ce.contractKey = f"BINANCE:ba_binance_primary:{environment}:BINANCE:OPTIONS:{crypto_und}:{base_snapshot.selected_expiry}:{r.strike}:CE:{r.ce.instrumentId}"
-            r.ce.streamKey = f"BINANCE:ba_binance_primary:{environment}:BINANCE:OPTIONS:{crypto_und}"
-            r.ce.freshnessStatus = "CONNECTED"
-            r.ce.latencyMs = 20.0
-
-            r.pe.provider = "BINANCE"
-            r.pe.brokerId = "binance"
-            r.pe.brokerAccountId = "ba_binance_primary"
-            r.pe.brokerAccountAlias = "Binance Options Primary"
-            r.pe.environment = environment
-            r.pe.exchange = "BINANCE"
-            r.pe.currency = "USDT"
-            r.pe.instrumentId = f"BINANCE_EOPT_{crypto_und}_{int(r.strike)}_P"
-            r.pe.contractKey = f"BINANCE:ba_binance_primary:{environment}:BINANCE:OPTIONS:{crypto_und}:{base_snapshot.selected_expiry}:{r.strike}:PE:{r.pe.instrumentId}"
-            r.pe.streamKey = f"BINANCE:ba_binance_primary:{environment}:BINANCE:OPTIONS:{crypto_und}"
-            r.pe.freshnessStatus = "CONNECTED"
-            r.pe.latencyMs = 20.0
-
-            self.upsert_quote(r.ce)
-            self.upsert_quote(r.pe)
-
-        return base_snapshot
 
     def _normalize_broker_option_chain(
         self,
@@ -1073,10 +1035,14 @@ class UniversalOptionsEngine:
                 markPrice=_clean_num(pe_raw.get("mark_price") or pe_raw.get("ltp")),
             )
 
-            total_call_oi += ce_quote.OI
-            total_put_oi += pe_quote.OI
-            total_call_vol += ce_quote.volume
-            total_put_vol += pe_quote.volume
+            if ce_quote.OI is not None and ce_quote.OI > 0:
+                total_call_oi += ce_quote.OI
+            if pe_quote.OI is not None and pe_quote.OI > 0:
+                total_put_oi += pe_quote.OI
+            if ce_quote.volume is not None and ce_quote.volume > 0:
+                total_call_vol += ce_quote.volume
+            if pe_quote.volume is not None and pe_quote.volume > 0:
+                total_put_vol += pe_quote.volume
 
             self.upsert_quote(ce_quote)
             self.upsert_quote(pe_quote)
@@ -1089,19 +1055,21 @@ class UniversalOptionsEngine:
                 pe=pe_quote,
             ))
 
-        pcr = raw_chain.get("pcr", {})
+        pcr = raw_chain.get("pcr")
+        pcr_oi = None
+        pcr_vol = None
         if isinstance(pcr, dict):
-            pcr_oi = float(pcr.get("pcr_oi") or (round(total_put_oi / max(1.0, total_call_oi), 2)))
-            pcr_vol = float(pcr.get("pcr_volume") or (round(total_put_vol / max(1.0, total_call_vol), 2)))
+            pcr_oi = pcr.get("pcr_oi")
+            pcr_vol = pcr.get("pcr_volume")
         elif isinstance(pcr, (int, float)):
             pcr_oi = float(pcr)
-            pcr_vol = float(round(total_put_vol / max(1.0, total_call_vol), 2))
-        else:
-            pcr_oi = round(total_put_oi / max(1.0, total_call_oi), 2)
-            pcr_vol = round(total_put_vol / max(1.0, total_call_vol), 2)
 
-        calc_max_pain = float(raw_chain.get("max_pain") or 0.0)
-        if calc_max_pain <= 0 and raw_strikes:
+        if pcr_oi is None and total_call_oi > 0 and total_put_oi > 0:
+            pcr_oi = round(total_put_oi / total_call_oi, 2)
+
+        raw_max_pain = raw_chain.get("max_pain")
+        calc_max_pain = float(raw_max_pain) if (raw_max_pain is not None and float(raw_max_pain) > 0) else None
+        if calc_max_pain is None and total_call_oi > 0 and total_put_oi > 0:
             from src.option_chain_engine import OptionChainEngine
             calc_max_pain = OptionChainEngine.calculate_max_pain(raw_strikes)
 
@@ -1152,7 +1120,9 @@ class UniversalOptionsEngine:
         """
         prov = provider.upper().strip()
         if spot_price <= 0:
-            spot_price = 22500.0 if "NIFTY" in underlying.upper() else 78000.0
+            cached_quote = global_market_cache.get(underlying)
+            if cached_quote and cached_quote.ltp:
+                spot_price = float(cached_quote.ltp)
 
         if prov == "DHAN":
             return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
@@ -1180,7 +1150,9 @@ class UniversalOptionsEngine:
         A failure in one provider (e.g. Dhan) never interrupts Upstox, Delta, Binance, or Paper Simulator.
         """
         if spot_price <= 0:
-            spot_price = 22500.0 if "NIFTY" in underlying.upper() else 78000.0
+            cached_quote = global_market_cache.get(underlying)
+            if cached_quote and cached_quote.ltp:
+                spot_price = float(cached_quote.ltp)
 
         sources: Dict[str, Any] = {}
 
@@ -1272,19 +1244,125 @@ class UniversalOptionsEngine:
         """
         Returns live connection status, feed type, and latency across all supported sources.
         """
+        now_iso = datetime.now(timezone.utc).isoformat()
         status_list = []
-        for prov_key, info in self._provider_health.items():
+
+        # 1. Delta India
+        try:
+            from src.delta_options_service import delta_options_service
+            from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
+            d_health = delta_options_service.get_health()
+            ws_health = delta_options_ws_adapter.get_sync_health()
+            is_delta_live = d_health.get("status") == "HEALTHY" or ws_health.get("status") in ("LIVE", "CONNECTED")
+            delta_latency = ws_health.get("latency_ms") or d_health.get("rest", {}).get("latency_ms")
             status_list.append({
-                "provider": prov_key,
-                "name": info["name"],
-                "account_alias": info["alias"],
-                "exchange": info["exchange"],
-                "segment": info["segment"],
-                "feed": info["feed"],
-                "status": info["status"],
-                "latency_ms": info["latency_ms"],
-                "last_update": info["last_update"],
+                "provider": "DELTA_INDIA",
+                "name": "Delta Exchange India",
+                "account_alias": "ba_delta_primary",
+                "exchange": "DELTA_INDIA",
+                "segment": "OPTIONS",
+                "feed": "WEBSOCKET",
+                "status": "LIVE" if ws_health.get("status") in ("LIVE", "CONNECTED") else ("CONNECTED" if is_delta_live else "DISCONNECTED"),
+                "latency_ms": delta_latency,
+                "last_update": ws_health.get("last_tick_time") or now_iso,
             })
+        except Exception:
+            status_list.append({
+                "provider": "DELTA_INDIA",
+                "name": "Delta Exchange India",
+                "account_alias": "ba_delta_primary",
+                "exchange": "DELTA_INDIA",
+                "segment": "OPTIONS",
+                "feed": "WEBSOCKET",
+                "status": "DISCONNECTED",
+                "latency_ms": None,
+                "last_update": now_iso,
+            })
+
+        # 2. Dhan
+        try:
+            from src.dhan_broker_adapter import DhanBrokerAdapter
+            dhan_adapter = DhanBrokerAdapter()
+            is_dhan_auth = dhan_adapter.is_authenticated
+            status_list.append({
+                "provider": "DHAN",
+                "name": "Dhan HQ API v2",
+                "account_alias": "ba_dhan_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "CONNECTED" if is_dhan_auth else "AUTHENTICATION_REQUIRED",
+                "latency_ms": 24.0 if is_dhan_auth else None,
+                "last_update": now_iso,
+            })
+        except Exception:
+            status_list.append({
+                "provider": "DHAN",
+                "name": "Dhan HQ API v2",
+                "account_alias": "ba_dhan_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "DISCONNECTED",
+                "latency_ms": None,
+                "last_update": now_iso,
+            })
+
+        # 3. Upstox
+        try:
+            from src.upstox_service import UpstoxService
+            upstox_svc = UpstoxService()
+            is_upstox_auth = upstox_svc.is_authenticated
+            status_list.append({
+                "provider": "UPSTOX",
+                "name": "Upstox API v3",
+                "account_alias": "ba_upstox_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "CONNECTED" if is_upstox_auth else "AUTHENTICATION_REQUIRED",
+                "latency_ms": 28.0 if is_upstox_auth else None,
+                "last_update": now_iso,
+            })
+        except Exception:
+            status_list.append({
+                "provider": "UPSTOX",
+                "name": "Upstox API v3",
+                "account_alias": "ba_upstox_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "DISCONNECTED",
+                "latency_ms": None,
+                "last_update": now_iso,
+            })
+
+        # 4. Binance
+        status_list.append({
+            "provider": "BINANCE",
+            "name": "Binance European Options",
+            "account_alias": "ba_binance_primary",
+            "exchange": "BINANCE",
+            "segment": "OPTIONS",
+            "feed": "REST",
+            "status": "CONNECTED",
+            "latency_ms": None,
+            "last_update": now_iso,
+        })
+
+        # 5. Paper Simulator
+        status_list.append({
+            "provider": "PAPER_SIMULATOR",
+            "name": "Paper Simulator Engine",
+            "account_alias": "ba_paper_sim",
+            "exchange": "SIM",
+            "segment": "OPTIONS",
+            "feed": "CALCULATED",
+            "status": "READY",
+            "latency_ms": 0.5,
+            "last_update": now_iso,
+        })
+
         return status_list
 
 

@@ -11501,12 +11501,13 @@ def upsert_delta_expiries(underlying: str, expiries_list: List[Dict[str, Any]]) 
 
 
 def get_delta_expiries(underlying: str, active_only: bool = True) -> List[Dict[str, Any]]:
-    """Fetches expiries for an underlying ordered by settlement time."""
+    """Fetches expiries for an underlying ordered by settlement time, strictly excluding expired dates when active_only=True."""
     und = underlying.upper().strip()
     if active_only:
+        now_iso = datetime.now(timezone.utc).isoformat()
         return safe_query(
-            "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? AND is_active = 1 ORDER BY settlement_time ASC",
-            (und,),
+            "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? AND is_active = 1 AND settlement_time >= ? ORDER BY settlement_time ASC",
+            (und, now_iso),
         )
     return safe_query(
         "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? ORDER BY settlement_time ASC",

@@ -2,8 +2,8 @@
 Delta Exchange Cryptocurrency Options REST Client & Rate Limiter
 =================================================================
 Production-grade, rate-limited, fault-tolerant REST API client for Delta Exchange.
-Fetches official product catalogues, active option chains, tickers, spot indices,
-orderbooks, trades, and candles with Decimal precision and circuit-breaker protection.
+Supports multi-region routing (Delta India vs Delta Global) with SSL validation,
+circuit breaker protection, token bucket rate limiting, and structured diagnostics.
 """
 
 import time
@@ -15,11 +15,12 @@ import threading
 import urllib.request
 import urllib.error
 import urllib.parse
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import Decimal
 from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timezone
 
 from src import config
+from src.delta_region_adapter import DeltaRegionAdapter, DeltaRegion
 
 logger = logging.getLogger("DeltaOptionsClient")
 
@@ -64,19 +65,21 @@ class DeltaRateLimiter:
 class DeltaOptionsClient:
     """
     Central, thread-safe REST client for Delta Exchange public & private endpoints.
-    Public market data works seamlessly without API keys.
+    Supports regional switching between India and Global endpoints.
     """
 
     def __init__(
         self,
         base_url: Optional[str] = None,
+        region: str = "INDIA",
         api_key: Optional[str] = None,
         api_secret: Optional[str] = None,
         timeout_sec: float = 8.0,
         max_retries: int = 3,
         rate_limit_per_sec: float = 10.0,
     ):
-        self.base_url = (base_url or getattr(config, "DELTA_REST_URL", "https://api.india.delta.exchange")).rstrip("/")
+        self.region = region.upper()
+        self.base_url = (base_url or DeltaRegionAdapter.get_rest_url(self.region)).rstrip("/")
         self.api_key = api_key if api_key is not None else getattr(config, "DELTA_API_KEY", "")
         self.api_secret = api_secret if api_secret is not None else getattr(config, "DELTA_API_SECRET", "")
         self.timeout_sec = float(timeout_sec)
@@ -94,6 +97,12 @@ class DeltaOptionsClient:
         # In-memory short TTL cache for catalogue & products
         self._cache: Dict[str, Tuple[float, Any]] = {}
         self._default_cache_ttl = 30.0
+
+    def set_region(self, region: str) -> None:
+        """Dynamically switch between INDIA and GLOBAL endpoints."""
+        self.region = region.upper()
+        self.base_url = DeltaRegionAdapter.get_rest_url(self.region).rstrip("/")
+        self._cache.clear()
 
     # --------------------------------------------------------------------------
     # CIRCUIT BREAKER
@@ -287,6 +296,8 @@ class DeltaOptionsClient:
             return []
 
         discovered: List[Dict[str, Any]] = []
+        now_utc = datetime.now(timezone.utc)
+
         for p in raw_products:
             ctype = str(p.get("contract_type", "")).lower()
             state = str(p.get("state", "")).lower()
@@ -298,14 +309,14 @@ class DeltaOptionsClient:
             if states and state not in states:
                 continue
 
-            # Check if expired
+            # Strict future filter: Remove past or expired dates
             if settle_time:
                 try:
                     clean_ts = settle_time.replace("Z", "+00:00")
                     settle_dt = datetime.fromisoformat(clean_ts)
                     if settle_dt.tzinfo is None:
                         settle_dt = settle_dt.replace(tzinfo=timezone.utc)
-                    if settle_dt < datetime.now(timezone.utc):
+                    if settle_dt < now_utc:
                         continue
                 except Exception:
                     pass
@@ -399,6 +410,7 @@ class DeltaOptionsClient:
             latency = (time.time() - start_t) * 1000.0
             return {
                 "status": "HEALTHY",
+                "region": self.region,
                 "circuit_state": self._circuit_state,
                 "latency_ms": round(latency, 2),
                 "base_url": self.base_url,
@@ -408,6 +420,7 @@ class DeltaOptionsClient:
             latency = (time.time() - start_t) * 1000.0
             return {
                 "status": "UNHEALTHY",
+                "region": self.region,
                 "circuit_state": self._circuit_state,
                 "latency_ms": round(latency, 2),
                 "base_url": self.base_url,
@@ -416,4 +429,4 @@ class DeltaOptionsClient:
 
 
 # Singleton global client instance
-global_delta_client = DeltaOptionsClient()
+global_delta_client = DeltaOptionsClient(region="INDIA")

@@ -25,10 +25,10 @@ class MarketQuote:
     exchange: str
     provider: str
     lastPrice: float
-    bid: float
-    ask: float
-    volume: float
-    timestamp: str  # ISO 8601 UTC
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    volume: Optional[float] = None
+    timestamp: str = ""  # ISO 8601 UTC
     status: str = "LIVE"
     data_quality: str = DataQuality.VALID.value
     provenance: str = DataProvenance.PROVIDER_DATA.value
@@ -54,17 +54,17 @@ class FuturesQuote:
     provider: str
     expiry: str  # "PERPETUAL" or "YYYY-MM-DD"
     lastPrice: float
-    bid: float
-    ask: float
-    volume: float
-    timestamp: str
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    volume: Optional[float] = None
+    timestamp: str = ""
     status: str = "LIVE"
     data_quality: str = DataQuality.VALID.value
     provenance: str = DataProvenance.PROVIDER_DATA.value
-    OI: float = 0.0
-    OIChange: float = 0.0
-    basis: float = 0.0
-    annualized_basis: float = 0.0
+    OI: Optional[float] = None
+    OIChange: Optional[float] = None
+    basis: Optional[float] = None
+    annualized_basis: Optional[float] = None
     markPrice: Optional[float] = None
     indexPrice: Optional[float] = None
     fundingRate: Optional[float] = None

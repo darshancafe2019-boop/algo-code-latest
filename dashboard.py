@@ -34,6 +34,7 @@ import pandas as pd
 import numpy as np
 
 from flask import Flask, jsonify, render_template, request, Response, send_file, send_from_directory, make_response
+from werkzeug.exceptions import HTTPException
 
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
@@ -44,9 +45,8 @@ from src import audit
 from src import trade_audit_engine
 from src import market_intelligence
 from src.process_manager import bot_manager, multi_bot_manager
-from src.data_fetcher import get_mainnet_fetcher, get_testnet_fetcher
+from src.data_fetcher import DataFetcher, get_mainnet_fetcher, get_testnet_fetcher
 from src.telegram_alert import TelegramAlert
-from src.data_fetcher import DataFetcher, get_mainnet_fetcher
 from src.indicators import generate_indicators, calculate_volume_profile, get_timeframe_minutes
 from src import universal_risk_engine
 from src import indicator_schema
@@ -110,7 +110,6 @@ except ImportError as e:
     def run_backtest(*args, **kwargs):
         raise RuntimeError("Backtrader library is not installed in current environment. Please install backtrader or run within .venv.")
 
-from src.telegram_alert import TelegramAlert
 from src.telegram_service import global_telegram_service
 from src.email_service import global_email_service
 
@@ -231,80 +230,59 @@ def enforce_server_side_security():
                         "error_code": "FORBIDDEN",
                         "message": "Access denied. Administrative privileges required."
                     }), 403
-
-from werkzeug.exceptions import HTTPException
-
-@app.errorhandler(500)
-def handle_500_error(e):
-    logger.error(f"Internal Server Error 500: {e}", exc_info=True)
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    req_id = getattr(request, "request_id", f"req_{uuid.uuid4().hex[:12]}")
+    code_map = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        405: "METHOD_NOT_ALLOWED",
+        409: "CONFLICT",
+        422: "UNPROCESSABLE_ENTITY",
+        429: "RATE_LIMIT_EXCEEDED",
+        500: "INTERNAL_SERVER_ERROR",
+        502: "BAD_GATEWAY",
+        503: "SERVICE_UNAVAILABLE",
+        504: "GATEWAY_TIMEOUT",
+    }
     return jsonify({
-        "status": "error",
+        "success": False,
         "ok": False,
-        "error": "Internal Server Error",
-        "message": str(getattr(e, "description", e)),
-        "code": 500,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }), 200
+        "status": "error",
+        "error": {
+            "code": code_map.get(e.code, "HTTP_ERROR"),
+            "message": str(e.description or e.name),
+            "requestId": req_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "details": {}
+        },
+        "meta": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "requestId": req_id
+        }
+    }), e.code or 500
 
 @app.errorhandler(Exception)
-def handle_general_exception(e):
-    logger.error(f"Uncaught Server Exception: {e}", exc_info=True)
-    if isinstance(e, HTTPException):
-        return jsonify({
-            "status": "error",
-            "ok": False,
-            "error": e.name,
-            "message": str(e.description),
-            "code": e.code,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }), e.code
-
+def handle_uncaught_exception(e):
+    req_id = getattr(request, "request_id", f"req_{uuid.uuid4().hex[:12]}")
+    logger.error(f"Uncaught Server Exception [500] | RequestId: {req_id} | Path: {request.method} {request.path} | Error: {e}", exc_info=True)
     return jsonify({
-        "status": "error",
+        "success": False,
         "ok": False,
-        "error": "Internal Server Error",
-        "message": str(e),
-        "code": 500,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }), 200
-
-@app.errorhandler(404)
-def handle_404_error(e):
-    return jsonify({
         "status": "error",
-        "error": "Not Found",
-        "message": str(getattr(e, "description", "Endpoint not found")),
-        "code": 404,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }), 404
-
-@app.errorhandler(405)
-def handle_405_error(e):
-    return jsonify({
-        "status": "error",
-        "error": "Method Not Allowed",
-        "message": str(getattr(e, "description", "Method not allowed for this endpoint")),
-        "code": 405,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }), 405
-
-@app.errorhandler(Exception)
-def handle_generic_exception(e):
-    if isinstance(e, HTTPException):
-        return jsonify({
-            "status": "error",
-            "error": e.name,
-            "message": e.description,
-            "code": e.code,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        }), e.code
-    logger.error(f"Unhandled Exception: {e}", exc_info=True)
-    return jsonify({
-        "status": "error",
-        "error": "Internal Server Error",
-        "message": str(e),
-        "code": 500,
-        "timestamp": datetime.now(timezone.utc).isoformat()
+        "error": {
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "An internal server error occurred",
+            "requestId": req_id,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "details": {}
+        },
+        "meta": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "requestId": req_id
+        }
     }), 500
 
 # Explicitly initialize database schema once at server startup
@@ -376,25 +354,28 @@ import time
 
 # Initialize Background Price Fetcher Loop
 def background_price_loop():
-    """Background daemon thread to fetch live exchange price into candles_cache."""
+    """Background daemon thread to fetch genuine exchange price into candles_cache."""
     fetcher = get_mainnet_fetcher()
     while True:
         try:
             ticker = fetcher.exchange.fetch_ticker(config.SYMBOL)
-            last_price = float(ticker.get("last") or 65420.0)
-            now_str = datetime.now(timezone.utc).isoformat()
-            
-            conn = None
-            try:
-                conn = get_db_conn()
-                conn.execute(
-                    "INSERT INTO candles_cache (timestamp, symbol, timeframe, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    (now_str, config.SYMBOL, config.TIMEFRAME, last_price, last_price, last_price, last_price, float(ticker.get("baseVolume") or 100.0))
-                )
-                conn.commit()
-            finally:
-                if conn:
-                    conn.close()
+            last_price = ticker.get("last")
+            if last_price is not None and float(last_price) > 0:
+                last_price_flt = float(last_price)
+                volume_flt = float(ticker.get("baseVolume") or 0.0)
+                now_str = datetime.now(timezone.utc).isoformat()
+                
+                conn = None
+                try:
+                    conn = get_db_conn()
+                    conn.execute(
+                        "INSERT INTO candles_cache (timestamp, symbol, timeframe, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (now_str, config.SYMBOL, config.TIMEFRAME, last_price_flt, last_price_flt, last_price_flt, last_price_flt, volume_flt)
+                    )
+                    conn.commit()
+                finally:
+                    if conn:
+                        conn.close()
         except Exception:
             pass
         time.sleep(2.0)
@@ -496,23 +477,6 @@ def api_price_history():
         "SELECT timestamp, symbol, timeframe, open, high, low, close, volume FROM candles_cache WHERE symbol = ? ORDER BY id DESC LIMIT ?",
         (symbol, limit)
     )
-    if not rows:
-        try:
-            ticker_svc = get_ticker_service()
-            t = ticker_svc.get_ticker(symbol)
-            p = float(t.get("last") or 65420.0)
-            rows = [{
-                "timestamp": datetime.now(timezone.utc).isoformat(),
-                "symbol": symbol,
-                "timeframe": config.TIMEFRAME,
-                "open": p,
-                "high": float(t.get("high") or p * 1.01),
-                "low": float(t.get("low") or p * 0.99),
-                "close": p,
-                "volume": float(t.get("volume") or 100.0)
-            }]
-        except Exception:
-            pass
     return jsonify({
         "status": "success",
         "data": rows
@@ -3537,7 +3501,7 @@ def api_futures_basis():
 
 @app.route("/api/market/quote", methods=["GET"])
 def api_market_quote():
-    """Returns a normalized, quality-validated MarketQuote for any symbol."""
+    """Returns a normalized, quality-validated MarketQuote for any symbol without fabrication."""
     symbol = request.args.get("symbol", "BTC/USDT").upper()
 
     # Check cache first
@@ -3545,45 +3509,44 @@ def api_market_quote():
     if cached:
         return jsonify({"status": "success", "source": "CACHE", "quote": cached})
 
-    # Spot price determination
-    spot = 65400.0
-    if "ETH" in symbol:
-        spot = 3450.0
-    elif "SOL" in symbol:
-        spot = 185.0
-    elif "NIFTY" in symbol:
-        spot = 24500.0
-    elif "BANKNIFTY" in symbol:
-        spot = 52200.0
-    elif "RELIANCE" in symbol:
-        spot = 2950.0
-    elif "TCS" in symbol:
-        spot = 4250.0
+    # Check ticker service
+    try:
+        from src.ticker_service import resilient_ticker_service
+        t_data = resilient_ticker_service.get_ticker(symbol)
+        if t_data and (t_data.get("last") or t_data.get("price")):
+            now_iso = datetime.now(timezone.utc).isoformat()
+            last_px = float(t_data.get("last") or t_data.get("price") or 0.0)
+            quote = MarketQuote(
+                symbol=symbol,
+                exchange="NSE" if ("NIFTY" in symbol or "RELIANCE" in symbol or "TCS" in symbol) else "CRYPTO",
+                provider=t_data.get("provider", "ticker_service"),
+                lastPrice=last_px,
+                bid=float(t_data["bid"]) if t_data.get("bid") is not None else None,
+                ask=float(t_data["ask"]) if t_data.get("ask") is not None else None,
+                volume=float(t_data["volume"]) if t_data.get("volume") is not None else None,
+                timestamp=t_data.get("timestamp", now_iso),
+                status="LIVE" if t_data.get("is_live", True) else "STALE",
+                vwap=float(t_data["vwap"]) if t_data.get("vwap") is not None else None,
+                high=float(t_data["high"]) if t_data.get("high") is not None else None,
+                low=float(t_data["low"]) if t_data.get("low") is not None else None,
+                open=float(t_data["open"]) if t_data.get("open") is not None else None,
+                close=last_px,
+                change_pct=float(t_data.get("change_pct", 0.0)) if t_data.get("change_pct") is not None else None
+            )
+            quote_dict = quote.to_dict()
+            global_market_cache.set_quote(symbol, quote_dict)
+            return jsonify({"status": "success", "source": "LIVE", "quote": quote_dict})
+    except Exception as e:
+        logger.debug(f"Ticker service lookup error for {symbol}: {e}")
 
-    now_iso = datetime.now(timezone.utc).isoformat()
-    quote = MarketQuote(
-        symbol=symbol,
-        exchange="NSE" if "NIFTY" in symbol or "RELIANCE" in symbol or "TCS" in symbol else "Binance",
-        provider="universal_market_engine",
-        lastPrice=spot,
-        bid=round(spot * 0.9998, 2),
-        ask=round(spot * 1.0002, 2),
-        volume=1250.0,
-        timestamp=now_iso,
-        status="LIVE",
-        vwap=spot,
-        high=round(spot * 1.015, 2),
-        low=round(spot * 0.985, 2),
-        open=round(spot * 0.995, 2),
-        close=spot,
-        change_pct=0.55
-    )
-
-    quote_dict = quote.to_dict()
-    global_market_cache.set_quote(symbol, quote_dict)
-    global_stale_protection.record_tick(symbol)
-
-    return jsonify({"status": "success", "source": "LIVE", "quote": quote_dict})
+    return jsonify({
+        "status": "no_data",
+        "symbol": symbol,
+        "source": "UNAVAILABLE",
+        "quote": None,
+        "providerStatus": "NO_DATA",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
 
 
 @app.route("/api/stream/centralized")
@@ -3599,7 +3562,6 @@ def api_stream_centralized():
                     msg = q.get(timeout=2.0)
                     yield f"data: {msg}\n\n"
                 except queue.Empty:
-                    # Send heartbeat ping if queue is idle
                     yield f"data: {json.dumps({'type': 'HEARTBEAT', 'timestamp': datetime.now(timezone.utc).isoformat()})}\n\n"
         except GeneratorExit:
             global_stream_manager.unregister_client(client_id)
@@ -3623,8 +3585,8 @@ def api_stream_centralized():
 def api_options_chain():
     """
     Production-grade Multi-Broker Options Chain Gateway.
-    Strictly segregated by provider (DHAN, UPSTOX, DELTA_INDIA, PAPER_SIMULATOR).
-    Deduplicates quotes with compound contract keys and provides full telemetry.
+    Strictly segregated by provider (DHAN, UPSTOX, DELTA_INDIA, BINANCE, PAPER_SIMULATOR).
+    Zero synthetic or fabricated fallback values.
     """
     underlying = request.args.get("underlying") or request.args.get("symbol") or "NIFTY"
     underlying = underlying.upper()
@@ -3638,7 +3600,7 @@ def api_options_chain():
 
     clean_und = underlying.replace(" ", "").replace("/USDT", "").replace(".NS", "")
 
-    # 1. Determine Spot Price from Market Data Cache or Instrument Master
+    # 1. Determine Spot Price from Market Data Cache or Instrument Master (No hardcoded fallback values)
     spot_price = 0.0
     cached_quote = global_market_cache.get_quote(underlying) or global_market_cache.get_quote(clean_und)
     if cached_quote:
@@ -3660,10 +3622,6 @@ def api_options_chain():
         except Exception:
             pass
 
-    if spot_price <= 0.0:
-        # Realistic default for spot based on asset
-        spot_price = 22500.0 if "NIFTY" in clean_und else (78500.0 if clean_und in ["BTC", "XAUT"] else (2650.0 if clean_und == "ETH" else 2850.0))
-
     # 2. Multi-Source or Single Provider Retrieval
     if provider == "ALL":
         multi_data = global_options_engine.get_multi_source_option_chain(
@@ -3673,17 +3631,21 @@ def api_options_chain():
             strike_count=strike_count,
             environment=environment,
         )
-        # Select primary source strikes for top-level backward compatibility
-        primary_snap = multi_data.get("sources", {}).get("DHAN") or multi_data.get("sources", {}).get("PAPER_SIMULATOR") or {}
+        # Determine primary snapshot based on requested asset class / environment
+        primary_snap = (
+            multi_data.get("sources", {}).get("DELTA_INDIA")
+            if clean_und in ["BTC", "ETH", "SOL", "XRP"]
+            else (multi_data.get("sources", {}).get("DHAN") or multi_data.get("sources", {}).get("PAPER_SIMULATOR") or {})
+        )
         multi_data["strikes"] = primary_snap.get("strikes", [])
         multi_data["strike_count"] = len(multi_data["strikes"])
         multi_data["total_available_strikes"] = len(multi_data["strikes"])
-        multi_data["max_pain"] = primary_snap.get("max_pain", 0.0)
-        multi_data["pcr"] = primary_snap.get("pcr", {"pcr_oi": 1.0, "pcr_volume": 1.0})
+        multi_data["max_pain"] = primary_snap.get("max_pain")
+        multi_data["pcr"] = primary_snap.get("pcr")
         multi_data["provider"] = "ALL"
         multi_data["environment"] = environment
-        multi_data["data_status"] = "LIVE"
-        multi_data["latency_ms"] = 20.0
+        multi_data["data_status"] = primary_snap.get("freshnessStatus", "NO_DATA")
+        multi_data["latency_ms"] = primary_snap.get("latencyMs")
         return jsonify(multi_data)
     else:
         snapshot = global_options_engine.get_option_chain(
@@ -6588,28 +6550,26 @@ def api_risk_calculate():
 def api_market_context():
     """Fetch crypto market context and traditional financial indices."""
     try:
+        btc_quote = global_market_cache.get("BTC")
         last_candle = safe_query_one("SELECT close FROM candles_cache ORDER BY timestamp DESC LIMIT 1")
-        btc_price = float(last_candle["close"]) if last_candle else 65420.0
+        btc_price = btc_quote.ltp if (btc_quote and btc_quote.ltp) else (float(last_candle["close"]) if last_candle else None)
 
-        eth_btc = 0.0518
-        if btc_price > 0:
-            eth_btc = round(3200.0 / btc_price, 4)
+        eth_btc = None
+        crypto_mcap = None
+        if btc_price and btc_price > 0:
+            eth_quote = global_market_cache.get("ETH")
+            eth_px = eth_quote.ltp if (eth_quote and eth_quote.ltp) else None
+            if eth_px:
+                eth_btc = round(eth_px / btc_price, 4)
+            crypto_mcap = round((btc_price * 19.7) / 500, 2)
 
         now_utc = datetime.now(timezone.utc).isoformat()
 
         context = {
-            "btc_dominance": 56.42,
-            "btc_dom_change": 0.35,
+            "btc_price": btc_price,
             "eth_btc_ratio": eth_btc,
-            "eth_btc_change": -0.82,
-            "crypto_market_cap_t": round((btc_price * 19.7) / 500, 2),
-            "market_cap_change": 1.25,
-            "funding_rate_pct": 0.0100,
-            "indices": [
-                {"name": "S&P 500", "symbol": "^GSPC", "val": 5464.61, "change_pct": 0.42},
-                {"name": "Dow Jones", "symbol": "^DJI", "val": 39127.14, "change_pct": -0.15},
-                {"name": "Nasdaq", "symbol": "^IXIC", "val": 17889.36, "change_pct": 0.85},
-            ],
+            "crypto_market_cap_t": crypto_mcap,
+            "indices": [],
             "last_updated": now_utc
         }
         return jsonify({"status": "success", "data": context})
@@ -10708,6 +10668,75 @@ def api_crypto_options_analytics():
 
 
 # ============================================================================
+# AUTHORITATIVE DELTA EXCHANGE CRYPTO OPTIONS API ROUTES
+# ============================================================================
+
+@app.route("/api/delta/options/expiries", methods=["GET"])
+def api_delta_direct_options_expiries():
+    """Returns verified active future expiries from Delta Exchange without expired dates."""
+    from src.delta_options_service import delta_options_service
+    underlying = request.args.get("underlying", "BTC").upper().strip()
+    region = request.args.get("region", "INDIA").upper().strip()
+    expiries = delta_options_service.get_available_expiries(underlying)
+    nearest = expiries[0]["expiry_date"] if expiries else None
+    return jsonify({
+        "status": "success",
+        "provider": "DELTA",
+        "region": region,
+        "underlying": underlying,
+        "count": len(expiries),
+        "nearest_expiry": nearest,
+        "expiries": expiries,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+
+@app.route("/api/delta/options/contracts", methods=["GET"])
+def api_delta_direct_options_contracts():
+    """Returns listed Delta options contracts for an underlying and expiry."""
+    from src import db
+    underlying = request.args.get("underlying", "BTC").upper().strip()
+    expiry = request.args.get("expiry")
+    contracts = db.get_delta_contracts(underlying=underlying, expiry=expiry, active_only=True)
+    return jsonify({
+        "status": "success",
+        "provider": "DELTA",
+        "underlying": underlying,
+        "expiry": expiry,
+        "count": len(contracts),
+        "contracts": contracts,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    })
+
+
+@app.route("/api/delta/options/chain", methods=["GET"])
+def api_delta_direct_options_chain():
+    """Returns full live option chain snapshot directly from DeltaOptionsService."""
+    from src.delta_options_service import delta_options_service
+    underlying = request.args.get("underlying", "BTC").upper().strip()
+    expiry = request.args.get("expiry")
+    region = request.args.get("region", "INDIA").upper().strip()
+    strike_count_str = request.args.get("strike_count") or request.args.get("strike_range")
+    strike_count = int(strike_count_str) if strike_count_str and strike_count_str.isdigit() else None
+
+    chain = delta_options_service.get_option_chain(
+        underlying=underlying,
+        expiry=expiry,
+        strike_count=strike_count,
+        region=region
+    )
+    return jsonify(chain)
+
+
+@app.route("/api/delta/options/health", methods=["GET"])
+def api_delta_direct_options_health():
+    """Returns deep diagnostic health for Delta REST, WebSocket, DB, and Subscription states."""
+    from src.delta_options_service import delta_options_service
+    health = delta_options_service.get_health()
+    return jsonify(health)
+
+
+# ============================================================================
 # UNIFIED BINANCE MARKET DATA & OPTIONS ENGINE ROUTES
 # ============================================================================
 
@@ -14547,7 +14576,6 @@ def api_risk_export():
                 d.get("threshold_unit"), d.get("policy_version"), d.get("execution_status")
             ])
         output.seek(0)
-        from flask import Response
         return Response(output.getvalue(), mimetype="text/csv", headers={"Content-Disposition": "attachment;filename=risk_decisions_ledger.csv"})
 
     return jsonify({"status": "success", "total": len(decisions), "decisions": decisions})
@@ -15709,45 +15737,47 @@ def api_markets_quote():
     if inst and inst.exchange == "NSE":
         from src.nse_service import NseService
         quote_res = NseService.get_instance().get_quote(inst.display_symbol)
-        data = quote_res.get("data", {})
+        data = quote_res.get("data", {}) if isinstance(quote_res, dict) else {}
+        ltp = float(data["LastTradedPrice"]) if data.get("LastTradedPrice") is not None else None
         return jsonify({
-            "status": "success",
+            "status": "success" if ltp is not None else "no_data",
             "symbol": inst.display_symbol,
             "instrumentId": inst.instrument_id,
             "exchange": "NSE",
             "assetClass": inst.asset_class.value,
-            "feedStatus": inst.feed_status.value,
-            "price": float(data.get("LastTradedPrice", 24350.0)),
-            "high": float(data.get("High", 24450.0)),
-            "low": float(data.get("Low", 24250.0)),
-            "open": float(data.get("Open", 24300.0)),
-            "close": float(data.get("Close", 24350.0)),
-            "changePct": float(data.get("PercentChange", 0.5)),
-            "volume": float(data.get("TotalTradedVolume", 5000000.0)),
-            "dataAgeMs": 150,
+            "feedStatus": inst.feed_status.value if ltp is not None else "NO_DATA",
+            "price": ltp,
+            "high": float(data["High"]) if data.get("High") is not None else None,
+            "low": float(data["Low"]) if data.get("Low") is not None else None,
+            "open": float(data["Open"]) if data.get("Open") is not None else None,
+            "close": float(data["Close"]) if data.get("Close") is not None else ltp,
+            "changePct": float(data["PercentChange"]) if data.get("PercentChange") is not None else None,
+            "volume": float(data["TotalTradedVolume"]) if data.get("TotalTradedVolume") is not None else None,
+            "dataAgeMs": 150 if ltp is not None else None,
             "provider": "nse_india",
             "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
     # Crypto / Global
     ticker_svc = get_ticker_service()
-    ticker = ticker_svc.get_ticker(symbol)
+    ticker = ticker_svc.get_ticker(symbol) if ticker_svc else {}
+    last_px = float(ticker.get("last") or ticker.get("price")) if (ticker.get("last") is not None or ticker.get("price") is not None) else None
     return jsonify({
-        "status": "success",
+        "status": "success" if last_px is not None else "no_data",
         "symbol": inst.display_symbol if inst else symbol,
         "instrumentId": inst.instrument_id if inst else f"CRYPTO:{symbol}",
-        "exchange": inst.exchange if inst else "BINANCE",
+        "exchange": inst.exchange if inst else "CRYPTO",
         "assetClass": inst.asset_class.value if inst else "CRYPTO_SPOT",
-        "feedStatus": inst.feed_status.value if inst else "REAL-TIME",
-        "price": float(ticker.get("last", 65420.0)),
-        "high": float(ticker.get("high", 66500.0)),
-        "low": float(ticker.get("low", 64800.0)),
-        "open": float(ticker.get("open", 65000.0)),
-        "close": float(ticker.get("last", 65420.0)),
-        "changePct": float(ticker.get("change_pct", 1.25)),
-        "volume": float(ticker.get("volume", 35000.0)),
-        "dataAgeMs": int(ticker.get("latency_ms", 12)),
-        "provider": ticker.get("provider", "binance_spot"),
+        "feedStatus": inst.feed_status.value if inst else ("REAL-TIME" if last_px is not None else "NO_DATA"),
+        "price": last_px,
+        "high": float(ticker["high"]) if ticker.get("high") is not None else None,
+        "low": float(ticker["low"]) if ticker.get("low") is not None else None,
+        "open": float(ticker["open"]) if ticker.get("open") is not None else None,
+        "close": last_px,
+        "changePct": float(ticker["change_pct"]) if ticker.get("change_pct") is not None else None,
+        "volume": float(ticker["volume"]) if ticker.get("volume") is not None else None,
+        "dataAgeMs": int(ticker["latency_ms"]) if ticker.get("latency_ms") is not None else None,
+        "provider": ticker.get("provider", "ticker_service"),
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
 
@@ -15784,11 +15814,6 @@ def api_markets_candles():
     )
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
-
-    if not rows:
-        rows = [
-            {"timestamp": datetime.now(timezone.utc).isoformat(), "open": 65000.0, "high": 65500.0, "low": 64800.0, "close": 65420.0, "volume": 1250.0}
-        ]
 
     return jsonify({
         "status": "success",
@@ -17086,23 +17111,27 @@ def api_brokers_delta_status():
     try:
         from src.delta_exchange_adapter import global_delta_adapter
         from market_data_gateway.gateway_client import gateway_client
+        from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
         
         status_data = global_delta_adapter.get_connection_status()
+        ws_health = delta_options_ws_adapter.get_sync_health()
         gw_status = "LIVE" if gateway_client.is_gateway_available() else "STANDALONE"
+        
+        is_conn = bool(status_data.get("connected") or ws_health.get("status") in ("LIVE", "CONNECTED"))
         
         return jsonify({
             "provider": "delta",
             "account": "delta_india",
-            "status": "CONNECTED" if status_data.get("connected") else "DISCONNECTED",
+            "status": "CONNECTED" if is_conn else "DISCONNECTED",
             "gateway_status": gw_status,
-            "subscribed_instruments": status_data.get("supportedPairsCount", 180),
-            "last_tick_at": status_data.get("timestamp"),
-            "freshness_ms": status_data.get("latencyMs", 50.0),
+            "subscribed_instruments": ws_health.get("subscribed_symbols", 0),
+            "last_tick_at": ws_health.get("last_tick_time") or status_data.get("timestamp"),
+            "freshness_ms": ws_health.get("latency_ms") or status_data.get("latencyMs"),
             "data_api_access": "AVAILABLE",
             "execution_mode": status_data.get("tradingMode", "LIVE_AND_PAPER"),
-            "ticks_received": 1000,
-            "error_count": 0,
-            "error_message": None,
+            "ticks_received": ws_health.get("messages_received", 0) if "messages_received" in ws_health else len(delta_options_ws_adapter.get_all_raw_quotes()),
+            "error_count": ws_health.get("error_count", 0),
+            "error_message": ws_health.get("message") if ws_health.get("error_count", 0) > 0 else None,
             "broker": "DELTA_EXCHANGE",
             "brokerName": status_data.get("brokerName", "Delta Exchange India & Global"),
             "supportedMarkets": status_data.get("supportedMarkets", ["Crypto Spot", "Perpetual Futures", "Crypto Options (BTC/ETH/SOL)", "Move Contracts"]),
@@ -17165,15 +17194,15 @@ def api_market_data_delta_quotes():
                 if t_data:
                     last_px = float(t_data.get("close") or t_data.get("mark_price") or t_data.get("spot_price") or 0.0)
                     quotes_sub = t_data.get("quotes") or {}
-                    bid_px = float(quotes_sub.get("best_bid") or last_px)
-                    ask_px = float(quotes_sub.get("best_ask") or last_px)
-                    vol = float(t_data.get("volume") or 0.0)
-                    turnover = float(t_data.get("turnover_usd") or t_data.get("turnover") or 0.0)
-                    oi = float(t_data.get("oi_contracts") or t_data.get("oi") or 0.0)
-                    high_24h = float(t_data.get("high") or 0.0)
-                    low_24h = float(t_data.get("low") or 0.0)
-                    open_24h = float(t_data.get("open") or 0.0)
-                    ltp_change = float(t_data.get("ltp_change_24h") or t_data.get("mark_change_24h") or 0.0)
+                    bid_px = float(quotes_sub["best_bid"]) if (quotes_sub.get("best_bid") is not None and float(quotes_sub["best_bid"]) > 0) else None
+                    ask_px = float(quotes_sub["best_ask"]) if (quotes_sub.get("best_ask") is not None and float(quotes_sub["best_ask"]) > 0) else None
+                    vol = float(t_data["volume"]) if t_data.get("volume") is not None else None
+                    turnover = float(t_data.get("turnover_usd") or t_data.get("turnover")) if (t_data.get("turnover_usd") is not None or t_data.get("turnover") is not None) else None
+                    oi = float(t_data.get("oi_contracts") or t_data.get("oi")) if (t_data.get("oi_contracts") is not None or t_data.get("oi") is not None) else None
+                    high_24h = float(t_data["high"]) if t_data.get("high") is not None else None
+                    low_24h = float(t_data["low"]) if t_data.get("low") is not None else None
+                    open_24h = float(t_data["open"]) if t_data.get("open") is not None else None
+                    ltp_change = float(t_data.get("ltp_change_24h") or t_data.get("mark_change_24h")) if (t_data.get("ltp_change_24h") is not None or t_data.get("mark_change_24h") is not None) else None
                     contract_type = t_data.get("contract_type", "perpetual_futures")
                     
                     quotes[sym] = {
@@ -17184,12 +17213,12 @@ def api_market_data_delta_quotes():
                         "symbol": sym,
                         "contract_symbol": t_data.get("symbol", sym),
                         "last_price": last_px,
-                        "mark_price": float(t_data.get("mark_price") or last_px),
-                        "spot_price": float(t_data.get("spot_price") or last_px),
+                        "mark_price": float(t_data.get("mark_price")) if t_data.get("mark_price") is not None else None,
+                        "spot_price": float(t_data.get("spot_price")) if t_data.get("spot_price") is not None else None,
                         "bid_price": bid_px,
                         "ask_price": ask_px,
-                        "bid_size": float(quotes_sub.get("bid_size") or 0.0),
-                        "ask_size": float(quotes_sub.get("ask_size") or 0.0),
+                        "bid_size": float(quotes_sub["bid_size"]) if quotes_sub.get("bid_size") is not None else None,
+                        "ask_size": float(quotes_sub["ask_size"]) if quotes_sub.get("ask_size") is not None else None,
                         "volume": vol,
                         "turnover_usd": turnover,
                         "open_interest": oi,
@@ -17197,12 +17226,13 @@ def api_market_data_delta_quotes():
                         "high": high_24h,
                         "low": low_24h,
                         "change_24h": ltp_change,
-                        "funding_rate": float(t_data.get("funding_rate") or 0.0),
+                        "funding_rate": float(t_data["funding_rate"]) if t_data.get("funding_rate") is not None else None,
                         "contract_type": contract_type,
                         "event_time": datetime.now(timezone.utc).isoformat(),
                         "received_at": datetime.now(timezone.utc).isoformat(),
-                        "freshness_ms": 12.0,
-                        "connection_status": "LIVE",
+                        "source": "DELTA_REST",
+                        "freshness": "LIVE" if last_px else "NO_DATA",
+                        "connection_status": "CONNECTED",
                         "data_mode": "LIVE_DATA",
                         "execution_mode": "LIVE_AND_PAPER",
                     }

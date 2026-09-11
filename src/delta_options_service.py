@@ -4,6 +4,7 @@ Delta Exchange Options Service & Ingestion Coordinator
 Coordinates Delta options catalogue discovery, REST/WebSocket normalization,
 in-memory caching, SQLite persistence, PCR, Max Pain, and Call/Put Wall computation,
 and real-time option chain generation with strict null validation (zero fake data policy).
+Supports multi-region routing (Delta India vs Delta Global).
 """
 
 import math
@@ -17,6 +18,7 @@ from decimal import Decimal
 
 from src import config
 from src import db
+from src.delta_region_adapter import DeltaRegionAdapter, DeltaRegion
 from src.delta_options_client import global_delta_client, DeltaOptionsClient
 from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
 from src.option_chain_engine import OptionGreeksCalculator, OptionChainEngine
@@ -40,7 +42,8 @@ def _format_expiry_date_display(settlement_time_str: str) -> Tuple[str, str, flo
         dte = max(0.0, (dt - now).total_seconds() / 86400.0)
         return dd_mm_yyyy, chain_suffix, round(dte, 2)
     except Exception:
-        return "01-01-2026", "010126", 0.0
+        now_dt = datetime.now(timezone.utc)
+        return now_dt.strftime("%d-%m-%Y"), now_dt.strftime("%d%m%y"), 0.0
 
 
 class DeltaOptionsService:
@@ -48,13 +51,19 @@ class DeltaOptionsService:
     Authoritative service managing Delta Exchange cryptocurrency options.
     """
 
-    def __init__(self, client: Optional[DeltaOptionsClient] = None):
+    def __init__(self, client: Optional[DeltaOptionsClient] = None, region: str = "INDIA"):
+        self.region = region.upper()
         self.client = client or global_delta_client
         self._lock = threading.RLock()
         self._last_catalogue_sync_time = 0.0
-        self._catalogue_sync_interval = 600.0  # 10 minutes
+        self._catalogue_sync_interval = 300.0  # 5 minutes
         self._bg_thread: Optional[threading.Thread] = None
         self._running = False
+
+    def set_region(self, region: str) -> None:
+        with self._lock:
+            self.region = region.upper()
+            self.client.set_region(self.region)
 
     def start(self):
         """Starts background periodic catalogue refresh and snapshot logging."""
@@ -62,6 +71,10 @@ class DeltaOptionsService:
             if self._running:
                 return
             self._running = True
+            try:
+                delta_options_ws_adapter.start_background_thread()
+            except Exception as e:
+                logger.warning(f"Could not start Delta WS adapter background thread: {e}")
             self._bg_thread = threading.Thread(target=self._background_worker, daemon=True, name="DeltaOptionsService-Worker")
             self._bg_thread.start()
             logger.info("Delta Options Service background coordinator started.")
@@ -90,6 +103,63 @@ class DeltaOptionsService:
                 logger.error(f"Error in Delta background worker: {e}")
 
     # --------------------------------------------------------------------------
+    # EXPIRY DISCOVERY (STRICT FUTURE FILTERING)
+    # --------------------------------------------------------------------------
+
+    def get_available_expiries(self, underlying: str = "BTC") -> List[Dict[str, Any]]:
+        """
+        Discovers, normalizes, and filters valid future expiries for an underlying.
+        Strictly excludes past/expired dates (settlement_time < now_utc).
+        """
+        und = underlying.upper().strip()
+        now_utc = datetime.now(timezone.utc)
+
+        # 1. First fetch active expiries from database
+        db_expiries = db.get_delta_expiries(und, active_only=True)
+
+        valid_expiries: List[Dict[str, Any]] = []
+        for e in db_expiries:
+            settle_str = e.get("settlement_time", "")
+            if not settle_str:
+                continue
+            try:
+                clean = settle_str.replace("Z", "+00:00")
+                dt = datetime.fromisoformat(clean)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                if dt >= now_utc:
+                    dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
+                    e_copy = dict(e)
+                    e_copy["days_to_expiry"] = round(dte, 2)
+                    valid_expiries.append(e_copy)
+            except Exception:
+                continue
+
+        # If DB expiries are empty or expired, trigger fresh catalogue discovery
+        if not valid_expiries:
+            logger.info(f"No future expiries found in DB for {und}. Triggering live catalogue sync...")
+            self.sync_catalogue(force=True)
+            db_expiries = db.get_delta_expiries(und, active_only=True)
+            for e in db_expiries:
+                settle_str = e.get("settlement_time", "")
+                try:
+                    clean = settle_str.replace("Z", "+00:00")
+                    dt = datetime.fromisoformat(clean)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if dt >= now_utc:
+                        dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
+                        e_copy = dict(e)
+                        e_copy["days_to_expiry"] = round(dte, 2)
+                        valid_expiries.append(e_copy)
+                except Exception:
+                    continue
+
+        # Sort ascending by settlement time
+        valid_expiries.sort(key=lambda x: x.get("settlement_time", ""))
+        return valid_expiries
+
+    # --------------------------------------------------------------------------
     # CATALOGUE & TICKER SYNCHRONIZATION
     # --------------------------------------------------------------------------
 
@@ -99,7 +169,7 @@ class DeltaOptionsService:
         Stores them in normalized SQLite tables and subscribes WebSocket to active chains.
         """
         start_ts = time.time()
-        logger.info("Starting Delta Exchange options catalogue discovery sync...")
+        logger.info(f"Starting Delta Exchange options catalogue discovery sync (Region: {self.region})...")
 
         raw_products = self.client.get_products(
             contract_types=["call_options", "put_options"],
@@ -115,7 +185,8 @@ class DeltaOptionsService:
         expiries_by_underlying: Dict[str, Dict[str, Dict[str, Any]]] = {}
         normalized_contracts: List[Dict[str, Any]] = []
 
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_utc = datetime.now(timezone.utc)
+        now_iso = now_utc.isoformat()
 
         for p in raw_products:
             product_id = p.get("id")
@@ -125,6 +196,17 @@ class DeltaOptionsService:
             settle_time = p.get("settlement_time")
 
             if not product_id or not symbol or not settle_time:
+                continue
+
+            # Strict filter: Exclude expired settlement times
+            try:
+                clean_ts = settle_time.replace("Z", "+00:00")
+                settle_dt = datetime.fromisoformat(clean_ts)
+                if settle_dt.tzinfo is None:
+                    settle_dt = settle_dt.replace(tzinfo=timezone.utc)
+                if settle_dt < now_utc:
+                    continue
+            except Exception:
                 continue
 
             # Underlying info
@@ -190,6 +272,8 @@ class DeltaOptionsService:
         total_expiries = 0
         for und_sym, exp_dict in expiries_by_underlying.items():
             exp_list = list(exp_dict.values())
+            # Sort ascending
+            exp_list.sort(key=lambda x: x.get("settlement_time", ""))
             db.upsert_delta_expiries(und_sym, exp_list)
             total_expiries += len(exp_list)
 
@@ -220,11 +304,12 @@ class DeltaOptionsService:
         logger.info(
             f"[OK] Delta catalogue sync finished in {elapsed_ms:.1f}ms: "
             f"{len(underlyings_map)} underlyings ({list(underlyings_map.keys())}), "
-            f"{total_expiries} expiries, {saved_contracts} contracts."
+            f"{total_expiries} active future expiries, {saved_contracts} active contracts."
         )
 
         return {
             "success": True,
+            "region": self.region,
             "underlyings_count": len(underlyings_map),
             "underlyings": list(underlyings_map.keys()),
             "expiries_count": total_expiries,
@@ -307,6 +392,7 @@ class DeltaOptionsService:
         underlying: str = "BTC",
         expiry: Optional[str] = None,
         strike_count: Optional[int] = None,
+        region: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Builds the structured dual-sided option chain for an underlying and expiry.
@@ -314,15 +400,42 @@ class DeltaOptionsService:
         Enriches with moneyness, ATM strike detection, PCR, Max Pain, and Greeks.
         Strictly sets missing/unquoted fields to None so that frontend renders '—' (never $0.00).
         """
+        req_start_t = time.time()
         und = underlying.upper().strip()
+        reg = (region or self.region).upper()
 
-        # 1. Fetch available expiries for this underlying
-        expiries = db.get_delta_expiries(und, active_only=True)
-        if not expiries:
-            self.sync_catalogue(force=True)
-            expiries = db.get_delta_expiries(und, active_only=True)
+        diagnostics: Dict[str, Any] = {
+            "provider": "DELTA",
+            "region": reg,
+            "underlying": und,
+            "expiry": expiry or "",
+            "expiryDiscovery": "PENDING",
+            "contractDiscovery": "PENDING",
+            "contractCount": 0,
+            "callCount": 0,
+            "putCount": 0,
+            "restSnapshot": "PENDING",
+            "snapshotRows": 0,
+            "websocket": delta_options_ws_adapter.get_status(),
+            "subscription": "SUBSCRIBED" if delta_options_ws_adapter.get_status() in ("LIVE", "CONNECTED") else "DISCONNECTED",
+            "tickerMessages": delta_options_ws_adapter.get_sync_health().get("subscribed_symbols", 0),
+            "validTickerMessages": len(delta_options_ws_adapter.get_all_raw_quotes()),
+            "orderBookMessages": len(delta_options_ws_adapter._orderbook_cache),
+            "validOrderBookMessages": len(delta_options_ws_adapter._orderbook_cache),
+            "oiRows": 0,
+            "greeksRows": 0,
+            "chainStatus": "NO_DATA",
+            "lastTickAt": delta_options_ws_adapter.get_sync_health().get("last_tick_time"),
+            "latencyMs": None,
+            "error": None,
+        }
 
+        # 1. Fetch valid future expiries for this underlying
+        expiries = self.get_available_expiries(und)
         if not expiries:
+            diagnostics["expiryDiscovery"] = "FAIL"
+            diagnostics["chainStatus"] = "NO_FUTURE_EXPIRY"
+            diagnostics["latencyMs"] = round((time.time() - req_start_t) * 1000.0, 2)
             return {
                 "underlying": und,
                 "spot_price": 0.0,
@@ -330,19 +443,25 @@ class DeltaOptionsService:
                 "selected_expiry": expiry or "",
                 "available_expiries": [],
                 "strikes": [],
+                "total_strikes": 0,
                 "atm_strike": 0.0,
-                "pcr": {"pcr_oi": None, "pcr_volume": None},
+                "pcr": None,
                 "max_pain": None,
                 "atm_iv": None,
                 "call_wall": None,
                 "put_wall": None,
                 "summary": {},
                 "is_live": False,
-                "is_stale": True,
-                "data_status": "DATA INCOMPLETE",
+                "is_stale": False,
+                "data_status": "NO_FUTURE_EXPIRY",
+                "diagnostics": diagnostics,
+                "latency_ms": diagnostics["latencyMs"],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-        # 2. Select target expiry
+        diagnostics["expiryDiscovery"] = "PASS"
+
+        # 2. Select target expiry: Ensure it is a valid future expiry
         selected_exp_obj = None
         if expiry:
             for e in expiries:
@@ -350,38 +469,50 @@ class DeltaOptionsService:
                     selected_exp_obj = e
                     break
         if not selected_exp_obj and expiries:
+            # Select earliest valid future expiry
             selected_exp_obj = expiries[0]
 
         target_settlement = selected_exp_obj["settlement_time"] if selected_exp_obj else ""
         target_expiry_date = selected_exp_obj["expiry_date"] if selected_exp_obj else ""
+        diagnostics["expiry"] = target_expiry_date
 
-        # 3. Retrieve all contracts for this underlying & expiry
+        # 3. Retrieve actual Delta listed contracts for this underlying & expiry
         contracts = db.get_delta_contracts(underlying=und, expiry=target_settlement, active_only=True)
         if not contracts and target_expiry_date:
             contracts = db.get_delta_contracts(underlying=und, expiry=target_expiry_date, active_only=True)
 
-        # 4. Fetch live raw quotes (WS cache -> REST fallback -> DB fallback)
+        if not contracts:
+            self.sync_catalogue(force=True)
+            contracts = db.get_delta_contracts(underlying=und, expiry=target_settlement, active_only=True)
+
+        diagnostics["contractCount"] = len(contracts)
+        diagnostics["contractDiscovery"] = "PASS" if contracts else "FAIL"
+
+        # 4. Fetch live quotes from WS cache and DB quotes
         live_quotes_ws = delta_options_ws_adapter.get_all_raw_quotes()
         db_quotes_list = db.get_delta_quotes(underlying=und, expiry=target_settlement[:10])
         db_quotes_map = {q["symbol"]: q for q in db_quotes_list}
 
-        # If WS cache is thin, trigger fast REST sync in background
+        # If WS cache is thin, trigger fast REST ticker sync
         if len(live_quotes_ws) < 5 and len(db_quotes_map) < 5:
             try:
-                self.sync_tickers_for_underlying(und, expiry_date=target_expiry_date)
+                synced_count = self.sync_tickers_for_underlying(und, expiry_date=target_expiry_date)
+                diagnostics["restSnapshot"] = "PASS" if synced_count > 0 else "EMPTY"
+                diagnostics["snapshotRows"] = synced_count
                 db_quotes_list = db.get_delta_quotes(underlying=und, expiry=target_settlement[:10])
                 db_quotes_map = {q["symbol"]: q for q in db_quotes_list}
-            except Exception:
-                pass
+            except Exception as ex:
+                diagnostics["restSnapshot"] = f"ERROR: {ex}"
+        else:
+            diagnostics["restSnapshot"] = "PASS"
+            diagnostics["snapshotRows"] = len(live_quotes_ws)
 
         # 5. Determine current Spot Price
         spot_price = 0.0
-        # Priority A: Check live WS spot cache
         sp_ws = delta_options_ws_adapter.get_spot_price(und) or delta_options_ws_adapter.get_spot_price(f"{und}USD")
         if sp_ws and sp_ws > 0:
             spot_price = sp_ws
 
-        # Priority B: Check WS quote cache
         if spot_price <= 0:
             for k, v in live_quotes_ws.items():
                 sp = v.get("spot_price")
@@ -389,7 +520,6 @@ class DeltaOptionsService:
                     spot_price = float(sp)
                     break
 
-        # Priority C: Check DB quotes
         if spot_price <= 0:
             for q in db_quotes_map.values():
                 sp = q.get("spot_price")
@@ -397,7 +527,6 @@ class DeltaOptionsService:
                     spot_price = float(sp)
                     break
 
-        # Priority D: Fallback to global indices REST
         if spot_price <= 0:
             try:
                 indices = self.client.get_spot_indices()
@@ -412,8 +541,15 @@ class DeltaOptionsService:
         if spot_price <= 0:
             spot_price = 78000.0 if und == "BTC" else (3500.0 if und == "ETH" else 100.0)
 
-        # 6. Group contracts by Strike Price into Dual-Sided Ladder
+        # 6. Group contracts by Strike Price into Dual-Sided Ladder (Actual Listed Strikes ONLY)
         strikes_map: Dict[float, Dict[str, Any]] = {}
+        valid_call_oi_total = 0.0
+        valid_put_oi_total = 0.0
+        valid_call_count = 0
+        valid_put_count = 0
+        has_any_real_quote = False
+        valid_oi_count = 0
+        valid_greeks_count = 0
 
         for c in contracts:
             k = float(c["strike_price"])
@@ -463,17 +599,31 @@ class DeltaOptionsService:
             vol_val = _get_val("volume_24h", "volume") or _get_val("volume")
             chg_val = _get_val("price_change_24h")
 
+            if mark_px is not None or bid_px is not None or ask_px is not None or oi_val is not None:
+                has_any_real_quote = True
+
+            if oi_val is not None and oi_val > 0:
+                valid_oi_count += 1
+
+            if delta_val is not None:
+                valid_greeks_count += 1
+
             # Spread calculation
             spread = round(ask_px - bid_px, 2) if (ask_px is not None and bid_px is not None and ask_px > 0 and bid_px > 0) else None
 
-            # ITM / ATM / OTM Moneyness calculation
+            # Moneyness calculation
             is_call = "call" in ctype
             if is_call:
+                valid_call_count += 1
+                if oi_val is not None and oi_val > 0:
+                    valid_call_oi_total += oi_val
                 moneyness = "ITM" if k < spot_price * 0.998 else ("ATM" if abs(k - spot_price) <= spot_price * 0.005 else "OTM")
             else:
+                valid_put_count += 1
+                if oi_val is not None and oi_val > 0:
+                    valid_put_oi_total += oi_val
                 moneyness = "ITM" if k > spot_price * 1.002 else ("ATM" if abs(k - spot_price) <= spot_price * 0.005 else "OTM")
 
-            # Normalized IV percentage
             norm_iv = round(mark_iv * 100.0 if mark_iv < 5.0 else mark_iv, 2) if mark_iv is not None and mark_iv > 0 else None
 
             leg_dict = {
@@ -515,6 +665,11 @@ class DeltaOptionsService:
             else:
                 strikes_map[k]["put"] = leg_dict
 
+        diagnostics["callCount"] = valid_call_count
+        diagnostics["putCount"] = valid_put_count
+        diagnostics["oiRows"] = valid_oi_count
+        diagnostics["greeksRows"] = valid_greeks_count
+
         # 7. Sort strikes ascending
         sorted_strike_rows = []
         for k in sorted(strikes_map.keys()):
@@ -522,12 +677,11 @@ class DeltaOptionsService:
             is_atm = abs(k - spot_price) <= (spot_price * 0.005)
             row["is_atm"] = is_atm
             row["distance_pct"] = round(((k - spot_price) / max(1.0, spot_price)) * 100.0, 2)
-            # Map canonical 'ce' and 'pe' keys for universal UI compatibility
             row["ce"] = row["call"]
             row["pe"] = row["put"]
             sorted_strike_rows.append(row)
 
-        # 8. Identify ATM strike
+        # 8. Identify ATM strike from actual listed strikes
         atm_strike = spot_price
         if sorted_strike_rows:
             min_dist = float("inf")
@@ -538,10 +692,21 @@ class DeltaOptionsService:
                     atm_strike = r["strike"]
 
         for r in sorted_strike_rows:
-            if r["strike"] == atm_strike:
-                r["is_atm"] = True
+            r["is_atm"] = (r["strike"] == atm_strike)
 
-        # 9. Compute PCR, Max Pain, Call Wall, Put Wall, and ATM IV
+        # 9. Compute PCR and Max Pain strictly from valid option OI
+        pcr_metrics: Optional[Dict[str, Optional[float]]] = None
+        if valid_call_oi_total > 0 and valid_put_oi_total > 0:
+            pcr_metrics = {
+                "pcr_oi": round(valid_put_oi_total / valid_call_oi_total, 2),
+                "pcr_volume": None,
+            }
+        else:
+            pcr_metrics = {
+                "pcr_oi": None,
+                "pcr_volume": None,
+            }
+
         compat_rows = []
         for r in sorted_strike_rows:
             compat_rows.append({
@@ -550,18 +715,18 @@ class DeltaOptionsService:
                 "pe": r["put"] or {},
             })
 
-        pcr_metrics = OptionChainEngine.calculate_pcr(compat_rows)
-        max_pain_strike = OptionChainEngine.calculate_max_pain(compat_rows)
+        max_pain_strike: Optional[float] = None
+        if valid_oi_count >= 3:
+            max_pain_strike = OptionChainEngine.calculate_max_pain(compat_rows)
 
-        # True Call Wall (strike with highest call OI) & Put Wall (strike with highest put OI)
-        call_wall_strike = None
+        # Call & Put Walls
+        call_wall_strike: Optional[float] = None
         max_call_oi = -1.0
-        put_wall_strike = None
+        put_wall_strike: Optional[float] = None
         max_put_oi = -1.0
-        atm_iv_val = None
+        atm_iv_val: Optional[float] = None
 
         for r in sorted_strike_rows:
-            # Check call OI
             c_leg = r.get("call")
             if c_leg and c_leg.get("open_interest") is not None:
                 c_oi = float(c_leg["open_interest"])
@@ -569,7 +734,6 @@ class DeltaOptionsService:
                     max_call_oi = c_oi
                     call_wall_strike = r["strike"]
 
-            # Check put OI
             p_leg = r.get("put")
             if p_leg and p_leg.get("open_interest") is not None:
                 p_oi = float(p_leg["open_interest"])
@@ -577,7 +741,6 @@ class DeltaOptionsService:
                     max_put_oi = p_oi
                     put_wall_strike = r["strike"]
 
-            # Check ATM IV
             if r.get("is_atm"):
                 if c_leg and c_leg.get("mark_iv"):
                     atm_iv_val = c_leg["mark_iv"]
@@ -590,7 +753,6 @@ class DeltaOptionsService:
                 sorted_strike_rows, spot_price=spot_price, strike_count=strike_count
             )
 
-        # Expiry countdown
         days_to_exp = selected_exp_obj.get("days_to_expiry", 0.0) if selected_exp_obj else 0.0
         total_seconds = max(0, int(days_to_exp * 86400.0))
         d_rem = total_seconds // 86400
@@ -599,17 +761,14 @@ class DeltaOptionsService:
         countdown_label = f"{d_rem}d {h_rem}h {m_rem}m"
 
         ws_health = delta_options_ws_adapter.get_status()
-        is_live = ws_health in ("LIVE", "CONNECTED")
+        is_live = ws_health in ("LIVE", "CONNECTED") and has_any_real_quote
 
-        # Determine data completeness
-        has_quotes = any(
-            (r.get("call") and r["call"].get("mark_price") is not None) or
-            (r.get("put") and r["put"].get("mark_price") is not None)
-            for r in sorted_strike_rows
-        )
-        data_status = "LIVE" if (is_live and has_quotes) else ("DATA INCOMPLETE" if not has_quotes else "STALE")
+        data_status = "LIVE" if is_live else ("DATA INCOMPLETE" if not has_any_real_quote else "STALE")
+        diagnostics["chainStatus"] = data_status
+        diagnostics["latencyMs"] = round((time.time() - req_start_t) * 1000.0, 2)
 
         result = {
+            "status": "success",
             "underlying": und,
             "spot_price": round(spot_price, 2),
             "expiry": target_expiry_date,
@@ -619,6 +778,9 @@ class DeltaOptionsService:
             "countdown_label": countdown_label,
             "available_expiries": expiries,
             "strikes": sorted_strike_rows,
+            "contracts": [c for c in contracts],
+            "calls": [s["call"] for s in sorted_strike_rows if s.get("call")],
+            "puts": [s["put"] for s in sorted_strike_rows if s.get("put")],
             "total_strikes": len(sorted_strike_rows),
             "total_strikes_count": len(sorted_strike_rows),
             "atm_strike": atm_strike,
@@ -629,11 +791,14 @@ class DeltaOptionsService:
             "atm_iv": atm_iv_val,
             "data_source": "Delta Exchange Live",
             "provider": "DELTA_EXCHANGE",
-            "environment": "INDIA",
+            "region": reg,
+            "environment": reg,
             "is_live": is_live,
-            "is_stale": not is_live and len(live_quotes_ws) == 0,
+            "is_stale": False if is_live else True,
             "data_status": data_status,
-            "latency_ms": delta_options_ws_adapter.get_sync_health().get("latency_ms", 16.0),
+            "freshness": data_status,
+            "latency_ms": diagnostics["latencyMs"],
+            "diagnostics": diagnostics,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
 
@@ -645,8 +810,8 @@ class DeltaOptionsService:
                 "settlement_time": target_settlement,
                 "spot_price": spot_price,
                 "atm_strike": atm_strike,
-                "pcr_oi": pcr_metrics.get("pcr_oi", 1.0),
-                "pcr_vol": pcr_metrics.get("pcr_volume", 1.0),
+                "pcr_oi": pcr_metrics.get("pcr_oi") if pcr_metrics else None,
+                "pcr_vol": pcr_metrics.get("pcr_volume") if pcr_metrics else None,
                 "max_pain_strike": max_pain_strike,
                 "chain_data_json": sorted_strike_rows,
             })
@@ -668,7 +833,7 @@ class DeltaOptionsService:
         res = []
         for u in underlyings:
             und_sym = u["underlying_symbol"]
-            expiries = db.get_delta_expiries(und_sym, active_only=True)
+            expiries = self.get_available_expiries(und_sym)
             contracts = db.get_delta_contracts(underlying=und_sym, active_only=True)
 
             spot_px = delta_options_ws_adapter.get_spot_price(und_sym) or (78000.0 if und_sym == "BTC" else (3500.0 if und_sym == "ETH" else 100.0))
@@ -687,7 +852,7 @@ class DeltaOptionsService:
         return res
 
     def get_expiries_for_underlying(self, underlying: str) -> List[Dict[str, Any]]:
-        return db.get_delta_expiries(underlying, active_only=True)
+        return self.get_available_expiries(underlying)
 
     def get_contract_by_id(self, product_id: int) -> Optional[Dict[str, Any]]:
         return db.get_delta_contract_by_id(product_id)
@@ -703,7 +868,8 @@ class DeltaOptionsService:
 
         return {
             "provider": "DELTA_EXCHANGE",
-            "environment": "INDIA",
+            "region": self.region,
+            "environment": self.region,
             "status": "HEALTHY" if rest_health.get("status") == "HEALTHY" else "DEGRADED",
             "rest": rest_health,
             "websocket": ws_health,
@@ -717,4 +883,4 @@ class DeltaOptionsService:
 
 
 # Singleton service instance
-delta_options_service = DeltaOptionsService()
+delta_options_service = DeltaOptionsService(region="INDIA")

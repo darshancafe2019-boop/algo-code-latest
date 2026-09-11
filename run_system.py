@@ -14,6 +14,6 @@ ORCHESTRATOR = ROOT_DIR / "scripts" / "dev_orchestrator.py"
 
 if __name__ == "__main__":
     try:
-        sys.exit(subprocess.call([sys.executable, str(ORCHESTRATOR)]))
+        sys.exit(subprocess.call([sys.executable, str(ORCHESTRATOR)] + sys.argv[1:]))
     except KeyboardInterrupt:
         sys.exit(0)

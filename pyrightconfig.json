@@ -1,0 +1,17 @@
+{
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.12",
+  "include": [
+    "algo-code-latest",
+    "algo-code-latest/src",
+    "algo-code-latest/market_data_gateway",
+    "algo-code-latest/scripts"
+  ],
+  "extraPaths": [
+    "algo-code-latest",
+    "algo-code-latest/src",
+    "algo-code-latest/market_data_gateway",
+    "algo-code-latest/.venv/lib/python3.12/site-packages"
+  ]
+}

@@ -14,6 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { formatGreek, formatPrice } from "@/lib/formatters/numbers";
 
 export function OptionsPositionsView() {
   const [modeFilter, setModeFilter] = useState<"ALL" | "PAPER" | "SHADOW" | "LIVE">("ALL");
@@ -160,14 +161,13 @@ export function OptionsPositionsView() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-sky-400">{p.provider || "DHAN"}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-200">{p.quantity || p.lots || 1}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-300">₹{(p.entry_price || p.average_price || 0).toFixed(2)}</td>
-                      <td className="py-2.5 px-3 text-right text-slate-200 font-bold">₹{(p.current_price || p.last_price || 0).toFixed(2)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-300">{formatPrice(p.entry_price ?? p.average_price, "₹", 2)}</td>
+                      <td className="py-2.5 px-3 text-right text-slate-200 font-bold">{formatPrice(p.current_price ?? p.last_price, "₹", 2)}</td>
                       <td className={`py-2.5 px-3 text-right font-bold ${pnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                        {pnl >= 0 ? "+" : ""}₹{pnl.toFixed(2)}
+                        {pnl >= 0 ? "+" : ""}{formatPrice(pnl, "₹", 2)}
                       </td>
-                      <td className="py-2.5 px-3 text-right text-sky-400">{p.delta !== undefined ? p.delta.toFixed(2) : "—"}</td>
-                      <td className="py-2.5 px-3 text-right text-rose-400">{p.theta !== undefined ? p.theta.toFixed(1) : "—"}</td>
+                      <td className="py-2.5 px-3 text-right text-sky-400">{formatGreek(p.delta, 2)}</td>
+                      <td className="py-2.5 px-3 text-right text-rose-400">{formatGreek(p.theta, 1)}</td>
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-300 border border-slate-700">
                           {p.mode || "PAPER"}

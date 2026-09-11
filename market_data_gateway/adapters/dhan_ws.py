@@ -20,7 +20,7 @@ import logging
 import os
 import struct
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 try:
@@ -52,8 +52,7 @@ def is_indian_market_open() -> bool:
     Monday to Friday, 09:15 to 15:30 IST (UTC+05:30).
     """
     now_utc = datetime.now(timezone.utc)
-    # IST = UTC + 5h30m
-    ist_offset = timezone(timezone.utc.utcoffset(now_utc) or __import__("datetime").timedelta(hours=5, minutes=30))
+    ist_offset = timezone(timedelta(hours=5, minutes=30))
     now_ist = now_utc.astimezone(ist_offset)
 
     # Check weekday (0 = Monday, ..., 4 = Friday, 5 = Saturday, 6 = Sunday)
@@ -106,6 +105,8 @@ class DhanWSAdapter(BaseProviderAdapter):
     def feed_state(self) -> str:
         if not global_dhan_service.is_authenticated:
             return global_dhan_service._auth_status if global_dhan_service._auth_status != "INITIAL" else "CREDENTIALS_MISSING"
+        if self._auth_error_reason in ("AUTH_REQUIRED", "AUTH_ERROR", "INVALID_DHAN_CLIENT_ID"):
+            return "AUTH_ERROR"
         if not is_indian_market_open() and self._status == "CONNECTED":
             return "MARKET_CLOSED"
         return self._status

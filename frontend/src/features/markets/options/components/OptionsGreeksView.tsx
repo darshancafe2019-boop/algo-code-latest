@@ -14,6 +14,12 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { OptionChainData, OptionStrikeRow } from "@/types/option-chain";
+import {
+  formatGreek,
+  formatPrice,
+  formatPercent,
+  formatNumber,
+} from "@/lib/formatters/numbers";
 
 export function OptionsGreeksView() {
   const [underlying, setUnderlying] = useState("NIFTY");
@@ -36,16 +42,23 @@ export function OptionsGreeksView() {
   });
 
   const strikes: OptionStrikeRow[] = data?.strikes || [];
-  const spotPrice = data?.spot_price || 22500.0;
-  const atmStrike = data?.atm_strike || 22500;
+  const spotPrice = typeof data?.spot_price === "number" && !isNaN(data.spot_price) ? data.spot_price : null;
+  const atmStrike = data?.atm_strike ?? null;
   const expiry = data?.selected_expiry || "Current Week";
 
-  // Compute ATM IV and average call/put IVs
-  const atmRow = strikes.find((s) => s.is_atm) || strikes[Math.floor(strikes.length / 2)];
-  const atmIv = atmRow ? (atmRow.ce?.iv || atmRow.pe?.iv || 14.5) : 14.5;
-  const avgCallIv = strikes.length > 0 ? strikes.reduce((acc, s) => acc + (s.ce?.iv || 0), 0) / strikes.length : 0;
-  const avgPutIv = strikes.length > 0 ? strikes.reduce((acc, s) => acc + (s.pe?.iv || 0), 0) / strikes.length : 0;
-  const ivSkew = Math.abs(avgPutIv - avgCallIv);
+  const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || source === "DELTA_INDIA" || source === "BINANCE";
+  const currency = isCrypto ? "$" : "₹";
+
+  // Compute ATM IV and average call/put IVs with strict null safety
+  const atmRow = strikes.find((s) => s.is_atm) || (strikes.length > 0 ? strikes[Math.floor(strikes.length / 2)] : undefined);
+  const atmIv = atmRow ? (atmRow.ce?.iv ?? atmRow.pe?.iv ?? null) : null;
+
+  const validCallIvs = strikes.map((s) => s.ce?.iv).filter((v): v is number => typeof v === "number" && !isNaN(v) && v > 0);
+  const validPutIvs = strikes.map((s) => s.pe?.iv).filter((v): v is number => typeof v === "number" && !isNaN(v) && v > 0);
+
+  const avgCallIv = validCallIvs.length > 0 ? validCallIvs.reduce((a, b) => a + b, 0) / validCallIvs.length : null;
+  const avgPutIv = validPutIvs.length > 0 ? validPutIvs.reduce((a, b) => a + b, 0) / validPutIvs.length : null;
+  const ivSkew = (avgCallIv !== null && avgPutIv !== null) ? Math.abs(avgPutIv - avgCallIv) : null;
 
   return (
     <div className="space-y-5 text-slate-100 font-sans">
@@ -127,20 +140,30 @@ export function OptionsGreeksView() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 font-mono">
           <span className="text-[10px] text-slate-400 tracking-wider uppercase block">UNDERLYING SPOT</span>
-          <div className="text-xl font-bold text-slate-100 mt-1">₹{spotPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</div>
+          <div className="text-xl font-bold text-slate-100 mt-1">
+            {formatPrice(spotPrice, currency, 2)}
+          </div>
           <span className="text-[10px] text-sky-400 mt-0.5 block">Expiry: {expiry}</span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 font-mono">
           <span className="text-[10px] text-slate-400 tracking-wider uppercase block">ATM IMPLIED VOLATILITY</span>
-          <div className="text-xl font-bold text-sky-300 mt-1">{atmIv ? `${atmIv.toFixed(2)}%` : "—"}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Strike: {atmStrike}</span>
+          <div className="text-xl font-bold text-sky-300 mt-1">
+            {formatPercent(atmIv, 2)}
+          </div>
+          <span className="text-[10px] text-slate-400 mt-0.5 block">
+            Strike: {atmStrike !== null ? atmStrike : "—"}
+          </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 font-mono">
           <span className="text-[10px] text-slate-400 tracking-wider uppercase block">CALL / PUT IV SKEW</span>
-          <div className="text-xl font-bold text-amber-300 mt-1">{ivSkew ? `${ivSkew.toFixed(2)}%` : "—"}</div>
-          <span className="text-[10px] text-slate-400 mt-0.5 block">Call: {avgCallIv.toFixed(1)}% | Put: {avgPutIv.toFixed(1)}%</span>
+          <div className="text-xl font-bold text-amber-300 mt-1">
+            {formatPercent(ivSkew, 2)}
+          </div>
+          <span className="text-[10px] text-slate-400 mt-0.5 block">
+            Call: {formatPercent(avgCallIv, 1)} | Put: {formatPercent(avgPutIv, 1)}
+          </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 font-mono">
@@ -191,52 +214,80 @@ export function OptionsGreeksView() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {strikes.map((r) => {
-                const isAtm = r.is_atm;
-                const isItmCall = r.strike < spotPrice;
-                const isItmPut = r.strike > spotPrice;
+              {strikes.length === 0 ? (
+                <tr>
+                  <td colSpan={13} className="py-8 text-center text-slate-500 font-mono text-xs">
+                    {isLoading ? "Loading option contracts and Greeks..." : "No active option contracts available for this underlying / expiry."}
+                  </td>
+                </tr>
+              ) : (
+                strikes.map((r) => {
+                  const isAtm = r.is_atm;
+                  const isItmCall = spotPrice !== null && r.strike < spotPrice;
+                  const isItmPut = spotPrice !== null && r.strike > spotPrice;
 
-                return (
-                  <tr
-                    key={r.strike}
-                    className={`hover:bg-slate-800/40 transition-colors ${
-                      isAtm ? "bg-sky-500/10 font-bold" : ""
-                    }`}
-                  >
-                    {/* Call Greeks */}
-                    <td className="py-2 px-3 text-right text-slate-300">{r.ce?.iv ? `${r.ce.iv.toFixed(1)}%` : "—"}</td>
-                    <td className="py-2 px-3 text-right text-emerald-400 font-bold">{r.ce?.delta !== undefined ? r.ce.delta.toFixed(3) : "—"}</td>
-                    <td className="py-2 px-3 text-right text-slate-400">{r.ce?.gamma !== undefined ? r.ce.gamma.toFixed(5) : "—"}</td>
-                    <td className="py-2 px-3 text-right text-rose-400/90">{r.ce?.theta !== undefined ? r.ce.theta.toFixed(2) : "—"}</td>
-                    <td className="py-2 px-3 text-right text-sky-400/90">{r.ce?.vega !== undefined ? r.ce.vega.toFixed(2) : "—"}</td>
-                    <td className={`py-2 px-3 text-right font-bold ${isItmCall ? "text-emerald-300" : "text-slate-300"}`}>
-                      {r.ce?.ltp !== undefined && r.ce.ltp !== null ? `₹${r.ce.ltp.toFixed(2)}` : "—"}
-                    </td>
+                  return (
+                    <tr
+                      key={r.strike}
+                      className={`hover:bg-slate-800/40 transition-colors ${
+                        isAtm ? "bg-sky-500/10 font-bold" : ""
+                      }`}
+                    >
+                      {/* Call Greeks */}
+                      <td className="py-2 px-3 text-right text-slate-300">
+                        {formatPercent(r.ce?.iv, 1)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-emerald-400 font-bold">
+                        {formatGreek(r.ce?.delta, 3)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-slate-400">
+                        {formatGreek(r.ce?.gamma, 5)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-rose-400/90">
+                        {formatGreek(r.ce?.theta, 2)}
+                      </td>
+                      <td className="py-2 px-3 text-right text-sky-400/90">
+                        {formatGreek(r.ce?.vega, 2)}
+                      </td>
+                      <td className={`py-2 px-3 text-right font-bold ${isItmCall ? "text-emerald-300" : "text-slate-300"}`}>
+                        {formatPrice(r.ce?.ltp, currency, 2)}
+                      </td>
 
-                    {/* Strike Center */}
-                    <td className="py-2 px-4 text-center bg-slate-900/90 font-bold text-slate-100 border-x border-slate-800">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <span>{r.strike}</span>
-                        {isAtm && (
-                          <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-sky-500/30 text-sky-300 border border-sky-400/40">
-                            ATM
-                          </span>
-                        )}
-                      </div>
-                    </td>
+                      {/* Strike Center */}
+                      <td className="py-2 px-4 text-center bg-slate-900/90 font-bold text-slate-100 border-x border-slate-800">
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span>{r.strike}</span>
+                          {isAtm && (
+                            <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-sky-500/30 text-sky-300 border border-sky-400/40">
+                              ATM
+                            </span>
+                          )}
+                        </div>
+                      </td>
 
-                    {/* Put Greeks */}
-                    <td className={`py-2 px-3 text-left font-bold ${isItmPut ? "text-rose-300" : "text-slate-300"}`}>
-                      {r.pe?.ltp !== undefined && r.pe.ltp !== null ? `₹${r.pe.ltp.toFixed(2)}` : "—"}
-                    </td>
-                    <td className="py-2 px-3 text-left text-sky-400/90">{r.pe?.vega !== undefined ? r.pe.vega.toFixed(2) : "—"}</td>
-                    <td className="py-2 px-3 text-left text-rose-400/90">{r.pe?.theta !== undefined ? r.pe.theta.toFixed(2) : "—"}</td>
-                    <td className="py-2 px-3 text-left text-slate-400">{r.pe?.gamma !== undefined ? r.pe.gamma.toFixed(5) : "—"}</td>
-                    <td className="py-2 px-3 text-left text-rose-400 font-bold">{r.pe?.delta !== undefined ? r.pe.delta.toFixed(3) : "—"}</td>
-                    <td className="py-2 px-3 text-left text-slate-300">{r.pe?.iv ? `${r.pe.iv.toFixed(1)}%` : "—"}</td>
-                  </tr>
-                );
-              })}
+                      {/* Put Greeks */}
+                      <td className={`py-2 px-3 text-left font-bold ${isItmPut ? "text-rose-300" : "text-slate-300"}`}>
+                        {formatPrice(r.pe?.ltp, currency, 2)}
+                      </td>
+                      <td className="py-2 px-3 text-left text-sky-400/90">
+                        {formatGreek(r.pe?.vega, 2)}
+                      </td>
+                      <td className="py-2 px-3 text-left text-rose-400/90">
+                        {formatGreek(r.pe?.theta, 2)}
+                      </td>
+                      <td className="py-2 px-3 text-left text-slate-400">
+                        {formatGreek(r.pe?.gamma, 5)}
+                      </td>
+                      <td className="py-2 px-3 text-left text-rose-400 font-bold">
+                        {formatGreek(r.pe?.delta, 3)}
+                      </td>
+                      <td className="py-2 px-3 text-left text-slate-300">
+                        {formatPercent(r.pe?.iv, 1)}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

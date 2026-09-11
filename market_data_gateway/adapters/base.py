@@ -26,9 +26,9 @@ class NormalizedQuote:
     exchange: str                  # e.g. "BINANCE", "NSE", "XNAS"
     provider: str                  # adapter id e.g. "binance_ws", "angelone"
     last_price: float
-    bid: float = 0.0
-    ask: float = 0.0
-    volume: float = 0.0
+    bid: Optional[float] = None
+    ask: Optional[float] = None
+    volume: Optional[float] = None
     high: Optional[float] = None
     low: Optional[float] = None
     open: Optional[float] = None
@@ -37,6 +37,8 @@ class NormalizedQuote:
     vwap: Optional[float] = None
     oi: Optional[float] = None
     funding_rate: Optional[float] = None
+    depth: Optional[Dict[str, Any]] = None
+    greeks: Optional[Dict[str, Any]] = None
     # Provenance
     event_timestamp: str = ""      # ISO-8601 UTC — from the provider
     received_timestamp: str = ""   # ISO-8601 UTC — when we received it

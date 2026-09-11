@@ -4,7 +4,6 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useRouter } from "next/navigation";
 import { useGlobalLayout } from "@/context/GlobalLayoutContext";
 import { GlobalHeader } from "./GlobalHeader";
-import { GlobalStatusRail } from "./GlobalStatusRail";
 import { LeftNavigationSidebar } from "@/components/layout/LeftNavigationSidebar";
 import { DetailDrawer } from "./DetailDrawer";
 import { OrderReviewModal, OrderIntentData } from "./OrderReviewModal";
@@ -260,12 +259,7 @@ export function QuantOSAppShell({
             />
           </ErrorBoundary>
 
-          {/* 2. OPERATIONAL STATUS RAIL */}
-          <ErrorBoundary title="Status Rail Failed">
-            <GlobalStatusRail onOpenDetailDrawer={handleQuickStatusInspect} />
-          </ErrorBoundary>
-
-          {/* 3. MIDDLE AREA: LEFT NAV + MAIN WORKSPACE */}
+          {/* 2. MIDDLE AREA: LEFT NAV + MAIN WORKSPACE */}
           <div className="flex-1 flex overflow-hidden relative">
             <ErrorBoundary title="Left Navigation Failed">
               <LeftNavigationSidebar

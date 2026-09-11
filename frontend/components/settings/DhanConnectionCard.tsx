@@ -363,16 +363,15 @@ export function DhanConnectionCard() {
 
         <div className="flex items-center gap-2">
           <a
-            href="https://dhan.co"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald-400 transition-colors"
+            href="/api/dhan/login?redirect=true"
+            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors"
           >
-            Dhan Portal <ExternalLink className="h-3 w-3" />
+            <ShieldCheck className="h-3.5 w-3.5" />
+            Connect Dhan (2FA Login)
           </a>
           <button
             onClick={() => setIsConfigModalOpen(true)}
-            className="flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition-colors"
+            className="flex items-center gap-1.5 rounded-lg border border-border bg-secondary/40 px-3.5 py-1.5 text-xs font-medium text-foreground hover:bg-secondary transition-colors"
           >
             <Sliders className="h-3.5 w-3.5" />
             {isConnected ? "Update Credentials" : "Enter API Keys"}

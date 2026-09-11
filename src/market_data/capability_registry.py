@@ -34,6 +34,50 @@ class ProviderCapabilityRegistry:
         has_binance_key = bool(os.getenv("BINANCE_API_KEY") or True) # Public market data available
         has_global_key = bool(os.getenv("POLYGON_API_KEY") or os.getenv("TWELVE_DATA_API_KEY") or os.getenv("FINNHUB_API_KEY"))
 
+        # 0. Official Delta Exchange (Crypto Options, Futures, Perpetuals, Spot)
+        has_delta_key = bool(os.getenv("DELTA_API_KEY") or True)  # Public market data and options catalogue available
+        self._providers["delta"] = ProviderCapabilityRecord(
+            provider="delta",
+            supported_markets=[MarketRegion.CRYPTO.value, MarketRegion.INDIA.value, MarketRegion.GLOBAL.value],
+            supported_asset_classes=[AssetClass.CRYPTO.value],
+            instrument_discovery=True,
+            historical_data=True,
+            rest_quotes=True,
+            websocket_quotes=True,
+            trades=True,
+            orderbook=True,
+            options_chain=True,
+            open_interest=True,
+            funding_rate=True,
+            economic_data=False,
+            authentication_required=False,
+            rate_limits={"requests_per_sec": 30, "websocket_subscriptions": 200},
+            licence_status="VERIFIED_OFFICIAL",
+            connection_status="LIVE",
+        )
+
+        # 0.1 Official Dhan (India Equities, Indices, Futures, Options)
+        has_dhan_token = bool(os.getenv("DHAN_ACCESS_TOKEN"))
+        self._providers["dhan"] = ProviderCapabilityRecord(
+            provider="dhan",
+            supported_markets=[MarketRegion.INDIA.value],
+            supported_asset_classes=[AssetClass.EQUITY.value, AssetClass.INDEX.value],
+            instrument_discovery=True,
+            historical_data=True,
+            rest_quotes=True,
+            websocket_quotes=True,
+            trades=True,
+            orderbook=True,
+            options_chain=True,
+            open_interest=True,
+            funding_rate=False,
+            economic_data=False,
+            authentication_required=True,
+            rate_limits={"requests_per_sec": 20, "websocket_subscriptions": 100},
+            licence_status="VERIFIED_OFFICIAL",
+            connection_status="LIVE" if has_dhan_token else "NOT_CONFIGURED",
+        )
+
         # 1. Official Upstox (India Equities, Indices, F&O)
         self._providers["upstox"] = ProviderCapabilityRecord(
             provider="upstox",

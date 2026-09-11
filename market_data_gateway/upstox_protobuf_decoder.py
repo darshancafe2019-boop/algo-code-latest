@@ -8,6 +8,7 @@ Decodes real-time binary frames received from wss://api.upstox.com/v3/feed/marke
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 from google.protobuf import descriptor_pb2, descriptor_pool, message_factory
 
@@ -205,42 +206,85 @@ def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
         }
     }
     """
+# Decoder Metrics Tracking
+_decoder_metrics = {
+    "decode_success": 0,
+    "decode_errors": 0,
+    "total_bytes_processed": 0,
+    "last_error": None,
+    "last_error_time": None,
+}
+
+
+def get_decoder_metrics() -> Dict[str, Any]:
+    """Returns current Protobuf decoder performance and error telemetry."""
+    return dict(_decoder_metrics)
+
+
+def reset_decoder_metrics() -> None:
+    """Resets decoder telemetry counters."""
+    _decoder_metrics["decode_success"] = 0
+    _decoder_metrics["decode_errors"] = 0
+    _decoder_metrics["total_bytes_processed"] = 0
+    _decoder_metrics["last_error"] = None
+    _decoder_metrics["last_error_time"] = None
+
+
+def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
+    """
+    Decodes a binary Protobuf buffer into a structured dictionary.
+    
+    STRICT TRUTH-IN-DATA:
+    - Missing fields are strictly set to None, never defaulted to 0.0.
+    - Decodes LTPC, OHLC, full 5-level MarketDepth, ExtendedFeedDetails, and OptionGreeks.
+    """
+    global _decoder_metrics
+    if not binary_data:
+        return None
+
     try:
         resp = FeedResponse()
         resp.ParseFromString(binary_data)
 
+        _decoder_metrics["decode_success"] += 1
+        _decoder_metrics["total_bytes_processed"] += len(binary_data)
+
         feed_type = "live_feed" if resp.type == 1 else "initial_feed"
         result: Dict[str, Any] = {
             "type": feed_type,
-            "current_ts": resp.currentTs,
+            "current_ts": resp.currentTs if resp.currentTs else None,
             "feeds": {},
         }
 
         for ik, feed_item in resp.feeds.items():
             parsed_feed: Dict[str, Any] = {
                 "instrument_key": ik,
-                "ltp": 0.0,
-                "ltt": 0,
-                "ltq": 0,
-                "cp": 0.0,
-                "open": 0.0,
-                "high": 0.0,
-                "low": 0.0,
-                "close": 0.0,
-                "volume": 0,
-                "oi": 0.0,
-                "bid": 0.0,
-                "ask": 0.0,
+                "ltp": None,
+                "ltt": None,
+                "ltq": None,
+                "cp": None,
+                "open": None,
+                "high": None,
+                "low": None,
+                "close": None,
+                "volume": None,
+                "oi": None,
+                "bid": None,
+                "ask": None,
+                "bid_size": None,
+                "ask_size": None,
+                "depth": None,
+                "option_greeks": None,
             }
 
             feed_union = feed_item.WhichOneof("FeedUnion")
             if feed_union == "ltpc":
                 ltpc = feed_item.ltpc
-                parsed_feed["ltp"] = float(ltpc.ltp)
-                parsed_feed["ltt"] = int(ltpc.ltt)
-                parsed_feed["ltq"] = int(ltpc.ltq)
-                parsed_feed["cp"] = float(ltpc.cp)
-                parsed_feed["close"] = float(ltpc.cp)
+                parsed_feed["ltp"] = float(ltpc.ltp) if ltpc.ltp else None
+                parsed_feed["ltt"] = int(ltpc.ltt) if ltpc.ltt else None
+                parsed_feed["ltq"] = int(ltpc.ltq) if ltpc.ltq else None
+                parsed_feed["cp"] = float(ltpc.cp) if ltpc.cp else None
+                parsed_feed["close"] = float(ltpc.cp) if ltpc.cp else None
 
             elif feed_union == "fullFeed":
                 ff = feed_item.fullFeed
@@ -249,28 +293,55 @@ def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
                 if ff_union == "marketFF":
                     mff = ff.marketFF
                     if mff.HasField("ltpc"):
-                        parsed_feed["ltp"] = float(mff.ltpc.ltp)
-                        parsed_feed["ltt"] = int(mff.ltpc.ltt)
-                        parsed_feed["ltq"] = int(mff.ltpc.ltq)
-                        parsed_feed["cp"] = float(mff.ltpc.cp)
-                        parsed_feed["close"] = float(mff.ltpc.cp)
+                        parsed_feed["ltp"] = float(mff.ltpc.ltp) if mff.ltpc.ltp else None
+                        parsed_feed["ltt"] = int(mff.ltpc.ltt) if mff.ltpc.ltt else None
+                        parsed_feed["ltq"] = int(mff.ltpc.ltq) if mff.ltpc.ltq else None
+                        parsed_feed["cp"] = float(mff.ltpc.cp) if mff.ltpc.cp else None
+                        parsed_feed["close"] = float(mff.ltpc.cp) if mff.ltpc.cp else None
 
                     if mff.HasField("marketOHLC") and mff.marketOHLC.ohlc:
                         c_ohlc = mff.marketOHLC.ohlc[0]
-                        parsed_feed["open"] = float(c_ohlc.open)
-                        parsed_feed["high"] = float(c_ohlc.high)
-                        parsed_feed["low"] = float(c_ohlc.low)
+                        parsed_feed["open"] = float(c_ohlc.open) if c_ohlc.open else None
+                        parsed_feed["high"] = float(c_ohlc.high) if c_ohlc.high else None
+                        parsed_feed["low"] = float(c_ohlc.low) if c_ohlc.low else None
                         parsed_feed["close"] = float(c_ohlc.close) if c_ohlc.close else parsed_feed["cp"]
-                        parsed_feed["volume"] = int(c_ohlc.volume)
+                        parsed_feed["volume"] = int(c_ohlc.volume) if c_ohlc.volume else None
 
                     if mff.HasField("marketLevel") and mff.marketLevel.bidAskQuote:
-                        best = mff.marketLevel.bidAskQuote[0]
-                        parsed_feed["bid"] = float(best.bp)
-                        parsed_feed["ask"] = float(best.ap)
+                        bids = []
+                        asks = []
+                        for q in mff.marketLevel.bidAskQuote:
+                            if q.bp > 0:
+                                bids.append({"price": float(q.bp), "quantity": int(q.bq), "orders": int(q.bno)})
+                            if q.ap > 0:
+                                asks.append({"price": float(q.ap), "quantity": int(q.aq), "orders": int(q.ano)})
+                        
+                        if bids:
+                            parsed_feed["bid"] = bids[0]["price"]
+                            parsed_feed["bid_size"] = bids[0]["quantity"]
+                        if asks:
+                            parsed_feed["ask"] = asks[0]["price"]
+                            parsed_feed["ask_size"] = asks[0]["quantity"]
+                        
+                        parsed_feed["depth"] = {"bids": bids, "asks": asks}
+
+                    if mff.HasField("optionGreeks"):
+                        og = mff.optionGreeks
+                        parsed_feed["option_greeks"] = {
+                            "iv": float(og.iv) if og.iv else None,
+                            "delta": float(og.delta) if og.delta else None,
+                            "theta": float(og.theta) if og.theta else None,
+                            "gamma": float(og.gamma) if og.gamma else None,
+                            "vega": float(og.vega) if og.vega else None,
+                            "rho": float(og.rho) if og.rho else None,
+                            "option_price": float(og.op) if og.op else None,
+                            "underlying_price": float(og.up) if og.up else None,
+                        }
 
                     if mff.HasField("eFeedDetails"):
                         ef = mff.eFeedDetails
-                        parsed_feed["oi"] = float(ef.oi)
+                        if ef.oi:
+                            parsed_feed["oi"] = float(ef.oi)
                         if ef.v:
                             parsed_feed["volume"] = int(ef.v)
                         if ef.close:
@@ -279,21 +350,22 @@ def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
                 elif ff_union == "indexFF":
                     iff = ff.indexFF
                     if iff.HasField("ltpc"):
-                        parsed_feed["ltp"] = float(iff.ltpc.ltp)
-                        parsed_feed["ltt"] = int(iff.ltpc.ltt)
-                        parsed_feed["cp"] = float(iff.ltpc.cp)
-                        parsed_feed["close"] = float(iff.ltpc.cp)
+                        parsed_feed["ltp"] = float(iff.ltpc.ltp) if iff.ltpc.ltp else None
+                        parsed_feed["ltt"] = int(iff.ltpc.ltt) if iff.ltpc.ltt else None
+                        parsed_feed["cp"] = float(iff.ltpc.cp) if iff.ltpc.cp else None
+                        parsed_feed["close"] = float(iff.ltpc.cp) if iff.ltpc.cp else None
 
                     if iff.HasField("marketOHLC") and iff.marketOHLC.ohlc:
                         c_ohlc = iff.marketOHLC.ohlc[0]
-                        parsed_feed["open"] = float(c_ohlc.open)
-                        parsed_feed["high"] = float(c_ohlc.high)
-                        parsed_feed["low"] = float(c_ohlc.low)
+                        parsed_feed["open"] = float(c_ohlc.open) if c_ohlc.open else None
+                        parsed_feed["high"] = float(c_ohlc.high) if c_ohlc.high else None
+                        parsed_feed["low"] = float(c_ohlc.low) if c_ohlc.low else None
                         parsed_feed["close"] = float(c_ohlc.close) if c_ohlc.close else parsed_feed["cp"]
 
                     if iff.HasField("eFeedDetails"):
                         ef = iff.eFeedDetails
-                        parsed_feed["oi"] = float(ef.oi)
+                        if ef.oi:
+                            parsed_feed["oi"] = float(ef.oi)
                         if ef.close:
                             parsed_feed["close"] = float(ef.close)
 
@@ -302,5 +374,8 @@ def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
         return result
 
     except Exception as exc:
-        logger.debug("Failed to decode Protobuf binary frame: %s", exc)
+        _decoder_metrics["decode_errors"] += 1
+        _decoder_metrics["last_error"] = str(exc)
+        _decoder_metrics["last_error_time"] = datetime.now(timezone.utc).isoformat()
+        logger.warning("Upstox Protobuf binary decode error: %s", exc)
         return None

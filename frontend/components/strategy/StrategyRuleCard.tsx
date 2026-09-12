@@ -96,7 +96,7 @@ export function StrategyRuleCard({
     <div
       className={`rounded-2xl border transition-all ${
         rule.enabled
-          ? "bg-[#121927] border-[#1E293B] hover:border-cyan-500/40 shadow-md"
+          ? "bg-[#121927] border-[#1A2A3F] hover:border-cyan-500/40 shadow-md"
           : "bg-[#0A0E17]/60 border-slate-800/40 opacity-60"
       }`}
     >
@@ -216,7 +216,7 @@ export function StrategyRuleCard({
                 value={rule.right}
                 onChange={(e) => onUpdate({ right: e.target.value })}
                 placeholder="e.g. 50, ema_21, 1.5 * atr"
-                className="w-full bg-[#0A0E17] border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-[#55C98A] focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0A0E17] border border-slate-700 rounded-xl px-2.5 py-1.5 text-xs font-mono font-bold text-[#22D3EE] focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>

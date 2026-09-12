@@ -91,7 +91,7 @@ export function BacktestingLab() {
   return (
     <div className="space-y-6">
       {/* Top Banner Header */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">
           <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 text-white">
             <FlaskConical className="h-5 w-5" />
@@ -116,7 +116,7 @@ export function BacktestingLab() {
           <button
             onClick={() => backtestMutation.mutate(currentConfig)}
             disabled={backtestMutation.isPending}
-            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-xs font-semibold text-slate-300 transition-colors disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-xs font-semibold text-slate-300 transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${backtestMutation.isPending ? "animate-spin text-cyan-400" : ""}`} />
             <span>Re-run Simulation</span>
@@ -125,7 +125,7 @@ export function BacktestingLab() {
       </div>
 
       {/* Sub-Navigation Tabs */}
-      <div className="flex items-center gap-1 border-b border-[#1E293B] pb-2 overflow-x-auto scrollbar-none">
+      <div className="flex items-center gap-1 border-b border-[#1A2A3F] pb-2 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveSubTab("overview")}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${

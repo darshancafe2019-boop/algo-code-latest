@@ -97,14 +97,14 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
   const isPending = controlMutation.isPending || deleteMutation.isPending;
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] hover:border-[#2E7D5B]/60 rounded-2xl p-5 shadow-xl transition-all flex flex-col justify-between select-none font-sans">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] hover:border-[#2563EB]/60 rounded-2xl p-5 shadow-xl transition-all flex flex-col justify-between select-none font-sans">
       {/* Header Row */}
       <div>
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
-            <h3 className="text-base font-bold text-[#E8F3EC] tracking-wide">{bot.name}</h3>
-            <div className="flex items-center gap-2 mt-1 text-xs text-[#A8BDB0] font-mono">
-              <span className="text-[#55C98A] font-bold">{bot.symbol}</span>
+            <h3 className="text-base font-bold text-[#F7FAFC] tracking-wide">{bot.name}</h3>
+            <div className="flex items-center gap-2 mt-1 text-xs text-[#7C8CA3] font-mono">
+              <span className="text-[#22D3EE] font-bold">{bot.symbol}</span>
               <span>•</span>
               <span>{bot.strategy}</span>
               <span>•</span>
@@ -117,7 +117,7 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
             <span
               className={`text-[10px] px-2 py-0.5 rounded-lg font-bold border ${
                 mode === "LIVE"
-                  ? "bg-[#55C98A]/15 text-[#55C98A] border-[#55C98A]/40"
+                  ? "bg-[#22D3EE]/15 text-[#22D3EE] border-[#22D3EE]/40"
                   : "bg-[#6699A6]/15 text-[#6699A6] border-[#6699A6]/40"
               }`}
             >
@@ -128,25 +128,25 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
             <span
               className={`text-xs px-2.5 py-0.5 rounded-lg font-semibold flex items-center gap-1.5 border ${
                 isRunning
-                  ? "bg-[#2E7D5B]/20 text-[#55C98A] border-[#2E7D5B]/50"
+                  ? "bg-[#2563EB]/20 text-[#22D3EE] border-[#2563EB]/50"
                   : isPaused
                   ? "bg-[#D9A441]/15 text-[#D9A441] border-[#D9A441]/40"
                   : isStalled
-                  ? "bg-[#78A88A]/15 text-[#78A88A] border-[#78A88A]/40"
+                  ? "bg-[#7C8CA3]/15 text-[#7C8CA3] border-[#7C8CA3]/40"
                   : isError
                   ? "bg-[#E26D6D]/15 text-[#E26D6D] border-[#E26D6D]/40"
-                  : "bg-[#07110D] text-[#70877A] border-[#1B3328]"
+                  : "bg-[#07101A] text-[#52627A] border-[#122033]"
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   isRunning
-                    ? "bg-[#55C98A] animate-pulse"
+                    ? "bg-[#22D3EE] animate-pulse"
                     : isPaused
                     ? "bg-[#D9A441]"
                     : isError
                     ? "bg-[#E26D6D]"
-                    : "bg-[#70877A]"
+                    : "bg-[#52627A]"
                 }`}
               />
               {status}
@@ -155,12 +155,12 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
         </div>
 
         {/* Health & Metrics Bar */}
-        <div className="grid grid-cols-3 gap-2 my-4 bg-[#07110D] p-3 rounded-xl border border-[#1B3328] text-xs font-mono">
+        <div className="grid grid-cols-3 gap-2 my-4 bg-[#07101A] p-3 rounded-xl border border-[#122033] text-xs font-mono">
           <div>
-            <span className="text-[10px] text-[#70877A] uppercase block mb-0.5">Realized P&L</span>
+            <span className="text-[10px] text-[#52627A] uppercase block mb-0.5">Realized P&L</span>
             <span
               className={`font-bold ${
-                pnl >= 0 ? "text-[#39B978]" : "text-[#E26D6D]"
+                pnl >= 0 ? "text-[#00E890]" : "text-[#E26D6D]"
               }`}
             >
               {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
@@ -168,40 +168,40 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
           </div>
 
           <div>
-            <span className="text-[10px] text-[#70877A] uppercase block mb-0.5">Positions</span>
-            <span className="font-bold text-[#E8F3EC]">{openTrades}</span>
+            <span className="text-[10px] text-[#52627A] uppercase block mb-0.5">Positions</span>
+            <span className="font-bold text-[#F7FAFC]">{openTrades}</span>
           </div>
 
           <div>
-            <span className="text-[10px] text-[#70877A] uppercase block mb-0.5">Uptime</span>
-            <span className="text-[#A8BDB0]">
+            <span className="text-[10px] text-[#52627A] uppercase block mb-0.5">Uptime</span>
+            <span className="text-[#7C8CA3]">
               {bot.health?.uptime_formatted || "0m 0s"}
             </span>
           </div>
         </div>
 
         {/* Last Checked Ticking Counter & Indicators */}
-        <div className="flex items-center justify-between text-[11px] text-[#70877A] mb-4 px-1 font-mono">
+        <div className="flex items-center justify-between text-[11px] text-[#52627A] mb-4 px-1 font-mono">
           <div className="flex items-center gap-1">
-            <Clock className="h-3 w-3 text-[#70877A]" />
+            <Clock className="h-3 w-3 text-[#52627A]" />
             <span>Checked: {secondsAgo}s ago</span>
           </div>
 
           <div className="flex items-center gap-1">
-            <Layers className="h-3 w-3 text-[#55C98A]" />
+            <Layers className="h-3 w-3 text-[#22D3EE]" />
             <span>{bot.indicators?.length || 0}/4 Indicators</span>
           </div>
         </div>
       </div>
 
       {/* Control Buttons Footer */}
-      <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#1B3328] font-mono">
+      <div className="flex items-center justify-between gap-2 pt-3 border-t border-[#122033] font-mono">
         <div className="flex items-center gap-2">
           {isStopped && (
             <button
               onClick={() => controlMutation.mutate("START")}
               disabled={isPending}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2E7D5B] hover:bg-[#39B978] text-[#07110D] font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#2563EB] hover:bg-[#00E890] text-[#07101A] font-bold rounded-xl text-xs transition shadow-md disabled:opacity-50"
             >
               <Play className="h-3.5 w-3.5" />
               <span>START</span>
@@ -213,7 +213,7 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
               <button
                 onClick={() => controlMutation.mutate("PAUSE")}
                 disabled={isPending}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#123C2A] hover:bg-[#1B4D36] text-[#D9A441] border border-[#D9A441]/40 font-bold rounded-xl text-xs transition disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[rgba(37,99,235,0.18)] hover:bg-[#1B4D36] text-[#D9A441] border border-[#D9A441]/40 font-bold rounded-xl text-xs transition disabled:opacity-50"
               >
                 <Pause className="h-3.5 w-3.5" />
                 <span>PAUSE</span>

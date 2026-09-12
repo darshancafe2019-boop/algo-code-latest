@@ -161,7 +161,7 @@ export function MarketHealthTelemetry() {
       {/* 2. Top 4 Status Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* CARD 1: FEED STATUS */}
-        <div className="p-4 bg-[#0E1524] border border-[#1E293B] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
+        <div className="p-4 bg-[#0E1524] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-cyan-500/5 rounded-full blur-2xl group-hover:bg-cyan-500/10 transition-all pointer-events-none" />
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2.5">
@@ -183,7 +183,7 @@ export function MarketHealthTelemetry() {
             </span>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-[#1E293B]/70 flex items-center justify-between text-[11px] text-slate-400">
+          <div className="mt-3 pt-2.5 border-t border-[#1A2A3F]/70 flex items-center justify-between text-[11px] text-slate-400">
             <span>
               Connected: <strong className="text-white">{feedHealth.connected_providers_count}/{feedHealth.total_providers_count}</strong>
             </span>
@@ -194,7 +194,7 @@ export function MarketHealthTelemetry() {
         </div>
 
         {/* CARD 2: STALE LOCKOUT */}
-        <div className="p-4 bg-[#0E1524] border border-[#1E293B] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
+        <div className="p-4 bg-[#0E1524] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all pointer-events-none" />
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2.5">
@@ -215,7 +215,7 @@ export function MarketHealthTelemetry() {
             </span>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-[#1E293B]/70 flex items-center justify-between text-[11px] text-slate-400">
+          <div className="mt-3 pt-2.5 border-t border-[#1A2A3F]/70 flex items-center justify-between text-[11px] text-slate-400">
             <span>
               Stale: <strong className={staleProtection.stale_count > 0 ? "text-rose-400" : "text-slate-300"}>{staleProtection.stale_count}</strong>
             </span>
@@ -226,7 +226,7 @@ export function MarketHealthTelemetry() {
         </div>
 
         {/* CARD 3: CACHE LAYER */}
-        <div className="p-4 bg-[#0E1524] border border-[#1E293B] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
+        <div className="p-4 bg-[#0E1524] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all pointer-events-none" />
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2.5">
@@ -247,7 +247,7 @@ export function MarketHealthTelemetry() {
             </span>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-[#1E293B]/70 flex items-center justify-between text-[11px] text-slate-400">
+          <div className="mt-3 pt-2.5 border-t border-[#1A2A3F]/70 flex items-center justify-between text-[11px] text-slate-400">
             <span>
               Hit Ratio: <strong className="text-emerald-400">{cache.hit_ratio_pct}%</strong>
             </span>
@@ -258,7 +258,7 @@ export function MarketHealthTelemetry() {
         </div>
 
         {/* CARD 4: STREAM ENGINE */}
-        <div className="p-4 bg-[#0E1524] border border-[#1E293B] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
+        <div className="p-4 bg-[#0E1524] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-2xl transition-all shadow-xl relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all pointer-events-none" />
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-2.5">
@@ -279,7 +279,7 @@ export function MarketHealthTelemetry() {
             </span>
           </div>
 
-          <div className="mt-3 pt-2.5 border-t border-[#1E293B]/70 flex items-center justify-between text-[11px] text-slate-400">
+          <div className="mt-3 pt-2.5 border-t border-[#1A2A3F]/70 flex items-center justify-between text-[11px] text-slate-400">
             <span>
               WebSockets: <strong className="text-cyan-300">{streamEngine.active_websockets_count} WS</strong>
             </span>

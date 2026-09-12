@@ -217,7 +217,7 @@ export function PnLCalendarHeatmap({
       return "border-2 border-cyan-400 bg-cyan-950/50 shadow-lg shadow-cyan-900/30";
     }
     if (!bar || (Math.abs(bar.netPnl) < 0.01 && bar.trades === 0)) {
-      return "bg-[#0A121D]/60 border border-[#1E293B]/40 hover:border-slate-600/80";
+      return "bg-[#0A121D]/60 border border-[#1A2A3F]/40 hover:border-slate-600/80";
     }
 
     const net = bar.netPnl;
@@ -235,7 +235,7 @@ export function PnLCalendarHeatmap({
   const monthNetFormatted = formatPnL(monthlyStats.totalNetPnl * currencyRate, currency, 2);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 font-mono">
       {/* 1. Header & Month Navigator */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3">
@@ -261,7 +261,7 @@ export function PnLCalendarHeatmap({
         <div className="flex items-center gap-2">
           <button
             onClick={handleCurrentMonth}
-            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#141E33] hover:bg-[#1E293B] text-slate-300 border border-slate-700 transition"
+            className="px-2.5 py-1 text-xs font-bold rounded-lg bg-[#141E33] hover:bg-[#1A2A3F] text-slate-300 border border-slate-700 transition"
           >
             Today
           </button>

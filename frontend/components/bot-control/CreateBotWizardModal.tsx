@@ -614,28 +614,28 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/85 backdrop-blur-md animate-fadeIn select-none font-sans">
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-sm animate-fadeIn select-none font-sans">
+      <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl w-full max-w-5xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
         {/* =========================================================
             HEADER: TITLE + 6-STEP PROGRESS STEPPER
             ========================================================= */}
-        <div className="p-4 sm:p-5 border-b border-[#182C23] bg-[#060D0A] flex flex-col gap-4">
+        <div className="p-4 sm:p-5 border-b border-[#122033] bg-[#07101A] flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-md">
+              <div className="p-2.5 rounded-lg bg-[#22D3EE]/10 text-[#22D3EE] border border-[#22D3EE]/30 shadow-none">
                 <Bot className="h-5 w-5" />
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="text-sm font-black text-white uppercase tracking-wider">
+                  <h2 className="text-sm font-bold text-[#F7FAFC] uppercase tracking-wider">
                     Create Bot Instance Wizard
                   </h2>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#142B21] text-[#55C98A] border border-[#275841]">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#2563EB]/15 text-[#19C5FF] border border-[#2563EB]/30">
                     NON-AI DETERMINISTIC ENGINE
                   </span>
                 </div>
-                <p className="text-xs text-[#8BA596]">
+                <p className="text-xs text-[#7C8CA3]">
                   {step === 1 && "Step 1: BOT IDENTITY & CAPITAL — Define the bot, trading capital, and operating environment."}
                   {step === 2 && "Step 2: MARKET & INSTRUMENT — Select multi-asset instrument, options, and derivatives filters."}
                   {step === 3 && "Step 3: TIMEFRAME & INDICATORS — Configure execution timeframes and quantitative indicator rules."}
@@ -646,7 +646,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               </div>
             </div>
 
-            <button onClick={onClose} className="text-[#8BA596] hover:text-white p-1.5 rounded-lg hover:bg-[#14271F] transition-colors">
+            <button onClick={onClose} className="text-[#7C8CA3] hover:text-[#F7FAFC] p-1.5 rounded-lg hover:bg-[#101B2D] transition-colors cursor-pointer">
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -664,21 +664,21 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                     if (s.num < step) setStep(s.num);
                   }}
                   disabled={s.num > step}
-                  className={`flex items-center gap-1.5 p-2 rounded-xl text-[11px] font-bold transition-all text-left ${
+                  className={`flex items-center gap-1.5 p-2 rounded-lg text-xs font-semibold transition-colors text-left ${
                     isCurrent
-                      ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md ring-1 ring-[#55C98A]/30"
+                      ? "bg-[#2563EB]/20 text-[#19C5FF] border border-[#2563EB]/50"
                       : isCompleted
-                      ? "bg-[#0C1B15] text-[#8BA596] hover:text-white border border-[#183126] cursor-pointer"
-                      : "bg-[#060D0A] text-[#42584C] border border-[#11221A] opacity-60 cursor-not-allowed"
+                      ? "bg-[#0D1727] text-[#7C8CA3] hover:text-[#F7FAFC] border border-[#1A2A3F] cursor-pointer"
+                      : "bg-[#07101A] text-[#52627A] border border-[#122033] opacity-60 cursor-not-allowed"
                   }`}
                 >
                   <div
                     className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-mono shrink-0 font-bold ${
                       isCompleted
-                        ? "bg-[#55C98A] text-black"
+                        ? "bg-[#00E890] text-black"
                         : isCurrent
-                        ? "bg-[#256B4A] text-white"
-                        : "bg-[#14271F] text-[#607D6E]"
+                        ? "bg-[#2563EB] text-white"
+                        : "bg-[#1A2A3F] text-[#7C8CA3]"
                     }`}
                   >
                     {isCompleted ? <Check className="h-3 w-3 stroke-[3]" /> : s.num}
@@ -701,16 +701,16 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* Left Column: Identity */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                    <Bot className="h-4 w-4 text-[#55C98A]" />
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <Bot className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">Bot Identity & Grouping</h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                       <span>Bot Instance Name *</span>
-                      <span className="text-[10px] text-[#55C98A] font-mono">{name.length}/60</span>
+                      <span className="text-[10px] text-[#22D3EE] font-mono">{name.length}/60</span>
                     </label>
                     <input
                       type="text"
@@ -718,7 +718,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       maxLength={60}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. BTC Momentum & Volume Bot"
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#55C98A] transition-colors"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#22D3EE] transition-colors"
                     />
                     {name.trim().length > 0 && name.trim().length < 3 && (
                       <p className="text-[10px] text-red-400">Name must be at least 3 characters.</p>
@@ -726,9 +726,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                       <span>Description (Optional)</span>
-                      <span className="text-[10px] text-[#607D6E] font-mono">{description.length}/160</span>
+                      <span className="text-[10px] text-[#52627A] font-mono">{description.length}/160</span>
                     </label>
                     <textarea
                       rows={2}
@@ -736,12 +736,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       value={description}
                       onChange={(e) => setDescription(e.target.value)}
                       placeholder="Deterministic quantitative strategy description..."
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#55C98A] resize-none transition-colors"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl p-2.5 text-xs text-white focus:outline-none focus:border-[#22D3EE] resize-none transition-colors"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Fleet / Cluster Group</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Fleet / Cluster Group</label>
                     {!isCreatingCustomGroup ? (
                       <div className="flex gap-2">
                         <select
@@ -753,7 +753,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                               setGroupName(e.target.value);
                             }
                           }}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#55C98A]"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#22D3EE]"
                         >
                           <option value="Crypto Scalping Bots">Crypto Scalping Bots</option>
                           <option value="NSE Options Bots">NSE Options Bots</option>
@@ -771,12 +771,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           value={customGroup}
                           onChange={(e) => setCustomGroup(e.target.value)}
                           placeholder="Enter new group name..."
-                          className="flex-1 bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#55C98A]"
+                          className="flex-1 bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none focus:border-[#22D3EE]"
                         />
                         <button
                           type="button"
                           onClick={() => setIsCreatingCustomGroup(false)}
-                          className="px-3 py-2 rounded-xl bg-[#14271F] text-[#8BA596] hover:text-white text-xs"
+                          className="px-3 py-2 rounded-xl bg-[#101B2D] text-[#7C8CA3] hover:text-white text-xs"
                         >
                           Cancel
                         </button>
@@ -785,15 +785,15 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Operating Environment</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Operating Environment</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
                         onClick={() => setEnvironment("PAPER")}
                         className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 ${
                           environment === "PAPER"
-                            ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md"
-                            : "bg-[#060D0A] text-[#8BA596] hover:text-white border border-[#1A3127]"
+                            ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE]/60 shadow-md"
+                            : "bg-[#07101A] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
                         }`}
                       >
                         <Shield className="h-4 w-4" />
@@ -806,7 +806,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all flex items-center justify-center gap-2 ${
                           environment === "LIVE"
                             ? "bg-red-950/60 text-red-400 border border-red-700 shadow-md"
-                            : "bg-[#060D0A] text-[#8BA596] hover:text-white border border-[#1A3127]"
+                            : "bg-[#07101A] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
                         }`}
                       >
                         <Zap className="h-4 w-4" />
@@ -823,20 +823,20 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 </div>
 
                 {/* Right Column: Capital Allocation */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center justify-between border-b border-[#1A3127] pb-2">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
                     <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-[#55C98A]" />
+                      <DollarSign className="h-4 w-4 text-[#22D3EE]" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">Capital & Sizing Model</h3>
                     </div>
-                    <div className="flex items-center gap-1 bg-[#060D0A] border border-[#1A3127] rounded-lg p-0.5">
+                    <div className="flex items-center gap-1 bg-[#07101A] border border-[#1A2A3F] rounded-lg p-0.5">
                       {(["USDT", "INR", "USD"] as const).map((curr) => (
                         <button
                           key={curr}
                           type="button"
                           onClick={() => setCurrency(curr)}
                           className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all ${
-                            currency === curr ? "bg-[#123C2A] text-[#55C98A]" : "text-[#607D6E] hover:text-white"
+                            currency === curr ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE]" : "text-[#52627A] hover:text-white"
                           }`}
                         >
                           {curr}
@@ -846,23 +846,23 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Total Capital Available *</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Total Capital Available *</label>
                     <div className="relative">
                       <input
                         type="number"
                         min={100}
                         value={totalCapital}
                         onChange={(e) => setTotalCapital(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#22D3EE]"
                       />
-                      <span className="absolute right-3 top-2.5 text-[11px] text-[#607D6E] font-mono font-bold">
+                      <span className="absolute right-3 top-2.5 text-[11px] text-[#52627A] font-mono font-bold">
                         {currency}
                       </span>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Used / Allocated Capital *</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Used / Allocated Capital *</label>
                     <div className="relative">
                       <input
                         type="number"
@@ -870,44 +870,44 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         max={totalCapital}
                         value={allocatedCapital}
                         onChange={(e) => setAllocatedCapital(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-cyan-400 font-mono font-bold focus:outline-none focus:border-[#22D3EE]"
                       />
-                      <span className="absolute right-3 top-2.5 text-[11px] text-[#607D6E] font-mono font-bold">
+                      <span className="absolute right-3 top-2.5 text-[11px] text-[#52627A] font-mono font-bold">
                         {currency}
                       </span>
                     </div>
                   </div>
 
                   {/* Real-time Allocation Metrics */}
-                  <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                  <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                     <div className="flex justify-between items-center text-[11px]">
-                      <span className="text-[#8BA596]">Allocation Breakdown:</span>
+                      <span className="text-[#7C8CA3]">Allocation Breakdown:</span>
                       <span className="text-white font-mono font-bold">
                         {formatCurrency(allocatedCapital, currency)} / {formatCurrency(totalCapital, currency)}
                       </span>
                     </div>
 
-                    <div className="w-full bg-[#11221A] h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-[#101B2D] h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 ${
                           allocatedCapital > totalCapital
                             ? "bg-red-500"
                             : allocationPct > 80
                             ? "bg-yellow-500"
-                            : "bg-[#55C98A]"
+                            : "bg-[#22D3EE]"
                         }`}
                         style={{ width: `${Math.min(100, allocationPct)}%` }}
                       />
                     </div>
 
                     <div className="flex justify-between items-center text-[11px] font-mono">
-                      <div className="text-[#8BA596]">
+                      <div className="text-[#7C8CA3]">
                         Remaining:{" "}
-                        <span className="text-[#55C98A] font-bold">
+                        <span className="text-[#22D3EE] font-bold">
                           {formatCurrency(remainingCapital, currency)}
                         </span>
                       </div>
-                      <div className="text-[#8BA596]">
+                      <div className="text-[#7C8CA3]">
                         Allocated:{" "}
                         <span className={`font-bold ${allocatedCapital > totalCapital ? "text-red-400" : "text-cyan-400"}`}>
                           {allocationPct}%
@@ -933,7 +933,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               
               {/* Asset Class Selector Grid */}
               <div className="space-y-2">
-                <label className="text-[11px] text-[#8BA596] font-semibold block">Select Market Asset Class *</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold block">Select Market Asset Class *</label>
                 <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
                   {ASSET_CLASSES.map((ac) => {
                     const isSelected = assetClass === ac.id;
@@ -952,8 +952,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         }}
                         className={`p-2.5 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-center ${
                           isSelected
-                            ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md ring-1 ring-[#55C98A]/30"
-                            : "bg-[#0C1713] text-[#8BA596] hover:text-white border border-[#1A3127]"
+                            ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE]/60 shadow-md ring-1 ring-[#22D3EE]/30"
+                            : "bg-[#0A1422] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
                         }`}
                       >
                         <IconComp className="h-4 w-4" />
@@ -965,22 +965,22 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               </div>
 
               {/* Dynamic Sub-Sections depending on chosen Asset Class */}
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
                 
                 {/* Searchable Instrument Grid */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">
                       Supported Instruments ({assetClass}) *
                     </label>
                     <div className="relative w-48">
-                      <Search className="h-3 w-3 absolute left-2.5 top-2 text-[#607D6E]" />
+                      <Search className="h-3 w-3 absolute left-2.5 top-2 text-[#52627A]" />
                       <input
                         type="text"
                         placeholder="Search symbol..."
                         value={instrumentSearch}
                         onChange={(e) => setInstrumentSearch(e.target.value)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-lg pl-7 pr-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#55C98A]"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-lg pl-7 pr-2 py-1 text-[10px] text-white focus:outline-none focus:border-[#22D3EE]"
                       />
                     </div>
                   </div>
@@ -1004,17 +1004,17 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                             }}
                             className={`p-2.5 rounded-xl border text-left transition-all ${
                               isChosen
-                                ? "bg-[#123C2A] border-[#39B978]/60 text-white shadow-sm"
-                                : "bg-[#060D0A] border-[#1A3127] text-[#8BA596] hover:text-white"
+                                ? "bg-[rgba(37,99,235,0.2)] border-[#22D3EE]/60 text-white shadow-sm"
+                                : "bg-[#07101A] border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
                             }`}
                           >
                             <div className="flex justify-between items-center">
                               <span className="font-mono font-bold text-xs text-cyan-400">{item.symbol}</span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#11221A] text-[#607D6E] font-bold">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#101B2D] text-[#52627A] font-bold">
                                 {item.exchange}
                               </span>
                             </div>
-                            <p className="text-[10px] text-[#8BA596] truncate mt-0.5">{item.name}</p>
+                            <p className="text-[10px] text-[#7C8CA3] truncate mt-0.5">{item.name}</p>
                           </button>
                         );
                       })}
@@ -1023,7 +1023,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                 {/* DYNAMIC DERIVATIVES & OPTIONS FILTERS */}
                 {(assetClass === "OPTIONS" || assetClass === "INDEX") && (
-                  <div className="pt-3 border-t border-[#1A3127] space-y-3">
+                  <div className="pt-3 border-t border-[#1A2A3F] space-y-3">
                     <h4 className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                       <Layers className="h-3.5 w-3.5 text-cyan-400" />
                       <span>Options Contract & Premium Range Filters</span>
@@ -1031,7 +1031,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Option Side</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Option Side</label>
                         <div className="grid grid-cols-3 gap-1">
                           {(["CALL", "PUT", "BOTH"] as const).map((side) => (
                             <button
@@ -1040,8 +1040,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                               onClick={() => setOptionSide(side)}
                               className={`py-1.5 rounded-lg text-[10px] font-bold font-mono ${
                                 optionSide === side
-                                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                                  : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                                  ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE]"
+                                  : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
                               }`}
                             >
                               {side}
@@ -1051,11 +1051,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Strike Selection Offset</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Strike Selection Offset</label>
                         <select
                           value={strikeOffset}
                           onChange={(e) => setStrikeOffset(parseInt(e.target.value) || 0)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                         >
                           <option value={0}>ATM (At The Money)</option>
                           <option value={1}>ATM +1 Strike (OTM Call / ITM Put)</option>
@@ -1066,11 +1066,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Expiry Cycle</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Expiry Cycle</label>
                         <select
                           value={optionExpiry}
                           onChange={(e) => setOptionExpiry(e.target.value)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white"
                         >
                           <option value="Nearest Weekly">Nearest Weekly Expiry</option>
                           <option value="Next Weekly">Next Weekly Expiry</option>
@@ -1081,15 +1081,15 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                     {/* Premium Range Inputs */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                      <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                      <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-bold text-emerald-400">Call Premium Range</span>
-                          <label className="flex items-center gap-1.5 text-[10px] text-[#8BA596] cursor-pointer">
+                          <label className="flex items-center gap-1.5 text-[10px] text-[#7C8CA3] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={callNoLimit}
                               onChange={(e) => setCallNoLimit(e.target.checked)}
-                              className="accent-[#55C98A] rounded"
+                              className="accent-[#22D3EE] rounded"
                             />
                             <span>No Limit</span>
                           </label>
@@ -1097,36 +1097,36 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         {!callNoLimit && (
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="text-[9px] text-[#607D6E]">Min Call (₹/$)</span>
+                              <span className="text-[9px] text-[#52627A]">Min Call (₹/$)</span>
                               <input
                                 type="number"
                                 value={callPremiumMin ?? ""}
                                 onChange={(e) => setCallPremiumMin(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                                className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                               />
                             </div>
                             <div>
-                              <span className="text-[9px] text-[#607D6E]">Max Call (₹/$)</span>
+                              <span className="text-[9px] text-[#52627A]">Max Call (₹/$)</span>
                               <input
                                 type="number"
                                 value={callPremiumMax ?? ""}
                                 onChange={(e) => setCallPremiumMax(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                                className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                               />
                             </div>
                           </div>
                         )}
                       </div>
 
-                      <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                      <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-[11px] font-bold text-red-400">Put Premium Range</span>
-                          <label className="flex items-center gap-1.5 text-[10px] text-[#8BA596] cursor-pointer">
+                          <label className="flex items-center gap-1.5 text-[10px] text-[#7C8CA3] cursor-pointer">
                             <input
                               type="checkbox"
                               checked={putNoLimit}
                               onChange={(e) => setPutNoLimit(e.target.checked)}
-                              className="accent-[#55C98A] rounded"
+                              className="accent-[#22D3EE] rounded"
                             />
                             <span>No Limit</span>
                           </label>
@@ -1134,21 +1134,21 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         {!putNoLimit && (
                           <div className="grid grid-cols-2 gap-2">
                             <div>
-                              <span className="text-[9px] text-[#607D6E]">Min Put (₹/$)</span>
+                              <span className="text-[9px] text-[#52627A]">Min Put (₹/$)</span>
                               <input
                                 type="number"
                                 value={putPremiumMin ?? ""}
                                 onChange={(e) => setPutPremiumMin(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                                className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                               />
                             </div>
                             <div>
-                              <span className="text-[9px] text-[#607D6E]">Max Put (₹/$)</span>
+                              <span className="text-[9px] text-[#52627A]">Max Put (₹/$)</span>
                               <input
                                 type="number"
                                 value={putPremiumMax ?? ""}
                                 onChange={(e) => setPutPremiumMax(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                                className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                               />
                             </div>
                           </div>
@@ -1160,7 +1160,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                 {/* CRYPTO OPTIONS DEDICATED CONFIGURATION */}
                 {assetClass === "CRYPTO_OPTIONS" && (
-                  <div className="pt-3 border-t border-[#1A3127] space-y-3">
+                  <div className="pt-3 border-t border-[#1A2A3F] space-y-3">
                     <h4 className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                       <Zap className="h-3.5 w-3.5 text-yellow-400" />
                       <span>Dedicated Crypto Options Chain Settings</span>
@@ -1168,11 +1168,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Derivatives Exchange</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Derivatives Exchange</label>
                         <select
                           value={cryptoOptExchange}
                           onChange={(e) => setCryptoOptExchange(e.target.value)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white"
                         >
                           <option value="deribit">Deribit Options</option>
                           <option value="binance">Binance European Options</option>
@@ -1182,11 +1182,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Underlying Asset</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Underlying Asset</label>
                         <select
                           value={cryptoOptUnderlying}
                           onChange={(e) => setCryptoOptUnderlying(e.target.value)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                         >
                           <option value="BTC">BTC (Bitcoin)</option>
                           <option value="ETH">ETH (Ethereum)</option>
@@ -1195,11 +1195,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Contract Type</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Contract Type</label>
                         <select
                           value={cryptoOptType}
                           onChange={(e) => setCryptoOptType(e.target.value as any)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                         >
                           <option value="BOTH">CALL + PUT</option>
                           <option value="CALL">CALL ONLY</option>
@@ -1208,12 +1208,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#8BA596]">Target Strike (USDT)</label>
+                        <label className="text-[10px] text-[#7C8CA3]">Target Strike (USDT)</label>
                         <input
                           type="text"
                           value={cryptoOptStrike}
                           onChange={(e) => setCryptoOptStrike(e.target.value)}
-                          className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                          className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                           placeholder="e.g. ATM or 65000"
                         />
                       </div>
@@ -1223,9 +1223,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               </div>
 
               {/* REAL-TIME MARKET INTELLIGENCE & LIVE FEED DECK */}
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4 shadow-lg">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4 shadow-lg">
                 {/* Deck Header */}
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A3127] pb-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A2A3F] pb-3">
                   <div className="flex items-center gap-2">
                     <span className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1241,13 +1241,13 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="flex items-center gap-2 text-[10px] font-mono">
-                    <span className="px-2 py-0.5 rounded bg-[#060D0A] border border-[#1A3127] text-[#8BA596]">
+                    <span className="px-2 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
                       EXCHANGE: <strong className="text-white">{exchange || "NSE"}</strong>
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-[#060D0A] border border-[#1A3127] text-[#8BA596]">
+                    <span className="px-2 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
                       PROVENANCE: <strong className="text-cyan-400">{quoteData?.provider || quoteData?.source || "GATEWAY_FEED"}</strong>
                     </span>
-                    <span className="px-2 py-0.5 rounded bg-[#123C2A] text-[#55C98A] font-bold">
+                    <span className="px-2 py-0.5 rounded bg-[rgba(37,99,235,0.2)] text-[#22D3EE] font-bold">
                       {assetClass === "CRYPTO" || assetClass === "CRYPTO_OPTIONS" ? "24/7 CONTINUOUS" : "MARKET SESSION ACTIVE"}
                     </span>
                   </div>
@@ -1274,8 +1274,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {/* LTP & 24h Change */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl flex flex-col justify-between">
-                          <span className="text-[10px] text-[#8BA596] font-semibold uppercase">Last Traded Price (LTP)</span>
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex flex-col justify-between">
+                          <span className="text-[10px] text-[#7C8CA3] font-semibold uppercase">Last Traded Price (LTP)</span>
                           <div className="flex items-baseline gap-2 mt-1">
                             <span className="text-xl font-extrabold font-mono text-white">
                               {currency === "INR" ? `₹${ltp.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${ltp.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
@@ -1285,14 +1285,14 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                               {isPositive ? `+${chgPct.toFixed(2)}%` : `${chgPct.toFixed(2)}%`}
                             </span>
                           </div>
-                          <span className="text-[9px] text-[#607D6E] mt-1 font-mono">
+                          <span className="text-[9px] text-[#52627A] mt-1 font-mono">
                             Freshness: {quoteData?.freshness_ms || 120}ms | Latency: 32ms
                           </span>
                         </div>
 
                         {/* Orderbook Microstructure */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl flex flex-col justify-between font-mono">
-                          <span className="text-[10px] text-[#8BA596] font-semibold uppercase">Orderbook Top & Spread</span>
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex flex-col justify-between font-mono">
+                          <span className="text-[10px] text-[#7C8CA3] font-semibold uppercase">Orderbook Top & Spread</span>
                           <div className="grid grid-cols-2 gap-1 text-[11px] mt-1">
                             <div>
                               <span className="text-[9px] text-emerald-500/80 block">BID</span>
@@ -1303,43 +1303,43 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                               <span className="font-bold text-white">{ask.toFixed(2)}</span>
                             </div>
                           </div>
-                          <div className="flex justify-between items-center text-[9px] text-[#607D6E] mt-1">
+                          <div className="flex justify-between items-center text-[9px] text-[#52627A] mt-1">
                             <span>Spread: {spread.toFixed(2)} pts</span>
                             <span className="text-cyan-400 font-bold">{spreadBps} bps</span>
                           </div>
                         </div>
 
                         {/* Day Session Extremes */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl flex flex-col justify-between font-mono">
-                          <span className="text-[10px] text-[#8BA596] font-semibold uppercase">Session Range</span>
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex flex-col justify-between font-mono">
+                          <span className="text-[10px] text-[#7C8CA3] font-semibold uppercase">Session Range</span>
                           <div className="grid grid-cols-2 gap-1 text-[11px] mt-1">
                             <div>
-                              <span className="text-[9px] text-[#607D6E] block">DAY LOW</span>
+                              <span className="text-[9px] text-[#52627A] block">DAY LOW</span>
                               <span className="font-bold text-red-400">{low.toFixed(2)}</span>
                             </div>
                             <div>
-                              <span className="text-[9px] text-[#607D6E] block">DAY HIGH</span>
+                              <span className="text-[9px] text-[#52627A] block">DAY HIGH</span>
                               <span className="font-bold text-emerald-400">{high.toFixed(2)}</span>
                             </div>
                           </div>
-                          <div className="flex justify-between items-center text-[9px] text-[#607D6E] mt-1">
+                          <div className="flex justify-between items-center text-[9px] text-[#52627A] mt-1">
                             <span>OPEN: {open.toFixed(2)}</span>
                             <span>VWAP: {vwap.toFixed(2)}</span>
                           </div>
                         </div>
 
                         {/* Volume & Quality Tag */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl flex flex-col justify-between font-mono">
-                          <span className="text-[10px] text-[#8BA596] font-semibold uppercase">Volume & Data Integrity</span>
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex flex-col justify-between font-mono">
+                          <span className="text-[10px] text-[#7C8CA3] font-semibold uppercase">Volume & Data Integrity</span>
                           <div className="mt-1">
                             <span className="text-base font-bold text-white">
                               {volume > 1000000 ? `${(volume / 1000000).toFixed(2)}M` : `${(volume / 1000).toFixed(1)}k`}
                             </span>
-                            <span className="text-[10px] text-[#607D6E] ml-1">contracts/units</span>
+                            <span className="text-[10px] text-[#52627A] ml-1">contracts/units</span>
                           </div>
                           <div className="flex items-center gap-1.5 mt-1">
-                            <ShieldCheck className="h-3 w-3 text-[#55C98A]" />
-                            <span className="text-[9px] text-[#55C98A] font-bold">100% Provenance Quality Verified</span>
+                            <ShieldCheck className="h-3 w-3 text-[#22D3EE]" />
+                            <span className="text-[9px] text-[#22D3EE] font-bold">100% Provenance Quality Verified</span>
                           </div>
                         </div>
                       </div>
@@ -1348,7 +1348,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                         
                         {/* Domain Card 1: Asset-Specific Intelligence */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                           <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             <BarChart3 className="h-3 w-3 text-cyan-400" />
                             <span>
@@ -1365,76 +1365,76 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           {assetClass === "STOCKS" || assetClass === "ETF" ? (
                             <div className="space-y-1.5 text-[10px] font-mono">
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">52W Range:</span>
+                                <span className="text-[#7C8CA3]">52W Range:</span>
                                 <span className="text-white font-bold">{(ltp * 0.78).toFixed(1)} - {(ltp * 1.25).toFixed(1)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Lower Circuit (10%):</span>
+                                <span className="text-[#7C8CA3]">Lower Circuit (10%):</span>
                                 <span className="text-red-400 font-bold">{(ltp * 0.90).toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Upper Circuit (10%):</span>
+                                <span className="text-[#7C8CA3]">Upper Circuit (10%):</span>
                                 <span className="text-emerald-400 font-bold">{(ltp * 1.10).toFixed(2)}</span>
                               </div>
-                              <div className="flex justify-between border-t border-[#1A3127] pt-1">
-                                <span className="text-[#8BA596]">Delivery Volume %:</span>
+                              <div className="flex justify-between border-t border-[#1A2A3F] pt-1">
+                                <span className="text-[#7C8CA3]">Delivery Volume %:</span>
                                 <span className="text-cyan-400 font-bold">54.2% (Institutional)</span>
                               </div>
                             </div>
                           ) : assetClass === "FUTURES" ? (
                             <div className="space-y-1.5 text-[10px] font-mono">
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Basis / Premium:</span>
+                                <span className="text-[#7C8CA3]">Basis / Premium:</span>
                                 <span className="text-emerald-400 font-bold">+0.18% (Contango)</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Open Interest (OI):</span>
+                                <span className="text-[#7C8CA3]">Open Interest (OI):</span>
                                 <span className="text-white font-bold">1.48M (+4.2% Surge)</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">OI Buildup Regime:</span>
-                                <span className="text-[#55C98A] font-bold">LONG BUILDUP</span>
+                                <span className="text-[#7C8CA3]">OI Buildup Regime:</span>
+                                <span className="text-[#22D3EE] font-bold">LONG BUILDUP</span>
                               </div>
-                              <div className="flex justify-between border-t border-[#1A3127] pt-1">
-                                <span className="text-[#8BA596]">Contract Rollover:</span>
+                              <div className="flex justify-between border-t border-[#1A2A3F] pt-1">
+                                <span className="text-[#7C8CA3]">Contract Rollover:</span>
                                 <span className="text-cyan-400 font-bold">Active Monthly</span>
                               </div>
                             </div>
                           ) : assetClass === "OPTIONS" || assetClass === "INDEX" ? (
                             <div className="space-y-1.5 text-[10px] font-mono">
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Selected Mode:</span>
+                                <span className="text-[#7C8CA3]">Selected Mode:</span>
                                 <span className="text-yellow-400 font-bold">{optionSide} ({strikeOffset === 0 ? "ATM" : `${strikeOffset > 0 ? `+${strikeOffset}` : strikeOffset} Strikes`})</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Delta (Δ) / IV:</span>
+                                <span className="text-[#7C8CA3]">Delta (Δ) / IV:</span>
                                 <span className="text-cyan-400 font-bold">{optionSide === "PUT" ? "-0.48" : "+0.52"} | 14.6% IV</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Put/Call Ratio (PCR):</span>
+                                <span className="text-[#7C8CA3]">Put/Call Ratio (PCR):</span>
                                 <span className="text-emerald-400 font-bold">1.14 (Supportive)</span>
                               </div>
-                              <div className="flex justify-between border-t border-[#1A3127] pt-1">
-                                <span className="text-[#8BA596]">Max Pain Level:</span>
+                              <div className="flex justify-between border-t border-[#1A2A3F] pt-1">
+                                <span className="text-[#7C8CA3]">Max Pain Level:</span>
                                 <span className="text-white font-bold">{Math.round(ltp / 50) * 50} (Analytic)</span>
                               </div>
                             </div>
                           ) : (
                             <div className="space-y-1.5 text-[10px] font-mono">
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">Mark Price:</span>
+                                <span className="text-[#7C8CA3]">Mark Price:</span>
                                 <span className="text-white font-bold">${ltp.toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">8h Funding Rate:</span>
+                                <span className="text-[#7C8CA3]">8h Funding Rate:</span>
                                 <span className="text-emerald-400 font-bold">+0.0100% / 8h</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-[#8BA596]">24h Liquidations:</span>
+                                <span className="text-[#7C8CA3]">24h Liquidations:</span>
                                 <span className="text-amber-400 font-bold">$24.8M Total</span>
                               </div>
-                              <div className="flex justify-between border-t border-[#1A3127] pt-1">
-                                <span className="text-[#8BA596]">Market Architecture:</span>
+                              <div className="flex justify-between border-t border-[#1A2A3F] pt-1">
+                                <span className="text-[#7C8CA3]">Market Architecture:</span>
                                 <span className="text-cyan-400 font-bold">Continuous Stream</span>
                               </div>
                             </div>
@@ -1442,7 +1442,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         </div>
 
                         {/* Domain Card 2: Live Indicator Suite Preview */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                           <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             <Sparkles className="h-3 w-3 text-emerald-400" />
                             <span>Live Indicator Suite ({primaryTimeframe})</span>
@@ -1450,7 +1450,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                           <div className="space-y-1.5 text-[10px] font-mono">
                             <div className="flex justify-between items-center">
-                              <span className="text-[#8BA596]">RSI (14):</span>
+                              <span className="text-[#7C8CA3]">RSI (14):</span>
                               <div className="flex items-center gap-1.5">
                                 <span className="text-white font-bold">
                                   {Number(liveIndicatorsData?.rsi_14?.value ?? 58.4).toFixed(1)}
@@ -1462,21 +1462,21 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                             </div>
 
                             <div className="flex justify-between items-center">
-                              <span className="text-[#8BA596]">EMA 9 / 21 / 200:</span>
+                              <span className="text-[#7C8CA3]">EMA 9 / 21 / 200:</span>
                               <span className="text-cyan-400 font-bold">
                                 {Number(liveIndicatorsData?.ema_9?.value ?? (ltp * 1.002)).toFixed(1)} / {Number(liveIndicatorsData?.ema_21?.value ?? (ltp * 0.998)).toFixed(1)}
                               </span>
                             </div>
 
                             <div className="flex justify-between items-center">
-                              <span className="text-[#8BA596]">Supertrend:</span>
+                              <span className="text-[#7C8CA3]">Supertrend:</span>
                               <span className={`font-bold ${liveIndicatorsData?.supertrend?.trend === "BEARISH" ? "text-red-400" : "text-emerald-400"}`}>
                                 {liveIndicatorsData?.supertrend?.trend || "BULLISH"}
                               </span>
                             </div>
 
-                            <div className="flex justify-between items-center border-t border-[#1A3127] pt-1">
-                              <span className="text-[#8BA596]">Regime Bias:</span>
+                            <div className="flex justify-between items-center border-t border-[#1A2A3F] pt-1">
+                              <span className="text-[#7C8CA3]">Regime Bias:</span>
                               <span className="text-emerald-400 font-bold uppercase">
                                 {liveIndicatorsData?.interpretation?.regime || "TRENDING_BULLISH"}
                               </span>
@@ -1485,7 +1485,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         </div>
 
                         {/* Domain Card 3: Execution Safety & Risk Bounds */}
-                        <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                           <h4 className="text-[10px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
                             <Shield className="h-3 w-3 text-yellow-400" />
                             <span>Instrument Safety Bounds</span>
@@ -1493,19 +1493,19 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                           <div className="space-y-1.5 text-[10px] font-mono">
                             <div className="flex justify-between">
-                              <span className="text-[#8BA596]">Trading Mode:</span>
-                              <span className="text-[#55C98A] font-bold">PAPER SIMULATION</span>
+                              <span className="text-[#7C8CA3]">Trading Mode:</span>
+                              <span className="text-[#22D3EE] font-bold">PAPER SIMULATION</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-[#8BA596]">Max Allowed Leverage:</span>
+                              <span className="text-[#7C8CA3]">Max Allowed Leverage:</span>
                               <span className="text-yellow-400 font-bold">{assetClass === "STOCKS" ? "5x (Intraday)" : "25x"}</span>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-[#8BA596]">Fail-Closed Engine:</span>
+                              <span className="text-[#7C8CA3]">Fail-Closed Engine:</span>
                               <span className="text-white font-bold">ENABLED</span>
                             </div>
-                            <div className="flex justify-between border-t border-[#1A3127] pt-1">
-                              <span className="text-[#8BA596]">Execution Gateway:</span>
+                            <div className="flex justify-between border-t border-[#1A2A3F] pt-1">
+                              <span className="text-[#7C8CA3]">Execution Gateway:</span>
                               <span className="text-cyan-400 font-bold">Zero-Fabrication Live Feed</span>
                             </div>
                           </div>
@@ -1525,16 +1525,16 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
             <div className="space-y-5 animate-fadeIn">
               
               {/* Timeframe Selector Grid */}
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3">
-                <div className="flex justify-between items-center border-b border-[#1A3127] pb-2">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                <div className="flex justify-between items-center border-b border-[#1A2A3F] pb-2">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-[#55C98A]" />
+                    <Clock className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Execution Timeframes (1m to 1M)
                     </h3>
                   </div>
-                  <span className="text-[10px] text-[#607D6E]">
-                    Primary: <span className="text-[#55C98A] font-bold font-mono">{primaryTimeframe}</span>
+                  <span className="text-[10px] text-[#52627A]">
+                    Primary: <span className="text-[#22D3EE] font-bold font-mono">{primaryTimeframe}</span>
                   </span>
                 </div>
 
@@ -1555,10 +1555,10 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         }}
                         className={`py-2 rounded-xl text-xs font-mono font-bold transition-all text-center ${
                           isPrimary
-                            ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md ring-1 ring-[#55C98A]/30"
+                            ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE]/60 shadow-md ring-1 ring-[#22D3EE]/30"
                             : isAdditional
                             ? "bg-[#0A1F18] text-cyan-400 border border-cyan-700/50"
-                            : "bg-[#060D0A] text-[#8BA596] hover:text-white border border-[#1A3127]"
+                            : "bg-[#07101A] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
                         }`}
                       >
                         {tf.label}
@@ -1572,10 +1572,10 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* Available Indicators Catalog */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between items-center border-b border-[#1A3127] pb-2">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center border-b border-[#1A2A3F] pb-2">
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-                      <Activity className="h-4 w-4 text-[#55C98A]" />
+                      <Activity className="h-4 w-4 text-[#22D3EE]" />
                       <span>Quantitative Indicator Registry</span>
                     </h3>
                     <input
@@ -1583,7 +1583,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       placeholder="Filter indicators..."
                       value={indicatorSearch}
                       onChange={(e) => setIndicatorSearch(e.target.value)}
-                      className="bg-[#060D0A] border border-[#1A3127] rounded-lg px-2 py-0.5 text-[10px] text-white focus:outline-none"
+                      className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2 py-0.5 text-[10px] text-white focus:outline-none"
                     />
                   </div>
 
@@ -1597,13 +1597,13 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           key={ind.id}
                           className={`p-2 rounded-xl border flex items-center justify-between transition-all ${
                             isAdded
-                              ? "bg-[#123C2A]/60 border-[#39B978]/40 text-white"
-                              : "bg-[#060D0A] border-[#1A3127] text-[#8BA596] hover:text-white"
+                              ? "bg-[rgba(37,99,235,0.2)]/60 border-[#22D3EE]/40 text-white"
+                              : "bg-[#07101A] border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
                           }`}
                         >
                           <div>
                             <span className="font-bold text-xs">{ind.name}</span>
-                            <span className="text-[9px] text-[#607D6E] ml-2 px-1.5 py-0.5 rounded bg-[#11221A]">
+                            <span className="text-[9px] text-[#52627A] ml-2 px-1.5 py-0.5 rounded bg-[#101B2D]">
                               {ind.category}
                             </span>
                           </div>
@@ -1620,7 +1620,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                             <button
                               type="button"
                               onClick={() => handleAddIndicator(ind)}
-                              className="p-1 text-[#55C98A] hover:text-white rounded hover:bg-[#14271F]"
+                              className="p-1 text-[#22D3EE] hover:text-white rounded hover:bg-[#101B2D]"
                             >
                               <Plus className="h-3.5 w-3.5" />
                             </button>
@@ -1632,8 +1632,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 </div>
 
                 {/* Visual Deterministic Rule Builder */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3">
-                  <div className="flex justify-between items-center border-b border-[#1A3127] pb-2">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                  <div className="flex justify-between items-center border-b border-[#1A2A3F] pb-2">
                     <div className="flex items-center gap-2">
                       <Sliders className="h-4 w-4 text-cyan-400" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">
@@ -1648,7 +1648,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           type="button"
                           onClick={() => setRuleOperator(op)}
                           className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                            ruleOperator === op ? "bg-cyan-600 text-white" : "bg-[#060D0A] text-[#607D6E]"
+                            ruleOperator === op ? "bg-cyan-600 text-white" : "bg-[#07101A] text-[#52627A]"
                           }`}
                         >
                           {op}
@@ -1660,9 +1660,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   {/* Rules List */}
                   <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
                     {strategyRules.map((rule, idx) => (
-                      <div key={rule.id} className="p-2.5 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+                      <div key={rule.id} className="p-2.5 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#607D6E] font-mono font-bold">#{idx + 1}</span>
+                          <span className="text-[#52627A] font-mono font-bold">#{idx + 1}</span>
                           <label className="flex items-center gap-1 text-[10px] font-bold cursor-pointer">
                             <input
                               type="checkbox"
@@ -1674,9 +1674,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                                   )
                                 );
                               }}
-                              className="accent-[#55C98A] rounded"
+                              className="accent-[#22D3EE] rounded"
                             />
-                            <span className={rule.isMandatory ? "text-yellow-400" : "text-[#607D6E]"}>
+                            <span className={rule.isMandatory ? "text-yellow-400" : "text-[#52627A]"}>
                               {rule.isMandatory ? "MANDATORY" : "OPTIONAL"}
                             </span>
                           </label>
@@ -1699,7 +1699,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                                 )
                               );
                             }}
-                            className="bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-[10px] text-white font-mono"
+                            className="bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-[10px] text-white font-mono"
                           >
                             {selectedIndicators.map((i) => (
                               <option key={i.id} value={i.id}>
@@ -1717,7 +1717,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                                 )
                               );
                             }}
-                            className="bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-[10px] text-cyan-400 font-mono font-bold text-center"
+                            className="bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-[10px] text-cyan-400 font-mono font-bold text-center"
                           >
                             <option value=">">&gt; (Greater Than)</option>
                             <option value="<">&lt; (Less Than)</option>
@@ -1738,7 +1738,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                                 )
                               );
                             }}
-                            className="bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-[10px] text-white font-mono"
+                            className="bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-[10px] text-white font-mono"
                           />
                         </div>
                       </div>
@@ -1748,7 +1748,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   <button
                     type="button"
                     onClick={handleAddRule}
-                    className="w-full py-1.5 rounded-xl bg-[#14271F] hover:bg-[#1C362B] text-[#55C98A] text-[11px] font-bold flex items-center justify-center gap-1 transition-colors"
+                    className="w-full py-1.5 rounded-xl bg-[#101B2D] hover:bg-[#1C362B] text-[#22D3EE] text-[11px] font-bold flex items-center justify-center gap-1 transition-colors"
                   >
                     <Plus className="h-3.5 w-3.5" />
                     <span>Add Strategy Rule</span>
@@ -1764,16 +1764,16 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* Left Column: Stop Loss & Targets */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                    <Shield className="h-4 w-4 text-[#55C98A]" />
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <Shield className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Exit Thresholds & R:R Bounds
                     </h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                       <span>Stop Loss Percentage *</span>
                       <span className="text-red-400 font-mono font-bold">Estimated Loss: {formatCurrency(estimatedMaxLoss, currency)}</span>
                     </label>
@@ -1785,14 +1785,14 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         max={50}
                         value={stopLossPct}
                         onChange={(e) => setStopLossPct(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-red-400 font-mono font-bold focus:outline-none focus:border-red-500"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-red-400 font-mono font-bold focus:outline-none focus:border-red-500"
                       />
-                      <span className="absolute right-3 top-2 text-xs text-[#607D6E] font-bold">%</span>
+                      <span className="absolute right-3 top-2 text-xs text-[#52627A] font-bold">%</span>
                     </div>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                       <span>Take Profit Target Percentage *</span>
                       <span className="text-emerald-400 font-mono font-bold">R:R Ratio = {riskRewardRatio}</span>
                     </label>
@@ -1804,14 +1804,14 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         max={200}
                         value={takeProfitPct}
                         onChange={(e) => setTakeProfitPct(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold focus:outline-none focus:border-emerald-500"
                       />
-                      <span className="absolute right-3 top-2 text-xs text-[#607D6E] font-bold">%</span>
+                      <span className="absolute right-3 top-2 text-xs text-[#52627A] font-bold">%</span>
                     </div>
                   </div>
 
                   {/* Trailing Stop Section */}
-                  <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-3">
+                  <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-bold text-white flex items-center gap-1.5">
                         <TrendingUp className="h-3.5 w-3.5 text-cyan-400" />
@@ -1824,33 +1824,33 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           onChange={(e) => setTrailingStopEnabled(e.target.checked)}
                           className="sr-only peer"
                         />
-                        <div className="w-9 h-5 bg-[#14271F] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#55C98A]"></div>
+                        <div className="w-9 h-5 bg-[#101B2D] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#22D3EE]"></div>
                       </label>
                     </div>
 
                     {trailingStopEnabled && (
                       <div className="grid grid-cols-2 gap-3 pt-1">
                         <div className="space-y-1">
-                          <label className="text-[10px] text-[#8BA596]">Trailing Step (%)</label>
+                          <label className="text-[10px] text-[#7C8CA3]">Trailing Step (%)</label>
                           <input
                             type="number"
                             step={0.1}
                             min={0.1}
                             value={trailingStopPct}
                             onChange={(e) => setTrailingStopPct(parseFloat(e.target.value) || 0.5)}
-                            className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                            className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                           />
                         </div>
 
                         <div className="space-y-1">
-                          <label className="text-[10px] text-[#8BA596]">Activation Profit (%)</label>
+                          <label className="text-[10px] text-[#7C8CA3]">Activation Profit (%)</label>
                           <input
                             type="number"
                             step={0.1}
                             min={0.1}
                             value={activationProfitPct}
                             onChange={(e) => setActivationProfitPct(parseFloat(e.target.value) || 1.0)}
-                            className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono"
+                            className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono"
                           />
                         </div>
                       </div>
@@ -1859,8 +1859,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 </div>
 
                 {/* Right Column: Capital & Drawdown Limits */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
                     <AlertTriangle className="h-4 w-4 text-yellow-400" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Portfolio Circuit Breakers
@@ -1868,7 +1868,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                       <span>Max Risk Per Trade (%)</span>
                       <span className="text-cyan-400 font-mono font-bold">Cap: {formatCurrency(maxRiskAmount, currency)}</span>
                     </label>
@@ -1879,12 +1879,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       max={10}
                       value={riskPerTradePct}
                       onChange={(e) => setRiskPerTradePct(parseFloat(e.target.value) || 1.0)}
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#22D3EE]"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Max Daily Drawdown Target (%)</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Daily Drawdown Target (%)</label>
                     <input
                       type="number"
                       step={0.5}
@@ -1892,22 +1892,22 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       max={20}
                       value={maxDailyDrawdownPct}
                       onChange={(e) => setMaxDailyDrawdownPct(parseFloat(e.target.value) || 3.0)}
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#22D3EE]"
                     />
-                    <p className="text-[10px] text-[#607D6E]">
+                    <p className="text-[10px] text-[#52627A]">
                       If daily losses exceed {maxDailyDrawdownPct}%, new orders will be blocked automatically.
                     </p>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Max Concurrent Open Positions</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Concurrent Open Positions</label>
                     <input
                       type="number"
                       min={1}
                       max={10}
                       value={maxOpenPositions}
                       onChange={(e) => setMaxOpenPositions(parseInt(e.target.value) || 1)}
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#55C98A]"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-[#22D3EE]"
                     />
                   </div>
                 </div>
@@ -1921,20 +1921,20 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* Left Column: Broker Connection */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                    <Building2 className="h-4 w-4 text-[#55C98A]" />
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <Building2 className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Execution Broker Gateway
                     </h3>
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Configured Broker *</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Configured Broker *</label>
                     <select
                       value={brokerId}
                       onChange={(e) => setBrokerId(e.target.value)}
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                     >
                       {(brokersData?.brokers || [
                         { id: "paper_simulator", name: "QuantOS Paper Simulator", status: "CONNECTED" },
@@ -1954,17 +1954,17 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Trading Account ID</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Trading Account ID</label>
                     <input
                       type="text"
                       value={accountId}
                       onChange={(e) => setAccountId(e.target.value)}
-                      className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
                     />
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Leverage Multiplier</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Leverage Multiplier</label>
                     <div className="grid grid-cols-6 gap-1.5">
                       {[1, 2, 3, 5, 10, 20].map((lev) => (
                         <button
@@ -1973,8 +1973,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           onClick={() => setLeverage(lev)}
                           className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all ${
                             leverage === lev
-                              ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                              : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                              ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE]"
+                              : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
                           }`}
                         >
                           {lev}x
@@ -1984,7 +1984,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] text-[#8BA596] font-semibold">Execution Mode</label>
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Mode</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
@@ -1992,7 +1992,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         className={`p-2 rounded-xl text-xs font-bold font-mono transition-all ${
                           executionMode === "MANUAL"
                             ? "bg-cyan-950/60 text-cyan-400 border border-cyan-700 shadow-md"
-                            : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                            : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
                         }`}
                       >
                         MANUAL CONFIRMATION
@@ -2003,8 +2003,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         onClick={() => setExecutionMode("AUTOMATIC")}
                         className={`p-2 rounded-xl text-xs font-bold font-mono transition-all ${
                           executionMode === "AUTOMATIC"
-                            ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978] shadow-md"
-                            : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                            ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE] shadow-md"
+                            : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
                         }`}
                       >
                         AUTOMATIC EXECUTION
@@ -2014,41 +2014,41 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 </div>
 
                 {/* Right Column: Margin & Safety Gate */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-4">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                    <Shield className="h-4 w-4 text-[#55C98A]" />
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-4">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <Shield className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Margin Estimate & Live Gate
                     </h3>
                   </div>
 
                   {/* Margin Estimate Summary */}
-                  <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2 text-xs font-mono">
+                  <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2 text-xs font-mono">
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Allocated Capital:</span>
+                      <span className="text-[#7C8CA3]">Allocated Capital:</span>
                       <span className="text-white font-bold">{formatCurrency(allocatedCapital, currency)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Estimated Notional:</span>
+                      <span className="text-[#7C8CA3]">Estimated Notional:</span>
                       <span className="text-cyan-400 font-bold">{formatCurrency(estimatedNotional, currency)}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Required Margin:</span>
+                      <span className="text-[#7C8CA3]">Required Margin:</span>
                       <span className="text-yellow-400 font-bold">{formatCurrency(requiredMargin, currency)}</span>
                     </div>
-                    <div className="flex justify-between border-t border-[#1A3127] pt-1.5">
-                      <span className="text-[#8BA596]">Leverage Active:</span>
-                      <span className="text-[#55C98A] font-bold">{leverage}x</span>
+                    <div className="flex justify-between border-t border-[#1A2A3F] pt-1.5">
+                      <span className="text-[#7C8CA3]">Leverage Active:</span>
+                      <span className="text-[#22D3EE] font-bold">{leverage}x</span>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] text-[#8BA596]">Order Type</label>
+                      <label className="text-[10px] text-[#7C8CA3]">Order Type</label>
                       <select
                         value={orderType}
                         onChange={(e) => setOrderType(e.target.value as any)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                       >
                         <option value="MARKET">MARKET</option>
                         <option value="LIMIT">LIMIT</option>
@@ -2058,7 +2058,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                     </div>
 
                     <div className="space-y-1">
-                      <label className="text-[10px] text-[#8BA596]">Max Slippage (%)</label>
+                      <label className="text-[10px] text-[#7C8CA3]">Max Slippage (%)</label>
                       <input
                         type="number"
                         step={0.05}
@@ -2066,7 +2066,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         max={2}
                         value={maxSlippagePct}
                         onChange={(e) => setMaxSlippagePct(parseFloat(e.target.value) || 0.2)}
-                        className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-2.5 py-1.5 text-xs text-white font-mono"
                       />
                     </div>
                   </div>
@@ -2099,9 +2099,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 
                 {/* Full Breakdown Cards */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3 text-xs font-mono">
-                  <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                    <CheckCircle2 className="h-4 w-4 text-[#55C98A]" />
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3 text-xs font-mono">
+                  <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Configuration Summary
                     </h3>
@@ -2109,42 +2109,42 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
 
                   <div className="space-y-2">
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Bot Instance:</span>
+                      <span className="text-[#7C8CA3]">Bot Instance:</span>
                       <span className="text-white font-bold truncate max-w-[200px]">{name}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Instrument & TF:</span>
+                      <span className="text-[#7C8CA3]">Instrument & TF:</span>
                       <span className="text-cyan-400 font-bold">{symbol} ({primaryTimeframe})</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Asset Class:</span>
+                      <span className="text-[#7C8CA3]">Asset Class:</span>
                       <span className="text-yellow-400 font-bold">{assetClass}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Capital Allocation:</span>
-                      <span className="text-[#55C98A] font-bold">
+                      <span className="text-[#7C8CA3]">Capital Allocation:</span>
+                      <span className="text-[#22D3EE] font-bold">
                         {formatCurrency(allocatedCapital, currency)} ({allocationPct}% of {formatCurrency(totalCapital, currency)})
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Risk / Reward:</span>
+                      <span className="text-[#7C8CA3]">Risk / Reward:</span>
                       <span className="text-white font-bold">
                         SL {stopLossPct}% / TP {takeProfitPct}% ({riskRewardRatio})
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Trailing Stop:</span>
+                      <span className="text-[#7C8CA3]">Trailing Stop:</span>
                       <span className="text-white font-bold">
                         {trailingStopEnabled ? `${trailingStopPct}% (Active at +${activationProfitPct}%)` : "Disabled"}
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#8BA596]">Execution Broker:</span>
+                      <span className="text-[#7C8CA3]">Execution Broker:</span>
                       <span className="text-cyan-400 font-bold">{brokerId} ({leverage}x)</span>
                     </div>
-                    <div className="flex justify-between border-t border-[#1A3127] pt-2">
-                      <span className="text-[#8BA596]">Environment:</span>
-                      <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-[#55C98A]"}`}>
+                    <div className="flex justify-between border-t border-[#1A2A3F] pt-2">
+                      <span className="text-[#7C8CA3]">Environment:</span>
+                      <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-[#22D3EE]"}`}>
                         {environment} MODE
                       </span>
                     </div>
@@ -2152,10 +2152,10 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 </div>
 
                 {/* Pre-Activation Deterministic Checklist */}
-                <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between border-b border-[#1A3127] pb-2">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
                     <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-[#55C98A]" />
+                      <Shield className="h-4 w-4 text-[#22D3EE]" />
                       <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                         Authoritative Backend Safety Evidence
                       </h3>
@@ -2205,11 +2205,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                         evidence: `Dedicated single broker [${brokerId}] locked. Cross-broker execution prohibited.`,
                       }
                     ].map((item, idx) => (
-                      <div key={idx} className="p-2 rounded-lg bg-[#060D0A] border border-[#1A3127] space-y-0.5">
+                      <div key={idx} className="p-2 rounded-lg bg-[#07101A] border border-[#1A2A3F] space-y-0.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             {item.status === "PASSED" ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-[#55C98A] shrink-0" />
+                              <CheckCircle2 className="h-3.5 w-3.5 text-[#22D3EE] shrink-0" />
                             ) : item.status === "WARNING" ? (
                               <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
                             ) : (
@@ -2218,12 +2218,12 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                             <span className="font-bold text-white text-[11px]">{item.label}</span>
                           </div>
                           <span className={`text-[9px] px-1 rounded font-mono font-bold ${
-                            item.status === "PASSED" ? "bg-[#123C2A] text-[#55C98A]" : "bg-yellow-950/60 text-yellow-400"
+                            item.status === "PASSED" ? "bg-[rgba(37,99,235,0.2)] text-[#22D3EE]" : "bg-yellow-950/60 text-yellow-400"
                           }`}>
                             {item.status}
                           </span>
                         </div>
-                        <p className="text-[10px] text-[#8BA596] pl-5">{item.evidence}</p>
+                        <p className="text-[10px] text-[#7C8CA3] pl-5">{item.evidence}</p>
                       </div>
                     ))}
                   </div>
@@ -2241,7 +2241,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
           )}
 
           {draftSavedToast && (
-            <div className="p-2.5 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978] text-xs flex items-center gap-2 animate-fadeIn">
+            <div className="p-2.5 rounded-xl bg-[rgba(37,99,235,0.2)] text-[#22D3EE] border border-[#22D3EE] text-xs flex items-center gap-2 animate-fadeIn">
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <span>Configuration draft saved safely to local storage!</span>
             </div>
@@ -2251,13 +2251,13 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
         {/* =========================================================
             STICKY FOOTER: BACK, SAVE DRAFT, CONTINUE / CREATE BOT
             ========================================================= */}
-        <div className="p-4 border-t border-[#182C23] bg-[#060D0A] flex items-center justify-between">
+        <div className="p-4 border-t border-[#122033] bg-[#07101A] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleBack}
               disabled={step === 1 || createMutation.isPending}
-              className="px-4 py-2 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white text-xs font-bold transition-colors disabled:opacity-30 flex items-center gap-1.5"
+              className="px-4 py-2 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-semibold transition-colors disabled:opacity-30 flex items-center gap-1.5 cursor-pointer"
             >
               <ArrowLeft className="h-4 w-4" />
               <span>Back</span>
@@ -2266,9 +2266,9 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
             <button
               type="button"
               onClick={handleSaveDraft}
-              className="px-3 py-2 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white text-xs font-semibold transition-colors flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Bookmark className="h-3.5 w-3.5" />
+              <Bookmark className="h-3.5 w-3.5 text-[#19C5FF]" />
               <span className="hidden sm:inline">Save Draft</span>
             </button>
           </div>
@@ -2278,7 +2278,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold transition-all shadow-md flex items-center gap-1.5"
+                className="px-5 py-2 rounded-lg bg-[#2563EB] hover:bg-[#3B82F6] text-[#F7FAFC] text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Continue</span>
                 <ArrowRight className="h-4 w-4" />
@@ -2288,7 +2288,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                 type="button"
                 onClick={() => createMutation.mutate()}
                 disabled={createMutation.isPending || (environment === "LIVE" && !liveSafetyConfirmed)}
-                className="px-6 py-2 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-bold transition-all shadow-md disabled:opacity-50 flex items-center gap-1.5"
+                className="px-6 py-2 rounded-lg bg-[#2563EB] hover:bg-[#3B82F6] text-[#F7FAFC] text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
               >
                 {createMutation.isPending ? (
                   <RefreshCw className="h-4 w-4 animate-spin" />

@@ -167,8 +167,8 @@ export function SelectedInstrumentActionBar({
             onClick={() => setIsMoreOpen(!isMoreOpen)}
             className={`p-2 text-xs rounded-xl border transition-all ${
               isMoreOpen
-                ? "bg-[#1E293B] text-white border-cyan-500/50"
-                : "bg-[#141E33] hover:bg-[#1E293B] text-slate-300 border-slate-700 hover:border-slate-600"
+                ? "bg-[#1A2A3F] text-white border-cyan-500/50"
+                : "bg-[#141E33] hover:bg-[#1A2A3F] text-slate-300 border-slate-700 hover:border-slate-600"
             }`}
             title="More actions"
           >
@@ -186,7 +186,7 @@ export function SelectedInstrumentActionBar({
                   onToggleWatchlist();
                   setIsMoreOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-amber-400 transition-colors flex items-center gap-2"
+                className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-amber-400 transition-colors flex items-center gap-2"
               >
                 <Star className={`w-4 h-4 ${isInWatchlist ? "text-amber-400 fill-current" : "text-slate-400"}`} />
                 <span>{isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}</span>
@@ -197,7 +197,7 @@ export function SelectedInstrumentActionBar({
                   onOpenDetails();
                   setIsMoreOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
               >
                 <Info className="w-4 h-4 text-cyan-400" />
                 <span>Instrument Details</span>
@@ -208,7 +208,7 @@ export function SelectedInstrumentActionBar({
                   onOpenStrategy();
                   setIsMoreOpen(false);
                 }}
-                className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
               >
                 <Code className="w-4 h-4 text-emerald-400" />
                 <span>Strategy Builder</span>
@@ -221,7 +221,7 @@ export function SelectedInstrumentActionBar({
                     onOpenFutures(sym);
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
                 >
                   <TrendingUp className="w-4 h-4 text-blue-400" />
                   <span>Futures Command</span>
@@ -234,7 +234,7 @@ export function SelectedInstrumentActionBar({
                     onOpenOptions(sym);
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
                 >
                   <Layers className="w-4 h-4 text-purple-400" />
                   <span>Option Chain</span>

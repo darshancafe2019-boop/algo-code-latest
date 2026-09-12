@@ -86,7 +86,7 @@ export function StrategyPalette({ onAddRule }: StrategyPaletteProps) {
   };
 
   return (
-    <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 flex flex-col h-full space-y-3 font-sans select-none shadow-xl">
+    <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col h-full space-y-3 font-sans select-none shadow-xl">
       {/* Palette Header & Search */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -106,7 +106,7 @@ export function StrategyPalette({ onAddRule }: StrategyPaletteProps) {
             placeholder="Search indicators, price, risk..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#121927] border border-[#1E293B] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+            className="w-full bg-[#121927] border border-[#1A2A3F] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
           />
         </div>
       </div>
@@ -121,7 +121,7 @@ export function StrategyPalette({ onAddRule }: StrategyPaletteProps) {
           const Icon = cat.icon;
 
           return (
-            <div key={cat.name} className="border border-[#1E293B] rounded-xl overflow-hidden bg-[#121927]/60">
+            <div key={cat.name} className="border border-[#1A2A3F] rounded-xl overflow-hidden bg-[#121927]/60">
               <button
                 onClick={() => toggleCategory(cat.name)}
                 className="w-full px-3 py-2 flex items-center justify-between text-xs font-bold text-slate-300 hover:bg-[#162032] transition-colors"
@@ -141,11 +141,11 @@ export function StrategyPalette({ onAddRule }: StrategyPaletteProps) {
               </button>
 
               {isExpanded && (
-                <div className="p-2 space-y-1.5 border-t border-[#1E293B] bg-[#0A0E17]/40">
+                <div className="p-2 space-y-1.5 border-t border-[#1A2A3F] bg-[#0A0E17]/40">
                   {itemsInCat.map((item) => (
                     <div
                       key={item.id}
-                      className="group p-2 rounded-lg bg-[#121927] hover:bg-[#162032] border border-[#1E293B] hover:border-cyan-500/40 transition-all flex flex-col gap-1.5"
+                      className="group p-2 rounded-lg bg-[#121927] hover:bg-[#162032] border border-[#1A2A3F] hover:border-cyan-500/40 transition-all flex flex-col gap-1.5"
                     >
                       <div className="flex items-start justify-between gap-1.5">
                         <div>

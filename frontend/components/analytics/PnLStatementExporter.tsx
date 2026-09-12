@@ -142,19 +142,19 @@ export function PnLStatementExporter({
   const unrealizedFmt = formatPnL(summary.unrealizedPnl * currencyRate, currency, 2);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn font-mono">
-      <div className="w-full max-w-4xl bg-[#09110E] border border-[#1F392D] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto animate-fadeIn font-sans">
+      <div className="w-full max-w-4xl bg-[#0A1422] border border-[#1A2A3F] rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Top Header */}
-        <div className="p-4 sm:p-5 border-b border-[#142B21] bg-[#060D0A] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#122033] bg-[#07101A] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/30">
+            <div className="p-2 rounded-lg bg-blue-500/10 text-cyan-400 border border-cyan-500/30">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-extrabold text-white uppercase tracking-wide">
-                INSTITUTIONAL PERFORMANCE STATEMENT
+              <h2 className="text-base font-semibold text-slate-100">
+                Institutional Performance Statement
               </h2>
-              <p className="text-xs text-[#8BA596]">
+              <p className="text-xs text-slate-400">
                 Audited financial summary & verified cryptographic ledger
               </p>
             </div>
@@ -163,16 +163,16 @@ export function PnLStatementExporter({
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyJSON}
-              className="px-3 py-1.5 rounded-xl bg-[#14271F] hover:bg-[#1B362B] text-slate-200 text-xs font-bold transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] border border-[#1A2A3F] text-slate-200 text-xs font-medium transition flex items-center gap-1.5"
               title="Copy JSON Payload"
             >
-              {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-[#55C98A]" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
               <span>{copied ? "Copied JSON" : "JSON"}</span>
             </button>
 
             <button
               onClick={handleDownloadCSV}
-              className="px-3 py-1.5 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white border border-[#39B978]/30 text-xs font-bold transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-cyan-400 hover:text-white border border-[#1A2A3F] text-xs font-medium transition flex items-center gap-1.5"
               title="Download CSV Spreadsheet"
             >
               <Download className="w-3.5 h-3.5" />
@@ -181,7 +181,7 @@ export function PnLStatementExporter({
 
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-extrabold transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-[#2563EB] hover:bg-[#3B82F6] text-white text-xs font-semibold transition flex items-center gap-1.5"
               title="Print / Save as PDF"
             >
               <Printer className="w-3.5 h-3.5" />
@@ -190,7 +190,7 @@ export function PnLStatementExporter({
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#14271F] transition ml-2"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#101B2D] transition ml-2"
             >
               <X className="w-5 h-5" />
             </button>
@@ -198,25 +198,25 @@ export function PnLStatementExporter({
         </div>
 
         {/* Statement Printable Body */}
-        <div className="p-6 overflow-y-auto space-y-6 text-slate-200 text-xs bg-[#09110E]">
+        <div className="p-6 overflow-y-auto space-y-6 text-slate-200 text-xs bg-[#0A1422]">
           {/* Header Metadata Strip */}
-          <div className="border border-[#14271F] rounded-xl p-4 bg-[#060D0A] flex flex-wrap items-center justify-between gap-4">
+          <div className="border border-[#122033] rounded-xl p-4 bg-[#0A1626] flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="text-sm font-black text-white uppercase tracking-wider">
-                QUANTOS AUTONOMOUS CAPITAL
+              <div className="text-sm font-semibold text-slate-100 uppercase tracking-wide">
+                QUANT.OS Autonomous Capital
               </div>
-              <div className="text-[11px] text-[#8BA596]">Account Reference: {statementId}</div>
-              <div className="text-[10px] text-[#607D6E] font-mono mt-0.5">{verificationHash}</div>
+              <div className="text-[11px] text-slate-400">Account Reference: {statementId}</div>
+              <div className="text-[10px] text-slate-500 font-mono mt-0.5">{verificationHash}</div>
             </div>
 
             <div className="text-right space-y-1">
-              <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
-                tradingMode === "LIVE" ? "bg-red-950 text-red-400 border border-red-800" : "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40"
+              <span className={`text-[10px] px-2.5 py-0.5 rounded-md font-semibold uppercase ${
+                tradingMode === "LIVE" ? "bg-rose-500/10 text-rose-400 border border-rose-500/30" : "bg-blue-500/10 text-cyan-400 border border-cyan-500/30"
               }`}>
                 ● {tradingMode} ACCOUNT
               </span>
-              <div className="text-[10px] text-[#8BA596]">As Of: {new Date().toLocaleString()}</div>
-              <div className="text-[10px] text-[#55C98A] flex items-center justify-end gap-1 font-bold">
+              <div className="text-[10px] text-slate-400">As Of: {new Date().toLocaleString()}</div>
+              <div className="text-[10px] text-emerald-400 flex items-center justify-end gap-1 font-semibold">
                 <ShieldCheck className="w-3 h-3" /> VERIFIED SINGLE SOURCE OF TRUTH
               </div>
             </div>
@@ -224,124 +224,124 @@ export function PnLStatementExporter({
 
           {/* Core Balance & Performance Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3.5 space-y-1">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Total Net Equity</span>
-              <span className="text-lg font-bold text-white block">
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3.5 space-y-1">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Total Net Equity</span>
+              <span className="text-lg font-bold text-slate-100 font-mono tabular-nums block">
                 {formatPrice(summary.equity * currencyRate, currency, 2)}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Cash: {formatPrice(summary.cashBalance * currencyRate, currency, 2)}</span>
+              <span className="text-[10px] text-slate-500 font-mono tabular-nums">Cash: {formatPrice(summary.cashBalance * currencyRate, currency, 2)}</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3.5 space-y-1">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Total Net P&L</span>
-              <span className={`text-lg font-bold block ${
-                netPnlFmt.isPositive ? "text-[#55C98A]" : netPnlFmt.isNegative ? "text-red-400" : "text-slate-300"
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3.5 space-y-1">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Total Net P&L</span>
+              <span className={`text-lg font-bold font-mono tabular-nums block ${
+                netPnlFmt.isPositive ? "text-emerald-400" : netPnlFmt.isNegative ? "text-rose-400" : "text-slate-300"
               }`}>
                 {netPnlFmt.formatted}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Net of {formatPrice(summary.fees * currencyRate, currency, 2)} fees</span>
+              <span className="text-[10px] text-slate-500 font-mono tabular-nums">Net of {formatPrice(summary.fees * currencyRate, currency, 2)} fees</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3.5 space-y-1">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Realized P&L</span>
-              <span className={`text-lg font-bold block ${
-                realizedFmt.isPositive ? "text-[#55C98A]" : realizedFmt.isNegative ? "text-red-400" : "text-slate-300"
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3.5 space-y-1">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Realized P&L</span>
+              <span className={`text-lg font-bold font-mono tabular-nums block ${
+                realizedFmt.isPositive ? "text-emerald-400" : realizedFmt.isNegative ? "text-rose-400" : "text-slate-300"
               }`}>
                 {realizedFmt.formatted}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Closed Positions</span>
+              <span className="text-[10px] text-slate-500">Closed Positions</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3.5 space-y-1">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Unrealized MTM</span>
-              <span className={`text-lg font-bold block ${
-                unrealizedFmt.isPositive ? "text-[#55C98A]" : unrealizedFmt.isNegative ? "text-red-400" : "text-slate-300"
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3.5 space-y-1">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Unrealized MTM</span>
+              <span className={`text-lg font-bold font-mono tabular-nums block ${
+                unrealizedFmt.isPositive ? "text-emerald-400" : unrealizedFmt.isNegative ? "text-rose-400" : "text-slate-300"
               }`}>
                 {unrealizedFmt.formatted}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Open Risk</span>
+              <span className="text-[10px] text-slate-500">Open Risk</span>
             </div>
           </div>
 
           {/* Quantitative Ratios & Win/Loss Statistics */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3 space-y-0.5">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Win Rate</span>
-              <span className="text-base font-bold text-[#55C98A] block">
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3 space-y-0.5">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Win Rate</span>
+              <span className="text-base font-bold text-emerald-400 font-mono tabular-nums block">
                 {formatPercent(summary.winRate, 1)}
               </span>
-              <span className="text-[10px] text-[#607D6E]">{summary.winningTrades}W / {summary.losingTrades}L ({summary.totalTrades} Total)</span>
+              <span className="text-[10px] text-slate-500 font-mono">{summary.winningTrades}W / {summary.losingTrades}L ({summary.totalTrades} Total)</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3 space-y-0.5">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Profit Factor</span>
-              <span className="text-base font-bold text-white block">
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3 space-y-0.5">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Profit Factor</span>
+              <span className="text-base font-bold text-slate-100 font-mono tabular-nums block">
                 {summary.profitFactor}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Gross Win / Gross Loss</span>
+              <span className="text-[10px] text-slate-500">Gross Win / Gross Loss</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3 space-y-0.5">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Sharpe / Sortino</span>
-              <span className="text-base font-bold text-cyan-400 block">
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3 space-y-0.5">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Sharpe / Sortino</span>
+              <span className="text-base font-bold text-cyan-400 font-mono tabular-nums block">
                 {summary.sharpeRatio ?? "2.45"} / {summary.sortinoRatio ?? "3.12"}
               </span>
-              <span className="text-[10px] text-[#607D6E]">Risk-adjusted returns</span>
+              <span className="text-[10px] text-slate-500">Risk-adjusted returns</span>
             </div>
 
-            <div className="bg-[#060D0A] border border-[#14271F] rounded-xl p-3 space-y-0.5">
-              <span className="text-[10px] text-[#8BA596] uppercase block">Max Drawdown</span>
-              <span className="text-base font-bold text-red-400 block">
+            <div className="bg-[#0A1626] border border-[#122033] rounded-xl p-3 space-y-0.5">
+              <span className="text-[10px] text-slate-400 uppercase font-medium block">Max Drawdown</span>
+              <span className="text-base font-bold text-rose-400 font-mono tabular-nums block">
                 -{formatPercent(summary.maxDrawdownPct, 2)}
               </span>
-              <span className="text-[10px] text-[#607D6E]">From High Water Mark</span>
+              <span className="text-[10px] text-slate-500">From High Water Mark</span>
             </div>
           </div>
 
           {/* Audited Execution Sample Table */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-white">
-              <span>EXECUTED TRANSACTIONS LEDGER (LAST 10 FILLS)</span>
-              <span className="text-[10px] text-[#8BA596]">Format: ISO-8601 UTC</span>
+            <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
+              <span>Executed Transactions Ledger (Last 10 Fills)</span>
+              <span className="text-[10px] text-slate-400 font-mono">Format: ISO-8601 UTC</span>
             </div>
 
-            <div className="border border-[#14271F] rounded-xl overflow-hidden bg-[#060D0A]">
+            <div className="border border-[#122033] rounded-xl overflow-hidden bg-[#07101A]">
               <table className="w-full text-left text-[11px]">
-                <thead className="bg-[#123C2A]/30 text-[#8BA596] uppercase text-[9px] border-b border-[#14271F]">
+                <thead className="bg-[#0A1422] text-slate-400 uppercase text-[9px] border-b border-[#122033]">
                   <tr>
-                    <th className="p-2.5">Trade ID</th>
-                    <th className="p-2.5">Symbol</th>
-                    <th className="p-2.5">Direction</th>
-                    <th className="p-2.5 text-right">Entry</th>
-                    <th className="p-2.5 text-right">Exit</th>
-                    <th className="p-2.5 text-right">Net P&L</th>
-                    <th className="p-2.5 text-right">Fee</th>
-                    <th className="p-2.5 text-center">Status</th>
+                    <th className="p-2.5 font-medium">Trade ID</th>
+                    <th className="p-2.5 font-medium">Symbol</th>
+                    <th className="p-2.5 font-medium">Direction</th>
+                    <th className="p-2.5 text-right font-medium">Entry</th>
+                    <th className="p-2.5 text-right font-medium">Exit</th>
+                    <th className="p-2.5 text-right font-medium">Net P&L</th>
+                    <th className="p-2.5 text-right font-medium">Fee</th>
+                    <th className="p-2.5 text-center font-medium">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#14271F]/50 text-slate-200">
+                <tbody className="divide-y divide-[#122033] text-slate-300">
                   {trades.slice(0, 10).map((t, idx) => {
                     const pnl = Number(t.net_pnl ?? t.realized_pnl ?? t.pnl ?? 0) * currencyRate;
                     const pnlFmt = formatPnL(pnl, currency, 2);
                     return (
-                      <tr key={t.id || idx} className="hover:bg-[#0C1713]">
-                        <td className="p-2.5 font-bold text-cyan-400">#{t.id || `1011${78 - idx}`}</td>
-                        <td className="p-2.5 font-bold text-white">{t.symbol || "BTC/USDT"}</td>
+                      <tr key={t.id || idx} className="hover:bg-[#101B2D]/60 transition-colors">
+                        <td className="p-2.5 font-mono text-cyan-400 font-medium">#{t.id || `1011${78 - idx}`}</td>
+                        <td className="p-2.5 font-semibold text-slate-100">{t.symbol || "BTC/USDT"}</td>
                         <td className="p-2.5">
-                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
-                            t.direction === "SHORT" || t.direction === "SELL" ? "bg-red-950 text-red-400" : "bg-[#123C2A] text-[#55C98A]"
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${
+                            t.direction === "SHORT" || t.direction === "SELL" ? "bg-rose-500/10 text-rose-400 border border-rose-500/30" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                           }`}>
                             {t.direction || "LONG"}
                           </span>
                         </td>
-                        <td className="p-2.5 text-right font-mono">{formatPrice(Number(t.entry_price || 64250) * currencyRate, currency, 2)}</td>
-                        <td className="p-2.5 text-right font-mono">{t.exit_price ? formatPrice(Number(t.exit_price) * currencyRate, currency, 2) : "—"}</td>
-                        <td className={`p-2.5 text-right font-bold font-mono ${pnlFmt.isPositive ? "text-[#55C98A]" : pnlFmt.isNegative ? "text-red-400" : "text-slate-300"}`}>
+                        <td className="p-2.5 text-right font-mono tabular-nums">{formatPrice(Number(t.entry_price || 64250) * currencyRate, currency, 2)}</td>
+                        <td className="p-2.5 text-right font-mono tabular-nums">{t.exit_price ? formatPrice(Number(t.exit_price) * currencyRate, currency, 2) : "—"}</td>
+                        <td className={`p-2.5 text-right font-semibold font-mono tabular-nums ${pnlFmt.isPositive ? "text-emerald-400" : pnlFmt.isNegative ? "text-rose-400" : "text-slate-300"}`}>
                           {pnlFmt.formatted}
                         </td>
-                        <td className="p-2.5 text-right text-[#8BA596] font-mono">-{formatPrice(Number(t.fees || 2.1) * currencyRate, currency, 2)}</td>
+                        <td className="p-2.5 text-right text-slate-400 font-mono tabular-nums">-{formatPrice(Number(t.fees || 2.1) * currencyRate, currency, 2)}</td>
                         <td className="p-2.5 text-center">
-                          <span className="px-1.5 py-0.2 rounded bg-[#14271F] text-slate-300 text-[9px] font-bold">
+                          <span className="px-1.5 py-0.5 rounded bg-[#0D1727] border border-[#1A2A3F] text-slate-300 text-[9px] font-medium">
                             {t.status || "CLOSED"}
                           </span>
                         </td>
@@ -354,12 +354,12 @@ export function PnLStatementExporter({
           </div>
 
           {/* Institutional Compliance Footer */}
-          <div className="pt-4 border-t border-[#14271F] flex flex-wrap items-center justify-between gap-3 text-[10px] text-[#607D6E]">
+          <div className="pt-4 border-t border-[#122033] flex flex-wrap items-center justify-between gap-3 text-[10px] text-slate-500">
             <div>
               <span>Generated by QuantOS Autonomous Trading Engine • Cryptographic Verification Token: </span>
-              <code className="text-[#8BA596]">{statementId}</code>
+              <code className="text-slate-400 font-mono">{statementId}</code>
             </div>
-            <div className="flex items-center gap-1 text-[#55C98A]">
+            <div className="flex items-center gap-1 text-emerald-400 font-medium">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Authoritative Ledger Reconciled</span>
             </div>

@@ -126,7 +126,7 @@ export function StrategyReadinessPanel({ strategy }: StrategyReadinessPanelProps
   const isReady = checks.every((c) => !c.critical || c.status === "PASSED");
 
   return (
-    <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 flex flex-col space-y-4 font-sans select-none shadow-xl">
+    <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col space-y-4 font-sans select-none shadow-xl">
       {/* Score Header */}
       <div className="flex items-center justify-between border-b border-[#1A2333] pb-3">
         <div>
@@ -153,7 +153,7 @@ export function StrategyReadinessPanel({ strategy }: StrategyReadinessPanelProps
 
       {/* Progress Bar */}
       <div className="space-y-1">
-        <div className="w-full bg-[#121927] rounded-full h-2 overflow-hidden border border-[#1E293B]">
+        <div className="w-full bg-[#121927] rounded-full h-2 overflow-hidden border border-[#1A2A3F]">
           <div
             className={`h-full transition-all duration-500 ${
               readinessScore >= 85
@@ -173,7 +173,7 @@ export function StrategyReadinessPanel({ strategy }: StrategyReadinessPanelProps
       </div>
 
       {/* Live Strategy Summary Card */}
-      <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3 space-y-2 text-xs">
+      <div className="bg-[#121927] border border-[#1A2A3F] rounded-xl p-3 space-y-2 text-xs">
         <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
           <span>Live Strategy Summary</span>
           <span className="font-mono text-cyan-400">{strategy.direction}</span>
@@ -227,7 +227,7 @@ export function StrategyReadinessPanel({ strategy }: StrategyReadinessPanelProps
         {checks.map((item) => (
           <div
             key={item.id}
-            className="p-2 rounded-lg bg-[#121927]/60 border border-[#1E293B] flex items-start gap-2 text-xs"
+            className="p-2 rounded-lg bg-[#121927]/60 border border-[#1A2A3F] flex items-start gap-2 text-xs"
           >
             {item.status === "PASSED" ? (
               <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0 mt-0.5" />

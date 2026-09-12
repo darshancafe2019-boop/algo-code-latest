@@ -23,8 +23,8 @@ export function StartAllModal({ isOpen, onClose, report }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl bg-[#121824] border border-[#1E293B] rounded-2xl p-6 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
+      <div className="w-full max-w-2xl bg-[#121824] border border-[#1A2A3F] rounded-2xl p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-4 mb-4">
           <div className="flex items-center gap-2 text-cyan-400">
             <Play className="h-5 w-5" />
             <h2 className="text-base font-bold text-white">Start All Bots — Pre-Flight Validation Report</h2>
@@ -98,7 +98,7 @@ export function StartAllModal({ isOpen, onClose, report }: Props) {
           )}
         </div>
 
-        <div className="flex items-center justify-end pt-4 border-t border-[#1E293B] mt-4">
+        <div className="flex items-center justify-end pt-4 border-t border-[#1A2A3F] mt-4">
           <button
             onClick={onClose}
             className="px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs"

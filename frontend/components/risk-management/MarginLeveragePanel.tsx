@@ -34,20 +34,20 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Margin & Leverage Protection Engine
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Automated collateral buffers, liquidation prevention gates, and leverage capping.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           70.0% Max Cap
         </span>
       </div>
 
       {/* Main Visual Margin Gauge Card */}
-      <div className="p-5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-4">
+      <div className="p-5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <span className="text-xs text-[#A8BDB0] font-bold uppercase tracking-wider block">
+            <span className="text-xs text-[#7C8CA3] font-bold uppercase tracking-wider block">
               Collateral Utilization
             </span>
             <div className="flex items-baseline gap-2">
@@ -55,7 +55,7 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
                 {marginPct.toFixed(1)}%
               </span>
               <span className="text-xs font-mono text-purple-300 font-bold">USED</span>
-              <span className="text-xs font-mono text-[#70877A]">
+              <span className="text-xs font-mono text-[#52627A]">
                 (${marginUsed.toLocaleString()} / ${balance.toLocaleString()})
               </span>
             </div>
@@ -63,11 +63,11 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
 
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <span className="text-[10px] text-[#70877A] font-mono uppercase block">Free Collateral</span>
-              <span className="text-lg font-bold font-mono text-[#55C98A]">
+              <span className="text-[10px] text-[#52627A] font-mono uppercase block">Free Collateral</span>
+              <span className="text-lg font-bold font-mono text-[#22D3EE]">
                 {marginFreePct.toFixed(1)}% FREE
               </span>
-              <span className="text-[10px] text-[#A8BDB0] font-mono block">
+              <span className="text-[10px] text-[#7C8CA3] font-mono block">
                 (${marginFreeDollars.toLocaleString()} Available)
               </span>
             </div>
@@ -78,7 +78,7 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
                   ? "bg-red-950 text-red-400 border-red-800 animate-pulse"
                   : isWarning
                   ? "bg-amber-950 text-amber-400 border-amber-800"
-                  : "bg-[#123C2A] text-[#55C98A] border-[#39B978]/40"
+                  : "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border-[#00E890]/40"
               }`}
             >
               {isCritical ? "ORDERS BLOCKED" : isWarning ? "MARGIN WARNING" : "SAFE THRESHOLD"}
@@ -88,10 +88,10 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
 
         {/* Progress Bar with Safety Threshold Marker */}
         <div className="space-y-1.5 font-mono">
-          <div className="h-3 w-full bg-[#07110D] rounded-full overflow-hidden border border-[#1B3328] relative">
+          <div className="h-3 w-full bg-[#07101A] rounded-full overflow-hidden border border-[#122033] relative">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
-                isCritical ? "bg-red-500" : isWarning ? "bg-amber-500" : "bg-[#55C98A]"
+                isCritical ? "bg-red-500" : isWarning ? "bg-amber-500" : "bg-[#22D3EE]"
               }`}
               style={{ width: `${Math.min(100, marginPct)}%` }}
             />
@@ -103,7 +103,7 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
             />
           </div>
 
-          <div className="flex justify-between text-[10px] text-[#70877A]">
+          <div className="flex justify-between text-[10px] text-[#52627A]">
             <span>0% Margin</span>
             <span className="text-amber-400">50% Warning</span>
             <span className="text-red-400 font-bold">70% Hard Order Block Limit</span>
@@ -113,32 +113,32 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
 
         {/* Leverage Tier Matrix */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono">
-          <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-1">
+          <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] space-y-1">
             <div className="flex items-center justify-between text-cyan-300 font-bold">
               <span>Crypto Perps</span>
               <span>10x Max</span>
             </div>
-            <p className="text-[10px] text-[#70877A]">
+            <p className="text-[10px] text-[#52627A]">
               Dynamic liquidation cushion: 10% maintenance margin required.
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-1">
+          <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] space-y-1">
             <div className="flex items-center justify-between text-purple-300 font-bold">
               <span>NSE Index Futures</span>
               <span>1x (Cash Secured)</span>
             </div>
-            <p className="text-[10px] text-[#70877A]">
+            <p className="text-[10px] text-[#52627A]">
               SPAN + Exposure margin strictly enforced before order dispatch.
             </p>
           </div>
 
-          <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-1">
-            <div className="flex items-center justify-between text-[#55C98A] font-bold">
+          <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] space-y-1">
+            <div className="flex items-center justify-between text-[#22D3EE] font-bold">
               <span>Options Buying</span>
               <span>100% Cash</span>
             </div>
-            <p className="text-[10px] text-[#70877A]">
+            <p className="text-[10px] text-[#52627A]">
               Maximum loss limited strictly to premium paid at entry.
             </p>
           </div>

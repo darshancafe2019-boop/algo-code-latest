@@ -39,26 +39,26 @@ export function OrderSystemDetailsDrawer({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 font-mono text-xs">
-      <div className="w-full max-w-xl h-full bg-[#0B132B] border-l border-slate-800 shadow-2xl p-5 sm:p-6 overflow-y-auto flex flex-col space-y-5 text-slate-300">
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/70 backdrop-blur-sm animate-in fade-in duration-200 font-sans text-xs">
+      <div className="w-full max-w-xl h-full bg-[#07101A] border-l border-[#1A2A3F] shadow-2xl p-5 sm:p-6 overflow-y-auto flex flex-col space-y-5 text-[#7C8CA3]">
         {/* Top Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800 shrink-0">
+        <div className="flex items-center justify-between pb-4 border-b border-[#1A2A3F] shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+            <div className="p-2 rounded-lg bg-[#22D3EE]/10 text-[#22D3EE] border border-[#22D3EE]/30">
               <Cpu className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-white uppercase tracking-wider">
-                Execution Engine & Safety Gates
+              <h3 className="text-base font-bold text-[#F7FAFC] tracking-tight">
+                System Health & Risk Gates
               </h3>
-              <p className="text-[11px] text-slate-400 font-sans">
+              <p className="text-xs text-[#7C8CA3]">
                 14-Point Pre-Order Validation & Health Telemetry
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -66,45 +66,45 @@ export function OrderSystemDetailsDrawer({
 
         {/* Telemetry Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
-            <div className="text-[10px] text-slate-400">Broker Link</div>
-            <div className="text-emerald-400 font-bold mt-0.5">CONNECTED</div>
+          <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-lg">
+            <div className="text-[10px] text-[#52627A]">Broker Link</div>
+            <div className="text-[#00E890] font-semibold mt-0.5">CONNECTED</div>
           </div>
-          <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
-            <div className="text-[10px] text-slate-400">Feed Latency</div>
-            <div className="text-white font-bold mt-0.5">18 ms</div>
+          <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-lg">
+            <div className="text-[10px] text-[#52627A]">Feed Latency</div>
+            <div className="text-[#22D3EE] font-mono tabular-nums font-semibold mt-0.5">18 ms</div>
           </div>
-          <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
-            <div className="text-[10px] text-slate-400">Risk Gate</div>
-            <div className="text-cyan-400 font-bold mt-0.5">ARMED (14/14)</div>
+          <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-lg">
+            <div className="text-[10px] text-[#52627A]">Risk Gate</div>
+            <div className="text-[#00E890] font-semibold mt-0.5">ARMED (14/14)</div>
           </div>
-          <div className="p-2.5 bg-slate-900/90 border border-slate-800 rounded-xl">
-            <div className="text-[10px] text-slate-400">Engine Mode</div>
-            <div className="text-amber-400 font-bold mt-0.5">{tradingMode}</div>
+          <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-lg">
+            <div className="text-[10px] text-[#52627A]">Engine Mode</div>
+            <div className="text-[#19C5FF] font-bold mt-0.5">{tradingMode}</div>
           </div>
         </div>
 
         {/* 14 Safety Gates Detailed List */}
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white uppercase">14 Safety Check Gates</span>
-            <span className="text-[10px] text-emerald-400 font-bold">ALL CHECKS PASSED</span>
+            <span className="text-xs font-bold text-[#F7FAFC]">14 Safety Check Gates</span>
+            <span className="text-[10px] text-[#00E890] font-semibold">ALL CHECKS PASSED</span>
           </div>
 
           <div className="space-y-2">
             {gatesList.map((g) => (
               <div
                 key={g.id}
-                className="flex items-start justify-between p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl"
+                className="flex items-start justify-between p-2.5 bg-[#0A1422] border border-[#1A2A3F] rounded-lg"
               >
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-500 font-bold">#{g.id}</span>
-                    <span className="font-bold text-white text-xs">{g.name}</span>
+                    <span className="text-[10px] text-[#52627A] font-mono">#{g.id}</span>
+                    <span className="font-semibold text-[#F7FAFC] text-xs">{g.name}</span>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-sans mt-0.5">{g.desc}</div>
+                  <div className="text-[11px] text-[#7C8CA3] mt-0.5">{g.desc}</div>
                 </div>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px] shrink-0 ml-2">
+                <span className="px-2 py-0.5 rounded-md bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30 font-semibold text-[10px] shrink-0 ml-2">
                   PASS
                 </span>
               </div>
@@ -115,3 +115,4 @@ export function OrderSystemDetailsDrawer({
     </div>
   );
 }
+

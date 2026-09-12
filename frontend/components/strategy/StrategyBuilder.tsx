@@ -14,13 +14,15 @@ import { apiClient } from "@/lib/apiClient";
 import { StrategyIdeHeader } from "./StrategyIdeHeader";
 import { StrategyBuildLibrary, RuleTargetStage } from "./StrategyBuildLibrary";
 import { StrategyRuleCanvas } from "./StrategyRuleCanvas";
-import { StrategyRiskSettings } from "./StrategyRiskSettings";
+import { StrategyOptionsStudio } from "./StrategyOptionsStudio";
+import { StrategyFuturesStudio } from "./StrategyFuturesStudio";
 import { StrategyInspector } from "./StrategyInspector";
+import { StrategyTestingDrawer } from "./StrategyTestingDrawer";
 import { StrategyAssignBotModal } from "./StrategyAssignBotModal";
 import { StrategyCatalogModal } from "./StrategyCatalogModal";
 import { StrategyVersionDiffModal } from "./StrategyVersionDiffModal";
 import { StrategyFullReportModal } from "./StrategyFullReportModal";
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Layers, Activity } from "lucide-react";
 
 const INITIAL_STRATEGY: StrategyIdeDefinition = {
   strategy_id: "strat-trend-confluence-btc",
@@ -85,6 +87,15 @@ const INITIAL_STRATEGY: StrategyIdeDefinition = {
       ],
     },
   },
+  position_sizing: {
+    method: "PCT_RISK_PER_TRADE",
+    value: 1.0,
+    available_capital: 10000,
+    allocated_capital: 2500,
+    estimated_margin: 2500,
+    estimated_exposure: 2500,
+    effective_leverage: 1.0,
+  },
   exit: {
     stop_loss_type: "PERCENT",
     stop_loss_value: 1.0,
@@ -104,6 +115,51 @@ const INITIAL_STRATEGY: StrategyIdeDefinition = {
     leverage: 1.0,
     cooldown_bars: 3,
   },
+  trade_management: {
+    partial_exits: [
+      { id: "pe-1", target_rr: 1.0, exit_pct: 25, label: "Target 1 (1R)" },
+      { id: "pe-2", target_rr: 2.0, exit_pct: 25, label: "Target 2 (2R)" },
+    ],
+    move_sl_to_be_on_target: true,
+    scale_in_enabled: false,
+    scale_in_max_steps: 2,
+    scale_out_enabled: true,
+    pyramiding_max: 1,
+    reentry_enabled: false,
+    cooldown_bars: 3,
+    max_trades_per_day: 8,
+    max_consecutive_losses: 3,
+  },
+  execution_filters: {
+    market_open_check: true,
+    broker_connected_check: true,
+    market_data_fresh_check: true,
+    max_spread_pct: 0.2,
+    min_liquidity_usd: 50000,
+    max_slippage_pct: 0.1,
+    orderbook_depth_check: true,
+    no_risk_lock_check: true,
+    no_kill_switch_check: true,
+    api_healthy_check: true,
+    execution_timing: "CLOSED_BAR",
+  },
+  order_config: {
+    order_type: "LIMIT",
+    limit_offset_ticks: 2,
+    trigger_offset_ticks: 1,
+    validity: "DAY",
+    product_type: "MARGIN",
+    slippage_tolerance_pct: 0.1,
+    retry_policy: {
+      max_retries: 3,
+      retry_delay_ms: 250,
+    },
+  },
+  broker_config: {
+    execution_broker: "Delta",
+    data_provider: "Delta",
+    mode: "PAPER",
+  },
   compiled_expression: "IF ([1H] close > ema_200 AND [15M] rsi_14 > 55 AND [15M] ema_9 crosses_above ema_21) THEN LONG",
 };
 
@@ -116,6 +172,7 @@ export function StrategyBuilder() {
   // Collapsible Side Panels State with localStorage persistence
   const [showIndicators, setShowIndicators] = useState(true);
   const [showStatus, setShowStatus] = useState(true);
+  const [showTestingDrawer, setShowTestingDrawer] = useState(false);
 
   // Undo / Redo Stack
   const [history, setHistory] = useState<StrategyIdeDefinition[]>([INITIAL_STRATEGY]);
@@ -259,20 +316,6 @@ export function StrategyBuilder() {
     validateStrategy(updated);
   };
 
-  const handleUpdateRisk = (riskFields: Partial<StrategyIdeDefinition["risk"]>) => {
-    const updated = { ...strategy, risk: { ...strategy.risk, ...riskFields } };
-    setStrategy(updated);
-    pushToHistory(updated);
-    validateStrategy(updated);
-  };
-
-  const handleUpdateExit = (exitFields: Partial<StrategyIdeDefinition["exit"]>) => {
-    const updated = { ...strategy, exit: { ...strategy.exit, ...exitFields } };
-    setStrategy(updated);
-    pushToHistory(updated);
-    validateStrategy(updated);
-  };
-
   // Add rule from Library or Palette
   const handleAddRuleFromLibrary = (target: RuleTargetStage, rule: StrategyIdeRule) => {
     const stageKey = target === "setup" ? "setup" : target === "confirmation" ? "confirmation" : "trigger";
@@ -287,7 +330,7 @@ export function StrategyBuilder() {
     handleUpdateStrategy({ entry: updatedEntry });
   };
 
-  // Save Draft (Manual or Autosave) with single-click guard
+  // Save Draft (Manual or Autosave)
   const handleSaveDraft = useCallback(async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -308,11 +351,18 @@ export function StrategyBuilder() {
     }
   }, [strategy, queryClient, isSaving]);
 
-  // Backtest / Test Strategy Action with single-click guard
-  const handleRunTestStrategy = async () => {
+  // Backtest / Test Strategy Action
+  const handleRunBacktest = async (params?: {
+    startDate?: string;
+    endDate?: string;
+    capital?: number;
+    feesPct?: number;
+    slippagePct?: number;
+  }) => {
     if (isBacktesting) return;
     setIsBacktesting(true);
     setIsBacktestStale(false);
+    setShowTestingDrawer(true);
     try {
       const idempotencyKey = apiClient.generateIdempotencyKey("BACKTEST_STRATEGY", strategy.id);
       const res = await apiClient.post<any>(
@@ -320,11 +370,11 @@ export function StrategyBuilder() {
         {
           symbol: strategy.symbol,
           timeframe: strategy.base_timeframe,
-          start_date: "2026-01-01",
-          end_date: "2026-08-25",
-          capital: strategy.risk.capital || 10000,
-          fees_pct: 0.001,
-          slippage_pct: 0.0005,
+          start_date: params?.startDate || "2026-01-01",
+          end_date: params?.endDate || "2026-08-25",
+          capital: params?.capital || strategy.risk.capital || 10000,
+          fees_pct: params?.feesPct || 0.001,
+          slippage_pct: params?.slippagePct || 0.0005,
           name: strategy.name,
           version: strategy.active_version,
           allow_shorts: strategy.direction !== "LONG",
@@ -496,8 +546,13 @@ export function StrategyBuilder() {
         confirmation: { conjunction: "AND", rules: [] },
         trigger: { conjunction: "AND", rules: item.entry_rules || [] },
       },
+      position_sizing: item.position_sizing || INITIAL_STRATEGY.position_sizing,
       exit: item.exit || INITIAL_STRATEGY.exit,
       risk: item.risk || INITIAL_STRATEGY.risk,
+      trade_management: item.trade_management || INITIAL_STRATEGY.trade_management,
+      execution_filters: item.execution_filters || INITIAL_STRATEGY.execution_filters,
+      order_config: item.order_config || INITIAL_STRATEGY.order_config,
+      broker_config: item.broker_config || INITIAL_STRATEGY.broker_config,
       compiled_expression: item.compiled_expression || "",
     };
 
@@ -508,12 +563,11 @@ export function StrategyBuilder() {
   };
 
   if (!isMounted) {
-    return <div className="p-8 text-center text-[#607D6E] font-mono">Initializing Strategy Workstation...</div>;
+    return <div className="p-8 text-center text-[#7D8EA5] font-mono">Initializing Strategy Workstation...</div>;
   }
 
   return (
-    <div className="flex flex-col gap-4 font-sans max-w-[1720px] mx-auto pb-12">
-      
+    <div className="flex flex-col gap-3 font-sans max-w-[1720px] mx-auto pb-12 select-none text-xs">
       {/* 1. TOP HEADER & COMPACT MARKET BAR */}
       <StrategyIdeHeader
         strategy={strategy}
@@ -521,8 +575,11 @@ export function StrategyBuilder() {
         onSaveDraft={handleSaveDraft}
         isSaving={isSaving}
         autosaveTime={autosaveTime}
-        onOpenTest={handleRunTestStrategy}
+        onOpenTest={() => handleRunBacktest()}
         isTesting={isBacktesting}
+        onOpenForwardTest={() => {
+          setShowTestingDrawer(true);
+        }}
         onOpenCatalog={() => setIsCatalogOpen(true)}
         onOpenVersionsModal={() => setIsVersionsOpen(true)}
         onOpenDiffModal={() => setIsVersionsOpen(true)}
@@ -542,26 +599,25 @@ export function StrategyBuilder() {
         <button
           type="button"
           onClick={toggleShowIndicators}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#09110E] hover:bg-[#123C2A] text-[#8BA596] hover:text-white border border-[#1F392D] transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0A1422] hover:bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A] transition-colors cursor-pointer"
         >
-          {showIndicators ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
-          <span>{showIndicators ? "Hide Indicators" : "Show Indicators"}</span>
+          {showIndicators ? <PanelLeftClose className="h-3.5 w-3.5 text-[#22D3EE]" /> : <PanelLeftOpen className="h-3.5 w-3.5 text-[#7D8EA5]" />}
+          <span>{showIndicators ? "Collapse Library" : "Components Library"}</span>
         </button>
 
         <button
           type="button"
           onClick={toggleShowStatus}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#09110E] hover:bg-[#123C2A] text-[#8BA596] hover:text-white border border-[#1F392D] transition-colors"
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0A1422] hover:bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A] transition-colors cursor-pointer"
         >
-          {showStatus ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
-          <span>{showStatus ? "Hide Status" : "Show Status"}</span>
+          {showStatus ? <PanelRightClose className="h-3.5 w-3.5 text-[#22D3EE]" /> : <PanelRightOpen className="h-3.5 w-3.5 text-[#7D8EA5]" />}
+          <span>{showStatus ? "Collapse Diagnostics" : "Live Diagnostics"}</span>
         </button>
       </div>
 
-      {/* 3. 3-COLUMN WORKSTATION */}
-      <div className="flex flex-col lg:flex-row gap-4 items-start">
-        
-        {/* LEFT COLUMN: INDICATORS (240px, collapsible) */}
+      {/* 3. 3-COLUMN WORKSTATION LAYOUT */}
+      <div className="flex flex-col lg:flex-row gap-3.5 items-start">
+        {/* LEFT COLUMN: INDICATOR & COMPONENT LIBRARY (220-240px, collapsible) */}
         {showIndicators && (
           <StrategyBuildLibrary
             onAddRule={handleAddRuleFromLibrary}
@@ -569,22 +625,59 @@ export function StrategyBuilder() {
           />
         )}
 
-        {/* CENTER COLUMN: MAIN STRATEGY BLOCKS (Setup, Confirm, Trigger, Exit & Risk) */}
-        <div className="flex-1 w-full space-y-4 min-w-0">
+        {/* CENTER COLUMN: 7-STAGE WORKFLOW BUILDER (flexible) */}
+        <div className="flex-1 w-full space-y-3.5 min-w-0">
+          {/* Options Studio if market_type is options */}
+          {strategy.market_type === "options" && (
+            <StrategyOptionsStudio
+              config={{
+                underlying: strategy.symbol.split(" ")[0] || "BTC",
+                expiry: "2026-08-28",
+                spot_price: 64500,
+                preset: "IRON_CONDOR",
+                legs: [],
+              }}
+              onUpdateConfig={() => {}}
+            />
+          )}
+
+          {/* Futures Studio if market_type is futures */}
+          {strategy.market_type === "futures" && (
+            <StrategyFuturesStudio
+              config={{
+                leverage: strategy.risk?.leverage || 5,
+                margin_mode: "ISOLATED",
+                liquidation_buffer_pct: 15,
+                funding_rate_filter: true,
+                max_funding_rate_pct: 0.05,
+              }}
+              symbol={strategy.symbol}
+              onUpdateConfig={() => {}}
+            />
+          )}
+
+          {/* 7-Stage Core Workflow Canvas */}
           <StrategyRuleCanvas
             strategy={strategy}
             onUpdateStrategy={handleUpdateStrategy}
+            interfaceMode={interfaceMode}
           />
 
-          <StrategyRiskSettings
-            risk={strategy.risk}
-            exit={strategy.exit}
-            onUpdateRisk={handleUpdateRisk}
-            onUpdateExit={handleUpdateExit}
-          />
+          {/* Testing Drawer (Backtest Lab & Paper Stream) */}
+          {showTestingDrawer && (
+            <StrategyTestingDrawer
+              strategy={strategy}
+              liveObservation={null}
+              isObserving={false}
+              onRunLiveObservation={() => {}}
+              backtestResult={backtestResult}
+              isBacktesting={isBacktesting}
+              onRunBacktest={(p) => handleRunBacktest(p)}
+            />
+          )}
         </div>
 
-        {/* RIGHT COLUMN: STATUS & FAST BACKTEST KPI (280px, collapsible) */}
+        {/* RIGHT COLUMN: STRATEGY READINESS & DIAGNOSTICS (260-300px, collapsible) */}
         {showStatus && (
           <StrategyInspector
             strategy={strategy}
@@ -597,7 +690,6 @@ export function StrategyBuilder() {
             onOpenVersionsModal={() => setIsVersionsOpen(true)}
           />
         )}
-
       </div>
 
       {/* 4. MODALS */}
@@ -635,7 +727,6 @@ export function StrategyBuilder() {
         strategy={strategy}
         backtestResult={backtestResult}
       />
-
     </div>
   );
 }

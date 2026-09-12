@@ -243,7 +243,7 @@ export function OptionStrategyBuilder() {
                         isProfit ? "bg-emerald-500/80 group-hover:bg-emerald-400" : "bg-rose-500/80 group-hover:bg-rose-400"
                       }`}
                     />
-                    <div className="absolute bottom-full mb-1 hidden group-hover:block bg-[#1E293B] border border-slate-700 p-1.5 rounded text-[9px] font-mono text-white whitespace-nowrap z-10">
+                    <div className="absolute bottom-full mb-1 hidden group-hover:block bg-[#1A2A3F] border border-slate-700 p-1.5 rounded text-[9px] font-mono text-white whitespace-nowrap z-10">
                       ${pt.underlying_price}: {isProfit ? `+$${pt.pnl}` : `-$${Math.abs(pt.pnl)}`}
                     </div>
                   </div>

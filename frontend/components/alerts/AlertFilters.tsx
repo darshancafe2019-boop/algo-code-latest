@@ -34,7 +34,7 @@ export function AlertFilters({
   const isFiltered = searchQuery !== "" || severityFilter !== "ALL" || categoryFilter !== "ALL";
 
   return (
-    <div className="space-y-3 bg-[#121824] p-4 rounded-xl border border-[#1E293B]">
+    <div className="space-y-3 bg-[#121824] p-4 rounded-xl border border-[#1A2A3F]">
       {/* Top Row: Search & Category Select */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {/* Search Box */}
@@ -45,7 +45,7 @@ export function AlertFilters({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search alerts (e.g. stall, bot-1, restart, PID)..."
-            className="w-full pl-9 pr-8 py-2 bg-[#0B0F17] border border-[#1E293B] focus:border-cyan-500/60 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
+            className="w-full pl-9 pr-8 py-2 bg-[#0B0F17] border border-[#1A2A3F] focus:border-cyan-500/60 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none transition-colors"
           />
           {searchQuery && (
             <button
@@ -66,7 +66,7 @@ export function AlertFilters({
           <select
             value={categoryFilter}
             onChange={(e) => setCategoryFilter(e.target.value)}
-            className="bg-[#0B0F17] border border-[#1E293B] text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/60 transition-colors"
+            className="bg-[#0B0F17] border border-[#1A2A3F] text-slate-200 text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-cyan-500/60 transition-colors"
           >
             <option value="ALL">All Sources ({categories.length})</option>
             {categories.map((cat) => (
@@ -95,7 +95,7 @@ export function AlertFilters({
       </div>
 
       {/* Severity Filter Tabs */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#1E293B]/60">
+      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-[#1A2A3F]/60">
         <button
           onClick={() => setSeverityFilter("ALL")}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${

@@ -56,7 +56,7 @@ export function RiskRulesPanel({ rules }: RiskRulesPanelProps) {
   };
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sliders className="h-4 w-4 text-cyan-400" />
@@ -109,7 +109,7 @@ export function RiskRulesPanel({ rules }: RiskRulesPanelProps) {
                 </div>
                 <p className="text-xs text-slate-400 mb-3">{r.description || "Pre-trade safety gate condition."}</p>
 
-                <div className="space-y-1 text-[11px] font-mono text-slate-300 border-t border-[#1E293B] pt-2.5">
+                <div className="space-y-1 text-[11px] font-mono text-slate-300 border-t border-[#1A2A3F] pt-2.5">
                   <div className="flex justify-between">
                     <span className="text-slate-500">Category:</span>
                     <span className="text-cyan-400">{r.category}</span>
@@ -125,7 +125,7 @@ export function RiskRulesPanel({ rules }: RiskRulesPanelProps) {
                 </div>
               </div>
 
-              <div className="mt-4 pt-3 border-t border-[#1E293B] flex justify-end">
+              <div className="mt-4 pt-3 border-t border-[#1A2A3F] flex justify-end">
                 <button
                   onClick={() => handleToggleClick(r)}
                   disabled={toggleMutation.isPending}
@@ -154,7 +154,7 @@ export function RiskRulesPanel({ rules }: RiskRulesPanelProps) {
       {/* Confirmation Modal */}
       {confirmModalOpen && toggleRule && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-amber-950 border border-amber-800 text-amber-400">
                 <Sliders className="h-6 w-6" />
@@ -165,7 +165,7 @@ export function RiskRulesPanel({ rules }: RiskRulesPanelProps) {
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 font-mono bg-[#0E1524] p-3 rounded-xl border border-[#1E293B]">
+            <p className="text-xs text-slate-300 font-mono bg-[#0E1524] p-3 rounded-xl border border-[#1A2A3F]">
               Are you sure you want to <b>{toggleRule.nextState ? "ENABLE" : "DISABLE"}</b> rule <b>{toggleRule.rule.name}</b>? This directly alters backend pre-trade order validation.
             </p>
 

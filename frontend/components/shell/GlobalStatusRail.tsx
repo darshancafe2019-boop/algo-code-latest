@@ -66,7 +66,7 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
           title="Click to view market data provider health"
         >
           <Activity className="h-3 w-3 text-[#22C7E8]" />
-          <span className="text-[10px] text-[#64748B] uppercase">MARKET DATA:</span>
+          <span className="text-[10px] text-[#52627A] uppercase">MARKET DATA:</span>
           <span className="font-semibold text-[#22C983]">{liveProvidersCount}/{totalProvidersCount} LIVE</span>
         </button>
 
@@ -83,7 +83,7 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
           title="Click to inspect risk limits and kill switch"
         >
           <ShieldCheck className={cn("h-3 w-3", isKillSwitchActive ? "text-[#F2556A]" : "text-[#22C983]")} />
-          <span className="text-[10px] text-[#64748B] uppercase">RISK:</span>
+          <span className="text-[10px] text-[#52627A] uppercase">RISK:</span>
           <span className={cn("font-semibold", isKillSwitchActive ? "text-[#F2556A]" : "text-[#22C983]")}>
             {isKillSwitchActive ? "HALTED" : "READY"}
           </span>
@@ -97,7 +97,7 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
           title="Click to view Order Management System telemetry"
         >
           <Zap className="h-3 w-3 text-[#22C7E8]" />
-          <span className="text-[10px] text-[#64748B] uppercase">OMS:</span>
+          <span className="text-[10px] text-[#52627A] uppercase">OMS:</span>
           <span className="font-semibold text-[#22C983]">READY</span>
         </button>
 
@@ -114,7 +114,7 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
           title="Click to view ledger reconciliation state"
         >
           <Scale className={cn("h-3 w-3", isReconOk ? "text-[#22C983]" : "text-[#F2B84B]")} />
-          <span className="text-[10px] text-[#64748B] uppercase">RECON:</span>
+          <span className="text-[10px] text-[#52627A] uppercase">RECON:</span>
           <span className={cn("font-semibold", isReconOk ? "text-[#22C983]" : "text-[#F2B84B]")}>
             {isReconOk ? "OK" : "REQUIRED"}
           </span>
@@ -128,22 +128,22 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
           title="Quantitative Backend Server"
         >
           <Server className="h-3 w-3 text-[#4EA1FF]" />
-          <span className="text-[10px] text-[#64748B] uppercase">BACKEND:</span>
+          <span className="text-[10px] text-[#52627A] uppercase">BACKEND:</span>
           <span className="font-semibold text-[#22C983]">READY</span>
         </button>
 
         {/* 6. DATABASE */}
         <div className="hidden lg:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0E1624] border border-[#213047] text-slate-400">
-          <Database className="h-3 w-3 text-[#64748B]" />
-          <span className="text-[10px] text-[#64748B] uppercase">DB:</span>
+          <Database className="h-3 w-3 text-[#52627A]" />
+          <span className="text-[10px] text-[#52627A] uppercase">DB:</span>
           <span className="text-[#22C983] font-semibold">READY</span>
         </div>
       </div>
 
       {/* Right End: Operational Mode + Latency */}
       <div className="flex items-center gap-2 shrink-0">
-        <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#101827] border border-[#213047] text-[10px] text-[#94A3B8]">
-          <span className="text-[#64748B]">MODE:</span>
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#101827] border border-[#213047] text-[10px] text-[#7C8CA3]">
+          <span className="text-[#52627A]">MODE:</span>
           <span
             className={cn(
               "font-bold uppercase",
@@ -153,7 +153,7 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
             {tradingMode}
           </span>
         </div>
-        <div className="hidden sm:flex items-center gap-1 text-[10px] text-[#64748B]">
+        <div className="hidden sm:flex items-center gap-1 text-[10px] text-[#52627A]">
           <span className="h-1.5 w-1.5 rounded-full bg-[#22C983]" />
           <span>PORT 3100</span>
         </div>

@@ -46,9 +46,9 @@ export function SelectedOptionInspectionDrawer({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[94vh] font-mono">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl max-w-2xl w-full p-5 space-y-4 shadow-2xl overflow-y-auto max-h-[94vh] font-mono">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
           <div className="flex items-center gap-3">
             <div
               className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm border ${
@@ -99,7 +99,7 @@ export function SelectedOptionInspectionDrawer({
 
         {/* Pricing & Liquidity Grid */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3">
+          <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3">
             <div className="text-[10px] text-slate-400 uppercase">Last Traded Price (LTP)</div>
             <div className="text-lg font-bold text-white mt-0.5">
               {currency}{quote.ltp?.toFixed(2)}
@@ -109,7 +109,7 @@ export function SelectedOptionInspectionDrawer({
             </div>
           </div>
 
-          <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3">
+          <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3">
             <div className="text-[10px] text-slate-400 uppercase">Implied Volatility (IV)</div>
             <div className="text-lg font-bold text-purple-400 mt-0.5 flex items-center gap-1">
               <span>{quote.iv ? `${quote.iv.toFixed(1)}%` : "—"}</span>

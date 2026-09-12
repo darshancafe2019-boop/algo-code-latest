@@ -7,11 +7,34 @@
 import { Instrument, MarketDataCallback, NormalizedTick } from "../types";
 import { DeltaClient } from "./client";
 
+export type DeltaOptionTickCallback = (update: {
+  symbol: string;
+  productId?: number | null;
+  markPrice?: number | null;
+  spotPrice?: number | null;
+  ltp?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+  bidSize?: number | null;
+  askSize?: number | null;
+  iv?: number | null;
+  delta?: number | null;
+  gamma?: number | null;
+  theta?: number | null;
+  vega?: number | null;
+  rho?: number | null;
+  openInterest?: number | null;
+  volume?: number | null;
+  timestamp: number;
+}) => void;
+
 export class DeltaWebSocket {
   private wsUrl: string = "wss://public-socket.india.delta.exchange";
   private socket: WebSocket | null = null;
   private subscriptions: Set<string> = new Set();
+  private chainSubscriptions: Set<string> = new Set(); // e.g. "BTC-180926"
   private callbacks: Set<MarketDataCallback> = new Set();
+  private optionCallbacks: Set<DeltaOptionTickCallback> = new Set();
   private isConnecting: boolean = false;
   private reconnectTimer: any = null;
   private pingTimer: any = null;
@@ -19,8 +42,8 @@ export class DeltaWebSocket {
   private retryCount: number = 0;
   private client: DeltaClient;
 
-  constructor(client: DeltaClient) {
-    this.client = client;
+  constructor(client?: DeltaClient) {
+    this.client = client || new DeltaClient();
   }
 
   public async connect(): Promise<void> {
@@ -46,18 +69,64 @@ export class DeltaWebSocket {
           if (data.type === "pong") return;
 
           if (data.type === "ticker" || data.type === "v2/ticker") {
-            const sym = data.symbol || data.s;
-            const ltp = Number(data.mark_price ?? data.close ?? data.last_price ?? data.m ?? 0);
-            if (sym && ltp > 0) {
-              const tick: NormalizedTick = {
-                broker: "delta",
-                instrumentId: sym,
-                symbol: sym,
-                exchange: "DELTA_INDIA",
-                ltp: ltp,
-                timestamp: Date.now(),
-              };
-              this.callbacks.forEach((cb) => cb(tick));
+            const spotPrice = data.sp ? Number(data.sp) : undefined;
+            const batch = Array.isArray(data.d) ? data.d : [data];
+
+            for (const item of batch) {
+              const sym = item.symbol || item.s;
+              if (!sym) continue;
+
+              const mark = item.mark_price ?? item.m ?? item.close ?? item.last_price;
+              const ltp = mark !== undefined && mark !== null ? Number(mark) : null;
+              const quotes = item.quotes || {};
+              const greeks = item.greeks || {};
+
+              const bid = quotes.best_bid !== undefined ? Number(quotes.best_bid) : (item.best_bid ? Number(item.best_bid) : null);
+              const ask = quotes.best_ask !== undefined ? Number(quotes.best_ask) : (item.best_ask ? Number(item.best_ask) : null);
+              const bidSize = quotes.bid_size !== undefined ? Number(quotes.bid_size) : null;
+              const askSize = quotes.ask_size !== undefined ? Number(quotes.ask_size) : null;
+
+              const rawIv = quotes.mark_iv ?? item.mark_vol ?? quotes.ask_iv;
+              const iv = rawIv !== undefined && rawIv !== null ? (Number(rawIv) < 5.0 ? Number(rawIv) * 100 : Number(rawIv)) : null;
+
+              const oi = item.oi ?? item.open_interest;
+              const vol = item.volume ?? item.v;
+
+              if (ltp && ltp > 0) {
+                const tick: NormalizedTick = {
+                  broker: "delta",
+                  instrumentId: sym,
+                  symbol: sym,
+                  exchange: "DELTA_INDIA",
+                  ltp: ltp,
+                  timestamp: Date.now(),
+                };
+                this.callbacks.forEach((cb) => cb(tick));
+              }
+
+              if (this.optionCallbacks.size > 0) {
+                const optUpdate = {
+                  symbol: sym,
+                  productId: item.product_id ?? item.id ?? null,
+                  markPrice: ltp,
+                  spotPrice: spotPrice ?? (item.spot_price ? Number(item.spot_price) : null),
+                  ltp: ltp,
+                  bid,
+                  ask,
+                  bidSize,
+                  askSize,
+                  iv,
+                  delta: greeks.delta !== undefined ? Number(greeks.delta) : null,
+                  gamma: greeks.gamma !== undefined ? Number(greeks.gamma) : null,
+                  theta: greeks.theta !== undefined ? Number(greeks.theta) : null,
+                  vega: greeks.vega !== undefined ? Number(greeks.vega) : null,
+                  rho: greeks.rho !== undefined ? Number(greeks.rho) : null,
+                  openInterest: oi !== undefined ? Number(oi) : null,
+                  volume: vol !== undefined ? Number(vol) : null,
+                  timestamp: Date.now(),
+                };
+                this.optionCallbacks.forEach((cb) => cb(optUpdate));
+              }
             }
           }
         } catch {}
@@ -119,10 +188,38 @@ export class DeltaWebSocket {
     }
   }
 
+  public subscribeOptionChain(chainSymbol: string, callback: DeltaOptionTickCallback): () => void {
+    const cleanSym = chainSymbol.toUpperCase().trim();
+    this.chainSubscriptions.add(cleanSym);
+    this.optionCallbacks.add(callback);
+    this.resubscribe();
+
+    return () => {
+      this.chainSubscriptions.delete(cleanSym);
+      this.optionCallbacks.delete(callback);
+      if (this.socket?.readyState === WebSocket.OPEN) {
+        this.socket.send(
+          JSON.stringify({
+            type: "unsubscribe",
+            payload: {
+              channels: [{ name: "ticker", symbols: [cleanSym] }],
+            },
+          })
+        );
+      }
+    };
+  }
+
   public isHealthy(): boolean {
     if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return false;
-    if (Date.now() - this.lastMessageTimestamp > 35000 && this.subscriptions.size > 0) return false;
+    if (Date.now() - this.lastMessageTimestamp > 35000 && (this.subscriptions.size > 0 || this.chainSubscriptions.size > 0)) return false;
     return true;
+  }
+
+  public getStatus(): "LIVE" | "CONNECTING" | "DISCONNECTED" {
+    if (this.socket?.readyState === WebSocket.OPEN) return "LIVE";
+    if (this.isConnecting || this.socket?.readyState === WebSocket.CONNECTING) return "CONNECTING";
+    return "DISCONNECTED";
   }
 
   private startHeartbeat(): void {
@@ -144,14 +241,21 @@ export class DeltaWebSocket {
   }
 
   private resubscribe(): void {
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN || !this.subscriptions.size) return;
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) return;
+    const allSymbols = Array.from(new Set([...Array.from(this.subscriptions), ...Array.from(this.chainSubscriptions)]));
+    if (allSymbols.length === 0) return;
+
     const payload = {
       type: "subscribe",
       payload: {
         channels: [
           {
             name: "ticker",
-            symbols: Array.from(this.subscriptions),
+            symbols: allSymbols,
+          },
+          {
+            name: "ob_l1",
+            symbols: allSymbols,
           },
         ],
       },
@@ -168,3 +272,5 @@ export class DeltaWebSocket {
     }, delay);
   }
 }
+
+export const deltaWebSocket = new DeltaWebSocket();

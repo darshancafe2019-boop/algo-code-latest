@@ -97,15 +97,15 @@ export function GlobalMarketCommandTable({
         <div className="relative">
           <button
             onClick={() => setShowColPicker(!showColPicker)}
-            className="px-3 py-1 rounded-xl bg-[#0B131E] border border-[#1E293B] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 flex items-center gap-1.5 transition-colors"
+            className="px-3 py-1 rounded-xl bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 flex items-center gap-1.5 transition-colors"
           >
             <Sliders className="h-3.5 w-3.5" />
             <span>Customize Columns</span>
           </button>
 
           {showColPicker && (
-            <div className="absolute right-0 mt-2 w-48 bg-[#0B131E] border border-[#1E293B] rounded-xl p-3 shadow-2xl z-30 space-y-2">
-              <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-[#1E293B] pb-1">
+            <div className="absolute right-0 mt-2 w-48 bg-[#0B131E] border border-[#1A2A3F] rounded-xl p-3 shadow-2xl z-30 space-y-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block border-b border-[#1A2A3F] pb-1">
                 Visible Columns
               </span>
               <div className="space-y-1.5 text-[11px]">
@@ -127,10 +127,10 @@ export function GlobalMarketCommandTable({
       </div>
 
       {/* Main Market Table */}
-      <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#070D14] text-slate-400 text-[10px] uppercase tracking-wider border-b border-[#1E293B]">
+            <thead className="bg-[#070D14] text-slate-400 text-[10px] uppercase tracking-wider border-b border-[#1A2A3F]">
               <tr>
                 <th className="py-3 px-3 w-8"></th>
                 {visibleCols.symbol && (
@@ -185,7 +185,7 @@ export function GlobalMarketCommandTable({
                 {visibleCols.actions && <th className="py-3 px-4 text-right">Actions</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1E293B] text-slate-200">
+            <tbody className="divide-y divide-[#1A2A3F] text-slate-200">
               {sortedInstruments.length === 0 ? (
                 <tr>
                   <td colSpan={9} className="py-12 text-center text-xs text-slate-500">
@@ -221,7 +221,7 @@ export function GlobalMarketCommandTable({
                             <span className="font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
                               {sym}
                             </span>
-                            <span className="px-1.5 py-0.2 rounded bg-[#070D14] text-cyan-300 text-[9px] font-bold border border-[#1E293B]">
+                            <span className="px-1.5 py-0.2 rounded bg-[#070D14] text-cyan-300 text-[9px] font-bold border border-[#1A2A3F]">
                               {inst.exchange || "GLOBAL"}
                             </span>
                           </div>
@@ -316,13 +316,13 @@ export function GlobalMarketCommandTable({
                           <div className="flex items-center justify-end gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => onSelectInstrument(inst)}
-                              className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-cyan-950 text-cyan-300 border border-[#1E293B] hover:border-cyan-800 text-[10px] font-bold transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-cyan-950 text-cyan-300 border border-[#1A2A3F] hover:border-cyan-800 text-[10px] font-bold transition-colors"
                             >
                               Select
                             </button>
                             <button
                               onClick={() => onOpenAnalysis(inst)}
-                              className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-purple-950 text-purple-300 border border-[#1E293B] hover:border-purple-800 text-[10px] font-bold transition-colors"
+                              className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-purple-950 text-purple-300 border border-[#1A2A3F] hover:border-purple-800 text-[10px] font-bold transition-colors"
                             >
                               Analyze
                             </button>

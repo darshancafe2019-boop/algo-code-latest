@@ -59,7 +59,7 @@ export function OrderReviewModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1 text-[#94A3B8] hover:text-white rounded hover:bg-[#121C2C] cursor-pointer"
+            className="p-1 text-[#7C8CA3] hover:text-white rounded hover:bg-[#121C2C] cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -88,37 +88,37 @@ export function OrderReviewModal({
           {/* Telemetry Grid */}
           <div className="rounded-lg bg-[#0A101C] border border-[#213047] p-3 grid grid-cols-2 gap-2 text-[11px]">
             <div>
-              <span className="text-[#64748B] block text-[10px]">BROKER / SOURCE:</span>
+              <span className="text-[#52627A] block text-[10px]">BROKER / SOURCE:</span>
               <ProviderBadge provider={order.broker} size="sm" className="mt-0.5" />
             </div>
             <div>
-              <span className="text-[#64748B] block text-[10px]">TRADING MODE:</span>
+              <span className="text-[#52627A] block text-[10px]">TRADING MODE:</span>
               <ModeBadge mode={order.tradingMode || "PAPER"} size="sm" className="mt-0.5" />
             </div>
             <div>
-              <span className="text-[#64748B] block text-[10px]">QUANTITY:</span>
+              <span className="text-[#52627A] block text-[10px]">QUANTITY:</span>
               <span className="text-[#F4F7FA] font-bold tabular-nums">{order.quantity}</span>
             </div>
             <div>
-              <span className="text-[#64748B] block text-[10px]">PRICE:</span>
+              <span className="text-[#52627A] block text-[10px]">PRICE:</span>
               <span className="text-[#F4F7FA] font-bold tabular-nums">
                 {order.orderType === "MARKET" ? "MARKET (LTP)" : `₹${order.price?.toLocaleString()}`}
               </span>
             </div>
             {order.estimatedMargin !== undefined && (
               <div>
-                <span className="text-[#64748B] block text-[10px]">EST. MARGIN:</span>
+                <span className="text-[#52627A] block text-[10px]">EST. MARGIN:</span>
                 <span className="text-[#F4F7FA] tabular-nums">₹{order.estimatedMargin.toLocaleString()}</span>
               </div>
             )}
             {order.estimatedFee !== undefined && (
               <div>
-                <span className="text-[#64748B] block text-[10px]">EST. FEES:</span>
+                <span className="text-[#52627A] block text-[10px]">EST. FEES:</span>
                 <span className="text-[#F4F7FA] tabular-nums">₹{order.estimatedFee.toLocaleString()}</span>
               </div>
             )}
             <div className="col-span-2 pt-1 border-t border-[#213047]/60 flex items-center justify-between text-[10px]">
-              <span className="text-[#64748B]">FEED FRESHNESS:</span>
+              <span className="text-[#52627A]">FEED FRESHNESS:</span>
               <DataAge timestamp={order.dataTimestamp || Date.now()} />
             </div>
           </div>
@@ -149,7 +149,7 @@ export function OrderReviewModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-3 py-1.5 rounded-md border border-[#213047] text-xs font-mono text-[#94A3B8] hover:text-white hover:bg-[#121C2C] transition-colors cursor-pointer"
+            className="px-3 py-1.5 rounded-md border border-[#213047] text-xs font-mono text-[#7C8CA3] hover:text-white hover:bg-[#121C2C] transition-colors cursor-pointer"
           >
             Cancel
           </button>

@@ -14,6 +14,7 @@ import {
   Activity,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { formatCurrency } from "@/lib/formatters";
 
 export function OptionsOrdersView() {
   const [modeFilter, setModeFilter] = useState<"ALL" | "PAPER" | "SHADOW" | "LIVE">("ALL");
@@ -133,7 +134,7 @@ export function OptionsOrdersView() {
                       <td className="py-2.5 px-3 text-slate-400">{o.order_type || "LIMIT"}</td>
                       <td className="py-2.5 px-3 text-right text-slate-200">{o.quantity}</td>
                       <td className="py-2.5 px-3 text-right font-bold text-slate-200">
-                        ₹{(o.price || o.average_fill_price || 0).toFixed(2)}
+                        {formatCurrency(o.price ?? o.average_fill_price, "₹", 2)}
                       </td>
                       <td className="py-2.5 px-3 text-slate-400">
                         <span className="text-sky-400 font-bold">{o.provider || "DHAN"}</span>

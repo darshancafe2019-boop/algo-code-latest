@@ -151,30 +151,30 @@ export function BotDetailDrawer({
   ];
 
   return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-[#0D1914] border-l border-[#294238] shadow-2xl flex flex-col font-sans select-none animate-slideLeft">
+    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl bg-[#0A1422] border-l border-[#1A2A3F] shadow-2xl flex flex-col font-sans select-none animate-slideLeft">
       {/* Drawer Top Header */}
-      <div className="p-4 sm:p-5 border-b border-[#1B3328] bg-[#0A130F] flex items-center justify-between">
+      <div className="p-4 sm:p-5 border-b border-[#122033] bg-[#0A130F] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-md">
+          <div className="p-2.5 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-md">
             <Bot className="h-5 w-5" />
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-[#E8F3EC]">{bot.name}</h2>
+              <h2 className="text-base font-bold text-[#F7FAFC]">{bot.name}</h2>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase ${
                   isRunning
                     ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
                     : isPaused
                     ? "bg-amber-950 text-amber-400 border border-amber-800"
-                    : "bg-[#07110D] text-[#A8BDB0] border border-[#1B3328]"
+                    : "bg-[#07101A] text-[#7C8CA3] border border-[#122033]"
                 }`}
               >
                 {status}
               </span>
             </div>
-            <p className="text-xs text-[#A8BDB0] font-mono">
+            <p className="text-xs text-[#7C8CA3] font-mono">
               ID: {bot.id} • {bot.symbol} • [{bot.timeframe || "15m"}] • Mode: {bot.execution_mode || "PAPER"}
             </p>
           </div>
@@ -210,7 +210,7 @@ export function BotDetailDrawer({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl text-[#A8BDB0] hover:text-white hover:bg-[#123C2A] transition-colors"
+            className="p-2 rounded-xl text-[#7C8CA3] hover:text-white hover:bg-[rgba(37,99,235,0.18)] transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -218,7 +218,7 @@ export function BotDetailDrawer({
       </div>
 
       {/* Tabs Navigation Strip */}
-      <div className="px-4 py-2 border-b border-[#1B3328] bg-[#07110D] flex items-center gap-1 overflow-x-auto custom-scrollbar">
+      <div className="px-4 py-2 border-b border-[#122033] bg-[#07101A] flex items-center gap-1 overflow-x-auto custom-scrollbar">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -228,8 +228,8 @@ export function BotDetailDrawer({
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 ${
                 isActive
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                  : "text-[#A8BDB0] hover:text-[#E8F3EC] hover:bg-[#123C2A]/40"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-sm"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[rgba(37,99,235,0.18)]/40"
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
@@ -246,85 +246,85 @@ export function BotDetailDrawer({
           <div className="space-y-4 animate-fadeIn">
             {/* Quick Metrics 4-Col Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Live P&L</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Live P&L</span>
                 <span
                   className={`text-base font-bold font-mono ${
-                    isPositivePnl ? "text-[#55C98A]" : "text-red-400"
+                    isPositivePnl ? "text-[#22D3EE]" : "text-red-400"
                   }`}
                 >
                   {isPositivePnl ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}
                 </span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Allocated Capital</span>
-                <span className="text-base font-bold font-mono text-[#E8F3EC]">
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Allocated Capital</span>
+                <span className="text-base font-bold font-mono text-[#F7FAFC]">
                   ${bot.allocated_capital?.toLocaleString() || "10,000"}
                 </span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Open Trades</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Open Trades</span>
                 <span className="text-base font-bold font-mono text-cyan-400">
                   {bot.open_trades || botPositions.length || 0}
                 </span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Confidence Gate</span>
-                <span className="text-base font-bold font-mono text-[#55C98A]">
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Confidence Gate</span>
+                <span className="text-base font-bold font-mono text-[#22D3EE]">
                   &ge; {bot.required_confidence || 75}%
                 </span>
               </div>
             </div>
 
             {/* General Specs Details Table */}
-            <div className="bg-[#07110D] border border-[#1B3328] rounded-xl p-4 space-y-2.5">
-              <h3 className="text-xs font-bold text-[#E8F3EC] uppercase tracking-wider flex items-center justify-between">
+            <div className="bg-[#07101A] border border-[#122033] rounded-xl p-4 space-y-2.5">
+              <h3 className="text-xs font-bold text-[#F7FAFC] uppercase tracking-wider flex items-center justify-between">
                 <span>Bot Runtime Specifications</span>
                 <span className="text-[10px] text-cyan-400 font-mono">CCXT & Async OMS</span>
               </h3>
 
               <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
                 <div>
-                  <span className="text-[#70877A]">Strategy Engine:</span>
+                  <span className="text-[#52627A]">Strategy Engine:</span>
                   <p className="text-white font-bold">{bot.strategy || "Trend Confluence"}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Instrument Symbol:</span>
+                  <span className="text-[#52627A]">Instrument Symbol:</span>
                   <p className="text-cyan-400 font-bold">{bot.symbol}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Base Timeframe:</span>
+                  <span className="text-[#52627A]">Base Timeframe:</span>
                   <p className="text-white font-bold">{bot.timeframe || "15m"}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Asset Market Class:</span>
+                  <span className="text-[#52627A]">Asset Market Class:</span>
                   <p className="text-white font-bold uppercase">{bot.asset_class || "Crypto"}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Exchange Adapter:</span>
+                  <span className="text-[#52627A]">Exchange Adapter:</span>
                   <p className="text-white font-bold">{bot.exchange || "Binance Spot/Perp"}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Execution Mode:</span>
-                  <p className="text-[#55C98A] font-bold uppercase">{bot.execution_mode || "PAPER"}</p>
+                  <span className="text-[#52627A]">Execution Mode:</span>
+                  <p className="text-[#22D3EE] font-bold uppercase">{bot.execution_mode || "PAPER"}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Worker Uptime:</span>
+                  <span className="text-[#52627A]">Worker Uptime:</span>
                   <p className="text-white font-bold">{bot.health?.uptime_formatted || (isRunning ? "3h 12m" : "0m")}</p>
                 </div>
 
                 <div>
-                  <span className="text-[#70877A]">Last Heartbeat:</span>
-                  <p className="text-[#55C98A] font-bold">
+                  <span className="text-[#52627A]">Last Heartbeat:</span>
+                  <p className="text-[#22D3EE] font-bold">
                     {bot.health?.last_checked_seconds_ago !== undefined
                       ? `${bot.health.last_checked_seconds_ago}s ago`
                       : "Active"}
@@ -334,22 +334,22 @@ export function BotDetailDrawer({
             </div>
 
             {/* Lifecycle Timeline Chips */}
-            <div className="bg-[#07110D] border border-[#1B3328] rounded-xl p-4 space-y-2">
-              <h3 className="text-xs font-bold text-[#E8F3EC] uppercase tracking-wider">
+            <div className="bg-[#07101A] border border-[#122033] rounded-xl p-4 space-y-2">
+              <h3 className="text-xs font-bold text-[#F7FAFC] uppercase tracking-wider">
                 Recent Bot Lifecycle Activity
               </h3>
-              <div className="space-y-1.5 text-[11px] font-mono text-[#A8BDB0]">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1E293B]">
+              <div className="space-y-1.5 text-[11px] font-mono text-[#7C8CA3]">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1A2A3F]">
                   <span className="text-emerald-400 font-bold">● Process Heartbeat Verified</span>
-                  <span className="text-[#70877A]">2s ago</span>
+                  <span className="text-[#52627A]">2s ago</span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1E293B]">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1A2A3F]">
                   <span className="text-cyan-400 font-bold">● Strategy Signal Evaluated (BUY 82.6%)</span>
-                  <span className="text-[#70877A]">15s ago</span>
+                  <span className="text-[#52627A]">15s ago</span>
                 </div>
-                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1E293B]">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-[#121824] border border-[#1A2A3F]">
                   <span className="text-purple-400 font-bold">● Risk Pre-Check Passed (20-stage gates)</span>
-                  <span className="text-[#70877A]">1m ago</span>
+                  <span className="text-[#52627A]">1m ago</span>
                 </div>
               </div>
             </div>
@@ -359,17 +359,17 @@ export function BotDetailDrawer({
         {/* ================= TAB 2: STRATEGY VISUAL BREAKDOWN ================= */}
         {activeTab === "strategy" && (
           <div className="space-y-4 animate-fadeIn">
-            <div className="bg-[#07110D] border border-[#1B3328] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-[#1B3328] pb-2">
+            <div className="bg-[#07101A] border border-[#122033] rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-[#122033] pb-2">
                 <div>
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                     Visual Rule Pipeline
                   </h3>
-                  <p className="text-[11px] text-[#A8BDB0]">
+                  <p className="text-[11px] text-[#7C8CA3]">
                     Executed automatically every candle close with zero look-ahead bias.
                   </p>
                 </div>
-                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
                   {bot.strategy || "Trend Confluence Strategy"}
                 </span>
               </div>
@@ -383,11 +383,11 @@ export function BotDetailDrawer({
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 font-bold">1H TF</span>
                   </div>
                   <p className="text-white font-bold">Price &gt; 200 EMA</p>
-                  <p className="text-[10px] text-[#70877A]">Ensures trades are aligned with multi-day structural market regime.</p>
+                  <p className="text-[10px] text-[#52627A]">Ensures trades are aligned with multi-day structural market regime.</p>
                 </div>
 
                 {/* Arrow */}
-                <div className="text-center text-[#55C98A] font-bold">↓</div>
+                <div className="text-center text-[#22D3EE] font-bold">↓</div>
 
                 {/* Block 2 */}
                 <div className="p-3 bg-[#121824] border border-emerald-900/60 rounded-xl space-y-1">
@@ -396,11 +396,11 @@ export function BotDetailDrawer({
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 font-bold">15M TF</span>
                   </div>
                   <p className="text-white font-bold">EMA 9 Crosses Above EMA 21</p>
-                  <p className="text-[10px] text-[#70877A]">Fast dynamic trigger detecting early trend reversal acceleration.</p>
+                  <p className="text-[10px] text-[#52627A]">Fast dynamic trigger detecting early trend reversal acceleration.</p>
                 </div>
 
                 {/* Arrow */}
-                <div className="text-center text-[#55C98A] font-bold">↓</div>
+                <div className="text-center text-[#22D3EE] font-bold">↓</div>
 
                 {/* Block 3 */}
                 <div className="p-3 bg-[#121824] border border-purple-900/60 rounded-xl space-y-1">
@@ -409,17 +409,17 @@ export function BotDetailDrawer({
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-950 text-purple-300 font-bold">15M TF</span>
                   </div>
                   <p className="text-white font-bold">RSI (14) &gt; 50 AND Volume &gt; 20-SMA</p>
-                  <p className="text-[10px] text-[#70877A]">Prevents false breakouts during low-liquidity chop.</p>
+                  <p className="text-[10px] text-[#52627A]">Prevents false breakouts during low-liquidity chop.</p>
                 </div>
 
                 {/* Arrow */}
-                <div className="text-center text-[#55C98A] font-bold">↓</div>
+                <div className="text-center text-[#22D3EE] font-bold">↓</div>
 
                 {/* Block 4 */}
                 <div className="p-3 bg-gradient-to-r from-emerald-950/80 to-teal-950/80 border border-emerald-700 rounded-xl space-y-1 text-center">
                   <span className="text-[10px] uppercase font-bold text-emerald-400">Step 4: Execution Output</span>
                   <p className="text-sm text-emerald-300 font-bold">DISPATCH BUY ORDER TO OMS</p>
-                  <p className="text-[10px] text-[#A8BDB0]">Passes 20-stage pre-trade risk check before execution.</p>
+                  <p className="text-[10px] text-[#7C8CA3]">Passes 20-stage pre-trade risk check before execution.</p>
                 </div>
               </div>
             </div>
@@ -430,33 +430,33 @@ export function BotDetailDrawer({
         {activeTab === "risk" && (
           <div className="space-y-4 animate-fadeIn">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Risk Per Trade</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Risk Per Trade</span>
                 <span className="text-sm font-bold font-mono text-cyan-400">1.0% ($100.00)</span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Stop Loss Method</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Stop Loss Method</span>
                 <span className="text-sm font-bold font-mono text-red-400">1.5x ATR (Adaptive)</span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Take Profit Target</span>
-                <span className="text-sm font-bold font-mono text-[#55C98A]">2.0x Risk:Reward</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Take Profit Target</span>
+                <span className="text-sm font-bold font-mono text-[#22D3EE]">2.0x Risk:Reward</span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Daily Loss Cap</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Daily Loss Cap</span>
                 <span className="text-sm font-bold font-mono text-amber-400">$500.00 Max</span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Max Drawdown Cap</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Max Drawdown Cap</span>
                 <span className="text-sm font-bold font-mono text-amber-400">5.0% Equity</span>
               </div>
 
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Auto Square-Off</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Auto Square-Off</span>
                 <span className="text-sm font-bold font-mono text-white">15:15 IST / 23:55 UTC</span>
               </div>
             </div>
@@ -466,7 +466,7 @@ export function BotDetailDrawer({
                 <CheckCircle2 className="h-4 w-4" />
                 <span>Pre-Trade Risk Engine Status: ENFORCED</span>
               </div>
-              <p className="text-[11px] text-[#A8BDB0]">
+              <p className="text-[11px] text-[#7C8CA3]">
                 All trades are validated across sizing, leverage boundaries, daily drawdown caps, and circuit breakers prior to execution.
               </p>
             </div>
@@ -476,18 +476,18 @@ export function BotDetailDrawer({
         {/* ================= TAB 4: ORDERS ================= */}
         {activeTab === "orders" && (
           <div className="space-y-3 animate-fadeIn">
-            <h3 className="text-xs font-bold text-[#E8F3EC] uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-[#F7FAFC] uppercase tracking-wider">
               Order Lifecycle Stream ({botOrders.length} Events)
             </h3>
 
             {botOrders.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#70877A] bg-[#07110D] rounded-xl border border-dashed border-[#1B3328]">
+              <div className="p-8 text-center text-xs text-[#52627A] bg-[#07101A] rounded-xl border border-dashed border-[#122033]">
                 No orders recorded for this bot instance yet.
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-[#1B3328] bg-[#07110D]">
+              <div className="overflow-x-auto rounded-xl border border-[#122033] bg-[#07101A]">
                 <table className="w-full text-left text-[11px] font-mono">
-                  <thead className="bg-[#0A130F] text-[10px] text-[#70877A] border-b border-[#1B3328]">
+                  <thead className="bg-[#0A130F] text-[10px] text-[#52627A] border-b border-[#122033]">
                     <tr>
                       <th className="py-2 px-3">Time</th>
                       <th className="py-2 px-3">Side</th>
@@ -497,10 +497,10 @@ export function BotDetailDrawer({
                       <th className="py-2 px-3">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#1B3328]">
+                  <tbody className="divide-y divide-[#122033]">
                     {botOrders.map((ord, idx) => (
-                      <tr key={ord.id || idx} className="hover:bg-[#123C2A]/20">
-                        <td className="py-2 px-3 text-[#70877A]">{ord.timestamp?.split("T")[1]?.slice(0, 8) || "Now"}</td>
+                      <tr key={ord.id || idx} className="hover:bg-[rgba(37,99,235,0.18)]/20">
+                        <td className="py-2 px-3 text-[#52627A]">{ord.timestamp?.split("T")[1]?.slice(0, 8) || "Now"}</td>
                         <td className="py-2 px-3 font-bold">
                           <span className={ord.side === "BUY" ? "text-emerald-400" : "text-red-400"}>
                             {ord.side}
@@ -532,17 +532,17 @@ export function BotDetailDrawer({
         {/* ================= TAB 5: POSITIONS ================= */}
         {activeTab === "positions" && (
           <div className="space-y-3 animate-fadeIn">
-            <h3 className="text-xs font-bold text-[#E8F3EC] uppercase tracking-wider">
+            <h3 className="text-xs font-bold text-[#F7FAFC] uppercase tracking-wider">
               Active Positions ({botPositions.length})
             </h3>
 
             {botPositions.length === 0 ? (
-              <div className="p-8 text-center text-xs text-[#70877A] bg-[#07110D] rounded-xl border border-dashed border-[#1B3328]">
+              <div className="p-8 text-center text-xs text-[#52627A] bg-[#07101A] rounded-xl border border-dashed border-[#122033]">
                 Your bot currently has no open positions.
               </div>
             ) : (
               botPositions.map((pos, idx) => (
-                <div key={pos.id || idx} className="p-4 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-3">
+                <div key={pos.id || idx} className="p-4 bg-[#07101A] border border-[#122033] rounded-xl space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 font-mono">
                       <span className="font-bold text-white text-sm">{pos.symbol}</span>
@@ -560,7 +560,7 @@ export function BotDetailDrawer({
                     <div className="font-mono text-right">
                       <span
                         className={`text-sm font-bold ${
-                          (Number(pos?.unrealized_pnl) || 0) >= 0 ? "text-[#55C98A]" : "text-red-400"
+                          (Number(pos?.unrealized_pnl) || 0) >= 0 ? "text-[#22D3EE]" : "text-red-400"
                         }`}
                       >
                         {(Number(pos?.unrealized_pnl) || 0) >= 0 ? `+$${(Number(pos?.unrealized_pnl) || 0).toFixed(2)}` : `-$${Math.abs(Number(pos?.unrealized_pnl) || 0).toFixed(2)}`}
@@ -568,22 +568,22 @@ export function BotDetailDrawer({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-[#A8BDB0]">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-[#7C8CA3]">
                     <div>
-                      <span className="text-[#70877A]">Entry Price:</span>
+                      <span className="text-[#52627A]">Entry Price:</span>
                       <p className="text-white font-bold">${pos.entry_price?.toLocaleString()}</p>
                     </div>
                     <div>
-                      <span className="text-[#70877A]">Current Price:</span>
+                      <span className="text-[#52627A]">Current Price:</span>
                       <p className="text-cyan-300 font-bold">${pos.current_price?.toLocaleString()}</p>
                     </div>
                     <div>
-                      <span className="text-[#70877A]">Stop Loss:</span>
+                      <span className="text-[#52627A]">Stop Loss:</span>
                       <p className="text-red-400 font-bold">${pos.stop_loss?.toLocaleString() || "63,200"}</p>
                     </div>
                     <div>
-                      <span className="text-[#70877A]">Take Profit:</span>
-                      <p className="text-[#55C98A] font-bold">${pos.take_profit?.toLocaleString() || "67,500"}</p>
+                      <span className="text-[#52627A]">Take Profit:</span>
+                      <p className="text-[#22D3EE] font-bold">${pos.take_profit?.toLocaleString() || "67,500"}</p>
                     </div>
                   </div>
                 </div>
@@ -596,30 +596,30 @@ export function BotDetailDrawer({
         {activeTab === "analytics" && (
           <div className="space-y-4 animate-fadeIn">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl">
-                <span className="text-[10px] text-[#70877A] uppercase font-bold block">Win Rate</span>
-                <span className="text-base font-bold font-mono text-[#55C98A]">64.2%</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl">
+                <span className="text-[10px] text-[#52627A] uppercase font-bold block">Win Rate</span>
+                <span className="text-base font-bold font-mono text-[#22D3EE]">64.2%</span>
               </div>
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl">
-                <span className="text-[10px] text-[#70877A] uppercase font-bold block">Profit Factor</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl">
+                <span className="text-[10px] text-[#52627A] uppercase font-bold block">Profit Factor</span>
                 <span className="text-base font-bold font-mono text-purple-400">2.15</span>
               </div>
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl">
-                <span className="text-[10px] text-[#70877A] uppercase font-bold block">Max Drawdown</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl">
+                <span className="text-[10px] text-[#52627A] uppercase font-bold block">Max Drawdown</span>
                 <span className="text-base font-bold font-mono text-amber-400">-4.2%</span>
               </div>
-              <div className="p-3 bg-[#07110D] border border-[#1B3328] rounded-xl">
-                <span className="text-[10px] text-[#70877A] uppercase font-bold block">Sharpe Ratio</span>
+              <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl">
+                <span className="text-[10px] text-[#52627A] uppercase font-bold block">Sharpe Ratio</span>
                 <span className="text-base font-bold font-mono text-white">2.28</span>
               </div>
             </div>
 
-            <div className="p-4 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-2">
-              <h3 className="text-xs font-bold text-[#E8F3EC] uppercase tracking-wider">
+            <div className="p-4 bg-[#07101A] border border-[#122033] rounded-xl space-y-2">
+              <h3 className="text-xs font-bold text-[#F7FAFC] uppercase tracking-wider">
                 Performance Mathematical Expectancy
               </h3>
-              <p className="text-[11px] text-[#A8BDB0]">
-                Avg Win: <strong className="text-[#55C98A]">+$142.50</strong> • Avg Loss: <strong className="text-red-400">-$65.20</strong> • Expectancy: <strong className="text-[#55C98A]">+$48.10 / trade</strong>
+              <p className="text-[11px] text-[#7C8CA3]">
+                Avg Win: <strong className="text-[#22D3EE]">+$142.50</strong> • Avg Loss: <strong className="text-red-400">-$65.20</strong> • Expectancy: <strong className="text-[#22D3EE]">+$48.10 / trade</strong>
               </p>
             </div>
           </div>
@@ -629,7 +629,7 @@ export function BotDetailDrawer({
         {activeTab === "logs" && (
           <div className="space-y-3 animate-fadeIn">
             {/* Filter & Search Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#07110D] p-2.5 rounded-xl border border-[#1B3328]">
+            <div className="flex flex-wrap items-center justify-between gap-2 bg-[#07101A] p-2.5 rounded-xl border border-[#122033]">
               <div className="flex items-center gap-1">
                 {["ALL", "SIGNALS", "ORDERS", "RISK", "ERRORS"].map((f) => (
                   <button
@@ -637,8 +637,8 @@ export function BotDetailDrawer({
                     onClick={() => setLogFilter(f)}
                     className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono transition-all ${
                       logFilter === f
-                        ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
-                        : "text-[#A8BDB0] hover:text-white"
+                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60"
+                        : "text-[#7C8CA3] hover:text-white"
                     }`}
                   >
                     {f}
@@ -647,13 +647,13 @@ export function BotDetailDrawer({
               </div>
 
               <div className="relative">
-                <Search className="h-3 w-3 text-[#70877A] absolute left-2.5 top-2" />
+                <Search className="h-3 w-3 text-[#52627A] absolute left-2.5 top-2" />
                 <input
                   type="text"
                   placeholder="Filter logs..."
                   value={logSearch}
                   onChange={(e) => setLogSearch(e.target.value)}
-                  className="bg-[#0A130F] border border-[#1B3328] rounded-lg pl-7 pr-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#55C98A] w-36"
+                  className="bg-[#0A130F] border border-[#122033] rounded-lg pl-7 pr-2 py-1 text-[11px] text-white focus:outline-none focus:border-[#22D3EE] w-36"
                 />
               </div>
             </div>
@@ -661,17 +661,17 @@ export function BotDetailDrawer({
             {/* Event Stream Cards */}
             <div className="space-y-2 max-h-[380px] overflow-y-auto custom-scrollbar font-mono text-[11px]">
               {rawDecisions.length === 0 ? (
-                <div className="p-8 text-center text-xs text-[#70877A] bg-[#07110D] rounded-xl border border-dashed border-[#1B3328]">
+                <div className="p-8 text-center text-xs text-[#52627A] bg-[#07101A] rounded-xl border border-dashed border-[#122033]">
                   Live decision events will appear here once bot processes market ticks.
                 </div>
               ) : (
                 rawDecisions.map((d, i) => (
                   <div
                     key={i}
-                    className="p-2.5 bg-[#07110D] border border-[#1B3328] rounded-xl space-y-1 hover:border-[#2E7D5B]/60 transition-colors"
+                    className="p-2.5 bg-[#07101A] border border-[#122033] rounded-xl space-y-1 hover:border-[#2563EB]/60 transition-colors"
                   >
                     <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-[#70877A]">{d.timestamp || "13:35:21"}</span>
+                      <span className="text-[#52627A]">{d.timestamp || "13:35:21"}</span>
                       <span className="text-cyan-400 font-bold">{d.symbol || bot.symbol}</span>
                     </div>
 
@@ -688,9 +688,9 @@ export function BotDetailDrawer({
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-[10px] text-[#70877A] pt-1 border-t border-[#1B3328]">
+                    <div className="flex items-center justify-between text-[10px] text-[#52627A] pt-1 border-t border-[#122033]">
                       <span>Price: ${d.price?.toLocaleString() || "65,420"}</span>
-                      <span className="text-[#55C98A]">Risk: PASSED</span>
+                      <span className="text-[#22D3EE]">Risk: PASSED</span>
                     </div>
                   </div>
                 ))
@@ -702,7 +702,7 @@ export function BotDetailDrawer({
         {/* ================= TAB 8: HEALTH ================= */}
         {activeTab === "health" && (
           <div className="space-y-3 animate-fadeIn">
-            <div className="p-4 bg-[#070D14] border border-[#1E293B] rounded-xl space-y-2.5 font-mono text-xs">
+            <div className="p-4 bg-[#070D14] border border-[#1A2A3F] rounded-xl space-y-2.5 font-mono text-xs">
               <div className="flex items-center justify-between text-slate-100 font-bold">
                 <span className="flex items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-emerald-400" />
@@ -731,7 +731,7 @@ export function BotDetailDrawer({
         {/* ================= TAB 9: TELEGRAM ================= */}
         {activeTab === "telegram" && (
           <div className="space-y-3 animate-fadeIn">
-            <div className="p-4 bg-[#070D14] border border-[#1E293B] rounded-xl space-y-3">
+            <div className="p-4 bg-[#070D14] border border-[#1A2A3F] rounded-xl space-y-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Send className="h-4 w-4 text-emerald-400" />
@@ -746,7 +746,7 @@ export function BotDetailDrawer({
                 Instant interactive notifications are dispatched for signal triggers, order fills, stop losses, take profits, and risk events.
               </p>
 
-              <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between">
+              <div className="pt-2 border-t border-[#1A2A3F] flex items-center justify-between">
                 <span className="text-[11px] text-slate-500">Dispatcher Status:</span>
                 <span className="text-[11px] text-emerald-400 font-mono font-bold">READY (Interactive Keyboards Active)</span>
               </div>

@@ -50,23 +50,23 @@ export function AnalyticsLeaderboards() {
   return (
     <div className="space-y-4 font-sans select-none">
       {/* Header & Category Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1B3328] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#122033] pb-3">
         <div>
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Quantitative Analytics & Comparative Attribution
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Performance attribution across trading strategies, bot instances, asset classes, and session times.
           </p>
         </div>
 
-        <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs font-mono">
+        <div className="flex items-center gap-1 bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs font-mono">
           <button
             onClick={() => setActiveLeaderboardTab("strategies")}
             className={`px-3 py-1.5 rounded-lg font-bold uppercase transition-all ${
               activeLeaderboardTab === "strategies"
-                ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                : "text-[#A8BDB0] hover:text-white"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                : "text-[#7C8CA3] hover:text-white"
             }`}
           >
             Strategies
@@ -75,8 +75,8 @@ export function AnalyticsLeaderboards() {
             onClick={() => setActiveLeaderboardTab("bots")}
             className={`px-3 py-1.5 rounded-lg font-bold uppercase transition-all ${
               activeLeaderboardTab === "bots"
-                ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                : "text-[#A8BDB0] hover:text-white"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                : "text-[#7C8CA3] hover:text-white"
             }`}
           >
             Bots
@@ -85,8 +85,8 @@ export function AnalyticsLeaderboards() {
             onClick={() => setActiveLeaderboardTab("markets")}
             className={`px-3 py-1.5 rounded-lg font-bold uppercase transition-all ${
               activeLeaderboardTab === "markets"
-                ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                : "text-[#A8BDB0] hover:text-white"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                : "text-[#7C8CA3] hover:text-white"
             }`}
           >
             Markets
@@ -95,8 +95,8 @@ export function AnalyticsLeaderboards() {
             onClick={() => setActiveLeaderboardTab("time")}
             className={`px-3 py-1.5 rounded-lg font-bold uppercase transition-all ${
               activeLeaderboardTab === "time"
-                ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                : "text-[#A8BDB0] hover:text-white"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                : "text-[#7C8CA3] hover:text-white"
             }`}
           >
             Time & Sessions
@@ -106,10 +106,10 @@ export function AnalyticsLeaderboards() {
 
       {/* 1. STRATEGY LEADERBOARD */}
       {activeLeaderboardTab === "strategies" && (
-        <div className="bg-[#0D1914] border border-[#294238] rounded-2xl overflow-hidden shadow-xl animate-fadeIn">
+        <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl animate-fadeIn">
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-[#0A130F] text-[#70877A] text-[10px] uppercase tracking-wider border-b border-[#1B3328]">
+              <thead className="bg-[#0A130F] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#122033]">
                 <tr>
                   <th className="py-3 px-4">Strategy</th>
                   <th className="py-3 px-3">Trades</th>
@@ -122,21 +122,21 @@ export function AnalyticsLeaderboards() {
                   <th className="py-3 px-4 text-right">Avg Hold</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1B3328]/60 text-slate-200">
+              <tbody className="divide-y divide-[#122033]/60 text-slate-200">
                 {strategies.map((s, idx) => (
-                  <tr key={idx} className="hover:bg-[#123C2A]/30 transition-colors">
+                  <tr key={idx} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-white flex items-center gap-2">
-                      <span className="text-[#55C98A]">#{idx + 1}</span>
+                      <span className="text-[#22D3EE]">#{idx + 1}</span>
                       <span>{s.strategy_name}</span>
                     </td>
-                    <td className="py-3.5 px-3 text-[#A8BDB0]">{s.total_trades}</td>
-                    <td className="py-3.5 px-3 font-bold text-[#55C98A]">{s.win_rate_pct.toFixed(1)}%</td>
-                    <td className="py-3.5 px-3 font-bold text-[#55C98A]">+${s.net_pnl.toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-[#7C8CA3]">{s.total_trades}</td>
+                    <td className="py-3.5 px-3 font-bold text-[#22D3EE]">{s.win_rate_pct.toFixed(1)}%</td>
+                    <td className="py-3.5 px-3 font-bold text-[#22D3EE]">+${s.net_pnl.toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-cyan-300 font-bold">{s.profit_factor.toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-purple-300">${s.expectancy.toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-slate-400">{s.max_drawdown_pct}%</td>
                     <td className="py-3.5 px-3 text-slate-300">1 : {s.avg_risk_reward}</td>
-                    <td className="py-3.5 px-4 text-right text-[#70877A]">{s.avg_duration}</td>
+                    <td className="py-3.5 px-4 text-right text-[#52627A]">{s.avg_duration}</td>
                   </tr>
                 ))}
               </tbody>
@@ -147,10 +147,10 @@ export function AnalyticsLeaderboards() {
 
       {/* 2. BOT PERFORMANCE */}
       {activeLeaderboardTab === "bots" && (
-        <div className="bg-[#0D1914] border border-[#294238] rounded-2xl overflow-hidden shadow-xl animate-fadeIn">
+        <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl animate-fadeIn">
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-[#0A130F] text-[#70877A] text-[10px] uppercase tracking-wider border-b border-[#1B3328]">
+              <thead className="bg-[#0A130F] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#122033]">
                 <tr>
                   <th className="py-3 px-4">Bot Instance</th>
                   <th className="py-3 px-3">Trades</th>
@@ -163,26 +163,26 @@ export function AnalyticsLeaderboards() {
                   <th className="py-3 px-4 text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1B3328]/60 text-slate-200">
+              <tbody className="divide-y divide-[#122033]/60 text-slate-200">
                 {bots.map((b, idx) => (
-                  <tr key={idx} className="hover:bg-[#123C2A]/30 transition-colors">
+                  <tr key={idx} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-white">
                       <span>{b.bot_name}</span>
-                      <span className="text-[10px] text-[#70877A] block">{b.bot_id}</span>
+                      <span className="text-[10px] text-[#52627A] block">{b.bot_id}</span>
                     </td>
-                    <td className="py-3.5 px-3 text-[#A8BDB0]">{b.total_trades}</td>
-                    <td className="py-3.5 px-3 font-bold text-[#55C98A]">{b.win_rate_pct.toFixed(1)}%</td>
-                    <td className="py-3.5 px-3 font-bold text-[#55C98A]">+${b.net_pnl.toFixed(2)}</td>
+                    <td className="py-3.5 px-3 text-[#7C8CA3]">{b.total_trades}</td>
+                    <td className="py-3.5 px-3 font-bold text-[#22D3EE]">{b.win_rate_pct.toFixed(1)}%</td>
+                    <td className="py-3.5 px-3 font-bold text-[#22D3EE]">+${b.net_pnl.toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-slate-400">{b.drawdown_pct}%</td>
                     <td className="py-3.5 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
                         {b.risk_status}
                       </span>
                     </td>
                     <td className="py-3.5 px-3 text-amber-400">${(b.fees ?? 0).toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-cyan-300 font-bold">{b.execution_quality}/100</td>
                     <td className="py-3.5 px-4 text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-[#55C98A] border border-emerald-800">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950 text-[#22D3EE] border border-emerald-800">
                         {b.status}
                       </span>
                     </td>
@@ -200,26 +200,26 @@ export function AnalyticsLeaderboards() {
           {markets.map((m, idx) => (
             <div
               key={idx}
-              className="p-4 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-2 hover:border-[#2E7D5B] transition-colors"
+              className="p-4 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-2 hover:border-[#2563EB] transition-colors"
             >
               <div className="flex justify-between items-center">
                 <span className="font-bold text-white">{m.market_name}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded bg-[#07110D] text-cyan-300 border border-[#1B3328]">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-[#07101A] text-cyan-300 border border-[#122033]">
                   {m.asset_class}
                 </span>
               </div>
-              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#1B3328] text-[11px]">
+              <div className="grid grid-cols-3 gap-2 pt-1 border-t border-[#122033] text-[11px]">
                 <div>
-                  <span className="text-[10px] text-[#70877A] block">Trades</span>
+                  <span className="text-[10px] text-[#52627A] block">Trades</span>
                   <span className="font-bold text-white">{m.total_trades}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-[#70877A] block">Win Rate</span>
-                  <span className="font-bold text-[#55C98A]">{m.win_rate_pct}%</span>
+                  <span className="text-[10px] text-[#52627A] block">Win Rate</span>
+                  <span className="font-bold text-[#22D3EE]">{m.win_rate_pct}%</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-[#70877A] block">Net P&L</span>
-                  <span className="font-bold text-[#55C98A]">+${m.net_pnl.toFixed(2)}</span>
+                  <span className="text-[10px] text-[#52627A] block">Net P&L</span>
+                  <span className="font-bold text-[#22D3EE]">+${m.net_pnl.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -233,20 +233,20 @@ export function AnalyticsLeaderboards() {
           {timeBreakdown.map((t, idx) => (
             <div
               key={idx}
-              className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#2E7D5B] transition-colors"
+              className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-[#2563EB] transition-colors"
             >
               <div>
                 <span className="font-bold text-white block">{t.period_label}</span>
-                <span className="text-[10px] text-[#70877A]">{t.total_trades} Trades Executed</span>
+                <span className="text-[10px] text-[#52627A]">{t.total_trades} Trades Executed</span>
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <span className="text-[10px] text-[#70877A] block">Win Rate</span>
-                  <span className="font-bold text-[#55C98A]">{t.win_rate_pct}%</span>
+                  <span className="text-[10px] text-[#52627A] block">Win Rate</span>
+                  <span className="font-bold text-[#22D3EE]">{t.win_rate_pct}%</span>
                 </div>
                 <div className="text-right">
-                  <span className="text-[10px] text-[#70877A] block">Realized Return</span>
-                  <span className="font-bold text-[#55C98A]">+${t.net_pnl.toFixed(2)} ({t.avg_return_pct}%)</span>
+                  <span className="text-[10px] text-[#52627A] block">Realized Return</span>
+                  <span className="font-bold text-[#22D3EE]">+${t.net_pnl.toFixed(2)} ({t.avg_return_pct}%)</span>
                 </div>
               </div>
             </div>

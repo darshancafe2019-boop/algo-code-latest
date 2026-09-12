@@ -29,6 +29,8 @@ interface OptionTerminalControlBarProps {
   onChangeSearchQuery: (q: string) => void;
   totalStrikesCount: number;
   displayedStrikesCount: number;
+  oneClickMode?: boolean;
+  onToggleOneClickMode?: () => void;
 }
 
 const STRIKE_RANGE_PRESETS = [
@@ -55,6 +57,8 @@ export const OptionTerminalControlBar: React.FC<OptionTerminalControlBarProps> =
   onChangeSearchQuery,
   totalStrikesCount,
   displayedStrikesCount,
+  oneClickMode = false,
+  onToggleOneClickMode,
 }) => {
   return (
     <div className="bg-[#090E17] border border-slate-800/90 rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-2.5 font-mono text-xs">
@@ -180,6 +184,23 @@ export const OptionTerminalControlBar: React.FC<OptionTerminalControlBarProps> =
           )}
         </button>
 
+        {/* One Click Trading Toggle Button */}
+        {onToggleOneClickMode && (
+          <button
+            type="button"
+            onClick={onToggleOneClickMode}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border font-bold transition text-xs ${
+              oneClickMode
+                ? "bg-amber-500/20 text-amber-300 border-amber-500/50 shadow-sm"
+                : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-400 hover:text-slate-200"
+            }`}
+            title={oneClickMode ? "One-Click Trading is ENABLED" : "One-Click Trading is OFF (Standard Ticket Review)"}
+          >
+            <Zap className={`w-3.5 h-3.5 ${oneClickMode ? "text-amber-400 animate-pulse" : "text-slate-500"}`} />
+            <span>ONE CLICK: {oneClickMode ? "ON" : "OFF"}</span>
+          </button>
+        )}
+
         {/* Strikes count indicator */}
         <span className="text-[10px] text-slate-400 pl-1">
           {displayedStrikesCount} / {totalStrikesCount} strikes
@@ -188,3 +209,4 @@ export const OptionTerminalControlBar: React.FC<OptionTerminalControlBarProps> =
     </div>
   );
 };
+

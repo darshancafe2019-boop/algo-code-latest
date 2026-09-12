@@ -34,7 +34,7 @@ export function RiskAndDailyLossLimitGauge({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
       {/* 1. Daily Loss Limit Gate & Risk Utilization */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             {isBlocked ? (
@@ -108,7 +108,7 @@ export function RiskAndDailyLossLimitGauge({
       </div>
 
       {/* 2. Asset Class & Market Concentration Breakdown */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <PieChart className="w-5 h-5 text-purple-400" />

@@ -16,9 +16,9 @@ export function IndicatorCompareModal({ isOpen, onClose }: IndicatorCompareModal
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
               <GitCompare className="w-5 h-5" />
@@ -38,7 +38,7 @@ export function IndicatorCompareModal({ isOpen, onClose }: IndicatorCompareModal
 
         {/* Indicator Selectors */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-2">
+          <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-2">
             <label className="text-[10px] font-mono uppercase text-slate-400">Indicator Model A</label>
             <select
               value={indA}
@@ -52,7 +52,7 @@ export function IndicatorCompareModal({ isOpen, onClose }: IndicatorCompareModal
             </select>
           </div>
 
-          <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-2">
+          <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-2">
             <label className="text-[10px] font-mono uppercase text-slate-400">Indicator Model B</label>
             <select
               value={indB}
@@ -68,7 +68,7 @@ export function IndicatorCompareModal({ isOpen, onClose }: IndicatorCompareModal
         </div>
 
         {/* Comparison Matrix Table */}
-        <div className="border border-[#1E293B] rounded-xl overflow-hidden bg-[#080D17]">
+        <div className="border border-[#1A2A3F] rounded-xl overflow-hidden bg-[#080D17]">
           <table className="w-full text-left text-xs font-mono">
             <thead className="bg-[#141E33] text-slate-400 uppercase text-[10px]">
               <tr>
@@ -107,7 +107,7 @@ export function IndicatorCompareModal({ isOpen, onClose }: IndicatorCompareModal
           </table>
         </div>
 
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 text-xs font-mono text-slate-300">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 text-xs font-mono text-slate-300">
           <strong className="text-cyan-400">Quant Architect Recommendation:</strong> Combining <span className="text-white font-bold">RSI (20% Weight)</span> with <span className="text-white font-bold">MACD (25% Weight)</span> yields a +14.2% higher Sharpe ratio than utilizing either model independently.
         </div>
       </div>

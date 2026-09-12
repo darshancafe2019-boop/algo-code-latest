@@ -57,8 +57,8 @@ export function BacktestEquityCurve({ metrics, config }: BacktestEquityCurveProp
   const milestones = generateMilestones();
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4 shadow-xl">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4 shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800/80 text-cyan-400">
             <Layers className="h-4 w-4" />
@@ -83,7 +83,7 @@ export function BacktestEquityCurve({ metrics, config }: BacktestEquityCurveProp
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs font-sans">
-          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1E293B]">
+          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1A2A3F]">
             <tr>
               <th className="py-2.5 px-3">Milestone</th>
               <th className="py-2.5 px-3">Date</th>

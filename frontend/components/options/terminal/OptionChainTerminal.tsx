@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Layers,
@@ -10,8 +10,10 @@ import {
   Send,
   CheckCircle2,
   AlertTriangle,
+  Zap,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { useGlobalData } from "@/context/GlobalDataContext";
 import {
   OptionTerminalSnapshot,
   OptionStrikeRowData,
@@ -19,6 +21,7 @@ import {
   ColumnVisibilityConfig,
   OptionFilterConfig,
   TerminalViewMode,
+  ActionableOptionContract,
 } from "@/types/option-terminal";
 
 import { OptionTerminalHeader } from "./OptionTerminalHeader";
@@ -27,6 +30,8 @@ import { OptionTerminalControlBar } from "./OptionTerminalControlBar";
 import { OptionChainTable } from "./OptionChainTable";
 import { OptionFlowTable } from "./OptionFlowTable";
 import { OptionAnalyticsPanel } from "./OptionAnalyticsPanel";
+import { OptionOrderBook } from "./OptionOrderBook";
+import { OptionQuickOrderTicket } from "./OptionQuickOrderTicket";
 import {
   ColumnCustomizerModal,
   DEFAULT_COLUMN_CONFIG,
@@ -46,7 +51,8 @@ interface OptionChainTerminalProps {
   isSourceLocked?: boolean;
 }
 
-const STORAGE_COLUMN_CONFIG = "quantos_option_chain_columns_v2";
+const STORAGE_COLUMN_CONFIG = "quantos_option_chain_columns_v3";
+const STORAGE_ONE_CLICK_KEY = "quantos_one_click_trading_mode";
 
 export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   initialUnderlying = "NIFTY",
@@ -54,6 +60,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   isSourceLocked = false,
 }) => {
   const queryClient = useQueryClient();
+  const { positions, tradingMode, refreshAll } = useGlobalData();
 
   // Primary State
   const [underlying, setUnderlying] = useState<string>(initialUnderlying);
@@ -69,13 +76,25 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   // Sub-tabs
   const [terminalTab, setTerminalTab] = useState<"CHAIN" | "FLOW" | "ANALYTICS">("CHAIN");
 
+  // One Click Trading Mode (Default: OFF)
+  const [oneClickMode, setOneClickMode] = useState<boolean>(false);
+
   // Modals & Drawers
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(DEFAULT_COLUMN_CONFIG);
   const [filterConfig, setFilterConfig] = useState<OptionFilterConfig>(DEFAULT_FILTER_CONFIG);
 
-  // Selected Option for Inspection Drawer
+  // Actionable Order Ticket State
+  const [isTicketOpen, setIsTicketOpen] = useState<boolean>(false);
+  const [ticketContract, setTicketContract] = useState<ActionableOptionContract | null>(null);
+  const [ticketSide, setTicketSide] = useState<"BUY" | "SELL">("BUY");
+
+  // Actionable Order Book Depth State
+  const [isDepthOpen, setIsDepthOpen] = useState<boolean>(false);
+  const [depthContract, setDepthContract] = useState<ActionableOptionContract | null>(null);
+
+  // Selected Option for Legacy Inspection Drawer
   const [selectedStrike, setSelectedStrike] = useState<number | null>(null);
   const [selectedOptionType, setSelectedOptionType] = useState<"CE" | "PE" | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<OptionContractQuote | null>(null);
@@ -87,13 +106,33 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   // Load Saved Column Configuration from localStorage
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_COLUMN_CONFIG);
-      if (saved) {
-        setColumnConfig(JSON.parse(saved));
+      const savedCol = localStorage.getItem(STORAGE_COLUMN_CONFIG);
+      if (savedCol) {
+        setColumnConfig(JSON.parse(savedCol));
+      }
+      const savedOneClick = localStorage.getItem(STORAGE_ONE_CLICK_KEY);
+      if (savedOneClick) {
+        setOneClickMode(savedOneClick === "true");
       }
     } catch {
-      // Storage unavailable or blocked
+      // Storage unavailable
     }
+  }, []);
+
+  const handleToggleOneClickMode = useCallback(() => {
+    setOneClickMode((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(STORAGE_ONE_CLICK_KEY, String(next));
+      } catch {}
+      setFeedback({
+        status: next ? "warn" : "success",
+        message: next
+          ? "ONE-CLICK TRADING ENABLED: Orders will be submitted immediately without review."
+          : "ONE-CLICK TRADING DISABLED: Standard Order Ticket review is active.",
+      });
+      return next;
+    });
   }, []);
 
   const handleUpdateColumnConfig = (newCfg: ColumnVisibilityConfig) => {
@@ -206,35 +245,32 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     });
   }, [rawStrikes, searchQuery, customStrikeFrom, customStrikeTo, filterConfig]);
 
-  // Order Execution Mutation
-  const singleOptionMutation = useMutation({
-    mutationFn: async ({
-      side,
-      lots,
-      strike,
-      type,
-      price,
-    }: {
-      side: "BUY" | "SELL";
-      lots: number;
-      strike: number;
-      type: "CE" | "PE";
-      price: number;
-    }) => {
-      const lotSize = underlying.includes("NIFTY") ? 50 : underlying.includes("BANKNIFTY") ? 15 : 1;
-      const clientOrderId = `OPT_ORD_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  // Direct One-Click Execution Handler
+  const executeOneClickTrade = async (side: "BUY" | "SELL", contract: ActionableOptionContract) => {
+    const clientOrderId = `OPT_1CLICK_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const lotSize = contract.lotSize || 1;
+    const price = side === "BUY" ? (contract.ask || contract.ltp) : (contract.bid || contract.ltp);
+
+    try {
       const payload = {
         client_order_id: clientOrderId,
-        symbol: `${underlying} ${strike} ${type}`,
+        symbol: contract.symbol,
         direction: side === "BUY" ? "LONG" : "SHORT",
         order_type: "MARKET",
-        quantity: lots * lotSize,
+        quantity: lotSize,
         price,
-        mode: environment,
-        bot_id: "bot-1",
-        provider: selectedQuote?.provider || source,
-        broker_account_id: selectedQuote?.brokerAccountId || "ba_dhan_primary",
-        instrument_id: selectedQuote?.instrumentId,
+        mode: tradingMode,
+        bot_id: "option-one-click",
+        strategy: "OPTION_ONE_CLICK",
+        provider: contract.source || contract.broker,
+        broker: contract.broker,
+        broker_account_id: contract.broker === "DELTA" ? "ba_delta_primary" : "ba_dhan_primary",
+        instrument_id: contract.instrumentId || contract.symbol,
+        product_id: contract.productId,
+        underlying: contract.underlying,
+        expiry: contract.expiry,
+        strike: contract.strike,
+        option_type: contract.optionType,
       };
 
       const res = await fetch("/api/quick-trade/execute", {
@@ -242,24 +278,65 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error("Failed to route option order");
-      return res.json();
-    },
-    onSuccess: (_, variables) => {
+
+      const data = await res.json();
+      if (!res.ok || data.status === "error") {
+        throw new Error(data.message || data.reason || "Execution failed");
+      }
+
       setFeedback({
         status: "success",
-        message: `Option Order Dispatched (${environment}): ${variables.side} ${variables.lots} Lots ${underlying} ${variables.strike} ${variables.type} @ ${currency}${variables.price.toFixed(2)}`,
+        message: `1-Click Trade Placed: ${side} 1 Lot ${contract.symbol} @ ${currency}${price.toFixed(2)} (${tradingMode})`,
       });
-      queryClient.invalidateQueries({ queryKey: ["optionsPositions"] });
-      queryClient.invalidateQueries({ queryKey: ["optionsOrders"] });
-    },
-    onError: (err: Error) => {
+      await refreshAll();
+    } catch (err: any) {
       setFeedback({
         status: "error",
-        message: `Order Execution Blocked: ${err.message}`,
+        message: `1-Click Trade Failed: ${err.message}`,
       });
-    },
-  });
+    }
+  };
+
+  // Action Dispatchers
+  const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
+    if (oneClickMode) {
+      executeOneClickTrade("BUY", contract);
+    } else {
+      setTicketContract(contract);
+      setTicketSide("BUY");
+      setIsTicketOpen(true);
+    }
+  }, [oneClickMode, tradingMode]);
+
+  const handleActionSell = useCallback((contract: ActionableOptionContract) => {
+    if (oneClickMode) {
+      executeOneClickTrade("SELL", contract);
+    } else {
+      setTicketContract(contract);
+      setTicketSide("SELL");
+      setIsTicketOpen(true);
+    }
+  }, [oneClickMode, tradingMode]);
+
+  const handleActionDepth = useCallback((contract: ActionableOptionContract) => {
+    setDepthContract(contract);
+    setIsDepthOpen(true);
+  }, []);
+
+  // Keyboard Shortcuts Handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsTicketOpen(false);
+        setIsDepthOpen(false);
+        setIsDrawerOpen(false);
+        setIsColumnModalOpen(false);
+        setIsFilterModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <div className="flex flex-col gap-3 text-slate-100 font-sans w-full max-w-[1700px] mx-auto min-w-0">
@@ -350,15 +427,16 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           })}
         </div>
 
-        <div className="hidden sm:flex items-center pr-1 flex-shrink-0 text-slate-400 font-mono text-[11px]">
-          Underlying: <strong className="text-cyan-300 ml-1">{underlying}</strong>
+        <div className="hidden sm:flex items-center pr-1 flex-shrink-0 text-slate-400 font-mono text-[11px] gap-3">
+          <span>Execution: <strong className={tradingMode === "LIVE" ? "text-rose-400" : "text-emerald-400"}>{tradingMode}</strong></span>
+          <span>Underlying: <strong className="text-cyan-300">{underlying}</strong></span>
         </div>
       </div>
 
       {/* 4. TAB VIEW RENDERING */}
       {terminalTab === "CHAIN" && (
         <div className="space-y-3">
-          {/* High-density Control Bar */}
+          {/* High-density Control Bar with One-Click Trading Toggle */}
           <OptionTerminalControlBar
             strikeRange={strikeRange}
             onChangeStrikeRange={(r) => setStrikeRange(r)}
@@ -375,26 +453,32 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
             onChangeSearchQuery={(q) => setSearchQuery(q)}
             totalStrikesCount={rawStrikes.length}
             displayedStrikesCount={displayedStrikes.length}
+            oneClickMode={oneClickMode}
+            onToggleOneClickMode={handleToggleOneClickMode}
           />
 
-          {/* Main Option Chain Table */}
+          {/* Actionable Option Chain Table */}
           <OptionChainTable
             strikes={displayedStrikes}
             spotPrice={snapshot?.spotPrice || 25420.0}
             atmStrike={snapshot?.atmStrike || 25400}
             currency={currency}
+            underlying={underlying}
+            selectedExpiry={snapshot?.selectedExpiry || selectedExpiry}
+            source={source}
             columnConfig={columnConfig}
             selectedStrike={selectedStrike}
             selectedOptionType={selectedOptionType}
+            positions={positions}
             onSelectOption={(k, type, quote) => {
               setSelectedStrike(k);
               setSelectedOptionType(type);
               setSelectedQuote(quote);
               setIsDrawerOpen(true);
             }}
-            onQuickTrade={(k, type, side, ltp) => {
-              singleOptionMutation.mutate({ side, lots: 1, strike: k, type, price: ltp });
-            }}
+            onActionBuy={handleActionBuy}
+            onActionSell={handleActionSell}
+            onActionDepth={handleActionDepth}
           />
         </div>
       )}
@@ -415,6 +499,31 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         <OptionAnalyticsPanel snapshot={snapshot} currency={currency} />
       )}
 
+      {/* Actionable Quick Order Ticket */}
+      <OptionQuickOrderTicket
+        isOpen={isTicketOpen}
+        onClose={() => setIsTicketOpen(false)}
+        contract={ticketContract}
+        initialSide={ticketSide}
+        currency={currency}
+        onOrderSuccess={() => {
+          setIsTicketOpen(false);
+          refetch();
+        }}
+      />
+
+      {/* Actionable Level-2 Order Book Depth Modal */}
+      <OptionOrderBook
+        isOpen={isDepthOpen}
+        onClose={() => setIsDepthOpen(false)}
+        contract={depthContract}
+        currency={currency}
+        onTradeAction={(act, c) => {
+          if (act === "BUY") handleActionBuy(c);
+          if (act === "SELL") handleActionSell(c);
+        }}
+      />
+
       {/* Column Customizer Modal */}
       <ColumnCustomizerModal
         isOpen={isColumnModalOpen}
@@ -432,7 +541,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         onResetFilters={() => setFilterConfig(DEFAULT_FILTER_CONFIG)}
       />
 
-      {/* Selected Option Inspection Drawer & Order Ticket */}
+      {/* Selected Option Inspection Drawer */}
       {isDrawerOpen && selectedStrike && selectedOptionType && selectedQuote && (
         <SelectedOptionInspectionDrawer
           isOpen={isDrawerOpen}
@@ -445,14 +554,11 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           expiry={snapshot?.selectedExpiry || selectedExpiry}
           currency={currency}
           onExecuteOrder={(side, lots) => {
-            singleOptionMutation.mutate({
-              side,
-              lots,
-              strike: selectedStrike,
-              type: selectedOptionType,
-              price: selectedQuote.ltp || 0,
-            });
             setIsDrawerOpen(false);
+            if (ticketContract) {
+              setTicketSide(side);
+              setIsTicketOpen(true);
+            }
           }}
         />
       )}

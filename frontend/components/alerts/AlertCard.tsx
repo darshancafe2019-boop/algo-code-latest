@@ -26,7 +26,7 @@ export function AlertCard({ alert, onDismiss, isDismissing = false }: AlertCardP
     bg: "bg-cyan-950/60",
     border: "border-cyan-500/40",
     text: "text-cyan-400",
-    cardBorder: "border-[#1E293B] hover:border-cyan-500/30",
+    cardBorder: "border-[#1A2A3F] hover:border-cyan-500/30",
     cardBg: "bg-[#121824]/80",
     icon: <Info className="w-4 h-4 text-cyan-400 shrink-0" />,
     label: "INFO"

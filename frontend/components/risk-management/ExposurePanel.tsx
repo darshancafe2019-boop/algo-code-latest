@@ -30,7 +30,7 @@ export function ExposurePanel({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Panel 1: Asset Class Allocation */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-cyan-400" />
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -49,7 +49,7 @@ export function ExposurePanel({
                     ${val.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({pct.toFixed(1)}%)
                   </span>
                 </div>
-                <div className="h-2 w-full bg-[#0E1524] rounded-full overflow-hidden border border-[#1E293B]">
+                <div className="h-2 w-full bg-[#0E1524] rounded-full overflow-hidden border border-[#1A2A3F]">
                   <div
                     className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
                     style={{ width: `${Math.min(100, pct)}%` }}
@@ -62,7 +62,7 @@ export function ExposurePanel({
       </div>
 
       {/* Panel 2: Exposure Concentration Heatmap */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Globe className="h-4 w-4 text-cyan-400" />
@@ -78,7 +78,7 @@ export function ExposurePanel({
         <div className="overflow-x-auto max-h-60 overflow-y-auto">
           {heatmap && heatmap.length > 0 ? (
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-[#0E1524] text-slate-400 uppercase text-[10px] sticky top-0 border-b border-[#1E293B]">
+              <thead className="bg-[#0E1524] text-slate-400 uppercase text-[10px] sticky top-0 border-b border-[#1A2A3F]">
                 <tr>
                   <th className="py-2 px-3">Entity</th>
                   <th className="py-2 px-3">Type</th>

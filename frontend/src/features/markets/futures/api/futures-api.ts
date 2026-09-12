@@ -14,6 +14,8 @@ import {
   FuturesPosition,
   OrderIntentPayload,
   OrderIntentResponse,
+  OrderBookData,
+  FuturesOrder,
 } from "../types/futures";
 
 export async function fetchFuturesUniverseData(params?: {
@@ -147,6 +149,70 @@ export async function submitFuturesOrderIntent(payload: OrderIntentPayload): Pro
       code: "NETWORK_ERROR",
       message: err.message || "Failed to contact execution gateway",
     };
+  }
+}
+
+export async function fetchFuturesOrderBook(symbol: string, limit: number = 10): Promise<OrderBookData | null> {
+  try {
+    const res = await apiClient.get<any>(`/api/futures/orderbook?symbol=${encodeURIComponent(symbol)}&limit=${limit}`, {
+      timeoutMs: 4000,
+    });
+    if (!res.ok || !res.data) throw new Error("Failed to fetch orderbook");
+    return res.data;
+  } catch (err) {
+    console.warn("Orderbook fetch fallback:", err);
+    return null;
+  }
+}
+
+export async function fetchFuturesOrders(): Promise<FuturesOrder[]> {
+  try {
+    const res = await apiClient.get<any>("/api/futures/orders", {
+      timeoutMs: 4000,
+      deduplicate: true,
+    });
+    if (!res.ok || !res.data) throw new Error("Failed to fetch futures orders");
+    return Array.isArray(res.data.orders) ? res.data.orders : [];
+  } catch (err) {
+    console.warn("Futures orders fetch fallback:", err);
+    return [];
+  }
+}
+
+export async function cancelFuturesOrder(orderId: string): Promise<boolean> {
+  try {
+    const res = await apiClient.post<any>(`/api/futures/orders/${encodeURIComponent(orderId)}/cancel`, {});
+    return res.ok;
+  } catch (err) {
+    console.error("Failed to cancel order:", err);
+    return false;
+  }
+}
+
+export async function executePositionAction(posId: string, action: string, payload?: any): Promise<any> {
+  try {
+    const res = await apiClient.post<any>(`/api/futures/positions/${encodeURIComponent(posId)}/action`, {
+      action,
+      ...payload,
+    });
+    if (!res.ok) throw new Error(res.error?.message || "Failed to execute position action");
+    return res.data;
+  } catch (err: any) {
+    throw new Error(err.message || "Position action execution failed");
+  }
+}
+
+export async function fetchFuturesAccountMargins(): Promise<Record<string, any>> {
+  try {
+    const res = await apiClient.get<any>("/api/futures/account-margins", {
+      timeoutMs: 3000,
+      deduplicate: true,
+    });
+    if (!res.ok || !res.data) throw new Error("Failed to fetch account margins");
+    return res.data.accounts || {};
+  } catch (err) {
+    console.warn("Account margins fetch fallback:", err);
+    return {};
   }
 }
 

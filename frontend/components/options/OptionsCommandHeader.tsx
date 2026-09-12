@@ -170,7 +170,7 @@ export function OptionsCommandHeader({
   const isStale = dataStatus === "STALE" || dataAgeMs > 8000;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4">
       {/* Top Bar: Title, Environment Mode, Live Spot Quote & Diagnostics */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         {/* Title & Environment Badge */}
@@ -207,7 +207,7 @@ export function OptionsCommandHeader({
         </div>
 
         {/* Live Spot Quote & Telemetry Bar */}
-        <div className="flex items-center gap-4 bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5 px-4 text-xs font-mono">
+        <div className="flex items-center gap-4 bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5 px-4 text-xs font-mono">
           <div>
             <div className="text-[10px] text-slate-400 uppercase">Underlying Spot</div>
             <div className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">

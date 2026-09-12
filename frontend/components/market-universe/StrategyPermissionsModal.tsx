@@ -73,9 +73,9 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="bg-[#0B0E14] border border-[#1E293B] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#0B0E14] border border-[#1A2A3F] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
-        <div className="p-4 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between">
+        <div className="p-4 bg-[#121824] border-b border-[#1A2A3F] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
               <ShieldCheck className="h-5 w-5" />
@@ -92,7 +92,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
 
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1E293B] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
+            className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1A2A3F] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -107,7 +107,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
               <select
                 value={selectedBot}
                 onChange={(e) => setSelectedBot(e.target.value)}
-                className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1E293B] text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
+                className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1A2A3F] text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
               >
                 <option value="ALL">ALL Active Bots</option>
                 <option value="bot-1">Bot 1 (BTC/USDT Primary)</option>
@@ -118,9 +118,9 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
           </div>
 
           {/* Permissions Table */}
-          <div className="rounded-xl border border-[#1E293B] overflow-hidden bg-[#0F141F]">
+          <div className="rounded-xl border border-[#1A2A3F] overflow-hidden bg-[#0F141F]">
             <table className="w-full text-left text-xs">
-              <thead className="bg-[#121824] text-slate-400 text-[11px] border-b border-[#1E293B]">
+              <thead className="bg-[#121824] text-slate-400 text-[11px] border-b border-[#1A2A3F]">
                 <tr>
                   <th className="py-2.5 px-3">Bot Scope</th>
                   <th className="py-2.5 px-3">Asset Class</th>
@@ -187,7 +187,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
           </div>
 
           {/* Add New Rule Form */}
-          <form onSubmit={handleAddNewRule} className="p-4 rounded-xl bg-[#121824] border border-[#1E293B] space-y-3">
+          <form onSubmit={handleAddNewRule} className="p-4 rounded-xl bg-[#121824] border border-[#1A2A3F] space-y-3">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Plus className="h-3.5 w-3.5 text-purple-400" />
               Configure Custom Strategy Rule
@@ -199,7 +199,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
                 <select
                   value={newAssetClass}
                   onChange={(e) => setNewAssetClass(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1E293B] text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] text-white focus:outline-none focus:border-purple-500"
                 >
                   <option value="CRYPTO">CRYPTO</option>
                   <option value="INDIAN_STOCKS">INDIAN STOCKS</option>
@@ -216,7 +216,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
                 <select
                   value={newStrategy}
                   onChange={(e) => setNewStrategy(e.target.value)}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1E293B] text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] text-white focus:outline-none focus:border-purple-500"
                 >
                   <option value="EMA_MACD_VP">EMA MACD Volume Profile</option>
                   <option value="RSI_BB_CONFLUENCE">RSI Bollinger Confluence</option>
@@ -232,7 +232,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
                 <select
                   value={newAllowed ? "ALLOW" : "BLOCK"}
                   onChange={(e) => setNewAllowed(e.target.value === "ALLOW")}
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1E293B] text-white focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] text-white focus:outline-none focus:border-purple-500"
                 >
                   <option value="ALLOW">PERMITTED (Allow)</option>
                   <option value="BLOCK">BLOCKED (Restrict)</option>
@@ -246,7 +246,7 @@ export function StrategyPermissionsModal({ isOpen, onClose }: StrategyPermission
                   value={newReason}
                   onChange={(e) => setNewReason(e.target.value)}
                   placeholder="e.g. Volatility filter"
-                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1E293B] text-white placeholder-slate-600 focus:outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] text-white placeholder-slate-600 focus:outline-none focus:border-purple-500"
                 />
               </div>
             </div>

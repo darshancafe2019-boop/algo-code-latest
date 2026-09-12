@@ -71,7 +71,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
       )}
 
       {/* Section 1: Pre-Configured Risk Profiles */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Shield className="h-4 w-4 text-cyan-400" />
@@ -93,7 +93,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
                 className={`p-4 rounded-xl border transition-all flex flex-col justify-between ${
                   isDefault
                     ? "bg-gradient-to-b from-[#162032] to-[#121824] border-cyan-500/50 shadow-lg shadow-cyan-950/20"
-                    : "bg-[#0E1524] border-[#1E293B] hover:border-slate-700"
+                    : "bg-[#0E1524] border-[#1A2A3F] hover:border-slate-700"
                 }`}
               >
                 <div>
@@ -109,7 +109,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
                   </div>
                   <p className="text-xs text-slate-400 mb-3">{p.description || "Quantitative multi-asset risk tier."}</p>
 
-                  <div className="space-y-1.5 text-[11px] font-mono text-slate-300 border-t border-[#1E293B] pt-2.5">
+                  <div className="space-y-1.5 text-[11px] font-mono text-slate-300 border-t border-[#1A2A3F] pt-2.5">
                     <div className="flex justify-between">
                       <span className="text-slate-500">Max Trade Risk:</span>
                       <span className="text-slate-200">{p.max_single_trade_risk_pct}%</span>
@@ -129,7 +129,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-[#1E293B]">
+                <div className="mt-4 pt-3 border-t border-[#1A2A3F]">
                   {isDefault ? (
                     <button
                       disabled
@@ -154,7 +154,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
       </div>
 
       {/* Section 2: Global Hardcoded Safety Caps (Read-Only) */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Lock className="h-4 w-4 text-amber-400" />
@@ -168,32 +168,32 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Max Daily Loss Cap</span>
             <span className="text-base font-bold text-white">${activeLimits?.max_daily_loss || 500}</span>
           </div>
 
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Max Position Size</span>
             <span className="text-base font-bold text-white">{activeLimits?.max_position_size || 1.0} BTC</span>
           </div>
 
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Max Order Value</span>
             <span className="text-base font-bold text-white">${activeLimits?.max_order_value || 10000}</span>
           </div>
 
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Max Open Positions</span>
             <span className="text-base font-bold text-white">{activeLimits?.max_open_positions || 3} Slots</span>
           </div>
 
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Confluence Gate</span>
             <span className="text-base font-bold text-cyan-400">{((activeLimits?.confluence_threshold || 0.75) * 100).toFixed(0)}%</span>
           </div>
 
-          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B] space-y-1">
+          <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F] space-y-1">
             <span className="text-slate-500 text-[10px] block">Max Data Age</span>
             <span className="text-base font-bold text-slate-200">{activeLimits?.max_market_data_age_seconds || 60}s</span>
           </div>
@@ -203,7 +203,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
       {/* Confirmation Modal */}
       {confirmModalOpen && targetProfile && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="p-2.5 rounded-xl bg-cyan-950 border border-cyan-800 text-cyan-400">
                 <Shield className="h-6 w-6" />
@@ -214,7 +214,7 @@ export function RiskLimits({ profiles, activeLimits }: RiskLimitsProps) {
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 font-mono bg-[#0E1524] p-3 rounded-xl border border-[#1E293B]">
+            <p className="text-xs text-slate-300 font-mono bg-[#0E1524] p-3 rounded-xl border border-[#1A2A3F]">
               Switching default profile to <b>{targetProfile.name}</b> will immediately update single-trade risk caps ({targetProfile.max_single_trade_risk_pct}%) and daily loss halts ({targetProfile.max_daily_loss_pct}%) across all bots.
             </p>
 

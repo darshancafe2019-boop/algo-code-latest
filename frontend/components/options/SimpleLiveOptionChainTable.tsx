@@ -99,7 +99,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
   }
 
   return (
-    <div className="bg-[#080E1C] border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden font-mono text-xs select-none">
+    <div className="bg-[#07101A] border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden font-mono text-xs select-none">
       {/* Table Container with Controlled Scroll */}
       <div className="overflow-x-auto max-h-[640px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
         <table className="w-full border-collapse">

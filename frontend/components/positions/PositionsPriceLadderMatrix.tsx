@@ -7,10 +7,7 @@ import {
   Sliders,
   Radio,
   Flame,
-  ArrowRight,
-  Zap,
 } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { PositionRecord } from "@/types/positions";
 
 interface PositionsPriceLadderMatrixProps {
@@ -28,10 +25,8 @@ export function PositionsPriceLadderMatrix({
   onSquareOff,
   onMoveToBreakeven,
 }: PositionsPriceLadderMatrixProps) {
-  const router = useRouter();
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 font-sans select-none">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 font-sans select-none">
       {positions.map((pos) => {
         const isLong = (pos.direction || pos.side || "LONG").toUpperCase().includes("LONG") || (pos.direction || pos.side || "LONG").toUpperCase().includes("BUY");
         const isProfit = pos.unrealized_pnl >= 0;
@@ -56,104 +51,104 @@ export function PositionsPriceLadderMatrix({
           <div
             key={pos.id}
             onClick={() => onSelectPosition(pos)}
-            className="p-5 rounded-3xl bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] shadow-xl space-y-4 cursor-pointer hover:border-[var(--theme-accent)]/50 transition-all group"
+            className="p-5 rounded-xl bg-[#0A1422] border border-[#1A2A3F] shadow-sm space-y-4 cursor-pointer hover:border-[#29415F] transition-all group"
           >
             {/* Header: Symbol & Float P&L */}
-            <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
+            <div className="flex items-center justify-between border-b border-[#122033] pb-3">
               <div className="flex items-center gap-2">
-                <span className="text-base font-extrabold text-[var(--theme-text-primary)] group-hover:text-[var(--theme-accent)] transition-colors">
+                <span className="text-base font-semibold text-[#F7FAFC] group-hover:text-[#19C5FF] transition-colors">
                   {pos.symbol}
                 </span>
                 <span
-                  className={`px-2 py-0.5 rounded-lg text-xs font-mono font-extrabold border ${
+                  className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${
                     isLong
-                      ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
-                      : "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/30"
+                      ? "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
+                      : "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30"
                   }`}
                 >
                   {isLong ? "LONG" : "SHORT"} {pos.leverage || 5}x
                 </span>
               </div>
 
-              <div className="text-right font-mono tabular-nums">
+              <div className="text-right tabular-nums">
                 <span
-                  className={`text-sm font-black block ${
-                    isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                  className={`text-sm font-bold block ${
+                    isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
                   }`}
                 >
                   {isProfit ? "+" : ""}${pos.unrealized_pnl.toFixed(2)} ({pos.unrealized_pnl_pct.toFixed(2)}%)
                 </span>
-                <span className="text-[10px] text-[var(--theme-text-muted)]">
+                <span className="text-xs text-[#52627A]">
                   Live Mark: ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
             </div>
 
             {/* Vertical Price Ladder Stack */}
-            <div className="space-y-2 font-mono text-xs">
+            <div className="space-y-2 text-xs">
               {/* Level: Extended Take Profit Target (TP3) */}
-              <div className="p-2.5 rounded-2xl bg-[var(--theme-elevated)]/40 border border-[var(--theme-profit)]/20 flex items-center justify-between">
+              <div className="p-2.5 rounded-lg bg-[#0D1727] border border-[#00E890]/20 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[var(--theme-profit)]/40" />
-                  <span className="text-[11px] text-[var(--theme-profit)]/80 font-bold">TP 3 (Runner Target)</span>
+                  <span className="w-2 h-2 rounded-full bg-[#00E890]/40" />
+                  <span className="text-xs text-[#00E890]/80 font-medium">TP 3 (Runner Target)</span>
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className="font-bold text-[var(--theme-text-secondary)]">
+                  <span className="font-semibold text-[#7C8CA3]">
                     ${tp3.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-[10px] text-[var(--theme-profit)] ml-1.5 font-bold">
+                  <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{Math.abs(((tp3 - entryP) / entryP) * 100).toFixed(2)}%
                   </span>
                 </div>
               </div>
 
               {/* Level: Extended Take Profit Target (TP2) */}
-              <div className="p-2.5 rounded-2xl bg-[var(--theme-elevated)]/70 border border-[var(--theme-profit)]/30 flex items-center justify-between">
+              <div className="p-2.5 rounded-lg bg-[#0D1727] border border-[#00E890]/30 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[var(--theme-profit)]/80" />
-                  <span className="text-[11px] text-[var(--theme-profit)] font-bold">TP 2 (Extension Target)</span>
+                  <span className="w-2 h-2 rounded-full bg-[#00E890]/80" />
+                  <span className="text-xs text-[#00E890] font-medium">TP 2 (Extension Target)</span>
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className="font-bold text-[var(--theme-text-primary)]">
+                  <span className="font-semibold text-[#F7FAFC]">
                     ${tp2.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-[10px] text-[var(--theme-profit)] ml-1.5 font-bold">
+                  <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{Math.abs(((tp2 - entryP) / entryP) * 100).toFixed(2)}%
                   </span>
                 </div>
               </div>
 
               {/* Level: Primary Take Profit (TP1) */}
-              <div className="p-2.5 rounded-2xl bg-[var(--theme-profit)]/15 border border-[var(--theme-profit)]/50 shadow-sm flex items-center justify-between">
+              <div className="p-2.5 rounded-lg bg-[#00E890]/10 border border-[#00E890]/40 shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Target className="h-3.5 w-3.5 text-[var(--theme-profit)]" />
-                  <span className="text-[11px] text-[var(--theme-profit)] font-extrabold">TP 1 (Primary Target)</span>
+                  <Target className="h-3.5 w-3.5 text-[#00E890]" />
+                  <span className="text-xs text-[#00E890] font-semibold">TP 1 (Primary Target)</span>
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className="font-black text-[var(--theme-profit)]">
+                  <span className="font-bold text-[#00E890]">
                     ${tpP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-[10px] text-[var(--theme-profit)] ml-1.5 font-extrabold">
+                  <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{pos.tp_distance_pct?.toFixed(2) || "4.00"}%
                   </span>
                 </div>
               </div>
 
               {/* Level: Current Mark Price (ACTIVE TICK) */}
-              <div className="p-3 rounded-2xl bg-[var(--theme-accent)]/15 border-2 border-[var(--theme-accent)] shadow-md flex items-center justify-between">
+              <div className="p-3 rounded-lg bg-[#2563EB]/15 border border-[#2563EB] shadow-sm flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Radio className="h-4 w-4 text-[var(--theme-accent)] animate-pulse" />
-                  <span className="text-xs text-[var(--theme-text-primary)] font-bold font-sans">
-                    CURRENT MARKET MARK
+                  <Radio className="h-4 w-4 text-[#19C5FF] animate-pulse" />
+                  <span className="text-xs text-[#F7FAFC] font-semibold">
+                    Current Market Mark
                   </span>
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className="text-sm font-black text-[var(--theme-text-primary)]">
+                  <span className="text-sm font-bold text-[#F7FAFC]">
                     ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                   <span
-                    className={`text-xs ml-2 font-black ${
-                      isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                    className={`text-xs ml-2 font-bold ${
+                      isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
                     }`}
                   >
                     {isProfit ? "+" : ""}${pos.unrealized_pnl.toFixed(2)}
@@ -162,57 +157,57 @@ export function PositionsPriceLadderMatrix({
               </div>
 
               {/* Level: Entry Price & Breakeven */}
-              <div className="p-2.5 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] flex items-center justify-between text-[var(--theme-text-muted)]">
+              <div className="p-2.5 rounded-lg bg-[#0D1727] border border-[#1A2A3F] flex items-center justify-between text-[#52627A]">
                 <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-[var(--theme-text-muted)]" />
-                  <span className="text-[11px] font-semibold">ENTRY / BASIS</span>
+                  <span className="w-2 h-2 rounded-full bg-[#52627A]" />
+                  <span className="text-xs font-medium">Entry / Basis</span>
                 </div>
-                <div className="text-right tabular-nums text-[var(--theme-text-primary)] font-bold">
+                <div className="text-right tabular-nums text-[#F7FAFC] font-semibold">
                   ${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </div>
               </div>
 
               {/* Level: Trailing Stop Level */}
               {trailingSl !== slP && (
-                <div className="p-2 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-warning)]/30 flex items-center justify-between text-[var(--theme-warning)]">
+                <div className="p-2 rounded-lg bg-[#0D1727] border border-[#F59E0B]/30 flex items-center justify-between text-[#F59E0B]">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[var(--theme-warning)]" />
-                    <span className="text-[11px] font-bold">DYNAMIC TRAILING STOP</span>
+                    <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                    <span className="text-xs font-medium">Dynamic Trailing Stop</span>
                   </div>
-                  <div className="text-right tabular-nums font-bold">
+                  <div className="text-right tabular-nums font-semibold">
                     ${trailingSl.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </div>
                 </div>
               )}
 
               {/* Level: Stop Loss Boundary */}
-              <div className="p-2.5 rounded-2xl bg-[var(--theme-loss)]/10 border border-[var(--theme-loss)]/40 flex items-center justify-between">
+              <div className="p-2.5 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/40 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-3.5 w-3.5 text-[var(--theme-loss)]" />
-                  <span className="text-[11px] text-[var(--theme-loss)] font-bold">STOP LOSS BOUNDARY</span>
+                  <Shield className="h-3.5 w-3.5 text-[#FF3B5C]" />
+                  <span className="text-xs text-[#FF3B5C] font-semibold">Stop Loss Boundary</span>
                   {isAtBreakeven && (
-                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] font-sans font-bold">
-                      BREAKEVEN
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#2563EB]/20 text-[#19C5FF] font-semibold">
+                      BE
                     </span>
                   )}
                 </div>
                 <div className="text-right tabular-nums">
-                  <span className="font-black text-[var(--theme-loss)]">
+                  <span className="font-bold text-[#FF3B5C]">
                     ${slP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-[10px] text-[var(--theme-loss)] ml-1.5 font-bold">
+                  <span className="text-xs text-[#FF3B5C] ml-1.5 font-semibold">
                     -{pos.sl_distance_pct?.toFixed(2) || "2.00"}%
                   </span>
                 </div>
               </div>
 
               {/* Level: Liquidation Risk Price */}
-              <div className="p-2 rounded-2xl bg-[var(--theme-elevated)]/40 border border-[var(--theme-border-subtle)] flex items-center justify-between text-[var(--theme-text-muted)] text-[10px]">
+              <div className="p-2 rounded-lg bg-[#0D1727] border border-[#1A2A3F] flex items-center justify-between text-[#52627A] text-xs">
                 <div className="flex items-center gap-1.5">
-                  <Flame className="h-3 w-3 text-[var(--theme-loss)]" />
-                  <span>ESTIMATED LIQUIDATION</span>
+                  <Flame className="h-3.5 w-3.5 text-[#FF3B5C]" />
+                  <span>Estimated Liquidation</span>
                 </div>
-                <span className="font-bold text-[var(--theme-warning)] tabular-nums">
+                <span className="font-semibold text-[#F59E0B] tabular-nums">
                   ${liqP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
@@ -220,32 +215,32 @@ export function PositionsPriceLadderMatrix({
 
             {/* Bottom Action Controls */}
             <div
-              className="flex items-center justify-between border-t border-[var(--theme-border-subtle)] pt-3"
+              className="flex items-center justify-between border-t border-[#122033] pt-3"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-1.5">
                 {!isAtBreakeven && (
                   <button
                     onClick={() => onMoveToBreakeven(pos)}
-                    className="px-3 py-1.5 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-accent)]/20 text-[var(--theme-text-secondary)] hover:text-[var(--theme-accent)] border border-[var(--theme-border-subtle)] text-xs font-bold transition"
+                    className="px-3 py-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#19C5FF] border border-[#1A2A3F] text-xs font-semibold transition"
                   >
-                    MOVE TO BE
+                    Move to BE
                   </button>
                 )}
                 <button
                   onClick={() => onModifyProtection(pos)}
-                  className="px-3 py-1.5 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-accent)] border border-[var(--theme-border-subtle)] text-xs font-bold flex items-center gap-1.5 transition"
+                  className="px-3 py-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#19C5FF] border border-[#1A2A3F] text-xs font-medium flex items-center gap-1.5 transition"
                 >
                   <Sliders className="h-3.5 w-3.5" />
-                  <span>ADJUST SL / TP</span>
+                  <span>Adjust SL / TP</span>
                 </button>
               </div>
 
               <button
                 onClick={() => onSquareOff(pos)}
-                className="px-4 py-1.5 rounded-xl bg-[var(--theme-loss)]/15 hover:bg-[var(--theme-loss)] text-[var(--theme-loss)] hover:text-white border border-[var(--theme-loss)]/30 text-xs font-extrabold font-mono transition active:scale-95"
+                className="px-3.5 py-1.5 rounded-lg bg-[#FF3B5C]/15 hover:bg-[#FF3B5C] text-[#FF3B5C] hover:text-white border border-[#FF3B5C]/30 text-xs font-semibold transition active:scale-95"
               >
-                SQUARE OFF
+                Square Off
               </button>
             </div>
           </div>

@@ -103,279 +103,60 @@ export async function GET(req: NextRequest) {
 
     const isDelta = source.includes("DELTA") || ["BTC", "ETH", "SOL", "XRP", "XAUT"].includes(underlying);
 
-    // 1. First probe Market Data Gateway (Port 5051)
+    // 1. If Delta provider or Crypto underlying: use authoritative Delta Product & Options Service
     if (isDelta) {
       try {
-        const gwUrl = new URL(`${GATEWAY_URL}/api/options/chain`);
-        gwUrl.searchParams.set("underlying", underlying);
-        gwUrl.searchParams.set("source", "DELTA_INDIA");
-        if (expiry) gwUrl.searchParams.set("expiry", expiry);
-        gwUrl.searchParams.set("strike_count", strikeCount);
+        const { deltaProductService } = await import("@/lib/brokers/delta/delta-product-service");
+        const snapshot = await deltaProductService.fetchOptionChainSnapshot(underlying, expiry || undefined);
 
-        const gwRes = await fetch(gwUrl.toString(), {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-          signal: AbortSignal.timeout(4000),
-        });
+        const expList = snapshot.availableExpiries.map((e) => e.expiryApiFormat);
+        populateOptionEngine(
+          underlying,
+          snapshot.spotPrice || 0,
+          snapshot.selectedExpiry,
+          expList,
+          snapshot.rows as any
+        );
 
-        if (gwRes.ok) {
-          const gwData = await gwRes.json();
-          if (gwData?.success && Array.isArray(gwData?.rows) && gwData.rows.length > 0) {
-            const expList = Array.isArray(gwData.availableExpiries) ? gwData.availableExpiries : [gwData.expiry || expiry];
-            populateOptionEngine(
-              underlying,
-              gwData.spot || 0,
-              gwData.expiry || expiry,
-              expList,
-              gwData.rows
-            );
+        const responsePayload = {
+          success: true,
+          source: "DELTA_EXCHANGE",
+          broker: "DELTA",
+          underlying: snapshot.underlying,
+          expiry: snapshot.selectedExpiry,
+          selected_expiry: snapshot.selectedExpiry,
+          available_expiries: expList,
+          availableExpiries: expList,
+          all_underlyings: snapshot.allUnderlyings,
+          spot: snapshot.spotPrice,
+          spot_price: snapshot.spotPrice,
+          atmStrike: snapshot.atmStrike,
+          atm_strike: snapshot.atmStrike,
+          contracts: snapshot.contractsCount,
+          calls: snapshot.callsCount,
+          puts: snapshot.putsCount,
+          rows: snapshot.rows,
+          strikes: snapshot.rows,
+          ws_subscription_symbol: snapshot.wsSubscriptionSymbol,
+          status: snapshot.status,
+          timestamp: new Date(snapshot.lastUpdated).toISOString(),
+          data: {
+            success: true,
+            source: "DELTA_EXCHANGE",
+            broker: "DELTA",
+            underlying: snapshot.underlying,
+            selected_expiry: snapshot.selectedExpiry,
+            available_expiries: expList,
+            spot_price: snapshot.spotPrice,
+            atm_strike: snapshot.atmStrike,
+            strikes: snapshot.rows,
+            contracts: snapshot.contractsCount,
+          },
+        };
 
-            // Structure data matching both gateway format and frontend OptionsUniverseView expectation
-            const responsePayload = {
-              success: true,
-              source: "DELTA_EXCHANGE",
-              broker: "DELTA",
-              underlying,
-              expiry: gwData.expiry || expiry,
-              selected_expiry: gwData.expiry || expiry,
-              available_expiries: expList,
-              spot: gwData.spot,
-              spot_price: gwData.spot,
-              atmStrike: gwData.atmStrike,
-              atm_strike: gwData.atmStrike,
-              contracts: gwData.contracts,
-              rows: gwData.rows,
-              strikes: gwData.rows,
-              timestamp: gwData.timestamp || new Date().toISOString(),
-              data: {
-                success: true,
-                source: "DELTA_EXCHANGE",
-                broker: "DELTA",
-                underlying,
-                selected_expiry: gwData.expiry || expiry,
-                available_expiries: expList,
-                spot_price: gwData.spot,
-                atm_strike: gwData.atmStrike,
-                strikes: gwData.rows,
-                contracts: gwData.contracts,
-              },
-            };
-
-            return NextResponse.json(responsePayload, { status: 200 });
-          }
-        }
-      } catch {
-        // Gateway probe failed, fall through to backend
-      }
-    }
-
-    // 2. Second probe Quantitative Backend (Port 5050)
-    try {
-      const backendUrl = new URL(`${BACKEND_URL}/api/options/chain`);
-      backendUrl.searchParams.set("underlying", underlying);
-      backendUrl.searchParams.set("source", source);
-      backendUrl.searchParams.set("environment", environment);
-      if (expiry) backendUrl.searchParams.set("expiry", expiry);
-      backendUrl.searchParams.set("strike_count", strikeCount);
-
-      const bRes = await fetch(backendUrl.toString(), {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(4000),
-      });
-
-      if (bRes.ok) {
-        const bData = await bRes.json();
-        const payload = bData?.data || bData;
-        const rows = payload?.strikes || payload?.rows || [];
-
-        if (Array.isArray(rows) && rows.length > 0) {
-          const expList = payload?.available_expiries || payload?.availableExpiries || [payload?.selected_expiry || expiry];
-          populateOptionEngine(
-            underlying,
-            payload?.spot_price || payload?.spot || 0,
-            payload?.selected_expiry || payload?.expiry || expiry,
-            expList,
-            rows
-          );
-
-          return NextResponse.json(bData, { status: 200 });
-        }
-      }
-    } catch {
-      // Backend probe failed
-    }
-
-    // 3. Fallback: Direct Delta India REST call if upstream services are initializing
-    if (isDelta) {
-      let targetExpiry = expiry;
-      let availableExpiries: string[] = [];
-
-      // If no expiry provided, fetch available expiries from Delta products catalogue
-      if (!targetExpiry) {
-        try {
-          const prodRes = await fetch(
-            `https://api.india.delta.exchange/v2/products?contract_types=call_options,put_options&underlying_asset_symbols=${underlying}`,
-            { headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(3500) }
-          );
-          if (prodRes.ok) {
-            const pData = await prodRes.json();
-            const prods = Array.isArray(pData?.result) ? pData.result : [];
-            const expSet = new Set<string>();
-            const now = new Date();
-
-            for (const p of prods) {
-              const st = p?.settlement_time;
-              if (!st) continue;
-              const dt = new Date(st);
-              if (isNaN(dt.getTime()) || dt < now) continue;
-              const dd = String(dt.getUTCDate()).padStart(2, "0");
-              const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
-              const yyyy = dt.getUTCFullYear();
-              expSet.add(`${dd}-${mm}-${yyyy}`);
-            }
-
-            availableExpiries = Array.from(expSet).sort((a, b) => {
-              const [d1, m1, y1] = a.split("-").map(Number);
-              const [d2, m2, y2] = b.split("-").map(Number);
-              return new Date(y1, m1 - 1, d1).getTime() - new Date(y2, m2 - 1, d2).getTime();
-            });
-
-            if (availableExpiries.length > 0) {
-              targetExpiry = availableExpiries[0];
-            }
-          }
-        } catch {
-          // catalogue fetch failed
-        }
-      }
-
-      if (targetExpiry) {
-        const deltaUrl = new URL("https://api.india.delta.exchange/v2/tickers");
-        deltaUrl.searchParams.set("contract_types", "call_options,put_options");
-        deltaUrl.searchParams.set("underlying_asset_symbols", underlying);
-        deltaUrl.searchParams.set("expiry_date", targetExpiry);
-
-        const deltaRes = await fetch(deltaUrl.toString(), {
-          headers: { Accept: "application/json" },
-          cache: "no-store",
-          signal: AbortSignal.timeout(4000),
-        });
-
-        if (deltaRes.ok) {
-          const dData = await deltaRes.json();
-          const contracts = Array.isArray(dData?.result) ? dData.result : [];
-
-          if (contracts.length > 0) {
-            const rowsMap = new Map<number, OptionChainRow>();
-            let spot: number | null = null;
-            let callCount = 0;
-            let putCount = 0;
-
-            for (const raw of contracts) {
-              const strike = toNum(raw?.strike_price);
-              if (strike === null) continue;
-
-              if (spot === null) {
-                spot = toNum(raw?.spot_price);
-              }
-
-              const quotes = raw?.quotes ?? {};
-              const greeks = raw?.greeks ?? {};
-
-              const leg: DeltaOptionLeg = {
-                source: "DELTA_EXCHANGE",
-                broker: "DELTA",
-                symbol: String(raw?.symbol ?? ""),
-                productId: toNum(raw?.product_id) ?? 0,
-                side: raw?.contract_type === "call_options" ? "CALL" : "PUT",
-                underlying,
-                expiry: targetExpiry,
-                strike,
-                spot: toNum(raw?.spot_price),
-                mark: toNum(raw?.mark_price),
-                bid: toNum(quotes?.best_bid),
-                ask: toNum(quotes?.best_ask),
-                bidSize: toNum(quotes?.bid_size),
-                askSize: toNum(quotes?.ask_size),
-                bidIv: toNum(quotes?.bid_iv),
-                askIv: toNum(quotes?.ask_iv),
-                markIv: toNum(raw?.mark_vol),
-                delta: toNum(greeks?.delta),
-                gamma: toNum(greeks?.gamma),
-                theta: toNum(greeks?.theta),
-                vega: toNum(greeks?.vega),
-                rho: toNum(greeks?.rho),
-                openInterest: toNum(raw?.oi),
-                volume: toNum(raw?.volume),
-                exchangeTs: toNum(raw?.timestamp),
-                receivedAt: Date.now(),
-                status: "LIVE",
-              };
-
-              let row = rowsMap.get(strike);
-              if (!row) {
-                row = { strike, call: null, put: null };
-                rowsMap.set(strike, row);
-              }
-
-              if (raw?.contract_type === "call_options") {
-                row.call = leg;
-                callCount++;
-              } else if (raw?.contract_type === "put_options") {
-                row.put = leg;
-                putCount++;
-              }
-            }
-
-            const chainRows = Array.from(rowsMap.values()).sort((a, b) => a.strike - b.strike);
-            let atmStrike: number | null = null;
-            if (spot !== null && chainRows.length > 0) {
-              atmStrike = chainRows.reduce((closest, row) => {
-                return Math.abs(row.strike - spot!) < Math.abs(closest - spot!) ? row.strike : closest;
-              }, chainRows[0].strike);
-            }
-
-            if (availableExpiries.length === 0) {
-              availableExpiries = [targetExpiry];
-            }
-
-            populateOptionEngine(underlying, spot || 0, targetExpiry, availableExpiries, chainRows);
-
-            return NextResponse.json({
-              success: true,
-              source: "DELTA_EXCHANGE",
-              broker: "DELTA",
-              underlying,
-              expiry: targetExpiry,
-              selected_expiry: targetExpiry,
-              available_expiries: availableExpiries,
-              spot,
-              spot_price: spot,
-              atmStrike,
-              atm_strike: atmStrike,
-              contracts: contracts.length,
-              calls: callCount,
-              puts: putCount,
-              rowCount: chainRows.length,
-              rows: chainRows,
-              strikes: chainRows,
-              timestamp: new Date().toISOString(),
-              data: {
-                success: true,
-                source: "DELTA_EXCHANGE",
-                broker: "DELTA",
-                underlying,
-                selected_expiry: targetExpiry,
-                available_expiries: availableExpiries,
-                spot_price: spot,
-                atm_strike: atmStrike,
-                strikes: chainRows,
-                contracts: contracts.length,
-              },
-            });
-          }
-        }
+        return NextResponse.json(responsePayload, { status: 200 });
+      } catch (deltaErr: any) {
+        console.warn("[/api/options/chain] Delta Direct Service fallback:", deltaErr?.message);
       }
     }
 

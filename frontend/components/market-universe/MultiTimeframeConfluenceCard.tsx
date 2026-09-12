@@ -44,11 +44,11 @@ export function MultiTimeframeConfluenceCard({
   const isBuy = state.aggregate_direction === "BUY";
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
       {/* Top Header: Symbol, Direction & Score */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1B3328] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#122033] pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+          <div className="p-2 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
             <Layers className="h-4 w-4" />
           </div>
           <div>
@@ -56,11 +56,11 @@ export function MultiTimeframeConfluenceCard({
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                 Multi-Timeframe Confluence Engine
               </h3>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#07110D] text-[#55C98A] border border-[#1B3328]">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#07101A] text-[#22D3EE] border border-[#122033]">
                 {symbol}
               </span>
             </div>
-            <p className="text-[11px] text-[#A8BDB0]">
+            <p className="text-[11px] text-[#7C8CA3]">
               Hierarchical timeframe cross-validation & statistical regime detection.
             </p>
           </div>
@@ -68,15 +68,15 @@ export function MultiTimeframeConfluenceCard({
 
         {/* Aggregate Signal Badge */}
         <div className="flex items-center gap-2 font-mono">
-          <div className="px-3 py-1.5 rounded-xl bg-[#123C2A] border border-[#39B978]/40 flex items-center gap-2">
-            <span className="text-[10px] text-[#70877A] uppercase font-bold">Aggregate:</span>
-            <span className="text-xs font-bold text-[#55C98A] flex items-center gap-1">
+          <div className="px-3 py-1.5 rounded-xl bg-[rgba(37,99,235,0.18)] border border-[#00E890]/40 flex items-center gap-2">
+            <span className="text-[10px] text-[#52627A] uppercase font-bold">Aggregate:</span>
+            <span className="text-xs font-bold text-[#22D3EE] flex items-center gap-1">
               {isBuy ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
               {state.aggregate_direction} ({state.aggregate_score.toFixed(1)}%)
             </span>
           </div>
 
-          <div className="px-3 py-1.5 rounded-xl bg-[#07110D] border border-[#1B3328] text-cyan-300 text-xs font-bold">
+          <div className="px-3 py-1.5 rounded-xl bg-[#07101A] border border-[#122033] text-cyan-300 text-xs font-bold">
             <span>Regime: </span>
             <span className="uppercase">{state.regime}</span>
           </div>
@@ -88,20 +88,20 @@ export function MultiTimeframeConfluenceCard({
         {state.timeframes.map((tf, idx) => (
           <div
             key={idx}
-            className="p-3.5 rounded-2xl bg-[#07110D] border border-[#1B3328] hover:border-[#2E7D5B] transition-colors space-y-2"
+            className="p-3.5 rounded-2xl bg-[#07101A] border border-[#122033] hover:border-[#2563EB] transition-colors space-y-2"
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-white uppercase">{tf.label}</span>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-[#123C2A] text-[#55C98A] font-bold">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[rgba(37,99,235,0.18)] text-[#22D3EE] font-bold">
                 {tf.direction} ({tf.score.toFixed(0)}%)
               </span>
             </div>
 
             {/* Condition bullets */}
-            <div className="space-y-1 text-[10px] text-[#A8BDB0] font-sans pt-1 border-t border-[#1B3328]">
+            <div className="space-y-1 text-[10px] text-[#7C8CA3] font-sans pt-1 border-t border-[#122033]">
               {tf.conditions.map((cond, cIdx) => (
                 <div key={cIdx} className="flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 text-[#55C98A] shrink-0" />
+                  <CheckCircle2 className="h-3 w-3 text-[#22D3EE] shrink-0" />
                   <span>{cond}</span>
                 </div>
               ))}
@@ -111,11 +111,11 @@ export function MultiTimeframeConfluenceCard({
       </div>
 
       {/* Regime Explanation Engine */}
-      <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] text-xs font-mono space-y-1">
-        <span className="text-[10px] text-[#70877A] uppercase font-bold block">
+      <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] text-xs font-mono space-y-1">
+        <span className="text-[10px] text-[#52627A] uppercase font-bold block">
           Mathematical Regime Attribution Factors:
         </span>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-[#A8BDB0]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px] text-[#7C8CA3]">
           {state.regime_factors.map((f, idx) => (
             <p key={idx}>• {f}</p>
           ))}

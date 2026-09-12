@@ -196,10 +196,10 @@ export function TerminalRightPanel({
 
   if (isCollapsed) {
     return (
-      <div className="w-9 bg-[#131722] border-l border-[#2A2E39] flex flex-col items-center py-2 z-20 shrink-0 select-none font-sans">
+      <div className="w-9 bg-[#07101A] border-l border-[#1A2A3F] flex flex-col items-center py-2 z-20 shrink-0 select-none font-sans">
         <button
           onClick={onToggleCollapse}
-          className="w-7 h-7 rounded flex items-center justify-center text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D] transition"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition"
           title="Expand Right Panel"
         >
           <ChevronLeft className="w-4 h-4" />
@@ -211,7 +211,7 @@ export function TerminalRightPanel({
               onChangeTab("watchlist");
               onToggleCollapse();
             }}
-            className="text-[#787B86] hover:text-[#D1D4DC] transition"
+            className="text-[#7C8CA3] hover:text-[#F7FAFC] transition"
             title="Watchlist"
           >
             <ListFilter className="w-4 h-4" />
@@ -221,7 +221,7 @@ export function TerminalRightPanel({
               onChangeTab("trade");
               onToggleCollapse();
             }}
-            className="text-[#787B86] hover:text-[#26A69A] transition"
+            className="text-[#7C8CA3] hover:text-[#00E890] transition"
             title="Trade Ticket"
           >
             <Zap className="w-4 h-4" />
@@ -231,7 +231,7 @@ export function TerminalRightPanel({
               onChangeTab("positions");
               onToggleCollapse();
             }}
-            className="text-[#787B86] hover:text-[#2962FF] transition"
+            className="text-[#7C8CA3] hover:text-[#19C5FF] transition"
             title="Positions"
           >
             <Layers className="w-4 h-4" />
@@ -241,7 +241,7 @@ export function TerminalRightPanel({
               onChangeTab("orders");
               onToggleCollapse();
             }}
-            className="text-[#787B86] hover:text-[#D1D4DC] transition"
+            className="text-[#7C8CA3] hover:text-[#F7FAFC] transition"
             title="Orders"
           >
             <Send className="w-4 h-4" />
@@ -252,10 +252,10 @@ export function TerminalRightPanel({
   }
 
   return (
-    <div className="w-80 md:w-88 bg-[#131722] border-l border-[#2A2E39] flex flex-col h-full z-20 shrink-0 select-none font-sans">
+    <div className="w-80 md:w-88 bg-[#07101A] border-l border-[#1A2A3F] flex flex-col h-full z-20 shrink-0 select-none font-sans">
       {/* 1. Panel Header & Tabs */}
-      <div className="h-10 bg-[#131722] border-b border-[#2A2E39] px-2 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-1 font-mono text-xs">
+      <div className="h-10 bg-[#07101A] border-b border-[#1A2A3F] px-2 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-1 text-xs">
           {[
             { id: "watchlist", label: "WATCHLIST", icon: ListFilter },
             { id: "trade", label: "TRADE", icon: Zap },
@@ -265,10 +265,10 @@ export function TerminalRightPanel({
             <button
               key={t.id}
               onClick={() => onChangeTab(t.id as RightPanelTabType)}
-              className={`px-2 py-1 rounded text-[11px] font-bold transition-all ${
+              className={`px-2 py-1 rounded-lg text-[11px] font-semibold transition-all ${
                 activeTab === t.id
-                  ? "bg-[#2962FF] text-white shadow-sm"
-                  : "text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D]"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
               }`}
             >
               {t.label}
@@ -279,7 +279,7 @@ export function TerminalRightPanel({
         {/* Collapse Button */}
         <button
           onClick={onToggleCollapse}
-          className="w-6 h-6 rounded flex items-center justify-center text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D] transition"
+          className="w-6 h-6 rounded-lg flex items-center justify-center text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition"
           title="Collapse Panel"
         >
           <ChevronRight className="w-4 h-4" />
@@ -290,27 +290,27 @@ export function TerminalRightPanel({
       {activeTab === "watchlist" && (
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Search & Filter bar */}
-          <div className="p-2 border-b border-[#2A2E39] space-y-1.5 shrink-0">
-            <div className="flex items-center gap-2 bg-[#0F1116] px-2 py-1 rounded border border-[#2A2E39]">
-              <Search className="w-3.5 h-3.5 text-[#787B86]" />
+          <div className="p-2 border-b border-[#1A2A3F] space-y-1.5 shrink-0 bg-[#0A1422]">
+            <div className="flex items-center gap-2 bg-[#0D1727] px-2.5 py-1.5 rounded-lg border border-[#1A2A3F] focus-within:border-[#22D3EE]">
+              <Search className="w-3.5 h-3.5 text-[#52627A]" />
               <input
                 type="text"
                 placeholder="Search symbol..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-xs text-[#D1D4DC] placeholder-[#787B86] outline-none"
+                className="w-full bg-transparent text-xs text-[#F7FAFC] placeholder-[#52627A] outline-none"
               />
             </div>
 
-            <div className="flex items-center gap-1 text-[10px] font-mono font-semibold">
+            <div className="flex items-center gap-1 text-[10px] font-semibold">
               {(["ALL", "NSE", "CRYPTO"] as const).map((f) => (
                 <button
                   key={f}
                   onClick={() => setFilterType(f)}
-                  className={`px-2 py-0.5 rounded transition ${
+                  className={`px-2 py-0.5 rounded-md transition ${
                     filterType === f
-                      ? "bg-[#2A2E39] text-[#D1D4DC]"
-                      : "text-[#787B86] hover:text-[#D1D4DC]"
+                      ? "bg-[#2563EB] text-white"
+                      : "text-[#7C8CA3] hover:text-[#F7FAFC] bg-[#0D1727] border border-[#1A2A3F]"
                   }`}
                 >
                   {f}
@@ -321,15 +321,15 @@ export function TerminalRightPanel({
 
           {/* Watchlist Table */}
           <div className="flex-1 overflow-y-auto">
-            <table className="w-full text-left text-xs font-mono">
-              <thead className="sticky top-0 bg-[#131722] text-[10px] font-bold text-[#787B86] uppercase border-b border-[#2A2E39]">
+            <table className="w-full text-left text-xs">
+              <thead className="sticky top-0 bg-[#101B2D] text-[10px] font-semibold text-[#7C8CA3] uppercase border-b border-[#1A2A3F]">
                 <tr>
                   <th className="py-1.5 px-2.5">Symbol</th>
                   <th className="py-1.5 px-2 text-right">LTP</th>
                   <th className="py-1.5 px-2.5 text-right">Chg %</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#1E222D]">
+              <tbody className="divide-y divide-[#1A2A3F]">
                 {filteredWatchlist.map((item) => {
                   const isSelected = activeSymbol === item.symbol;
                   const isBull = item.changePct >= 0;
@@ -339,23 +339,23 @@ export function TerminalRightPanel({
                       key={item.symbol}
                       onClick={() => onSelectSymbol(item.symbol)}
                       className={`cursor-pointer transition-colors ${
-                        isSelected ? "bg-[#2962FF]/15 border-l-2 border-[#2962FF]" : "hover:bg-[#1E222D]"
+                        isSelected ? "bg-[#2563EB]/15 border-l-2 border-[#19C5FF]" : "hover:bg-[#101B2D]"
                       }`}
                     >
                       <td className="py-2 px-2.5">
-                        <div className="font-bold text-[#D1D4DC] flex items-center gap-1">
+                        <div className="font-bold text-[#F7FAFC] flex items-center gap-1 font-mono">
                           <span>{item.symbol}</span>
-                          <span className="text-[9px] text-[#787B86] font-normal font-sans">
+                          <span className="text-[9px] text-[#52627A] font-normal font-sans">
                             {item.exchange}
                           </span>
                         </div>
                       </td>
-                      <td className="py-2 px-2 text-right font-bold text-[#D1D4DC] tabular-nums">
+                      <td className="py-2 px-2 text-right font-bold text-[#F7FAFC] font-mono tabular-nums">
                         {item.price > 0 ? (item.price >= 1000 ? item.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.price.toFixed(2)) : "—"}
                       </td>
                       <td
-                        className={`py-2 px-2.5 text-right font-bold tabular-nums ${
-                          isBull ? "text-[#26A69A]" : "text-[#EF5350]"
+                        className={`py-2 px-2.5 text-right font-bold font-mono tabular-nums ${
+                          isBull ? "text-[#00E890]" : "text-[#FF3B5C]"
                         }`}
                       >
                         {isBull ? "+" : ""}
@@ -372,28 +372,28 @@ export function TerminalRightPanel({
 
       {/* 3. TAB CONTENT 2: TRADE TICKET */}
       {activeTab === "trade" && (
-        <div className="flex-1 flex flex-col p-3 overflow-y-auto space-y-3">
+        <div className="flex-1 flex flex-col p-3 overflow-y-auto space-y-3 bg-[#0A1422]">
           {/* Active Symbol & LTP Banner */}
-          <div className="bg-[#0F1116] p-2.5 rounded border border-[#2A2E39] flex items-center justify-between">
+          <div className="bg-[#0D1727] p-2.5 rounded-lg border border-[#1A2A3F] flex items-center justify-between">
             <div>
-              <div className="text-[11px] font-bold font-mono text-[#787B86]">INSTRUMENT</div>
-              <div className="text-sm font-extrabold font-mono text-[#D1D4DC]">{activeSymbol}</div>
+              <div className="text-[10px] font-semibold text-[#52627A]">INSTRUMENT</div>
+              <div className="text-sm font-bold font-mono text-[#F7FAFC]">{activeSymbol}</div>
             </div>
             <div className="text-right">
-              <div className="text-[11px] font-bold font-mono text-[#787B86]">MARK PRICE</div>
-              <div className="text-sm font-extrabold font-mono text-[#26A69A] tabular-nums">
+              <div className="text-[10px] font-semibold text-[#52627A]">MARK PRICE</div>
+              <div className="text-sm font-bold font-mono text-[#00E890] tabular-nums">
                 {livePrice > 0 ? livePrice.toFixed(2) : "—"}
               </div>
             </div>
           </div>
 
           {/* BUY / SELL Switcher */}
-          <div className="grid grid-cols-2 gap-1 bg-[#0F1116] p-1 rounded border border-[#2A2E39]">
+          <div className="grid grid-cols-2 gap-1.5 bg-[#0D1727] p-1 rounded-lg border border-[#1A2A3F]">
             <button
               type="button"
               onClick={() => setSide("BUY")}
-              className={`py-2 rounded text-xs font-extrabold font-mono transition-all ${
-                side === "BUY" ? "bg-[#26A69A] text-white shadow-md" : "text-[#787B86] hover:text-[#D1D4DC]"
+              className={`py-2 rounded-md text-xs font-bold transition-all ${
+                side === "BUY" ? "bg-[#00E890] text-slate-950 shadow-md" : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               BUY / LONG
@@ -401,8 +401,8 @@ export function TerminalRightPanel({
             <button
               type="button"
               onClick={() => setSide("SELL")}
-              className={`py-2 rounded text-xs font-extrabold font-mono transition-all ${
-                side === "SELL" ? "bg-[#EF5350] text-white shadow-md" : "text-[#787B86] hover:text-[#D1D4DC]"
+              className={`py-2 rounded-md text-xs font-bold transition-all ${
+                side === "SELL" ? "bg-[#FF3B5C] text-white shadow-md" : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               SELL / SHORT
@@ -410,14 +410,16 @@ export function TerminalRightPanel({
           </div>
 
           {/* Order Type Tabs */}
-          <div className="flex items-center gap-1 text-[11px] font-mono">
+          <div className="flex items-center gap-1 text-xs">
             {(["MARKET", "LIMIT", "STOP"] as const).map((t) => (
               <button
                 key={t}
                 type="button"
                 onClick={() => setOrderType(t)}
-                className={`flex-1 py-1 rounded transition text-center font-bold ${
-                  orderType === t ? "bg-[#2A2E39] text-[#D1D4DC]" : "text-[#787B86] hover:text-[#D1D4DC]"
+                className={`flex-1 py-1 rounded-md transition text-center font-semibold border ${
+                  orderType === t
+                    ? "bg-[#2563EB] text-white border-[#2563EB]"
+                    : "text-[#7C8CA3] hover:text-[#F7FAFC] bg-[#0D1727] border-[#1A2A3F]"
                 }`}
               >
                 {t}
@@ -426,10 +428,10 @@ export function TerminalRightPanel({
           </div>
 
           {/* Inputs Form */}
-          <form onSubmit={handleOrderSubmit} className="space-y-2.5 text-xs font-mono">
+          <form onSubmit={handleOrderSubmit} className="space-y-2.5 text-xs font-sans">
             {/* Quantity */}
             <div>
-              <div className="flex justify-between text-[#787B86] text-[11px] mb-1">
+              <div className="flex justify-between text-[#7C8CA3] text-[11px] mb-1">
                 <span>Quantity / Size</span>
                 <span>Contracts</span>
               </div>
@@ -438,7 +440,7 @@ export function TerminalRightPanel({
                 step="any"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                className="w-full bg-[#0F1116] border border-[#2A2E39] rounded px-2.5 py-1.5 text-[#D1D4DC] font-mono outline-none focus:border-[#2962FF]"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-[#F7FAFC] font-mono outline-none focus:border-[#22D3EE]"
                 required
               />
             </div>
@@ -446,7 +448,7 @@ export function TerminalRightPanel({
             {/* Limit Price (if LIMIT or STOP) */}
             {orderType !== "MARKET" && (
               <div>
-                <div className="flex justify-between text-[#787B86] text-[11px] mb-1">
+                <div className="flex justify-between text-[#7C8CA3] text-[11px] mb-1">
                   <span>Price</span>
                   <span>USDT / INR</span>
                 </div>
@@ -455,7 +457,7 @@ export function TerminalRightPanel({
                   step="any"
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value)}
-                  className="w-full bg-[#0F1116] border border-[#2A2E39] rounded px-2.5 py-1.5 text-[#D1D4DC] font-mono outline-none focus:border-[#2962FF]"
+                  className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-[#F7FAFC] font-mono outline-none focus:border-[#22D3EE]"
                   required
                 />
               </div>
@@ -464,38 +466,38 @@ export function TerminalRightPanel({
             {/* Stop Loss & Take Profit */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="text-[10px] text-[#EF5350] font-bold block mb-1">STOP LOSS</span>
+                <span className="text-[10px] text-[#FF3B5C] font-bold block mb-1">STOP LOSS</span>
                 <input
                   type="number"
                   step="any"
                   value={stopLoss}
                   onChange={(e) => setStopLoss(e.target.value)}
-                  className="w-full bg-[#0F1116] border border-[#2A2E39] rounded px-2 py-1 text-[#D1D4DC] font-mono outline-none focus:border-[#EF5350]"
+                  className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2 py-1 text-[#F7FAFC] font-mono outline-none focus:border-[#FF3B5C]"
                 />
               </div>
               <div>
-                <span className="text-[10px] text-[#26A69A] font-bold block mb-1">TAKE PROFIT</span>
+                <span className="text-[10px] text-[#00E890] font-bold block mb-1">TAKE PROFIT</span>
                 <input
                   type="number"
                   step="any"
                   value={takeProfit}
                   onChange={(e) => setTakeProfit(e.target.value)}
-                  className="w-full bg-[#0F1116] border border-[#2A2E39] rounded px-2 py-1 text-[#D1D4DC] font-mono outline-none focus:border-[#26A69A]"
+                  className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2 py-1 text-[#F7FAFC] font-mono outline-none focus:border-[#00E890]"
                 />
               </div>
             </div>
 
             {/* Risk:Reward & Margin Telemetry */}
-            <div className="bg-[#0F1116] p-2 rounded border border-[#2A2E39] text-[11px] space-y-1">
+            <div className="bg-[#0D1727] p-2 rounded-lg border border-[#1A2A3F] text-[11px] space-y-1">
               <div className="flex justify-between">
-                <span className="text-[#787B86]">Estimated R:R Ratio:</span>
-                <span className="font-bold text-[#2962FF]">
+                <span className="text-[#7C8CA3]">Estimated R:R Ratio:</span>
+                <span className="font-bold text-[#19C5FF] font-mono">
                   {riskRewardRatio ? `1 : ${riskRewardRatio}` : "—"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-[#787B86]">Execution Mode:</span>
-                <span className={`font-bold ${executionMode === "LIVE" ? "text-[#EF5350]" : "text-[#2962FF]"}`}>
+                <span className="text-[#7C8CA3]">Execution Mode:</span>
+                <span className={`font-bold ${executionMode === "LIVE" ? "text-[#FF3B5C]" : "text-[#19C5FF]"}`}>
                   {executionMode}
                 </span>
               </div>
@@ -504,10 +506,10 @@ export function TerminalRightPanel({
             {/* Order Feedback Alert */}
             {orderMessage && (
               <div
-                className={`p-2 rounded text-[11px] flex items-center gap-1.5 ${
+                className={`p-2 rounded-lg text-[11px] flex items-center gap-1.5 ${
                   orderMessage.type === "success"
-                    ? "bg-[#26A69A]/15 text-[#26A69A] border border-[#26A69A]/30"
-                    : "bg-[#EF5350]/15 text-[#EF5350] border border-[#EF5350]/30"
+                    ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30"
+                    : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
                 }`}
               >
                 {orderMessage.type === "success" ? (
@@ -523,10 +525,10 @@ export function TerminalRightPanel({
             <button
               type="submit"
               disabled={isSubmitting}
-              className={`w-full py-2.5 rounded font-extrabold text-white text-xs font-mono transition shadow-lg ${
+              className={`w-full py-2.5 rounded-lg font-bold text-xs transition shadow-lg ${
                 side === "BUY"
-                  ? "bg-[#26A69A] hover:bg-[#26A69A]/90 shadow-[#26A69A]/20"
-                  : "bg-[#EF5350] hover:bg-[#EF5350]/90 shadow-[#EF5350]/20"
+                  ? "bg-[#00E890] hover:bg-[#00E890]/90 text-slate-950 shadow-[#00E890]/20"
+                  : "bg-[#FF3B5C] hover:bg-[#FF3B5C]/90 text-white shadow-[#FF3B5C]/20"
               }`}
             >
               {isSubmitting
@@ -539,9 +541,9 @@ export function TerminalRightPanel({
 
       {/* 4. TAB CONTENT 3: POSITIONS */}
       {activeTab === "positions" && (
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-2 bg-[#0A1422]">
           {positions.length === 0 ? (
-            <div className="h-40 flex flex-col items-center justify-center text-[#787B86] text-xs font-mono">
+            <div className="h-40 flex flex-col items-center justify-center text-[#52627A] text-xs">
               <Layers className="w-6 h-6 mb-1 opacity-40" />
               <span>No Active Positions</span>
             </div>
@@ -552,40 +554,40 @@ export function TerminalRightPanel({
                 return (
                   <div
                     key={pos.id}
-                    className="bg-[#0F1116] p-2.5 rounded border border-[#2A2E39] space-y-1.5 font-mono text-xs"
+                    className="bg-[#0D1727] p-2.5 rounded-lg border border-[#1A2A3F] space-y-1.5 text-xs"
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 font-mono">
                         <span
-                          className={`text-[10px] px-1.5 py-0.2 rounded font-bold ${
+                          className={`text-[10px] px-1.5 py-0.2 rounded-md font-bold ${
                             pos.side === "LONG"
-                              ? "bg-[#26A69A]/20 text-[#26A69A]"
-                              : "bg-[#EF5350]/20 text-[#EF5350]"
+                              ? "bg-[#00E890]/20 text-[#00E890]"
+                              : "bg-[#FF3B5C]/20 text-[#FF3B5C]"
                           }`}
                         >
                           {pos.side}
                         </span>
-                        <span className="font-bold text-[#D1D4DC]">{pos.symbol}</span>
+                        <span className="font-bold text-[#F7FAFC]">{pos.symbol}</span>
                       </div>
                       <button
                         onClick={() => onClosePosition && onClosePosition(pos.id)}
-                        className="text-[10px] px-2 py-0.5 rounded bg-[#EF5350]/15 hover:bg-[#EF5350]/25 text-[#EF5350] border border-[#EF5350]/30 transition"
+                        className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B5C]/15 hover:bg-[#FF3B5C]/25 text-[#FF3B5C] border border-[#FF3B5C]/30 transition font-semibold"
                       >
                         CLOSE
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1 text-[11px] text-[#787B86] pt-1">
+                    <div className="grid grid-cols-2 gap-1 text-[11px] text-[#7C8CA3] pt-1 font-mono tabular-nums">
                       <div>
-                        Size: <span className="text-[#D1D4DC]">{pos.size}</span>
+                        Size: <span className="text-[#F7FAFC]">{pos.size}</span>
                       </div>
                       <div className="text-right">
-                        Entry: <span className="text-[#D1D4DC]">{pos.entryPrice.toFixed(2)}</span>
+                        Entry: <span className="text-[#F7FAFC]">{pos.entryPrice.toFixed(2)}</span>
                       </div>
                       <div>
-                        Mark: <span className="text-[#D1D4DC]">{pos.markPrice.toFixed(2)}</span>
+                        Mark: <span className="text-[#F7FAFC]">{pos.markPrice.toFixed(2)}</span>
                       </div>
-                      <div className={`text-right font-bold ${isProfit ? "text-[#26A69A]" : "text-[#EF5350]"}`}>
+                      <div className={`text-right font-bold ${isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
                         PnL: {isProfit ? "+" : ""}${pos.pnl.toFixed(2)} ({isProfit ? "+" : ""}
                         {pos.pnlPct.toFixed(2)}%)
                       </div>
@@ -600,9 +602,9 @@ export function TerminalRightPanel({
 
       {/* 5. TAB CONTENT 4: ORDERS */}
       {activeTab === "orders" && (
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto p-2 bg-[#0A1422]">
           {orders.length === 0 ? (
-            <div className="h-40 flex flex-col items-center justify-center text-[#787B86] text-xs font-mono">
+            <div className="h-40 flex flex-col items-center justify-center text-[#52627A] text-xs">
               <Send className="w-6 h-6 mb-1 opacity-40" />
               <span>No Active Working Orders</span>
             </div>
@@ -611,30 +613,30 @@ export function TerminalRightPanel({
               {orders.map((ord) => (
                 <div
                   key={ord.id}
-                  className="bg-[#0F1116] p-2.5 rounded border border-[#2A2E39] space-y-1 font-mono text-xs"
+                  className="bg-[#0D1727] p-2.5 rounded-lg border border-[#1A2A3F] space-y-1 text-xs"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-bold text-[#D1D4DC]">{ord.symbol}</span>
+                    <span className="font-bold text-[#F7FAFC] font-mono">{ord.symbol}</span>
                     <span
-                      className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
+                      className={`text-[9px] px-1.5 py-0.2 rounded-md font-bold font-mono ${
                         ord.status === "OPEN"
-                          ? "bg-[#2962FF]/20 text-[#2962FF]"
+                          ? "bg-[#2563EB]/20 text-[#19C5FF]"
                           : ord.status === "FILLED"
-                          ? "bg-[#26A69A]/20 text-[#26A69A]"
-                          : "bg-[#787B86]/20 text-[#787B86]"
+                          ? "bg-[#00E890]/20 text-[#00E890]"
+                          : "bg-[#52627A]/20 text-[#7C8CA3]"
                       }`}
                     >
                       {ord.status}
                     </span>
                   </div>
-                  <div className="flex justify-between text-[11px] text-[#787B86]">
+                  <div className="flex justify-between text-[11px] text-[#7C8CA3] font-mono tabular-nums">
                     <span>
                       {ord.side} {ord.quantity} @ {ord.price.toFixed(2)}
                     </span>
                     {ord.status === "OPEN" && onCancelOrder && (
                       <button
                         onClick={() => onCancelOrder(ord.id)}
-                        className="text-[#EF5350] hover:underline"
+                        className="text-[#FF3B5C] hover:underline font-semibold"
                       >
                         Cancel
                       </button>

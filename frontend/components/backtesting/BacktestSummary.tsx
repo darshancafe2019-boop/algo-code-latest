@@ -15,8 +15,8 @@ export function BacktestSummary({ metrics, config }: BacktestSummaryProps) {
   const isProfit = metrics.total_net_profit >= 0;
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-emerald-950 border border-emerald-800/80 text-emerald-400">
             <Award className="h-4 w-4" />
@@ -36,7 +36,7 @@ export function BacktestSummary({ metrics, config }: BacktestSummaryProps) {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left Column: Financial & Yield Audit */}
-        <div className="bg-[#0B0F17] border border-[#1E293B] rounded-xl p-4 space-y-2.5">
+        <div className="bg-[#0B0F17] border border-[#1A2A3F] rounded-xl p-4 space-y-2.5">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
             Capital Progression
           </span>
@@ -67,7 +67,7 @@ export function BacktestSummary({ metrics, config }: BacktestSummaryProps) {
         </div>
 
         {/* Right Column: Risk & Viability Metrics */}
-        <div className="bg-[#0B0F17] border border-[#1E293B] rounded-xl p-4 space-y-2.5">
+        <div className="bg-[#0B0F17] border border-[#1A2A3F] rounded-xl p-4 space-y-2.5">
           <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2">
             Risk & Expectancy Audit
           </span>

@@ -58,8 +58,8 @@ const STRATEGY_PRESETS = [
 
 export function BacktestProfiles({ onSelectPreset, isLoading }: BacktestProfilesProps) {
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-amber-950 border border-amber-800/80 text-amber-400">
             <Sparkles className="h-4 w-4" />
@@ -79,7 +79,7 @@ export function BacktestProfiles({ onSelectPreset, isLoading }: BacktestProfiles
         {STRATEGY_PRESETS.map((p) => (
           <div
             key={p.id}
-            className="bg-[#0B0F17] border border-[#1E293B] hover:border-cyan-800/70 rounded-xl p-4 flex flex-col justify-between transition-all"
+            className="bg-[#0B0F17] border border-[#1A2A3F] hover:border-cyan-800/70 rounded-xl p-4 flex flex-col justify-between transition-all"
           >
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
@@ -112,7 +112,7 @@ export function BacktestProfiles({ onSelectPreset, isLoading }: BacktestProfiles
                 })
               }
               disabled={isLoading}
-              className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-[#121824] hover:bg-cyan-950/80 border border-[#1E293B] hover:border-cyan-700 text-cyan-300 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-2 px-3 rounded-lg text-xs font-bold bg-[#121824] hover:bg-cyan-950/80 border border-[#1A2A3F] hover:border-cyan-700 text-cyan-300 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Play className="h-3 w-3 fill-cyan-400" />
               <span>Load Preset into Simulator</span>

@@ -31,7 +31,7 @@ export function LogRow({ log, isStructured, onOpenDetails }: LogRowProps) {
     return (
       <div
         onClick={() => onOpenDetails(log)}
-        className="group px-3 py-2 bg-[#0B0F17] hover:bg-[#161F30] border border-[#1E293B] hover:border-slate-700 rounded-xl flex items-start gap-3 transition-colors cursor-pointer font-mono text-xs"
+        className="group px-3 py-2 bg-[#0B0F17] hover:bg-[#161F30] border border-[#1A2A3F] hover:border-slate-700 rounded-xl flex items-start gap-3 transition-colors cursor-pointer font-mono text-xs"
       >
         <span
           className={`px-1.5 py-0.5 rounded text-[10px] font-bold border flex-shrink-0 ${
@@ -68,7 +68,7 @@ export function LogRow({ log, isStructured, onOpenDetails }: LogRowProps) {
   return (
     <div
       onClick={() => onOpenDetails(evt)}
-      className="group px-3.5 py-2.5 bg-[#0B0F17] hover:bg-[#161F30] border border-[#1E293B] hover:border-slate-700 rounded-xl flex flex-wrap items-center justify-between gap-3 transition-colors cursor-pointer text-xs"
+      className="group px-3.5 py-2.5 bg-[#0B0F17] hover:bg-[#161F30] border border-[#1A2A3F] hover:border-slate-700 rounded-xl flex flex-wrap items-center justify-between gap-3 transition-colors cursor-pointer text-xs"
     >
       <div className="flex items-center gap-2.5 flex-1 min-w-[280px]">
         {/* Severity Badge */}

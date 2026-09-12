@@ -16,7 +16,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5">
       {/* 1. Total Net Profit */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Net Profit</span>
           <div className={`p-1.5 rounded-lg ${isProfit ? "bg-emerald-950/80 text-emerald-400" : "bg-red-950/80 text-red-400"}`}>
@@ -34,7 +34,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
       </div>
 
       {/* 2. Total Return % */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Return %</span>
           <div className={`p-1.5 rounded-lg ${isProfit ? "bg-emerald-950/80 text-emerald-400" : "bg-red-950/80 text-red-400"}`}>
@@ -52,7 +52,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
       </div>
 
       {/* 3. Total Simulated Trades */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Trades</span>
           <div className="p-1.5 rounded-lg bg-blue-950/80 text-blue-400">
@@ -70,7 +70,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
       </div>
 
       {/* 4. Win Rate % */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Win Rate</span>
           <div className="p-1.5 rounded-lg bg-purple-950/80 text-purple-400">
@@ -88,7 +88,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
       </div>
 
       {/* 5. Max Drawdown % */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Max Drawdown</span>
           <div className="p-1.5 rounded-lg bg-orange-950/80 text-orange-400">
@@ -106,7 +106,7 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
       </div>
 
       {/* 6. Sharpe Ratio */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Sharpe Ratio</span>
           <div className="p-1.5 rounded-lg bg-cyan-950/80 text-cyan-400">

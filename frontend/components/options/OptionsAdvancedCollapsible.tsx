@@ -40,7 +40,7 @@ export function OptionsAdvancedCollapsible({
   const [activeTab, setActiveTab] = useState<"HEATMAP" | "SKEW" | "STRATEGY" | "SCANNER" | "DIAGNOSTICS">("HEATMAP");
 
   return (
-    <div className="bg-[#080E1C] border border-slate-800 rounded-2xl overflow-hidden font-mono text-xs">
+    <div className="bg-[#07101A] border border-slate-800 rounded-2xl overflow-hidden font-mono text-xs">
       {/* Expand / Collapse Header */}
       <button
         type="button"

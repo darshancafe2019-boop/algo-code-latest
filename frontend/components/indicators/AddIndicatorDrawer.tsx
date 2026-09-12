@@ -110,9 +110,9 @@ export function AddIndicatorDrawer({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex justify-end transition-opacity">
-      <div className="bg-[#0B111E] border-l border-[#1E293B] w-full max-w-xl h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="bg-[#0B111E] border-l border-[#1A2A3F] w-full max-w-xl h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200">
         {/* Header */}
-        <div className="p-5 border-b border-[#1E293B] space-y-3 bg-[#080D17]">
+        <div className="p-5 border-b border-[#1A2A3F] space-y-3 bg-[#080D17]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-2 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
@@ -198,7 +198,7 @@ export function AddIndicatorDrawer({
                   className={`p-4 rounded-xl border transition-all flex items-center justify-between gap-4 ${
                     isActive
                       ? "bg-[#0E1729] border-cyan-500/40 shadow-lg shadow-cyan-950/20"
-                      : "bg-[#0F1626] border-[#1E293B] hover:border-slate-700"
+                      : "bg-[#0F1626] border-[#1A2A3F] hover:border-slate-700"
                   }`}
                 >
                   {/* Left: Star + Name + Description */}
@@ -279,7 +279,7 @@ export function AddIndicatorDrawer({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#1E293B] bg-[#080D17] flex items-center justify-between text-xs font-mono text-slate-400">
+        <div className="p-4 border-t border-[#1A2A3F] bg-[#080D17] flex items-center justify-between text-xs font-mono text-slate-400">
           <span>{filteredList.length} indicators shown</span>
           <button
             onClick={onClose}

@@ -29,30 +29,49 @@ export async function GET(request: NextRequest) {
 
     const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || provider.includes("DELTA");
 
-    // 1. Probe upstream gateway / backend for current live option chain data
+    // 1. Probe Delta service directly for crypto/Delta, or upstream gateway / backend for Indian markets
     let chainData: any = null;
-    try {
-      const primaryUrl = isCrypto
-        ? `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=DELTA_INDIA${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`
-        : `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`;
-
-      const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
-      if (upstreamRes.ok) {
-        const rawJson = await upstreamRes.json();
-        chainData = rawJson.data || rawJson;
-      }
-    } catch {
-      // Gateway may be offline, fallback to backend
+    if (isCrypto) {
       try {
-        const fallbackRes = await fetch(
-          `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`,
-          { cache: "no-store", signal: AbortSignal.timeout(4000) }
-        );
-        if (fallbackRes.ok) {
-          const rawJson = await fallbackRes.json();
+        const { deltaProductService } = await import("@/lib/brokers/delta/delta-product-service");
+        const snap = await deltaProductService.fetchOptionChainSnapshot(underlying, expiry || undefined);
+        chainData = {
+          spot_price: snap.spotPrice,
+          spot: snap.spotPrice,
+          available_expiries: snap.availableExpiries.map((e) => e.expiryDisplay),
+          selected_expiry: snap.selectedExpiry,
+          atm_strike: snap.atmStrike,
+          strikes: snap.rows,
+        };
+      } catch (deltaErr: any) {
+        console.warn("[/api/options/flow] Delta Direct Service fallback:", deltaErr?.message);
+      }
+    }
+
+    if (!chainData) {
+      try {
+        const primaryUrl = isCrypto
+          ? `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=DELTA_INDIA${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`
+          : `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`;
+
+        const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+        if (upstreamRes.ok) {
+          const rawJson = await upstreamRes.json();
           chainData = rawJson.data || rawJson;
         }
-      } catch {}
+      } catch {
+        // Gateway may be offline, fallback to backend
+        try {
+          const fallbackRes = await fetch(
+            `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`,
+            { cache: "no-store", signal: AbortSignal.timeout(4000) }
+          );
+          if (fallbackRes.ok) {
+            const rawJson = await fallbackRes.json();
+            chainData = rawJson.data || rawJson;
+          }
+        } catch {}
+      }
     }
 
     const defaultSpot = underlying.includes("BANKNIFTY")
@@ -73,16 +92,12 @@ export async function GET(request: NextRequest) {
     const spotChange = typeof chainData?.spot_change === "number" ? chainData.spot_change : 128.4;
     const spotChangePct = typeof chainData?.spot_change_24h === "number" ? chainData.spot_change_24h : 0.51;
 
-
     // Available Expiries
-    const availableExpiriesRaw = chainData?.available_expiries || [
-      "18 Sep 2026",
-      "25 Sep 2026",
-      "01 Oct 2026",
-      "29 Oct 2026",
-    ];
+    const availableExpiriesRaw: string[] = Array.isArray(chainData?.available_expiries) && chainData.available_expiries.length > 0
+      ? chainData.available_expiries
+      : (isCrypto ? [] : ["18 Sep 2026", "25 Sep 2026", "01 Oct 2026", "29 Oct 2026"]);
 
-    const selectedExpiry = expiry || (typeof chainData?.selected_expiry === "string" ? chainData.selected_expiry : availableExpiriesRaw[0]);
+    const selectedExpiry = expiry || (typeof chainData?.selected_expiry === "string" ? chainData.selected_expiry : (availableExpiriesRaw[0] || ""));
 
     // Parse strikes
     const stepSize = spotPrice > 40000 ? 500 : spotPrice > 15000 ? 100 : spotPrice > 5000 ? 50 : 10;

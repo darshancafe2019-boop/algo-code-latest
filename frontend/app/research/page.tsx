@@ -37,7 +37,7 @@ export default function ResearchPage() {
           {activeTab === "backtesting" && <BacktestingLab />}
 
           {activeTab === "walkforward" && (
-            <div className="p-6 rounded-2xl bg-[#0F172A]/80 border border-[#1E293B] space-y-4 font-mono">
+            <div className="p-6 rounded-2xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-4 font-mono">
               <div className="flex items-center gap-2 text-sky-400">
                 <Sparkles className="h-5 w-5" />
                 <h3 className="font-bold text-sm text-white">Walk-Forward Optimization & Out-of-Sample Validation</h3>
@@ -63,7 +63,7 @@ export default function ResearchPage() {
           )}
 
           {activeTab === "datasets" && (
-            <div className="p-6 rounded-2xl bg-[#0F172A]/80 border border-[#1E293B] space-y-4 font-mono">
+            <div className="p-6 rounded-2xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-4 font-mono">
               <div className="flex items-center gap-2 text-sky-400">
                 <Database className="h-5 w-5" />
                 <h3 className="font-bold text-sm text-white">Institutional Market Datasets & Candle Repository</h3>

@@ -95,7 +95,7 @@ export function IndicatorProfileSelector({
   const currentProfile = profileList.find((p) => p.profile_id === selectedPreset) || profileList[0];
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Preset Tabs Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -123,7 +123,7 @@ export function IndicatorProfileSelector({
               className={`p-3 rounded-xl border text-left transition-all relative ${
                 isSelected
                   ? "bg-[#142342] border-cyan-500 shadow-md shadow-cyan-950/30"
-                  : "bg-[#141E33] border-[#1E293B] hover:border-slate-700 hover:bg-[#1A2640]"
+                  : "bg-[#141E33] border-[#1A2A3F] hover:border-slate-700 hover:bg-[#1A2640]"
               }`}
             >
               <div className="flex items-center justify-between gap-1 mb-1">
@@ -144,7 +144,7 @@ export function IndicatorProfileSelector({
 
       {/* Selected Preset Details & One-Click Apply */}
       {currentProfile && (
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1.5 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-white">{currentProfile.name}</h3>
@@ -179,7 +179,7 @@ export function IndicatorProfileSelector({
       {/* Confirmation Modal */}
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center border border-cyan-500/30">
                 <ShieldAlert className="w-5 h-5" />
@@ -194,7 +194,7 @@ export function IndicatorProfileSelector({
               Applying <strong className="text-cyan-400">{currentProfile.name}</strong> will update indicator weights and parameters for <strong>{selectedBotName}</strong>. Other active bots will remain completely isolated and unaffected.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1A2A3F]">
               <button
                 onClick={() => setShowConfirmModal(false)}
                 className="px-3 py-2 text-xs font-semibold rounded-lg bg-[#141E33] hover:bg-[#1C2A47] text-slate-300 transition-all"

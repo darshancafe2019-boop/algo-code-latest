@@ -75,7 +75,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
   const dataQuality = isStale ? "RECONNECTING" : feedAgeMs < 500 ? "LIVE" : "DEGRADED";
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-2.5 sm:p-3 shadow-lg select-none font-sans overflow-x-auto">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-2.5 sm:p-3 shadow-lg select-none font-sans overflow-x-auto">
       <div className="flex items-center justify-between gap-4 min-w-max text-xs">
         {/* Left: Active Symbol & Live Mark Price */}
         <div className="flex items-center gap-3">
@@ -139,7 +139,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
 
         {/* Right: Data Feed Age & Provider Health */}
         <div className="flex items-center gap-2 font-mono text-[11px]">
-          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#070D14] border border-[#1E293B] text-slate-300">
+          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#070D14] border border-[#1A2A3F] text-slate-300">
             <Radio className="h-3 w-3 text-cyan-400" />
             <span>Feed: {feedAgeMs}ms</span>
           </div>
@@ -147,7 +147,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
             className={`flex items-center gap-1 bg-[#070D14] px-2.5 py-1 rounded-xl border ${
               isStale
                 ? "border-amber-700/60 text-amber-300"
-                : "border-[#1E293B] text-emerald-400"
+                : "border-[#1A2A3F] text-emerald-400"
             }`}
           >
             {isStale ? (

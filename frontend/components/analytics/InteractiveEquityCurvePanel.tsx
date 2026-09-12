@@ -351,12 +351,12 @@ export function InteractiveEquityCurvePanel({
   return (
     <div
       ref={panelRef}
-      className={`bg-[#080D18] border border-[#1E293B] rounded-2xl shadow-xl p-4 sm:p-6 font-mono space-y-4 transition-all ${
+      className={`bg-[#080D18] border border-[#1A2A3F] rounded-2xl shadow-xl p-4 sm:p-6 font-mono space-y-4 transition-all ${
         isFullscreen ? "fixed inset-0 z-50 overflow-y-auto rounded-none p-6" : ""
       }`}
     >
       {/* 1. Header Bar: Title, Mode, Metric & View Dropdowns, Range Tabs */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#1E293B] pb-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#1A2A3F] pb-4">
         {/* Title & Live Badge */}
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 text-cyan-400">
@@ -389,7 +389,7 @@ export function InteractiveEquityCurvePanel({
             <button
               type="button"
               onClick={() => setShowMetricMenu(!showMetricMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0B111E] border border-[#1E293B] text-xs font-semibold text-slate-200 hover:border-cyan-500/50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0B111E] border border-[#1A2A3F] text-xs font-semibold text-slate-200 hover:border-cyan-500/50 transition-colors"
             >
               <Zap className="w-3.5 h-3.5 text-cyan-400" />
               <span>{METRIC_OPTIONS.find((m) => m.id === metric)?.label}</span>
@@ -397,7 +397,7 @@ export function InteractiveEquityCurvePanel({
             </button>
 
             {showMetricMenu && (
-              <div className="absolute right-0 mt-1 w-56 bg-[#0B111E] border border-[#1E293B] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
+              <div className="absolute right-0 mt-1 w-56 bg-[#0B111E] border border-[#1A2A3F] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
                 {METRIC_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
@@ -407,7 +407,7 @@ export function InteractiveEquityCurvePanel({
                       setShowMetricMenu(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex flex-col ${
-                      metric === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1E293B]"
+                      metric === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1A2A3F]"
                     }`}
                   >
                     <span className="text-xs">{opt.label}</span>
@@ -423,7 +423,7 @@ export function InteractiveEquityCurvePanel({
             <button
               type="button"
               onClick={() => setShowViewMenu(!showViewMenu)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0B111E] border border-[#1E293B] text-xs font-semibold text-slate-200 hover:border-cyan-500/50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0B111E] border border-[#1A2A3F] text-xs font-semibold text-slate-200 hover:border-cyan-500/50 transition-colors"
             >
               <Layers className="w-3.5 h-3.5 text-cyan-400" />
               <span>{VIEW_MODE_OPTIONS.find((v) => v.id === viewMode)?.label}</span>
@@ -431,7 +431,7 @@ export function InteractiveEquityCurvePanel({
             </button>
 
             {showViewMenu && (
-              <div className="absolute right-0 mt-1 w-52 bg-[#0B111E] border border-[#1E293B] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
+              <div className="absolute right-0 mt-1 w-52 bg-[#0B111E] border border-[#1A2A3F] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
                 {VIEW_MODE_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
@@ -441,7 +441,7 @@ export function InteractiveEquityCurvePanel({
                       setShowViewMenu(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                      viewMode === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1E293B]"
+                      viewMode === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1A2A3F]"
                     }`}
                   >
                     {opt.label}
@@ -456,7 +456,7 @@ export function InteractiveEquityCurvePanel({
             <button
               type="button"
               onClick={() => setShowTimezoneMenu(!showTimezoneMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0B111E] border border-[#1E293B] text-xs font-semibold text-slate-300 hover:border-cyan-500/50 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#0B111E] border border-[#1A2A3F] text-xs font-semibold text-slate-300 hover:border-cyan-500/50 transition-colors"
               title="Select timezone for trading day grouping"
             >
               <Globe className="w-3.5 h-3.5 text-slate-400" />
@@ -465,7 +465,7 @@ export function InteractiveEquityCurvePanel({
             </button>
 
             {showTimezoneMenu && (
-              <div className="absolute right-0 mt-1 w-52 bg-[#0B111E] border border-[#1E293B] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
+              <div className="absolute right-0 mt-1 w-52 bg-[#0B111E] border border-[#1A2A3F] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
                 {TIMEZONE_OPTIONS.map((opt) => (
                   <button
                     key={opt.id}
@@ -475,7 +475,7 @@ export function InteractiveEquityCurvePanel({
                       setShowTimezoneMenu(false);
                     }}
                     className={`w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                      timezoneName === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1E293B]"
+                      timezoneName === opt.id ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-300 hover:bg-[#1A2A3F]"
                     }`}
                   >
                     {opt.label}
@@ -490,18 +490,18 @@ export function InteractiveEquityCurvePanel({
             <button
               type="button"
               onClick={() => setShowExportMenu(!showExportMenu)}
-              className="p-1.5 rounded-lg bg-[#0B111E] border border-[#1E293B] text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg bg-[#0B111E] border border-[#1A2A3F] text-slate-400 hover:text-white transition-colors"
               title="Export chart and daily data"
             >
               <Download className="w-4 h-4" />
             </button>
 
             {showExportMenu && (
-              <div className="absolute right-0 mt-1 w-44 bg-[#0B111E] border border-[#1E293B] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
+              <div className="absolute right-0 mt-1 w-44 bg-[#0B111E] border border-[#1A2A3F] rounded-xl shadow-2xl p-1 z-30 space-y-0.5 text-xs">
                 <button
                   type="button"
                   onClick={exportCSV}
-                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1E293B] flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1A2A3F] flex items-center gap-2"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Export CSV</span>
@@ -509,7 +509,7 @@ export function InteractiveEquityCurvePanel({
                 <button
                   type="button"
                   onClick={exportPNG}
-                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1E293B] flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1A2A3F] flex items-center gap-2"
                 >
                   <FileText className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Export PNG</span>
@@ -517,7 +517,7 @@ export function InteractiveEquityCurvePanel({
                 <button
                   type="button"
                   onClick={exportJSON}
-                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1E293B] flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1A2A3F] flex items-center gap-2"
                 >
                   <Code className="w-3.5 h-3.5 text-amber-400" />
                   <span>Export JSON</span>
@@ -525,7 +525,7 @@ export function InteractiveEquityCurvePanel({
                 <button
                   type="button"
                   onClick={printReport}
-                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1E293B] flex items-center gap-2 border-t border-[#1E293B]/50"
+                  className="w-full text-left px-3 py-2 rounded-lg text-slate-300 hover:bg-[#1A2A3F] flex items-center gap-2 border-t border-[#1A2A3F]/50"
                 >
                   <Printer className="w-3.5 h-3.5 text-purple-400" />
                   <span>Print Report</span>
@@ -538,7 +538,7 @@ export function InteractiveEquityCurvePanel({
           <button
             type="button"
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1.5 rounded-lg bg-[#0B111E] border border-[#1E293B] text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg bg-[#0B111E] border border-[#1A2A3F] text-slate-400 hover:text-white transition-colors"
             title={isFullscreen ? "Exit Fullscreen" : "Fullscreen View"}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -548,7 +548,7 @@ export function InteractiveEquityCurvePanel({
 
       {/* 2. Time Range Selector Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center bg-[#050811] border border-[#1E293B] rounded-xl p-1 gap-1 text-xs">
+        <div className="flex items-center bg-[#050811] border border-[#1A2A3F] rounded-xl p-1 gap-1 text-xs">
           {["7D", "30D", "90D", "6M", "YTD", "1Y", "ALL"].map((range) => (
             <button
               key={range}
@@ -557,7 +557,7 @@ export function InteractiveEquityCurvePanel({
               className={`px-3 py-1 rounded-lg font-bold transition-all ${
                 timeRange === range
                   ? "bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-md shadow-cyan-900/30"
-                  : "text-slate-400 hover:text-white hover:bg-[#1E293B]/60"
+                  : "text-slate-400 hover:text-white hover:bg-[#1A2A3F]/60"
               }`}
             >
               {range}
@@ -572,7 +572,7 @@ export function InteractiveEquityCurvePanel({
           <button
             type="button"
             onClick={() => refetch()}
-            className="p-1 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded transition-colors"
+            className="p-1 text-slate-400 hover:text-white hover:bg-[#1A2A3F] rounded transition-colors"
             title="Refresh authoritative bars"
           >
             <RotateCcw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
@@ -582,7 +582,7 @@ export function InteractiveEquityCurvePanel({
 
       {/* 3. Active Filters Bar & Chips */}
       {hasActiveFilters && (
-        <div className="flex flex-wrap items-center gap-2 bg-[#050811] border border-[#1E293B] rounded-xl px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 bg-[#050811] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs">
           <span className="text-[10px] text-slate-400 uppercase font-semibold flex items-center gap-1">
             <SlidersHorizontal className="w-3 h-3 text-cyan-400" /> Active Filters:
           </span>
@@ -638,7 +638,7 @@ export function InteractiveEquityCurvePanel({
       )}
 
       {/* 4. Main Chart Canvas Area */}
-      <div className="bg-[#050811] border border-[#1E293B] rounded-xl p-3 sm:p-4">
+      <div className="bg-[#050811] border border-[#1A2A3F] rounded-xl p-3 sm:p-4">
         {isLoading ? (
           <div className="h-64 flex items-center justify-center text-slate-400 text-xs gap-2 animate-pulse">
             <Zap className="w-4 h-4 text-cyan-400 animate-spin" />
@@ -667,51 +667,51 @@ export function InteractiveEquityCurvePanel({
 
       {/* 5. Chart Panel Summary Metrics Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 font-mono">
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Period Net P&L</div>
           <div className={`text-sm font-bold ${summary.totalNetPnl >= 0 ? "text-emerald-400" : "text-red-400"}`}>
             {formatPnL(summary.totalNetPnl, "$", 2).formatted}
           </div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Profitable Days</div>
           <div className="text-sm font-bold text-emerald-400">{summary.profitableDays}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Losing Days</div>
           <div className="text-sm font-bold text-red-400">{summary.losingDays}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Flat Days</div>
           <div className="text-sm font-bold text-slate-400">{summary.flatDays}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Daily Win Rate</div>
           <div className={`text-sm font-bold ${summary.dailyWinRate >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
             {formatPercent(summary.dailyWinRate, 1)}
           </div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Best Day</div>
           <div className="text-sm font-bold text-emerald-400">+{formatPrice(summary.bestDay, "$", 2)}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Worst Day</div>
           <div className="text-sm font-bold text-red-400">{formatPrice(summary.worstDay, "$", 2)}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Profit Factor</div>
           <div className="text-sm font-bold text-white">{summary.profitFactor.toFixed(2)}</div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Current Streak</div>
           <div className="text-sm font-bold text-cyan-400 flex items-center gap-1">
             <Flame className="w-3.5 h-3.5" />
@@ -719,7 +719,7 @@ export function InteractiveEquityCurvePanel({
           </div>
         </div>
 
-        <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-2.5 space-y-0.5">
+        <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-2.5 space-y-0.5">
           <div className="text-[9px] text-slate-400 uppercase">Max Drawdown</div>
           <div className="text-sm font-bold text-red-400">
             {summary.maxDrawdownPct > 0 ? `-${formatPercent(summary.maxDrawdownPct, 2)}` : "0.00%"}
@@ -728,8 +728,8 @@ export function InteractiveEquityCurvePanel({
       </div>
 
       {/* 6. Synchronized Performance Contribution Section */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-4 space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1E293B] pb-3">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1A2A3F] pb-3">
           <div>
             <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <span>Performance Contribution Breakdown</span>
@@ -747,7 +747,7 @@ export function InteractiveEquityCurvePanel({
           </div>
 
           {/* Contribution Tabs */}
-          <div className="flex items-center bg-[#050811] border border-[#1E293B] rounded-lg p-0.5 text-xs">
+          <div className="flex items-center bg-[#050811] border border-[#1A2A3F] rounded-lg p-0.5 text-xs">
             {(["bot", "strategy", "symbol", "asset"] as const).map((tab) => (
               <button
                 key={tab}
@@ -787,7 +787,7 @@ export function InteractiveEquityCurvePanel({
               const winRate = item.trades > 0 ? (item.wins / item.trades) * 100 : 0;
               const isWin = item.pnl >= 0;
               return (
-                <div key={idx} className="bg-[#050811] border border-[#1E293B] rounded-xl p-3 space-y-2">
+                <div key={idx} className="bg-[#050811] border border-[#1A2A3F] rounded-xl p-3 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white text-xs truncate max-w-[140px]">{item.name}</span>
                     <span className={`text-xs font-extrabold ${isWin ? "text-emerald-400" : "text-red-400"}`}>

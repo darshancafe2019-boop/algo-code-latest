@@ -158,13 +158,60 @@ export interface LiquidationCalcResult {
   riskLevel: "HIGH" | "MODERATE" | "SAFE";
 }
 
+export interface OrderBookLevel {
+  price: number;
+  quantity: number;
+  total?: number;
+  cumulative_quantity?: number;
+}
+
+export interface OrderBookData {
+  status: string;
+  symbol: string;
+  underlying: string;
+  best_bid: number;
+  best_ask: number;
+  spread: number;
+  spread_pct: number;
+  imbalance_ratio: number;
+  imbalance_sentiment?: "BUY_PRESSURE" | "SELL_PRESSURE" | "BALANCED" | string;
+  sentiment?: "BULLISH" | "BEARISH" | "NEUTRAL" | string;
+  total_bid_depth: number;
+  total_ask_depth: number;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  depth_levels: number;
+  timestamp: string;
+}
+
+export interface FuturesOrder {
+  id: string;
+  order_id?: string;
+  symbol: string;
+  displayName?: string;
+  side: "BUY" | "SELL" | "LONG" | "SHORT";
+  order_type: "MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT" | string;
+  price?: number | null;
+  quantity: number;
+  filled_quantity?: number;
+  remaining_quantity?: number;
+  average_fill_price?: number | null;
+  status: "OPEN" | "SUBMITTED" | "ACKNOWLEDGED" | "FILLED" | "PARTIALLY_FILLED" | "CANCELLED" | "REJECTED";
+  provider?: string;
+  broker?: string;
+  execution_mode?: "PAPER" | "SHADOW" | "LIVE" | string;
+  created_at: string;
+  client_order_id?: string;
+  remarks?: string;
+}
+
 export interface FuturesPosition {
   id: string;
   symbol: string;
-  displayName: string;
-  provider: string;
-  exchange: string;
-  side: "LONG" | "SHORT";
+  displayName?: string;
+  provider?: string;
+  exchange?: string;
+  side: "LONG" | "SHORT" | "BUY" | "SELL";
   quantity: number;
   entry_price: number;
   mark_price: number;
@@ -175,21 +222,24 @@ export interface FuturesPosition {
   margin_usd: number;
   liquidation_price: number;
   liquidation_distance_pct: number;
-  environment: "PAPER" | "SHADOW" | "LIVE";
-  opened_at: string;
+  stop_loss?: number | null;
+  take_profit?: number | null;
+  environment?: "PAPER" | "SHADOW" | "LIVE";
+  opened_at?: string;
 }
 
 export interface OrderIntentPayload {
   symbol: string;
   side: "BUY" | "SELL" | "LONG" | "SHORT";
   quantity: number;
-  order_type?: "MARKET" | "LIMIT" | "STOP_MARKET";
+  order_type?: "MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT" | "STOP_MARKET";
   limit_price?: number;
   leverage?: number;
   margin_mode?: MarginMode;
   stop_loss?: number;
   take_profit?: number;
   mode?: "PAPER" | "SHADOW" | "LIVE";
+  idempotency_key?: string;
   client_order_id?: string;
 }
 
@@ -200,6 +250,7 @@ export interface OrderIntentResponse {
   result?: {
     order_intent_id: string;
     client_order_id: string;
+    idempotency_key?: string;
     symbol: string;
     canonical_symbol?: string;
     market_data_provider?: string;
@@ -216,6 +267,7 @@ export interface OrderIntentResponse {
     estimated_fee: number;
     status: string;
     risk_decision: string;
+    risk_stages?: Array<{ stage: number; name: string; status: string; description: string }>;
     message: string;
     timestamp: string;
   };

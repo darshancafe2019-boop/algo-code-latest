@@ -3,9 +3,16 @@
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw, Layers, TrendingUp, TrendingDown, Clock } from "lucide-react";
-import { NormalizedOptionChainResponse } from "@/lib/upstox/types";
+import { NormalizedOptionChainResponse, NormalizedOptionChainStrike } from "@/lib/upstox/types";
 import { normalizeExpiriesList } from "@/lib/expiry-utils";
 import { apiClient } from "@/lib/apiClient";
+import {
+  formatCurrency,
+  formatPercent,
+  formatDecimal,
+  formatInteger,
+  safeArray,
+} from "@/lib/formatters";
 
 const UNDERLYINGS = [
   { key: "NSE_INDEX|Nifty 50", symbol: "NIFTY", name: "Nifty 50" },
@@ -36,7 +43,7 @@ export function UpstoxOptionChainViewer() {
     const availableExpiries = data?.availableExpiries || [];
     return normalizeExpiriesList(availableExpiries, selectedUnderlying);
   }, [data?.availableExpiries, selectedUnderlying]);
-  const strikes = data?.strikes || [];
+  const strikes = safeArray<NormalizedOptionChainStrike>(data?.strikes);
   const currentExpiry = data?.expiry || selectedExpiry;
 
   return (
@@ -110,17 +117,17 @@ export function UpstoxOptionChainViewer() {
             <div>
               <span className="text-[10px] text-slate-400 uppercase">Underlying Spot</span>
               <div className="text-sm font-extrabold text-white">
-                ₹{data.underlyingLtp.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                {formatCurrency(data.underlyingLtp, "₹", 2)}
               </div>
             </div>
             <div>
               <span className="text-[10px] text-slate-400 uppercase">ATM Strike</span>
-              <div className="text-sm font-extrabold text-purple-400">{data.atmStrike}</div>
+              <div className="text-sm font-extrabold text-purple-400">{data.atmStrike ?? "—"}</div>
             </div>
           </div>
           <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
             <Clock className="w-3 h-3" />
-            <span>Updated: {new Date(data.timestamp).toLocaleTimeString()}</span>
+            <span>Updated: {data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : "—"}</span>
           </div>
         </div>
       )}
@@ -189,19 +196,19 @@ export function UpstoxOptionChainViewer() {
                 >
                   {/* Calls */}
                   <td className="py-1.5 px-2 text-left text-slate-400">
-                    {s.call.delta !== null ? s.call.delta.toFixed(2) : "-"}
+                    {formatDecimal(s.call?.delta, 2, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-400">
-                    {s.call.iv !== null ? `${s.call.iv.toFixed(1)}%` : "-"}
+                    {formatPercent(s.call?.iv, 1, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-300">
-                    {s.call.oi !== null ? s.call.oi.toLocaleString("en-IN") : "-"}
+                    {formatInteger(s.call?.oi, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-400">
-                    {s.call.volume !== null ? s.call.volume.toLocaleString("en-IN") : "-"}
+                    {formatInteger(s.call?.volume, "—")}
                   </td>
                   <td className="py-1.5 px-2 font-bold text-emerald-400 border-r border-slate-800">
-                    {s.call.ltp !== null ? `₹${s.call.ltp.toFixed(2)}` : "-"}
+                    {formatCurrency(s.call?.ltp, "₹", 2, "—")}
                   </td>
 
                   {/* Strike Column */}
@@ -215,19 +222,19 @@ export function UpstoxOptionChainViewer() {
 
                   {/* Puts */}
                   <td className="py-1.5 px-2 font-bold text-rose-400 text-left">
-                    {s.put.ltp !== null ? `₹${s.put.ltp.toFixed(2)}` : "-"}
+                    {formatCurrency(s.put?.ltp, "₹", 2, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-400">
-                    {s.put.volume !== null ? s.put.volume.toLocaleString("en-IN") : "-"}
+                    {formatInteger(s.put?.volume, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-300">
-                    {s.put.oi !== null ? s.put.oi.toLocaleString("en-IN") : "-"}
+                    {formatInteger(s.put?.oi, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-slate-400">
-                    {s.put.iv !== null ? `${s.put.iv.toFixed(1)}%` : "-"}
+                    {formatPercent(s.put?.iv, 1, "—")}
                   </td>
                   <td className="py-1.5 px-2 text-right text-slate-400">
-                    {s.put.delta !== null ? s.put.delta.toFixed(2) : "-"}
+                    {formatDecimal(s.put?.delta, 2, "—")}
                   </td>
                 </tr>
               ))}

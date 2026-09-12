@@ -58,7 +58,7 @@ export function StrategyPaperTestPanel({ strategy }: StrategyPaperTestPanelProps
   }, [isActive]);
 
   return (
-    <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">
+    <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">
       {/* Header & Toggle */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2333] pb-3">
         <div className="flex items-center gap-2">
@@ -110,15 +110,15 @@ export function StrategyPaperTestPanel({ strategy }: StrategyPaperTestPanelProps
         </h4>
 
         {signalsLog.length === 0 ? (
-          <div className="p-8 text-center text-xs text-slate-500 bg-[#121927]/40 rounded-xl border border-dashed border-[#1E293B]">
+          <div className="p-8 text-center text-xs text-slate-500 bg-[#121927]/40 rounded-xl border border-dashed border-[#1A2A3F]">
             {isActive
               ? "Listening to live market feed for confluence condition triggers..."
               : "Click \"Start Paper Stream\" to begin live market simulation."}
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-[#1E293B] bg-[#0A0E17]">
+          <div className="overflow-x-auto rounded-xl border border-[#1A2A3F] bg-[#0A0E17]">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-[#121927] text-[10px] text-slate-400 border-b border-[#1E293B]">
+              <thead className="bg-[#121927] text-[10px] text-slate-400 border-b border-[#1A2A3F]">
                 <tr>
                   <th className="py-2 px-3">Time</th>
                   <th className="py-2 px-3">Signal</th>

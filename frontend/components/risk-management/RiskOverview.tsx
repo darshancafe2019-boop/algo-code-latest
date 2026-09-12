@@ -23,7 +23,7 @@ export function RiskOverview({ data }: RiskOverviewProps) {
   const availableCapital = data.available_capital || totalCapital - allocatedCapital;
 
   return (
-    <div className="space-y-4 font-sans text-[#E8F3EC] select-none">
+    <div className="space-y-4 font-sans text-[#F7FAFC] select-none">
       {/* 1. Eco Gauges Row: Risk Meter (0-100%) + Capital Meter (SVG Ring) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Left: Eco Risk Meter */}
@@ -63,32 +63,32 @@ export function RiskOverview({ data }: RiskOverviewProps) {
 
       {/* 2. Key Telemetry Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-        <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl">
-          <span className="text-[10px] text-[#70877A] uppercase block mb-1">Max Daily Loss</span>
-          <span className="text-sm font-extrabold text-[#E8F3EC]">$2,500.00</span>
-          <span className="text-[10px] text-[#55C98A] block mt-0.5">18% utilized</span>
+        <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-2xl">
+          <span className="text-[10px] text-[#52627A] uppercase block mb-1">Max Daily Loss</span>
+          <span className="text-sm font-extrabold text-[#F7FAFC]">$2,500.00</span>
+          <span className="text-[10px] text-[#22D3EE] block mt-0.5">18% utilized</span>
         </div>
 
-        <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl">
-          <span className="text-[10px] text-[#70877A] uppercase block mb-1">Peak-to-Trough Drawdown</span>
-          <span className="text-sm font-extrabold text-[#39B978]">
+        <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-2xl">
+          <span className="text-[10px] text-[#52627A] uppercase block mb-1">Peak-to-Trough Drawdown</span>
+          <span className="text-sm font-extrabold text-[#00E890]">
             {(data.daily_drawdown_pct || 1.25).toFixed(2)}%
           </span>
-          <span className="text-[10px] text-[#70877A] block mt-0.5">Cap: 5.00%</span>
+          <span className="text-[10px] text-[#52627A] block mt-0.5">Cap: 5.00%</span>
         </div>
 
-        <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl">
-          <span className="text-[10px] text-[#70877A] uppercase block mb-1">Margin Buffer</span>
-          <span className="text-sm font-extrabold text-[#55C98A]">
+        <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-2xl">
+          <span className="text-[10px] text-[#52627A] uppercase block mb-1">Margin Buffer</span>
+          <span className="text-sm font-extrabold text-[#22D3EE]">
             {(100 - (data.margin_usage_pct || 21.5)).toFixed(1)}% FREE
           </span>
-          <span className="text-[10px] text-[#55C98A] block mt-0.5">Safe Threshold</span>
+          <span className="text-[10px] text-[#22D3EE] block mt-0.5">Safe Threshold</span>
         </div>
 
-        <div className="p-3 bg-[#0D1914] border border-[#294238] rounded-2xl">
-          <span className="text-[10px] text-[#70877A] uppercase block mb-1">14-Point Pre-Order Gate</span>
-          <span className="text-sm font-extrabold text-[#55C98A]">100% PASS</span>
-          <span className="text-[10px] text-[#55C98A] block mt-0.5">0 Breaches</span>
+        <div className="p-3 bg-[#0A1422] border border-[#1A2A3F] rounded-2xl">
+          <span className="text-[10px] text-[#52627A] uppercase block mb-1">14-Point Pre-Order Gate</span>
+          <span className="text-sm font-extrabold text-[#22D3EE]">100% PASS</span>
+          <span className="text-[10px] text-[#22D3EE] block mt-0.5">0 Breaches</span>
         </div>
       </div>
     </div>

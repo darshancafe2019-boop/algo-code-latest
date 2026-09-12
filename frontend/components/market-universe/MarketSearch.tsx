@@ -37,7 +37,7 @@ export function MarketSearch({
   setExchangeFilter,
 }: MarketSearchProps) {
   return (
-    <div className="p-4 rounded-xl bg-[#121824] border border-[#1E293B] space-y-3">
+    <div className="p-4 rounded-xl bg-[#121824] border border-[#1A2A3F] space-y-3">
       {/* Top Search & Filter Dropdowns Bar */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Search Input */}
@@ -48,7 +48,7 @@ export function MarketSearch({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search by Symbol (RELIANCE, BTC, AAPL, NIFTY50), ISIN, or Company..."
-            className="w-full pl-10 pr-9 py-2 bg-[#0B0E14] border border-[#1E293B] focus:border-cyan-500 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
+            className="w-full pl-10 pr-9 py-2 bg-[#0B0E14] border border-[#1A2A3F] focus:border-cyan-500 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
           />
           {searchQuery && (
             <button
@@ -62,7 +62,7 @@ export function MarketSearch({
 
         {/* Volatility Filter */}
         {setVolatilityFilter && (
-          <div className="flex items-center gap-1.5 bg-[#0B0E14] px-3 py-1.5 rounded-xl border border-[#1E293B]">
+          <div className="flex items-center gap-1.5 bg-[#0B0E14] px-3 py-1.5 rounded-xl border border-[#1A2A3F]">
             <span className="text-[11px] text-slate-400 font-semibold">Volatility:</span>
             <select
               value={volatilityFilter}
@@ -80,7 +80,7 @@ export function MarketSearch({
 
         {/* Exchange Filter */}
         {setExchangeFilter && (
-          <div className="flex items-center gap-1.5 bg-[#0B0E14] px-3 py-1.5 rounded-xl border border-[#1E293B]">
+          <div className="flex items-center gap-1.5 bg-[#0B0E14] px-3 py-1.5 rounded-xl border border-[#1A2A3F]">
             <span className="text-[11px] text-slate-400 font-semibold">Exchange:</span>
             <select
               value={exchangeFilter}
@@ -111,7 +111,7 @@ export function MarketSearch({
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                 isActive
                   ? "bg-cyan-500 text-black font-bold shadow-lg shadow-cyan-500/20"
-                  : "bg-[#0B0E14] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-[#1E293B]"
+                  : "bg-[#0B0E14] hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-[#1A2A3F]"
               }`}
             >
               {ac.label}

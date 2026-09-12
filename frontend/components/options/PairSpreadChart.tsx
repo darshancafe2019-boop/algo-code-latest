@@ -192,13 +192,13 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
             y1={zeroY}
             x2={width - padding.right}
             y2={zeroY}
-            stroke="#94A3B8"
+            stroke="#7C8CA3"
             strokeWidth="1.5"
           />
           <text
             x={padding.left - 6}
             y={zeroY + 3}
-            fill="#94A3B8"
+            fill="#7C8CA3"
             fontSize="9"
             fontFamily="monospace"
             textAnchor="end"
@@ -210,7 +210,7 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
           <path
             d={pathD}
             fill="none"
-            stroke="#38BDF8"
+            stroke="#19C5FF"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -227,8 +227,8 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
                   ? "#F43F5E"
                   : curVal <= -2.0
                   ? "#10B981"
-                  : "#38BDF8"
-                : "#38BDF8"
+                  : "#19C5FF"
+                : "#19C5FF"
             }
             stroke="#FFFFFF"
             strokeWidth="2"
@@ -242,7 +242,7 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
                 y1={padding.top}
                 x2={getX(hoverIndex)}
                 y2={height - padding.bottom}
-                stroke="#94A3B8"
+                stroke="#7C8CA3"
                 strokeWidth="1"
                 strokeDasharray="2 2"
               />
@@ -263,7 +263,7 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
               <text
                 x={padding.left}
                 y={height - 8}
-                fill="#64748B"
+                fill="#52627A"
                 fontSize="9"
                 fontFamily="monospace"
               >
@@ -272,7 +272,7 @@ export function PairSpreadChart({ analysis }: PairSpreadChartProps) {
               <text
                 x={width - padding.right}
                 y={height - 8}
-                fill="#64748B"
+                fill="#52627A"
                 fontSize="9"
                 fontFamily="monospace"
                 textAnchor="end"

@@ -61,7 +61,7 @@ export function TerminalLeftToolbar({
   return (
     <aside
       aria-label="Drawing Tools"
-      className="w-11 bg-[#131722] border-r border-[#2A2E39] flex flex-col items-center py-2 z-20 select-none shrink-0"
+      className="w-11 bg-[#07101A] border-r border-[#1A2A3F] flex flex-col items-center py-2 z-20 select-none shrink-0"
     >
       <div className="flex flex-col items-center gap-1 w-full px-1">
         {TOOLS.map((tool) => {
@@ -72,40 +72,40 @@ export function TerminalLeftToolbar({
             <button
               key={tool.id}
               onClick={() => onSelectTool(tool.id)}
-              className={`group relative w-8 h-8 rounded flex items-center justify-center transition-all ${
+              className={`group relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
                 isActive
-                  ? "bg-[#2962FF] text-white shadow-sm"
-                  : "text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D]"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
               }`}
               title={`${tool.label} ${tool.shortcut ? `(${tool.shortcut})` : ""}`}
             >
               <Icon className="w-4 h-4" />
 
               {/* Tooltip on hover */}
-              <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#1E222D] text-[#D1D4DC] border border-[#2A2E39] rounded text-[11px] font-sans font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
-                {tool.label} {tool.shortcut && <span className="text-[#787B86] font-mono ml-1">[{tool.shortcut}]</span>}
+              <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#0A1422] text-[#F7FAFC] border border-[#1A2A3F] rounded-md text-[11px] font-sans font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+                {tool.label} {tool.shortcut && <span className="text-[#52627A] font-mono ml-1">[{tool.shortcut}]</span>}
               </span>
             </button>
           );
         })}
       </div>
 
-      <div className="w-6 h-[1px] bg-[#2A2E39] my-2" />
+      <div className="w-6 h-[1px] bg-[#1A2A3F] my-2" />
 
       {/* Drawing Management Tools */}
       <div className="flex flex-col items-center gap-1 w-full px-1">
         {/* Toggle Hide/Show */}
         <button
           onClick={onToggleHide}
-          className={`group relative w-8 h-8 rounded flex items-center justify-center transition-all ${
+          className={`group relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
             drawingsHidden
-              ? "bg-[#EF5350]/20 text-[#EF5350]"
-              : "text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D]"
+              ? "bg-[#FF3B5C]/20 text-[#FF3B5C]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
           }`}
           title={drawingsHidden ? "Show All Drawings" : "Hide All Drawings"}
         >
           {drawingsHidden ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#1E222D] text-[#D1D4DC] border border-[#2A2E39] rounded text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#0A1422] text-[#F7FAFC] border border-[#1A2A3F] rounded-md text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
             {drawingsHidden ? "Show Drawings" : "Hide Drawings"}
           </span>
         </button>
@@ -113,15 +113,15 @@ export function TerminalLeftToolbar({
         {/* Toggle Lock */}
         <button
           onClick={onToggleLock}
-          className={`group relative w-8 h-8 rounded flex items-center justify-center transition-all ${
+          className={`group relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
             drawingsLocked
-              ? "bg-[#2962FF]/20 text-[#2962FF]"
-              : "text-[#787B86] hover:text-[#D1D4DC] hover:bg-[#1E222D]"
+              ? "bg-[#2563EB]/20 text-[#19C5FF]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
           }`}
           title={drawingsLocked ? "Unlock Drawings" : "Lock Drawings"}
         >
           <Lock className="w-4 h-4" />
-          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#1E222D] text-[#D1D4DC] border border-[#2A2E39] rounded text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#0A1422] text-[#F7FAFC] border border-[#1A2A3F] rounded-md text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
             {drawingsLocked ? "Unlock All Drawings" : "Lock Drawings"}
           </span>
         </button>
@@ -130,22 +130,22 @@ export function TerminalLeftToolbar({
         <button
           onClick={onClearDrawings}
           disabled={drawingsCount === 0}
-          className={`group relative w-8 h-8 rounded flex items-center justify-center transition-all ${
+          className={`group relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
             drawingsCount > 0
-              ? "text-[#787B86] hover:text-[#EF5350] hover:bg-[#EF5350]/10 cursor-pointer"
-              : "text-[#787B86]/40 cursor-not-allowed"
+              ? "text-[#7C8CA3] hover:text-[#FF3B5C] hover:bg-[#FF3B5C]/10 cursor-pointer"
+              : "text-[#52627A]/40 cursor-not-allowed"
           }`}
           title={`Clear All Drawings (${drawingsCount})`}
         >
           <Trash2 className="w-4 h-4" />
-          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#1E222D] text-[#D1D4DC] border border-[#2A2E39] rounded text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
+          <span className="pointer-events-none absolute left-full ml-2 px-2 py-1 bg-[#0A1422] text-[#F7FAFC] border border-[#1A2A3F] rounded-md text-[11px] font-sans whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity z-50 shadow-lg">
             Remove All Objects ({drawingsCount})
           </span>
         </button>
       </div>
 
       <div className="mt-auto flex flex-col items-center">
-        <span className="text-[9px] font-mono text-[#787B86] tabular-nums" title="Active drawings on chart">
+        <span className="text-[9px] font-mono text-[#52627A] tabular-nums" title="Active drawings on chart">
           {drawingsCount} obj
         </span>
       </div>

@@ -48,7 +48,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         {/* 1. RUNNING BOTS */}
         <div
           onClick={() => setActiveTooltip(activeTooltip === "fleet" ? null : "fleet")}
-          className="relative cursor-pointer bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
+          className="relative cursor-pointer bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">RUNNING BOTS</span>
@@ -68,7 +68,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         {/* 2. CAPITAL ALLOCATED */}
         <div
           onClick={() => setActiveTooltip(activeTooltip === "capital" ? null : "capital")}
-          className="relative cursor-pointer bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
+          className="relative cursor-pointer bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">ALLOCATED CAPITAL</span>
@@ -85,7 +85,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         </div>
 
         {/* 3. AVAILABLE CAPITAL */}
-        <div className="bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">AVAILABLE CAPITAL</span>
             <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
@@ -103,7 +103,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         {/* 4. TODAY'S NET P&L */}
         <div
           onClick={() => setActiveTooltip(activeTooltip === "pnl" ? null : "pnl")}
-          className="relative cursor-pointer bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
+          className="relative cursor-pointer bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1"
         >
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">TODAY&apos;S NET P&L</span>
@@ -131,7 +131,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
           {/* Metric Provenance Tooltip */}
           {activeTooltip === "pnl" && (
             <div className="absolute top-full left-0 mt-2 z-30 w-56 p-2.5 rounded-xl bg-[#070D14] border border-cyan-700/80 shadow-2xl space-y-1.5 text-xs font-mono">
-              <div className="flex items-center justify-between border-b border-[#1E293B] pb-1 text-[11px] font-bold text-cyan-300">
+              <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-1 text-[11px] font-bold text-cyan-300">
                 <span>P&L Provenance</span>
                 <Database className="h-3 w-3" />
               </div>
@@ -154,7 +154,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         </div>
 
         {/* 5. CURRENT EXPOSURE */}
-        <div className="bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">CURRENT EXPOSURE</span>
             <Activity className="h-3.5 w-3.5 text-amber-400" />
@@ -170,7 +170,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         </div>
 
         {/* 6. OPEN POSITIONS / ORDERS */}
-        <div className="bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">POSITIONS / ORDERS</span>
             <Layers className="h-3.5 w-3.5 text-purple-400" />
@@ -189,7 +189,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         </div>
 
         {/* 7. WORKER HEALTH */}
-        <div className="bg-[#0B131E] border border-[#1E293B] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-600/60 rounded-2xl p-3 shadow-lg transition-all space-y-1">
           <div className="flex items-center justify-between text-slate-400">
             <span className="text-[10px] font-bold uppercase tracking-wider">WORKER HEALTH</span>
             <Cpu className="h-3.5 w-3.5 text-emerald-400" />
@@ -207,36 +207,36 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
 
       {/* Bottom Compact Row: Secondary Performance & Quality Metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 text-xs font-mono">
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Closed Trades:</span>
           <span className="font-bold text-slate-200">{metrics.closed_trades || 0}</span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Win Rate:</span>
           <span className="font-bold text-emerald-400">{(metrics.win_rate_pct || 0).toFixed(1)}%</span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Profit Factor:</span>
           <span className="font-bold text-cyan-300">{profitFactorDisplay}</span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Realized P&L:</span>
           <span className={`font-bold ${isPositiveTotal ? "text-emerald-400" : "text-rose-400"}`}>
             {isPositiveTotal ? `+$${(Number(metrics.total_pnl) || 0).toFixed(2)}` : `-$${Math.abs(Number(metrics.total_pnl) || 0).toFixed(2)}`}
           </span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Risk Utilized:</span>
           <span className="font-bold text-slate-300">
             {metrics.running > 0 ? `${(metrics.running * 1.5).toFixed(1)}%` : "0.0%"}
           </span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] flex items-center justify-between">
+        <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Max Drawdown:</span>
           <span className="font-bold text-slate-300">0.0%</span>
         </div>

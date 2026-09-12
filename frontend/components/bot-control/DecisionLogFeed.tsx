@@ -21,8 +21,8 @@ export function DecisionLogFeed() {
   const logs = data?.events || data?.decision_logs || data?.logs || [];
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-5 shadow-xl">
-      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3 mb-3">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-5 shadow-xl">
+      <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3 mb-3">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-cyan-400" />
           <h3 className="text-sm font-bold text-white">Live Decision Log Feed</h3>

@@ -26,11 +26,11 @@ export function EmptyState({
         className
       )}
     >
-      <div className="p-2.5 rounded-full bg-[#121C2C] border border-[#213047] text-[#64748B] mb-2.5">
+      <div className="p-2.5 rounded-full bg-[#121C2C] border border-[#213047] text-[#52627A] mb-2.5">
         <Icon className="h-5 w-5" />
       </div>
       {title && <h4 className="text-xs font-semibold text-[#F4F7FA] font-sans mb-1">{title}</h4>}
-      <p className="text-[11px] text-[#94A3B8] font-mono max-w-sm">{message}</p>
+      <p className="text-[11px] text-[#7C8CA3] font-mono max-w-sm">{message}</p>
       {action && <div className="mt-3">{action}</div>}
     </div>
   );

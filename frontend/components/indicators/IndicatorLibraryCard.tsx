@@ -37,7 +37,7 @@ export function IndicatorLibraryCard({
     <div
       className={`rounded-2xl border transition-all duration-200 p-4 space-y-3.5 flex flex-col justify-between ${
         isEnabled
-          ? "bg-[#0B111E] border-[#1E293B] hover:border-cyan-500/50 shadow-lg shadow-black/40"
+          ? "bg-[#0B111E] border-[#1A2A3F] hover:border-cyan-500/50 shadow-lg shadow-black/40"
           : "bg-[#080D17] border-slate-900 opacity-60 hover:opacity-90"
       }`}
     >
@@ -76,7 +76,7 @@ export function IndicatorLibraryCard({
       </div>
 
       {/* Value & Signal Display */}
-      <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5 space-y-1.5">
+      <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5 space-y-1.5">
         <div className="flex items-center justify-between text-[11px] font-mono">
           <span className="text-slate-400">Current Value</span>
           <span className="text-white font-bold text-xs">{formattedVal}</span>
@@ -133,7 +133,7 @@ export function IndicatorLibraryCard({
         )}
         <button
           onClick={() => onConfigure(indicator)}
-          className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#1E293B] hover:bg-slate-700 text-cyan-400 border border-slate-700 transition-all flex items-center gap-1.5"
+          className="ml-auto px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#1A2A3F] hover:bg-slate-700 text-cyan-400 border border-slate-700 transition-all flex items-center gap-1.5"
         >
           <Sliders className="w-3.5 h-3.5" />
           Configure

@@ -79,7 +79,7 @@ export function IndicatorHeader({
   }, []);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         {/* Left: Title & Quick Market / Timeframe Controls */}
         <div className="flex flex-wrap items-center gap-3 sm:gap-4">
@@ -123,7 +123,7 @@ export function IndicatorHeader({
                       onSelectSymbol(s);
                       setIsSymbolDropdownOpen(false);
                     }}
-                    className={`w-full text-left px-3 py-1.5 hover:bg-[#1E293B] transition-colors flex items-center justify-between ${
+                    className={`w-full text-left px-3 py-1.5 hover:bg-[#1A2A3F] transition-colors flex items-center justify-between ${
                       s === symbol ? "text-cyan-400 font-bold bg-cyan-500/10" : "text-slate-200"
                     }`}
                   >
@@ -188,7 +188,7 @@ export function IndicatorHeader({
           <button
             onClick={onRefresh}
             disabled={isSyncing}
-            className="p-2 text-xs rounded-xl bg-[#141E33] hover:bg-[#1E293B] text-slate-300 border border-slate-700 hover:border-slate-600 transition-all disabled:opacity-50"
+            className="p-2 text-xs rounded-xl bg-[#141E33] hover:bg-[#1A2A3F] text-slate-300 border border-slate-700 hover:border-slate-600 transition-all disabled:opacity-50"
             title="Recalculate live indicators"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin text-cyan-400" : ""}`} />
@@ -200,8 +200,8 @@ export function IndicatorHeader({
               onClick={() => setIsMoreOpen(!isMoreOpen)}
               className={`p-2 text-xs rounded-xl border transition-all ${
                 isMoreOpen
-                  ? "bg-[#1E293B] text-white border-cyan-500/50"
-                  : "bg-[#141E33] hover:bg-[#1E293B] text-slate-300 border-slate-700 hover:border-slate-600"
+                  ? "bg-[#1A2A3F] text-white border-cyan-500/50"
+                  : "bg-[#141E33] hover:bg-[#1A2A3F] text-slate-300 border-slate-700 hover:border-slate-600"
               }`}
               title="More Actions"
             >
@@ -218,7 +218,7 @@ export function IndicatorHeader({
                     onOpenBacktest();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
                 >
                   <BarChart3 className="w-4 h-4 text-cyan-400" />
                   <span>Backtest Indicators</span>
@@ -228,7 +228,7 @@ export function IndicatorHeader({
                     onOpenCompare();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
                 >
                   <GitCompare className="w-4 h-4 text-cyan-400" />
                   <span>Compare Indicators</span>
@@ -238,7 +238,7 @@ export function IndicatorHeader({
                     onOpenDiagnostics();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-200 hover:text-cyan-400 transition-colors flex items-center gap-2"
                 >
                   <Activity className="w-4 h-4 text-blue-400" />
                   <span>Engine Diagnostics</span>
@@ -253,7 +253,7 @@ export function IndicatorHeader({
                     onEnableAll();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-emerald-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-emerald-400 transition-colors flex items-center gap-2"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   <span>Enable All</span>
@@ -263,7 +263,7 @@ export function IndicatorHeader({
                     onDisableAll();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-red-400 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-red-400 transition-colors flex items-center gap-2"
                 >
                   <XCircle className="w-4 h-4" />
                   <span>Disable All</span>
@@ -273,7 +273,7 @@ export function IndicatorHeader({
                     onResetAll();
                     setIsMoreOpen(false);
                   }}
-                  className="w-full text-left px-3 py-2 hover:bg-[#1E293B] text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2"
+                  className="w-full text-left px-3 py-2 hover:bg-[#1A2A3F] text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-2"
                 >
                   <RotateCcw className="w-4 h-4" />
                   <span>Reset Overrides</span>

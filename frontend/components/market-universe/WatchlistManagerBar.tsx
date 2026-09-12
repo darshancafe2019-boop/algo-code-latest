@@ -85,7 +85,7 @@ export function WatchlistManagerBar({
   };
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3 shadow-xl select-none font-sans flex flex-wrap items-center justify-between gap-3">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3 shadow-xl select-none font-sans flex flex-wrap items-center justify-between gap-3">
       {/* 1. Watchlist Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none font-mono text-xs">
         <div className="flex items-center gap-1.5 text-slate-400 mr-2">
@@ -102,7 +102,7 @@ export function WatchlistManagerBar({
             className={`px-3 py-1.5 rounded-xl border transition-all flex items-center gap-2 whitespace-nowrap ${
               activeWatchlistId === wl.id
                 ? "bg-cyan-950 text-cyan-200 border-cyan-800 font-bold shadow-md"
-                : "bg-[#070D14] border-[#1E293B] text-slate-400 hover:text-slate-200"
+                : "bg-[#070D14] border-[#1A2A3F] text-slate-400 hover:text-slate-200"
             }`}
           >
             <span>{wl.name}</span>
@@ -116,7 +116,7 @@ export function WatchlistManagerBar({
         {!isCreating ? (
           <button
             onClick={() => setIsCreating(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-dashed border-[#1E293B] text-slate-400 hover:text-cyan-300 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-dashed border-[#1A2A3F] text-slate-400 hover:text-cyan-300 transition-colors"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>New List</span>
@@ -153,7 +153,7 @@ export function WatchlistManagerBar({
       <div className="flex items-center gap-1.5 font-mono text-xs">
         <button
           onClick={handleExportCSV}
-          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-400 hover:text-slate-200 transition-colors"
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-400 hover:text-slate-200 transition-colors"
           title="Export Active Watchlist to CSV"
         >
           <Download className="h-3.5 w-3.5" />
@@ -163,7 +163,7 @@ export function WatchlistManagerBar({
         {onToggleColumnsModal && (
           <button
             onClick={onToggleColumnsModal}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-400 hover:text-slate-200 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-400 hover:text-slate-200 transition-colors"
             title="Configure Visible Columns"
           >
             <Columns className="h-3.5 w-3.5" />

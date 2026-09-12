@@ -67,8 +67,8 @@ export function MultiBotLeaderboard({ bots }: Props) {
   });
 
   return (
-    <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] shadow-xl">
-      <div className="flex items-center justify-between mb-4 border-b border-[#1E293B] pb-3">
+    <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] shadow-xl">
+      <div className="flex items-center justify-between mb-4 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <Trophy className="h-5 w-5 text-amber-400" />
           <h3 className="text-sm font-bold text-white">Multi-Bot Performance Leaderboard</h3>
@@ -91,7 +91,7 @@ export function MultiBotLeaderboard({ bots }: Props) {
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="bg-[#0B0F17] text-slate-400 border-b border-[#1E293B] font-mono">
+            <tr className="bg-[#0B0F17] text-slate-400 border-b border-[#1A2A3F] font-mono">
               <th className="p-3">Rank</th>
 
               <th className="p-3 cursor-pointer hover:text-white" onClick={() => handleSort("name")}>

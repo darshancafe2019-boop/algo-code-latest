@@ -59,9 +59,9 @@ export function IndicatorBacktestModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl max-w-2xl w-full p-6 space-y-5 shadow-2xl overflow-y-auto max-h-[90vh]">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 flex items-center justify-center">
               <BarChart3 className="w-5 h-5" />
@@ -80,7 +80,7 @@ export function IndicatorBacktestModal({
         </div>
 
         {/* Configuration Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5">
           <div>
             <label className="text-[10px] font-mono uppercase text-slate-400">Target Asset</label>
             <input
@@ -137,25 +137,25 @@ export function IndicatorBacktestModal({
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 text-center">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 text-center">
                 <div className="text-[10px] font-mono uppercase text-slate-400">Historical Signals</div>
                 <div className="text-lg font-bold font-mono text-white mt-0.5">{result.total_signals}</div>
               </div>
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 text-center">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 text-center">
                 <div className="text-[10px] font-mono uppercase text-slate-400">Confluence Win Rate</div>
                 <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">{result.win_rate_pct.toFixed(1)}%</div>
               </div>
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 text-center">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 text-center">
                 <div className="text-[10px] font-mono uppercase text-slate-400">Profit Factor</div>
                 <div className="text-lg font-bold font-mono text-cyan-400 mt-0.5">{result.profit_factor.toFixed(2)}</div>
               </div>
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 text-center">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 text-center">
                 <div className="text-[10px] font-mono uppercase text-slate-400">Max Drawdown</div>
                 <div className="text-lg font-bold font-mono text-amber-400 mt-0.5">{result.max_drawdown_pct.toFixed(2)}%</div>
               </div>
             </div>
 
-            <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 space-y-1.5 text-xs font-mono">
+            <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 space-y-1.5 text-xs font-mono">
               <div className="flex justify-between text-slate-300">
                 <span>Avg Favorable Excursion (MFE):</span>
                 <span className="text-emerald-400 font-bold">+{result.avg_favorable_move_pct.toFixed(2)}%</span>

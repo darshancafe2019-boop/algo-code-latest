@@ -22,9 +22,9 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
   });
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
       {/* Header & Filter Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <div className="p-1.5 rounded-lg bg-purple-950 border border-purple-800/80 text-purple-400">
             <ListFilter className="h-4 w-4" />
@@ -44,7 +44,7 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
           <select
             value={filterSide}
             onChange={(e) => setFilterSide(e.target.value)}
-            className="bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
+            className="bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
           >
             <option value="ALL">All Sides</option>
             <option value="LONG">Long Only</option>
@@ -59,7 +59,7 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
               placeholder="Search symbol or exit..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-[#0B0F17] border border-[#1E293B] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="bg-[#0B0F17] border border-[#1A2A3F] rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
             />
           </div>
         </div>
@@ -70,7 +70,7 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-[#1E293B] text-[10px] uppercase font-semibold text-slate-400 tracking-wider">
+              <tr className="border-b border-[#1A2A3F] text-[10px] uppercase font-semibold text-slate-400 tracking-wider">
                 <th className="pb-2">#</th>
                 <th className="pb-2">Symbol</th>
                 <th className="pb-2">Side</th>
@@ -125,7 +125,7 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
           </table>
         </div>
       ) : (
-        <div className="py-10 text-center space-y-2 bg-[#0B0F17] border border-[#1E293B] rounded-xl">
+        <div className="py-10 text-center space-y-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-xl">
           <div className="p-2.5 rounded-full bg-slate-900 text-slate-500 inline-flex">
             <ListFilter className="h-5 w-5" />
           </div>

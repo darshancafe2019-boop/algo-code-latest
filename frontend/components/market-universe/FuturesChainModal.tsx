@@ -34,9 +34,9 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="bg-[#0B0E14] border border-[#1E293B] rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#0B0E14] border border-[#1A2A3F] rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header Bar */}
-        <div className="p-4 bg-[#121824] border-b border-[#1E293B] flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-[#121824] border-b border-[#1A2A3F] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400">
               <BarChart2 className="h-5 w-5" />
@@ -65,7 +65,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
             <select
               value={selectedUnderlying}
               onChange={(e) => setSelectedUnderlying(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1E293B] text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
+              className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1A2A3F] text-xs font-semibold text-white focus:outline-none focus:border-purple-500"
             >
               <option value="NIFTY50">NIFTY 50</option>
               <option value="BANKNIFTY">BANK NIFTY</option>
@@ -79,7 +79,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
 
             <button
               onClick={() => refetch()}
-              className="p-2 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1E293B] text-slate-300 hover:text-white"
+              className="p-2 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300 hover:text-white"
               title="Refresh Futures Chain"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin text-purple-400" : ""}`} />
@@ -87,7 +87,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1E293B] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
+              className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1A2A3F] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -117,7 +117,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
                   return (
                     <div
                       key={c.instrument_id || idx}
-                      className="p-4 rounded-xl bg-[#0F141F] border border-[#1E293B] hover:border-purple-500/40 transition-all flex flex-col justify-between space-y-3"
+                      className="p-4 rounded-xl bg-[#0F141F] border border-[#1A2A3F] hover:border-purple-500/40 transition-all flex flex-col justify-between space-y-3"
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400 px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20">
@@ -150,7 +150,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-[#1E293B]">
+                      <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-[#1A2A3F]">
                         <div>
                           <span className="text-[10px] text-slate-500 block">Basis Spread</span>
                           <span className={c.basis >= 0 ? "text-amber-400 font-bold" : "text-emerald-400 font-bold"}>
@@ -191,7 +191,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
               </div>
 
               {/* Technical Basis Curve Notice */}
-              <div className="p-3.5 rounded-xl bg-[#0D121C] border border-[#1E293B] text-[11px] text-slate-400 space-y-1">
+              <div className="p-3.5 rounded-xl bg-[#0D121C] border border-[#1A2A3F] text-[11px] text-slate-400 space-y-1">
                 <span className="font-bold text-slate-300">Futures Pricing & Cost of Carry Model:</span>
                 <p>
                   Futures basis reflects the interest rate cost of carry minus expected dividend yields. Positive basis indicates normal Contango, while negative basis indicates Backwardation signaling strong near-term spot demand.

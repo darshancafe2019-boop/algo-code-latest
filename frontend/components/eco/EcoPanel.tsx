@@ -17,15 +17,15 @@ export function EcoPanel({
   ...props
 }: EcoPanelProps) {
   const baseClasses =
-    "rounded-2xl border transition-all duration-200 overflow-hidden";
+    "rounded-xl border transition-all duration-200 overflow-hidden";
 
   const variantClasses = {
-    default: "bg-[#0D1914]/90 border-[#294238] shadow-xl backdrop-blur-md",
-    elevated: "bg-[#12221B]/95 border-[#2E7D5B]/40 shadow-2xl backdrop-blur-lg",
-    subtle: "bg-[#0B1F17]/60 border-[#1B3328] shadow-md",
+    default: "bg-[#0A1422] border-[#1A2A3F] shadow-lg backdrop-blur-md",
+    elevated: "bg-[#101B2D] border-[#2563EB]/40 shadow-xl backdrop-blur-lg",
+    subtle: "bg-[#07101A]/80 border-[#122033] shadow-md",
   };
 
-  const glowClass = glow ? "glow-leaf border-[#2E7D5B]/70" : "";
+  const glowClass = glow ? "border-[#22D3EE]/70 shadow-[0_0_15px_rgba(34,211,238,0.15)]" : "";
 
   return (
     <div
@@ -54,21 +54,21 @@ export function EcoPanelHeader({
 }) {
   return (
     <div
-      className={`px-5 py-4 border-b border-[#1B3328] flex flex-wrap items-center justify-between gap-3 bg-[#0B1F17]/40 ${className}`}
+      className={`px-4 py-3.5 border-b border-[#122033] flex flex-wrap items-center justify-between gap-3 bg-[#07101A] ${className}`}
     >
       {title ? (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {Icon && (
-            <div className="p-2 rounded-xl bg-[#123C2A]/60 border border-[#2E7D5B]/40 text-[#55C98A]">
+            <div className="p-2 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 text-[#22D3EE]">
               <Icon className="h-4 w-4" />
             </div>
           )}
           <div>
-            <h3 className="text-sm font-bold text-[#E8F3EC] tracking-wide flex items-center gap-2">
+            <h3 className="text-xs font-bold text-[#F7FAFC] tracking-wide uppercase flex items-center gap-2">
               {title}
             </h3>
             {subtitle && (
-              <p className="text-xs text-[#A8BDB0]/80 mt-0.5">{subtitle}</p>
+              <p className="text-[11px] text-[#7C8CA3] mt-0.5">{subtitle}</p>
             )}
           </div>
         </div>
@@ -89,7 +89,7 @@ export function EcoPanelToolbar({
 }) {
   return (
     <div
-      className={`px-5 py-2.5 bg-[#07110D]/60 border-b border-[#1B3328] flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#A8BDB0] ${className}`}
+      className={`px-4 py-2 bg-[#060B14] border-b border-[#122033] flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#7C8CA3] ${className}`}
     >
       {children}
     </div>
@@ -103,7 +103,7 @@ export function EcoPanelContent({
   children: React.ReactNode;
   className?: string;
 }) {
-  return <div className={`p-5 text-[#E8F3EC] ${className}`}>{children}</div>;
+  return <div className={`p-4 text-[#F7FAFC] ${className}`}>{children}</div>;
 }
 
 export function EcoPanelFooter({
@@ -115,7 +115,7 @@ export function EcoPanelFooter({
 }) {
   return (
     <div
-      className={`px-5 py-3 border-t border-[#1B3328] bg-[#07110D]/40 flex flex-wrap items-center justify-between gap-3 text-xs text-[#70877A] font-mono ${className}`}
+      className={`px-4 py-3 border-t border-[#122033] bg-[#06101B] flex flex-wrap items-center justify-between gap-3 text-xs text-[#52627A] font-mono ${className}`}
     >
       {children}
     </div>

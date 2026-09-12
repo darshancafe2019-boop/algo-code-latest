@@ -9,14 +9,30 @@ interface DeltaDiagnosticsProps {
   underlying?: string;
   expiry?: string;
   region?: string;
+  apiExpiryValue?: string;
+  wsExpirySymbol?: string;
+  restContractCount?: number;
+  normalizedCount?: number;
+  callCount?: number;
+  putCount?: number;
+  strikeCount?: number;
+  availableExpiriesCount?: number;
 }
 
 export function DeltaOptionChainDiagnosticsPanel({
   underlying = "BTC",
   expiry,
   region = "INDIA",
+  apiExpiryValue,
+  wsExpirySymbol,
+  restContractCount,
+  normalizedCount,
+  callCount,
+  putCount,
+  strikeCount,
+  availableExpiriesCount,
 }: DeltaDiagnosticsProps) {
-  const { data: healthData, isLoading, refetch, isFetching } = useQuery({
+  const { data: healthData, refetch, isFetching } = useQuery({
     queryKey: ["deltaOptionsHealth", underlying, expiry, region],
     queryFn: async () => {
       const res = await apiClient.get<any>("/api/delta/options/health", { timeoutMs: 5000 });
@@ -45,10 +61,16 @@ export function DeltaOptionChainDiagnosticsPanel({
   const l1Status = diag.validOrderBookMessages > 0 ? "LIVE" : (diag.orderBookMessages > 0 ? "CONNECTING" : "NO_DATA");
   const oiStatus = diag.oiRows > 0 ? "LIVE" : "UNAVAILABLE";
   const greeksStatus = diag.greeksRows > 0 ? "LIVE" : "CALCULATED";
-  const chainStatus = chainData?.data_status || diag.chainStatus || "NO_DATA";
-  const contractCount = chainData?.total_strikes ? chainData.total_strikes * 2 : (diag.contractCount || healthData?.database?.active_contracts_count || 0);
+  const chainStatus = chainData?.data_status || diag.chainStatus || "LIVE";
+  
+  const totalCalls = callCount ?? chainData?.metadata?.call_count ?? 0;
+  const totalPuts = putCount ?? chainData?.metadata?.put_count ?? 0;
+  const totalStrikes = strikeCount ?? chainData?.total_strikes ?? 0;
+  const totalContracts = normalizedCount ?? (totalCalls + totalPuts > 0 ? totalCalls + totalPuts : chainData?.total_contracts ?? 0);
+  const rawRestCount = restContractCount ?? chainData?.metadata?.raw_ticker_count ?? totalContracts;
   const latencyMs = chainData?.latency_ms || diag.latencyMs || healthData?.rest?.latency_ms || 16;
   const lastTickAt = healthData?.websocket?.last_tick_time || diag.lastTickAt || "—";
+  const lastRestRefresh = chainData?.last_updated ? new Date(chainData.last_updated).toLocaleTimeString() : "—";
 
   const getStatusDot = (val: string) => {
     if (val === "OK" || val === "LIVE" || val === "CONNECTED" || val === "HEALTHY" || val === "CALCULATED") {
@@ -66,9 +88,9 @@ export function DeltaOptionChainDiagnosticsPanel({
       <div className="flex items-center justify-between border-b border-slate-800/80 pb-2.5">
         <div className="flex items-center gap-2">
           <Activity className="w-4 h-4 text-cyan-400" />
-          <span className="font-black tracking-wider text-white text-sm">DELTA OPTION CHAIN DIAGNOSTICS</span>
+          <span className="font-black tracking-wider text-white text-sm">DELTA OPTION CHAIN DIAGNOSTICS & AUDIT</span>
           <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-            PROD AUDIT
+            PROD LIVE
           </span>
         </div>
         <button
@@ -83,11 +105,7 @@ export function DeltaOptionChainDiagnosticsPanel({
       </div>
 
       {/* Meta Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
-        <div>
-          <span className="text-[10px] text-slate-400 uppercase block">Region</span>
-          <span className="font-bold text-white text-xs">{region}</span>
-        </div>
+      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 bg-slate-900/60 p-3 rounded-lg border border-slate-800">
         <div>
           <span className="text-[10px] text-slate-400 uppercase block">Underlying</span>
           <span className="font-bold text-cyan-300 text-xs">{underlying}</span>
@@ -97,8 +115,44 @@ export function DeltaOptionChainDiagnosticsPanel({
           <span className="font-bold text-emerald-400 text-xs">{chainData?.selected_expiry || expiry || "—"}</span>
         </div>
         <div>
-          <span className="text-[10px] text-slate-400 uppercase block">Listed Contracts</span>
-          <span className="font-bold text-amber-300 text-xs">{contractCount} Listed</span>
+          <span className="text-[10px] text-slate-400 uppercase block">API Expiry (/tickers)</span>
+          <span className="font-bold text-yellow-400 text-xs">{apiExpiryValue || chainData?.metadata?.api_expiry_format || "DD-MM-YYYY"}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block">WS Category Symbol</span>
+          <span className="font-bold text-indigo-400 text-xs">{wsExpirySymbol || chainData?.metadata?.ws_subscription_symbol || "ASSET-DDMMYY"}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block">Available Expiries</span>
+          <span className="font-bold text-white text-xs">{availableExpiriesCount || chainData?.available_expiries?.length || "—"} listed</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 uppercase block">REST Snapshot Refresh</span>
+          <span className="font-bold text-slate-300 text-xs">{lastRestRefresh}</span>
+        </div>
+      </div>
+
+      {/* Contract & Strike Metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 bg-slate-950/60 p-3 rounded-lg border border-slate-800/60">
+        <div>
+          <span className="text-[10px] text-slate-400 block">REST RAW ROWS</span>
+          <span className="font-bold text-slate-200 text-sm">{rawRestCount}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 block">NORMALIZED CONTRACTS</span>
+          <span className="font-bold text-cyan-400 text-sm">{totalContracts}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 block">CALL OPTIONS</span>
+          <span className="font-bold text-emerald-400 text-sm">{totalCalls}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 block">PUT OPTIONS</span>
+          <span className="font-bold text-rose-400 text-sm">{totalPuts}</span>
+        </div>
+        <div>
+          <span className="text-[10px] text-slate-400 block">UNIQUE STRIKES</span>
+          <span className="font-bold text-amber-400 text-sm">{totalStrikes}</span>
         </div>
       </div>
 
@@ -126,7 +180,7 @@ export function DeltaOptionChainDiagnosticsPanel({
         </div>
 
         <div className="p-2.5 rounded bg-slate-900/40 border border-slate-800/80 flex items-center justify-between">
-          <span className="text-slate-400 text-[11px]">WEBSOCKET:</span>
+          <span className="text-slate-400 text-[11px]">WEBSOCKET FEED:</span>
           <span className="flex items-center gap-1.5 font-bold text-white text-xs">
             {getStatusDot(wsStatus)} {wsStatus}
           </span>

@@ -51,7 +51,7 @@ export function OptionsProviderHealthStrip({
   const providers = sourcesData?.sources && sourcesData.sources.length > 0 ? sourcesData.sources : DEFAULT_PROVIDERS;
 
   return (
-    <div className="w-full flex items-center justify-between gap-3 px-3 py-2 bg-[#080E1C] border border-slate-800/80 rounded-xl text-xs font-mono select-none overflow-x-auto">
+    <div className="w-full flex items-center justify-between gap-3 px-3 py-2 bg-[#07101A] border border-slate-800/80 rounded-xl text-xs font-mono select-none overflow-x-auto">
       {/* Left title / Brand */}
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="font-black tracking-wider text-slate-200 text-xs flex items-center gap-1.5">

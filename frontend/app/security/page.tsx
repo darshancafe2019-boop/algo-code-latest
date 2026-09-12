@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { AccountSecurity } from "@/components/account-security/AccountSecurity";
+import { ProductionSecurityControlCenter } from "@/components/security/ProductionSecurityControlCenter";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export default function SecurityPage() {
@@ -11,10 +11,11 @@ export default function SecurityPage() {
       <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
         <ErrorBoundary title="Security Center Failed">
           <Suspense fallback={<div className="p-8 text-center font-mono text-slate-400">Loading security center...</div>}>
-            <AccountSecurity />
+            <ProductionSecurityControlCenter />
           </Suspense>
         </ErrorBoundary>
       </div>
     </DirectPageLayout>
   );
 }
+

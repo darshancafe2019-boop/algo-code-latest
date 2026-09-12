@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LayoutDashboard,
   Clock,
@@ -17,9 +17,22 @@ import {
   Sliders,
   RefreshCw,
   ShieldCheck,
+  TrendingUp,
+  TrendingDown,
+  Percent,
+  CheckCircle2,
+  AlertTriangle,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
 import { TaxOverviewPayload, TaxpayerProfile } from "@/types/tax";
 import { apiClient } from "@/lib/apiClient";
+import { useGlobalData } from "@/context/GlobalDataContext";
+import {
+  calculateLiveTaxIntelligence,
+  JURISDICTION_RULES,
+  CalculatedTaxMetrics,
+} from "@/lib/taxEngineService";
 import { TaxCommandCenter } from "./TaxCommandCenter";
 import { GlobalTaxExposureTable } from "./GlobalTaxExposureTable";
 import { TaxPositionsView } from "./TaxPositionsView";
@@ -50,10 +63,24 @@ type SubTabType =
   | "RULE SOURCES"
   | "SETTINGS";
 
-// Initial mock snapshot for zero-lag instant tab presentation
-const INITIAL_TAX_DATA: TaxOverviewPayload = {
-  profile: {
-    id: "tax_prof_default",
+export function TaxIntelligenceTab() {
+  const { positions, orders, portfolioSnapshot, refreshAll } = useGlobalData();
+
+  const [activeSubTab, setActiveSubTab] = useState<SubTabType>("OVERVIEW");
+  const [selectedBroker, setSelectedBroker] = useState<string>("ALL");
+  const [serverTaxData, setServerTaxData] = useState<any>(null);
+  const [lots, setLots] = useState<any[]>([]);
+  const [serverTransactions, setServerTransactions] = useState<any[]>([]);
+  const [countries, setCountries] = useState<any[]>([]);
+  const [sources, setSources] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  // Authoritative Taxpayer Profile
+  const [profile, setProfile] = useState<TaxpayerProfile>({
+    id: "tax_prof_active",
     user_id: "primary_trader",
     primary_residence: "IN",
     secondary_residence: "",
@@ -67,217 +94,107 @@ const INITIAL_TAX_DATA: TaxOverviewPayload = {
     treaty_benefit_claimed: true,
     base_currency: "INR",
     tax_reserve_rate: 20.0,
-    created_at: "2026-04-01T00:00:00Z",
-    updated_at: "2026-04-01T00:00:00Z",
-  },
-  liability_summary: {
-    calculation_id: "CALC_INST_INIT",
-    tax_year: "FY 2025-26",
-    jurisdiction: "IN",
-    currency: "INR",
-    gross_realized_gains: 45000.0,
-    allowable_losses: 18000.0,
-    net_capital_gains: 27000.0,
-    business_derivative_income: 28000.0,
-    crypto_vda_income: 0.0,
-    estimated_tax_liability: 14352.0,
-    transaction_taxes_paid: 698.5,
-    brokerage_fees_paid: 80.0,
-    taxes_already_withheld: 270.31,
-    remaining_estimated_payable: 14081.69,
-    suggested_tax_reserve: 14081.69,
-    confidence: "HIGH-CONFIDENCE ESTIMATE",
-    reasons: [
-      "Tax residency confirmed: IN",
-      "Official statutory rules loaded: Finance Act 2024 (Section 111A / 112A)",
-      "Transaction taxes separated from broker commissions",
-    ],
-  },
-  command_center: {
-    estimated_tax_liability: 14352.0,
-    realized_taxable_gains: 45000.0,
-    realized_losses: 18000.0,
-    net_realized_pl: 27000.0,
-    unrealized_tax_exposure: 31450.0,
-    total_unrealized_pl: 442000.0,
-    taxes_already_withheld: 270.31,
-    transaction_taxes_paid: 698.5,
-    upcoming_tax_payments: 6458.4,
-    tax_loss_opportunities: 18250.0,
-    tax_reserve: 14081.69,
-    compliance_status: "COMPLIANT",
-    confidence: "HIGH-CONFIDENCE ESTIMATE",
-  },
-  global_tax_exposure: [
-    {
-      country_code: "IN",
-      country_name: "India",
-      relationship: "tax_residence",
-      tax_type: "Capital Gains / Trading / STT",
-      estimated_liability: 14352.0,
-      paid_withheld: 698.5,
-      remaining_estimate: 13653.5,
-      next_deadline: "2026-06-15",
-      confidence: "HIGH-CONFIDENCE ESTIMATE",
-      explanation: "Taxpayer is a tax resident of India. Subject to worldwide taxation under Income Tax Act 1961.",
-      treaty_relevant: false,
-    },
-    {
-      country_code: "US",
-      country_name: "United States",
-      relationship: "source",
-      tax_type: "Dividend Withholding (IRC)",
-      estimated_liability: 270.31,
-      paid_withheld: 270.31,
-      remaining_estimate: 0.0,
-      next_deadline: "2026-04-15",
-      confidence: "CONFIRMED INPUTS",
-      explanation: "U.S. source dividend withholding tax deducted at source under DTAA Article 10.",
-      treaty_relevant: true,
-    },
-  ],
-  upcoming_deadlines: [
-    {
-      id: "IN_ADV_Q1_2026",
-      country_code: "IN",
-      tax_year: "FY 2025-26",
-      title: "Advance Tax Installment 1 (15%)",
-      category: "ADVANCE_TAX",
-      due_date: "2026-06-15",
-      estimated_amount: 2152.8,
-      currency: "INR",
-      status: "UPCOMING",
-      confidence: "HIGH-CONFIDENCE ESTIMATE",
-      statutory_reference: "Section 211(1)(a) Income Tax Act 1961",
-      days_remaining: 102,
-    },
-    {
-      id: "IN_ADV_Q2_2026",
-      country_code: "IN",
-      tax_year: "FY 2025-26",
-      title: "Advance Tax Installment 2 (45% Cumulative)",
-      category: "ADVANCE_TAX",
-      due_date: "2026-09-15",
-      estimated_amount: 4305.6,
-      currency: "INR",
-      status: "UPCOMING",
-      confidence: "HIGH-CONFIDENCE ESTIMATE",
-      statutory_reference: "Section 211(1)(b) Income Tax Act 1961",
-      days_remaining: 194,
-    },
-  ],
-  tax_alerts: [
-    {
-      id: "ALERT_HOLDING_RELIANCE_12D",
-      alert_type: "HOLDING_PERIOD_THRESHOLD",
-      symbol: "RELIANCE",
-      title: "Holding Period Threshold in 12 Days for RELIANCE",
-      message: "RELIANCE has been held for 353 days. Waiting 12 days transitions gains to Long-Term classification (12.5% vs 20%), saving an estimated ₹39,000 in tax.",
-      severity: "HIGH",
-      confidence: "HIGH-CONFIDENCE ESTIMATE",
-      potential_tax_saving: 39000.0,
-      currency: "INR",
-      status: "ACTIVE",
-      created_at: "2026-04-01T00:00:00Z",
-    },
-  ],
-  analyzed_positions: [
-    {
-      lot_id: "LOT_RELIANCE_001",
-      symbol: "RELIANCE",
-      asset_class: "equity",
-      broker: "Upstox",
-      account_id: "ACC_IN_01",
-      quantity: 200,
-      cost_basis_per_unit: 2890.0,
-      total_cost_basis: 578000.0,
-      current_price: 3150.0,
-      market_value: 630000.0,
-      unrealized_pl: 52000.0,
-      holding_period_days: 353,
-      statutory_threshold_days: 365,
-      days_remaining_to_threshold: 12,
-      current_classification_if_sold: "SHORT_TERM_CAPITAL_GAIN",
-      future_classification: "LONG_TERM_CAPITAL_GAIN",
-      estimated_tax_if_sold_now: 10400.0,
-      estimated_tax_after_threshold: 6500.0,
-      potential_tax_savings_waiting: 3900.0,
-      tax_action_priority_score: 86,
-      anti_avoidance_warning: null,
-      confidence: "HIGH-CONFIDENCE ESTIMATE",
-    },
-  ],
-  legal_disclaimer:
-    "Tax calculations are decision-support estimates based on available transaction, taxpayer, and statutory jurisdiction data. Complex cases may require verification by a qualified tax professional.",
-};
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
 
-export function TaxIntelligenceTab() {
-  const [activeSubTab, setActiveSubTab] = useState<SubTabType>("OVERVIEW");
-  const [taxData, setTaxData] = useState<TaxOverviewPayload>(INITIAL_TAX_DATA);
-  const [lots, setLots] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [countries, setCountries] = useState<any[]>([]);
-  const [sources, setSources] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  // 1. Fetch Backend Tax Intelligence Data with Promise.allSettled
+  const fetchAllTaxData = useCallback(async () => {
+    setIsLoading(true);
+    setFetchError(null);
 
-  // Fetch background data without blocking UI render using resilient apiClient and Promise.allSettled
-  useEffect(() => {
-    let isMounted = true;
-    const fetchTaxData = async () => {
-      setLoading(true);
-      try {
-        const [ovRes, lotsRes, txRes, countRes, srcRes, docRes] =
-          await Promise.allSettled([
-            apiClient.get<any>("/api/tax/overview", { timeoutMs: 6000, deduplicate: true }),
-            apiClient.get<any>("/api/tax/lots", { timeoutMs: 6000, deduplicate: true }),
-            apiClient.get<any>("/api/tax/transactions", { timeoutMs: 6000, deduplicate: true }),
-            apiClient.get<any>("/api/tax/countries", { timeoutMs: 6000, deduplicate: true }),
-            apiClient.get<any>("/api/tax/sources", { timeoutMs: 6000, deduplicate: true }),
-            apiClient.get<any>("/api/tax/documents", { timeoutMs: 6000, deduplicate: true }),
-          ]);
+    try {
+      const [ovRes, lotsRes, txRes, countRes, srcRes, docRes, profRes] =
+        await Promise.allSettled([
+          apiClient.get<any>("/api/tax/overview", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/lots", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/transactions", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/countries", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/sources", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/documents", { timeoutMs: 5000, deduplicate: true }),
+          apiClient.get<any>("/api/tax/profile", { timeoutMs: 5000, deduplicate: true }),
+        ]);
 
-        if (ovRes.status === "fulfilled" && ovRes.value.ok && ovRes.value.data?.status === "success" && isMounted) {
-          setTaxData(ovRes.value.data.data);
-        }
-        if (lotsRes.status === "fulfilled" && lotsRes.value.ok && lotsRes.value.data?.status === "success" && isMounted) {
-          setLots(lotsRes.value.data.data);
-        }
-        if (txRes.status === "fulfilled" && txRes.value.ok && txRes.value.data?.status === "success" && isMounted) {
-          setTransactions(txRes.value.data.data);
-        }
-        if (countRes.status === "fulfilled" && countRes.value.ok && countRes.value.data?.status === "success" && isMounted) {
-          setCountries(countRes.value.data.data);
-        }
-        if (srcRes.status === "fulfilled" && srcRes.value.ok && srcRes.value.data?.status === "success" && isMounted) {
-          setSources(srcRes.value.data.data);
-        }
-        if (docRes.status === "fulfilled" && docRes.value.ok && docRes.value.data?.status === "success" && isMounted) {
-          setDocuments(docRes.value.data.data);
-        }
-      } catch {
-        // Fallback gracefully on existing initial state
-      } finally {
-        if (isMounted) setLoading(false);
+      if (ovRes.status === "fulfilled" && ovRes.value.ok && ovRes.value.data?.status === "success") {
+        setServerTaxData(ovRes.value.data.data);
       }
-    };
-
-    fetchTaxData();
-    return () => {
-      isMounted = false;
-    };
+      if (lotsRes.status === "fulfilled" && lotsRes.value.ok && lotsRes.value.data?.status === "success") {
+        setLots(lotsRes.value.data.data || []);
+      }
+      if (txRes.status === "fulfilled" && txRes.value.ok && txRes.value.data?.status === "success") {
+        setServerTransactions(txRes.value.data.data || []);
+      }
+      if (countRes.status === "fulfilled" && countRes.value.ok && countRes.value.data?.status === "success") {
+        setCountries(countRes.value.data.data || []);
+      }
+      if (srcRes.status === "fulfilled" && srcRes.value.ok && srcRes.value.data?.status === "success") {
+        setSources(srcRes.value.data.data || []);
+      }
+      if (docRes.status === "fulfilled" && docRes.value.ok && docRes.value.data?.status === "success") {
+        setDocuments(docRes.value.data.data || []);
+      }
+      if (profRes.status === "fulfilled" && profRes.value.ok && profRes.value.data?.status === "success") {
+        setProfile(profRes.value.data.data);
+      }
+    } catch (err: any) {
+      setFetchError(err?.message || "Partial tax service sync issue");
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAllTaxData();
+  }, [fetchAllTaxData]);
+
+  // Handle Manual Refresh
+  const handleManualRefresh = async () => {
+    setIsRefreshing(true);
+    if (refreshAll) {
+      try {
+        await refreshAll();
+      } catch {}
+    }
+    await fetchAllTaxData();
+    setIsRefreshing(false);
+  };
+
+  // 2. Compute Master Live Tax Calculations
+  const calculatedMetrics: CalculatedTaxMetrics = useMemo(() => {
+    return calculateLiveTaxIntelligence(
+      profile,
+      portfolioSnapshot,
+      positions,
+      orders,
+      serverTaxData
+    );
+  }, [profile, portfolioSnapshot, positions, orders, serverTaxData]);
+
+  // Merge transactions from live orders & server
+  const allMergedTransactions = useMemo(() => {
+    const txMap = new Map<string, any>();
+    for (const tx of calculatedMetrics.transactions) {
+      txMap.set(tx.id, tx);
+    }
+    for (const stx of serverTransactions) {
+      const key = stx.id || stx.transaction_id;
+      if (!txMap.has(key)) {
+        txMap.set(key, stx);
+      }
+    }
+    return Array.from(txMap.values());
+  }, [calculatedMetrics.transactions, serverTransactions]);
 
   const navTabs: { id: SubTabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
     { id: "OVERVIEW", label: "OVERVIEW", icon: LayoutDashboard },
     { id: "POSITIONS", label: "POSITIONS", icon: Clock },
     { id: "TAX LOTS", label: "TAX LOTS", icon: Layers },
     { id: "TRANSACTIONS", label: "TRANSACTIONS", icon: FileSpreadsheet },
-    { id: "COUNTRIES", label: "COUNTRIES", icon: Globe },
-    { id: "CALENDAR", label: "CALENDAR", icon: Calendar },
+    { id: "COUNTRIES", label: "COUNTRIES & DTAA", icon: Globe },
+    { id: "CALENDAR", label: "TAX CALENDAR", icon: Calendar },
     { id: "ALERTS", label: "ALERTS", icon: Bell },
     { id: "TAX PLANNER", label: "TAX PLANNER", icon: Calculator },
-    { id: "WHAT-IF", label: "WHAT-IF", icon: Sparkles },
+    { id: "WHAT-IF", label: "WHAT-IF SIMULATOR", icon: Sparkles },
     { id: "DOCUMENTS", label: "DOCUMENTS", icon: FileText },
     { id: "REPORTS", label: "REPORTS", icon: Download },
     { id: "RULE SOURCES", label: "RULE SOURCES", icon: Scale },
@@ -285,37 +202,78 @@ export function TaxIntelligenceTab() {
   ];
 
   const handleProfileUpdate = (updated: TaxpayerProfile) => {
-    setTaxData((prev) => ({ ...prev, profile: updated }));
+    setProfile(updated);
+  };
+
+  const getStatusBadge = () => {
+    const status = calculatedMetrics.data_freshness;
+    if (status === "LIVE") {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[11px] font-mono font-bold">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          LIVE STREAM
+        </span>
+      );
+    }
+    if (status === "STALE") {
+      return (
+        <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 text-[11px] font-mono font-bold">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          STALE DATA
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 text-[11px] font-mono font-bold">
+        DISCONNECTED
+      </span>
+    );
   };
 
   return (
-    <div className="flex flex-col gap-5 p-4 sm:p-6 min-h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Top Main Navigation Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-2 border-b border-slate-800/80">
+    <div className="flex flex-col gap-5 w-full text-slate-100 font-sans pb-12">
+      {/* Top Header Strip */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-indigo-400 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
             <Scale className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-xl font-bold font-sans tracking-wide text-white flex items-center gap-2">
-              TAX INTELLIGENCE
-              <span className="text-[10px] font-mono font-normal px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold font-sans tracking-wide text-white">
+                TAX INTELLIGENCE
+              </h1>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                 INSTITUTIONAL v2.5
               </span>
-            </h1>
+              {getStatusBadge()}
+            </div>
             <p className="text-xs text-slate-400 font-mono">
-              Worldwide trading tax recognition, statutory jurisdiction engine & tax-aware assistant
+              Multi-jurisdiction trade recognition, broker segregation & statutory tax liability engine
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Top Controls: Residency, Currency, Last Update, Refresh */}
+        <div className="flex flex-wrap items-center gap-2">
           <div className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-400">
-            Residence: <span className="text-slate-200 font-semibold">{taxData.profile.primary_residence}</span>
+            Jurisdiction: <span className="text-slate-200 font-bold">{profile.primary_residence}</span> ({calculatedMetrics.current_tax_year})
           </div>
           <div className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-400">
-            Currency: <span className="text-slate-200 font-semibold">{taxData.profile.base_currency}</span>
+            Base Currency: <span className="text-slate-200 font-bold">{profile.base_currency}</span>
           </div>
+          <div className="px-3 py-1 rounded-lg bg-slate-900 border border-slate-800 text-xs font-mono text-slate-400 hidden md:block">
+            Updated: <span className="text-slate-200 font-semibold">{calculatedMetrics.last_updated}</span>
+          </div>
+          <button
+            onClick={handleManualRefresh}
+            disabled={isRefreshing || isLoading}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-mono text-slate-200 transition-all disabled:opacity-50"
+            title="Refresh live tax computations"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing || isLoading ? "animate-spin text-indigo-400" : "text-slate-400"}`} />
+            <span>Sync</span>
+          </button>
         </div>
       </div>
 
@@ -328,10 +286,11 @@ export function TaxIntelligenceTab() {
             <button
               key={tab.id}
               onClick={() => setActiveSubTab(tab.id)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-mono font-medium transition-all whitespace-nowrap ${isActive
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-mono font-medium transition-all whitespace-nowrap ${
+                isActive
                   ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/20"
                   : "text-slate-400 hover:text-slate-100 hover:bg-slate-900"
-                }`}
+              }`}
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{tab.label}</span>
@@ -341,25 +300,181 @@ export function TaxIntelligenceTab() {
       </div>
 
       {/* Active Tab View */}
-      <div className="min-h-[500px]">
+      <div className="min-h-[480px]">
         {activeSubTab === "OVERVIEW" && (
           <div className="space-y-6">
+            {/* 1. Main Command Center Cards */}
             <TaxCommandCenter
-              summary={taxData.command_center}
-              currency={taxData.profile.base_currency}
+              metrics={calculatedMetrics}
+              selectedBroker={selectedBroker}
+              onSelectBroker={setSelectedBroker}
             />
-            <GlobalTaxExposureTable
-              exposures={taxData.global_tax_exposure}
-              currency={taxData.profile.base_currency}
-            />
+
+            {/* 2. Broker Segregation Matrix */}
+            <div className="rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm p-4 backdrop-blur-md space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-slate-100 font-sans">
+                    BROKER & SOURCE SEGREGATION
+                  </h3>
+                </div>
+                <span className="text-[11px] font-mono text-slate-400">
+                  Strict isolation per execution gateway
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                {Object.values(calculatedMetrics.broker_segregations).map((seg) => {
+                  const isSelected = selectedBroker === seg.broker;
+                  return (
+                    <div
+                      key={seg.broker}
+                      onClick={() => setSelectedBroker(seg.broker)}
+                      className={`p-3.5 rounded-xl border cursor-pointer transition-all duration-150 ${
+                        isSelected
+                          ? "bg-indigo-950/40 border-indigo-500 shadow-md shadow-indigo-900/20"
+                          : "bg-slate-950/80 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-bold text-xs text-slate-200 font-sans">
+                          {seg.broker}
+                        </span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-900 text-slate-400 border border-slate-800">
+                          {seg.transaction_count} events
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-xs font-mono">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Realized P&L:</span>
+                          <span className={seg.realized_pnl !== null ? (seg.realized_pnl >= 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold") : "text-slate-500"}>
+                            {seg.realized_pnl !== null ? `₹${Math.round(seg.realized_pnl).toLocaleString()}` : "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Est. Tax:</span>
+                          <span className="text-amber-400 font-semibold">
+                            {seg.estimated_tax !== null ? `₹${Math.round(seg.estimated_tax).toLocaleString()}` : "N/A"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Fees / STT:</span>
+                          <span className="text-slate-300">
+                            ₹{(seg.fees + seg.taxes_paid).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 text-[10px] font-mono text-slate-500 truncate">
+                        {seg.source_name}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Asset Class Tax Breakdown & Global Exposure */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {/* Asset Class Distribution */}
+              <div className="rounded-xl bg-slate-900/80 border border-slate-800 p-4 shadow-sm backdrop-blur-md space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Percent className="w-4 h-4 text-indigo-400" />
+                    <h3 className="text-sm font-bold text-slate-100 font-sans">
+                      ASSET CLASS TAX CLASSIFICATION
+                    </h3>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Statutory Rule Mapping
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {calculatedMetrics.asset_breakdown.map((item) => (
+                    <div
+                      key={item.asset_class}
+                      className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs font-mono"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-200 font-sans">
+                          {item.label}
+                        </div>
+                        <div className="text-[10px] text-slate-500">
+                          {item.trade_count} trades | Statutory Rate: {item.effective_rate_pct}%
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-slate-200 font-semibold">
+                          Taxable: ₹{item.taxable_amount.toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-amber-400 font-bold">
+                          Est. Tax: ₹{item.estimated_tax.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Global Tax Exposure Table */}
+              <GlobalTaxExposureTable
+                exposures={serverTaxData?.global_tax_exposure || [
+                  {
+                    country_code: profile.primary_residence,
+                    country_name: profile.primary_residence === "IN" ? "India" : profile.primary_residence,
+                    relationship: "tax_residence",
+                    tax_type: "Capital Gains / Derivatives / STT",
+                    estimated_liability: calculatedMetrics.estimated_tax_liability || 0,
+                    paid_withheld: calculatedMetrics.total_taxes_paid_or_withheld || 0,
+                    remaining_estimate: calculatedMetrics.remaining_estimated_payable || 0,
+                    next_deadline: "2026-06-15",
+                    confidence: calculatedMetrics.confidence,
+                    explanation: `Taxpayer is a tax resident of ${profile.primary_residence}. Subject to statutory income tax on worldwide trading profits.`,
+                    treaty_relevant: false,
+                  },
+                ]}
+                currency={profile.base_currency}
+              />
+            </div>
+
+            {/* 4. Active Tax Alerts & Statutory Deadlines */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
               <TaxAlertsView
-                alerts={taxData.tax_alerts}
-                currency={taxData.profile.base_currency}
+                alerts={serverTaxData?.tax_alerts || []}
+                currency={profile.base_currency}
               />
               <TaxCalendarView
-                deadlines={taxData.upcoming_deadlines}
-                currency={taxData.profile.base_currency}
+                deadlines={serverTaxData?.upcoming_deadlines || []}
+                currency={profile.base_currency}
+              />
+            </div>
+
+            {/* 5. Transaction Ledger Preview */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileSpreadsheet className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-slate-100 font-sans">
+                    TAX-NORMALIZED TRANSACTIONS
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setActiveSubTab("TRANSACTIONS")}
+                  className="text-xs font-mono text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                >
+                  <span>View All ({allMergedTransactions.length})</span>
+                  <ExternalLink className="w-3 h-3" />
+                </button>
+              </div>
+
+              <TaxTransactionsView
+                transactions={allMergedTransactions.slice(0, 15)}
+                currency={profile.base_currency}
+                selectedBroker={selectedBroker}
               />
             </div>
           </div>
@@ -367,22 +482,23 @@ export function TaxIntelligenceTab() {
 
         {activeSubTab === "POSITIONS" && (
           <TaxPositionsView
-            positions={taxData.analyzed_positions}
-            currency={taxData.profile.base_currency}
+            positions={serverTaxData?.analyzed_positions || []}
+            currency={profile.base_currency}
           />
         )}
 
         {activeSubTab === "TAX LOTS" && (
           <TaxLotsView
-            lots={lots.length > 0 ? lots : (taxData.analyzed_positions as any)}
-            currency={taxData.profile.base_currency}
+            lots={lots.length > 0 ? lots : (serverTaxData?.analyzed_positions as any) || []}
+            currency={profile.base_currency}
           />
         )}
 
         {activeSubTab === "TRANSACTIONS" && (
           <TaxTransactionsView
-            transactions={transactions}
-            currency={taxData.profile.base_currency}
+            transactions={allMergedTransactions}
+            currency={profile.base_currency}
+            selectedBroker={selectedBroker}
           />
         )}
 
@@ -392,27 +508,41 @@ export function TaxIntelligenceTab() {
 
         {activeSubTab === "CALENDAR" && (
           <TaxCalendarView
-            deadlines={taxData.upcoming_deadlines}
-            currency={taxData.profile.base_currency}
+            deadlines={serverTaxData?.upcoming_deadlines || []}
+            currency={profile.base_currency}
           />
         )}
 
         {activeSubTab === "ALERTS" && (
           <TaxAlertsView
-            alerts={taxData.tax_alerts}
-            currency={taxData.profile.base_currency}
+            alerts={serverTaxData?.tax_alerts || []}
+            currency={profile.base_currency}
           />
         )}
 
         {activeSubTab === "TAX PLANNER" && (
           <TaxPlannerView
-            summary={taxData.command_center}
-            currency={taxData.profile.base_currency}
+            summary={serverTaxData?.command_center || {
+              estimated_tax_liability: calculatedMetrics.estimated_tax_liability || 0,
+              realized_taxable_gains: calculatedMetrics.taxable_realized_pnl || 0,
+              realized_losses: 0,
+              net_realized_pl: calculatedMetrics.total_realized_pnl || 0,
+              unrealized_tax_exposure: calculatedMetrics.total_unrealized_pnl || 0,
+              total_unrealized_pl: calculatedMetrics.total_unrealized_pnl || 0,
+              taxes_already_withheld: calculatedMetrics.total_taxes_paid_or_withheld || 0,
+              transaction_taxes_paid: 0,
+              upcoming_tax_payments: 0,
+              tax_loss_opportunities: 0,
+              tax_reserve: calculatedMetrics.remaining_estimated_payable || 0,
+              compliance_status: "COMPLIANT",
+              confidence: calculatedMetrics.confidence,
+            }}
+            currency={profile.base_currency}
           />
         )}
 
         {activeSubTab === "WHAT-IF" && (
-          <TaxWhatIfSimulator currency={taxData.profile.base_currency} />
+          <TaxWhatIfSimulator currency={profile.base_currency} />
         )}
 
         {activeSubTab === "DOCUMENTS" && (
@@ -421,8 +551,49 @@ export function TaxIntelligenceTab() {
 
         {activeSubTab === "REPORTS" && (
           <TaxReportsCenter
-            overviewData={taxData}
-            currency={taxData.profile.base_currency}
+            overviewData={serverTaxData || {
+              profile: profile,
+              liability_summary: {
+                calculation_id: "CALC_LIVE",
+                tax_year: calculatedMetrics.current_tax_year,
+                jurisdiction: profile.primary_residence,
+                currency: profile.base_currency,
+                gross_realized_gains: calculatedMetrics.taxable_realized_pnl || 0,
+                allowable_losses: 0,
+                net_capital_gains: calculatedMetrics.total_realized_pnl || 0,
+                business_derivative_income: 0,
+                crypto_vda_income: 0,
+                estimated_tax_liability: calculatedMetrics.estimated_tax_liability || 0,
+                transaction_taxes_paid: calculatedMetrics.total_taxes_paid_or_withheld || 0,
+                brokerage_fees_paid: calculatedMetrics.total_fees_and_charges || 0,
+                taxes_already_withheld: 0,
+                remaining_estimated_payable: calculatedMetrics.remaining_estimated_payable || 0,
+                suggested_tax_reserve: calculatedMetrics.remaining_estimated_payable || 0,
+                confidence: calculatedMetrics.confidence,
+                reasons: [`Tax residency confirmed: ${profile.primary_residence}`],
+              },
+              command_center: {
+                estimated_tax_liability: calculatedMetrics.estimated_tax_liability || 0,
+                realized_taxable_gains: calculatedMetrics.taxable_realized_pnl || 0,
+                realized_losses: 0,
+                net_realized_pl: calculatedMetrics.total_realized_pnl || 0,
+                unrealized_tax_exposure: calculatedMetrics.total_unrealized_pnl || 0,
+                total_unrealized_pl: calculatedMetrics.total_unrealized_pnl || 0,
+                taxes_already_withheld: calculatedMetrics.total_taxes_paid_or_withheld || 0,
+                transaction_taxes_paid: 0,
+                upcoming_tax_payments: 0,
+                tax_loss_opportunities: 0,
+                tax_reserve: calculatedMetrics.remaining_estimated_payable || 0,
+                compliance_status: "COMPLIANT",
+                confidence: calculatedMetrics.confidence,
+              },
+              global_tax_exposure: [],
+              upcoming_deadlines: [],
+              tax_alerts: [],
+              analyzed_positions: [],
+              legal_disclaimer: "Tax calculations are decision-support estimates based on available transaction, taxpayer, and statutory jurisdiction data.",
+            }}
+            currency={profile.base_currency}
           />
         )}
 
@@ -432,7 +603,7 @@ export function TaxIntelligenceTab() {
 
         {activeSubTab === "SETTINGS" && (
           <TaxpayerProfileSettings
-            profile={taxData.profile}
+            profile={profile}
             onProfileUpdate={handleProfileUpdate}
           />
         )}
@@ -440,7 +611,7 @@ export function TaxIntelligenceTab() {
 
       {/* Statutory Legal Disclaimer */}
       <div className="p-3.5 rounded-xl bg-slate-900/50 border border-slate-800 text-[11px] font-mono text-slate-500 text-center">
-        {taxData.legal_disclaimer}
+        Tax calculations are decision-support estimates based on available transaction, taxpayer, and statutory jurisdiction data. Complex cases may require verification by a qualified tax professional.
       </div>
     </div>
   );

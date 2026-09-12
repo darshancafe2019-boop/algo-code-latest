@@ -4,13 +4,6 @@ import React from "react";
 import {
   PieChart,
   Shield,
-  AlertTriangle,
-  Flame,
-  ArrowUpRight,
-  ArrowDownRight,
-  TrendingUp,
-  Activity,
-  Layers,
 } from "lucide-react";
 import { PositionRecord } from "@/types/positions";
 
@@ -23,9 +16,6 @@ interface PositionsRiskMatrixProps {
 
 export function PositionsRiskMatrix({
   positions,
-  onSelectPosition,
-  onModifyProtection,
-  onSquareOff,
 }: PositionsRiskMatrixProps) {
   // Aggregate exposure by symbol
   const symbolStats = React.useMemo(() => {
@@ -82,24 +72,24 @@ export function PositionsRiskMatrix({
       {/* Overview Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Left 2 Cols: Symbol Capital Concentration Matrix */}
-        <div className="lg:col-span-2 p-5 rounded-3xl bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-[var(--theme-border-subtle)] pb-3">
+        <div className="lg:col-span-2 p-5 rounded-xl bg-[#0A1422] border border-[#1A2A3F] shadow-sm space-y-4">
+          <div className="flex items-center justify-between border-b border-[#122033] pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[var(--theme-accent)]/15 text-[var(--theme-accent)]">
+              <div className="p-2 rounded-lg bg-[#2563EB]/15 text-[#19C5FF]">
                 <PieChart className="h-5 w-5" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-[var(--theme-text-primary)]">
+                <h3 className="text-sm font-semibold text-[#F7FAFC]">
                   Capital Allocation & Asset Exposure
                 </h3>
-                <p className="text-xs text-[var(--theme-text-secondary)] font-mono">
+                <p className="text-xs text-[#52627A]">
                   Concentration matrix across {symbolStats.items.length} active market instrument(s)
                 </p>
               </div>
             </div>
-            <div className="text-right font-mono text-xs">
-              <span className="text-[10px] text-[var(--theme-text-muted)] block uppercase">Total Portfolio Notional</span>
-              <span className="font-extrabold text-[var(--theme-text-primary)]">
+            <div className="text-right text-xs">
+              <span className="text-[10px] text-[#52627A] block uppercase font-medium">Total Portfolio Notional</span>
+              <span className="font-bold text-[#F7FAFC] tabular-nums">
                 ${symbolStats.grandTotalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
@@ -115,30 +105,30 @@ export function PositionsRiskMatrix({
               return (
                 <div
                   key={stat.symbol}
-                  className="p-3.5 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-2.5"
+                  className="p-3.5 rounded-lg bg-[#0D1727] border border-[#1A2A3F] space-y-2.5"
                 >
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-[var(--theme-text-primary)] font-sans">
+                      <span className="font-semibold text-sm text-[#F7FAFC]">
                         {stat.symbol}
                       </span>
-                      <span className="px-1.5 py-0.5 rounded bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] text-[10px] border border-[var(--theme-border-subtle)]">
+                      <span className="px-1.5 py-0.5 rounded-md bg-[#07101A] text-[#7C8CA3] text-xs border border-[#1A2A3F]">
                         {stat.count} {stat.count === 1 ? "position" : "positions"}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-3 text-right">
                       <div>
-                        <span className="text-[10px] text-[var(--theme-text-muted)] block">Total Notional</span>
-                        <span className="font-bold text-[var(--theme-text-primary)]">
+                        <span className="text-[10px] text-[#52627A] block">Total Notional</span>
+                        <span className="font-semibold text-[#F7FAFC] tabular-nums">
                           ${stat.totalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-[var(--theme-text-muted)] block">Aggregate P&L</span>
+                        <span className="text-[10px] text-[#52627A] block">Aggregate P&L</span>
                         <span
-                          className={`font-black ${
-                            isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                          className={`font-bold tabular-nums ${
+                            isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
                           }`}
                         >
                           {isProfit ? "+" : ""}${stat.totalPnl.toFixed(2)}
@@ -148,13 +138,13 @@ export function PositionsRiskMatrix({
                   </div>
 
                   {/* Allocation Bar */}
-                  <div className="w-full bg-[var(--theme-surface)] h-2 rounded-full overflow-hidden border border-[var(--theme-border-subtle)]">
+                  <div className="w-full bg-[#07101A] h-1.5 rounded-full overflow-hidden border border-[#1A2A3F]">
                     <div
-                      className="h-full bg-[var(--theme-accent)] rounded-full transition-all"
+                      className="h-full bg-[#2563EB] rounded-full transition-all"
                       style={{ width: `${Math.min(100, Math.max(5, allocationPct))}%` }}
                     />
                   </div>
-                  <div className="flex justify-between text-[10px] font-mono text-[var(--theme-text-muted)]">
+                  <div className="flex justify-between text-xs text-[#52627A] tabular-nums">
                     <span>{allocationPct}% Portfolio Allocation</span>
                     <span>Planned Risk at SL: ${stat.totalRisk.toFixed(2)}</span>
                   </div>
@@ -165,48 +155,48 @@ export function PositionsRiskMatrix({
         </div>
 
         {/* Right Col: Risk Guardrails & Safety Matrix */}
-        <div className="p-5 rounded-3xl bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] shadow-xl space-y-4">
-          <div className="flex items-center gap-2.5 border-b border-[var(--theme-border-subtle)] pb-3">
-            <div className="p-2 rounded-xl bg-[var(--theme-profit)]/15 text-[var(--theme-profit)]">
+        <div className="p-5 rounded-xl bg-[#0A1422] border border-[#1A2A3F] shadow-sm space-y-4">
+          <div className="flex items-center gap-2.5 border-b border-[#122033] pb-3">
+            <div className="p-2 rounded-lg bg-[#00E890]/15 text-[#00E890]">
               <Shield className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-[var(--theme-text-primary)]">
+              <h3 className="text-sm font-semibold text-[#F7FAFC]">
                 Risk Engine Safety Gates
               </h3>
-              <p className="text-xs text-[var(--theme-text-secondary)] font-mono">
+              <p className="text-xs text-[#52627A]">
                 Continuous pre-trade & in-flight telemetry
               </p>
             </div>
           </div>
 
-          <div className="space-y-3 font-mono text-xs">
-            <div className="p-3 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-1">
+          <div className="space-y-3 text-xs">
+            <div className="p-3 rounded-lg bg-[#0D1727] border border-[#1A2A3F] space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[var(--theme-text-secondary)]">Max Position Size Gate</span>
-                <span className="text-[var(--theme-profit)] font-bold">PASSED (100%)</span>
+                <span className="text-[#7C8CA3] font-medium">Max Position Size Gate</span>
+                <span className="text-[#00E890] font-semibold">PASSED (100%)</span>
               </div>
-              <span className="text-[10px] text-[var(--theme-text-muted)] block">
+              <span className="text-xs text-[#52627A] block">
                 No single position exceeds 20.0% capital allocation.
               </span>
             </div>
 
-            <div className="p-3 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-1">
+            <div className="p-3 rounded-lg bg-[#0D1727] border border-[#1A2A3F] space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[var(--theme-text-secondary)]">Stop Loss Discipline</span>
-                <span className="text-[var(--theme-profit)] font-bold">100% PROTECTED</span>
+                <span className="text-[#7C8CA3] font-medium">Stop Loss Discipline</span>
+                <span className="text-[#00E890] font-semibold">100% PROTECTED</span>
               </div>
-              <span className="text-[10px] text-[var(--theme-text-muted)] block">
+              <span className="text-xs text-[#52627A] block">
                 All {positions.length} active positions have hard SL limits active on server.
               </span>
             </div>
 
-            <div className="p-3 rounded-2xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-1">
+            <div className="p-3 rounded-lg bg-[#0D1727] border border-[#1A2A3F] space-y-1">
               <div className="flex items-center justify-between">
-                <span className="text-[var(--theme-text-secondary)]">Leverage Tier Monitor</span>
-                <span className="text-[var(--theme-accent)] font-bold">CONTROLLED</span>
+                <span className="text-[#7C8CA3] font-medium">Leverage Tier Monitor</span>
+                <span className="text-[#19C5FF] font-semibold">CONTROLLED</span>
               </div>
-              <span className="text-[10px] text-[var(--theme-text-muted)] block">
+              <span className="text-xs text-[#52627A] block">
                 Average portfolio leverage is within safe risk tolerance parameters.
               </span>
             </div>

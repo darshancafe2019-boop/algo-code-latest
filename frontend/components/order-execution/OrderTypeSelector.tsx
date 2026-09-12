@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { TrendingUp, TrendingDown, Clock, ShieldAlert } from "lucide-react";
+import { TrendingUp, TrendingDown } from "lucide-react";
 import { OrderSide, OrderType } from "@/types/order-execution";
 
 interface OrderTypeSelectorProps {
@@ -39,15 +39,15 @@ export function OrderTypeSelector({
   ];
 
   return (
-    <div className="space-y-3">
-      {/* Side Selector (BUY vs SELL) */}
-      <div className="grid grid-cols-2 gap-2 font-mono">
+    <div className="space-y-3 font-sans">
+      {/* Side Selector (BUY vs SELL) - Segmented institutional control */}
+      <div className="grid grid-cols-2 gap-2 p-1 bg-[#07101A] rounded-lg border border-[#1A2A3F]">
         <button
           onClick={() => onChangeSide("BUY")}
-          className={`py-2.5 rounded-xl font-bold uppercase transition-all flex items-center justify-center gap-2 text-xs shadow-md ${
+          className={`py-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 text-xs ${
             isBuy
-              ? "bg-gradient-to-r from-emerald-600 to-teal-500 text-white shadow-emerald-950/40 border border-emerald-400/40"
-              : "bg-[#141E33] text-slate-400 border border-[#1E293B] hover:text-slate-200"
+              ? "bg-[#00E890]/15 border border-[#00E890]/40 text-[#00E890]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC]"
           }`}
         >
           <TrendingUp className="w-4 h-4" />
@@ -56,10 +56,10 @@ export function OrderTypeSelector({
 
         <button
           onClick={() => onChangeSide("SELL")}
-          className={`py-2.5 rounded-xl font-bold uppercase transition-all flex items-center justify-center gap-2 text-xs shadow-md ${
+          className={`py-2 rounded-md font-semibold transition-all flex items-center justify-center gap-1.5 text-xs ${
             !isBuy
-              ? "bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-rose-950/40 border border-rose-400/40"
-              : "bg-[#141E33] text-slate-400 border border-[#1E293B] hover:text-slate-200"
+              ? "bg-[#FF3B5C]/15 border border-[#FF3B5C]/40 text-[#FF3B5C]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC]"
           }`}
         >
           <TrendingDown className="w-4 h-4" />
@@ -68,17 +68,17 @@ export function OrderTypeSelector({
       </div>
 
       {/* Order Type Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto pb-1 border-b border-slate-800/80">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 border-b border-[#1A2A3F]">
         {orderTypes.map((type) => {
           const isSelected = orderType === type.key;
           return (
             <button
               key={type.key}
               onClick={() => onChangeOrderType(type.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold whitespace-nowrap transition-all ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
                 isSelected
-                  ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-950/30"
-                  : "bg-[#141E33] text-slate-400 hover:text-slate-200 hover:bg-[#1A2640]"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "bg-[#0D1727] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
               }`}
             >
               {type.label}
@@ -89,10 +89,10 @@ export function OrderTypeSelector({
 
       {/* Dynamic Price Inputs based on Order Type */}
       {(orderType === "LIMIT" || orderType === "STOP_LIMIT" || orderType === "BRACKET") && (
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 space-y-1.5 font-mono text-xs">
-          <label className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-3 space-y-1.5 text-xs">
+          <label className="text-[10px] text-[#7C8CA3] uppercase flex items-center justify-between">
             <span>Limit Price</span>
-            <span className="text-cyan-400 cursor-pointer" onClick={() => onChangeLimitPrice(currentPrice.toString())}>
+            <span className="text-[#22D3EE] cursor-pointer hover:underline font-mono" onClick={() => onChangeLimitPrice(currentPrice.toString())}>
               Use LTP (${currentPrice.toLocaleString()})
             </span>
           </label>
@@ -101,26 +101,27 @@ export function OrderTypeSelector({
             step="any"
             value={limitPrice}
             onChange={(e) => onChangeLimitPrice(e.target.value)}
-            className="w-full bg-[#0B111E] border border-slate-700 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-cyan-500"
+            className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-md px-3 py-2 text-[#F7FAFC] font-semibold font-mono tabular-nums focus:outline-none focus:border-[#22D3EE]"
           />
         </div>
       )}
 
       {(orderType === "STOP" || orderType === "STOP_LIMIT") && (
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 space-y-1.5 font-mono text-xs">
-          <label className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-3 space-y-1.5 text-xs">
+          <label className="text-[10px] text-[#7C8CA3] uppercase flex items-center justify-between">
             <span>Stop Trigger Price</span>
-            <span className="text-amber-400">Triggers order when market hits price</span>
+            <span className="text-[#F59E0B]">Triggers order when market hits price</span>
           </label>
           <input
             type="number"
             step="any"
             value={stopPrice}
             onChange={(e) => onChangeStopPrice(e.target.value)}
-            className="w-full bg-[#0B111E] border border-slate-700 rounded-lg px-3 py-2 text-white font-bold focus:outline-none focus:border-cyan-500"
+            className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-md px-3 py-2 text-[#F7FAFC] font-semibold font-mono tabular-nums focus:outline-none focus:border-[#22D3EE]"
           />
         </div>
       )}
     </div>
   );
 }
+

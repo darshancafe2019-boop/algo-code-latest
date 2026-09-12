@@ -30,7 +30,7 @@ export function GlobalMarketStatusBar({
   const avgLatency = stats?.avg_latency_ms || 28;
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl select-none font-sans">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl select-none font-sans">
       {/* Left: Terminal Identity & Universe Scope */}
       <div className="flex items-center gap-3.5">
         <div className="p-2.5 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800 shadow-md">
@@ -54,25 +54,25 @@ export function GlobalMarketStatusBar({
       {/* Right: Real-time Telemetry Chips & Sync Action */}
       <div className="flex flex-wrap items-center gap-2 font-mono text-xs">
         {/* Total Active Instruments */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1E293B] rounded-xl text-slate-200">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1A2A3F] rounded-xl text-slate-200">
           <Layers className="h-3.5 w-3.5 text-cyan-400" />
           <span>Universe: <strong>{totalInstruments}</strong></span>
         </div>
 
         {/* Live Feed Status */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1E293B] rounded-xl text-emerald-400">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1A2A3F] rounded-xl text-emerald-400">
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
           <span>DATA: LIVE</span>
         </div>
 
         {/* Latency */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1E293B] rounded-xl text-cyan-300">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1A2A3F] rounded-xl text-cyan-300">
           <Zap className="h-3.5 w-3.5 text-cyan-400" />
           <span>{avgLatency} ms</span>
         </div>
 
         {/* Providers */}
-        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1E293B] rounded-xl text-amber-300">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#070D14] border border-[#1A2A3F] rounded-xl text-amber-300">
           <Cpu className="h-3.5 w-3.5 text-amber-400" />
           <span>{liveFeeds} Providers</span>
         </div>

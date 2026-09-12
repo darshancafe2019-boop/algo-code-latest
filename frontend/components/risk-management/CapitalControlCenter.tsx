@@ -73,73 +73,73 @@ export function CapitalControlCenter({ overview }: CapitalControlCenterProps) {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Capital Control Center
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Authoritative balance ledger, reserved margins, and capital distribution tiers.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           Server Authoritative
         </span>
       </div>
 
       {/* 6 Key Capital Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Total Capital</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Total Capital</span>
           <span className="text-base font-bold text-white">${totalCap.toLocaleString()}</span>
-          <span className="text-[10px] text-[#A8BDB0] block">Account Equity</span>
+          <span className="text-[10px] text-[#7C8CA3] block">Account Equity</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Available Capital</span>
-          <span className="text-base font-bold text-[#55C98A]">${availCap.toLocaleString()}</span>
-          <span className="text-[10px] text-[#70877A] block">{((availCap / totalCap) * 100).toFixed(0)}% Free Cash</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Available Capital</span>
+          <span className="text-base font-bold text-[#22D3EE]">${availCap.toLocaleString()}</span>
+          <span className="text-[10px] text-[#52627A] block">{((availCap / totalCap) * 100).toFixed(0)}% Free Cash</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Used Capital</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Used Capital</span>
           <span className="text-base font-bold text-cyan-300">${usedCap.toLocaleString()}</span>
-          <span className="text-[10px] text-[#70877A] block">Active In Trade</span>
+          <span className="text-[10px] text-[#52627A] block">Active In Trade</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Reserved Capital</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Reserved Capital</span>
           <span className="text-base font-bold text-purple-300">${reserveCap.toLocaleString()}</span>
-          <span className="text-[10px] text-[#70877A] block">Safety Buffer</span>
+          <span className="text-[10px] text-[#52627A] block">Safety Buffer</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Margin Available</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Margin Available</span>
           <span className="text-base font-bold text-emerald-400">${marginAvail.toLocaleString()}</span>
-          <span className="text-[10px] text-[#70877A] block">For New Orders</span>
+          <span className="text-[10px] text-[#52627A] block">For New Orders</span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-[#0D1914] border border-[#1B3328]">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold block">Today&apos;s P&L</span>
-          <span className="text-base font-bold text-[#55C98A]">+$286.10</span>
-          <span className="text-[10px] text-[#70877A] block">+2.86% Return</span>
+        <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold block">Today&apos;s P&L</span>
+          <span className="text-base font-bold text-[#22D3EE]">+$286.10</span>
+          <span className="text-[10px] text-[#52627A] block">+2.86% Return</span>
         </div>
       </div>
 
       {/* Capital Allocation Explorer Table with Tabs */}
-      <div className="p-4 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1B3328] pb-3">
+      <div className="p-4 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#122033] pb-3">
           <div className="flex items-center gap-2">
-            <Wallet className="h-4 w-4 text-[#55C98A]" />
+            <Wallet className="h-4 w-4 text-[#22D3EE]" />
             <h4 className="text-xs font-bold text-white uppercase tracking-wider">
               Capital Distribution & Quota Management
             </h4>
           </div>
 
-          <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs font-mono">
+          <div className="flex items-center gap-1 bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs font-mono">
             {(["bot", "strategy", "symbol", "asset"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setAllocationTab(t)}
                 className={`px-3 py-1 rounded-lg font-bold uppercase transition-all ${
                   allocationTab === t
-                    ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                    : "text-[#A8BDB0] hover:text-white"
+                    ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                    : "text-[#7C8CA3] hover:text-white"
                 }`}
               >
                 By {t}
@@ -153,26 +153,26 @@ export function CapitalControlCenter({ overview }: CapitalControlCenterProps) {
           {activeList.map((item, idx) => (
             <div
               key={idx}
-              className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-[#2E7D5B] transition-colors"
+              className="p-3 rounded-xl bg-[#07101A] border border-[#122033] flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:border-[#2563EB] transition-colors"
             >
               <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-lg bg-[#123C2A] text-[#55C98A] font-bold">
+                <div className="p-2 rounded-lg bg-[rgba(37,99,235,0.18)] text-[#22D3EE] font-bold">
                   {item.pct}%
                 </div>
                 <div>
                   <span className="font-bold text-white block">{item.name}</span>
-                  <span className="text-[10px] text-[#70877A]">Allocated: ${item.allocated.toLocaleString()}</span>
+                  <span className="text-[10px] text-[#52627A]">Allocated: ${item.allocated.toLocaleString()}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-right">
                 <div>
-                  <span className="text-[10px] text-[#70877A] block">Active Used</span>
+                  <span className="text-[10px] text-[#52627A] block">Active Used</span>
                   <span className="font-bold text-cyan-300">${item.used.toLocaleString()}</span>
                 </div>
-                <div className="w-24 bg-[#0A130F] h-2 rounded-full overflow-hidden border border-[#1B3328] hidden sm:block">
+                <div className="w-24 bg-[#0A130F] h-2 rounded-full overflow-hidden border border-[#122033] hidden sm:block">
                   <div
-                    className="bg-[#55C98A] h-full rounded-full"
+                    className="bg-[#22D3EE] h-full rounded-full"
                     style={{ width: `${(item.used / item.allocated) * 100}%` }}
                   />
                 </div>

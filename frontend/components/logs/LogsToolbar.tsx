@@ -37,11 +37,11 @@ export function LogsToolbar({
   };
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-4">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-4">
       {/* Top Source Tabs & Status Pill */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         {/* Source Sub-Tabs */}
-        <div className="flex items-center gap-1.5 bg-[#0B0F17] p-1 rounded-xl border border-[#1E293B]">
+        <div className="flex items-center gap-1.5 bg-[#0B0F17] p-1 rounded-xl border border-[#1A2A3F]">
           <button
             onClick={() => onSourceChange("AUDIT_EVENTS")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
@@ -97,7 +97,7 @@ export function LogsToolbar({
             className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors flex items-center gap-1.5 ${
               isPaused
                 ? "bg-emerald-600 hover:bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-600/20"
-                : "bg-[#0B0F17] hover:bg-slate-800 text-slate-300 border-[#1E293B]"
+                : "bg-[#0B0F17] hover:bg-slate-800 text-slate-300 border-[#1A2A3F]"
             }`}
           >
             {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
@@ -107,7 +107,7 @@ export function LogsToolbar({
           <button
             onClick={onRefresh}
             disabled={isFetching}
-            className="p-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-400 hover:text-white transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-400 hover:text-white transition-colors disabled:opacity-50"
             title="Refresh Logs"
           >
             <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
@@ -115,7 +115,7 @@ export function LogsToolbar({
 
           <button
             onClick={handleExportCsv}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-xs font-bold text-slate-300 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-xs font-bold text-slate-300 hover:text-white transition-colors"
           >
             <Download className="h-3.5 w-3.5 text-cyan-400" />
             <span>Export CSV</span>
@@ -134,7 +134,7 @@ export function LogsToolbar({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search by message, bot, event type, or keyword..."
-              className="w-full pl-9 pr-4 py-2 bg-[#0B0F17] border border-[#1E293B] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
+              className="w-full pl-9 pr-4 py-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition-colors"
             />
           </div>
 
@@ -146,7 +146,7 @@ export function LogsToolbar({
             <select
               value={severity}
               onChange={(e) => onSeverityChange(e.target.value)}
-              className="px-3 py-2 bg-[#0B0F17] border border-[#1E293B] rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500 transition-colors font-mono"
+              className="px-3 py-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-xl text-xs text-white focus:outline-none focus:border-cyan-500 transition-colors font-mono"
             >
               <option value="ALL">ALL LEVELS</option>
               <option value="INFO">INFO ONLY</option>

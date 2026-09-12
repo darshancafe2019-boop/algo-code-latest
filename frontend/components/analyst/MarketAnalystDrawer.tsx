@@ -210,7 +210,7 @@ export function MarketAnalystDrawer({
                   READ-ONLY COPILOT
                 </span>
               </div>
-              <p className="text-xs text-[#607D6E] font-mono mt-0.5">
+              <p className="text-xs text-[#52627A] font-mono mt-0.5">
                 {symbol} • {exchange.toUpperCase()} • {analysis?.data_quality || "LIVE"}
               </p>
             </div>
@@ -279,7 +279,7 @@ export function MarketAnalystDrawer({
             <div className="flex flex-col items-center justify-center py-20 text-slate-400">
               <RefreshCw className="w-8 h-8 animate-spin text-emerald-400 mb-3" />
               <p className="text-sm font-medium">Synthesizing quantitative market data...</p>
-              <p className="text-xs text-[#607D6E] mt-1 font-mono">
+              <p className="text-xs text-[#52627A] mt-1 font-mono">
                 Calculating multi-timeframe indicators, evidence score, and 3 scenarios
               </p>
             </div>
@@ -662,7 +662,7 @@ export function MarketAnalystDrawer({
               <div className="flex-1 min-h-[220px] max-h-[360px] overflow-y-auto space-y-2.5 p-3 rounded-lg border border-[#1b2b23] bg-[#09110d]">
                 {chatMessages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-slate-500 text-xs py-8">
-                    <HelpCircle className="w-6 h-6 mb-2 text-[#607D6E]" />
+                    <HelpCircle className="w-6 h-6 mb-2 text-[#52627A]" />
                     Ask the Market Analyst any question about {symbol}&apos;s structure, levels, or waiting reasons.
                   </div>
                 ) : (
@@ -685,7 +685,7 @@ export function MarketAnalystDrawer({
                   ))
                 )}
                 {isAsking && (
-                  <div className="flex items-center gap-2 text-xs text-[#607D6E] font-mono">
+                  <div className="flex items-center gap-2 text-xs text-[#52627A] font-mono">
                     <RefreshCw className="w-3 h-3 animate-spin text-emerald-400" />
                     Analyst copilot evaluating snapshot...
                   </div>
@@ -717,7 +717,7 @@ export function MarketAnalystDrawer({
         </div>
 
         {/* FOOTER & DATA PROVENANCE */}
-        <div className="p-3 border-t border-[#1b2b23] bg-[#0d1612] text-[10px] font-mono text-[#607D6E] flex flex-col sm:flex-row items-center justify-between gap-2">
+        <div className="p-3 border-t border-[#1b2b23] bg-[#0d1612] text-[10px] font-mono text-[#52627A] flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span>Model: {analysis?.data_provenance.model || "Local Deterministic Engine"}</span>
             <span>•</span>

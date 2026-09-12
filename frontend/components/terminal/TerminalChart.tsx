@@ -479,35 +479,35 @@ export function TerminalChart({
   const isBarBull = barChange >= 0;
 
   return (
-    <div ref={containerRef} className="relative w-full h-full flex-1 overflow-hidden select-none bg-[#0F1116]">
+    <div ref={containerRef} className="relative w-full h-full flex-1 overflow-hidden select-none bg-[#060B14]">
       {/* Top-Left OHLCV & Indicator Header Readout */}
       {activeBar && (
-        <div className="absolute top-2 left-3 z-10 flex flex-wrap items-center gap-2 text-[11px] font-mono tabular-nums pointer-events-none bg-[#131722]/85 backdrop-blur-sm px-2.5 py-1 rounded border border-[#2A2E39] shadow-md">
-          <span className="font-bold text-[#D1D4DC]">{symbol}</span>
-          <span className="text-[#787B86]">{timeframe}</span>
+        <div className="absolute top-2 left-3 z-10 flex flex-wrap items-center gap-2 text-[11px] font-mono tabular-nums pointer-events-none bg-[#0A1422]/90 backdrop-blur-sm px-2.5 py-1 rounded-lg border border-[#1A2A3F] shadow-md">
+          <span className="font-bold text-[#F7FAFC]">{symbol}</span>
+          <span className="text-[#52627A]">{timeframe}</span>
 
-          <span className="text-[#787B86]">O:</span>
-          <span className="text-[#D1D4DC] font-semibold">{activeBar.open.toFixed(2)}</span>
+          <span className="text-[#52627A]">O:</span>
+          <span className="text-[#F7FAFC] font-semibold">{activeBar.open.toFixed(2)}</span>
 
-          <span className="text-[#787B86]">H:</span>
-          <span className="text-[#D1D4DC] font-semibold">{activeBar.high.toFixed(2)}</span>
+          <span className="text-[#52627A]">H:</span>
+          <span className="text-[#F7FAFC] font-semibold">{activeBar.high.toFixed(2)}</span>
 
-          <span className="text-[#787B86]">L:</span>
-          <span className="text-[#D1D4DC] font-semibold">{activeBar.low.toFixed(2)}</span>
+          <span className="text-[#52627A]">L:</span>
+          <span className="text-[#F7FAFC] font-semibold">{activeBar.low.toFixed(2)}</span>
 
-          <span className="text-[#787B86]">C:</span>
-          <span className={`font-semibold ${isBarBull ? "text-[#26A69A]" : "text-[#EF5350]"}`}>
+          <span className="text-[#52627A]">C:</span>
+          <span className={`font-semibold ${isBarBull ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
             {activeBar.close.toFixed(2)}
           </span>
 
-          <span className={`font-bold ml-1 ${isBarBull ? "text-[#26A69A]" : "text-[#EF5350]"}`}>
+          <span className={`font-bold ml-1 ${isBarBull ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
             {isBarBull ? "+" : ""}{barChange.toFixed(2)} ({isBarBull ? "+" : ""}{barChangePct.toFixed(2)}%)
           </span>
 
           {activeBar.volume && (
             <>
-              <span className="text-[#787B86] ml-2">Vol:</span>
-              <span className="text-[#D1D4DC]">{activeBar.volume.toLocaleString()}</span>
+              <span className="text-[#52627A] ml-2">Vol:</span>
+              <span className="text-[#F7FAFC]">{activeBar.volume.toLocaleString()}</span>
             </>
           )}
         </div>

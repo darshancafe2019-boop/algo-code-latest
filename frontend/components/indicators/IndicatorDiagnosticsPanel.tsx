@@ -81,7 +81,7 @@ export function IndicatorDiagnosticsPanel({ diagnostics }: IndicatorDiagnosticsP
   const diagList = diagnostics && diagnostics.length > 0 ? diagnostics : defaultDiagnostics;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -97,9 +97,9 @@ export function IndicatorDiagnosticsPanel({ diagnostics }: IndicatorDiagnosticsP
       </div>
 
       {/* Diagnostics Table */}
-      <div className="overflow-x-auto border border-[#1E293B] rounded-xl bg-[#080D17]">
+      <div className="overflow-x-auto border border-[#1A2A3F] rounded-xl bg-[#080D17]">
         <table className="w-full text-left text-xs font-mono">
-          <thead className="bg-[#141E33] border-b border-[#1E293B] text-slate-400 uppercase text-[10px]">
+          <thead className="bg-[#141E33] border-b border-[#1A2A3F] text-slate-400 uppercase text-[10px]">
             <tr>
               <th className="p-3">Indicator Model</th>
               <th className="p-3">Category</th>

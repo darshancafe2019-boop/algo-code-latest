@@ -47,8 +47,8 @@ export function SecurityAuditTable({ logs }: SecurityAuditTableProps) {
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1E293B] shadow-xl">
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1E293B]">
+    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1A2A3F] shadow-xl">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1A2A3F]">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400">
             <Terminal className="w-5 h-5" />
@@ -68,20 +68,20 @@ export function SecurityAuditTable({ logs }: SecurityAuditTableProps) {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search audit events..."
-            className="w-full pl-9 pr-4 py-1.5 bg-[#0B0F17] border border-[#1E293B] focus:border-purple-500/50 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
+            className="w-full pl-9 pr-4 py-1.5 bg-[#0B0F17] border border-[#1A2A3F] focus:border-purple-500/50 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none"
           />
         </div>
       </div>
 
       {/* Audit Log Table */}
       {filteredLogs.length === 0 ? (
-        <div className="py-12 text-center text-slate-400 text-xs bg-[#0B0F17]/60 rounded-xl border border-[#1E293B]">
+        <div className="py-12 text-center text-slate-400 text-xs bg-[#0B0F17]/60 rounded-xl border border-[#1A2A3F]">
           No matching security audit events found.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#1E293B]">
+        <div className="overflow-x-auto rounded-xl border border-[#1A2A3F]">
           <table className="w-full text-left text-xs">
-            <thead className="bg-[#0B0F17] text-[11px] text-slate-400 uppercase tracking-wider font-semibold border-b border-[#1E293B]">
+            <thead className="bg-[#0B0F17] text-[11px] text-slate-400 uppercase tracking-wider font-semibold border-b border-[#1A2A3F]">
               <tr>
                 <th className="py-3 px-4">Event ID</th>
                 <th className="py-3 px-4">Timestamp</th>
@@ -91,7 +91,7 @@ export function SecurityAuditTable({ logs }: SecurityAuditTableProps) {
                 <th className="py-3 px-4">Details</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1E293B]/60 font-sans">
+            <tbody className="divide-y divide-[#1A2A3F]/60 font-sans">
               {filteredLogs.slice(0, 20).map((log) => (
                 <tr key={log.id} className="hover:bg-slate-800/30 transition-colors">
                   <td className="py-3 px-4 font-mono text-slate-400 font-medium">#{log.id}</td>

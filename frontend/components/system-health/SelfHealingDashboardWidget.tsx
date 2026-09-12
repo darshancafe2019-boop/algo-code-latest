@@ -110,9 +110,9 @@ export function SelfHealingDashboardWidget() {
   const isHealthy = telemetry?.active_incidents === 0;
 
   return (
-    <div className="bg-[#0D141F] border border-[#1E293B] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 font-sans">
+    <div className="bg-[#0D141F] border border-[#1A2A3F] rounded-2xl p-5 sm:p-6 shadow-2xl space-y-5 font-sans">
       {/* 1. Header with Autonomous Mode & Trigger Button */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E293B] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1A2A3F] pb-4">
         <div className="flex items-center gap-3">
           <div className="p-3 rounded-2xl bg-cyan-950/60 border border-cyan-700/50 text-cyan-400 shadow-md shadow-cyan-950/40">
             <Sparkles className="h-6 w-6" />
@@ -159,7 +159,7 @@ export function SelfHealingDashboardWidget() {
 
       {/* 2. Key Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1E293B]">
+        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1A2A3F]">
           <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block">
             Auto-Heal Success Rate
           </span>
@@ -170,7 +170,7 @@ export function SelfHealingDashboardWidget() {
           <span className="text-[10px] text-slate-400 mt-0.5 block">Zero-Downtime Guarantee</span>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1E293B]">
+        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1A2A3F]">
           <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block">
             Active Anomalies
           </span>
@@ -182,7 +182,7 @@ export function SelfHealingDashboardWidget() {
           </span>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1E293B]">
+        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1A2A3F]">
           <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block">
             Incidents Auto-Solved
           </span>
@@ -192,7 +192,7 @@ export function SelfHealingDashboardWidget() {
           <span className="text-[10px] text-emerald-400 mt-0.5 block">Zero Human Touch</span>
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1E293B]">
+        <div className="p-3.5 rounded-xl bg-[#080D15] border border-[#1A2A3F]">
           <span className="text-[10px] uppercase font-mono tracking-wider text-slate-500 block">
             Learned Error Signatures
           </span>
@@ -206,7 +206,7 @@ export function SelfHealingDashboardWidget() {
       {/* 3. Operational Grid: Adaptive Learning Matrix & Real-Time Resolution Trace */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left Column: Learned Adaptive Patterns */}
-        <div className="lg:col-span-7 bg-[#080D15] border border-[#1E293B] rounded-xl p-4 space-y-3">
+        <div className="lg:col-span-7 bg-[#080D15] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between border-b border-slate-900 pb-2">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-cyan-400" />
@@ -226,7 +226,7 @@ export function SelfHealingDashboardWidget() {
               telemetry.learned_patterns.map((pat) => (
                 <div
                   key={pat.id}
-                  className="p-2.5 rounded-lg bg-[#0D141F] border border-[#1E293B] flex items-center justify-between gap-3 text-xs"
+                  className="p-2.5 rounded-lg bg-[#0D141F] border border-[#1A2A3F] flex items-center justify-between gap-3 text-xs"
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -255,7 +255,7 @@ export function SelfHealingDashboardWidget() {
         </div>
 
         {/* Right Column: Live Resolution Trace Console */}
-        <div className="lg:col-span-5 bg-[#080D15] border border-[#1E293B] rounded-xl p-4 flex flex-col justify-between space-y-3">
+        <div className="lg:col-span-5 bg-[#080D15] border border-[#1A2A3F] rounded-xl p-4 flex flex-col justify-between space-y-3">
           <div className="flex items-center justify-between border-b border-slate-900 pb-2">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-emerald-400" />

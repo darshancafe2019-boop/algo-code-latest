@@ -45,25 +45,25 @@ export function MarketScannerPanel({
       : topBreakouts;
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
       {/* Header & Preset Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1B3328] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#122033] pb-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+          <div className="p-2 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
             <Flame className="h-4 w-4" />
           </div>
           <div>
             <h3 className="text-xs font-bold text-white uppercase tracking-wider">
               Market Scanner & Top Movers
             </h3>
-            <p className="text-[11px] text-[#A8BDB0]">
+            <p className="text-[11px] text-[#7C8CA3]">
               Real-time statistical momentum, volume expansion, and Open Interest concentration.
             </p>
           </div>
         </div>
 
         {/* Scan Filter Pills */}
-        <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs font-mono">
+        <div className="flex items-center gap-1 bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs font-mono">
           {[
             { id: "gainers", label: "Top Gainers" },
             { id: "losers", label: "Top Losers" },
@@ -76,8 +76,8 @@ export function MarketScannerPanel({
               onClick={() => setActiveScanPreset(preset.id as any)}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
                 activeScanPreset === preset.id
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                  : "text-[#70877A] hover:text-white"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                  : "text-[#52627A] hover:text-white"
               }`}
             >
               {preset.label}
@@ -97,22 +97,22 @@ export function MarketScannerPanel({
             <div
               key={idx}
               onClick={() => onSelectInstrument(inst)}
-              className="p-3.5 rounded-2xl bg-[#07110D] border border-[#1B3328] hover:border-[#2E7D5B] transition-colors cursor-pointer group space-y-2"
+              className="p-3.5 rounded-2xl bg-[#07101A] border border-[#122033] hover:border-[#2563EB] transition-colors cursor-pointer group space-y-2"
             >
               <div className="flex items-center justify-between">
-                <span className="font-bold text-white group-hover:text-[#55C98A] transition-colors">
+                <span className="font-bold text-white group-hover:text-[#22D3EE] transition-colors">
                   {sym}
                 </span>
                 <span
                   className={`text-[11px] font-bold ${
-                    isPositive ? "text-[#55C98A]" : "text-red-400"
+                    isPositive ? "text-[#22D3EE]" : "text-red-400"
                   }`}
                 >
                   {isPositive ? "+" : ""}{(inst.change_24h || 0).toFixed(2)}%
                 </span>
               </div>
 
-              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#1B3328]">
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#122033]">
                 <span className="text-white font-bold">
                   {inst.last_price ? `${currSymbol}${inst.last_price.toLocaleString()}` : "N/A"}
                 </span>

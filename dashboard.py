@@ -12798,6 +12798,7 @@ def api_auth_session_revoke(session_id):
 
 
 @app.route("/api/auth/sessions/revoke-others", methods=["POST"])
+@app.route("/api/auth/sessions/revoke-all-others", methods=["POST"])
 def api_auth_sessions_revoke_others():
     """Revokes all active sessions except the current session."""
     user, session = get_current_user_and_session(allow_dev_fallback=False)
@@ -12806,7 +12807,620 @@ def api_auth_sessions_revoke_others():
 
     curr_id = session.get("session_id", "")
     ok = db.revoke_all_other_sessions(user["id"], curr_id)
-    return jsonify({"status": "success", "revoked_others": ok})
+    if ok:
+        db.log_security_audit_event(
+            action="ALL_OTHER_SESSIONS_REVOKED",
+            actor_user_id=user["id"],
+            resource_type="SESSION",
+            result="SUCCESS",
+            details={"retained_session": curr_id}
+        )
+    return jsonify({"status": "success", "revoked_others": ok, "message": "All other sessions revoked successfully."})
+
+
+@app.route("/api/auth/sessions/<session_id>/revoke", methods=["POST"])
+def api_auth_session_revoke_post(session_id):
+    """Alias for revoking a specific session via POST."""
+    return api_auth_session_revoke(session_id)
+
+
+@app.route("/api/auth/username/request-otp", methods=["POST"])
+def api_auth_username_request_otp():
+    """
+    Validates proposed new username and dispatches 6-digit OTP to user's registered email.
+    """
+    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "error_code": "UNAUTHORIZED", "message": "Authentication required."}), 401
+
+    client_ip = request.remote_addr or "127.0.0.1"
+    request_id = f"req_{secrets.token_hex(6)}"
+
+    data = request.get_json(silent=True) or {}
+    new_username = (data.get("new_username") or "").strip()
+
+    if not new_username:
+        return jsonify({"status": "error", "error_code": "MISSING_USERNAME", "message": "New username is required."}), 400
+
+    # Validate username formatting
+    import re
+    if len(new_username) < 3 or len(new_username) > 32:
+        return jsonify({"status": "error", "error_code": "INVALID_LENGTH", "message": "Username must be between 3 and 32 characters."}), 400
+
+    if not re.match(r"^[a-zA-Z0-9_.-]+$", new_username):
+        return jsonify({"status": "error", "error_code": "INVALID_CHARACTERS", "message": "Username may only contain letters, numbers, underscores, dashes, and periods."}), 400
+
+    if new_username.lower() == user["username"].lower():
+        return jsonify({"status": "error", "error_code": "SAME_USERNAME", "message": "New username must be different from your current username."}), 400
+
+    # Reserved names check
+    reserved = {"system", "root", "support", "help", "security", "quantos", "null", "undefined", "anonymous"}
+    if new_username.lower() in reserved:
+        return jsonify({"status": "error", "error_code": "RESERVED_USERNAME", "message": "This username is reserved and cannot be chosen."}), 400
+
+    # Check if already taken
+    existing = db.get_user_by_username(new_username)
+    if existing and existing["id"] != user["id"]:
+        return jsonify({"status": "error", "error_code": "USERNAME_TAKEN", "message": "Username is already taken by another account."}), 400
+
+    user_email = (user.get("email") or "").strip()
+    if user["username"] == "admin":
+        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+
+    if not user_email or "@" not in user_email:
+        return jsonify({"status": "error", "error_code": "NO_VERIFIED_EMAIL", "message": "No verified email address found on file."}), 400
+
+    db.invalidate_user_auth_otp_challenges(user["id"], "USERNAME_CHANGE")
+
+    otp_code = f"{secrets.randbelow(1_000_000):06d}"
+    otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
+    challenge_id = f"chall_usr_{secrets.token_urlsafe(24)}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+
+    db.create_auth_otp_challenge(
+        challenge_id=challenge_id,
+        user_id=user["id"],
+        purpose="USERNAME_CHANGE",
+        recipient_email=user_email,
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        requested_ip=client_ip,
+        request_id=request_id
+    )
+
+    sent, err, msg_id = global_email_service.send_username_change_otp(
+        to_email=user_email,
+        otp_code=otp_code,
+        current_username=user["username"],
+        new_username=new_username,
+        user_id=user["id"]
+    )
+
+    is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+    no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST) or ("@example.com" in user_email)
+
+    if sent or no_real_provider:
+        db.activate_auth_otp_challenge(
+            challenge_id=challenge_id,
+            user_id=user["id"],
+            purpose="USERNAME_CHANGE",
+            provider_message_id=msg_id or "",
+            provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
+        )
+    else:
+        db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=str(err or ""))
+
+    masked_dest = _mask_email_address(user_email)
+
+    db.log_security_audit_event(
+        action="USERNAME_CHANGE_OTP_REQUESTED",
+        actor_user_id=user["id"],
+        result="SUCCESS" if (sent or no_real_provider) else "FAILED",
+        ip_address=client_ip,
+        details={"challenge_id": challenge_id, "new_username": new_username}
+    )
+
+    resp_payload = {
+        "status": "success",
+        "message": f"Verification code sent to {masked_dest}.",
+        "challenge_id": challenge_id,
+        "destination": masked_dest,
+        "new_username": new_username,
+        "request_id": request_id
+    }
+
+    if no_real_provider or is_dev_console:
+        resp_payload["dev_otp"] = otp_code
+        resp_payload["dev_mode"] = True
+
+    return jsonify(resp_payload), 200
+
+
+@app.route("/api/auth/username/change", methods=["POST"])
+@app.route("/api/auth/username/verify-otp", methods=["POST"])
+def api_auth_username_change():
+    """
+    Verifies 6-digit OTP and updates the account username server-side.
+    """
+    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "error_code": "UNAUTHORIZED", "message": "Authentication required."}), 401
+
+    client_ip = request.remote_addr or "127.0.0.1"
+    request_id = f"req_{secrets.token_hex(6)}"
+
+    data = request.get_json(silent=True) or {}
+    challenge_id = (data.get("challenge_id") or "").strip()
+    code = (data.get("otp") or data.get("code") or "").strip()
+    new_username = (data.get("new_username") or "").strip()
+
+    if not challenge_id or not code or not new_username:
+        return jsonify({"status": "error", "error_code": "MISSING_FIELDS", "message": "Challenge ID, verification code, and new username are required."}), 400
+
+    import re
+    if len(new_username) < 3 or len(new_username) > 32 or not re.match(r"^[a-zA-Z0-9_.-]+$", new_username):
+        return jsonify({"status": "error", "error_code": "INVALID_USERNAME", "message": "Invalid username format."}), 400
+
+    existing = db.get_user_by_username(new_username)
+    if existing and existing["id"] != user["id"]:
+        return jsonify({"status": "error", "error_code": "USERNAME_TAKEN", "message": "Username is already taken by another account."}), 400
+
+    challenge = db.get_auth_otp_challenge(challenge_id)
+    if not challenge or challenge.get("purpose") != "USERNAME_CHANGE" or challenge.get("user_id") != user["id"]:
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
+
+    chal_status = challenge.get("status", "ACTIVE")
+    if chal_status == "USED" or challenge.get("used_at"):
+        return jsonify({"status": "error", "error_code": "ALREADY_USED", "message": "This verification code has already been used."}), 400
+
+    if chal_status != "ACTIVE":
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
+
+    try:
+        exp = datetime.fromisoformat(challenge["expires_at"])
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
+            return jsonify({"status": "error", "error_code": "EXPIRED", "message": "Verification code has expired. Please request a new one."}), 400
+    except Exception:
+        pass
+
+    attempts = challenge.get("attempt_count", 0)
+    if attempts >= 5:
+        db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
+        return jsonify({"status": "error", "error_code": "MAX_ATTEMPTS", "message": "Maximum verification attempts exceeded."}), 429
+
+    code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+    if not hmac.compare_digest(code_hash, challenge["otp_hash"]):
+        new_attempts = db.increment_auth_otp_attempts(challenge_id)
+        remaining = max(0, 5 - new_attempts)
+        return jsonify({
+            "status": "error",
+            "error_code": "INVALID_OTP",
+            "message": f"Incorrect verification code. {remaining} attempt(s) remaining.",
+            "remaining_attempts": remaining
+        }), 401
+
+    # Consume challenge
+    db.mark_auth_otp_challenge_used(challenge_id)
+
+    # Perform DB update
+    old_username = user["username"]
+    db.update_user_username(user["id"], new_username)
+
+    db.log_security_audit_event(
+        action="USERNAME_CHANGED",
+        actor_user_id=user["id"],
+        actor_role=user.get("role", "ADMIN"),
+        result="SUCCESS",
+        ip_address=client_ip,
+        details={"old_username": old_username, "new_username": new_username}
+    )
+
+    return jsonify({
+        "status": "success",
+        "message": f"Username successfully changed to {new_username}.",
+        "user": {
+            "id": user["id"],
+            "username": new_username,
+            "email": user["email"],
+            "role": user["role"]
+        }
+    }), 200
+
+
+@app.route("/api/auth/password/request-change-otp", methods=["POST"])
+def api_auth_password_request_change_otp():
+    """
+    Validates current password and new password requirements, then dispatches 6-digit OTP.
+    """
+    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "error_code": "UNAUTHORIZED", "message": "Authentication required."}), 401
+
+    client_ip = request.remote_addr or "127.0.0.1"
+    request_id = f"req_{secrets.token_hex(6)}"
+
+    data = request.get_json(silent=True) or {}
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+
+    if not current_password or not new_password:
+        return jsonify({"status": "error", "error_code": "MISSING_FIELDS", "message": "Current and new password required."}), 400
+
+    if new_password != confirm_password:
+        return jsonify({"status": "error", "error_code": "PASSWORD_MISMATCH", "message": "New passwords do not match."}), 400
+
+    if len(new_password) < 10:
+        return jsonify({"status": "error", "error_code": "PASSWORD_TOO_SHORT", "message": "New password must be at least 10 characters."}), 400
+
+    if not PasswordManager.verify_password(current_password, user["password_hash"], user["salt"]):
+        return jsonify({"status": "error", "error_code": "INVALID_CURRENT_PASSWORD", "message": "Current password is incorrect."}), 401
+
+    if current_password == new_password:
+        return jsonify({"status": "error", "error_code": "PASSWORD_REUSED", "message": "New password must be different from current password."}), 400
+
+    user_email = (user.get("email") or "").strip()
+    if user["username"] == "admin":
+        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+
+    if not user_email or "@" not in user_email:
+        return jsonify({"status": "error", "error_code": "NO_VERIFIED_EMAIL", "message": "No verified email address found on file."}), 400
+
+    db.invalidate_user_auth_otp_challenges(user["id"], "PASSWORD_CHANGE")
+
+    otp_code = f"{secrets.randbelow(1_000_000):06d}"
+    otp_hash = hashlib.sha256(otp_code.encode("utf-8")).hexdigest()
+    challenge_id = f"chall_pwc_{secrets.token_urlsafe(24)}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
+
+    db.create_auth_otp_challenge(
+        challenge_id=challenge_id,
+        user_id=user["id"],
+        purpose="PASSWORD_CHANGE",
+        recipient_email=user_email,
+        otp_hash=otp_hash,
+        expires_at=expires_at,
+        requested_ip=client_ip,
+        request_id=request_id
+    )
+
+    sent, err, msg_id = global_email_service.send_password_change_otp(
+        to_email=user_email,
+        otp_code=otp_code,
+        username=user["username"],
+        user_id=user["id"]
+    )
+
+    is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+    no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST) or ("@example.com" in user_email)
+
+    if sent or no_real_provider:
+        db.activate_auth_otp_challenge(
+            challenge_id=challenge_id,
+            user_id=user["id"],
+            purpose="PASSWORD_CHANGE",
+            provider_message_id=msg_id or "",
+            provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
+        )
+    else:
+        db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=str(err or ""))
+
+    masked_dest = _mask_email_address(user_email)
+
+    db.log_security_audit_event(
+        action="PASSWORD_CHANGE_OTP_REQUESTED",
+        actor_user_id=user["id"],
+        result="SUCCESS" if (sent or no_real_provider) else "FAILED",
+        ip_address=client_ip,
+        details={"challenge_id": challenge_id}
+    )
+
+    resp_payload = {
+        "status": "success",
+        "message": f"Verification code sent to {masked_dest}.",
+        "challenge_id": challenge_id,
+        "destination": masked_dest,
+        "request_id": request_id
+    }
+
+    if no_real_provider or is_dev_console:
+        resp_payload["dev_otp"] = otp_code
+        resp_payload["dev_mode"] = True
+
+    return jsonify(resp_payload), 200
+
+
+@app.route("/api/auth/password/change-with-otp", methods=["POST"])
+def api_auth_password_change_with_otp():
+    """
+    Verifies 6-digit OTP, current password, and new password requirements,
+    then updates the master password and rotates/revokes sessions.
+    """
+    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "error_code": "UNAUTHORIZED", "message": "Authentication required."}), 401
+
+    client_ip = request.remote_addr or "127.0.0.1"
+    data = request.get_json(silent=True) or {}
+    challenge_id = (data.get("challenge_id") or "").strip()
+    code = (data.get("otp") or data.get("code") or "").strip()
+    current_password = data.get("current_password") or ""
+    new_password = data.get("new_password") or ""
+    confirm_password = data.get("confirm_password") or ""
+    logout_others = bool(data.get("logout_all_other_sessions", True))
+
+    if not challenge_id or not code or not current_password or not new_password:
+        return jsonify({"status": "error", "error_code": "MISSING_FIELDS", "message": "All fields including verification code are required."}), 400
+
+    if new_password != confirm_password:
+        return jsonify({"status": "error", "error_code": "PASSWORD_MISMATCH", "message": "New passwords do not match."}), 400
+
+    if len(new_password) < 10:
+        return jsonify({"status": "error", "error_code": "PASSWORD_TOO_SHORT", "message": "New password must be at least 10 characters."}), 400
+
+    if not PasswordManager.verify_password(current_password, user["password_hash"], user["salt"]):
+        return jsonify({"status": "error", "error_code": "INVALID_CURRENT_PASSWORD", "message": "Current password is incorrect."}), 401
+
+    challenge = db.get_auth_otp_challenge(challenge_id)
+    if not challenge or challenge.get("purpose") != "PASSWORD_CHANGE" or challenge.get("user_id") != user["id"]:
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
+
+    chal_status = challenge.get("status", "ACTIVE")
+    if chal_status == "USED" or challenge.get("used_at"):
+        return jsonify({"status": "error", "error_code": "ALREADY_USED", "message": "This verification code has already been used."}), 400
+
+    if chal_status != "ACTIVE":
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
+
+    try:
+        exp = datetime.fromisoformat(challenge["expires_at"])
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < datetime.now(timezone.utc):
+            db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
+            return jsonify({"status": "error", "error_code": "EXPIRED", "message": "Verification code has expired. Please request a new one."}), 400
+    except Exception:
+        pass
+
+    attempts = challenge.get("attempt_count", 0)
+    if attempts >= 5:
+        db.safe_execute("UPDATE auth_otp_challenges SET status = 'INVALIDATED' WHERE id = ?", (challenge_id,))
+        return jsonify({"status": "error", "error_code": "MAX_ATTEMPTS", "message": "Maximum verification attempts exceeded."}), 429
+
+    code_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+    if not hmac.compare_digest(code_hash, challenge["otp_hash"]):
+        new_attempts = db.increment_auth_otp_attempts(challenge_id)
+        remaining = max(0, 5 - new_attempts)
+        return jsonify({
+            "status": "error",
+            "error_code": "INVALID_OTP",
+            "message": f"Incorrect verification code. {remaining} attempt(s) remaining.",
+            "remaining_attempts": remaining
+        }), 401
+
+    # Consume challenge
+    db.mark_auth_otp_challenge_used(challenge_id)
+
+    # Hash new password with fresh salt
+    new_hash, new_salt = PasswordManager.hash_password(new_password)
+    db.update_user_password(user["id"], new_hash, new_salt, must_change_password=0)
+
+    # Invalidate other sessions if requested
+    curr_session_id = session.get("session_id", "") if session else ""
+    if logout_others and curr_session_id:
+        db.revoke_all_other_sessions(user["id"], curr_session_id)
+
+    # Rotate session
+    raw_token, new_session = SessionManager.rotate_session(
+        old_session_id=curr_session_id,
+        user_id=user["id"],
+        device_name=session.get("device_name", "Browser") if session else "Browser",
+        ip_address=client_ip
+    )
+
+    db.log_security_audit_event(
+        action="PASSWORD_CHANGED_WITH_OTP",
+        actor_user_id=user["id"],
+        actor_role=user.get("role", "ADMIN"),
+        result="SUCCESS",
+        ip_address=client_ip,
+        details={"other_sessions_revoked": logout_others}
+    )
+
+    global_email_service.send_password_changed_notification(
+        to_email=user["email"],
+        username=user["username"],
+        user_id=user["id"]
+    )
+
+    is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
+    resp = make_response(jsonify({
+        "status": "success",
+        "message": "Password updated successfully with two-step authorization.",
+        "session_token": raw_token
+    }))
+    resp.set_cookie(
+        "algo_session_token",
+        raw_token,
+        httponly=True,
+        samesite="Lax",
+        secure=is_https,
+        max_age=7 * 86400,
+        path="/"
+    )
+    return resp
+
+
+@app.route("/api/auth/passkeys", methods=["GET"])
+def api_auth_passkeys_list():
+    """Returns registered hardware passkeys for current user."""
+    user, _ = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    user_rec = db.get_user_by_id(user["id"]) or user
+    passkeys = json.loads(user_rec.get("passkeys_json") or "[]")
+    return jsonify({"status": "success", "passkeys": passkeys})
+
+
+@app.route("/api/auth/passkeys/add", methods=["POST"])
+def api_auth_passkeys_add():
+    """Adds a new registered passkey/FIDO2 credential."""
+    user, _ = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or data.get("device_name") or "Security Key").strip()
+    credential_id = data.get("credential_id") or f"cred_{secrets.token_hex(16)}"
+    public_key = data.get("public_key") or secrets.token_hex(32)
+
+    user_rec = db.get_user_by_id(user["id"]) or user
+    passkeys = json.loads(user_rec.get("passkeys_json") or "[]")
+    new_pk = {
+        "id": f"pk_{secrets.token_hex(8)}",
+        "credential_id": credential_id,
+        "public_key": public_key,
+        "device_name": name,
+        "name": name,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "last_used_at": datetime.now(timezone.utc).isoformat()
+    }
+    passkeys.append(new_pk)
+
+    db.update_user_passkeys(user["id"], json.dumps(passkeys))
+
+    db.log_security_audit_event(
+        action="PASSKEY_ADDED",
+        actor_user_id=user["id"],
+        result="SUCCESS",
+        details={"name": name, "passkey_id": new_pk["id"]}
+    )
+
+    return jsonify({"status": "success", "message": f"Passkey '{name}' registered successfully.", "passkey": new_pk, "passkeys": passkeys})
+
+
+@app.route("/api/auth/passkeys/<key_id>", methods=["PUT"])
+def api_auth_passkeys_rename(key_id):
+    """Renames an existing registered passkey."""
+    user, _ = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    data = request.get_json(silent=True) or {}
+    new_name = (data.get("name") or data.get("device_name") or "").strip()
+    if not new_name:
+        return jsonify({"status": "error", "message": "Name cannot be empty."}), 400
+
+    user_rec = db.get_user_by_id(user["id"]) or user
+    passkeys = json.loads(user_rec.get("passkeys_json") or "[]")
+    found = False
+    for pk in passkeys:
+        if pk.get("id") == key_id or pk.get("credential_id") == key_id:
+            pk["name"] = new_name
+            pk["device_name"] = new_name
+            found = True
+            break
+
+    if not found:
+        return jsonify({"status": "error", "message": "Passkey not found."}), 404
+
+    db.update_user_passkeys(user["id"], json.dumps(passkeys))
+    db.log_security_audit_event(
+        action="PASSKEY_RENAMED",
+        actor_user_id=user["id"],
+        result="SUCCESS",
+        details={"passkey_id": key_id, "new_name": new_name}
+    )
+
+    return jsonify({"status": "success", "message": "Passkey renamed successfully.", "passkeys": passkeys})
+
+
+@app.route("/api/auth/passkeys/<key_id>", methods=["DELETE"])
+def api_auth_passkeys_delete(key_id):
+    """Removes a registered passkey."""
+    user, _ = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    user_rec = db.get_user_by_id(user["id"]) or user
+    passkeys = json.loads(user_rec.get("passkeys_json") or "[]")
+    initial_len = len(passkeys)
+    passkeys = [pk for pk in passkeys if pk.get("id") != key_id and pk.get("credential_id") != key_id]
+
+    if len(passkeys) == initial_len:
+        return jsonify({"status": "error", "message": "Passkey not found."}), 404
+
+    db.update_user_passkeys(user["id"], json.dumps(passkeys))
+    db.log_security_audit_event(
+        action="PASSKEY_REMOVED",
+        actor_user_id=user["id"],
+        result="SUCCESS",
+        details={"passkey_id": key_id}
+    )
+
+    return jsonify({"status": "success", "message": "Passkey removed successfully.", "passkeys": passkeys})
+
+
+
+@app.route("/api/security/events", methods=["GET"])
+def api_security_events():
+    """Returns structured security events with filter and search capabilities."""
+    user, _ = get_current_user_and_session(allow_dev_fallback=False)
+    if not user:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
+    limit = int(request.args.get("limit", 100))
+    severity_filter = request.args.get("severity", "ALL").upper()
+    search_query = (request.args.get("q") or "").strip().lower()
+
+    logs = db.get_security_audit_events(limit=limit, action_filter="ALL")
+    
+    # Enrich and format events
+    events = []
+    for log in logs:
+        action = log.get("action", "")
+        # Determine severity
+        sev = "INFO"
+        if any(w in action for w in ["FAILED", "BLOCKED", "VULNERABILITY", "COMPROMISED"]):
+            sev = "HIGH"
+        elif any(w in action for w in ["CRITICAL", "STEP_UP_FAILED", "REVOKED"]):
+            sev = "MEDIUM"
+        elif any(w in action for w in ["PASSWORD", "USERNAME", "TOTP", "PASSKEY"]):
+            sev = "MEDIUM"
+
+        if severity_filter != "ALL" and sev != severity_filter:
+            continue
+
+        raw_details = log.get("details", "")
+        details_str = json.dumps(raw_details) if isinstance(raw_details, dict) else str(raw_details)
+        
+        event_obj = {
+            "id": log.get("id", ""),
+            "timestamp": log.get("timestamp_utc", log.get("created_at", "")),
+            "type": action,
+            "action": action,
+            "severity": sev,
+            "device": log.get("ip_address", "Indore Gateway"),
+            "ip": log.get("ip_address", "127.0.0.1"),
+            "user_id": log.get("actor_user_id", "admin"),
+            "description": f"Security action: {action.replace('_', ' ').title()}",
+            "resolution": "Resolved" if log.get("result") == "SUCCESS" else "Needs Review",
+            "result": log.get("result", "SUCCESS"),
+            "details": raw_details
+        }
+
+        if search_query:
+            combined = f"{event_obj['type']} {event_obj['description']} {event_obj['ip']} {details_str}".lower()
+            if search_query not in combined:
+                continue
+
+        events.append(event_obj)
+
+    return jsonify({"status": "success", "events": events, "total": len(events)})
 
 
 @app.route("/api/auth/me", methods=["GET"])

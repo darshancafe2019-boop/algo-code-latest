@@ -74,7 +74,7 @@ export function BotControlCenterHeader({
     dbStatus === "HEALTHY";
 
   return (
-    <header className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 sm:p-4.5 shadow-2xl select-none font-sans space-y-3.5">
+    <header className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 sm:p-4.5 shadow-2xl select-none font-sans space-y-3.5">
       {/* Top Bar: Title, System Status, Environment, Global Indicators */}
       <div className="flex flex-wrap items-center justify-between gap-3.5">
         {/* Left: Branding & Fleet State Summary */}
@@ -105,8 +105,8 @@ export function BotControlCenterHeader({
         </div>
 
         {/* Middle/Right: Authoritative Subsystem Health Pills */}
-        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] text-[11px] font-mono">
-          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1E293B]">
+        <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] text-[11px] font-mono">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1A2A3F]">
             <span className={`h-1.5 w-1.5 rounded-full ${isSystemHealthy ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
             <span className="text-slate-400">System:</span>
             <span className={`font-bold ${isSystemHealthy ? "text-emerald-400" : "text-amber-400"}`}>
@@ -114,17 +114,17 @@ export function BotControlCenterHeader({
             </span>
           </div>
 
-          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1E293B]">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1A2A3F]">
             <span className="text-slate-500">Broker:</span>
             <span className="text-slate-200 font-bold">{brokerStatus}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1E293B]">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1A2A3F]">
             <span className="text-slate-500">Feed:</span>
             <span className="text-emerald-400 font-bold">{marketDataStatus}</span>
           </div>
 
-          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1E293B]">
+          <div className="flex items-center gap-1.5 pr-2 border-r border-[#1A2A3F]">
             <span className="text-slate-500">Risk:</span>
             <span className="text-cyan-300 font-bold">{riskStatus}</span>
           </div>
@@ -145,14 +145,14 @@ export function BotControlCenterHeader({
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search bot, symbol, strategy..."
-              className="w-40 sm:w-56 bg-[#070D14] border border-[#1E293B] rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-all font-mono"
+              className="w-40 sm:w-56 bg-[#070D14] border border-[#1A2A3F] rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-400 transition-all font-mono"
             />
           </div>
 
           {/* Command Palette Trigger */}
           <button
             onClick={onOpenCommandPalette}
-            className="px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#122238] border border-[#1E293B] text-slate-300 hover:text-slate-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-2.5 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#122238] border border-[#1A2A3F] text-slate-300 hover:text-slate-100 text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
             title="Open Command Palette (⌘K)"
           >
             <Command className="h-3.5 w-3.5 text-cyan-400" />
@@ -176,7 +176,7 @@ export function BotControlCenterHeader({
           <div
             className={`px-2.5 py-1.5 rounded-xl font-mono text-[11px] font-bold flex items-center gap-1.5 border ${
               telegramStatus === "CONNECTED"
-                ? "bg-[#070D14] text-emerald-400 border-[#1E293B]"
+                ? "bg-[#070D14] text-emerald-400 border-[#1A2A3F]"
                 : "bg-amber-950/60 text-amber-300 border-amber-800"
             }`}
             title="Telegram Alert Dispatcher"
@@ -187,7 +187,7 @@ export function BotControlCenterHeader({
           </div>
 
           {/* Real Latency */}
-          <div className="px-2.5 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] font-mono text-[11px] text-slate-300 flex items-center gap-1.5">
+          <div className="px-2.5 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] font-mono text-[11px] text-slate-300 flex items-center gap-1.5">
             <Radio className="h-3 w-3 text-cyan-400 animate-pulse" />
             <span>{systemLatencyMs}ms</span>
           </div>
@@ -205,7 +205,7 @@ export function BotControlCenterHeader({
               className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all shrink-0 font-mono ${
                 selectedMarket === m.id
                   ? "bg-gradient-to-r from-[#122238] to-[#1E3A5F] text-cyan-300 border border-cyan-600/70 shadow-md"
-                  : "bg-[#070D14] hover:bg-[#122238]/60 text-slate-400 hover:text-slate-200 border border-[#1E293B]"
+                  : "bg-[#070D14] hover:bg-[#122238]/60 text-slate-400 hover:text-slate-200 border border-[#1A2A3F]"
               }`}
             >
               {m.label}

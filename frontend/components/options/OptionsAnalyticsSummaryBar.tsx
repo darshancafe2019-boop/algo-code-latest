@@ -31,7 +31,7 @@ export function OptionsAnalyticsSummaryBar({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
       {/* 1. ATM Strike */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>ATM Strike</span>
           <Target className="w-3 h-3 text-cyan-400" />
@@ -45,7 +45,7 @@ export function OptionsAnalyticsSummaryBar({
       </div>
 
       {/* 2. PCR OI */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>PCR (Open Interest)</span>
           <Activity className="w-3 h-3 text-emerald-400" />
@@ -59,7 +59,7 @@ export function OptionsAnalyticsSummaryBar({
       </div>
 
       {/* 3. Max Pain */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>Max Pain Strike</span>
           <Zap className="w-3 h-3 text-amber-400" />
@@ -73,7 +73,7 @@ export function OptionsAnalyticsSummaryBar({
       </div>
 
       {/* 4. ATM IV */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>ATM Volatility</span>
           <Layers className="w-3 h-3 text-purple-400" />
@@ -87,7 +87,7 @@ export function OptionsAnalyticsSummaryBar({
       </div>
 
       {/* 5. Call OI Resistance Wall */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>Call Wall (Resistance)</span>
           <TrendingDown className="w-3 h-3 text-rose-400" />
@@ -101,7 +101,7 @@ export function OptionsAnalyticsSummaryBar({
       </div>
 
       {/* 6. Put OI Support Wall */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase flex items-center justify-between">
           <span>Put Wall (Support)</span>
           <TrendingUp className="w-3 h-3 text-emerald-400" />

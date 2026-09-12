@@ -4,7 +4,7 @@ import React from "react";
 
 interface EcoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
-  variant?: "leaf" | "moss" | "outline" | "danger" | "warning" | "ghost";
+  variant?: "leaf" | "moss" | "outline" | "danger" | "warning" | "ghost" | "primary" | "cyan";
   size?: "xs" | "sm" | "md" | "lg";
   icon?: React.ElementType;
   iconPosition?: "left" | "right";
@@ -14,7 +14,7 @@ interface EcoButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function EcoButton({
   children,
-  variant = "leaf",
+  variant = "primary",
   size = "md",
   icon: Icon,
   iconPosition = "left",
@@ -25,7 +25,7 @@ export function EcoButton({
   ...props
 }: EcoButtonProps) {
   const baseClasses =
-    "inline-flex items-center justify-center font-bold font-mono rounded-xl transition-all duration-150 select-none active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none disabled:active:scale-100";
+    "inline-flex items-center justify-center font-bold font-mono rounded-lg transition-all duration-150 select-none cursor-pointer disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed";
 
   const sizeClasses = {
     xs: "px-2.5 py-1 text-[11px] gap-1.5",
@@ -35,15 +35,17 @@ export function EcoButton({
   };
 
   const variantClasses = {
-    leaf: "bg-[#2E7D5B] hover:bg-[#39B978] text-[#07110D] shadow-md hover:shadow-lg border border-[#39B978]/60",
-    moss: "bg-[#123C2A] hover:bg-[#1B4D36] text-[#E8F3EC] border border-[#294238]",
-    outline: "bg-transparent hover:bg-[#12221B] text-[#A8BDB0] hover:text-[#E8F3EC] border border-[#294238]",
-    danger: "bg-[#E26D6D]/15 hover:bg-[#E26D6D]/25 text-[#E26D6D] border border-[#E26D6D]/40",
-    warning: "bg-[#D9A441]/15 hover:bg-[#D9A441]/25 text-[#D9A441] border border-[#D9A441]/40",
-    ghost: "bg-transparent hover:bg-[#12221B]/60 text-[#A8BDB0] hover:text-[#E8F3EC] border border-transparent",
+    primary: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md border border-[#3B82F6]/60",
+    leaf: "bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-md border border-[#3B82F6]/60",
+    cyan: "bg-[#22D3EE] hover:bg-[#06B6D4] text-black shadow-md border border-[#22D3EE]",
+    moss: "bg-[#101B2D] hover:bg-[#1A2A3F] text-[#F7FAFC] border border-[#1A2A3F]",
+    outline: "bg-[#07101A] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F7FAFC] border border-[#1A2A3F]",
+    danger: "bg-[#FF3B5C]/15 hover:bg-[#FF3B5C]/25 text-[#FF3B5C] border border-[#FF3B5C]/40",
+    warning: "bg-[#F59E0B]/15 hover:bg-[#F59E0B]/25 text-[#F59E0B] border border-[#F59E0B]/40",
+    ghost: "bg-transparent hover:bg-[#101B2D]/60 text-[#7C8CA3] hover:text-[#F7FAFC] border border-transparent",
   };
 
-  const glowClass = glow && variant === "leaf" ? "glow-leaf" : "";
+  const glowClass = glow ? "shadow-[0_0_15px_rgba(34,211,238,0.25)] border-[#22D3EE]/80" : "";
 
   return (
     <button

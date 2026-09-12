@@ -36,7 +36,7 @@ export function ContextualActionBar({
 }: ContextualActionBarProps) {
   if (!instrument) {
     return (
-      <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 flex items-center justify-between font-mono text-xs text-slate-400">
+      <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 flex items-center justify-between font-mono text-xs text-slate-400">
         <span>Select an instrument from the table or search to open contextual actions.</span>
       </div>
     );
@@ -48,9 +48,9 @@ export function ContextualActionBar({
   const isFuturesAvailable = isCrypto || Boolean(instrument.expiry || instrument.asset_class?.toLowerCase().includes("fut"));
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 shadow-xl select-none font-sans space-y-3">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl select-none font-sans space-y-3">
       {/* 1. Header with Selected Instrument Summary */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3 font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3 font-mono">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800">
             <TrendingUp className="h-4 w-4" />
@@ -58,7 +58,7 @@ export function ContextualActionBar({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-black text-slate-100 uppercase">{sym}</h3>
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#162231] border border-[#1E293B] text-slate-300">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-[#162231] border border-[#1A2A3F] text-slate-300">
                 {instrument.exchange}
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800 text-cyan-300">
@@ -92,7 +92,7 @@ export function ContextualActionBar({
             className={`p-2 rounded-xl border transition-all ${
               isInWatchlist
                 ? "bg-amber-950/60 border-amber-800 text-amber-400 hover:bg-amber-900/60"
-                : "bg-[#070D14] border-[#1E293B] text-slate-400 hover:text-cyan-300 hover:border-cyan-700"
+                : "bg-[#070D14] border-[#1A2A3F] text-slate-400 hover:text-cyan-300 hover:border-cyan-700"
             }`}
             title={isInWatchlist ? "Remove from Watchlist" : "Add to Watchlist"}
           >
@@ -106,7 +106,7 @@ export function ContextualActionBar({
         {/* Open Interactive Chart */}
         <Link
           href={`/charts?symbol=${encodeURIComponent(sym)}`}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-200 hover:text-cyan-300 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-200 hover:text-cyan-300 transition-colors"
         >
           <LineChart className="h-3.5 w-3.5 text-cyan-400" />
           <span>Open Chart</span>
@@ -115,7 +115,7 @@ export function ContextualActionBar({
         {/* Open Strategy Builder IDE */}
         <Link
           href={`/strategy-builder?symbol=${encodeURIComponent(sym)}`}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-200 hover:text-purple-300 transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-200 hover:text-purple-300 transition-colors"
         >
           <Code className="h-3.5 w-3.5 text-purple-400" />
           <span>Open Strategy</span>
@@ -134,7 +134,7 @@ export function ContextualActionBar({
         {isFuturesAvailable && (
           <Link
             href={isCrypto ? `/crypto/futures?symbol=${encodeURIComponent(sym)}` : `/crypto/futures`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-200 hover:text-amber-300 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-200 hover:text-amber-300 transition-colors"
           >
             <Layers className="h-3.5 w-3.5 text-amber-400" />
             <span>Open Futures</span>
@@ -145,7 +145,7 @@ export function ContextualActionBar({
         {isOptionAvailable && (
           <Link
             href={`/options?underlying=${encodeURIComponent(sym)}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1E293B] text-slate-200 hover:text-emerald-300 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#070D14] hover:bg-[#162231] border border-[#1A2A3F] text-slate-200 hover:text-emerald-300 transition-colors"
           >
             <Layers className="h-3.5 w-3.5 text-emerald-400" />
             <span>Open Options</span>

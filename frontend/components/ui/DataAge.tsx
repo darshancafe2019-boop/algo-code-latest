@@ -54,11 +54,11 @@ export function DataAge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 font-mono text-[10px] text-[#94A3B8] select-none shrink-0",
+        "inline-flex items-center gap-1 font-mono text-[10px] text-[#7C8CA3] select-none shrink-0",
         className
       )}
     >
-      {showIcon && <Clock className="h-2.5 w-2.5 text-[#64748B]" />}
+      {showIcon && <Clock className="h-2.5 w-2.5 text-[#52627A]" />}
       <span>{ageText}</span>
     </span>
   );

@@ -31,6 +31,7 @@ import { MarketInstrument } from "@/types/market-universe";
 import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import Link from "next/link";
+import { formatPrice, formatCurrency, formatPercent, formatDecimal, toFiniteNumber } from "@/lib/formatters";
 
 interface TickerMap {
   [symbol: string]: {
@@ -336,18 +337,16 @@ export function WatchlistsView() {
                       <div className="flex items-center gap-3 font-mono text-xs text-right">
                         <div>
                           <div className="font-bold text-[var(--theme-text-primary)]">
-                            {currSymbol}
-                            {inst.last_price ? inst.last_price.toLocaleString() : "—"}
+                            {formatPrice(inst.last_price, currSymbol, 2)}
                           </div>
                           <div
                             className={`text-[10px] ${
-                              (inst.change_24h || 0) >= 0
+                              (toFiniteNumber(inst.change_24h) ?? 0) >= 0
                                 ? "text-[var(--theme-profit)]"
                                 : "text-[var(--theme-loss)]"
                             }`}
                           >
-                            {(inst.change_24h || 0) >= 0 ? "+" : ""}
-                            {(inst.change_24h || 0).toFixed(2)}%
+                            {formatPercent(inst.change_24h, 2, "—", false, true)}
                           </div>
                         </div>
                       </div>
@@ -570,17 +569,7 @@ export function WatchlistsView() {
 
                       {/* Live Price */}
                       <td className="py-3.5 px-4 text-right font-bold text-[var(--theme-text-primary)]">
-                        {price > 0 ? (
-                          <span>
-                            {currSymbol}
-                            {price.toLocaleString(undefined, {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: price < 1 ? 4 : 2,
-                            })}
-                          </span>
-                        ) : (
-                          <span className="text-[var(--theme-text-muted)]">—</span>
-                        )}
+                        <span>{formatPrice(price > 0 ? price : (item.last_price ?? null), currSymbol, price < 1 ? 4 : 2)}</span>
                       </td>
 
                       {/* 24h Change */}
@@ -592,8 +581,7 @@ export function WatchlistsView() {
                               : "text-[var(--theme-loss)] bg-[var(--theme-loss)]/10"
                           }`}
                         >
-                          {isPos ? "+" : ""}
-                          {changePct.toFixed(2)}%
+                          {formatPercent(changePct, 2, "—", false, true)}
                         </span>
                       </td>
 
@@ -687,15 +675,14 @@ export function WatchlistsView() {
 
                     <div className="text-right font-mono">
                       <div className="text-xs font-bold text-[var(--theme-text-primary)]">
-                        {price > 0 ? `${currSymbol}${price.toLocaleString()}` : "—"}
+                        {formatPrice(price > 0 ? price : (item.last_price ?? null), currSymbol, 2)}
                       </div>
                       <div
                         className={`text-[10px] font-bold ${
                           isPos ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
                         }`}
                       >
-                        {isPos ? "+" : ""}
-                        {changePct.toFixed(2)}%
+                        {formatPercent(changePct, 2, "—", false, true)}
                       </div>
                     </div>
                   </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Play, Pause, Edit3, Eye, ShieldCheck, Activity, Zap } from "lucide-react";
+import { Play, Pause, Edit3, Eye } from "lucide-react";
 import { EcoButton } from "./EcoButton";
 import { EcoBadge } from "./EcoBadge";
 
@@ -53,19 +53,19 @@ export function EcoBotCard({
 
   return (
     <div
-      className={`p-5 bg-[#0D1914] border border-[#294238] hover:border-[#2E7D5B]/60 rounded-2xl space-y-4 font-sans transition-all duration-200 shadow-xl select-none ${className}`}
+      className={`p-4 bg-[#0A1422] border border-[#1A2A3F] hover:border-[#29415F] rounded-xl space-y-3.5 font-sans transition-all duration-150 shadow-sm select-none ${className}`}
     >
       {/* 1. Header: Bot Name + Mode & Status */}
-      <div className="flex items-center justify-between gap-2 border-b border-[#1B3328] pb-3">
+      <div className="flex items-center justify-between gap-2 border-b border-[#122033] pb-2.5">
         <div className="flex items-center gap-2.5">
           <span
-            className={`w-2.5 h-2.5 rounded-full ${
-              isRunning ? "bg-[#55C98A] animate-pulse" : "bg-[#70877A]"
+            className={`w-2 h-2 rounded-full ${
+              isRunning ? "bg-[#00E890] animate-pulse" : "bg-[#52627A]"
             }`}
           />
           <div>
-            <h4 className="text-sm font-bold text-[#E8F3EC] leading-tight">{name}</h4>
-            <span className="text-[10px] font-mono text-[#A8BDB0]">{symbol} • {timeframe.toUpperCase()}</span>
+            <h4 className="text-xs font-bold text-[#F7FAFC] leading-tight">{name}</h4>
+            <span className="text-[10px] font-mono text-[#7C8CA3]">{symbol} • {timeframe.toUpperCase()}</span>
           </div>
         </div>
 
@@ -73,48 +73,48 @@ export function EcoBotCard({
           <EcoBadge variant={tradingMode === "LIVE" ? "live" : "paper"} size="xs">
             {tradingMode}
           </EcoBadge>
-          <EcoBadge variant={isRunning ? "leaf" : "neutral"} size="xs">
+          <EcoBadge variant={isRunning ? "profit" : "neutral"} size="xs">
             {status}
           </EcoBadge>
         </div>
       </div>
 
       {/* 2. Key Metrics Grid */}
-      <div className="grid grid-cols-2 gap-2.5 font-mono text-xs">
-        <div className="p-2.5 bg-[#07110D] border border-[#1B3328] rounded-xl">
-          <span className="text-[9px] text-[#70877A] uppercase block">Strategy</span>
-          <span className="text-xs font-bold text-[#A8D5BA] truncate block">{strategy}</span>
+      <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+        <div className="p-2 bg-[#07101A] border border-[#122033] rounded-lg">
+          <span className="text-[9px] text-[#52627A] uppercase block">Strategy</span>
+          <span className="text-xs font-bold text-[#19C5FF] truncate block">{strategy}</span>
         </div>
 
-        <div className="p-2.5 bg-[#07110D] border border-[#1B3328] rounded-xl">
-          <span className="text-[9px] text-[#70877A] uppercase block">Net P&L</span>
+        <div className="p-2 bg-[#07101A] border border-[#122033] rounded-lg">
+          <span className="text-[9px] text-[#52627A] uppercase block">Net P&L</span>
           <span
-            className={`text-xs font-extrabold block ${
-              isProfit ? "text-[#39B978]" : "text-[#E26D6D]"
+            className={`text-xs font-bold block tabular-nums ${
+              isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
             {isProfit ? `+${currency}${pnl.toLocaleString()}` : `-${currency}${Math.abs(pnl).toLocaleString()}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})
           </span>
         </div>
 
-        <div className="p-2.5 bg-[#07110D] border border-[#1B3328] rounded-xl">
-          <span className="text-[9px] text-[#70877A] uppercase block">Capital / Used</span>
-          <span className="text-xs font-bold text-[#E8F3EC]">
-            {currency}{capitalUsed.toLocaleString()} <span className="text-[#70877A] font-normal">/ {currency}{capitalTotal.toLocaleString()}</span>
+        <div className="p-2 bg-[#07101A] border border-[#122033] rounded-lg">
+          <span className="text-[9px] text-[#52627A] uppercase block">Capital / Used</span>
+          <span className="text-xs font-bold text-[#F7FAFC] tabular-nums">
+            {currency}{capitalUsed.toLocaleString()} <span className="text-[#52627A] font-normal">/ {currency}{capitalTotal.toLocaleString()}</span>
           </span>
         </div>
 
-        <div className="p-2.5 bg-[#07110D] border border-[#1B3328] rounded-xl flex items-center justify-between">
+        <div className="p-2 bg-[#07101A] border border-[#122033] rounded-lg flex items-center justify-between">
           <div>
-            <span className="text-[9px] text-[#70877A] uppercase block">Risk Profile</span>
-            <span className="text-xs font-bold text-[#55C98A]">{riskStatus}</span>
+            <span className="text-[9px] text-[#52627A] uppercase block">Risk Profile</span>
+            <span className="text-xs font-bold text-[#00E890]">{riskStatus}</span>
           </div>
-          <span className="text-[10px] text-[#78A88A] font-bold">{winRatePct}% WR</span>
+          <span className="text-[10px] text-[#7C8CA3] font-bold tabular-nums">{winRatePct}% WR</span>
         </div>
       </div>
 
       {/* 3. Action Buttons Footer */}
-      <div className="flex items-center gap-2 pt-1 font-mono">
+      <div className="flex items-center gap-2 pt-0.5 font-mono">
         {isRunning ? (
           <EcoButton
             variant="moss"
@@ -127,7 +127,7 @@ export function EcoBotCard({
           </EcoButton>
         ) : (
           <EcoButton
-            variant="leaf"
+            variant="primary"
             size="sm"
             icon={Play}
             onClick={() => onStart && onStart(id)}

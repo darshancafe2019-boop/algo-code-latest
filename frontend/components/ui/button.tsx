@@ -4,31 +4,37 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-xl text-xs font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--theme-accent)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none active:scale-[0.98]",
+  "inline-flex items-center justify-center whitespace-nowrap rounded-lg text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#22D3EE] disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer",
   {
     variants: {
       variant: {
         default:
-          "bg-[var(--theme-accent)] text-black font-bold shadow-sm hover:brightness-110",
+          "bg-[#2563EB] text-[#F7FAFC] hover:bg-[#3B82F6] shadow-none",
+        primary:
+          "bg-[#2563EB] text-[#F7FAFC] hover:bg-[#3B82F6] shadow-none",
         destructive:
-          "bg-[var(--theme-loss)] text-white shadow-sm hover:brightness-110",
+          "bg-[#FF3B5C] text-white hover:bg-[#DC2626] shadow-none",
         outline:
-          "border border-[var(--theme-border)] bg-transparent hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)]",
+          "border border-[#1A2A3F] bg-[#0D1727] text-[#CBD5E1] hover:bg-[#101B2D] hover:text-[#F7FAFC] hover:border-[#29415F]",
         secondary:
-          "bg-[var(--theme-elevated)] text-[var(--theme-text-primary)] border border-[var(--theme-border)] hover:bg-[var(--theme-surface)]",
+          "bg-[#0D1727] text-[#CBD5E1] border border-[#1A2A3F] hover:bg-[#101B2D] hover:text-[#F7FAFC] hover:border-[#29415F]",
         ghost:
-          "hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)]",
+          "hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F7FAFC]",
         link:
-          "text-[var(--theme-accent)] underline-offset-4 hover:underline",
+          "text-[#22D3EE] underline-offset-4 hover:underline",
+        buy:
+          "bg-[#00E890] text-[#060B14] font-bold hover:bg-[#10B981]",
+        sell:
+          "bg-[#FF3B5C] text-white font-bold hover:bg-[#DC2626]",
         profit:
-          "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30 hover:bg-[var(--theme-profit)]/25",
+          "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30 hover:bg-[#00E890]/25",
         loss:
-          "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border border-[var(--theme-loss)]/30 hover:bg-[var(--theme-loss)]/25",
+          "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30 hover:bg-[#FF3B5C]/25",
       },
       size: {
-        default: "h-9 px-4 py-2",
-        sm: "h-7 rounded-lg px-2.5 text-[11px]",
-        lg: "h-11 rounded-xl px-6 text-sm",
+        default: "h-9 px-4 py-2 text-xs",
+        sm: "h-7 rounded-md px-2.5 text-[11px]",
+        lg: "h-10 rounded-lg px-5 text-sm",
         icon: "h-8 w-8 rounded-lg",
       },
     },

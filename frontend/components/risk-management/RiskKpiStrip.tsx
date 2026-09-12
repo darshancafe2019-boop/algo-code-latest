@@ -59,7 +59,7 @@ export function RiskKpiStrip({ analytics }: RiskKpiStripProps) {
       {items.map((item, idx) => (
         <div
           key={idx}
-          className="bg-[#0B131E] border border-[#1E293B] hover:border-slate-700 rounded-2xl p-3 shadow-lg transition-colors flex flex-col justify-between"
+          className="bg-[#0B131E] border border-[#1A2A3F] hover:border-slate-700 rounded-2xl p-3 shadow-lg transition-colors flex flex-col justify-between"
         >
           <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider truncate">
             {item.label}

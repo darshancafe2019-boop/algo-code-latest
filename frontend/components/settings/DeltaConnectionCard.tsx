@@ -155,7 +155,7 @@ export function DeltaConnectionCard() {
   };
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] hover:border-cyan-500/30 rounded-2xl p-6 shadow-xl space-y-5 transition-all">
+    <div className="bg-[#121824] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-2xl p-6 shadow-xl space-y-5 transition-all">
       {/* Toast Notification */}
       {notification && (
         <div
@@ -187,7 +187,7 @@ export function DeltaConnectionCard() {
       )}
 
       {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E293B] pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1A2A3F] pb-4">
         <div className="flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-500/20 to-teal-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400 font-black text-xl shadow-lg shadow-cyan-950/40">
             Δ
@@ -226,7 +226,7 @@ export function DeltaConnectionCard() {
           <button
             onClick={handlePing}
             disabled={isPinging || isLoading}
-            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-[#1E293B] text-slate-300 hover:text-white transition disabled:opacity-50"
+            className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-[#1A2A3F] text-slate-300 hover:text-white transition disabled:opacity-50"
             title="Test Real-Time Round-Trip Latency"
           >
             <RefreshCw className={`h-4 w-4 ${isPinging ? "animate-spin text-cyan-400" : ""}`} />
@@ -237,7 +237,7 @@ export function DeltaConnectionCard() {
       {/* Network & Connection Info Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs font-sans">
         {/* Network & Base URL */}
-        <div className="bg-[#0B131E] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
           <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider flex items-center gap-1.5">
             <Globe className="h-3 w-3 text-cyan-400" />
             Gateway Endpoint
@@ -251,7 +251,7 @@ export function DeltaConnectionCard() {
         </div>
 
         {/* API Authentication Status */}
-        <div className="bg-[#0B131E] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
           <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider flex items-center gap-1.5">
             <Lock className="h-3 w-3 text-teal-400" />
             API Key (HMAC-SHA256)
@@ -274,7 +274,7 @@ export function DeltaConnectionCard() {
         </div>
 
         {/* Trading Mode */}
-        <div className="bg-[#0B131E] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+        <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
           <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider flex items-center gap-1.5">
             <Zap className="h-3 w-3 text-amber-400" />
             Execution Mode
@@ -294,7 +294,7 @@ export function DeltaConnectionCard() {
 
       {/* Wallet Balance Summary */}
       {walletData?.balances && walletData.balances.length > 0 && (
-        <div className="p-3 bg-[#0B131E] border border-[#1E293B] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="p-3 bg-[#0B131E] border border-[#1A2A3F] rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2">
             <Wallet className="h-4 w-4 text-cyan-400" />
             <span className="font-bold text-slate-300">Delta Wallet Balances:</span>
@@ -333,7 +333,7 @@ export function DeltaConnectionCard() {
           ].map((mkt) => (
             <span
               key={mkt}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1E293B] text-slate-300 font-medium"
+              className="text-[11px] px-2.5 py-1 rounded-lg bg-[#070D14] border border-[#1A2A3F] text-slate-300 font-medium"
             >
               {mkt}
             </span>
@@ -342,7 +342,7 @@ export function DeltaConnectionCard() {
       </div>
 
       {/* Action Strip */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-[#1E293B]">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-[#1A2A3F]">
         <div className="flex items-center gap-4 text-xs text-slate-400">
           <a
             href="https://india.delta.exchange"
@@ -377,7 +377,7 @@ export function DeltaConnectionCard() {
       {isConfigModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
           <div className="bg-[#0B131E] border border-cyan-800/60 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden">
-            <div className="p-4 border-b border-[#1E293B] bg-[#070D14] flex items-center justify-between">
+            <div className="p-4 border-b border-[#1A2A3F] bg-[#070D14] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800">
                   <Key className="h-4 w-4" />
@@ -408,7 +408,7 @@ export function DeltaConnectionCard() {
                     className={`p-2.5 rounded-xl border text-center font-bold transition ${
                       isIndiaRegion
                         ? "bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-sm"
-                        : "bg-[#070D14] text-slate-400 border-[#1E293B]"
+                        : "bg-[#070D14] text-slate-400 border-[#1A2A3F]"
                     }`}
                   >
                     <div>Delta India (INR)</div>
@@ -420,7 +420,7 @@ export function DeltaConnectionCard() {
                     className={`p-2.5 rounded-xl border text-center font-bold transition ${
                       !isIndiaRegion
                         ? "bg-cyan-950 text-cyan-300 border-cyan-500/50 shadow-sm"
-                        : "bg-[#070D14] text-slate-400 border-[#1E293B]"
+                        : "bg-[#070D14] text-slate-400 border-[#1A2A3F]"
                     }`}
                   >
                     <div>Delta Global (USDT)</div>
@@ -440,7 +440,7 @@ export function DeltaConnectionCard() {
                   value={apiKeyInput}
                   onChange={(e) => setApiKeyInput(e.target.value)}
                   placeholder="Paste your Delta Exchange API Key..."
-                  className="w-full bg-[#070D14] border border-[#1E293B] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+                  className="w-full bg-[#070D14] border border-[#1A2A3F] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
                 />
               </div>
 
@@ -455,7 +455,7 @@ export function DeltaConnectionCard() {
                   value={secretKeyInput}
                   onChange={(e) => setSecretKeyInput(e.target.value)}
                   placeholder="Paste your Delta Exchange API Secret..."
-                  className="w-full bg-[#070D14] border border-[#1E293B] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+                  className="w-full bg-[#070D14] border border-[#1A2A3F] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
                 />
               </div>
 
@@ -468,7 +468,7 @@ export function DeltaConnectionCard() {
               </div>
 
               {/* Modal Buttons */}
-              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1E293B]">
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-[#1A2A3F]">
                 <button
                   type="button"
                   onClick={() => setIsConfigModalOpen(false)}

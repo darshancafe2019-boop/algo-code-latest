@@ -76,18 +76,18 @@ export function TradeFilterBar({
   };
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 shadow-xl select-none font-sans space-y-3.5">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl select-none font-sans space-y-3.5">
       {/* Top Filter Row: Search & Action Buttons */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Search Input */}
         <div className="relative flex-1 min-w-[280px]">
-          <Search className="h-4 w-4 text-[#70877A] absolute left-3.5 top-3" />
+          <Search className="h-4 w-4 text-[#52627A] absolute left-3.5 top-3" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search by Trade ID, Symbol, Strategy, Bot ID, or Remarks..."
-            className="w-full bg-[#07110D] border border-[#1B3328] rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-[#70877A] focus:outline-none focus:border-[#55C98A] font-mono"
+            className="w-full bg-[#07101A] border border-[#122033] rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-[#52627A] focus:outline-none focus:border-[#22D3EE] font-mono"
           />
         </div>
 
@@ -97,7 +97,7 @@ export function TradeFilterBar({
           <select
             value={statusFilter}
             onChange={(e) => onStatusChange(e.target.value)}
-            className="bg-[#07110D] border border-[#1B3328] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+            className="bg-[#07101A] border border-[#122033] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
           >
             <option value="ALL">All Outcomes</option>
             <option value="OPEN">Open Positions</option>
@@ -110,7 +110,7 @@ export function TradeFilterBar({
           <select
             value={directionFilter}
             onChange={(e) => onDirectionChange(e.target.value)}
-            className="bg-[#07110D] border border-[#1B3328] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+            className="bg-[#07101A] border border-[#122033] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
           >
             <option value="ALL">All Directions</option>
             <option value="LONG">LONG (Buy)</option>
@@ -121,7 +121,7 @@ export function TradeFilterBar({
           <select
             value={strategyFilter}
             onChange={(e) => onStrategyChange(e.target.value)}
-            className="bg-[#07110D] border border-[#1B3328] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+            className="bg-[#07101A] border border-[#122033] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
           >
             <option value="ALL">All Strategies</option>
             <option value="Trend Confluence">Trend Confluence</option>
@@ -134,13 +134,13 @@ export function TradeFilterBar({
             onClick={onToggleRealtime}
             className={`px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 transition-all shadow-sm ${
               isRealtimeLive
-                ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
-                : "bg-[#07110D] text-amber-400 border border-amber-800"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60"
+                : "bg-[#07101A] text-amber-400 border border-amber-800"
             }`}
           >
             {isRealtimeLive ? (
               <>
-                <span className="h-2 w-2 rounded-full bg-[#55C98A] animate-pulse" />
+                <span className="h-2 w-2 rounded-full bg-[#22D3EE] animate-pulse" />
                 <span>LIVE FEED</span>
               </>
             ) : (
@@ -164,9 +164,9 @@ export function TradeFilterBar({
       </div>
 
       {/* Saved Filter Presets Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#1B3328] text-xs font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#122033] text-xs font-mono">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] text-[#70877A] uppercase font-bold flex items-center gap-1">
+          <span className="text-[10px] text-[#52627A] uppercase font-bold flex items-center gap-1">
             <Bookmark className="h-3 w-3" />
             <span>Saved Views:</span>
           </span>
@@ -174,7 +174,7 @@ export function TradeFilterBar({
           {savedPresets.map((preset, idx) => (
             <div
               key={idx}
-              className="flex items-center gap-1 bg-[#07110D] border border-[#1B3328] hover:border-[#2E7D5B] rounded-lg px-2.5 py-1 text-[11px] text-[#A8BDB0] group transition-colors"
+              className="flex items-center gap-1 bg-[#07101A] border border-[#122033] hover:border-[#2563EB] rounded-lg px-2.5 py-1 text-[11px] text-[#7C8CA3] group transition-colors"
             >
               <button
                 onClick={() => handleApplyPreset(preset)}
@@ -184,7 +184,7 @@ export function TradeFilterBar({
               </button>
               <button
                 onClick={() => handleDeletePreset(idx)}
-                className="text-[#70877A] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+                className="text-[#52627A] hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -201,17 +201,17 @@ export function TradeFilterBar({
               value={newPresetName}
               onChange={(e) => setNewPresetName(e.target.value)}
               placeholder="Preset name..."
-              className="bg-[#07110D] border border-[#1B3328] rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:border-[#55C98A]"
+              className="bg-[#07101A] border border-[#122033] rounded-lg px-2 py-0.5 text-xs text-white focus:outline-none focus:border-[#22D3EE]"
             />
             <button
               onClick={handleSaveCurrentFilter}
-              className="px-2 py-0.5 bg-[#123C2A] text-[#55C98A] rounded-lg font-bold text-[11px] border border-[#39B978]/40"
+              className="px-2 py-0.5 bg-[rgba(37,99,235,0.18)] text-[#22D3EE] rounded-lg font-bold text-[11px] border border-[#00E890]/40"
             >
               Save
             </button>
             <button
               onClick={() => setIsSavingPreset(false)}
-              className="text-[#70877A] hover:text-white p-0.5"
+              className="text-[#52627A] hover:text-white p-0.5"
             >
               <X className="h-3 w-3" />
             </button>
@@ -219,7 +219,7 @@ export function TradeFilterBar({
         ) : (
           <button
             onClick={() => setIsSavingPreset(true)}
-            className="text-[10px] text-[#55C98A] hover:text-white flex items-center gap-1 font-bold"
+            className="text-[10px] text-[#22D3EE] hover:text-white flex items-center gap-1 font-bold"
           >
             <BookmarkPlus className="h-3 w-3" />
             <span>+ Save Current View</span>

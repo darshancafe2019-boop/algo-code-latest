@@ -29,7 +29,7 @@ export function TradeFilters({
   setShowTestTrades,
 }: Props) {
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-4">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-4 mb-4 flex flex-wrap items-center justify-between gap-4">
       {/* Search Bar */}
       <div className="relative min-w-[240px] flex-1 max-w-xs">
         <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />

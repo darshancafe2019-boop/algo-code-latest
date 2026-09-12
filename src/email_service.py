@@ -548,6 +548,128 @@ Quant.OS Security Team
             user_id=user_id
         )
 
+    def send_username_change_otp(
+        self,
+        to_email: str,
+        otp_code: str,
+        current_username: str,
+        new_username: str,
+        user_id: Optional[str] = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Dispatches 6-digit Username Change Verification Code."""
+        clean_recipient = normalize_email(to_email)
+        if current_username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
+            clean_recipient = TARGET_ADMIN_EMAIL
+
+        subject = "Quant.OS — Authorize Username Change"
+        text_content = f"""Quant.OS Security
+
+Your username change authorization code is: {otp_code}
+
+Requested new username: {new_username}
+This code expires in 5 minutes.
+
+If you did not request this change, ignore this email or review your account security immediately.
+"""
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #060913; color: #f1f5f9; padding: 24px; }}
+    .card {{ max-width: 520px; margin: 0 auto; background-color: #0b132b; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; }}
+    .header {{ font-family: monospace; font-size: 13px; letter-spacing: 2px; color: #00f0ff; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }}
+    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; }}
+    p {{ font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 8px 0; }}
+    .otp-container {{ text-align: center; margin: 28px 0; }}
+    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #00f0ff; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #00f0ff; }}
+    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">Quant.OS Security</div>
+    <h1>Authorize Username Change</h1>
+    <p>We received a request to change your Quant.OS username from <strong>{current_username}</strong> to <strong>{new_username}</strong>.</p>
+    <p>Your verification code is:</p>
+    <div class="otp-container">
+      <div class="otp-box"><strong>{otp_code}</strong></div>
+    </div>
+    <p>This code expires in <strong>5 minutes</strong>.</p>
+    <p>If you did not request this, please change your password immediately.</p>
+    <div class="footer">Quant.OS Algorithmic Trading Systems · Security Gateway</div>
+  </div>
+</body>
+</html>"""
+        return self._dispatch_and_record(
+            to_email=clean_recipient,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            purpose="USERNAME_CHANGE",
+            user_id=user_id
+        )
+
+    def send_password_change_otp(
+        self,
+        to_email: str,
+        otp_code: str,
+        username: str = "admin",
+        user_id: Optional[str] = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        """Dispatches 6-digit Password Change Verification Code for logged in user."""
+        clean_recipient = normalize_email(to_email)
+        if username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
+            clean_recipient = TARGET_ADMIN_EMAIL
+
+        subject = "Quant.OS — Authorize Password Update"
+        text_content = f"""Quant.OS Security
+
+Your password change authorization code is: {otp_code}
+
+This code expires in 5 minutes.
+
+If you did not request this change, ignore this email and secure your account immediately.
+"""
+        html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #060913; color: #f1f5f9; padding: 24px; }}
+    .card {{ max-width: 520px; margin: 0 auto; background-color: #0b132b; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; }}
+    .header {{ font-family: monospace; font-size: 13px; letter-spacing: 2px; color: #f59e0b; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }}
+    h1 {{ font-size: 20px; font-weight: 700; color: #ffffff; margin: 0 0 16px 0; }}
+    p {{ font-size: 14px; line-height: 1.6; color: #94a3b8; margin: 8px 0; }}
+    .otp-container {{ text-align: center; margin: 28px 0; }}
+    .otp-box {{ display: inline-block; background-color: #060913; border: 2px solid #f59e0b; border-radius: 12px; padding: 16px 32px; font-family: monospace; font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #fbbf24; }}
+    .footer {{ font-size: 11px; color: #64748b; margin-top: 24px; border-top: 1px solid #1e293b; padding-top: 16px; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">Quant.OS Security</div>
+    <h1>Authorize Password Update</h1>
+    <p>We received a request to update your account password.</p>
+    <p>Your verification code is:</p>
+    <div class="otp-container">
+      <div class="otp-box"><strong>{otp_code}</strong></div>
+    </div>
+    <p>This code expires in <strong>5 minutes</strong>.</p>
+    <p>If you did not make this request, please contact your security administrator.</p>
+    <div class="footer">Quant.OS Algorithmic Trading Systems · Security Gateway</div>
+  </div>
+</body>
+</html>"""
+        return self._dispatch_and_record(
+            to_email=clean_recipient,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content,
+            purpose="PASSWORD_CHANGE",
+            user_id=user_id
+        )
+
     def send_test_email(
         self,
         to_email: str
@@ -577,3 +699,4 @@ Quant.OS Security Team
 
 global_email_service = EmailService()
 email_service = global_email_service
+

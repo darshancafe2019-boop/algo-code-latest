@@ -74,13 +74,13 @@ export function MetricCard({
     >
       {/* Top row: Title + Icon/Status */}
       <div className="flex items-center justify-between gap-2 mb-1.5 min-w-0">
-        <span className="text-[11px] sm:text-xs font-medium text-[#94A3B8] uppercase tracking-wider truncate">
+        <span className="text-[11px] sm:text-xs font-medium text-[#7C8CA3] uppercase tracking-wider truncate">
           {title}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
           {statusBadge}
           {Icon && (
-            <Icon className="h-3.5 w-3.5 text-[#64748B]" />
+            <Icon className="h-3.5 w-3.5 text-[#52627A]" />
           )}
         </div>
       </div>
@@ -101,7 +101,7 @@ export function MetricCard({
       {(subtitle || change !== undefined) && (
         <div className="mt-1.5 flex items-center justify-between text-[11px] min-w-0 pt-1 border-t border-[#213047]/50 font-mono">
           {subtitle && (
-            <span className="text-[#64748B] truncate">{subtitle}</span>
+            <span className="text-[#52627A] truncate">{subtitle}</span>
           )}
           {change !== undefined && (
             <span
@@ -111,7 +111,7 @@ export function MetricCard({
                   ? "text-[#22C983]"
                   : changeType === "negative" || (typeof change === "number" && change < 0)
                   ? "text-[#F2556A]"
-                  : "text-[#94A3B8]"
+                  : "text-[#7C8CA3]"
               )}
             >
               {typeof change === "number" && change > 0 ? `+${change}` : change}

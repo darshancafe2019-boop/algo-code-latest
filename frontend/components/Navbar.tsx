@@ -181,7 +181,7 @@ export function Navbar({
   const isPositive = (Number(ticker?.change_pct) || 0) >= 0;
 
   return (
-    <header className="w-full bg-[#0B0F17] border-b border-[#1E293B] sticky top-0 z-40 shadow-xl">
+    <header className="w-full bg-[#0B0F17] border-b border-[#1A2A3F] sticky top-0 z-40 shadow-xl">
       {/* Top Header Strip */}
       <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2333]">
         {/* Brand */}
@@ -200,7 +200,7 @@ export function Navbar({
         </div>
 
         {/* Center Real-Time Market Ticker */}
-        <div className="flex items-center gap-3 bg-[#121824] px-3.5 py-1 rounded-xl border border-[#1E293B]">
+        <div className="flex items-center gap-3 bg-[#121824] px-3.5 py-1 rounded-xl border border-[#1A2A3F]">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-300">{ticker?.symbol || "BTC/USDT"}</span>
             <span
@@ -278,7 +278,7 @@ export function Navbar({
           {/* Theme & Appearance Palette Button */}
           <button
             onClick={openAppearanceDrawer}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1E293B] border border-[#1E293B] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
             title="Open Theme & Appearance Editor"
           >
             <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
@@ -288,7 +288,7 @@ export function Navbar({
           {/* Guided Tutorial Button */}
           <button
             onClick={() => onOpenTutorial?.()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1E293B] border border-[#1E293B] text-cyan-300 hover:text-cyan-200 text-xs font-bold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-cyan-300 hover:text-cyan-200 text-xs font-bold transition-colors"
             title="17-Step In-App Tutorial Walkthrough"
           >
             <HelpCircle className="h-3.5 w-3.5 text-cyan-400" />

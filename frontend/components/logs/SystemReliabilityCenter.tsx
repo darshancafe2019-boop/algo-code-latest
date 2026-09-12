@@ -187,7 +187,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
     <div className="space-y-6">
       {/* Header & Global Reliability Telemetry Strip */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">System State</div>
             <div className="text-lg font-black mt-1 flex items-center gap-2">
@@ -211,7 +211,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
           </div>
         </div>
 
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Incidents</div>
             <div className="text-2xl font-black font-mono text-white mt-1">
@@ -226,7 +226,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
           </div>
         </div>
 
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Recovered Today</div>
             <div className="text-2xl font-black font-mono text-emerald-400 mt-1">
@@ -238,7 +238,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
           </div>
         </div>
 
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex items-center justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex items-center justify-between">
           <div>
             <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Affected Bots</div>
             <div className="text-2xl font-black font-mono text-cyan-300 mt-1">
@@ -252,8 +252,8 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
       </div>
 
       {/* Provider Connectivity & Circuit Breakers Strip */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-3">
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-2.5">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-3">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2.5">
           <div className="flex items-center gap-2">
             <Activity className="h-4 w-4 text-cyan-400" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">
@@ -263,7 +263,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
           <button
             onClick={fetchReliabilityData}
             disabled={loading}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-[11px] font-semibold text-slate-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-[11px] font-semibold text-slate-300 transition-colors"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin text-cyan-400" : ""}`} />
             Refresh Telemetry
@@ -273,7 +273,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {providers.length > 0 ? (
             providers.map((p) => (
-              <div key={p.provider_id} className="bg-[#0B0F17] border border-[#1E293B] rounded-xl p-3 space-y-2">
+              <div key={p.provider_id} className="bg-[#0B0F17] border border-[#1A2A3F] rounded-xl p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Zap className="h-3.5 w-3.5 text-cyan-400" />
@@ -291,7 +291,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
                     {p.status}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 pt-1 border-t border-[#1E293B]">
+                <div className="grid grid-cols-2 gap-2 text-[10px] font-mono text-slate-400 pt-1 border-t border-[#1A2A3F]">
                   <div>
                     Circuit: <span>{getCircuitBadge(p.circuit_state)}</span>
                   </div>
@@ -319,7 +319,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
       </div>
 
       {/* Incident Ledger Filters & Search */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
           {/* Quick Filter Chips */}
           <div className="flex flex-wrap items-center gap-2">
@@ -328,7 +328,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                 activeFilter === "ALL"
                   ? "bg-cyan-500 text-black shadow-lg shadow-cyan-500/20"
-                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-300"
+                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300"
               }`}
             >
               All Incidents ({incidents.length})
@@ -338,7 +338,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                 activeFilter === "ACTIVE"
                   ? "bg-red-500 text-white shadow-lg shadow-red-500/20"
-                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-300"
+                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300"
               }`}
             >
               Active ({incidents.filter((i) => i.status === "ACTIVE" || i.status === "NEW").length})
@@ -348,7 +348,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                 activeFilter === "CRITICAL"
                   ? "bg-rose-600 text-white"
-                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-300"
+                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300"
               }`}
             >
               Critical ({incidents.filter((i) => i.severity === "CRITICAL").length})
@@ -358,7 +358,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                 activeFilter === "INSTRUMENT"
                   ? "bg-purple-600 text-white"
-                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-300"
+                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300"
               }`}
             >
               Instrument Errors
@@ -368,7 +368,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors ${
                 activeFilter === "RESOLVED"
                   ? "bg-emerald-600 text-white"
-                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-300"
+                  : "bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300"
               }`}
             >
               Resolved ({incidents.filter((i) => i.status === "RESOLVED").length})
@@ -383,16 +383,16 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search error message, code, bot, symbol..."
-              className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
+              className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder-slate-600 focus:border-cyan-500 focus:outline-none"
             />
           </div>
         </div>
 
         {/* Dense Institutional Incident Table */}
-        <div className="overflow-x-auto rounded-xl border border-[#1E293B]">
+        <div className="overflow-x-auto rounded-xl border border-[#1A2A3F]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-[#0B0F17] border-b border-[#1E293B] text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+              <tr className="bg-[#0B0F17] border-b border-[#1A2A3F] text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                 <th className="py-3 px-3.5">Severity</th>
                 <th className="py-3 px-3">Incident / Code</th>
                 <th className="py-3 px-3">Bot / Symbol</th>
@@ -403,7 +403,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
                 <th className="py-3 px-3.5 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1E293B] font-mono">
+            <tbody className="divide-y divide-[#1A2A3F] font-mono">
               {filteredIncidents.length > 0 ? (
                 filteredIncidents.map((inc) => {
                   const count = inc.occurrence_count || 1;
@@ -459,7 +459,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
                             e.stopPropagation();
                             setSelectedIncident(inc);
                           }}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0B0F17] hover:bg-cyan-950/60 border border-[#1E293B] text-[11px] font-bold text-cyan-300 transition-colors"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0B0F17] hover:bg-cyan-950/60 border border-[#1A2A3F] text-[11px] font-bold text-cyan-300 transition-colors"
                         >
                           <Eye className="h-3 w-3" />
                           Details
@@ -483,10 +483,10 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
       {/* Incident Slide-Over Detail Drawer */}
       {selectedIncident && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm transition-opacity">
-          <div className="w-full max-w-2xl bg-[#0E131F] border-l border-[#1E293B] h-full overflow-y-auto p-6 space-y-6 shadow-2xl flex flex-col justify-between">
+          <div className="w-full max-w-2xl bg-[#0E131F] border-l border-[#1A2A3F] h-full overflow-y-auto p-6 space-y-6 shadow-2xl flex flex-col justify-between">
             <div className="space-y-6">
               {/* Drawer Header */}
-              <div className="flex items-center justify-between border-b border-[#1E293B] pb-4">
+              <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-4">
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     {getSeverityBadge(selectedIncident.severity)}
@@ -504,7 +504,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               </div>
 
               {/* Aggregation & Occurrence Banner */}
-              <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-3.5 flex items-center justify-between text-xs font-mono">
+              <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-3.5 flex items-center justify-between text-xs font-mono">
                 <div className="space-y-0.5">
                   <div className="text-slate-400 text-[10px] uppercase">Occurrence Aggregation</div>
                   <div className="text-white font-bold">
@@ -518,7 +518,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
               </div>
 
               {/* 1. What Happened? (Plain English) */}
-              <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-2">
+              <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-2">
                 <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-wider">
                   <Info className="h-4 w-4" />
                   What Happened? (Plain-Language Explanation)
@@ -552,19 +552,19 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
 
               {/* Metadata Grid */}
               <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-3">
+                <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-3">
                   <div className="text-[10px] text-slate-500 uppercase">Bot Instance</div>
                   <div className="text-white font-bold mt-0.5">{selectedIncident.bot_id || "system"}</div>
                 </div>
-                <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-3">
+                <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-3">
                   <div className="text-[10px] text-slate-500 uppercase">Instrument Query</div>
                   <div className="text-cyan-300 font-bold mt-0.5">{selectedIncident.instrument_id || "UNKNOWN"}</div>
                 </div>
-                <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-3">
+                <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-3">
                   <div className="text-[10px] text-slate-500 uppercase">Provider Venue</div>
                   <div className="text-white font-bold mt-0.5">{selectedIncident.provider || "Binance"}</div>
                 </div>
-                <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-3">
+                <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-3">
                   <div className="text-[10px] text-slate-500 uppercase">Retry Classification</div>
                   <div className="text-white font-bold mt-0.5">
                     {selectedIncident.is_retryable ? "Retryable (Network/RateLimit)" : "Non-Retryable (Configuration)"}
@@ -574,7 +574,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
 
               {/* Technical Stack Trace (Sanitized) */}
               {selectedIncident.stack_trace && (
-                <div className="bg-[#0B0F17] border border-[#1E293B] rounded-2xl p-4 space-y-2">
+                <div className="bg-[#0B0F17] border border-[#1A2A3F] rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                       Sanitized Stack Trace
@@ -595,7 +595,7 @@ export function SystemReliabilityCenter({ initialIncidents = [] }: SystemReliabi
             </div>
 
             {/* Drawer Actions */}
-            <div className="border-t border-[#1E293B] pt-4 flex items-center justify-between gap-3">
+            <div className="border-t border-[#1A2A3F] pt-4 flex items-center justify-between gap-3">
               <button
                 onClick={() => handleIncidentAction(selectedIncident.id, "ARCHIVE")}
                 disabled={actionLoading}

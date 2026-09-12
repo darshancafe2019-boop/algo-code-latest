@@ -25,7 +25,7 @@ export function IndicatorHealthCard({
   const isAllHealthy = errorCount === 0;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
       {/* Auto-surfaced Error Banner if present */}
       {errorMessage && (
         <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start justify-between gap-3 animate-in fade-in duration-150">

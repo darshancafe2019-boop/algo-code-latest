@@ -58,7 +58,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="p-4 rounded-xl bg-[#121824] border border-[#1E293B] flex flex-wrap items-center justify-between gap-3">
+      <div className="p-4 rounded-xl bg-[#121824] border border-[#1A2A3F] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
             <Radio className="h-5 w-5" />
@@ -78,7 +78,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
 
         <button
           onClick={() => refetch()}
-          className="px-3 py-1.5 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1E293B] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors"
         >
           <RefreshCw className={`h-3.5 w-3.5 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
           Refresh Health Status
@@ -102,7 +102,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
             return (
               <div
                 key={p.provider_id}
-                className="p-4 rounded-xl bg-[#0F141F] border border-[#1E293B] hover:border-cyan-500/30 transition-all flex flex-col justify-between space-y-3"
+                className="p-4 rounded-xl bg-[#0F141F] border border-[#1A2A3F] hover:border-cyan-500/30 transition-all flex flex-col justify-between space-y-3"
               >
                 <div>
                   {/* Status header */}
@@ -131,7 +131,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
                 </div>
 
                 {/* Metrics */}
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-[#1E293B]">
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-2 border-t border-[#1A2A3F]">
                   <div>
                     <span className="text-[10px] text-slate-500 block">Latency</span>
                     <span
@@ -164,7 +164,7 @@ export function ProviderHealthDashboard({ onSyncCompleted }: ProviderHealthDashb
                 </div>
 
                 {/* Footer sync action */}
-                <div className="pt-2 border-t border-[#1E293B] flex items-center justify-between">
+                <div className="pt-2 border-t border-[#1A2A3F] flex items-center justify-between">
                   <span className="text-[10px] text-slate-500">
                     {p.last_sync ? <>Sync: <HydratedTimestamp timestamp={p.last_sync} /></> : "Sync: OK"}
                   </span>

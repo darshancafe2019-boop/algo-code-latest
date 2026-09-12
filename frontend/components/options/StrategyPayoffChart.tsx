@@ -253,7 +253,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
                 y1={padding.top}
                 x2={getX(hoveredPoint.underlying_price)}
                 y2={height - padding.bottom}
-                stroke="#38BDF8"
+                stroke="#19C5FF"
                 strokeWidth="1"
                 strokeDasharray="2 2"
               />
@@ -272,7 +272,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
           <text
             x={padding.left}
             y={height - 12}
-            fill="#64748B"
+            fill="#52627A"
             fontSize="10"
             fontFamily="monospace"
           >
@@ -281,7 +281,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
           <text
             x={width - padding.right}
             y={height - 12}
-            fill="#64748B"
+            fill="#52627A"
             fontSize="10"
             fontFamily="monospace"
             textAnchor="end"

@@ -325,6 +325,16 @@ class InstrumentMaster {
 
       // ── Delta Crypto Perps ──────────────────────────────────────────────────
       {
+        symbol: "BTC",
+        tradingSymbol: "BTCUSDT",
+        securityId: "BTC-USDT-PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.1,
+      },
+      {
         symbol: "BTC/USDT",
         tradingSymbol: "BTCUSDT",
         securityId: "BTC-USDT-PERP",
@@ -333,6 +343,26 @@ class InstrumentMaster {
         instrumentType: "CRYPTO_PERP",
         lotSize: 1,
         tickSize: 0.1,
+      },
+      {
+        symbol: "BTCUSDT",
+        tradingSymbol: "BTCUSDT",
+        securityId: "BTC-USDT-PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.1,
+      },
+      {
+        symbol: "ETH",
+        tradingSymbol: "ETHUSDT",
+        securityId: "ETH-USDT-PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.01,
       },
       {
         symbol: "ETH/USDT",

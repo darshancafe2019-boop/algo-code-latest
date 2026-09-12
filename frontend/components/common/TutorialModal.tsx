@@ -220,7 +220,7 @@ export function TutorialModal({ isOpen, onClose, onNavigateTab }: TutorialModalP
       onClick={onClose}
     >
       <div
-        className="bg-[#0E1524] border border-[#1E293B] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+        className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -284,14 +284,14 @@ export function TutorialModal({ isOpen, onClose, onNavigateTab }: TutorialModalP
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* What & Why */}
             <div className="space-y-3">
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+              <div className="bg-[#121927] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
                 <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider font-mono">
                   1. What is this?
                 </span>
                 <p className="text-xs text-slate-200 leading-relaxed">{current.what}</p>
               </div>
 
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+              <div className="bg-[#121927] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
                 <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider font-mono">
                   2. Why is this important?
                 </span>
@@ -301,14 +301,14 @@ export function TutorialModal({ isOpen, onClose, onNavigateTab }: TutorialModalP
 
             {/* How & Expected Result */}
             <div className="space-y-3">
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+              <div className="bg-[#121927] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
                 <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider font-mono">
                   3. How do I do it?
                 </span>
                 <p className="text-xs text-slate-200 leading-relaxed">{current.how}</p>
               </div>
 
-              <div className="bg-[#121927] border border-[#1E293B] rounded-xl p-3.5 space-y-1">
+              <div className="bg-[#121927] border border-[#1A2A3F] rounded-xl p-3.5 space-y-1">
                 <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider font-mono">
                   4. Expected Result & Next Action
                 </span>

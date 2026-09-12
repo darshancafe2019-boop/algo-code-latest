@@ -44,7 +44,7 @@ export function OptionsScannerView({
   }).slice(0, 10);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
       {/* Scanner Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">

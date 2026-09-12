@@ -22,7 +22,7 @@ export function ActiveIndicatorsTable({
   const activeList = indicators.filter((ind) => ind.enabled);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Title Bar */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export function ActiveIndicatorsTable({
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => onConfigure(ind)}
-                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#1E293B] hover:bg-cyan-500 hover:text-slate-950 text-slate-300 font-sans transition-all flex items-center gap-1"
+                          className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-[#1A2A3F] hover:bg-cyan-500 hover:text-slate-950 text-slate-300 font-sans transition-all flex items-center gap-1"
                           title="Configure parameters"
                         >
                           <Sliders className="w-3.5 h-3.5" />
@@ -143,7 +143,7 @@ export function ActiveIndicatorsTable({
                         </button>
                         <button
                           onClick={() => onToggleEnable(ind.id || ind.indicator_id, false)}
-                          className="p-1.5 text-xs rounded-lg bg-[#1E293B] hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
+                          className="p-1.5 text-xs rounded-lg bg-[#1A2A3F] hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors"
                           title="Disable indicator"
                         >
                           <Power className="w-3.5 h-3.5" />

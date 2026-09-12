@@ -55,7 +55,7 @@ export function MarketSummaryCard({ summary }: MarketSummaryCardProps) {
   const isBearish = data.decision === "SHORT" || bearPct > bullPct;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Top Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">

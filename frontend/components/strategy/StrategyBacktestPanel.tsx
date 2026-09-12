@@ -108,7 +108,7 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
   };
 
   return (
-    <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">
+    <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">
       {/* Header & Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2333] pb-3">
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
 
         {/* Backtest Parameters Toolbar */}
         <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 bg-[#121927] px-2.5 py-1 rounded-lg border border-[#1E293B]">
+          <div className="flex items-center gap-1.5 bg-[#121927] px-2.5 py-1 rounded-lg border border-[#1A2A3F]">
             <Calendar className="h-3.5 w-3.5 text-slate-400" />
             <input
               type="date"
@@ -147,7 +147,7 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
             />
           </div>
 
-          <div className="flex items-center gap-1.5 bg-[#121927] px-2.5 py-1 rounded-lg border border-[#1E293B]">
+          <div className="flex items-center gap-1.5 bg-[#121927] px-2.5 py-1 rounded-lg border border-[#1A2A3F]">
             <span className="text-slate-500">Fees:</span>
             <span className="text-white font-mono font-bold">{feesPct}%</span>
           </div>
@@ -168,58 +168,58 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
         <div className="space-y-4 animate-fadeIn">
           {/* Key Metrics Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Net Profit</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
                 +${backtestData.total_net_profit?.toLocaleString() || "0"}
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Return</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
                 +{(Number(backtestData?.return_pct) || 14.2).toFixed(1)}%
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Win Rate</span>
               <span className="text-sm font-bold font-mono text-cyan-400">
                 {(Number(backtestData?.win_rate_pct) || 68.5).toFixed(1)}%
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Profit Factor</span>
               <span className="text-sm font-bold font-mono text-purple-400">
                 {(Number(backtestData?.profit_factor) || 1.85).toFixed(2)}
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Max Drawdown</span>
               <span className="text-sm font-bold font-mono text-amber-400">
                 -{(Number(backtestData?.max_drawdown_pct) || 4.2).toFixed(1)}%
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Sharpe Ratio</span>
               <span className="text-sm font-bold font-mono text-white">
                 {(Number(backtestData?.sharpe_ratio) || 2.10).toFixed(2)}
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Total Trades</span>
               <span className="text-sm font-bold font-mono text-slate-200">
                 {backtestData?.total_trades || 48}
               </span>
             </div>
 
-            <div className="p-2.5 bg-[#121927] border border-[#1E293B] rounded-xl">
+            <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Expectancy</span>
-              <span className="text-sm font-bold font-mono text-[#55C98A]">
+              <span className="text-sm font-bold font-mono text-[#22D3EE]">
                 +${(Number(backtestData?.expectancy) || 50.00).toFixed(2)}
               </span>
             </div>
@@ -249,7 +249,7 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
           </div>
         </div>
       ) : (
-        <div className="p-8 text-center text-xs text-slate-500 bg-[#121927]/40 rounded-xl border border-dashed border-[#1E293B]">
+        <div className="p-8 text-center text-xs text-slate-500 bg-[#121927]/40 rounded-xl border border-dashed border-[#1A2A3F]">
           Click &quot;Run Backtest&quot; to execute bar-by-bar historical simulation with zero look-ahead bias.
         </div>
       )}

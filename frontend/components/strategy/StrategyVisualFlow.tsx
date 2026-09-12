@@ -54,7 +54,7 @@ export function StrategyVisualFlow({ activeStep, onSelectStep, direction }: Stra
   ];
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-3 shadow-lg select-none font-sans overflow-x-auto">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-3 shadow-lg select-none font-sans overflow-x-auto">
       <div className="flex items-center gap-1.5 min-w-max">
         {steps.map((step, idx) => {
           const isActive = activeStep === step.id;
@@ -66,16 +66,16 @@ export function StrategyVisualFlow({ activeStep, onSelectStep, direction }: Stra
                 onClick={() => onSelectStep(step.id)}
                 className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                   isActive
-                    ? "bg-gradient-to-r from-[#123C2A] to-[#2E7D5B] text-[#55C98A] border border-[#39B978]/60 shadow-md shadow-[#2E7D5B]/20"
-                    : "bg-[#07110D] hover:bg-[#123C2A]/60 text-[#A8BDB0] hover:text-[#E8F3EC] border border-[#1B3328]"
+                    ? "bg-gradient-to-r from-[rgba(37,99,235,0.18)] to-[#2563EB] text-[#22D3EE] border border-[#00E890]/60 shadow-md shadow-[#2563EB]/20"
+                    : "bg-[#07101A] hover:bg-[rgba(37,99,235,0.18)]/60 text-[#7C8CA3] hover:text-[#F7FAFC] border border-[#122033]"
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 ${isActive ? "text-[#55C98A]" : "text-[#70877A]"}`} />
+                <Icon className={`h-3.5 w-3.5 ${isActive ? "text-[#22D3EE]" : "text-[#52627A]"}`} />
                 <span>{step.label}</span>
               </button>
 
               {idx < steps.length - 1 && (
-                <ArrowRight className="h-3 w-3 text-[#294238] shrink-0" />
+                <ArrowRight className="h-3 w-3 text-[#1A2A3F] shrink-0" />
               )}
             </React.Fragment>
           );

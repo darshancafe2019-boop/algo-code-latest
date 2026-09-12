@@ -1,638 +1,332 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   Search,
   Star,
   Plus,
+  Sliders,
+  Folder,
+  ChevronDown,
+  ChevronRight,
   TrendingUp,
   Activity,
-  BarChart2,
   Zap,
-  Shield,
   Layers,
-  ChevronRight,
-  ChevronDown,
+  Percent,
+  Coins,
+  DollarSign,
+  Bookmark,
   Sparkles,
-  Check,
-  X,
-  Sliders,
-  Clock,
 } from "lucide-react";
 import { StrategyIdeRule, RuleTimeframe } from "@/types/strategy-ide";
+import { STRATEGY_PALETTE_ITEMS } from "./paletteData";
 
 export type RuleTargetStage = "setup" | "confirmation" | "trigger";
 
-export interface IndicatorDefinition {
-  id: string;
-  name: string;
-  category: "TREND" | "MOMENTUM" | "VOLUME" | "VOLATILITY" | "STRUCTURE";
-  description: string;
-  leftKey: string;
-  leftLabel: string;
-  defaultOp: string;
-  defaultRight: string;
-  defaultRightLabel: string;
-  defaultLength?: number;
-  defaultTimeframe: RuleTimeframe;
-}
-
-const INDICATOR_CATALOG: IndicatorDefinition[] = [
-  // Trend
-  {
-    id: "ema_9",
-    name: "EMA 9",
-    category: "TREND",
-    description: "Fast momentum & timing line",
-    leftKey: "ema_9",
-    leftLabel: "EMA 9",
-    defaultOp: "crosses_above",
-    defaultRight: "ema_21",
-    defaultRightLabel: "EMA 21",
-    defaultLength: 9,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "ema_21",
-    name: "EMA 21",
-    category: "TREND",
-    description: "Short-term trend baseline",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "ema_21",
-    defaultRightLabel: "EMA 21",
-    defaultLength: 21,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "ema_50",
-    name: "EMA 50",
-    category: "TREND",
-    description: "Medium-term trend filter",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "ema_50",
-    defaultRightLabel: "EMA 50",
-    defaultLength: 50,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "ema_200",
-    name: "EMA 200",
-    category: "TREND",
-    description: "Macro bull/bear institutional filter",
-    leftKey: "close",
-    leftLabel: "1H Close",
-    defaultOp: ">",
-    defaultRight: "ema_200",
-    defaultRightLabel: "1H EMA 200",
-    defaultLength: 200,
-    defaultTimeframe: "1h",
-  },
-  {
-    id: "sma_200",
-    name: "SMA 200",
-    category: "TREND",
-    description: "Simple Moving Average benchmark",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "sma_200",
-    defaultRightLabel: "SMA 200",
-    defaultLength: 200,
-    defaultTimeframe: "1d",
-  },
-  {
-    id: "supertrend",
-    name: "Supertrend",
-    category: "TREND",
-    description: "Adaptive ATR-based trend direction",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "supertrend",
-    defaultRightLabel: "Supertrend (10, 3)",
-    defaultLength: 10,
-    defaultTimeframe: "15m",
-  },
-
-  // Momentum
-  {
-    id: "rsi_14",
-    name: "RSI",
-    category: "MOMENTUM",
-    description: "Relative Strength Index momentum",
-    leftKey: "rsi_14",
-    leftLabel: "RSI (14)",
-    defaultOp: ">",
-    defaultRight: "55",
-    defaultRightLabel: "55.0",
-    defaultLength: 14,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "macd",
-    name: "MACD",
-    category: "MOMENTUM",
-    description: "Moving Average Convergence Divergence",
-    leftKey: "macd_line",
-    leftLabel: "MACD Line",
-    defaultOp: "crosses_above",
-    defaultRight: "macd_signal",
-    defaultRightLabel: "MACD Signal",
-    defaultLength: 12,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "adx_14",
-    name: "ADX",
-    category: "MOMENTUM",
-    description: "Directional trend strength filter",
-    leftKey: "adx_14",
-    leftLabel: "ADX (14)",
-    defaultOp: ">",
-    defaultRight: "25",
-    defaultRightLabel: "25.0",
-    defaultLength: 14,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "stoch",
-    name: "Stochastic",
-    category: "MOMENTUM",
-    description: "Overbought / Oversold oscillator",
-    leftKey: "stoch_k",
-    leftLabel: "Stoch %K",
-    defaultOp: "<",
-    defaultRight: "20",
-    defaultRightLabel: "20.0",
-    defaultLength: 14,
-    defaultTimeframe: "15m",
-  },
-
-  // Volume
-  {
-    id: "vwap",
-    name: "VWAP",
-    category: "VOLUME",
-    description: "Volume-Weighted Average Price",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "vwap",
-    defaultRightLabel: "VWAP (Session)",
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "volume_surge",
-    name: "Volume Surge",
-    category: "VOLUME",
-    description: "Current volume exceeding 20-bar average",
-    leftKey: "volume",
-    leftLabel: "Volume",
-    defaultOp: ">",
-    defaultRight: "volume_ma_20",
-    defaultRightLabel: "20-bar Avg Volume",
-    defaultTimeframe: "15m",
-  },
-
-  // Volatility
-  {
-    id: "atr_14",
-    name: "ATR",
-    category: "VOLATILITY",
-    description: "Average True Range expansion filter",
-    leftKey: "atr_14",
-    leftLabel: "ATR (14)",
-    defaultOp: ">",
-    defaultRight: "atr_ma_20",
-    defaultRightLabel: "20-bar Avg ATR",
-    defaultLength: 14,
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "bollinger",
-    name: "Bollinger Bands",
-    category: "VOLATILITY",
-    description: "Statistical standard deviation bands",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: "<",
-    defaultRight: "bb_lower",
-    defaultRightLabel: "Lower Band (20, 2)",
-    defaultLength: 20,
-    defaultTimeframe: "15m",
-  },
-
-  // Structure
-  {
-    id: "swing_break",
-    name: "Swing Breakout",
-    category: "STRUCTURE",
-    description: "Break of 20-bar swing high / low",
-    leftKey: "close",
-    leftLabel: "Close",
-    defaultOp: ">",
-    defaultRight: "swing_high_20",
-    defaultRightLabel: "20-bar Swing High",
-    defaultTimeframe: "15m",
-  },
-  {
-    id: "bos",
-    name: "Break of Structure",
-    category: "STRUCTURE",
-    description: "Market structure change confirmation",
-    leftKey: "bos_bullish",
-    leftLabel: "BOS Bullish",
-    defaultOp: "==",
-    defaultRight: "1",
-    defaultRightLabel: "Confirmed (1)",
-    defaultTimeframe: "15m",
-  },
-];
-
-const CATEGORIES = [
-  { id: "ALL", label: "All Indicators" },
-  { id: "FAVORITES", label: "★ Favorites" },
-  { id: "TREND", label: "Trend" },
-  { id: "MOMENTUM", label: "Momentum" },
-  { id: "VOLUME", label: "Volume" },
-  { id: "VOLATILITY", label: "Volatility" },
-  { id: "STRUCTURE", label: "Structure" },
-];
-
-const CONDITIONS = [
-  { value: ">", label: "Greater Than (>)" },
-  { value: "<", label: "Less Than (<)" },
-  { value: ">=", label: "Greater or Equal (>=)" },
-  { value: "<=", label: "Less or Equal (<=)" },
-  { value: "==", label: "Equals (==)" },
-  { value: "crosses_above", label: "Crosses Above" },
-  { value: "crosses_below", label: "Crosses Below" },
-];
-
-const TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
-
-interface Props {
+interface StrategyBuildLibraryProps {
   onAddRule: (target: RuleTargetStage, rule: StrategyIdeRule) => void;
-  baseTimeframe: RuleTimeframe;
+  baseTimeframe?: RuleTimeframe;
 }
 
-export function StrategyBuildLibrary({ onAddRule, baseTimeframe }: Props) {
-  const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState<string>("ALL");
-  const [favorites, setFavorites] = useState<string[]>(["ema_50", "rsi_14", "vwap", "volume_surge"]);
+const CATEGORY_TABS = [
+  { id: "ALL", label: "ALL" },
+  { id: "TREND", label: "TREND" },
+  { id: "MOMENTUM", label: "MOMENTUM" },
+  { id: "VOLATILITY", label: "VOLATILITY" },
+  { id: "VOLUME", label: "VOLUME" },
+  { id: "STRUCTURE", label: "PRICE ACTION" },
+  { id: "DERIVATIVES", label: "OPEN INTEREST" },
+  { id: "OPTIONS", label: "OPTIONS" },
+  { id: "GREEKS", label: "GREEKS" },
+  { id: "FUNDING", label: "FUNDING" },
+  { id: "CUSTOM", label: "CUSTOM" },
+];
 
-  // Add Rule Drawer / Modal State
-  const [addModalIndicator, setAddModalIndicator] = useState<IndicatorDefinition | null>(null);
-  const [addLength, setAddLength] = useState<number>(14);
-  const [addCondition, setAddCondition] = useState<string>(">");
-  const [addValue, setAddValue] = useState<string>("55");
-  const [addTimeframe, setAddTimeframe] = useState<RuleTimeframe>(baseTimeframe || "15m");
-  const [addTargetStage, setAddTargetStage] = useState<RuleTargetStage>("setup");
-  const [addRequired, setAddRequired] = useState<boolean>(true);
+const FOLDERS = [
+  { id: "favs", name: "Favorites", icon: Star, color: "text-[#F59E0B]" },
+  { id: "trend_f", name: "Trend Systems", icon: TrendingUp, color: "text-[#22D3EE]" },
+  { id: "momentum_f", name: "Momentum", icon: Activity, color: "text-[#168BFF]" },
+  { id: "options_f", name: "Options & Greeks", icon: Layers, color: "text-[#A78BFA]" },
+  { id: "crypto_f", name: "Crypto Derivatives", icon: Coins, color: "text-[#00E89A]" },
+  { id: "saved_rules", name: "Saved Rules", icon: Bookmark, color: "text-[#7D8EA5]" },
+  { id: "templates_f", name: "My Templates", icon: Folder, color: "text-[#7D8EA5]" },
+];
 
-  // Load favorites from localStorage
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("quantos_strategy_favorites");
-      if (saved) {
-        setFavorites(JSON.parse(saved));
-      }
-    } catch {}
-  }, []);
+export function StrategyBuildLibrary({
+  onAddRule,
+  baseTimeframe = "15m",
+}: StrategyBuildLibraryProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeTab, setActiveTab] = useState("ALL");
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({
+    price_vwap: true,
+    ema_9_21: true,
+    ema_200_trend: true,
+    rsi_bullish_55: true,
+    oi_rising: true,
+  });
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [selectedItemForAdd, setSelectedItemForAdd] = useState<string | null>(null);
+  const [customTimeframe, setCustomTimeframe] = useState<RuleTimeframe>(baseTimeframe);
 
   const toggleFavorite = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setFavorites((prev) => {
-      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
-      try {
-        localStorage.setItem("quantos_strategy_favorites", JSON.stringify(next));
-      } catch {}
-      return next;
+    setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const filteredItems = useMemo(() => {
+    return STRATEGY_PALETTE_ITEMS.filter((item) => {
+      // Search match
+      const matchesSearch =
+        item.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (item.tooltip && item.tooltip.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      if (!matchesSearch) return false;
+
+      // Folder match
+      if (activeFolder === "favs") {
+        return !!favorites[item.id];
+      }
+      if (activeFolder === "trend_f") {
+        return item.category === "TREND";
+      }
+      if (activeFolder === "momentum_f") {
+        return item.category === "MOMENTUM";
+      }
+      if (activeFolder === "options_f") {
+        return item.category === "OPTIONS" || item.category === "GREEKS";
+      }
+      if (activeFolder === "crypto_f") {
+        return item.category === "DERIVATIVES" || item.category === "FUNDING";
+      }
+
+      // Tab match
+      if (activeTab === "ALL") return true;
+      if (activeTab === "PRICE ACTION") return item.category === "STRUCTURE";
+      if (activeTab === "OPEN INTEREST") return item.category === "DERIVATIVES";
+      return item.category === activeTab;
     });
-  };
+  }, [searchQuery, activeTab, activeFolder, favorites]);
 
-  // Open Unified Add Rule Modal
-  const handleOpenAddModal = (ind: IndicatorDefinition) => {
-    setAddModalIndicator(ind);
-    setAddLength(ind.defaultLength || 14);
-    setAddCondition(ind.defaultOp);
-    setAddValue(ind.defaultRight);
-    setAddTimeframe(ind.defaultTimeframe || baseTimeframe || "15m");
-    setAddTargetStage("setup");
-    setAddRequired(true);
-  };
-
-  // Submit Add Rule
-  const handleSubmitAddRule = () => {
-    if (!addModalIndicator) return;
-
+  const handleAddDirectly = (target: RuleTargetStage, item: (typeof STRATEGY_PALETTE_ITEMS)[0]) => {
     const newRule: StrategyIdeRule = {
-      id: `rule-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      timeframe: addTimeframe,
-      left: addModalIndicator.leftKey,
-      leftLabel: addModalIndicator.leftLabel,
-      op: addCondition,
-      right: addValue,
-      rightLabel: addValue,
-      category: addModalIndicator.category,
+      id: `rule-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      timeframe: customTimeframe || item.defaultTimeframe || baseTimeframe,
+      left: item.defaultLeft,
+      leftLabel: item.label,
+      op: item.defaultOp,
+      right: item.defaultRight,
+      rightLabel: item.defaultRight,
+      category: item.category as any,
       enabled: true,
-      description: `${addTimeframe} ${addModalIndicator.name} ${addCondition} ${addValue}`,
+      description: item.tooltip,
+      logicConnector: "AND",
     };
-
-    onAddRule(addTargetStage, newRule);
-    setAddModalIndicator(null);
+    onAddRule(target, newRule);
+    setSelectedItemForAdd(null);
   };
-
-  // Filtered indicators
-  const displayedIndicators = useMemo(() => {
-    let list = INDICATOR_CATALOG;
-
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (i) =>
-          i.name.toLowerCase().includes(q) ||
-          i.description.toLowerCase().includes(q) ||
-          i.category.toLowerCase().includes(q)
-      );
-    }
-
-    if (activeCategory === "FAVORITES") {
-      list = list.filter((i) => favorites.includes(i.id));
-    } else if (activeCategory !== "ALL") {
-      list = list.filter((i) => i.category === activeCategory);
-    }
-
-    // Sort: Favorites first when in ALL view
-    if (activeCategory === "ALL" && !search.trim()) {
-      return [...list].sort((a, b) => {
-        const aFav = favorites.includes(a.id) ? 1 : 0;
-        const bFav = favorites.includes(b.id) ? 1 : 0;
-        return bFav - aFav;
-      });
-    }
-
-    return list;
-  }, [search, activeCategory, favorites]);
 
   return (
-    <aside className="w-full lg:w-60 bg-[#09110E] border border-[#1F392D] rounded-2xl p-3.5 flex flex-col gap-3 shadow-xl text-xs font-sans select-none shrink-0">
-      
-      {/* 1. Panel Header & Search Bar */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between border-b border-[#142B21] pb-2">
+    <aside className="w-full lg:w-[240px] bg-[#0A1422] border border-[#12304A] rounded-xl flex flex-col shadow-sm text-xs font-sans select-none shrink-0 overflow-hidden h-[calc(100vh-140px)] sticky top-4">
+      {/* 1. Header */}
+      <div className="p-3 border-b border-[#12304A] bg-[#07111F] space-y-2.5">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <Sliders className="h-4 w-4 text-[#55C98A]" />
-            <h3 className="text-xs font-black text-white uppercase tracking-wider">Indicators</h3>
+            <Sliders className="h-3.5 w-3.5 text-[#22D3EE]" />
+            <h2 className="text-xs font-bold text-[#F8FAFC] uppercase tracking-wider">STRATEGY COMPONENTS</h2>
           </div>
-          <span className="text-[10px] px-1.5 py-0.2 rounded bg-[#0C1713] text-[#8BA596] font-mono">
-            {displayedIndicators.length}
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#12304A] text-[#7D8EA5] font-mono font-bold">
+            {filteredItems.length}
           </span>
         </div>
 
-        {/* Search */}
-        <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-[#060D0A] border border-[#14271F] rounded-xl text-xs">
-          <Search className="h-3.5 w-3.5 text-[#8BA596] shrink-0" />
+        {/* Search Field */}
+        <div className="relative">
+          <Search className="h-3.5 w-3.5 text-[#7D8EA5] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search indicators..."
-            className="bg-transparent text-white focus:outline-none w-full text-xs placeholder-[#4E6B5C]"
+            placeholder="Search indicators, greeks, rules..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-7 pl-8 pr-2.5 bg-[#0A1422] border border-[#12304A] rounded-lg text-[11px] text-[#F8FAFC] placeholder:text-[#7D8EA5] focus:outline-none focus:border-[#22D3EE] transition-colors font-sans"
           />
-          {search && (
-            <button onClick={() => setSearch("")} className="text-[#607D6E] hover:text-white">
-              <X className="h-3 w-3" />
-            </button>
-          )}
         </div>
       </div>
 
-      {/* 2. Category Filters Pills */}
-      <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-1 text-[11px] font-mono">
-        {CATEGORIES.map((cat) => (
+      {/* 2. Folders / Favorites Strip */}
+      <div className="px-2.5 py-2 border-b border-[#12304A] bg-[#07111F]/50">
+        <div className="flex items-center gap-1 overflow-x-auto scrollbar-none pb-0.5">
           <button
-            key={cat.id}
             type="button"
-            onClick={() => setActiveCategory(cat.id)}
-            className={`px-2 py-0.5 rounded-lg whitespace-nowrap transition-all ${
-              activeCategory === cat.id
-                ? "bg-[#123C2A] text-[#55C98A] font-bold border border-[#39B978]/40"
-                : "text-[#8BA596] hover:text-white hover:bg-[#0C1713]"
+            onClick={() => setActiveFolder(null)}
+            className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all whitespace-nowrap ${
+              activeFolder === null
+                ? "bg-[#168BFF] text-white"
+                : "bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A]"
             }`}
           >
-            {cat.label}
+            All Folders
           </button>
-        ))}
+          {FOLDERS.map((f) => {
+            const Icon = f.icon;
+            const isSelected = activeFolder === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setActiveFolder(isSelected ? null : f.id)}
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all flex items-center gap-1 whitespace-nowrap ${
+                  isSelected
+                    ? "bg-[#168BFF] text-white"
+                    : "bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A]"
+                }`}
+              >
+                <Icon className={`h-2.5 w-2.5 ${isSelected ? "text-white" : f.color}`} />
+                <span>{f.name}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* 3. Indicators List */}
-      <div className="space-y-1.5 max-h-[640px] overflow-y-auto pr-0.5 scrollbar-thin">
-        {displayedIndicators.length === 0 ? (
-          <div className="py-8 text-center text-[#607D6E] text-xs font-mono">
-            No matching indicators found.
+      {/* 3. Category Tabs (Compact horizontal scroll) */}
+      <div className="px-2.5 py-1.5 border-b border-[#12304A] bg-[#0A1422] overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1">
+          {CATEGORY_TABS.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setActiveFolder(null);
+                }}
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all whitespace-nowrap ${
+                  isActive
+                    ? "bg-[#22D3EE]/20 text-[#22D3EE] border border-[#22D3EE]/50"
+                    : "bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A]"
+                }`}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 4. Component List */}
+      <div className="flex-1 overflow-y-auto p-2 space-y-1.5 scrollbar-thin">
+        {filteredItems.length === 0 ? (
+          <div className="p-4 text-center text-[#7D8EA5] text-[11px] font-mono">
+            No components match your search.
           </div>
         ) : (
-          displayedIndicators.map((ind) => {
-            const isFav = favorites.includes(ind.id);
+          filteredItems.map((item) => {
+            const isFav = !!favorites[item.id];
+            const isExpanded = selectedItemForAdd === item.id;
+
             return (
               <div
-                key={ind.id}
-                className="group bg-[#060D0A] hover:bg-[#0C1713] border border-[#14271F] hover:border-[#1F392D] rounded-xl p-2.5 transition-all flex items-center justify-between gap-2"
+                key={item.id}
+                className={`rounded-lg border transition-all p-2 text-xs font-sans ${
+                  isExpanded
+                    ? "bg-[#0C1727] border-[#22D3EE]/50 shadow-sm"
+                    : "bg-[#0C1727] border-[#12304A] hover:border-[#1A3E61] hover:bg-[#0F1C2F]"
+                }`}
               >
-                <div className="flex items-start gap-2 flex-1 min-w-0">
-                  {/* Star Favorite Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => toggleFavorite(ind.id, e)}
-                    className={`mt-0.5 transition-colors ${
-                      isFav ? "text-amber-400" : "text-[#243E30] group-hover:text-[#4B705B]"
-                    }`}
-                    title={isFav ? "Remove from Favorites" : "Add to Favorites"}
-                  >
-                    <Star className="h-3.5 w-3.5 fill-current" />
-                  </button>
-
-                  <div className="min-w-0">
+                <div
+                  className="flex items-start justify-between gap-1.5 cursor-pointer"
+                  onClick={() => setSelectedItemForAdd(isExpanded ? null : item.id)}
+                >
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-white text-xs truncate">{ind.name}</span>
+                      <span className="font-semibold text-[#F8FAFC] text-[11px] leading-tight truncate">
+                        {item.label}
+                      </span>
                     </div>
-                    <p className="text-[10px] text-[#8BA596] truncate">{ind.description}</p>
+                    {item.tooltip && (
+                      <p className="text-[10px] text-[#7D8EA5] line-clamp-1 mt-0.5">
+                        {item.tooltip}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => toggleFavorite(item.id, e)}
+                      className={`p-1 rounded transition-colors ${
+                        isFav ? "text-[#F59E0B]" : "text-[#7D8EA5] hover:text-[#F8FAFC]"
+                      }`}
+                      title={isFav ? "Remove favorite" : "Add to favorites"}
+                    >
+                      <Star className={`h-3 w-3 ${isFav ? "fill-[#F59E0B]" : ""}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedItemForAdd(isExpanded ? null : item.id)}
+                      className="p-1 rounded bg-[#0A1422] border border-[#12304A] text-[#22D3EE] hover:bg-[#22D3EE]/10"
+                      title="Add rule to stage"
+                    >
+                      <Plus className="h-3 w-3" />
+                    </button>
                   </div>
                 </div>
 
-                {/* [+ Add] Button */}
-                <button
-                  type="button"
-                  onClick={() => handleOpenAddModal(ind)}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-mono font-bold text-[11px] transition-colors border border-[#39B978]/30 shrink-0"
-                  title="Add rule to strategy"
-                >
-                  <Plus className="h-3 w-3" />
-                  <span>Add</span>
-                </button>
+                {/* Quick Add Stage Target Selector */}
+                {isExpanded && (
+                  <div className="mt-2 pt-2 border-t border-[#12304A] space-y-1.5 animate-fadeIn">
+                    <div className="flex items-center justify-between text-[10px] font-mono text-[#7D8EA5]">
+                      <span>Select Target Stage:</span>
+                      <select
+                        value={customTimeframe}
+                        onChange={(e) => setCustomTimeframe(e.target.value as RuleTimeframe)}
+                        className="bg-[#0A1422] border border-[#12304A] rounded px-1 text-[10px] text-[#22D3EE]"
+                      >
+                        <option value="1m">1m</option>
+                        <option value="3m">3m</option>
+                        <option value="5m">5m</option>
+                        <option value="15m">15m</option>
+                        <option value="30m">30m</option>
+                        <option value="1h">1h</option>
+                        <option value="4h">4h</option>
+                        <option value="1d">1d</option>
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-1 text-[10px] font-mono font-bold">
+                      <button
+                        type="button"
+                        onClick={() => handleAddDirectly("setup", item)}
+                        className="py-1 px-1.5 rounded bg-[#168BFF]/15 hover:bg-[#168BFF]/30 text-[#168BFF] border border-[#168BFF]/40 text-center transition-colors cursor-pointer"
+                      >
+                        + Setup
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDirectly("confirmation", item)}
+                        className="py-1 px-1.5 rounded bg-[#22D3EE]/15 hover:bg-[#22D3EE]/30 text-[#22D3EE] border border-[#22D3EE]/40 text-center transition-colors cursor-pointer"
+                      >
+                        + Confirm
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAddDirectly("trigger", item)}
+                        className="py-1 px-1.5 rounded bg-[#00E89A]/15 hover:bg-[#00E89A]/30 text-[#00E89A] border border-[#00E89A]/40 text-center transition-colors cursor-pointer"
+                      >
+                        + Trigger
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
-
-      {/* 4. UNIFIED ADD RULE MODAL / DRAWER */}
-      {addModalIndicator && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 font-sans select-none animate-fadeIn">
-          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-2xl w-full max-w-md space-y-4">
-            
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-[#142B21] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-lg bg-[#123C2A] text-[#55C98A]">
-                  <Plus className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-white uppercase">ADD RULE</h3>
-                  <span className="text-[10px] text-[#8BA596] font-mono">{addModalIndicator.name}</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setAddModalIndicator(null)}
-                className="text-[#8BA596] hover:text-white"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Parameter Fields */}
-            <div className="space-y-3 font-mono text-xs">
-              
-              {/* Target Stage (Use In: Setup / Confirm / Trigger) */}
-              <div className="space-y-1">
-                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Use In Stage</span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(["setup", "confirmation", "trigger"] as RuleTargetStage[]).map((stage) => (
-                    <button
-                      key={stage}
-                      type="button"
-                      onClick={() => setAddTargetStage(stage)}
-                      className={`py-1.5 rounded-lg text-xs font-bold transition-all capitalize ${
-                        addTargetStage === stage
-                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
-                      }`}
-                    >
-                      {stage === "confirmation" ? "Confirm" : stage}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Indicator Length & Source (if applicable) */}
-              {addModalIndicator.defaultLength && (
-                <div className="space-y-1">
-                  <span className="text-[11px] text-[#8BA596] uppercase font-bold">Length / Period</span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={500}
-                    value={addLength}
-                    onChange={(e) => setAddLength(parseInt(e.target.value) || 14)}
-                    className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
-                  />
-                </div>
-              )}
-
-              {/* Condition Dropdown */}
-              <div className="space-y-1">
-                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Condition</span>
-                <select
-                  value={addCondition}
-                  onChange={(e) => setAddCondition(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A] cursor-pointer"
-                >
-                  {CONDITIONS.map((c) => (
-                    <option key={c.value} value={c.value} className="bg-[#09110E] text-white">
-                      {c.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Target Value */}
-              <div className="space-y-1">
-                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Compare Value / Target</span>
-                <input
-                  type="text"
-                  value={addValue}
-                  onChange={(e) => setAddValue(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#14271F] rounded-lg px-3 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
-                />
-              </div>
-
-              {/* Timeframe */}
-              <div className="space-y-1">
-                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Timeframe</span>
-                <div className="grid grid-cols-4 gap-1">
-                  {TIMEFRAMES.map((tf) => (
-                    <button
-                      key={tf}
-                      type="button"
-                      onClick={() => setAddTimeframe(tf)}
-                      className={`py-1 rounded text-[11px] font-bold transition-all ${
-                        addTimeframe === tf
-                          ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
-                          : "bg-[#060D0A] text-[#8BA596] border border-[#14271F] hover:text-white"
-                      }`}
-                    >
-                      {tf}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Required Toggle */}
-              <div className="flex items-center justify-between pt-1 border-t border-[#142B21]">
-                <span className="text-[11px] text-[#8BA596] uppercase font-bold">Required Rule</span>
-                <button
-                  type="button"
-                  onClick={() => setAddRequired(!addRequired)}
-                  className={`px-2.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-                    addRequired
-                      ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60"
-                      : "bg-[#060D0A] text-[#607D6E] border border-[#14271F]"
-                  }`}
-                >
-                  {addRequired ? "ON" : "OFF"}
-                </button>
-              </div>
-
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#142B21]">
-              <button
-                type="button"
-                onClick={() => setAddModalIndicator(null)}
-                className="px-4 py-2 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-bold font-mono text-xs transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitAddRule}
-                className="px-5 py-2 rounded-xl bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] hover:text-white font-bold font-mono text-xs transition-all shadow-sm flex items-center gap-1.5"
-              >
-                <Check className="h-3.5 w-3.5" />
-                <span>Add Rule</span>
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
     </aside>
   );
 }

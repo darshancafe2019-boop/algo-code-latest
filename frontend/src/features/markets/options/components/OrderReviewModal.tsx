@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Scale,
 } from "lucide-react";
+import { formatCurrency, formatDecimal } from "@/lib/formatters";
 
 export interface OptionOrderIntentRequest {
   canonical_id: string;
@@ -127,7 +128,7 @@ export function OrderReviewModal({
             <div className="text-right">
               <div className="text-xs text-slate-400 font-mono">EST. PRICE</div>
               <div className="text-lg font-bold font-mono text-emerald-400">
-                ₹{order.price.toFixed(2)}
+                {formatCurrency(order.price, "₹", 2)}
               </div>
             </div>
           </div>
@@ -162,7 +163,7 @@ export function OrderReviewModal({
               <div className="flex justify-between py-1.5 border-b border-slate-800">
                 <span className="text-slate-400">Greeks (Δ / Γ / Θ / Vega)</span>
                 <span className="font-bold text-sky-400">
-                  {order.delta?.toFixed(2) || "—"} / {order.gamma?.toFixed(4) || "—"} / {order.theta?.toFixed(1) || "—"} / {order.vega?.toFixed(1) || "—"}
+                  {formatDecimal(order.delta, 2)} / {formatDecimal(order.gamma, 4)} / {formatDecimal(order.theta, 1)} / {formatDecimal(order.vega, 1)}
                 </span>
               </div>
             )}

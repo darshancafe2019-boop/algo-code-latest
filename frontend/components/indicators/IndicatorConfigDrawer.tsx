@@ -84,9 +84,9 @@ export function IndicatorConfigDrawer({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex justify-end transition-opacity">
-      <div className="bg-[#0B111E] border-l border-[#1E293B] w-full max-w-lg h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
+      <div className="bg-[#0B111E] border-l border-[#1A2A3F] w-full max-w-lg h-full shadow-2xl flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
-        <div className="p-5 border-b border-[#1E293B] space-y-3 bg-[#080D17]">
+        <div className="p-5 border-b border-[#1A2A3F] space-y-3 bg-[#080D17]">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
@@ -133,7 +133,7 @@ export function IndicatorConfigDrawer({
           {activeTab === "inputs" && (
             <div className="space-y-4 font-sans text-xs">
               {/* Mathematical Parameters */}
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-3">
                 <div className="text-xs font-bold text-white uppercase tracking-wider font-mono flex items-center gap-1.5">
                   <Sliders className="w-3.5 h-3.5 text-cyan-400" />
                   Mathematical Parameters
@@ -179,7 +179,7 @@ export function IndicatorConfigDrawer({
               </div>
 
               {/* Price Source & Timeframe */}
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-3">
                 <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   Source & Bar Execution Rules
                 </div>
@@ -234,7 +234,7 @@ export function IndicatorConfigDrawer({
           {/* TAB 2: SIGNALS */}
           {activeTab === "signals" && (
             <div className="space-y-4 font-sans text-xs">
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-3">
                 <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                   Signal Trigger Logic
                 </div>
@@ -272,7 +272,7 @@ export function IndicatorConfigDrawer({
           {/* TAB 3: WEIGHT */}
           {activeTab === "weight" && (
             <div className="space-y-4 font-sans text-xs">
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-3">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-xs font-bold text-white uppercase tracking-wider font-mono">
                     Confluence Weight Contribution
@@ -298,7 +298,7 @@ export function IndicatorConfigDrawer({
           {/* TAB 4: HISTORY */}
           {activeTab === "history" && (
             <div className="space-y-2 font-mono text-xs">
-              <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3 space-y-1">
+              <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
                 <div className="flex items-center justify-between text-slate-200">
                   <span className="font-bold text-cyan-400">v1.2 (Active)</span>
                   <span className="text-[10px] text-slate-500">Live Config</span>
@@ -341,7 +341,7 @@ export function IndicatorConfigDrawer({
         </div>
 
         {/* Drawer Footer */}
-        <div className="p-4 border-t border-[#1E293B] bg-[#080D17] flex items-center justify-between gap-3">
+        <div className="p-4 border-t border-[#1A2A3F] bg-[#080D17] flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
               onClick={() => onReset(indicator.indicator_id)}

@@ -2,7 +2,7 @@
  * Comprehensive Type Definitions for World-Class Strategy Builder
  */
 
-export type RuleTimeframe = "1m" | "3m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d" | "1w";
+export type RuleTimeframe = "1m" | "3m" | "5m" | "15m" | "30m" | "1h" | "4h" | "8h" | "1d" | "1w";
 
 export type StrategyDirection = "LONG" | "SHORT" | "BOTH" | "OPTIONS_MULTI_LEG" | "FUTURES";
 
@@ -81,8 +81,16 @@ export interface OptionsBuilderConfig {
   underlying: string;
   expiry: string;
   spot_price: number;
-  lot_size: number;
+  lot_size?: number;
   legs: OptionLegBuilderItem[];
+  max_profit?: number;
+  max_loss?: number;
+  greeks_total?: {
+    delta: number;
+    gamma: number;
+    theta: number;
+    vega: number;
+  };
   evaluation?: {
     max_profit: number;
     max_loss: number;
@@ -95,15 +103,17 @@ export interface OptionsBuilderConfig {
 }
 
 export interface FuturesBuilderConfig {
-  contract: string;
-  underlying: string;
-  expiry: string;
-  lot_size: number;
+  contract?: string;
+  underlying?: string;
+  expiry?: string;
+  lot_size?: number;
   leverage: number;
   margin_mode: "ISOLATED" | "CROSS";
-  basis: number;
-  funding_rate_pct: number;
-  liquidation_buffer_pct: number;
+  basis?: number;
+  funding_rate_pct?: number;
+  liquidation_buffer_pct?: number;
+  funding_rate_filter?: boolean;
+  max_funding_rate_pct?: number;
 }
 
 export interface FullVisualStrategy {
@@ -145,7 +155,22 @@ export interface ReadinessCheckItem {
 export interface StrategyPaletteItem {
   id: string;
   label: string;
-  category: "MARKET" | "TREND" | "MOMENTUM" | "VOLATILITY" | "VOLUME" | "PRICE ACTION" | "MARKET STRUCTURE" | "OPTIONS" | "FUTURES" | "RISK";
+  category:
+    | "MARKET"
+    | "TREND"
+    | "MOMENTUM"
+    | "VOLATILITY"
+    | "VOLUME"
+    | "PRICE ACTION"
+    | "MARKET STRUCTURE"
+    | "STRUCTURE"
+    | "DERIVATIVES"
+    | "OPTIONS"
+    | "FUTURES"
+    | "GREEKS"
+    | "FUNDING"
+    | "CUSTOM"
+    | "RISK";
   defaultLeft: string;
   defaultOp: RuleOperator | string;
   defaultRight: string;

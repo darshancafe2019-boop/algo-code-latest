@@ -77,9 +77,9 @@ export function IndicatorPresetsModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="p-5 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+        <div className="p-5 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/30">
               <Sparkles className="w-4 h-4" />
@@ -213,7 +213,7 @@ export function IndicatorPresetsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+        <div className="p-4 border-t border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold font-sans transition-colors"

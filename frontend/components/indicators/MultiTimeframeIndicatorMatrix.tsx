@@ -67,7 +67,7 @@ export function MultiTimeframeIndicatorMatrix({
   const rows = matrixData && matrixData.length > 0 ? matrixData : defaultMatrix;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -92,7 +92,7 @@ export function MultiTimeframeIndicatorMatrix({
           return (
             <div
               key={row.timeframe}
-              className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 space-y-3 flex flex-col justify-between"
+              className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 space-y-3 flex flex-col justify-between"
             >
               {/* Card Top: Role & Score */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">

@@ -12,7 +12,8 @@ export type EcoBadgeVariant =
   | "halted"
   | "neutral"
   | "leaf"
-  | "sage";
+  | "sage"
+  | "cyan";
 
 interface EcoBadgeProps {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ export function EcoBadge({
   icon: Icon,
 }: EcoBadgeProps) {
   const baseClasses =
-    "inline-flex items-center font-mono font-bold rounded-lg border transition-colors select-none";
+    "inline-flex items-center font-mono font-bold rounded-md border transition-colors select-none";
 
   const sizeClasses = {
     xs: "px-1.5 py-0.5 text-[10px] gap-1",
@@ -43,29 +44,31 @@ export function EcoBadge({
   };
 
   const variantClasses = {
-    profit: "bg-[#39B978]/15 text-[#39B978] border-[#39B978]/40",
-    loss: "bg-[#E26D6D]/15 text-[#E26D6D] border-[#E26D6D]/40",
-    warning: "bg-[#D9A441]/15 text-[#D9A441] border-[#D9A441]/40",
-    info: "bg-[#62B8C4]/15 text-[#62B8C4] border-[#62B8C4]/40",
-    live: "bg-[#55C98A]/15 text-[#55C98A] border-[#55C98A]/40",
-    paper: "bg-[#6699A6]/15 text-[#6699A6] border-[#6699A6]/40",
-    halted: "bg-[#C95454]/15 text-[#C95454] border-[#C95454]/40",
-    neutral: "bg-[#12221B] text-[#A8BDB0] border-[#294238]",
-    leaf: "bg-[#2E7D5B]/20 text-[#55C98A] border-[#2E7D5B]/50",
-    sage: "bg-[#1B3328] text-[#78A88A] border-[#2E7D5B]/30",
+    profit: "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30",
+    loss: "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30",
+    warning: "bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30",
+    info: "bg-[#19C5FF]/15 text-[#19C5FF] border-[#19C5FF]/30",
+    live: "bg-[#F43F5E]/15 text-[#F43F5E] border-[#F43F5E]/30",
+    paper: "bg-[#19C5FF]/15 text-[#19C5FF] border-[#19C5FF]/30",
+    halted: "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30",
+    neutral: "bg-[#101B2D] text-[#7C8CA3] border-[#1A2A3F]",
+    leaf: "bg-[#2563EB]/15 text-[#19C5FF] border-[#2563EB]/30",
+    sage: "bg-[#101B2D] text-[#7C8CA3] border-[#1A2A3F]",
+    cyan: "bg-[#22D3EE]/15 text-[#22D3EE] border-[#22D3EE]/30",
   };
 
   const dotColorClasses = {
-    profit: "bg-[#39B978]",
-    loss: "bg-[#E26D6D]",
-    warning: "bg-[#D9A441]",
-    info: "bg-[#62B8C4]",
-    live: "bg-[#55C98A]",
-    paper: "bg-[#6699A6]",
-    halted: "bg-[#C95454]",
-    neutral: "bg-[#8CA49A]",
-    leaf: "bg-[#55C98A]",
-    sage: "bg-[#78A88A]",
+    profit: "bg-[#00E890]",
+    loss: "bg-[#FF3B5C]",
+    warning: "bg-[#F59E0B]",
+    info: "bg-[#19C5FF]",
+    live: "bg-[#F43F5E]",
+    paper: "bg-[#19C5FF]",
+    halted: "bg-[#FF3B5C]",
+    neutral: "bg-[#52627A]",
+    leaf: "bg-[#19C5FF]",
+    sage: "bg-[#52627A]",
+    cyan: "bg-[#22D3EE]",
   };
 
   return (
@@ -95,14 +98,14 @@ export function EcoStatusDot({
   className?: string;
 }) {
   const statusConfig = {
-    LIVE: { color: "bg-[#55C98A]", text: "text-[#55C98A]", label: "LIVE", pulse: true },
-    DELAYED: { color: "bg-[#D9A441]", text: "text-[#D9A441]", label: "DELAYED", pulse: false },
-    STALE: { color: "bg-[#E26D6D]", text: "text-[#E26D6D]", label: "STALE", pulse: true },
-    DISCONNECTED: { color: "bg-[#8CA49A]", text: "text-[#8CA49A]", label: "DISCONNECTED", pulse: false },
-    HALTED: { color: "bg-[#C95454]", text: "text-[#C95454]", label: "HALTED", pulse: true },
-    SAFE: { color: "bg-[#55C98A]", text: "text-[#55C98A]", label: "SAFE", pulse: false },
-    WARNING: { color: "bg-[#D9A441]", text: "text-[#D9A441]", label: "WARNING", pulse: false },
-    DANGER: { color: "bg-[#E26D6D]", text: "text-[#E26D6D]", label: "DANGER", pulse: true },
+    LIVE: { color: "bg-[#00E890]", text: "text-[#00E890]", label: "LIVE", pulse: true },
+    DELAYED: { color: "bg-[#F59E0B]", text: "text-[#F59E0B]", label: "DELAYED", pulse: false },
+    STALE: { color: "bg-[#FF3B5C]", text: "text-[#FF3B5C]", label: "STALE", pulse: true },
+    DISCONNECTED: { color: "bg-[#52627A]", text: "text-[#52627A]", label: "DISCONNECTED", pulse: false },
+    HALTED: { color: "bg-[#FF3B5C]", text: "text-[#FF3B5C]", label: "HALTED", pulse: true },
+    SAFE: { color: "bg-[#00E890]", text: "text-[#00E890]", label: "SAFE", pulse: false },
+    WARNING: { color: "bg-[#F59E0B]", text: "text-[#F59E0B]", label: "WARNING", pulse: false },
+    DANGER: { color: "bg-[#FF3B5C]", text: "text-[#FF3B5C]", label: "DANGER", pulse: true },
   };
 
   const current = statusConfig[status] || statusConfig.LIVE;

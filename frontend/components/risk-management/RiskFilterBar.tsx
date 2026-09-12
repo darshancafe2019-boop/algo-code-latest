@@ -54,7 +54,7 @@ export function RiskFilterBar({
   ];
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-3">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-3">
       {/* 1. Top Search Bar & Export Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="relative flex-1 min-w-[280px]">
@@ -64,7 +64,7 @@ export function RiskFilterBar({
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search risk event ID, symbol, bot, gate, explanation, or policy (e.g. RISK-10942, BTC, CONCENTRATION)..."
-            className="w-full bg-[#070D14] border border-[#1E293B] rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono shadow-inner"
+            className="w-full bg-[#070D14] border border-[#1A2A3F] rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono shadow-inner"
           />
           {searchQuery && (
             <button
@@ -80,7 +80,7 @@ export function RiskFilterBar({
         <div className="flex items-center gap-2 font-mono text-xs">
           <button
             onClick={() => onExport("csv")}
-            className="px-3 py-2 rounded-xl bg-[#070D14] border border-[#1E293B] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-[#070D14] border border-[#1A2A3F] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 transition-colors flex items-center gap-1.5"
             title="Download Risk Decision Ledger as CSV"
           >
             <Download className="h-3.5 w-3.5" />
@@ -89,7 +89,7 @@ export function RiskFilterBar({
 
           <button
             onClick={() => onExport("json")}
-            className="px-3 py-2 rounded-xl bg-[#070D14] border border-[#1E293B] hover:border-purple-700 text-slate-300 hover:text-purple-300 transition-colors flex items-center gap-1.5"
+            className="px-3 py-2 rounded-xl bg-[#070D14] border border-[#1A2A3F] hover:border-purple-700 text-slate-300 hover:text-purple-300 transition-colors flex items-center gap-1.5"
             title="Download Risk Decision Ledger as JSON"
           >
             <Download className="h-3.5 w-3.5" />
@@ -98,7 +98,7 @@ export function RiskFilterBar({
 
           <button
             onClick={onRefresh}
-            className="p-2 rounded-xl bg-[#070D14] border border-[#1E293B] hover:border-slate-600 text-slate-300 hover:text-white transition-colors"
+            className="p-2 rounded-xl bg-[#070D14] border border-[#1A2A3F] hover:border-slate-600 text-slate-300 hover:text-white transition-colors"
             title="Refresh Ledger"
           >
             <RefreshCw className="h-4 w-4" />
@@ -107,7 +107,7 @@ export function RiskFilterBar({
       </div>
 
       {/* 2. Decision Pills & Category / Mode Selectors */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-[#1E293B]/60 text-xs font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-[#1A2A3F]/60 text-xs font-mono">
         {/* Decision Filters */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-0.5">
           {decisionFilters.map((df) => (
@@ -123,7 +123,7 @@ export function RiskFilterBar({
                     : df.id === "APPROVED_WITH_WARNING"
                     ? "bg-amber-950 text-amber-300 border border-amber-800 shadow-md"
                     : "bg-cyan-950 text-cyan-300 border border-cyan-800 shadow-md"
-                  : "text-slate-400 hover:text-slate-100 bg-[#070D14] border border-[#1E293B] hover:border-slate-700"
+                  : "text-slate-400 hover:text-slate-100 bg-[#070D14] border border-[#1A2A3F] hover:border-slate-700"
               }`}
             >
               {df.label}
@@ -134,7 +134,7 @@ export function RiskFilterBar({
         {/* Category & Account Mode Controls */}
         <div className="flex items-center gap-2">
           {/* Account Mode */}
-          <div className="flex items-center gap-1 bg-[#070D14] border border-[#1E293B] rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-[#070D14] border border-[#1A2A3F] rounded-xl p-1">
             {["ALL", "PAPER", "LIVE"].map((mode) => (
               <button
                 key={mode}
@@ -156,7 +156,7 @@ export function RiskFilterBar({
           <select
             value={activeCategory}
             onChange={(e) => onCategoryChange(e.target.value)}
-            className="bg-[#070D14] border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+            className="bg-[#070D14] border border-[#1A2A3F] rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
           >
             {categories.map((c) => (
               <option key={c} value={c}>

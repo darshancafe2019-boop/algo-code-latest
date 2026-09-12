@@ -54,19 +54,16 @@ export function TerminalSettingsView() {
 
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto min-w-0 font-sans pb-12">
-      {/* 1. SECURITY & ACCESS */}
+      {/* 1. SECURITY & ACCESS CONTROL CENTER */}
       <SimpleSecuritySection telemetry={telemetry} onRefresh={refetch} />
 
-      {/* 2. TRADING PROTECTION & ACCESS */}
-      <SimpleTradingProtectionSection onRefresh={refetch} />
-
-      {/* 3. API & BROKER CONNECTIONS */}
+      {/* 2. API & BROKER CONNECTIONS */}
       <SimpleConnectionsSection />
 
-      {/* 4. APPEARANCE & REGION */}
+      {/* 3. APPEARANCE & REGION */}
       <SimpleAppearanceRegionSection />
 
-      {/* 5. ADVANCED SETTINGS ACCORDION */}
+      {/* 4. ADVANCED SETTINGS ACCORDION */}
       <SimpleAdvancedSettingsAccordion
         checkup={checkup}
         totalScore={totalScore}
@@ -75,3 +72,4 @@ export function TerminalSettingsView() {
     </div>
   );
 }
+

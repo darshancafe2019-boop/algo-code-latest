@@ -60,7 +60,7 @@ export const StrikeCenteredOptionLadderTable = React.memo(function StrikeCentere
 
   if (!strikes || strikes.length === 0) {
     return (
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-12 text-center text-slate-400 font-mono text-xs space-y-2">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-12 text-center text-slate-400 font-mono text-xs space-y-2">
         <div className="text-sm font-bold text-white">NO OPTION STRIKES AVAILABLE FOR {sourceName.toUpperCase()}</div>
         <p>Connecting to {sourceName} market data feed to synchronize derivative contracts...</p>
       </div>
@@ -102,7 +102,7 @@ export const StrikeCenteredOptionLadderTable = React.memo(function StrikeCentere
   const isStale = freshnessStatus === "STALE" || dataAgeMs > 8000;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl shadow-2xl overflow-hidden font-mono text-[11px] mb-6">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl shadow-2xl overflow-hidden font-mono text-[11px] mb-6">
       {/* Source Header Banner */}
       <div className="bg-[#141E33] border-b border-slate-700 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3 flex-wrap">

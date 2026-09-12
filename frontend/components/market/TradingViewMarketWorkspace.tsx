@@ -126,11 +126,11 @@ export function TradingViewMarketWorkspace() {
       <MarketHealthTelemetry />
 
       {/* 2. One-Click Market / Exchange / Symbol Bar */}
-      <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
+      <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         {/* Left: Asset Class + Symbol Selector */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Asset Class Pills */}
-          <div className="flex items-center gap-1 bg-[#080C14] p-1 rounded-xl border border-[#1E293B] text-xs font-mono">
+          <div className="flex items-center gap-1 bg-[#080C14] p-1 rounded-xl border border-[#1A2A3F] text-xs font-mono">
             {assetClasses.map((ac) => (
               <button
                 key={ac.id}
@@ -151,7 +151,7 @@ export function TradingViewMarketWorkspace() {
             <select
               value={activeSymbol}
               onChange={(e) => setActiveSymbol(e.target.value)}
-              className="px-3 py-1.5 bg-[#080C14] border border-[#1E293B] rounded-xl text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
+              className="px-3 py-1.5 bg-[#080C14] border border-[#1A2A3F] rounded-xl text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-500 cursor-pointer"
             >
               {instruments.map((inst: any) => (
                 <option key={inst.symbol} value={inst.symbol} className="bg-[#080C14] text-white">
@@ -169,7 +169,7 @@ export function TradingViewMarketWorkspace() {
               <select
                 value={selectedExpiry || normalizedExpiries[0]?.value || ""}
                 onChange={(e) => setSelectedExpiry(e.target.value)}
-                className="px-2.5 py-1.5 bg-[#080C14] border border-[#1E293B] rounded-xl text-xs font-mono text-purple-300 focus:outline-none focus:border-purple-500 cursor-pointer"
+                className="px-2.5 py-1.5 bg-[#080C14] border border-[#1A2A3F] rounded-xl text-xs font-mono text-purple-300 focus:outline-none focus:border-purple-500 cursor-pointer"
               >
                 {normalizedExpiries.map((opt) => (
                   <option key={opt.key} value={opt.value} className="bg-[#080C14] text-white">
@@ -190,14 +190,14 @@ export function TradingViewMarketWorkspace() {
             </span>
           </div>
 
-          <div className="border-l border-[#1E293B] pl-3">
+          <div className="border-l border-[#1A2A3F] pl-3">
             <span className="text-[10px] text-slate-500 block uppercase">24H CHANGE</span>
             <span className={`font-bold ${(quote.change_pct || 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
               {formatPercent(quote.change_pct, 2, true)}
             </span>
           </div>
 
-          <div className="border-l border-[#1E293B] pl-3 hidden md:block">
+          <div className="border-l border-[#1A2A3F] pl-3 hidden md:block">
             <span className="text-[10px] text-slate-500 block uppercase">BID / ASK SPREAD</span>
             <span className="text-slate-300">
               {formatPrice(quote.bid, "$", 1)} / {formatPrice(quote.ask, "$", 1)}
@@ -215,7 +215,7 @@ export function TradingViewMarketWorkspace() {
         {/* Left 3 Columns: Interactive Workspace Tabs */}
         <div className="xl:col-span-3 space-y-4">
           {/* Sub-Tab Navigation Strip */}
-          <div className="flex items-center gap-2 border-b border-[#1E293B] pb-2 font-mono text-xs">
+          <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2 font-mono text-xs">
             {[
               { id: "overview" as const, label: "Market Overview", icon: Activity },
               { id: "options" as const, label: "Strike-Centered Option Chain", icon: Zap },
@@ -242,7 +242,7 @@ export function TradingViewMarketWorkspace() {
 
           {/* Tab 1: Overview */}
           {activeSubTab === "overview" && (
-            <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase font-mono">
@@ -258,21 +258,21 @@ export function TradingViewMarketWorkspace() {
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono pt-2">
-                <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                   <span className="text-[10px] text-slate-500 uppercase block">VWAP</span>
                   <span className="text-sm font-bold text-white">{formatPrice(quote.vwap || quote.lastPrice, "$", 2)}</span>
                 </div>
-                <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                   <span className="text-[10px] text-slate-500 uppercase block">24h High / Low</span>
                   <span className="text-sm font-bold text-white">
                     {formatPrice(quote.high || (Number(quote.lastPrice || 0) * 1.02), "$", 2)} / {formatPrice(quote.low || (Number(quote.lastPrice || 0) * 0.98), "$", 2)}
                   </span>
                 </div>
-                <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                   <span className="text-[10px] text-slate-500 uppercase block">Volume</span>
                   <span className="text-sm font-bold text-cyan-400">{formatNumber(quote.volume, 0, "1,250")}</span>
                 </div>
-                <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                   <span className="text-[10px] text-slate-500 uppercase block">Exchange</span>
                   <span className="text-sm font-bold text-purple-300">{quote.exchange || "BINANCE"}</span>
                 </div>
@@ -282,7 +282,7 @@ export function TradingViewMarketWorkspace() {
 
           {/* Tab 2: Options Analytics */}
           {activeSubTab === "options" && (
-            <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-5 space-y-4 shadow-xl">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase font-mono">
@@ -302,19 +302,19 @@ export function TradingViewMarketWorkspace() {
 
               {optionsData && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
-                  <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                  <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                     <span className="text-[10px] text-slate-500 uppercase block">Max Pain Strike</span>
                     <span className="text-sm font-bold text-amber-400">${optionsData.max_pain}</span>
                   </div>
-                  <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                  <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                     <span className="text-[10px] text-slate-500 uppercase block">PCR (Open Interest)</span>
                     <span className="text-sm font-bold text-cyan-400">{optionsData.pcr_oi}</span>
                   </div>
-                  <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                  <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                     <span className="text-[10px] text-slate-500 uppercase block">PCR (Volume)</span>
                     <span className="text-sm font-bold text-white">{optionsData.pcr_volume}</span>
                   </div>
-                  <div className="p-3 bg-[#080C14] border border-[#1E293B] rounded-xl">
+                  <div className="p-3 bg-[#080C14] border border-[#1A2A3F] rounded-xl">
                     <span className="text-[10px] text-slate-500 uppercase block">Major Support</span>
                     <span className="text-sm font-bold text-emerald-400">
                       ${optionsData.support_zones?.join(", $") || "—"}
@@ -327,7 +327,7 @@ export function TradingViewMarketWorkspace() {
 
           {/* Tab 3: Futures */}
           {activeSubTab === "futures" && (
-            <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 space-y-4 shadow-xl">
+            <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-5 space-y-4 shadow-xl">
               <div>
                 <h3 className="text-sm font-bold text-white uppercase font-mono">
                   {activeSymbol} Futures Term Structure & Basis
@@ -340,7 +340,7 @@ export function TradingViewMarketWorkspace() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs font-mono">
                   <thead>
-                    <tr className="border-b border-[#1E293B] text-[10px] text-slate-400 uppercase">
+                    <tr className="border-b border-[#1A2A3F] text-[10px] text-slate-400 uppercase">
                       <th className="py-2 px-3">Contract</th>
                       <th className="py-2 px-3">Expiry</th>
                       <th className="py-2 px-3 text-right">Price</th>

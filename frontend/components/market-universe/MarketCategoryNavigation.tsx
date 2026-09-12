@@ -45,7 +45,7 @@ export function MarketCategoryNavigation({
   ];
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-3">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-3">
       {/* 1. Global Search Input Bar */}
       <div className="relative flex-1">
         <Search className="h-4 w-4 text-slate-500 absolute left-3.5 top-3" />
@@ -54,7 +54,7 @@ export function MarketCategoryNavigation({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Universal search: symbol, company, ISIN, strike, futures (e.g. BTC, RELIANCE, NIFTY 25000 CE, AAPL, XAUUSD)..."
-          className="w-full bg-[#070D14] border border-[#1E293B] rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono shadow-inner"
+          className="w-full bg-[#070D14] border border-[#1A2A3F] rounded-xl pl-10 pr-9 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono shadow-inner"
         />
         {searchQuery && (
           <button
@@ -75,7 +75,7 @@ export function MarketCategoryNavigation({
             className={`px-3 py-1.5 rounded-xl font-bold uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
               activeCategory === cat.id
                 ? "bg-cyan-950 text-cyan-300 border border-cyan-800 shadow-md"
-                : "text-slate-400 hover:text-slate-100 bg-[#070D14] border border-[#1E293B] hover:border-slate-700"
+                : "text-slate-400 hover:text-slate-100 bg-[#070D14] border border-[#1A2A3F] hover:border-slate-700"
             }`}
           >
             {cat.label}

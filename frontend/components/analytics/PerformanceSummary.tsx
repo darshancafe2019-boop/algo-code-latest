@@ -82,7 +82,7 @@ export function PerformanceSummary({ summary }: { summary?: Partial<TradeSummary
         return (
           <div
             key={idx}
-            className={`p-4 rounded-xl bg-[#121824] border border-[#1E293B] flex flex-col justify-between shadow-lg transition-all duration-300 ${
+            className={`p-4 rounded-xl bg-[#121824] border border-[#1A2A3F] flex flex-col justify-between shadow-lg transition-all duration-300 ${
               c.flash ? "border-cyan-400 bg-cyan-950/20 scale-[1.02]" : ""
             }`}
           >

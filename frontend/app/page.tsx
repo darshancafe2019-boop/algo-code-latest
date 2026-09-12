@@ -162,7 +162,7 @@ function MainApp() {
     <CommandCenterShell activeTab={activeTab} onTabSelect={setActiveTab}>
       <div className="w-full h-full">
         {/* 0. Executive Home Overview */}
-        {activeTab === "home" && (
+        {(activeTab === "home" || activeTab === "dashboard") && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
           </ErrorBoundary>
@@ -219,7 +219,7 @@ function MainApp() {
         )}
 
         {/* 2. Runtime Operations & Command Center */}
-        {(activeTab === "command-center" || activeTab === "dashboard") && (
+        {activeTab === "command-center" && (
           <ErrorBoundary title="Command Center Operations Failed">
             <RuntimeCommandCenter />
           </ErrorBoundary>
@@ -319,7 +319,7 @@ function MainApp() {
         )}
 
         {/* 11.8 Tax Intelligence */}
-        {(activeTab === "tax" || activeTab === "tax-intelligence") && (
+        {(activeTab === "tax" || activeTab === "tax-intelligence" || activeTab === "reports") && (
           <ErrorBoundary title="Tax Intelligence Tab Failed">
             <TaxIntelligenceTab />
           </ErrorBoundary>
@@ -376,7 +376,7 @@ function MainApp() {
         )}
 
         {/* 17. Crypto Derivatives Overview */}
-        {activeTab === "crypto-derivatives" && (
+        {(activeTab === "crypto-derivatives" || activeTab === "crypto") && (
           <ErrorBoundary title="Crypto Derivatives Hub Failed">
             <CryptoOverviewView />
           </ErrorBoundary>
@@ -400,6 +400,22 @@ function MainApp() {
         {activeTab === "crypto-options" && (
           <ErrorBoundary title="Crypto Options Studio Failed">
             <OptionStrategyBuilder />
+          </ErrorBoundary>
+        )}
+
+        {/* Fallback for unhandled or unexpected tab IDs to prevent blank/black screen */}
+        {![
+          "home", "dashboard", "live", "live-feed", "live-data", "markets", "market-universe", "watchlist",
+          "command-center", "terminal", "options", "orderbook", "bot-control", "bots",
+          "strategy-builder", "strategies", "indicators", "scanner", "risk-management", "risk",
+          "providers", "backtesting", "backtest", "research", "performance", "pnl",
+          "portfolio", "capital-funds", "capital", "funds", "tax", "tax-intelligence", "reports",
+          "orders", "positions", "trade-journal", "journal", "alerts", "logs", "settings",
+          "account-security", "security", "crypto", "crypto-derivatives", "crypto-futures", "futures",
+          "crypto-options-chain", "crypto-options"
+        ].includes(activeTab) && (
+          <ErrorBoundary title="Executive Home Overview Failed">
+            <HomeExecutiveOverview />
           </ErrorBoundary>
         )}
       </div>

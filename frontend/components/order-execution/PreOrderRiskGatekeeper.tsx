@@ -38,24 +38,24 @@ export function PreOrderRiskGatekeeper({
   const passedCount = gateList.filter((g) => g.status === "PASS").length;
 
   return (
-    <div className="bg-[#141E33] border border-[#1E293B] rounded-2xl p-4 space-y-3 font-mono">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3 font-sans">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-bold text-white uppercase">
+        <div className="flex items-center gap-1.5 text-xs font-bold text-[#F7FAFC]">
           {allPassed ? (
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <ShieldCheck className="w-4 h-4 text-[#00E890]" />
           ) : (
-            <ShieldAlert className="w-4 h-4 text-amber-400" />
+            <ShieldAlert className="w-4 h-4 text-[#F59E0B]" />
           )}
-          <span>Pre-Order Risk Gatekeeper</span>
+          <span>PRE-ORDER RISK GATEKEEPER</span>
         </div>
 
         <div className="flex items-center gap-2">
           <span
-            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+            className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
               allPassed
-                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
-                : "bg-red-500/10 text-red-400 border border-red-500/30"
+                ? "bg-[#00E890]/10 text-[#00E890] border border-[#00E890]/30"
+                : "bg-[#FF3B5C]/10 text-[#FF3B5C] border border-[#FF3B5C]/30"
             }`}
           >
             {passedCount}/{gateList.length} GATES CLEARED
@@ -63,7 +63,7 @@ export function PreOrderRiskGatekeeper({
 
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-slate-400 hover:text-white p-1 rounded transition-colors"
+            className="text-[#7C8CA3] hover:text-[#F7FAFC] p-1 rounded-md transition-colors"
           >
             {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
           </button>
@@ -72,8 +72,8 @@ export function PreOrderRiskGatekeeper({
 
       {/* Block Reason Warning if any */}
       {!allPassed && blockReason && (
-        <div className="bg-red-950/60 border border-red-900/60 rounded-xl p-2.5 flex items-center gap-2 text-xs text-red-300">
-          <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+        <div className="bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 rounded-lg p-2.5 flex items-center gap-2 text-xs text-[#FF3B5C]">
+          <XCircle className="w-4 h-4 text-[#FF3B5C] flex-shrink-0" />
           <span>{blockReason}</span>
         </div>
       )}
@@ -83,19 +83,19 @@ export function PreOrderRiskGatekeeper({
         {gateList.map((g) => (
           <div
             key={g.gate_id || g.gate_name}
-            className="bg-[#0B111E] border border-slate-800/80 rounded-lg p-2 flex items-center justify-between text-[10px]"
+            className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2 flex items-center justify-between text-[10px]"
           >
-            <span className="text-slate-300 truncate">{g.gate_name}</span>
+            <span className="text-[#7C8CA3] truncate">{g.gate_name}</span>
             {g.status === "PASS" ? (
-              <span className="text-emerald-400 font-bold flex items-center gap-0.5">
+              <span className="text-[#00E890] font-semibold flex items-center gap-0.5">
                 <CheckCircle2 className="w-3 h-3" /> PASS
               </span>
             ) : g.status === "WARNING" ? (
-              <span className="text-amber-400 font-bold flex items-center gap-0.5">
+              <span className="text-[#F59E0B] font-semibold flex items-center gap-0.5">
                 <AlertTriangle className="w-3 h-3" /> WARN
               </span>
             ) : (
-              <span className="text-red-400 font-bold flex items-center gap-0.5">
+              <span className="text-[#FF3B5C] font-semibold flex items-center gap-0.5">
                 <XCircle className="w-3 h-3" /> BLOCK
               </span>
             )}
@@ -103,9 +103,10 @@ export function PreOrderRiskGatekeeper({
         ))}
 
         {!isExpanded && (
-          <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[#141E33] to-transparent pointer-events-none" />
+          <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-[#0A1422] to-transparent pointer-events-none" />
         )}
       </div>
     </div>
   );
 }
+

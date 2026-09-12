@@ -222,7 +222,7 @@ export function AccountSecurity() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="p-6 rounded-2xl bg-gradient-to-r from-[#121824] via-[#101726] to-[#121824] border border-[#1E293B] shadow-xl flex flex-wrap items-center justify-between gap-4">
+      <div className="p-6 rounded-2xl bg-gradient-to-r from-[#121824] via-[#101726] to-[#121824] border border-[#1A2A3F] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
             <Shield className="w-7 h-7" />
@@ -245,7 +245,7 @@ export function AccountSecurity() {
           id="btn-refresh-account-security"
           onClick={handleRefreshAll}
           disabled={isKeysFetching}
-          className="p-2.5 bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] rounded-xl text-slate-300 transition-colors cursor-pointer"
+          className="p-2.5 bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] rounded-xl text-slate-300 transition-colors cursor-pointer"
           title="Refresh account & security data"
         >
           <RefreshCw className={`w-4 h-4 ${isKeysFetching ? "animate-spin text-cyan-400" : ""}`} />

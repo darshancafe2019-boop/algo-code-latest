@@ -82,7 +82,7 @@ export function GlobalBotCommandBar({
 
   return (
     <>
-      <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3 sm:p-4 shadow-xl select-none font-sans space-y-3">
+      <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3 sm:p-4 shadow-xl select-none font-sans space-y-3">
         {/* Commands and Summary Row */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Action Buttons Toolbar */}
@@ -173,8 +173,8 @@ export function GlobalBotCommandBar({
       {/* 1. Bulk Action Preview Modal */}
       {bulkPreviewAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-[#0B131E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4 font-sans">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+          <div className="w-full max-w-lg bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4 font-sans">
+            <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 rounded-xl bg-cyan-950 text-cyan-400 border border-cyan-800">
                   <Layers className="h-4 w-4" />
@@ -198,7 +198,7 @@ export function GlobalBotCommandBar({
 
             {/* Breakdown Stats */}
             <div className="grid grid-cols-3 gap-2 text-center text-xs font-mono">
-              <div className="p-2.5 rounded-xl bg-[#070D14] border border-[#1E293B]">
+              <div className="p-2.5 rounded-xl bg-[#070D14] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 uppercase block">Total Fleet</span>
                 <span className="text-sm font-bold text-slate-200">{bots.length}</span>
               </div>
@@ -214,7 +214,7 @@ export function GlobalBotCommandBar({
                     : activeBots.length}
                 </span>
               </div>
-              <div className="p-2.5 rounded-xl bg-[#070D14] border border-[#1E293B]">
+              <div className="p-2.5 rounded-xl bg-[#070D14] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 uppercase block">Skipped</span>
                 <span className="text-sm font-bold text-slate-400">
                   {bots.length -
@@ -244,7 +244,7 @@ export function GlobalBotCommandBar({
               ).map((b) => (
                 <div
                   key={b.id}
-                  className="flex items-center justify-between p-2 rounded-xl bg-[#070D14] border border-[#1E293B] text-xs font-mono"
+                  className="flex items-center justify-between p-2 rounded-xl bg-[#070D14] border border-[#1A2A3F] text-xs font-mono"
                 >
                   <div className="flex items-center gap-2">
                     <Bot className="h-3.5 w-3.5 text-cyan-400" />
@@ -259,7 +259,7 @@ export function GlobalBotCommandBar({
             </div>
 
             {/* Modal Actions */}
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1A2A3F]">
               <button
                 onClick={() => setBulkPreviewAction(null)}
                 className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold font-mono"
@@ -328,7 +328,7 @@ export function GlobalBotCommandBar({
               </span>
             </label>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#1A2A3F]">
               <button
                 onClick={() => setIsKillModalOpen(false)}
                 className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold font-mono"

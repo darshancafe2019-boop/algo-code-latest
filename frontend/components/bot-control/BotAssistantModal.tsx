@@ -148,7 +148,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 font-sans select-none">
       <div className="bg-[#0B131E] border border-cyan-800/50 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh] max-h-[640px]">
         {/* Modal Header */}
-        <div className="p-4 border-b border-[#1E293B] bg-[#070D14] flex items-center justify-between">
+        <div className="p-4 border-b border-[#1A2A3F] bg-[#070D14] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-gradient-to-br from-cyan-600 to-teal-700 text-white shadow-md shadow-cyan-950/50">
               <Bot className="h-5 w-5" />
@@ -169,7 +169,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono text-slate-500 bg-[#0B131E] px-2 py-1 rounded border border-[#1E293B] hidden sm:inline">
+            <span className="text-[10px] font-mono text-slate-500 bg-[#0B131E] px-2 py-1 rounded border border-[#1A2A3F] hidden sm:inline">
               Ctrl+J / Cmd+J
             </span>
             <button
@@ -200,7 +200,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
                 className={`max-w-[85%] rounded-2xl p-3 space-y-2 shadow-md ${
                   msg.sender === "user"
                     ? "bg-cyan-600 text-white rounded-tr-none font-medium"
-                    : "bg-[#070D14] border border-[#1E293B] text-slate-200 rounded-tl-none font-sans"
+                    : "bg-[#070D14] border border-[#1A2A3F] text-slate-200 rounded-tl-none font-sans"
                 }`}
               >
                 <div className="leading-relaxed text-xs">{msg.text}</div>
@@ -234,7 +234,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
             </div>
           ))}
           {isProcessing && (
-            <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono p-2 bg-[#070D14] rounded-xl border border-[#1E293B] w-max animate-pulse">
+            <div className="flex items-center gap-2 text-cyan-400 text-xs font-mono p-2 bg-[#070D14] rounded-xl border border-[#1A2A3F] w-max animate-pulse">
               <Sparkles className="h-3.5 w-3.5 animate-spin" />
               <span>Analyzing intent & dispatching via CommandBus...</span>
             </div>
@@ -243,14 +243,14 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
         </div>
 
         {/* Quick Action Prompt Chips */}
-        <div className="p-2.5 bg-[#070D14] border-t border-[#1E293B] flex flex-wrap items-center gap-1.5">
+        <div className="p-2.5 bg-[#070D14] border-t border-[#1A2A3F] flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] text-slate-500 font-mono uppercase font-bold mr-1">Quick:</span>
           {quickActionPrompts.map((q, idx) => (
             <button
               key={idx}
               onClick={() => handleExecuteQuery(q.prompt)}
               disabled={isProcessing}
-              className="px-2.5 py-1 rounded-lg bg-[#0B131E] hover:bg-slate-800 border border-[#1E293B] hover:border-cyan-500/40 text-slate-300 hover:text-white text-[11px] font-medium transition flex items-center gap-1"
+              className="px-2.5 py-1 rounded-lg bg-[#0B131E] hover:bg-slate-800 border border-[#1A2A3F] hover:border-cyan-500/40 text-slate-300 hover:text-white text-[11px] font-medium transition flex items-center gap-1"
             >
               <span>{q.label}</span>
             </button>
@@ -263,7 +263,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
             e.preventDefault();
             handleExecuteQuery(query);
           }}
-          className="p-3 bg-[#05090F] border-t border-[#1E293B] flex items-center gap-2"
+          className="p-3 bg-[#05090F] border-t border-[#1A2A3F] flex items-center gap-2"
         >
           <input
             type="text"
@@ -271,7 +271,7 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Type a command (e.g. 'start all bots', 'self heal', 'apply conservative risk', 'reconcile ledger')..."
-            className="flex-1 bg-[#0B131E] border border-[#1E293B] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
+            className="flex-1 bg-[#0B131E] border border-[#1A2A3F] focus:border-cyan-500 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none font-sans"
           />
           <button
             type="submit"

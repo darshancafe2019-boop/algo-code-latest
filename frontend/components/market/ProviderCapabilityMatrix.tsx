@@ -179,7 +179,7 @@ export function ProviderCapabilityMatrix() {
   return (
     <div className="space-y-4 font-sans text-slate-100 select-none">
       {/* 1. Header & Controls Card */}
-      <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-5 shadow-xl">
+      <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-5 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <div className="p-3 rounded-2xl bg-cyan-950/60 border border-cyan-800/50 text-cyan-400 shadow-inner">
@@ -209,7 +209,7 @@ export function ProviderCapabilityMatrix() {
                 placeholder="Search provider, exchange, account..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-8 pr-3 py-1.5 bg-[#080C14] border border-[#1E293B] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-48 sm:w-64"
+                className="pl-8 pr-3 py-1.5 bg-[#080C14] border border-[#1A2A3F] rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono w-48 sm:w-64"
               />
             </div>
 
@@ -226,7 +226,7 @@ export function ProviderCapabilityMatrix() {
             {/* Diagnostics Toggle */}
             <button
               onClick={() => setShowDiagnostics(!showDiagnostics)}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#121927] hover:bg-[#1A253A] text-slate-300 rounded-xl border border-[#1E293B] text-xs font-mono transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#121927] hover:bg-[#1A253A] text-slate-300 rounded-xl border border-[#1A2A3F] text-xs font-mono transition-all"
             >
               <Sliders className="h-3.5 w-3.5 text-slate-400" />
               <span>Metrics</span>
@@ -244,7 +244,7 @@ export function ProviderCapabilityMatrix() {
         )}
 
         {/* Category Filter Pills */}
-        <div className="mt-4 pt-3 border-t border-[#1E293B]/70 flex flex-wrap items-center justify-between gap-2">
+        <div className="mt-4 pt-3 border-t border-[#1A2A3F]/70 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
             <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Filter Segment:</span>
             {["ALL", "INDIA", "CRYPTO", "DERIVATIVES", "FOREX", "GLOBAL"].map((cat) => (
@@ -254,7 +254,7 @@ export function ProviderCapabilityMatrix() {
                 className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
                   filterCategory === cat
                     ? "bg-cyan-500 text-slate-950 shadow-md scale-105"
-                    : "bg-[#080C14] text-slate-400 hover:text-white border border-[#1E293B]"
+                    : "bg-[#080C14] text-slate-400 hover:text-white border border-[#1A2A3F]"
                 }`}
               >
                 {cat}
@@ -300,11 +300,11 @@ export function ProviderCapabilityMatrix() {
       )}
 
       {/* 3. Authoritative Provider Capability Matrix Table */}
-      <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl overflow-hidden shadow-2xl">
+      <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-2xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs font-mono">
             <thead>
-              <tr className="border-b border-[#1E293B] bg-[#080C14]/90 text-[10px] text-slate-400 uppercase tracking-wider">
+              <tr className="border-b border-[#1A2A3F] bg-[#080C14]/90 text-[10px] text-slate-400 uppercase tracking-wider">
                 <th className="py-3.5 px-4">Provider / Adapter</th>
                 <th className="py-3.5 px-3">Exact Source</th>
                 <th className="py-3.5 px-3">Broker Account</th>

@@ -125,7 +125,7 @@ export function BotCommandPalette({
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 sm:pt-20 p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-150 select-none font-sans">
       <div className="bg-[#0B131E] border border-cyan-800/60 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
         {/* Search Input Bar */}
-        <div className="p-3.5 border-b border-[#1E293B] bg-[#070D14] flex items-center gap-3">
+        <div className="p-3.5 border-b border-[#1A2A3F] bg-[#070D14] flex items-center gap-3">
           <Command className="h-5 w-5 text-cyan-400 shrink-0" />
           <input
             type="text"
@@ -141,7 +141,7 @@ export function BotCommandPalette({
         </div>
 
         {/* Category Filter Chips */}
-        <div className="px-3.5 py-2 bg-[#05090F] border-b border-[#1E293B] flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono">
+        <div className="px-3.5 py-2 bg-[#05090F] border-b border-[#1A2A3F] flex items-center gap-1.5 overflow-x-auto text-[11px] font-mono">
           {(["ALL", "FLEET", "HEAL", "RISK", "BOTS"] as const).map((cat) => (
             <button
               key={cat}
@@ -149,7 +149,7 @@ export function BotCommandPalette({
               className={`px-2.5 py-1 rounded-lg transition font-bold ${
                 activeCategory === cat
                   ? "bg-cyan-600 text-white shadow-sm shadow-cyan-950/50"
-                  : "bg-[#0B131E] text-slate-400 hover:text-white border border-[#1E293B]"
+                  : "bg-[#0B131E] text-slate-400 hover:text-white border border-[#1A2A3F]"
               }`}
             >
               {cat === "ALL" ? "All Commands" : cat === "FLEET" ? "Fleet Controls" : cat === "HEAL" ? "Self-Healing" : cat === "RISK" ? "Risk Profiles" : "Bot Fleet"}
@@ -174,10 +174,10 @@ export function BotCommandPalette({
                       cmd.action();
                       onClose();
                     }}
-                    className="w-full p-2.5 rounded-xl bg-[#070D14] hover:bg-cyan-950/40 border border-[#1E293B] hover:border-cyan-800/60 text-left transition flex items-center justify-between group"
+                    className="w-full p-2.5 rounded-xl bg-[#070D14] hover:bg-cyan-950/40 border border-[#1A2A3F] hover:border-cyan-800/60 text-left transition flex items-center justify-between group"
                   >
                     <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-[#0B131E] border border-[#1E293B] group-hover:scale-105 transition">
+                      <div className="p-1.5 rounded-lg bg-[#0B131E] border border-[#1A2A3F] group-hover:scale-105 transition">
                         <Icon className={`h-4 w-4 ${cmd.color}`} />
                       </div>
                       <span className="font-bold text-slate-200 group-hover:text-white">{cmd.label}</span>
@@ -198,7 +198,7 @@ export function BotCommandPalette({
               {filteredBots.map((bot) => (
                 <div
                   key={bot.id}
-                  className="p-2.5 rounded-xl bg-[#070D14] hover:bg-[#0E1726] border border-[#1E293B] transition flex items-center justify-between group"
+                  className="p-2.5 rounded-xl bg-[#070D14] hover:bg-[#0E1726] border border-[#1A2A3F] transition flex items-center justify-between group"
                 >
                   <button
                     onClick={() => {
@@ -207,7 +207,7 @@ export function BotCommandPalette({
                     }}
                     className="flex items-center gap-2.5 text-left flex-1 min-w-0"
                   >
-                    <div className="p-1.5 rounded-lg bg-[#0B131E] border border-[#1E293B] text-cyan-400">
+                    <div className="p-1.5 rounded-lg bg-[#0B131E] border border-[#1A2A3F] text-cyan-400">
                       <Bot className="h-4 w-4" />
                     </div>
                     <div className="truncate">

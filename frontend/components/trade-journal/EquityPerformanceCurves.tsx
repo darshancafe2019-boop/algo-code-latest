@@ -27,17 +27,17 @@ export function EquityPerformanceCurves() {
   ];
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
       {/* Header & Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1B3328] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#122033] pb-3">
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs font-mono">
+          <div className="flex items-center gap-1 bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs font-mono">
             <button
               onClick={() => setCurveType("equity")}
               className={`px-3 py-1 rounded-lg font-bold uppercase transition-all ${
                 curveType === "equity"
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                  : "text-[#A8BDB0] hover:text-white"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                  : "text-[#7C8CA3] hover:text-white"
               }`}
             >
               Equity Curve
@@ -46,8 +46,8 @@ export function EquityPerformanceCurves() {
               onClick={() => setCurveType("pnl")}
               className={`px-3 py-1 rounded-lg font-bold uppercase transition-all ${
                 curveType === "pnl"
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                  : "text-[#A8BDB0] hover:text-white"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                  : "text-[#7C8CA3] hover:text-white"
               }`}
             >
               Cumulative P&L
@@ -56,8 +56,8 @@ export function EquityPerformanceCurves() {
               onClick={() => setCurveType("drawdown")}
               className={`px-3 py-1 rounded-lg font-bold uppercase transition-all ${
                 curveType === "drawdown"
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-sm"
-                  : "text-[#A8BDB0] hover:text-white"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-sm"
+                  : "text-[#7C8CA3] hover:text-white"
               }`}
             >
               Drawdown
@@ -66,15 +66,15 @@ export function EquityPerformanceCurves() {
         </div>
 
         {/* Timeframe Filter Buttons */}
-        <div className="flex items-center gap-1 bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs font-mono">
+        <div className="flex items-center gap-1 bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs font-mono">
           {timeframes.map((tf) => (
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
               className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
                 timeframe === tf
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40"
-                  : "text-[#70877A] hover:text-white"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40"
+                  : "text-[#52627A] hover:text-white"
               }`}
             >
               {tf}
@@ -88,8 +88,8 @@ export function EquityPerformanceCurves() {
         <svg className="w-full h-36 overflow-visible" preserveAspectRatio="none" viewBox="0 0 500 100">
           <defs>
             <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#55C98A" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#55C98A" stopOpacity="0.0" />
+              <stop offset="0%" stopColor="#22D3EE" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#22D3EE" stopOpacity="0.0" />
             </linearGradient>
           </defs>
 
@@ -102,7 +102,7 @@ export function EquityPerformanceCurves() {
           {/* Stroke Line */}
           <polyline
             fill="none"
-            stroke="#55C98A"
+            stroke="#22D3EE"
             strokeWidth="2.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -118,12 +118,12 @@ export function EquityPerformanceCurves() {
             { x: 400, y: 30 },
             { x: 500, y: 10 },
           ].map((pt, i) => (
-            <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#0D1914" stroke="#55C98A" strokeWidth="2" />
+            <circle key={i} cx={pt.x} cy={pt.y} r="3.5" fill="#0A1422" stroke="#22D3EE" strokeWidth="2" />
           ))}
         </svg>
 
         {/* X-Axis Labels */}
-        <div className="flex justify-between text-[10px] text-[#70877A] font-mono border-t border-[#1B3328] pt-2">
+        <div className="flex justify-between text-[10px] text-[#52627A] font-mono border-t border-[#122033] pt-2">
           {points.map((p, idx) => (
             <span key={idx}>{p.label}</span>
           ))}

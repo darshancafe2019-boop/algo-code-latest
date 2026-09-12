@@ -128,11 +128,11 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Live Risk Telemetry Dashboard
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Authoritative real-time multi-asset exposure, margin, volatility, and stress limits.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           Continuous Audit
         </span>
       </div>
@@ -144,11 +144,11 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
           return (
             <div
               key={item.id}
-              className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-2.5 hover:border-[#2E7D5B] transition-colors"
+              className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-2.5 hover:border-[#2563EB] transition-colors"
             >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[#A8BDB0]">
-                  <Icon className="h-3.5 w-3.5 text-[#55C98A]" />
+                <div className="flex items-center gap-1.5 text-[#7C8CA3]">
+                  <Icon className="h-3.5 w-3.5 text-[#22D3EE]" />
                   <span className="text-[10px] font-bold uppercase truncate">{item.label}</span>
                 </div>
                 <span
@@ -157,7 +157,7 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
                       ? "bg-red-950 text-red-400 border border-red-800"
                       : item.status === "WARNING"
                       ? "bg-amber-950 text-amber-400 border border-amber-800"
-                      : "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40"
+                      : "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40"
                   }`}
                 >
                   {item.status}
@@ -166,23 +166,23 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
 
               <div>
                 <span className="text-sm font-bold text-white block">{item.current}</span>
-                <span className="text-[10px] text-[#70877A] block">Limit: {item.limit}</span>
+                <span className="text-[10px] text-[#52627A] block">Limit: {item.limit}</span>
               </div>
 
               {/* Utilization Progress Bar */}
               <div className="space-y-1">
-                <div className="flex justify-between text-[9px] text-[#70877A]">
+                <div className="flex justify-between text-[9px] text-[#52627A]">
                   <span>Utilization</span>
                   <span>{item.utilization.toFixed(0)}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-[#07110D] rounded-full overflow-hidden">
+                <div className="h-1.5 w-full bg-[#07101A] rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-300 ${
                       item.status === "CRITICAL"
                         ? "bg-red-500"
                         : item.status === "WARNING"
                         ? "bg-amber-500"
-                        : "bg-[#55C98A]"
+                        : "bg-[#22D3EE]"
                     }`}
                     style={{ width: `${Math.min(100, item.utilization)}%` }}
                   />
@@ -194,17 +194,17 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
       </div>
 
       {/* Score Contributing Factor Log */}
-      <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-2 text-xs">
-        <h4 className="text-[10px] font-bold text-[#A8BDB0] uppercase tracking-wider flex items-center justify-between">
+      <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-2 text-xs">
+        <h4 className="text-[10px] font-bold text-[#7C8CA3] uppercase tracking-wider flex items-center justify-between">
           <span>Authoritative Risk Factors & Defense Rationale</span>
-          <span className="text-[10px] text-[#55C98A] font-mono">Realtime Engine Synced</span>
+          <span className="text-[10px] text-[#22D3EE] font-mono">Realtime Engine Synced</span>
         </h4>
         <div className="space-y-1 text-[11px] font-mono text-slate-300">
           {(overview.score_factors || [
             "All risk parameters operating well within safe quantitative boundaries.",
           ]).map((factor, idx) => (
             <div key={idx} className="flex items-center gap-2">
-              <span className="text-[#55C98A] font-bold">•</span>
+              <span className="text-[#22D3EE] font-bold">•</span>
               <span>{factor}</span>
             </div>
           ))}

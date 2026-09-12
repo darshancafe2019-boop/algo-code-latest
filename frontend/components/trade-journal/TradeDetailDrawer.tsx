@@ -184,14 +184,14 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/70 backdrop-blur-sm animate-fadeIn select-none font-sans">
-      <div className="bg-[#0D1914] border-l border-[#294238] w-full max-w-2xl h-full shadow-2xl flex flex-col overflow-hidden">
+      <div className="bg-[#0A1422] border-l border-[#1A2A3F] w-full max-w-2xl h-full shadow-2xl flex flex-col overflow-hidden">
         {/* Drawer Header */}
-        <div className="p-4 sm:p-5 border-b border-[#1B3328] bg-[#0A130F] flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-[#122033] bg-[#0A130F] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div
               className={`p-2.5 rounded-xl border font-bold text-xs font-mono uppercase ${
                 isProfit
-                  ? "bg-emerald-950 text-[#55C98A] border-emerald-800"
+                  ? "bg-emerald-950 text-[#22D3EE] border-emerald-800"
                   : "bg-red-950 text-red-400 border-red-800"
               }`}
             >
@@ -202,31 +202,31 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
                 <h2 className="text-sm font-bold text-white uppercase tracking-wider">
                   {trade.symbol}
                 </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+                <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
                   {trade.direction}
                 </span>
               </div>
-              <p className="text-xs text-[#A8BDB0]">
+              <p className="text-xs text-[#7C8CA3]">
                 {trade.strategy || "Algorithmic Strategy"} • {trade.bot_id || "Bot Worker"}
               </p>
             </div>
           </div>
 
-          <button onClick={onClose} className="text-[#A8BDB0] hover:text-white p-1">
+          <button onClick={onClose} className="text-[#7C8CA3] hover:text-white p-1">
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* 10-Tab Navigation Strip */}
-        <div className="bg-[#07110D] border-b border-[#1B3328] px-3 py-2 flex items-center gap-1 overflow-x-auto custom-scrollbar text-xs font-mono">
+        <div className="bg-[#07101A] border-b border-[#122033] px-3 py-2 flex items-center gap-1 overflow-x-auto custom-scrollbar text-xs font-mono">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-3 py-1.5 rounded-xl font-bold transition-all shrink-0 ${
                 activeTab === tab.id
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                  : "text-[#A8BDB0] hover:text-white hover:bg-[#0D1914]"
+                  ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-sm"
+                  : "text-[#7C8CA3] hover:text-white hover:bg-[#0A1422]"
               }`}
             >
               {tab.label}
@@ -239,41 +239,41 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 1: OVERVIEW */}
           {activeTab === "overview" && (
             <div className="space-y-3.5 animate-fadeIn">
-              <div className="p-4 rounded-2xl bg-[#07110D] border border-[#1B3328] space-y-2.5">
+              <div className="p-4 rounded-2xl bg-[#07101A] border border-[#122033] space-y-2.5">
                 <div className="flex justify-between items-baseline">
-                  <span className="text-[#70877A] text-[10px] uppercase font-bold">Realized Return</span>
+                  <span className="text-[#52627A] text-[10px] uppercase font-bold">Realized Return</span>
                   <span
                     className={`text-xl font-bold ${
-                      isProfit ? "text-[#55C98A]" : "text-red-400"
+                      isProfit ? "text-[#22D3EE]" : "text-red-400"
                     }`}
                   >
                     {isProfit ? "+" : ""}${Number(trade.net_pnl ?? trade.result_pnl ?? 0).toFixed(2)}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[#1B3328] text-[11px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[#122033] text-[11px]">
                   <div>
-                    <span className="text-[#70877A] block">Entry Price</span>
+                    <span className="text-[#52627A] block">Entry Price</span>
                     <span className="text-white font-bold">${Number(trade.entry_price || 0).toLocaleString()}</span>
                   </div>
                   <div>
-                    <span className="text-[#70877A] block">Exit Price</span>
+                    <span className="text-[#52627A] block">Exit Price</span>
                     <span className="text-white font-bold">${trade.exit_price ? Number(trade.exit_price).toLocaleString() : "Active"}</span>
                   </div>
                   <div>
-                    <span className="text-[#70877A] block">Position Size</span>
+                    <span className="text-[#52627A] block">Position Size</span>
                     <span className="text-cyan-300 font-bold">{trade.position_size || trade.quantity || 0}</span>
                   </div>
                   <div>
-                    <span className="text-[#70877A] block">Stop Loss</span>
+                    <span className="text-[#52627A] block">Stop Loss</span>
                     <span className="text-red-400 font-bold">${trade.stop_loss ? Number(trade.stop_loss).toLocaleString() : "None"}</span>
                   </div>
                   <div>
-                    <span className="text-[#70877A] block">Take Profit</span>
-                    <span className="text-[#55C98A] font-bold">${trade.take_profit ? Number(trade.take_profit).toLocaleString() : "Trailing"}</span>
+                    <span className="text-[#52627A] block">Take Profit</span>
+                    <span className="text-[#22D3EE] font-bold">${trade.take_profit ? Number(trade.take_profit).toLocaleString() : "Trailing"}</span>
                   </div>
                   <div>
-                    <span className="text-[#70877A] block">Status</span>
+                    <span className="text-[#52627A] block">Status</span>
                     <span className="text-white font-bold uppercase">{trade.status || "CLOSED"}</span>
                   </div>
                 </div>
@@ -284,29 +284,29 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 2: EXECUTION */}
           {activeTab === "execution" && (
             <div className="space-y-3 animate-fadeIn">
-              <div className="p-3.5 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-2">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">Execution Quality Score</span>
-                <span className="text-xl font-bold text-[#55C98A]">98.5 / 100</span>
-                <p className="text-[10px] text-[#A8BDB0] font-sans">
+              <div className="p-3.5 rounded-xl bg-[#07101A] border border-[#122033] space-y-2">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">Execution Quality Score</span>
+                <span className="text-xl font-bold text-[#22D3EE]">98.5 / 100</span>
+                <p className="text-[10px] text-[#7C8CA3] font-sans">
                   Zero adverse slippage detected against venue midpoint quote.
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-[11px]">
-                <div className="p-2.5 rounded-xl bg-[#07110D] border border-[#1B3328]">
-                  <span className="text-[#70877A] block">Total Slippage</span>
-                  <span className="text-[#55C98A] font-bold">${trade.slippage || "0.00"}</span>
+                <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">
+                  <span className="text-[#52627A] block">Total Slippage</span>
+                  <span className="text-[#22D3EE] font-bold">${trade.slippage || "0.00"}</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#07110D] border border-[#1B3328]">
-                  <span className="text-[#70877A] block">Broker Fees</span>
+                <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">
+                  <span className="text-[#52627A] block">Broker Fees</span>
                   <span className="text-amber-400 font-bold">${trade.fees || "0.50"}</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#07110D] border border-[#1B3328]">
-                  <span className="text-[#70877A] block">Execution Latency</span>
+                <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">
+                  <span className="text-[#52627A] block">Execution Latency</span>
                   <span className="text-cyan-300 font-bold">4.2 ms</span>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#07110D] border border-[#1B3328]">
-                  <span className="text-[#70877A] block">Order Type</span>
+                <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">
+                  <span className="text-[#52627A] block">Order Type</span>
                   <span className="text-white font-bold">MARKET IOC</span>
                 </div>
               </div>
@@ -316,12 +316,12 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 3: STRATEGY */}
           {activeTab === "strategy" && (
             <div className="space-y-3 animate-fadeIn">
-              <div className="p-3.5 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-2">
+              <div className="p-3.5 rounded-xl bg-[#07101A] border border-[#122033] space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-[#70877A] text-[10px] uppercase font-bold">Strategy Evaluation</span>
-                  <span className="text-[#55C98A] font-bold">Score: 82.6%</span>
+                  <span className="text-[#52627A] text-[10px] uppercase font-bold">Strategy Evaluation</span>
+                  <span className="text-[#22D3EE] font-bold">Score: 82.6%</span>
                 </div>
-                <div className="space-y-1 text-[11px] text-[#A8BDB0]">
+                <div className="space-y-1 text-[11px] text-[#7C8CA3]">
                   <p>• 15M Trend: EMA 9 ($65,200) &gt; EMA 21 ($64,800) [BULLISH]</p>
                   <p>• Momentum: RSI 58.5 &gt; 50.0 [CONFIRMED]</p>
                   <p>• Volume Profile: Price &gt; POC ($64,500) [SUPPORTED]</p>
@@ -333,9 +333,9 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 4: RISK */}
           {activeTab === "risk" && (
             <div className="space-y-3 animate-fadeIn">
-              <div className="p-3.5 rounded-xl bg-[#07110D] border border-[#1B3328] space-y-2">
-                <span className="text-[10px] text-[#70877A] font-bold uppercase block">14-Stage Risk Gate Verdict</span>
-                <span className="text-sm font-bold text-[#55C98A]">14 / 14 PASSED</span>
+              <div className="p-3.5 rounded-xl bg-[#07101A] border border-[#122033] space-y-2">
+                <span className="text-[10px] text-[#52627A] font-bold uppercase block">14-Stage Risk Gate Verdict</span>
+                <span className="text-sm font-bold text-[#22D3EE]">14 / 14 PASSED</span>
                 <div className="grid grid-cols-2 gap-2 pt-2 text-[11px]">
                   <div>Risk Amount: <strong className="text-white">${trade.risk_amount || "50.00"}</strong></div>
                   <div>Risk %: <strong className="text-white">{trade.risk_pct || "1.0"}%</strong></div>
@@ -349,24 +349,24 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 9: TIMELINE */}
           {activeTab === "timeline" && (
             <div className="space-y-2.5 animate-fadeIn">
-              <span className="text-[10px] font-bold text-[#70877A] uppercase block">
+              <span className="text-[10px] font-bold text-[#52627A] uppercase block">
                 Trade Lifecycle Audit Timeline
               </span>
-              <div className="space-y-2 border-l-2 border-[#1B3328] pl-3 ml-2 text-xs">
+              <div className="space-y-2 border-l-2 border-[#122033] pl-3 ml-2 text-xs">
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-[#70877A]">{trade.timestamp}</span>
-                  <p className="font-bold text-[#55C98A]">1. Signal Generated (Score: 82.6%)</p>
+                  <span className="text-[10px] text-[#52627A]">{trade.timestamp}</span>
+                  <p className="font-bold text-[#22D3EE]">1. Signal Generated (Score: 82.6%)</p>
                 </div>
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-[#70877A]">{trade.timestamp}</span>
+                  <span className="text-[10px] text-[#52627A]">{trade.timestamp}</span>
                   <p className="font-bold text-white">2. Pre-Order Risk Gate Cleared (14/14)</p>
                 </div>
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-[#70877A]">{trade.timestamp}</span>
+                  <span className="text-[10px] text-[#52627A]">{trade.timestamp}</span>
                   <p className="font-bold text-cyan-300">3. Order Submitted & Filled @ ${trade.entry_price}</p>
                 </div>
                 <div className="space-y-0.5">
-                  <span className="text-[10px] text-[#70877A]">{trade.exit_timestamp || trade.timestamp}</span>
+                  <span className="text-[10px] text-[#52627A]">{trade.exit_timestamp || trade.timestamp}</span>
                   <p className="font-bold text-purple-300">4. Position Closed ({trade.exit_reason || "Target Reached"})</p>
                 </div>
               </div>
@@ -376,16 +376,16 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
           {/* TAB 10: NOTES & TAGS */}
           {activeTab === "notes" && (
             <div className="space-y-3 animate-fadeIn">
-              <span className="text-[10px] font-bold text-[#70877A] uppercase block">
+              <span className="text-[10px] font-bold text-[#52627A] uppercase block">
                 Trader Reflections & Setup Tags
               </span>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-[#70877A]">Setup Tag</label>
+                <label className="text-[10px] text-[#52627A]">Setup Tag</label>
                 <select
                   value={selectedTag}
                   onChange={(e) => setSelectedTag(e.target.value)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 >
                   <option value="A+ Setup">A+ Setup</option>
                   <option value="Breakout">Breakout</option>
@@ -396,13 +396,13 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] text-[#70877A]">Observation Note</label>
+                <label className="text-[10px] text-[#52627A]">Observation Note</label>
                 <textarea
                   rows={3}
                   value={userNote}
                   onChange={(e) => setUserNote(e.target.value)}
                   placeholder="Record why this trade was taken, discipline adherence, and learnings..."
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-xl p-3 text-xs text-white placeholder-[#70877A] focus:outline-none focus:border-[#55C98A] resize-none font-sans"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-xl p-3 text-xs text-white placeholder-[#52627A] focus:outline-none focus:border-[#22D3EE] resize-none font-sans"
                 />
               </div>
 

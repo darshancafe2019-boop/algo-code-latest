@@ -34,7 +34,7 @@ export function FilterSelect({
   return (
     <div className={cn("inline-flex items-center gap-1.5 font-mono select-none", className)}>
       {label && (
-        <span className="text-[10px] sm:text-[11px] font-medium text-[#94A3B8] uppercase tracking-wider shrink-0">
+        <span className="text-[10px] sm:text-[11px] font-medium text-[#7C8CA3] uppercase tracking-wider shrink-0">
           {label}:
         </span>
       )}
@@ -53,7 +53,7 @@ export function FilterSelect({
             </option>
           ))}
         </select>
-        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[#64748B] pointer-events-none" />
+        <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 h-3 w-3 text-[#52627A] pointer-events-none" />
       </div>
     </div>
   );

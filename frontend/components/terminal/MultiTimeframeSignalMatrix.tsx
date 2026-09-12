@@ -78,7 +78,7 @@ export const MultiTimeframeSignalMatrix: React.FC<MultiTimeframeSignalMatrixProp
           <button
             onClick={fetchData}
             title="Refresh Matrix"
-            className="p-1.5 rounded-lg bg-[#121927] hover:bg-[#1A253A] text-slate-400 hover:text-white transition-colors border border-[#1E293B]"
+            className="p-1.5 rounded-lg bg-[#121927] hover:bg-[#1A253A] text-slate-400 hover:text-white transition-colors border border-[#1A2A3F]"
           >
             <RefreshCw className={`h-3 w-3 ${loading ? "animate-spin text-cyan-400" : ""}`} />
           </button>
@@ -98,7 +98,7 @@ export const MultiTimeframeSignalMatrix: React.FC<MultiTimeframeSignalMatrixProp
               className={`p-3 rounded-xl border flex flex-col justify-between transition-all ${
                 isCurrentActive
                   ? "bg-gradient-to-b from-[#162238] to-[#0E1524] border-cyan-500/50 shadow-md shadow-cyan-950/40"
-                  : "bg-[#121927]/80 border-[#1E293B]"
+                  : "bg-[#121927]/80 border-[#1A2A3F]"
               }`}
             >
               <div className="flex items-center justify-between mb-1.5">
@@ -153,7 +153,7 @@ export const MultiTimeframeSignalMatrix: React.FC<MultiTimeframeSignalMatrixProp
       </div>
 
       {/* Aggregate Score & Disclaimer Footer */}
-      <div className="px-3 py-2 bg-[#121927] border border-[#1E293B] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="px-3 py-2 bg-[#121927] border border-[#1A2A3F] rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-slate-400">Aggregate Decision:</span>

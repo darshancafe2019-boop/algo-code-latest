@@ -48,10 +48,10 @@ export function WorkspaceTabs({
               "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium transition-all duration-100 whitespace-nowrap cursor-pointer border",
               isActive
                 ? "bg-[#121C2C] text-[#22C7E8] border-[#22C7E8]/40 shadow-xs"
-                : "bg-transparent text-[#94A3B8] border-transparent hover:text-[#F4F7FA] hover:bg-[#0E1624]"
+                : "bg-transparent text-[#7C8CA3] border-transparent hover:text-[#F4F7FA] hover:bg-[#0E1624]"
             )}
           >
-            {Icon && <Icon className={cn("h-3.5 w-3.5", isActive ? "text-[#22C7E8]" : "text-[#64748B]")} />}
+            {Icon && <Icon className={cn("h-3.5 w-3.5", isActive ? "text-[#22C7E8]" : "text-[#52627A]")} />}
             <span>{tab.label}</span>
             {tab.count !== undefined && (
               <span
@@ -59,7 +59,7 @@ export function WorkspaceTabs({
                   "px-1.5 py-0.2 rounded text-[10px] tabular-nums font-semibold",
                   isActive
                     ? "bg-[#22C7E8]/20 text-[#22C7E8]"
-                    : "bg-[#101827] text-[#64748B]"
+                    : "bg-[#101827] text-[#52627A]"
                 )}
               >
                 {tab.count}

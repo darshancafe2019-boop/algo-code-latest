@@ -99,9 +99,9 @@ export function DayAnalysisDrawer({
       <div className="fixed inset-0" onClick={onClose} aria-hidden="true" />
 
       {/* Drawer Container (Slide-over desktop, full-width sheet mobile) */}
-      <div className="relative w-full max-w-2xl bg-[#080D18] border-l border-[#1E293B] shadow-2xl flex flex-col h-full z-10 font-mono text-slate-200 animate-in slide-in-from-right duration-200">
+      <div className="relative w-full max-w-2xl bg-[#080D18] border-l border-[#1A2A3F] shadow-2xl flex flex-col h-full z-10 font-mono text-slate-200 animate-in slide-in-from-right duration-200">
         {/* Top Header */}
-        <div className="bg-[#0B111E] border-b border-[#1E293B] p-4 flex items-center justify-between">
+        <div className="bg-[#0B111E] border-b border-[#1A2A3F] p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -126,7 +126,7 @@ export function DayAnalysisDrawer({
 
           <div className="flex items-center gap-2">
             {/* Prev / Next Date Navigation */}
-            <div className="flex items-center bg-[#050811] border border-[#1E293B] rounded-lg p-0.5 mr-2">
+            <div className="flex items-center bg-[#050811] border border-[#1A2A3F] rounded-lg p-0.5 mr-2">
               <button
                 type="button"
                 disabled={!prevDate}
@@ -152,7 +152,7 @@ export function DayAnalysisDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-[#1E293B] rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-white hover:bg-[#1A2A3F] rounded-lg transition-colors"
             >
               <X className="w-5 h-5" />
             </button>
@@ -162,33 +162,33 @@ export function DayAnalysisDrawer({
         {/* Scrollable Content Body */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {/* Executive Summary Card */}
-          <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-4 space-y-3">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
             <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider flex items-center justify-between">
               <span>Session Executive Breakdown</span>
               <Activity className="w-3.5 h-3.5 text-cyan-400" />
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed bg-[#050811] border border-[#1E293B]/70 rounded-lg p-3">
+            <p className="text-xs text-slate-300 leading-relaxed bg-[#050811] border border-[#1A2A3F]/70 rounded-lg p-3">
               {summary.explanation}
             </p>
 
             {/* Key Day Metrics Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-              <div className="bg-[#050811] border border-[#1E293B] rounded-lg p-2.5 space-y-0.5">
+              <div className="bg-[#050811] border border-[#1A2A3F] rounded-lg p-2.5 space-y-0.5">
                 <div className="text-[10px] text-slate-400 uppercase">Gross P&L</div>
                 <div className="text-sm font-bold text-white">{formatPnL(summary.grossPnl, currency).formatted}</div>
               </div>
-              <div className="bg-[#050811] border border-[#1E293B] rounded-lg p-2.5 space-y-0.5">
+              <div className="bg-[#050811] border border-[#1A2A3F] rounded-lg p-2.5 space-y-0.5">
                 <div className="text-[10px] text-slate-400 uppercase">Total Fees</div>
                 <div className="text-sm font-bold text-red-400">-{formatPrice(summary.fees, currency)}</div>
               </div>
-              <div className="bg-[#050811] border border-[#1E293B] rounded-lg p-2.5 space-y-0.5">
+              <div className="bg-[#050811] border border-[#1A2A3F] rounded-lg p-2.5 space-y-0.5">
                 <div className="text-[10px] text-slate-400 uppercase">Executions</div>
                 <div className="text-sm font-bold text-white">
                   {summary.tradesCount} ({summary.wins}W / {summary.losses}L)
                 </div>
               </div>
-              <div className="bg-[#050811] border border-[#1E293B] rounded-lg p-2.5 space-y-0.5">
+              <div className="bg-[#050811] border border-[#1A2A3F] rounded-lg p-2.5 space-y-0.5">
                 <div className="text-[10px] text-slate-400 uppercase">Win Rate</div>
                 <div className={`text-sm font-bold ${summary.winRate >= 50 ? "text-emerald-400" : "text-amber-400"}`}>
                   {formatPercent(summary.winRate, 1)}
@@ -198,7 +198,7 @@ export function DayAnalysisDrawer({
           </div>
 
           {/* Navigation Tabs for Subsections */}
-          <div className="flex border-b border-[#1E293B] gap-2 text-xs">
+          <div className="flex border-b border-[#1A2A3F] gap-2 text-xs">
             <button
               type="button"
               onClick={() => setActiveTab("trades")}
@@ -249,14 +249,14 @@ export function DayAnalysisDrawer({
           {activeTab === "trades" && (
             <div className="space-y-3">
               {(!dayData?.trades || dayData.trades.length === 0) ? (
-                <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-8 text-center text-slate-400 text-xs">
+                <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-8 text-center text-slate-400 text-xs">
                   No trade executions recorded on this date.
                 </div>
               ) : (
-                <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl overflow-hidden">
+                <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-[#050811] text-[10px] text-slate-400 uppercase border-b border-[#1E293B]">
+                      <thead className="bg-[#050811] text-[10px] text-slate-400 uppercase border-b border-[#1A2A3F]">
                         <tr>
                           <th className="py-2.5 px-3">Symbol</th>
                           <th className="py-2.5 px-3">Side</th>
@@ -266,9 +266,9 @@ export function DayAnalysisDrawer({
                           <th className="py-2.5 px-3">Bot / Strat</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#1E293B]/60">
+                      <tbody className="divide-y divide-[#1A2A3F]/60">
                         {dayData.trades.map((tr) => (
-                          <tr key={tr.id} className="hover:bg-[#1E293B]/30 transition-colors">
+                          <tr key={tr.id} className="hover:bg-[#1A2A3F]/30 transition-colors">
                             <td className="py-2.5 px-3 font-bold text-white">{tr.symbol}</td>
                             <td className="py-2.5 px-3">
                               <span
@@ -310,7 +310,7 @@ export function DayAnalysisDrawer({
 
           {/* Tab 2: Intraday Step Movement */}
           {activeTab === "intraday" && (
-            <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-4 space-y-3">
+            <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
               <div className="text-xs text-slate-400 font-semibold uppercase">Cumulative Session Step P&L</div>
               {(!dayData?.intradayEquity || dayData.intradayEquity.length === 0) ? (
                 <div className="p-6 text-center text-slate-500 text-xs">
@@ -321,7 +321,7 @@ export function DayAnalysisDrawer({
                   {dayData.intradayEquity.map((step, idx) => (
                     <div
                       key={idx}
-                      className="bg-[#050811] border border-[#1E293B] rounded-lg p-2.5 flex items-center justify-between text-xs"
+                      className="bg-[#050811] border border-[#1A2A3F] rounded-lg p-2.5 flex items-center justify-between text-xs"
                     >
                       <div className="flex items-center gap-2">
                         <Clock className="w-3.5 h-3.5 text-cyan-400" />
@@ -349,12 +349,12 @@ export function DayAnalysisDrawer({
           {activeTab === "signals" && (
             <div className="space-y-2">
               {(!dayData?.signals || dayData.signals.length === 0) ? (
-                <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-8 text-center text-slate-400 text-xs">
+                <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-8 text-center text-slate-400 text-xs">
                   No strategy triggers logged on this date.
                 </div>
               ) : (
                 dayData.signals.map((sig) => (
-                  <div key={sig.id} className="bg-[#0B111E] border border-[#1E293B] rounded-lg p-3 flex items-center justify-between text-xs">
+                  <div key={sig.id} className="bg-[#0B111E] border border-[#1A2A3F] rounded-lg p-3 flex items-center justify-between text-xs">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-white">{sig.symbol}</span>
@@ -387,12 +387,12 @@ export function DayAnalysisDrawer({
           {activeTab === "events" && (
             <div className="space-y-2">
               {(!dayData?.events || dayData.events.length === 0) ? (
-                <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-8 text-center text-slate-400 text-xs">
+                <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-8 text-center text-slate-400 text-xs">
                   No system audit events recorded on this date.
                 </div>
               ) : (
                 dayData.events.map((evt) => (
-                  <div key={evt.id} className="bg-[#0B111E] border border-[#1E293B] rounded-lg p-3 space-y-1 text-xs">
+                  <div key={evt.id} className="bg-[#0B111E] border border-[#1A2A3F] rounded-lg p-3 space-y-1 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-white">{evt.type}</span>
                       <span className="text-[10px] text-slate-400"><HydratedTimestamp timestamp={evt.timestamp} /></span>
@@ -406,7 +406,7 @@ export function DayAnalysisDrawer({
         </div>
 
         {/* Bottom Action Footer */}
-        <div className="bg-[#0B111E] border-t border-[#1E293B] p-4 flex items-center justify-between gap-3">
+        <div className="bg-[#0B111E] border-t border-[#1A2A3F] p-4 flex items-center justify-between gap-3">
           <Link
             href={`/trade-journal?date=${date}`}
             className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-900/30 transition-all"
@@ -417,7 +417,7 @@ export function DayAnalysisDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl bg-[#1E293B] hover:bg-[#334155] text-slate-300 font-semibold text-xs transition-colors"
+            className="px-4 py-2.5 rounded-xl bg-[#1A2A3F] hover:bg-[#29415F] text-slate-300 font-semibold text-xs transition-colors"
           >
             Close
           </button>

@@ -88,11 +88,11 @@ export function SafetyGatesPanel() {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             14-Stage Pre-Order Risk Gate & Live Order Preview
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Every order must clear all 14 mandatory validation gates before reaching OMS order routing.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           14 / 14 Mandatory Gates
         </span>
       </div>
@@ -100,10 +100,10 @@ export function SafetyGatesPanel() {
       {/* Grid: 14 Stage Checklist + Interactive Simulator Box */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 text-xs font-mono">
         {/* Left: 14-Stage Checklist (7 cols) */}
-        <div className="lg:col-span-7 bg-[#0D1914] border border-[#1B3328] rounded-2xl p-4 space-y-2.5">
-          <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#1B3328] pb-2 flex items-center justify-between">
+        <div className="lg:col-span-7 bg-[#0A1422] border border-[#122033] rounded-2xl p-4 space-y-2.5">
+          <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#122033] pb-2 flex items-center justify-between">
             <span>Pre-Trade Defense Checklist</span>
-            <span className="text-[#55C98A] text-[10px]">ALL ACTIVE</span>
+            <span className="text-[#22D3EE] text-[10px]">ALL ACTIVE</span>
           </h4>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
@@ -117,7 +117,7 @@ export function SafetyGatesPanel() {
                   className={`p-2.5 rounded-xl border transition-colors ${
                     isFailed
                       ? "bg-red-950/60 border-red-800 text-red-300"
-                      : "bg-[#07110D] border-[#1B3328] text-slate-300 hover:border-[#2E7D5B]"
+                      : "bg-[#07101A] border-[#122033] text-slate-300 hover:border-[#2563EB]"
                   }`}
                 >
                   <div className="flex items-center justify-between">
@@ -125,10 +125,10 @@ export function SafetyGatesPanel() {
                     {isFailed ? (
                       <XCircle className="h-4 w-4 text-red-400 shrink-0" />
                     ) : (
-                      <CheckCircle2 className="h-4 w-4 text-[#55C98A] shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-[#22D3EE] shrink-0" />
                     )}
                   </div>
-                  <p className="text-[10px] text-[#70877A] font-sans pt-0.5 line-clamp-1">
+                  <p className="text-[10px] text-[#52627A] font-sans pt-0.5 line-clamp-1">
                     {gate.desc}
                   </p>
                 </div>
@@ -138,9 +138,9 @@ export function SafetyGatesPanel() {
         </div>
 
         {/* Right: Interactive Order Risk Preview Box (5 cols) */}
-        <div className="lg:col-span-5 bg-[#0D1914] border border-[#1B3328] rounded-2xl p-4 space-y-3 flex flex-col justify-between">
+        <div className="lg:col-span-5 bg-[#0A1422] border border-[#122033] rounded-2xl p-4 space-y-3 flex flex-col justify-between">
           <div className="space-y-3">
-            <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#1B3328] pb-2 flex items-center justify-between">
+            <h4 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#122033] pb-2 flex items-center justify-between">
               <span>Order Risk Preview Simulator</span>
               <span className="text-[10px] text-cyan-300">Server Evaluated</span>
             </h4>
@@ -148,21 +148,21 @@ export function SafetyGatesPanel() {
             {/* Input Form */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Symbol</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Symbol</label>
                 <input
                   type="text"
                   value={symbol}
                   onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Side</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Side</label>
                 <select
                   value={side}
                   onChange={(e) => setSide(e.target.value as any)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 >
                   <option value="LONG">LONG (Buy)</option>
                   <option value="SHORT">SHORT (Sell)</option>
@@ -170,43 +170,43 @@ export function SafetyGatesPanel() {
               </div>
 
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Quantity</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Quantity</label>
                 <input
                   type="number"
                   step={0.01}
                   value={quantity}
                   onChange={(e) => setQuantity(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Entry Price ($)</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Entry Price ($)</label>
                 <input
                   type="number"
                   value={entryPrice}
                   onChange={(e) => setEntryPrice(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Stop Loss ($)</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Stop Loss ($)</label>
                 <input
                   type="number"
                   value={stopLoss}
                   onChange={(e) => setStopLoss(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-red-400 font-bold focus:outline-none focus:border-red-500"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-red-400 font-bold focus:outline-none focus:border-red-500"
                 />
               </div>
 
               <div>
-                <label className="text-[10px] text-[#70877A] font-bold block">Take Profit ($)</label>
+                <label className="text-[10px] text-[#52627A] font-bold block">Take Profit ($)</label>
                 <input
                   type="number"
                   value={takeProfit}
                   onChange={(e) => setTakeProfit(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07110D] border border-[#1B3328] rounded-lg px-2.5 py-1.5 text-[#55C98A] font-bold focus:outline-none focus:border-emerald-500"
+                  className="w-full bg-[#07101A] border border-[#122033] rounded-lg px-2.5 py-1.5 text-[#22D3EE] font-bold focus:outline-none focus:border-emerald-500"
                 />
               </div>
             </div>
@@ -233,7 +233,7 @@ export function SafetyGatesPanel() {
               <div className="flex items-center justify-between font-bold">
                 <span className="flex items-center gap-1.5">
                   {previewResult.is_approved ? (
-                    <CheckCircle2 className="h-4 w-4 text-[#55C98A]" />
+                    <CheckCircle2 className="h-4 w-4 text-[#22D3EE]" />
                   ) : (
                     <XCircle className="h-4 w-4 text-red-400" />
                   )}

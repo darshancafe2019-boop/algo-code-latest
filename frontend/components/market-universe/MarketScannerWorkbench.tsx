@@ -82,9 +82,9 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
   };
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
       {/* 1. Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
             <Filter className="h-4 w-4" />
@@ -100,7 +100,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
         </div>
 
         {/* Preset Selector Buttons */}
-        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1E293B] text-[11px] font-mono overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1A2A3F] text-[11px] font-mono overflow-x-auto scrollbar-none">
           {scanners.map((s) => (
             <button
               key={s.id}
@@ -118,13 +118,13 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
       </div>
 
       {/* 2. Custom Condition Builder Row */}
-      <div className="p-3 bg-[#070D14] border border-[#1E293B] rounded-xl flex flex-wrap items-center gap-2.5 font-mono text-xs">
+      <div className="p-3 bg-[#070D14] border border-[#1A2A3F] rounded-xl flex flex-wrap items-center gap-2.5 font-mono text-xs">
         <span className="text-[10px] font-bold text-slate-400 uppercase">Rule Condition:</span>
 
         <select
           value={customRuleField}
           onChange={(e) => setCustomRuleField(e.target.value)}
-          className="bg-[#0B131E] border border-[#1E293B] rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none"
+          className="bg-[#0B131E] border border-[#1A2A3F] rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none"
         >
           <option value="momentum_score">Momentum Score (0-100)</option>
           <option value="volatility_score">Volatility Score (0-100)</option>
@@ -136,7 +136,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
         <select
           value={customRuleOp}
           onChange={(e) => setCustomRuleOp(e.target.value)}
-          className="bg-[#0B131E] border border-[#1E293B] rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none"
+          className="bg-[#0B131E] border border-[#1A2A3F] rounded-lg px-2.5 py-1 text-slate-200 focus:outline-none"
         >
           <option value=">=">&gt;= (Greater or Equal)</option>
           <option value="<=">&lt;= (Less or Equal)</option>
@@ -148,7 +148,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
           value={customRuleVal}
           onChange={(e) => setCustomRuleVal(e.target.value)}
           placeholder="Threshold value..."
-          className="bg-[#0B131E] border border-[#1E293B] rounded-lg px-2.5 py-1 text-slate-200 w-28 focus:outline-none"
+          className="bg-[#0B131E] border border-[#1A2A3F] rounded-lg px-2.5 py-1 text-slate-200 w-28 focus:outline-none"
         />
 
         <button
@@ -173,7 +173,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
               <div
                 key={idx}
                 onClick={() => onSelectInstrument(inst)}
-                className="p-3 bg-[#070D14] hover:bg-[#0F1B2A] border border-[#1E293B] hover:border-cyan-700 rounded-xl transition-all cursor-pointer space-y-1.5 group shadow-md"
+                className="p-3 bg-[#070D14] hover:bg-[#0F1B2A] border border-[#1A2A3F] hover:border-cyan-700 rounded-xl transition-all cursor-pointer space-y-1.5 group shadow-md"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
@@ -213,7 +213,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
           })}
         </div>
       ) : (
-        <div className="p-5 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1E293B]">
+        <div className="p-5 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1A2A3F]">
           Select a scanner preset or execute custom conditions to view matched instruments.
         </div>
       )}

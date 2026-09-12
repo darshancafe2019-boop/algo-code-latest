@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
@@ -20,15 +20,9 @@ import { Button } from "@/components/ui/button";
 import { HoldToConfirmButton } from "@/components/ui/hold-to-confirm";
 import { Badge } from "@/components/ui/badge";
 import {
-  ShieldCheck,
-  ShieldAlert,
   AlertCircle,
   ArrowUpRight,
   ArrowDownRight,
-  Radio,
-  Percent,
-  CheckCircle2,
-  Lock,
 } from "lucide-react";
 
 export function QuickOrderModal() {
@@ -94,9 +88,8 @@ export function QuickOrderModal() {
   // Financial & Charges Calculations
   const executionPrice = currentOrderType === "LIMIT" && Number(limitPrice) > 0 ? Number(limitPrice) : currentLtp;
   const notionalValue = currentQty * executionPrice;
-  const requiredCapital = notionalValue;
   
-  // Realistic fee estimation (Brokerage + STT + GST + Exchange Turnovers)
+  // Realistic fee estimation
   const isIndianEquity = effectiveSymbol.includes("NSE") || ["RELIANCE", "HDFCBANK", "TCS", "INFY", "ICICIBANK", "NIFTY", "BANKNIFTY"].includes(effectiveSymbol);
   const estimatedBrokerage = isIndianEquity ? Math.min(20.0, notionalValue * 0.0003) : notionalValue * 0.0005;
   const estimatedSTT = isIndianEquity && currentSide === "SELL" ? notionalValue * 0.001 : 0.0;
@@ -159,14 +152,14 @@ export function QuickOrderModal() {
 
   return (
     <Dialog open={isOrderPlacementModalOpen} onOpenChange={setOrderPlacementModalOpen}>
-      <DialogContent className="max-w-lg bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl p-5">
+      <DialogContent className="max-w-lg bg-[#0A1422] border border-[#1A2A3F] rounded-xl shadow-2xl p-5 font-sans">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <DialogTitle className="text-base font-bold font-mono tracking-tight text-[var(--theme-text-primary)]">
+              <DialogTitle className="text-base font-bold tracking-tight text-[#F7FAFC]">
                 UNIVERSAL TRADE TICKET
               </DialogTitle>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[var(--theme-elevated)] border border-[var(--theme-border)] text-[var(--theme-text-muted)]">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-md bg-[#101B2D] border border-[#1A2A3F] text-[#7C8CA3]">
                 {effectiveSymbol}
               </span>
             </div>
@@ -174,27 +167,27 @@ export function QuickOrderModal() {
               {currentMode}
             </Badge>
           </div>
-          <DialogDescription className="text-xs text-[var(--theme-text-secondary)]">
-            One unified execution ticket routed via OMS & 20-Stage Pre-Trade Risk Engine.
+          <DialogDescription className="text-xs text-[#7C8CA3]">
+            One unified execution ticket routed via OMS & Pre-Trade Risk Engine.
           </DialogDescription>
         </DialogHeader>
 
         {orderError && (
-          <div className="flex items-center gap-2 p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs font-mono text-rose-300">
-            <AlertCircle className="h-4 w-4 shrink-0 text-rose-400" />
+          <div className="flex items-center gap-2 p-3 bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 rounded-lg text-xs text-[#FF3B5C]">
+            <AlertCircle className="h-4 w-4 shrink-0 text-[#FF3B5C]" />
             <span>{orderError}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 font-sans text-xs">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3.5 text-xs">
           {/* 1. Broker & Environment Selection */}
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="block text-[10px] font-mono text-[var(--theme-text-muted)] mb-1">TARGET BROKER</label>
+              <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">TARGET BROKER</label>
               <select
                 value={selectedBroker}
                 onChange={(e) => setSelectedBroker(e.target.value)}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
               >
                 <option value="PAPER">PAPER SIMULATOR</option>
                 <option value="DHAN">DHAN HQ v2</option>
@@ -204,11 +197,11 @@ export function QuickOrderModal() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-mono text-[var(--theme-text-muted)] mb-1">PRODUCT TYPE</label>
+              <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">PRODUCT TYPE</label>
               <select
                 value={productType}
                 onChange={(e) => setProductType(e.target.value)}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
               >
                 <option value="CNC">CNC (Delivery / Cash)</option>
                 <option value="MIS">MIS (Intraday Margin)</option>
@@ -218,18 +211,18 @@ export function QuickOrderModal() {
             </div>
           </div>
 
-          {/* 2. Side Toggle (BUY / SELL) */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)]">
+          {/* 2. Side Toggle (BUY / SELL) - Segmented Control */}
+          <div className="grid grid-cols-2 gap-2 p-1 bg-[#07101A] rounded-lg border border-[#1A2A3F]">
             <button
               type="button"
               onClick={() => {
                 setValue("side", "BUY");
                 setQuickOrderSide("BUY");
               }}
-              className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-md font-semibold transition-all ${
                 currentSide === "BUY"
-                  ? "bg-[var(--theme-profit)] text-black shadow-sm"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
+                  ? "bg-[#00E890]/15 border border-[#00E890]/40 text-[#00E890]"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               <ArrowUpRight className="h-4 w-4" />
@@ -241,10 +234,10 @@ export function QuickOrderModal() {
                 setValue("side", "SELL");
                 setQuickOrderSide("SELL");
               }}
-              className={`flex items-center justify-center gap-1.5 py-1.5 rounded-lg font-mono font-bold transition-all ${
+              className={`flex items-center justify-center gap-1.5 py-2 rounded-md font-semibold transition-all ${
                 currentSide === "SELL"
-                  ? "bg-[var(--theme-loss)] text-white shadow-sm"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
+                  ? "bg-[#FF3B5C]/15 border border-[#FF3B5C]/40 text-[#FF3B5C]"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               <ArrowDownRight className="h-4 w-4" />
@@ -253,24 +246,24 @@ export function QuickOrderModal() {
           </div>
 
           {/* 3. Quantity & Order Type */}
-          <div className="grid grid-cols-2 gap-2.5 font-mono">
+          <div className="grid grid-cols-2 gap-2.5">
             <div>
-              <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">QUANTITY (UNITS)</label>
+              <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">QUANTITY (UNITS)</label>
               <input
                 type="number"
                 step="any"
                 min="0.0001"
                 {...register("quantity", { valueAsNumber: true })}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs font-mono tabular-nums text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
               />
-              {errors.quantity && <p className="text-[10px] text-rose-400 mt-1">{errors.quantity.message}</p>}
+              {errors.quantity && <p className="text-[10px] text-[#FF3B5C] mt-1">{errors.quantity.message}</p>}
             </div>
 
             <div>
-              <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">ORDER TYPE</label>
+              <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">ORDER TYPE</label>
               <select
                 {...register("order_type")}
-                className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
               >
                 <option value="MARKET">MARKET</option>
                 <option value="LIMIT">LIMIT</option>
@@ -282,52 +275,52 @@ export function QuickOrderModal() {
 
           {/* 4. Conditional Limit & Trigger Prices */}
           {currentOrderType !== "MARKET" && (
-            <div className="grid grid-cols-2 gap-2.5 font-mono animate-in fade-in">
+            <div className="grid grid-cols-2 gap-2.5 animate-in fade-in">
               <div>
-                <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">LIMIT PRICE</label>
+                <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">LIMIT PRICE</label>
                 <input
                   type="number"
                   step="any"
                   placeholder={currentLtp.toString()}
                   value={limitPrice}
                   onChange={(e) => setLimitPrice(e.target.value)}
-                  className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                  className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs font-mono tabular-nums text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] text-[var(--theme-text-muted)] mb-1">TRIGGER PRICE</label>
+                <label className="block text-[10px] text-[#7C8CA3] mb-1 font-medium">TRIGGER PRICE</label>
                 <input
                   type="number"
                   step="any"
                   placeholder="Optional"
                   value={triggerPrice}
                   onChange={(e) => setTriggerPrice(e.target.value)}
-                  className="w-full bg-[var(--theme-elevated)] border border-[var(--theme-border)] rounded-xl px-2.5 py-1.5 text-xs font-mono text-[var(--theme-text-primary)] focus:outline-none focus:border-[var(--theme-accent)]"
+                  className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg px-2.5 py-1.5 text-xs font-mono tabular-nums text-[#F7FAFC] focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
             </div>
           )}
 
           {/* 5. Pre-Trade Financial Preview Strip */}
-          <div className="p-3 bg-[var(--theme-elevated)] rounded-xl border border-[var(--theme-border)] space-y-1.5 font-mono text-[11px]">
-            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+          <div className="p-3 bg-[#07101A] rounded-lg border border-[#1A2A3F] space-y-1.5 text-[11px]">
+            <div className="flex items-center justify-between text-[#7C8CA3]">
               <span>LTP & Provenance:</span>
               <span className="flex items-center gap-1.5">
-                <span className={`h-1.5 w-1.5 rounded-full ${isDataStale ? "bg-rose-400" : "bg-emerald-400"}`} />
-                <strong className="text-[var(--theme-text-primary)]">₹/${executionPrice.toFixed(2)}</strong>
-                <span className="text-[9px] text-[var(--theme-text-muted)]">({selectedBroker} • {dataAge.toFixed(1)}s ago)</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${isDataStale ? "bg-[#FF3B5C]" : "bg-[#00E890]"}`} />
+                <strong className="text-[#F7FAFC] font-mono tabular-nums">₹/${executionPrice.toFixed(2)}</strong>
+                <span className="text-[10px] text-[#52627A]">({selectedBroker} • {dataAge.toFixed(1)}s ago)</span>
               </span>
             </div>
 
-            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+            <div className="flex items-center justify-between text-[#7C8CA3]">
               <span>Est. Notional Value:</span>
-              <strong className="text-[var(--theme-text-primary)]">₹/${notionalValue.toFixed(2)}</strong>
+              <strong className="text-[#F7FAFC] font-mono tabular-nums">₹/${notionalValue.toFixed(2)}</strong>
             </div>
 
-            <div className="flex items-center justify-between text-[var(--theme-text-secondary)]">
+            <div className="flex items-center justify-between text-[#7C8CA3]">
               <span>Est. Charges & Taxes:</span>
-              <strong className="text-amber-400">₹/${totalCharges}</strong>
+              <strong className="text-[#F59E0B] font-mono tabular-nums">₹/${totalCharges}</strong>
             </div>
           </div>
 
@@ -336,6 +329,7 @@ export function QuickOrderModal() {
               type="button"
               variant="outline"
               onClick={() => setOrderPlacementModalOpen(false)}
+              className="bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC]"
             >
               Cancel
             </Button>
@@ -353,7 +347,7 @@ export function QuickOrderModal() {
                 type="submit"
                 variant={currentSide === "BUY" ? "profit" : "loss"}
                 disabled={orderMutation.isPending || isDataStale}
-                className="font-bold font-mono px-5"
+                className="font-semibold px-5 rounded-lg"
               >
                 {orderMutation.isPending ? "DISPATCHING..." : `EXECUTE PAPER ${currentSide}`}
               </Button>
@@ -364,4 +358,5 @@ export function QuickOrderModal() {
     </Dialog>
   );
 }
+
 

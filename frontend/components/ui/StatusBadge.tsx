@@ -26,6 +26,8 @@ export type InstitutionalStatus =
   | "HEALTHY"
   | "ONLINE"
   | "OFFLINE"
+  | "CONNECTED"
+  | "DISABLED"
   | string;
 
 interface StatusBadgeProps {
@@ -43,25 +45,31 @@ export function StatusBadge({
 }: StatusBadgeProps) {
   const norm = (status || "").toUpperCase().trim();
 
-  let dotColor = "bg-slate-400";
-  let bgBorderText = "bg-[#101827] text-slate-300 border-[#213047]";
+  let dotColor = "bg-[#52627A]";
+  let bgBorderText = "bg-[#0D1727] text-[#7C8CA3] border-[#1A2A3F]";
 
-  if (["LIVE", "READY", "HEALTHY", "ACTIVE", "ONLINE"].includes(norm)) {
-    dotColor = "bg-[#22C983]";
-    bgBorderText = "bg-[#22C983]/10 text-[#22C983] border-[#22C983]/30";
+  if (["LIVE", "READY", "HEALTHY", "ACTIVE", "ONLINE", "CONNECTED", "OPEN"].includes(norm)) {
+    dotColor = "bg-[#00E890]";
+    bgBorderText = "bg-[#00E890]/10 text-[#00E890] border-[#00E890]/30";
   } else if (["PAPER"].includes(norm)) {
-    dotColor = "bg-[#22C7E8]";
-    bgBorderText = "bg-[#22C7E8]/10 text-[#22C7E8] border-[#22C7E8]/30";
+    dotColor = "bg-[#19C5FF]";
+    bgBorderText = "bg-[#19C5FF]/10 text-[#19C5FF] border-[#19C5FF]/30";
+  } else if (["CONNECTING"].includes(norm)) {
+    dotColor = "bg-[#19C5FF]";
+    bgBorderText = "bg-[#19C5FF]/10 text-[#19C5FF] border-[#19C5FF]/30";
   } else if (["SHADOW"].includes(norm)) {
-    dotColor = "bg-[#9B7BFF]";
-    bgBorderText = "bg-[#9B7BFF]/10 text-[#9B7BFF] border-[#9B7BFF]/30";
-  } else if (["CONNECTING", "PAUSED", "STALE", "MARKET CLOSED", "RECONCILIATION REQUIRED"].includes(norm)) {
-    dotColor = "bg-[#F2B84B]";
-    bgBorderText = "bg-[#F2B84B]/10 text-[#F2B84B] border-[#F2B84B]/30";
+    dotColor = "bg-[#A78BFA]";
+    bgBorderText = "bg-[#A78BFA]/10 text-[#A78BFA] border-[#A78BFA]/30";
+  } else if (["STALE", "PAUSED", "LIVE LOCKED", "MARKET CLOSED", "RECONCILIATION REQUIRED"].includes(norm)) {
+    dotColor = "bg-[#F59E0B]";
+    bgBorderText = "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/30";
+  } else if (["DEGRADED"].includes(norm)) {
+    dotColor = "bg-[#F97316]";
+    bgBorderText = "bg-[#F97316]/10 text-[#F97316] border-[#F97316]/30";
   } else if (
     [
-      "DEGRADED",
       "AUTH REQUIRED",
+      "AUTH_FAILED",
       "TOKEN EXPIRED",
       "DATA PLAN INACTIVE",
       "RISK BLOCKED",
@@ -72,8 +80,11 @@ export function StatusBadge({
       "OFFLINE",
     ].includes(norm)
   ) {
-    dotColor = "bg-[#F2556A]";
-    bgBorderText = "bg-[#F2556A]/10 text-[#F2556A] border-[#F2556A]/30";
+    dotColor = "bg-[#FF3B5C]";
+    bgBorderText = "bg-[#FF3B5C]/10 text-[#FF3B5C] border-[#FF3B5C]/30";
+  } else if (["DISABLED"].includes(norm)) {
+    dotColor = "bg-[#52627A]";
+    bgBorderText = "bg-[#0D1727] text-[#52627A] border-[#1A2A3F]";
   }
 
   const sizeClasses = {

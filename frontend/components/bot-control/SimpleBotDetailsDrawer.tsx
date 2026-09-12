@@ -74,13 +74,6 @@ export function SimpleBotDetailsDrawer({
   const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
   const [isUpdatingContract, setIsUpdatingContract] = useState(false);
 
-  // Trade Preparation State
-  const [prepOrderSide, setPrepOrderSide] = useState<"BUY" | "SELL">("BUY");
-  const [prepOrderType, setPrepOrderType] = useState<"MARKET" | "LIMIT">("MARKET");
-  const [prepProductType, setPrepProductType] = useState<"INTRADAY" | "CNC" | "MARGIN">("INTRADAY");
-  const [prepQuantity, setPrepQuantity] = useState<number>(1);
-  const [prepLimitPrice, setPrepLimitPrice] = useState<string>("");
-  const [isFiringOrder, setIsFiringOrder] = useState(false);
 
   const { getQuote, subscribe, unsubscribe } = useMarketGatewayContext();
 
@@ -455,124 +448,8 @@ export function SimpleBotDetailsDrawer({
                   </span>
                 </div>
               )}
-
-              {/* Trade Preparation Controls */}
-              <div className="pt-2 border-t border-[var(--theme-border-subtle)] space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-sans font-bold text-[var(--theme-text-primary)]">Pre-Trade Execution Ticket</span>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => setPrepOrderSide("BUY")}
-                      className={`px-2.5 py-1 rounded text-[10px] font-extrabold transition ${
-                        prepOrderSide === "BUY"
-                          ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20"
-                          : "bg-[#121824] text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      BUY
-                    </button>
-                    <button
-                      onClick={() => setPrepOrderSide("SELL")}
-                      className={`px-2.5 py-1 rounded text-[10px] font-extrabold transition ${
-                        prepOrderSide === "SELL"
-                          ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-                          : "bg-[#121824] text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      SELL
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 text-[11px]">
-                  <div>
-                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Type</label>
-                    <select
-                      value={prepOrderType}
-                      onChange={(e) => setPrepOrderType(e.target.value as any)}
-                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none"
-                    >
-                      <option value="MARKET">MARKET</option>
-                      <option value="LIMIT">LIMIT</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Product</label>
-                    <select
-                      value={prepProductType}
-                      onChange={(e) => setPrepProductType(e.target.value as any)}
-                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none"
-                    >
-                      <option value="INTRADAY">INTRADAY</option>
-                      <option value="CNC">DELIVERY</option>
-                      <option value="MARGIN">MARGIN</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Qty / Lots</label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={prepQuantity}
-                      onChange={(e) => setPrepQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none font-mono text-center"
-                    />
-                  </div>
-                </div>
-
-                {prepOrderType === "LIMIT" && (
-                  <div>
-                    <label className="text-[10px] text-[var(--theme-text-muted)] block mb-1">Limit Price</label>
-                    <input
-                      type="number"
-                      step="0.05"
-                      placeholder={String(liveQuote?.last_price || 2450.0)}
-                      value={prepLimitPrice}
-                      onChange={(e) => setPrepLimitPrice(e.target.value)}
-                      className="w-full bg-[var(--theme-surface)] border border-[var(--theme-border)] text-white px-2 py-1 rounded text-xs focus:outline-none font-mono"
-                    />
-                  </div>
-                )}
-
-                <button
-                  onClick={async () => {
-                    setIsFiringOrder(true);
-                    setActionFeedback(null);
-                    try {
-                      const res = await apiClient.post<any>("/api/orders", {
-                        symbol: bot.symbol,
-                        side: prepOrderSide,
-                        type: prepOrderType,
-                        quantity: prepQuantity,
-                        price: prepOrderType === "LIMIT" ? parseFloat(prepLimitPrice) || liveQuote?.last_price : undefined,
-                        broker: execBrokerId,
-                        account_id: brokerAcc,
-                        product_type: prepProductType,
-                      });
-                      if (res.ok) {
-                        setActionFeedback(`Order submitted successfully: ${prepOrderSide} ${prepQuantity} ${bot.symbol} via ${execBroker}`);
-                        onRefresh();
-                      } else {
-                        setActionFeedback(`Order submission note: Order placed in ${bot.execution_mode} mode`);
-                      }
-                    } catch (e: any) {
-                      setActionFeedback(`Order executed: ${prepOrderSide} ${prepQuantity} ${bot.symbol}`);
-                    } finally {
-                      setIsFiringOrder(false);
-                    }
-                  }}
-                  disabled={isFiringOrder}
-                  className={`w-full py-2 rounded-xl font-extrabold text-xs transition flex items-center justify-center gap-1.5 shadow-md ${
-                    prepOrderSide === "BUY"
-                      ? "bg-emerald-500 hover:bg-emerald-400 text-black shadow-emerald-500/20"
-                      : "bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20"
-                  }`}
-                >
-                  <Zap className="h-3.5 w-3.5 fill-current" />
-                  <span>Execute {prepOrderSide} Trade ({prepOrderType} • {prepQuantity} Qty)</span>
-                </button>
-              </div>
             </div>
+
 
             {/* Order Destination Interactive Trigger */}
             <div className="p-4 rounded-2xl bg-[var(--theme-elevated)]/40 border border-[var(--theme-border-subtle)] space-y-2.5">

@@ -78,9 +78,9 @@ export function SecurityActions({
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1E293B] shadow-xl flex flex-col justify-between">
+    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1A2A3F] shadow-xl flex flex-col justify-between">
       <div>
-        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#1E293B]">
+        <div className="flex items-center gap-3 mb-6 pb-4 border-b border-[#1A2A3F]">
           <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
             <ShieldAlert className="w-5 h-5" />
           </div>
@@ -99,7 +99,7 @@ export function SecurityActions({
 
         <div className="space-y-4">
           {/* Live Trading Gate Control */}
-          <div className="p-4 rounded-xl bg-[#0B0F17] border border-[#1E293B] flex items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-[#0B0F17] border border-[#1A2A3F] flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold text-slate-200 mb-0.5">Live Execution Gate</div>
               <p className="text-[11px] text-slate-400">
@@ -147,7 +147,7 @@ export function SecurityActions({
           </div>
 
           {/* Paper Ledger Sandbox Reset */}
-          <div className="p-4 rounded-xl bg-[#0B0F17] border border-[#1E293B] flex items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-[#0B0F17] border border-[#1A2A3F] flex items-center justify-between gap-4">
             <div>
               <div className="text-xs font-semibold text-slate-200 mb-0.5">Paper Sandbox Ledger</div>
               <p className="text-[11px] text-slate-400">Clear simulated test trades & reset balance to $10,000.00.</p>
@@ -169,7 +169,7 @@ export function SecurityActions({
       {showArmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-[#121824] border border-amber-500/40 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+            <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
               <div className="flex items-center gap-2 text-amber-400 font-bold text-sm uppercase tracking-wider">
                 <AlertTriangle className="w-4 h-4" />
                 <span>Arm Live Execution Gate</span>
@@ -211,7 +211,7 @@ export function SecurityActions({
               </label>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1A2A3F]">
               <button
                 id="btn-cancel-arm"
                 onClick={() => setShowArmModal(false)}
@@ -236,7 +236,7 @@ export function SecurityActions({
       {showKillModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-[#121824] border border-red-500/40 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+            <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
               <div className="flex items-center gap-2 text-red-400 font-bold text-sm uppercase tracking-wider">
                 <Power className="w-4 h-4" />
                 <span>Emergency Kill Switch</span>
@@ -254,7 +254,7 @@ export function SecurityActions({
               Activating the Global Kill Switch will write a safety lock file, immediately pause execution across all bots, and halt order generation.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1A2A3F]">
               <button
                 id="btn-cancel-kill"
                 onClick={() => setShowKillModal(false)}
@@ -279,7 +279,7 @@ export function SecurityActions({
       {showResetModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-[#121824] border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+            <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
               <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm uppercase tracking-wider">
                 <RotateCcw className="w-4 h-4" />
                 <span>Reset Paper Sandbox</span>
@@ -297,7 +297,7 @@ export function SecurityActions({
               Are you sure you want to reset the paper trading sandbox? All simulated trades will be archived and paper balance restored to $10,000.00 capital.
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1E293B]">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#1A2A3F]">
               <button
                 id="btn-cancel-reset"
                 onClick={() => setShowResetModal(false)}

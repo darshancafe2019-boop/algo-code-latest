@@ -36,9 +36,9 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
   };
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 flex flex-col justify-between">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-3 mb-4">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800/80 text-cyan-400">
               <FlaskConical className="h-4 w-4" />
@@ -68,7 +68,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
                 value={form.symbol || "BTC/USDT"}
                 onChange={(e) => setForm({ ...form, symbol: e.target.value })}
                 disabled={isLoading}
-                className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
               >
                 <option value="BTC/USDT">BTC/USDT (Spot)</option>
                 <option value="ETH/USDT">ETH/USDT (Spot)</option>
@@ -85,7 +85,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
                 value={form.timeframe || "5m"}
                 onChange={(e) => setForm({ ...form, timeframe: e.target.value })}
                 disabled={isLoading}
-                className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-semibold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
               >
                 <option value="1m">1m (High Frequency)</option>
                 <option value="5m">5m (Standard Scalping)</option>
@@ -106,7 +106,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
               value={form.strategy_name}
               onChange={(e) => setForm({ ...form, strategy_name: e.target.value })}
               disabled={isLoading}
-              className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+              className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500 disabled:opacity-50"
             >
               <option value="EMA_MACD_VP">EMA Cross + MACD + Volume Profile (Default)</option>
               <option value="EMA9_RSI">9EMA / RSI / Daily Bias Momentum</option>
@@ -127,7 +127,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
                 value={form.start_date}
                 onChange={(e) => setForm({ ...form, start_date: e.target.value })}
                 disabled={isLoading}
-                className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
               />
             </div>
 
@@ -140,7 +140,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
                 value={form.end_date}
                 onChange={(e) => setForm({ ...form, end_date: e.target.value })}
                 disabled={isLoading}
-                className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
               />
             </div>
           </div>
@@ -158,12 +158,12 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
                 value={form.initial_cash}
                 onChange={(e) => setForm({ ...form, initial_cash: parseFloat(e.target.value) || 0 })}
                 disabled={isLoading}
-                className="w-full bg-[#0B0F17] border border-[#1E293B] rounded-xl px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
+                className="w-full bg-[#0B0F17] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs font-mono font-bold text-white focus:outline-none focus:border-cyan-500 disabled:opacity-50"
               />
             </div>
 
             <div className="flex flex-col justify-end">
-              <label className="flex items-center gap-2 px-3 py-2 bg-[#0B0F17] border border-[#1E293B] rounded-xl cursor-pointer hover:border-slate-700 transition-colors">
+              <label className="flex items-center gap-2 px-3 py-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-xl cursor-pointer hover:border-slate-700 transition-colors">
                 <input
                   type="checkbox"
                   checked={form.allow_shorts ?? true}
@@ -200,7 +200,7 @@ export function BacktestConfigPanel({ initialConfig, onRunBacktest, isLoading }:
         </form>
       </div>
 
-      <div className="mt-4 pt-3 border-t border-[#1E293B] flex items-center justify-between text-[10px] text-slate-500">
+      <div className="mt-4 pt-3 border-t border-[#1A2A3F] flex items-center justify-between text-[10px] text-slate-500">
         <span>Cerebro Multi-Candle Engine</span>
         <span>Isolated Sandbox Mode</span>
       </div>

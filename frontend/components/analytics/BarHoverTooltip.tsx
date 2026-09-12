@@ -56,9 +56,9 @@ export function BarHoverTooltip({
         width: `${tooltipWidth}px`,
       }}
     >
-      <div className="bg-[#0B111E]/95 backdrop-blur-md border border-[#1E293B] shadow-2xl shadow-black/80 rounded-xl p-3.5 space-y-2.5 font-mono text-xs text-slate-200">
+      <div className="bg-[#0B111E]/95 backdrop-blur-md border border-[#1A2A3F] shadow-2xl shadow-black/80 rounded-xl p-3.5 space-y-2.5 font-mono text-xs text-slate-200">
         {/* Header: Date + Status Badges */}
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
           <div>
             <div className="text-white font-bold text-sm tracking-tight">{bar.displayDate}</div>
             <div className="text-[10px] text-slate-400">{bar.dayOfWeek}</div>
@@ -85,7 +85,7 @@ export function BarHoverTooltip({
         </div>
 
         {/* Primary Metric Hero Card */}
-        <div className="bg-[#050811] border border-[#1E293B]/70 rounded-lg p-2.5 flex items-center justify-between">
+        <div className="bg-[#050811] border border-[#1A2A3F]/70 rounded-lg p-2.5 flex items-center justify-between">
           <div>
             <div className="text-[10px] text-slate-400 uppercase tracking-wider">Net Profit / Loss</div>
             <div
@@ -129,7 +129,7 @@ export function BarHoverTooltip({
             <span className="font-medium text-slate-300">{formatPnL(bar.funding, currency).formatted}</span>
           </div>
           {bar.netExternalCashFlow !== 0 && (
-            <div className="col-span-2 flex items-center justify-between border-t border-[#1E293B]/50 pt-1">
+            <div className="col-span-2 flex items-center justify-between border-t border-[#1A2A3F]/50 pt-1">
               <span className="text-slate-400">Net Cash Flow:</span>
               <span className="font-semibold text-cyan-400">{formatPnL(bar.netExternalCashFlow, currency).formatted}</span>
             </div>
@@ -137,7 +137,7 @@ export function BarHoverTooltip({
         </div>
 
         {/* Trade Quality & Sizing */}
-        <div className="border-t border-[#1E293B] pt-2 space-y-1">
+        <div className="border-t border-[#1A2A3F] pt-2 space-y-1">
           <div className="flex items-center justify-between text-[11px]">
             <span className="text-slate-400">Executions:</span>
             <span className="text-white font-bold">
@@ -161,7 +161,7 @@ export function BarHoverTooltip({
         </div>
 
         {/* Equity & Peak State */}
-        <div className="border-t border-[#1E293B] pt-2 flex items-center justify-between text-[10px] text-slate-400">
+        <div className="border-t border-[#1A2A3F] pt-2 flex items-center justify-between text-[10px] text-slate-400">
           <div>
             <span>End Equity: </span>
             <span className="text-white font-semibold">{formatPrice(bar.closingEquity, currency)}</span>
@@ -175,7 +175,7 @@ export function BarHoverTooltip({
         </div>
 
         {/* Click-to-Analyze Prompt */}
-        <div className="text-[9px] text-cyan-400/80 text-center pt-1 border-t border-[#1E293B]/40 italic">
+        <div className="text-[9px] text-cyan-400/80 text-center pt-1 border-t border-[#1A2A3F]/40 italic">
           Click bar for full Day Analysis drill-down & orders
         </div>
       </div>

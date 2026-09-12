@@ -29,7 +29,7 @@ export function QuantitativeWinLossExpectancyPanel({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono">
       {/* 1. Win/Loss & Mathematical Expectancy */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Calculator className="w-5 h-5 text-cyan-400" />
@@ -84,7 +84,7 @@ export function QuantitativeWinLossExpectancyPanel({
       </div>
 
       {/* 2. Execution Quality & Fee Analytics */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
           <div className="flex items-center gap-2">
             <Zap className="w-5 h-5 text-amber-400" />

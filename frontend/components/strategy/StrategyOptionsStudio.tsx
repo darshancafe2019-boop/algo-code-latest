@@ -18,6 +18,7 @@ import {
 import { OptionLegBuilderItem, OptionsBuilderConfig } from "@/types/strategy-builder";
 import { normalizeExpiriesList } from "@/lib/expiry-utils";
 import { RawExpiryItem } from "@/types/option-chain";
+import { QosButton, QosBadge } from "@/components/ui/QosComponents";
 
 interface Props {
   config: OptionsBuilderConfig;
@@ -31,7 +32,7 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
     { id: "IRON_CONDOR", name: "Iron Condor", type: "Neutral", desc: "4-Leg range-bound income strategy" },
     { id: "BULL_CALL_SPREAD", name: "Bull Call Spread", type: "Bullish", desc: "2-Leg defined risk directional upside" },
     { id: "BEAR_PUT_SPREAD", name: "Bear Put Spread", type: "Bearish", desc: "2-Leg defined risk directional downside" },
-    { id: "STRADDLE", name: "Long Straddle", type: "Volatility", desc: "2-Leg long volatility non-directional breakout" },
+    { id: "LONG_STRADDLE", name: "Long Straddle", type: "Volatility", desc: "2-Leg long volatility breakout" },
     { id: "STRANGLE", name: "Long Strangle", type: "Volatility", desc: "2-Leg OTM long volatility play" },
     { id: "CALENDAR_SPREAD", name: "Calendar Spread", type: "Time Decay", desc: "Time decay harvesting across expiries" },
     { id: "CUSTOM_MULTI_LEG", name: "Custom Multi-Leg", type: "Flexible", desc: "Build any arbitrary multi-leg options matrix" },
@@ -61,7 +62,6 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
   const handleApplyPreset = (presetId: string) => {
     setSelectedPreset(presetId);
     let newLegs: OptionLegBuilderItem[] = [];
-
     const baseStrike = Math.round(spotPrice / 1000) * 1000;
 
     if (presetId === "IRON_CONDOR") {
@@ -92,7 +92,6 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
       ];
     }
 
-    // Compute basic payoff metrics
     let netPremium = 0;
     for (const leg of newLegs) {
       if (leg.action === "BUY") netPremium -= leg.premium * leg.quantity;
@@ -100,264 +99,106 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
     }
 
     onUpdateConfig({
-      preset: presetId,
-      expiry: activeExpiry,
+      preset: presetId as any,
       legs: newLegs,
-      evaluation: {
-        max_profit: netPremium > 0 ? netPremium : 2000 - Math.abs(netPremium),
-        max_loss: netPremium > 0 ? 2000 - netPremium : Math.abs(netPremium),
-        breakevens: [baseStrike - 1500, baseStrike + 1500],
-        margin_required: 3500,
-        net_premium: netPremium,
-        risk_reward_ratio: 1.85,
+      max_profit: netPremium > 0 ? netPremium : 2000 - Math.abs(netPremium),
+      max_loss: netPremium > 0 ? 2000 - netPremium : Math.abs(netPremium),
+      greeks_total: {
+        delta: Math.round(newLegs.reduce((acc, l) => acc + (l.delta || 0) * (l.action === "BUY" ? 1 : -1), 0) * 100) / 100,
+        gamma: Math.round(newLegs.reduce((acc, l) => acc + (l.gamma || 0), 0) * 10000) / 10000,
+        theta: Math.round(newLegs.reduce((acc, l) => acc + (l.theta || 0) * (l.action === "BUY" ? 1 : -1), 0) * 10) / 10,
+        vega: Math.round(newLegs.reduce((acc, l) => acc + (l.vega || 0) * (l.action === "BUY" ? 1 : -1), 0) * 10) / 10,
       },
     });
   };
 
-  const handleUpdateLeg = (legId: string, field: keyof OptionLegBuilderItem, value: any) => {
-    const updatedLegs = config.legs.map((leg) => {
-      if (leg.id === legId) {
-        return { ...leg, [field]: value };
-      }
-      return leg;
-    });
-    onUpdateConfig({ legs: updatedLegs });
-  };
-
-  const handleAddLeg = () => {
-    const newLeg: OptionLegBuilderItem = {
-      id: `leg-${Date.now()}`,
-      action: "BUY",
-      option_type: "CALL",
-      strike: Math.round(spotPrice / 1000) * 1000,
-      expiry: activeExpiry,
-      premium: 500,
-      quantity: 1,
-      delta: 0.5,
-      gamma: 0.0002,
-      theta: -15.0,
-      vega: 20.0,
-    };
-    onUpdateConfig({ legs: [...config.legs, newLeg] });
-  };
-
-  const handleRemoveLeg = (legId: string) => {
-    onUpdateConfig({ legs: config.legs.filter((l) => l.id !== legId) });
-  };
+  const legs = config.legs || [];
 
   return (
-    <div className="bg-[#0E1524] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">
-      {/* Options Header */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#1A2333] pb-3">
+    <div className="bg-[#0A1422] border border-[#12304A] rounded-xl p-3.5 sm:p-4 shadow-sm space-y-3.5 font-sans select-none text-xs">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#12304A] pb-2.5">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-purple-950 text-purple-400 border border-purple-800">
-            <Percent className="h-4 w-4" />
+          <div className="p-1.5 rounded-lg bg-[#A78BFA]/10 text-[#A78BFA] border border-[#A78BFA]/30">
+            <Layers className="h-4 w-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              Options Multi-Leg Construction Studio
-              <span className="text-[10px] px-2 py-0.5 rounded bg-purple-950 text-purple-400 border border-purple-800 font-mono">
-                Analytical Greeks & Payoff
-              </span>
+            <h3 className="text-xs font-bold text-[#F8FAFC] uppercase tracking-wider flex items-center gap-2">
+              Options Multi-Leg Architecture Studio
             </h3>
-            <p className="text-[11px] text-slate-400">
-              Construct multi-leg option structures with automated delta, gamma, theta, vega, and payoff metrics.
+            <p className="text-[11px] text-[#7D8EA5]">
+              Configure single & multi-leg spreads, strike offsets, delta targets, and net Greeks
             </p>
           </div>
         </div>
 
-        {/* Underlying & Expiry Controls */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400 font-medium">Expiry:</span>
-          <select
-            value={activeExpiry}
-            onChange={(e) => onUpdateConfig({ expiry: e.target.value })}
-            className="bg-[#121927] border border-[#1E293B] rounded-lg px-2.5 py-1 text-xs text-cyan-300 font-mono font-bold focus:outline-none focus:border-cyan-500"
-          >
-            {normalizedExpiries.map((opt) => (
-              <option key={opt.key} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex items-center gap-2 font-mono text-[11px]">
+          <span className="text-[#7D8EA5]">Underlying Spot:</span>
+          <span className="text-[#F8FAFC] font-bold">${spotPrice.toLocaleString()}</span>
         </div>
       </div>
 
-      {/* Preset Strategy Chips */}
+      {/* Preset Strategy Templates */}
       <div className="space-y-1.5">
-        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-          Strategy Archetypes & Multi-Leg Presets
-        </label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          {presets.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => handleApplyPreset(p.id)}
-              className={`p-2 rounded-xl text-left border transition-all ${
-                selectedPreset === p.id
-                  ? "bg-purple-950/60 border-purple-500 text-white shadow-lg shadow-purple-950/40"
-                  : "bg-[#121927] border-[#1E293B] text-slate-400 hover:text-white hover:bg-[#162032]"
-              }`}
+        <span className="text-[10px] font-mono text-[#7D8EA5] uppercase font-bold">Strategy Presets</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pb-1">
+          {presets.map((p) => {
+            const isSelected = selectedPreset === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handleApplyPreset(p.id)}
+                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap border ${
+                  isSelected
+                    ? "bg-[#168BFF] text-white border-[#168BFF] font-bold"
+                    : "bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border-[#12304A]"
+                }`}
+              >
+                <span>{p.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Options Legs Table */}
+      <div className="space-y-1.5 font-mono text-xs">
+        <div className="flex items-center justify-between text-[10px] text-[#7D8EA5] uppercase font-bold">
+          <span>Configured Option Legs ({legs.length})</span>
+          <span>Expiry: {activeExpiry}</span>
+        </div>
+
+        <div className="space-y-1.5">
+          {legs.map((leg, idx) => (
+            <div
+              key={leg.id || idx}
+              className="p-2.5 rounded-lg bg-[#0C1727] border border-[#12304A] flex items-center justify-between gap-2 text-xs"
             >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold truncate">{p.name}</span>
+              <div className="flex items-center gap-2">
                 <span
-                  className={`text-[9px] px-1 py-0.2 rounded font-mono font-bold ${
-                    p.type === "Credit" ? "text-emerald-400 bg-emerald-950/80" : "text-cyan-400 bg-cyan-950/80"
+                  className={`px-2 py-0.5 rounded font-bold text-[10px] ${
+                    leg.action === "BUY"
+                      ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
+                      : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
                   }`}
                 >
-                  {p.type}
+                  {leg.action}
+                </span>
+                <span className="font-bold text-[#F8FAFC]">
+                  {leg.strike} {leg.option_type}
                 </span>
               </div>
-              <p className="text-[9px] text-slate-500 line-clamp-1 mt-0.5">{p.desc}</p>
-            </button>
+
+              <div className="flex items-center gap-3 text-[11px] text-[#7D8EA5]">
+                <span>Prem: ${leg.premium}</span>
+                <span>Delta: {leg.delta}</span>
+                <span>Qty: {leg.quantity}</span>
+              </div>
+            </div>
           ))}
         </div>
       </div>
-
-      {/* Multi-Leg Table */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            Strategy Legs Configuration ({config.legs.length} Legs)
-          </span>
-          <button
-            onClick={handleAddLeg}
-            className="px-2.5 py-1 rounded-lg bg-[#121927] hover:bg-[#162032] border border-dashed border-slate-700 text-purple-400 text-xs font-bold flex items-center gap-1 transition-colors"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            <span>Add Custom Leg</span>
-          </button>
-        </div>
-
-        <div className="overflow-x-auto rounded-xl border border-[#1E293B] bg-[#0A0E17]">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#121927] text-[10px] text-slate-400 border-b border-[#1E293B]">
-              <tr>
-                <th className="py-2 px-3">Action</th>
-                <th className="py-2 px-3">Type</th>
-                <th className="py-2 px-3">Strike ($)</th>
-                <th className="py-2 px-3">Premium ($)</th>
-                <th className="py-2 px-3">Qty</th>
-                <th className="py-2 px-3">Delta (Δ)</th>
-                <th className="py-2 px-3">Theta (Θ)</th>
-                <th className="py-2 px-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#1A2333]">
-              {config.legs.map((leg) => (
-                <tr key={leg.id} className="hover:bg-[#121927] transition-colors">
-                  <td className="py-2 px-3">
-                    <select
-                      value={leg.action}
-                      onChange={(e) => handleUpdateLeg(leg.id, "action", e.target.value)}
-                      className={`bg-transparent font-bold focus:outline-none ${
-                        leg.action === "BUY" ? "text-emerald-400" : "text-red-400"
-                      }`}
-                    >
-                      <option value="BUY" className="bg-[#0A0E17] text-emerald-400">BUY</option>
-                      <option value="SELL" className="bg-[#0A0E17] text-red-400">SELL</option>
-                    </select>
-                  </td>
-                  <td className="py-2 px-3">
-                    <select
-                      value={leg.option_type}
-                      onChange={(e) => handleUpdateLeg(leg.id, "option_type", e.target.value)}
-                      className="bg-transparent text-cyan-300 font-bold focus:outline-none"
-                    >
-                      <option value="CALL" className="bg-[#0A0E17] text-cyan-300">CALL (CE)</option>
-                      <option value="PUT" className="bg-[#0A0E17] text-purple-300">PUT (PE)</option>
-                    </select>
-                  </td>
-                  <td className="py-2 px-3">
-                    <input
-                      type="number"
-                      value={leg.strike}
-                      onChange={(e) => handleUpdateLeg(leg.id, "strike", parseFloat(e.target.value))}
-                      className="w-24 bg-[#121927] border border-slate-700 rounded px-2 py-0.5 text-white font-bold focus:outline-none focus:border-purple-500"
-                    />
-                  </td>
-                  <td className="py-2 px-3">
-                    <input
-                      type="number"
-                      value={leg.premium}
-                      onChange={(e) => handleUpdateLeg(leg.id, "premium", parseFloat(e.target.value))}
-                      className="w-20 bg-[#121927] border border-slate-700 rounded px-2 py-0.5 text-[#55C98A] font-bold focus:outline-none focus:border-purple-500"
-                    />
-                  </td>
-                  <td className="py-2 px-3">
-                    <input
-                      type="number"
-                      value={leg.quantity}
-                      onChange={(e) => handleUpdateLeg(leg.id, "quantity", parseInt(e.target.value) || 1)}
-                      className="w-14 bg-[#121927] border border-slate-700 rounded px-2 py-0.5 text-white font-bold focus:outline-none focus:border-purple-500"
-                    />
-                  </td>
-                  <td className="py-2 px-3 text-cyan-400 font-semibold">{(Number(leg.delta) || 0.50).toFixed(2)}</td>
-                  <td className="py-2 px-3 text-red-400 font-semibold">{(Number(leg.theta) || -10.0).toFixed(1)}</td>
-                  <td className="py-2 px-3 text-right">
-                    {config.legs.length > 1 && (
-                      <button
-                        onClick={() => handleRemoveLeg(leg.id)}
-                        className="text-slate-500 hover:text-red-400 p-1 rounded transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Calculated Strategy Metrics Output Cards */}
-      {config.evaluation && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-2">
-          <div className="p-2.5 bg-[#121927] border border-emerald-900/60 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Max Profit</span>
-            <span className="text-sm font-bold font-mono text-emerald-400">
-              +${config.evaluation.max_profit?.toLocaleString() || "0"}
-            </span>
-          </div>
-
-          <div className="p-2.5 bg-[#121927] border border-red-900/60 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Max Loss</span>
-            <span className="text-sm font-bold font-mono text-red-400">
-              -${config.evaluation.max_loss?.toLocaleString() || "0"}
-            </span>
-          </div>
-
-          <div className="p-2.5 bg-[#121927] border border-slate-800 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Net Premium</span>
-            <span className="text-sm font-bold font-mono text-cyan-400">
-              {config.evaluation.net_premium >= 0 ? `+$${config.evaluation.net_premium}` : `-$${Math.abs(config.evaluation.net_premium)}`}
-            </span>
-          </div>
-
-          <div className="p-2.5 bg-[#121927] border border-slate-800 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Breakevens</span>
-            <span className="text-xs font-bold font-mono text-slate-200">
-              ${config.evaluation.breakevens?.[0]} / ${config.evaluation.breakevens?.[1]}
-            </span>
-          </div>
-
-          <div className="p-2.5 bg-[#121927] border border-slate-800 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Est. Margin</span>
-            <span className="text-sm font-bold font-mono text-white">
-              ${config.evaluation.margin_required?.toLocaleString() || "3,500"}
-            </span>
-          </div>
-
-          <div className="p-2.5 bg-[#121927] border border-slate-800 rounded-xl">
-            <span className="text-[10px] text-slate-400 uppercase font-bold block">Risk:Reward</span>
-            <span className="text-sm font-bold font-mono text-purple-400">
-              1:{config.evaluation.risk_reward_ratio || "1.85"}
-            </span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

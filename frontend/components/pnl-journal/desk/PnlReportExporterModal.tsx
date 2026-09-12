@@ -21,9 +21,9 @@ export const PnlReportExporterModal: React.FC<PnlReportExporterModalProps> = ({
   calendarRecords,
   capitalEvents,
 }) => {
-  if (!isOpen) return null;
-
   const [copied, setCopied] = useState(false);
+
+  if (!isOpen) return null;
 
   // 1. Export CSV of Trade Journal
   const handleExportTradesCsv = () => {

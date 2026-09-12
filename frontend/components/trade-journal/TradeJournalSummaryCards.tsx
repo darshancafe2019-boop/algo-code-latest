@@ -72,89 +72,89 @@ export function TradeJournalSummaryCards({ summary }: TradeJournalSummaryCardsPr
       {/* 6 Top Primary Performance Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
         {/* Net P&L */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Net Realized P&L</span>
-            {isNetProfit ? <TrendingUp className="h-3.5 w-3.5 text-[#55C98A]" /> : <TrendingDown className="h-3.5 w-3.5 text-red-400" />}
+            {isNetProfit ? <TrendingUp className="h-3.5 w-3.5 text-[#22D3EE]" /> : <TrendingDown className="h-3.5 w-3.5 text-red-400" />}
           </div>
           <span
             className={`text-lg font-bold block ${
-              isNetProfit ? "text-[#55C98A]" : "text-red-400"
+              isNetProfit ? "text-[#22D3EE]" : "text-red-400"
             }`}
           >
             {isNetProfit ? "+" : ""}${metrics.net_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             Gross: +${metrics.gross_profit.toFixed(0)} / -${metrics.gross_loss.toFixed(0)}
           </span>
         </div>
 
         {/* Win Rate */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Win Rate</span>
-            <Award className="h-3.5 w-3.5 text-[#55C98A]" />
+            <Award className="h-3.5 w-3.5 text-[#22D3EE]" />
           </div>
           <span className="text-lg font-bold text-white block">
             {metrics.win_rate_pct.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             {metrics.winning_trades}W • {metrics.losing_trades}L • {metrics.total_trades} Total
           </span>
         </div>
 
         {/* Profit Factor */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Profit Factor</span>
             <Scale className="h-3.5 w-3.5 text-cyan-300" />
           </div>
           <span className="text-lg font-bold text-cyan-300 block">
             {metrics.profit_factor.toFixed(2)}
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             Expectancy: ${metrics.expectancy.toFixed(2)}/trade
           </span>
         </div>
 
         {/* Avg Win / Avg Loss */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Avg Win / Loss</span>
             <Activity className="h-3.5 w-3.5 text-purple-300" />
           </div>
           <span className="text-lg font-bold text-purple-300 block">
             +${metrics.average_win.toFixed(0)} / -${metrics.average_loss.toFixed(0)}
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             Avg R:R: 1 : {metrics.average_risk_reward.toFixed(1)}
           </span>
         </div>
 
         {/* Max Drawdown */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Max Drawdown</span>
             <Shield className="h-3.5 w-3.5 text-emerald-400" />
           </div>
-          <span className="text-lg font-bold text-[#55C98A] block">
+          <span className="text-lg font-bold text-[#22D3EE] block">
             {metrics.max_drawdown_pct.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             Peak to Trough High Mark
           </span>
         </div>
 
         {/* Execution Costs */}
-        <div className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-1 hover:border-[#2E7D5B] transition-colors">
-          <div className="flex items-center justify-between text-[#70877A]">
+        <div className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-1 hover:border-[#2563EB] transition-colors">
+          <div className="flex items-center justify-between text-[#52627A]">
             <span className="text-[10px] font-bold uppercase">Fees & Slippage</span>
             <Zap className="h-3.5 w-3.5 text-amber-400" />
           </div>
           <span className="text-lg font-bold text-amber-400 block">
             ${(metrics.total_fees + metrics.total_slippage).toFixed(2)}
           </span>
-          <span className="text-[10px] text-[#70877A] block">
+          <span className="text-[10px] text-[#52627A] block">
             Avg Hold: {metrics.average_holding_time}
           </span>
         </div>

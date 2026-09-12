@@ -139,19 +139,19 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
   }, [data, searchQuery, searchFilter, sortKey, sortDir]);
 
   return (
-    <div className={cn("flex flex-col w-full bg-[#0A101C] rounded-lg border border-[#213047] overflow-hidden", className)}>
+    <div className={cn("flex flex-col w-full bg-[#0A1422] rounded-xl border border-[#1A2A3F] overflow-hidden font-sans", className)}>
       {/* Optional Search / Controls Bar */}
       {(searchable || toolbarRight) && (
-        <div className="flex items-center justify-between gap-3 px-3 py-2 bg-[#0E1624] border-b border-[#213047]">
+        <div className="flex items-center justify-between gap-3 px-3.5 py-2.5 bg-[#07101A] border-b border-[#122033]">
           {searchable && (
             <div className="relative flex-1 max-w-xs">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#64748B]" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#52627A]" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full bg-[#101827] border border-[#213047] rounded-md pl-8 pr-3 py-1 text-xs text-[#F4F7FA] placeholder-[#64748B] focus:outline-none focus:border-[#22C7E8] font-mono transition-colors"
+                className="w-full bg-[#0D1727] border border-[#1A2A3F] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[#F7FAFC] placeholder-[#52627A] focus:outline-none focus:border-[#22D3EE] font-mono transition-colors"
               />
             </div>
           )}
@@ -163,17 +163,17 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
       <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight }}>
         <table className={cn("w-full border-collapse text-left select-text", tableClassName)}>
           {/* Sticky Header */}
-          <thead className="sticky top-0 z-10 bg-[#0E1624] border-b border-[#213047] text-[11px] font-semibold uppercase tracking-wider text-[#94A3B8] select-none">
+          <thead className="sticky top-0 z-10 bg-[#07101A] border-b border-[#122033] text-[11px] font-semibold uppercase tracking-wider text-[#7C8CA3] select-none">
             {/* Group headers row if present */}
             {hasGroupHeaders && headerGroups && (
-              <tr className="border-b border-[#213047]/60">
+              <tr className="border-b border-[#122033]">
                 {headerGroups.map((g, idx) => (
                   <th
                     key={idx}
                     colSpan={g.colSpan}
                     className={cn(
-                      "px-3 py-1.5 font-mono text-[10px] text-center tracking-widest uppercase border-r border-[#213047]/40 last:border-none",
-                      g.title ? "bg-[#121C2C]/70 text-[#22C7E8]" : "bg-transparent text-transparent"
+                      "px-3 py-1.5 font-mono text-[10px] text-center tracking-widest uppercase border-r border-[#122033] last:border-none",
+                      g.title ? "bg-[#0A1422] text-[#22D3EE]" : "bg-transparent text-transparent"
                     )}
                   >
                     {g.title}
@@ -192,10 +192,10 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
                     style={{ width: col.width }}
                     onClick={() => col.sortable && handleSort(col.key)}
                     className={cn(
-                      "px-3 font-mono font-medium tracking-tight whitespace-nowrap",
+                      "px-3.5 font-mono font-semibold tracking-tight whitespace-nowrap",
                       compact ? "py-2 text-[11px]" : "py-2.5 text-xs",
                       col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left",
-                      col.sortable && "cursor-pointer hover:text-[#F4F7FA] hover:bg-[#121C2C]/50 transition-colors",
+                      col.sortable && "cursor-pointer hover:text-[#F7FAFC] hover:bg-[#101B2D]/50 transition-colors",
                       col.headerClassName
                     )}
                   >
@@ -208,12 +208,12 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
                     >
                       <span>{col.header}</span>
                       {col.sortable && (
-                        <span className="text-[#64748B]">
+                        <span className="text-[#52627A]">
                           {isSorted ? (
                             sortDir === "asc" ? (
-                              <ChevronUp className="h-3.5 w-3.5 text-[#22C7E8]" />
+                              <ChevronUp className="h-3.5 w-3.5 text-[#22D3EE]" />
                             ) : (
-                              <ChevronDown className="h-3.5 w-3.5 text-[#22C7E8]" />
+                              <ChevronDown className="h-3.5 w-3.5 text-[#22D3EE]" />
                             )
                           ) : (
                             <ArrowUpDown className="h-3 w-3 opacity-40 hover:opacity-100" />
@@ -228,12 +228,12 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
           </thead>
 
           {/* Table Body */}
-          <tbody className="divide-y divide-[#213047]/40 text-xs text-[#F4F7FA]">
+          <tbody className="divide-y divide-[#122033] text-xs text-[#F7FAFC]">
             {isLoading ? (
               <tr>
-                <td colSpan={columns.length} className="px-4 py-12 text-center text-slate-400 font-mono text-xs">
+                <td colSpan={columns.length} className="px-4 py-12 text-center text-[#7C8CA3] font-mono text-xs">
                   <div className="flex items-center justify-center gap-2">
-                    <div className="h-4 w-4 rounded-full border-2 border-[#22C7E8] border-t-transparent animate-spin" />
+                    <div className="h-4 w-4 rounded-full border-2 border-[#22D3EE] border-t-transparent animate-spin" />
                     <span>Streaming institutional table data...</span>
                   </div>
                 </td>
@@ -254,10 +254,10 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
                     key={rowKey}
                     onClick={() => onRowClick && onRowClick(row, rowIdx)}
                     className={cn(
-                      "transition-colors duration-100 font-mono",
-                      rowIdx % 2 === 0 ? "bg-[#070B14]/40" : "bg-[#0A101C]",
-                      onRowClick && "cursor-pointer hover:bg-[#121C2C]/90",
-                      isSelected && "bg-[#22C7E8]/10 border-l-2 border-l-[#22C7E8]"
+                      "transition-colors duration-100 font-mono h-10",
+                      rowIdx % 2 === 0 ? "bg-[#0A1422]" : "bg-[#07101A]/40",
+                      onRowClick && "cursor-pointer hover:bg-[#101B2D]",
+                      isSelected && "bg-[#2563EB]/15 border-l-2 border-l-[#22D3EE]"
                     )}
                   >
                     {columns.map((col) => {
@@ -271,7 +271,7 @@ export function InstitutionalDataTable<T extends Record<string, any>>({
                         <td
                           key={col.key}
                           className={cn(
-                            "px-3 whitespace-nowrap",
+                            "px-3.5 whitespace-nowrap",
                             compact ? "py-1.5 text-[11px]" : "py-2 text-xs",
                             col.align === "right"
                               ? "text-right tabular-nums"

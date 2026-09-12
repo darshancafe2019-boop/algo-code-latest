@@ -35,7 +35,7 @@ export function ConfluenceScoreGauge({ evaluation }: ConfluenceScoreGaugeProps) 
   const isSell = data.direction === "SELL";
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -55,7 +55,7 @@ export function ConfluenceScoreGauge({ evaluation }: ConfluenceScoreGaugeProps) 
       {/* Main Metric Cards Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* 1. Bull Score */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 flex items-center justify-between">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 flex items-center justify-between">
           <div>
             <div className="text-[10px] font-mono uppercase text-slate-400">Bullish Confluence</div>
             <div className="text-2xl font-bold font-mono text-emerald-400 mt-0.5">
@@ -69,7 +69,7 @@ export function ConfluenceScoreGauge({ evaluation }: ConfluenceScoreGaugeProps) 
         </div>
 
         {/* 2. Bear Score */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 flex items-center justify-between">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 flex items-center justify-between">
           <div>
             <div className="text-[10px] font-mono uppercase text-slate-400">Bearish Confluence</div>
             <div className="text-2xl font-bold font-mono text-red-400 mt-0.5">
@@ -83,7 +83,7 @@ export function ConfluenceScoreGauge({ evaluation }: ConfluenceScoreGaugeProps) 
         </div>
 
         {/* 3. Decision */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-3.5 flex items-center justify-between">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-3.5 flex items-center justify-between">
           <div>
             <div className="text-[10px] font-mono uppercase text-slate-400">Strategy Decision Gate</div>
             <div className={`text-base font-bold font-mono mt-0.5 ${

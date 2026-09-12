@@ -454,27 +454,27 @@ export function TradingTerminal() {
       {/* Live Trading Confirmation Modal */}
       {isConfirmingLive && (
         <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-          <div className="bg-[#131722] border border-[#EF5350]/60 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4">
-            <div className="flex items-center gap-3 text-[#EF5350]">
+          <div className="bg-[#0A1422] border border-[#FF3B5C]/60 rounded-xl p-5 max-w-md w-full shadow-2xl space-y-4 font-sans">
+            <div className="flex items-center gap-3 text-[#FF3B5C]">
               <ShieldAlert className="w-6 h-6 animate-bounce" />
-              <h3 className="text-base font-bold text-[#D1D4DC]">Activate Real-Money Live Trading?</h3>
+              <h3 className="text-base font-bold text-[#F7FAFC]">Activate Real-Money Live Trading?</h3>
             </div>
-            <p className="text-xs text-[#787B86] leading-relaxed">
-              You are about to switch from simulated paper execution to <strong>LIVE REAL-MONEY MODE</strong>. Orders will be directly transmitted to authorized broker endpoints. The 14-Point Pre-Order Safety Gate remains enforced at all times.
+            <p className="text-xs text-[#7C8CA3] leading-relaxed">
+              You are about to switch from simulated paper execution to <strong className="text-[#F7FAFC]">LIVE REAL-MONEY MODE</strong>. Orders will be directly transmitted to authorized broker endpoints. The 14-Point Pre-Order Safety Gate remains enforced at all times.
             </p>
-            <div className="p-2.5 bg-[#EF5350]/10 border border-[#EF5350]/30 rounded text-[11px] font-mono text-[#EF5350]">
+            <div className="p-2.5 bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 rounded-lg text-xs font-mono text-[#FF3B5C]">
               ⚠️ Ensure account risk limits and stop losses are properly set before proceeding.
             </div>
             <div className="flex items-center justify-end gap-2.5 pt-1">
               <button
                 onClick={() => setIsConfirmingLive(false)}
-                className="px-3.5 py-1.5 rounded bg-[#1E222D] hover:bg-[#2A2E39] text-[#787B86] hover:text-[#D1D4DC] text-xs font-semibold transition-colors"
+                className="px-3.5 py-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-semibold border border-[#1A2A3F] transition-colors"
               >
                 Cancel (Keep Paper)
               </button>
               <button
                 onClick={confirmLiveMode}
-                className="px-4 py-1.5 rounded bg-[#EF5350] hover:bg-[#EF5350]/90 text-white text-xs font-bold shadow-lg shadow-[#EF5350]/30 transition-all"
+                className="px-4 py-1.5 rounded-lg bg-[#FF3B5C] hover:bg-[#FF3B5C]/90 text-white text-xs font-bold shadow-lg shadow-[#FF3B5C]/30 transition-all"
               >
                 Confirm Live Activation
               </button>

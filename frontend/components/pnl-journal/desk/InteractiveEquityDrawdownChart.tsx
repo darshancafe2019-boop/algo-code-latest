@@ -237,14 +237,14 @@ export const InteractiveEquityDrawdownChart: React.FC<InteractiveEquityDrawdownC
                       y1={y}
                       x2={chartWidth - padding.right}
                       y2={y}
-                      stroke="#334155"
+                      stroke="#29415F"
                       strokeDasharray="3 3"
                       strokeWidth="0.5"
                     />
                     <text
                       x={padding.left - 8}
                       y={y + 3}
-                      fill="#64748B"
+                      fill="#52627A"
                       fontSize="9"
                       fontFamily="monospace"
                       textAnchor="end"
@@ -304,13 +304,13 @@ export const InteractiveEquityDrawdownChart: React.FC<InteractiveEquityDrawdownC
                 y1="10"
                 x2={chartWidth - padding.right}
                 y2="10"
-                stroke="#64748B"
+                stroke="#52627A"
                 strokeWidth="1"
               />
               <text
                 x={padding.left - 8}
                 y="13"
-                fill="#64748B"
+                fill="#52627A"
                 fontSize="9"
                 fontFamily="monospace"
                 textAnchor="end"
@@ -354,7 +354,7 @@ export const InteractiveEquityDrawdownChart: React.FC<InteractiveEquityDrawdownC
                         ? equityChartHeight - padding.bottom
                         : ddChartHeight
                     }
-                    stroke="#38BDF8"
+                    stroke="#19C5FF"
                     strokeWidth="1"
                     strokeDasharray="2 2"
                   />

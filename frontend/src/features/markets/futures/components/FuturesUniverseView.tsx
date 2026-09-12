@@ -95,6 +95,8 @@ export function FuturesUniverseView({
     setOrderReviewOpen,
     orderReviewContract,
     orderReviewSide,
+    orderSide,
+    setOrderSide,
     executionMode,
     setExecutionMode,
   } = useFuturesStore();
@@ -207,6 +209,49 @@ export function FuturesUniverseView({
   const liveCount = healthData?.live_providers_count ?? 4;
   const totalCount = healthData?.total_providers_count ?? 6;
 
+  // Global Keyboard Shortcuts (B, S, O, Esc)
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing inside form inputs
+      const target = e.target as HTMLElement;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        if (e.key === "Escape") {
+          setDetailsDrawerOpen(false);
+          setOrderReviewOpen(false);
+        }
+        return;
+      }
+
+      if (e.key === "Escape") {
+        setDetailsDrawerOpen(false);
+        setOrderReviewOpen(false);
+        return;
+      }
+
+      const active = selectedContract || filteredContracts[0];
+      if (!active) return;
+
+      if (e.key === "b" || e.key === "B") {
+        e.preventDefault();
+        setSelectedContract(active);
+        setOrderSide("BUY");
+        setDetailsDrawerOpen(true);
+      } else if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        setSelectedContract(active);
+        setOrderSide("SELL");
+        setDetailsDrawerOpen(true);
+      } else if (e.key === "o" || e.key === "O") {
+        e.preventDefault();
+        setSelectedContract(active);
+        setDetailsDrawerOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedContract, filteredContracts, setDetailsDrawerOpen, setOrderReviewOpen, setSelectedContract, setOrderSide]);
+
   return (
     <div className="w-full space-y-3 font-sans text-slate-100 select-none max-w-[1650px] mx-auto min-w-0">
       {/* 1. Top High-Density Bar */}
@@ -263,8 +308,14 @@ export function FuturesUniverseView({
           })}
         </div>
 
-        {/* Active Source Badge */}
-        <div className="hidden sm:flex items-center pr-1 flex-shrink-0 font-mono text-[10px] text-slate-400">
+        {/* Active Source Badge & Keyboard Hint */}
+        <div className="hidden sm:flex items-center gap-3 pr-2 flex-shrink-0 font-mono text-[10px] text-slate-400">
+          <span className="text-slate-500">
+            Keys: <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">B</kbd> Buy •{" "}
+            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">S</kbd> Sell •{" "}
+            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">O</kbd> Book •{" "}
+            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">Esc</kbd>
+          </span>
           <span>Source: <strong className="text-cyan-300">{effectiveSource}</strong></span>
         </div>
       </div>
@@ -303,7 +354,8 @@ export function FuturesUniverseView({
             }}
             onTrade={(e, contract, side) => {
               setSelectedContract(contract);
-              setOrderReviewOpen(true, contract, side);
+              setOrderSide(side === "SELL" ? "SELL" : "BUY");
+              setDetailsDrawerOpen(true);
             }}
           />
 
@@ -357,11 +409,16 @@ export function FuturesUniverseView({
         <FuturesHealthView />
       )}
 
-      {/* 4. Details Drawer (Opens smoothly when any contract is clicked) */}
+      {/* 4. Details Drawer / Execution Ticket (Opens immediately when Buy/Sell or row is clicked) */}
       <FuturesDetailsDrawer
         contract={selectedContract}
         isOpen={isDetailsDrawerOpen}
         onClose={() => setDetailsDrawerOpen(false)}
+        initialSide={orderSide}
+        onOrderSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
+          queryClient.invalidateQueries({ queryKey: ["futuresOrdersList"] });
+        }}
       />
 
       {/* 5. Safe Order Review Modal */}

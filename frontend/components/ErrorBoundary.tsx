@@ -15,6 +15,22 @@ interface State {
   error: Error | null;
 }
 
+/**
+ * Redacts sensitive tokens, API secrets, passwords, and private keys from error logs.
+ */
+function sanitizeErrorLog(raw: any): any {
+  if (!raw) return raw;
+  try {
+    const jsonStr = typeof raw === "string" ? raw : JSON.stringify(raw);
+    return jsonStr.replace(
+      /(token|secret|password|key|auth|bearer|cookie|session)=([^&\s,]+)/gi,
+      "$1=[REDACTED]"
+    );
+  } catch {
+    return "[Unserializable Error Payload]";
+  }
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
@@ -22,7 +38,13 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   private unhandledRejectionHandler = (event: PromiseRejectionEvent) => {
-    console.warn(`[ASYNC_PROMISE_REJECTION] Caught in ErrorBoundary context [${this.props.title || "Root"}]:`, event.reason);
+    const route = typeof window !== "undefined" ? window.location.pathname : "/";
+    console.warn(`[ASYNC_PROMISE_REJECTION] Caught in ErrorBoundary context [${this.props.title || "Root"}]`, {
+      component: this.props.title || "Root",
+      route,
+      reason: sanitizeErrorLog(event.reason),
+      timestamp: new Date().toISOString(),
+    });
   };
 
   public static getDerivedStateFromError(error: Error): State {
@@ -42,7 +64,20 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error(`[REACT_ERROR_BOUNDARY] [${this.props.title || "Component"}] caught an error:`, error, errorInfo);
+    const route = typeof window !== "undefined" ? window.location.pathname : "/";
+    const component = this.props.title || "Component";
+    const errorClass = error?.name || "Error";
+    const message = error?.message || "Unknown error";
+    const timestamp = new Date().toISOString();
+
+    console.error(`[REACT_ERROR_BOUNDARY] [${component}] caught an error:`, {
+      component,
+      errorClass,
+      message: sanitizeErrorLog(message),
+      route,
+      timestamp,
+      componentStack: errorInfo.componentStack ? sanitizeErrorLog(errorInfo.componentStack) : undefined,
+    });
   }
 
   public handleRetry = () => {
@@ -90,4 +125,3 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-

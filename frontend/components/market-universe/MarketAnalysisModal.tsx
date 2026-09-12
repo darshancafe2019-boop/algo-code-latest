@@ -70,9 +70,9 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="bg-[#0B0E14] border border-[#1E293B] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-[#0B0E14] border border-[#1A2A3F] rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="p-4 bg-[#121824] border-b border-[#1E293B] flex items-center justify-between">
+        <div className="p-4 bg-[#121824] border-b border-[#1A2A3F] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
               <Activity className="h-5 w-5" />
@@ -82,7 +82,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 <h3 className="text-base font-bold text-white tracking-wide">
                   {instrument.canonical_symbol || instrument.symbol}
                 </h3>
-                <span className="px-2 py-0.5 rounded-md bg-[#1E293B] text-slate-300 text-[11px] font-bold">
+                <span className="px-2 py-0.5 rounded-md bg-[#1A2A3F] text-slate-300 text-[11px] font-bold">
                   {instrument.exchange}
                 </span>
                 <span className="px-2 py-0.5 rounded-md bg-cyan-500/20 text-cyan-300 text-[11px] font-bold border border-cyan-500/30">
@@ -95,7 +95,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
 
           <button
             onClick={onClose}
-            className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1E293B] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
+            className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1A2A3F] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
           >
             <X className="h-4 w-4" />
           </button>
@@ -104,7 +104,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
         {/* Content */}
         <div className="p-5 space-y-5 overflow-y-auto">
           {/* Price & Trend Banner */}
-          <div className="p-4 rounded-xl bg-[#0F141F] border border-[#1E293B] flex flex-wrap items-center justify-between gap-4">
+          <div className="p-4 rounded-xl bg-[#0F141F] border border-[#1A2A3F] flex flex-wrap items-center justify-between gap-4">
             <div>
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
                 Last Traded Price ({instrument.currency || "USD"})
@@ -151,7 +151,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
               Explainable Market Intelligence
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1E293B]">
+              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 block uppercase">Volatility Score</span>
                 <span className="text-sm font-bold text-white font-mono mt-0.5 block">
                   {instrument.volatility_score || 45}/100
@@ -169,7 +169,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 </span>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1E293B]">
+              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 block uppercase">Momentum Score</span>
                 <span className="text-sm font-bold text-white font-mono mt-0.5 block">
                   {instrument.momentum_score || 50}/100
@@ -177,7 +177,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 <span className="text-[10px] text-cyan-400 font-semibold">Ranked Top 15%</span>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1E293B]">
+              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 block uppercase">24h Volume</span>
                 <span className="text-sm font-bold text-white font-mono mt-0.5 block">
                   {instrument.volume_24h ? (instrument.volume_24h / 1000000).toFixed(2) + "M" : "—"}
@@ -185,7 +185,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 <span className="text-[10px] text-emerald-400 font-semibold">High Liquidity</span>
               </div>
 
-              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1E293B]">
+              <div className="p-3 rounded-xl bg-[#0F141F] border border-[#1A2A3F]">
                 <span className="text-[10px] text-slate-500 block uppercase">Data Source</span>
                 <span className="text-xs font-bold text-white font-mono mt-0.5 block truncate">
                   {instrument.data_source || "Authorized Feed"}
@@ -208,7 +208,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 className={`p-3 rounded-xl border flex items-center justify-between ${
                   instrument.is_swing_candidate
                     ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                    : "bg-slate-900/40 border-[#1E293B] text-slate-500"
+                    : "bg-slate-900/40 border-[#1A2A3F] text-slate-500"
                 }`}
               >
                 <div>
@@ -226,7 +226,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 className={`p-3 rounded-xl border flex items-center justify-between ${
                   instrument.is_scalping_candidate
                     ? "bg-cyan-500/10 border-cyan-500/30 text-cyan-300"
-                    : "bg-slate-900/40 border-[#1E293B] text-slate-500"
+                    : "bg-slate-900/40 border-[#1A2A3F] text-slate-500"
                 }`}
               >
                 <div>
@@ -244,7 +244,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
                 className={`p-3 rounded-xl border flex items-center justify-between ${
                   instrument.is_hedge_candidate
                     ? "bg-purple-500/10 border-purple-500/30 text-purple-300"
-                    : "bg-slate-900/40 border-[#1E293B] text-slate-500"
+                    : "bg-slate-900/40 border-[#1A2A3F] text-slate-500"
                 }`}
               >
                 <div>
@@ -266,7 +266,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
               <Globe className="h-3.5 w-3.5 text-purple-400" />
               Contract Reference & Exchange Data
             </h4>
-            <div className="p-3.5 rounded-xl bg-[#0F141F] border border-[#1E293B] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+            <div className="p-3.5 rounded-xl bg-[#0F141F] border border-[#1A2A3F] grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
               <div>
                 <span className="text-[10px] text-slate-500 block">ISIN / Security Code</span>
                 <span className="text-slate-300 font-semibold">{instrument.isin || "—"}</span>
@@ -287,7 +287,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
           </div>
 
           {/* Activation & Execution Safety Controls */}
-          <div className="p-4 rounded-xl bg-[#121824] border border-[#1E293B] space-y-3">
+          <div className="p-4 rounded-xl bg-[#121824] border border-[#1A2A3F] space-y-3">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
               <Sliders className="h-3.5 w-3.5 text-cyan-400" />
               Instrument Activation Controls & Permissions
@@ -295,7 +295,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {/* Paper Trading */}
-              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1E293B] flex items-center justify-between cursor-pointer hover:border-cyan-500/40 transition-colors">
+              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] flex items-center justify-between cursor-pointer hover:border-cyan-500/40 transition-colors">
                 <div>
                   <span className="text-xs font-bold text-white block">Paper Trading</span>
                   <span className="text-[10px] text-slate-400">Simulation Enabled</span>
@@ -309,7 +309,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
               </label>
 
               {/* Strategy Engine Scan */}
-              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1E293B] flex items-center justify-between cursor-pointer hover:border-cyan-500/40 transition-colors">
+              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] flex items-center justify-between cursor-pointer hover:border-cyan-500/40 transition-colors">
                 <div>
                   <span className="text-xs font-bold text-white block">Strategy Scan</span>
                   <span className="text-[10px] text-slate-400">Allow in Bots</span>
@@ -323,7 +323,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
               </label>
 
               {/* Live Trading */}
-              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1E293B] flex items-center justify-between cursor-pointer hover:border-rose-500/40 transition-colors">
+              <label className="p-3 rounded-lg bg-[#0B0E14] border border-[#1A2A3F] flex items-center justify-between cursor-pointer hover:border-rose-500/40 transition-colors">
                 <div>
                   <span className="text-xs font-bold text-rose-400 block flex items-center gap-1">
                     Live Trading

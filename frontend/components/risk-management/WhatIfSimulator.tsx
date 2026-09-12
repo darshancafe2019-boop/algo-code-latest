@@ -62,11 +62,11 @@ export function WhatIfSimulator() {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             What-If Scenario Stress Testing Simulator
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Simulate macro price shocks, volatility spikes, and gap downs against your live portfolio.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           Simulation Only • Zero Order Execution
         </span>
       </div>
@@ -84,12 +84,12 @@ export function WhatIfSimulator() {
             }}
             className={`p-2.5 rounded-xl text-left border transition-all space-y-1 ${
               selectedScenario === sc.id
-                ? "bg-[#123C2A] text-[#55C98A] border-[#39B978]/60 shadow-md"
-                : "bg-[#0D1914] text-[#A8BDB0] hover:text-white border-[#1B3328]"
+                ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border-[#00E890]/60 shadow-md"
+                : "bg-[#0A1422] text-[#7C8CA3] hover:text-white border-[#122033]"
             }`}
           >
             <span className="font-bold block text-[11px] truncate">{sc.name}</span>
-            <span className="text-[10px] text-[#70877A] block">
+            <span className="text-[10px] text-[#52627A] block">
               {sc.price > 0 ? "+" : ""}{sc.price}% Price • {sc.vol > 0 ? "+" : ""}{sc.vol}% Vol
             </span>
           </button>
@@ -97,16 +97,16 @@ export function WhatIfSimulator() {
       </div>
 
       {/* Action Trigger Card */}
-      <div className="p-4 rounded-2xl bg-[#0D1914] border border-[#1B3328] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono">
+      <div className="p-4 rounded-2xl bg-[#0A1422] border border-[#122033] flex flex-col sm:flex-row items-center justify-between gap-4 text-xs font-mono">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A]">
+          <div className="p-2 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE]">
             <Sparkles className="h-5 w-5" />
           </div>
           <div>
             <span className="text-white font-bold block">
               Active Scenario: {presetScenarios.find((s) => s.id === selectedScenario)?.name || "Custom Shock"}
             </span>
-            <span className="text-[11px] text-[#A8BDB0]">
+            <span className="text-[11px] text-[#7C8CA3]">
               Evaluates multi-asset portfolio drawdown, liquidation buffer, and margin strain.
             </span>
           </div>
@@ -130,7 +130,7 @@ export function WhatIfSimulator() {
             return (
               <div
                 key={res.scenario_id}
-                className="p-3.5 rounded-2xl bg-[#07110D] border border-[#1B3328] space-y-2 hover:border-[#2E7D5B] transition-colors"
+                className="p-3.5 rounded-2xl bg-[#07101A] border border-[#122033] space-y-2 hover:border-[#2563EB] transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white text-[11px]">{res.scenario_name}</span>
@@ -140,7 +140,7 @@ export function WhatIfSimulator() {
                         ? "bg-red-950 text-red-400 border border-red-800"
                         : res.risk_status === "HIGH RISK"
                         ? "bg-amber-950 text-amber-400 border border-amber-800"
-                        : "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40"
+                        : "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40"
                     }`}
                   >
                     {res.risk_status}
@@ -149,10 +149,10 @@ export function WhatIfSimulator() {
 
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   <div>
-                    <span className="text-[10px] text-[#70877A] block">Projected P&L</span>
+                    <span className="text-[10px] text-[#52627A] block">Projected P&L</span>
                     <span
                       className={`text-sm font-bold block ${
-                        isLoss ? "text-red-400" : "text-[#55C98A]"
+                        isLoss ? "text-red-400" : "text-[#22D3EE]"
                       }`}
                     >
                       {res.projected_pnl > 0 ? "+" : ""}${res.projected_pnl.toFixed(2)} ({res.projected_pnl_pct}%)
@@ -160,7 +160,7 @@ export function WhatIfSimulator() {
                   </div>
 
                   <div>
-                    <span className="text-[10px] text-[#70877A] block">Projected Equity</span>
+                    <span className="text-[10px] text-[#52627A] block">Projected Equity</span>
                     <span className="text-sm font-bold text-white block">
                       ${res.projected_equity.toLocaleString()}
                     </span>

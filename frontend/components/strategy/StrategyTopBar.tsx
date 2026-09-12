@@ -64,12 +64,12 @@ export function StrategyTopBar({
   const directions: StrategyDirection[] = ["LONG", "SHORT", "BOTH", "OPTIONS_MULTI_LEG", "FUTURES"];
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 shadow-xl space-y-3 font-sans select-none">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl space-y-3 font-sans select-none">
       {/* Top Row: Title, Status, Undo/Redo, Autosave & Primary Actions */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Strategy Name & Status Pill */}
         <div className="flex items-center gap-3 min-w-[280px] flex-1">
-          <div className="p-2 rounded-xl bg-gradient-to-tr from-[#123C2A] to-[#2E7D5B] text-[#55C98A] border border-[#39B978]/40 shadow-lg shadow-[#2E7D5B]/20">
+          <div className="p-2 rounded-xl bg-gradient-to-tr from-[rgba(37,99,235,0.18)] to-[#2563EB] text-[#22D3EE] border border-[#00E890]/40 shadow-lg shadow-[#2563EB]/20">
             <Sparkles className="h-5 w-5" />
           </div>
 
@@ -80,7 +80,7 @@ export function StrategyTopBar({
                 value={strategy.name}
                 onChange={(e) => onUpdateStrategy({ name: e.target.value })}
                 placeholder="Strategy Name..."
-                className="bg-transparent text-base font-bold text-[#E8F3EC] focus:outline-none border-b border-transparent focus:border-[#55C98A] transition-all w-full truncate"
+                className="bg-transparent text-base font-bold text-[#F7FAFC] focus:outline-none border-b border-transparent focus:border-[#22D3EE] transition-all w-full truncate"
               />
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider ${
@@ -94,7 +94,7 @@ export function StrategyTopBar({
                 {strategy.status}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-[#A8BDB0]">
+            <div className="flex items-center gap-2 text-[11px] text-[#7C8CA3]">
               <span>{autosaveTime ? `Autosaved ${autosaveTime}` : "Autosave ready"}</span>
               <span className="text-[#3E5C4E]">•</span>
               <span>ID: {strategy.id || "NEW"}</span>
@@ -104,13 +104,13 @@ export function StrategyTopBar({
 
         {/* Undo / Redo & Mode Toggle */}
         <div className="flex items-center gap-2">
-          <div className="flex items-center bg-[#07110D] p-1 rounded-xl border border-[#1B3328]">
+          <div className="flex items-center bg-[#07101A] p-1 rounded-xl border border-[#122033]">
             <button
               onClick={onUndo}
               disabled={!canUndo}
               title="Undo (Ctrl+Z)"
               className={`p-1.5 rounded-lg transition-colors ${
-                canUndo ? "text-[#A8BDB0] hover:text-[#E8F3EC] hover:bg-[#123C2A]" : "text-[#3E5C4E] cursor-not-allowed"
+                canUndo ? "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[rgba(37,99,235,0.18)]" : "text-[#3E5C4E] cursor-not-allowed"
               }`}
             >
               <RotateCcw className="h-4 w-4" />
@@ -120,7 +120,7 @@ export function StrategyTopBar({
               disabled={!canRedo}
               title="Redo (Ctrl+Y)"
               className={`p-1.5 rounded-lg transition-colors ${
-                canRedo ? "text-[#A8BDB0] hover:text-[#E8F3EC] hover:bg-[#123C2A]" : "text-[#3E5C4E] cursor-not-allowed"
+                canRedo ? "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[rgba(37,99,235,0.18)]" : "text-[#3E5C4E] cursor-not-allowed"
               }`}
             >
               <RotateCw className="h-4 w-4" />
@@ -128,13 +128,13 @@ export function StrategyTopBar({
           </div>
 
           {/* Simple vs Advanced Mode */}
-          <div className="flex items-center bg-[#07110D] p-1 rounded-xl border border-[#1B3328] text-xs">
+          <div className="flex items-center bg-[#07101A] p-1 rounded-xl border border-[#122033] text-xs">
             <button
               onClick={() => onUpdateStrategy({ mode: "simple" })}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
                 strategy.mode === "simple"
-                  ? "bg-[#2E7D5B] text-white shadow-sm"
-                  : "text-[#A8BDB0] hover:text-[#E8F3EC]"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               Simple
@@ -143,8 +143,8 @@ export function StrategyTopBar({
               onClick={() => onUpdateStrategy({ mode: "advanced" })}
               className={`px-2.5 py-1 rounded-lg font-semibold transition-colors ${
                 strategy.mode === "advanced"
-                  ? "bg-[#2E7D5B] text-white shadow-sm"
-                  : "text-[#A8BDB0] hover:text-[#E8F3EC]"
+                  ? "bg-[#2563EB] text-white shadow-sm"
+                  : "text-[#7C8CA3] hover:text-[#F7FAFC]"
               }`}
             >
               Advanced
@@ -156,7 +156,7 @@ export function StrategyTopBar({
         <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={onOpenCatalog}
-            className="px-3 py-1.5 rounded-xl bg-[#07110D] hover:bg-[#123C2A] border border-[#1B3328] text-[#A8BDB0] hover:text-[#E8F3EC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#07101A] hover:bg-[rgba(37,99,235,0.18)] border border-[#122033] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
           >
             <FolderOpen className="h-3.5 w-3.5 text-cyan-400" />
             <span>Catalog</span>
@@ -164,7 +164,7 @@ export function StrategyTopBar({
 
           <button
             onClick={onNewStrategy}
-            className="px-3 py-1.5 rounded-xl bg-[#07110D] hover:bg-[#123C2A] border border-[#1B3328] text-[#A8BDB0] hover:text-[#E8F3EC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#07101A] hover:bg-[rgba(37,99,235,0.18)] border border-[#122033] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
             title="Create clean new strategy"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -173,7 +173,7 @@ export function StrategyTopBar({
 
           <button
             onClick={onDuplicateStrategy}
-            className="px-3 py-1.5 rounded-xl bg-[#07110D] hover:bg-[#123C2A] border border-[#1B3328] text-[#A8BDB0] hover:text-[#E8F3EC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
+            className="px-3 py-1.5 rounded-xl bg-[#07101A] hover:bg-[rgba(37,99,235,0.18)] border border-[#122033] text-[#7C8CA3] hover:text-[#F7FAFC] text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm"
             title="Duplicate strategy into new record"
           >
             <Copy className="h-3.5 w-3.5" />
@@ -225,15 +225,15 @@ export function StrategyTopBar({
       </div>
 
       {/* Second Row: Configuration Meta (Asset Class, Symbol, Base Timeframe, Direction) */}
-      <div className="pt-2 border-t border-[#1B3328] flex flex-wrap items-center justify-between gap-3 text-xs">
+      <div className="pt-2 border-t border-[#122033] flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex flex-wrap items-center gap-3">
           {/* Asset Market Class */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[#A8BDB0] font-medium">Market:</span>
+            <span className="text-[#7C8CA3] font-medium">Market:</span>
             <select
               value={strategy.market_type}
               onChange={(e) => onUpdateStrategy({ market_type: e.target.value as any })}
-              className="bg-[#07110D] border border-[#1B3328] rounded-lg px-2 py-1 text-xs text-[#E8F3EC] font-semibold focus:outline-none focus:border-[#55C98A]"
+              className="bg-[#07101A] border border-[#122033] rounded-lg px-2 py-1 text-xs text-[#F7FAFC] font-semibold focus:outline-none focus:border-[#22D3EE]"
             >
               <option value="crypto">Crypto Spot / Perp</option>
               <option value="equity">Indian Equities (NSE)</option>
@@ -246,27 +246,27 @@ export function StrategyTopBar({
 
           {/* Primary Symbol */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[#A8BDB0] font-medium">Symbol:</span>
+            <span className="text-[#7C8CA3] font-medium">Symbol:</span>
             <input
               type="text"
               value={strategy.symbol}
               onChange={(e) => onUpdateStrategy({ symbol: e.target.value.toUpperCase() })}
-              className="w-28 bg-[#07110D] border border-[#1B3328] rounded-lg px-2 py-1 text-xs font-mono font-bold text-[#55C98A] focus:outline-none focus:border-[#55C98A]"
+              className="w-28 bg-[#07101A] border border-[#122033] rounded-lg px-2 py-1 text-xs font-mono font-bold text-[#22D3EE] focus:outline-none focus:border-[#22D3EE]"
             />
           </div>
 
           {/* Primary Base Timeframe */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[#A8BDB0] font-medium">Timeframe:</span>
-            <div className="flex items-center bg-[#07110D] p-0.5 rounded-lg border border-[#1B3328]">
+            <span className="text-[#7C8CA3] font-medium">Timeframe:</span>
+            <div className="flex items-center bg-[#07101A] p-0.5 rounded-lg border border-[#122033]">
               {timeframes.map((tf) => (
                 <button
                   key={tf}
                   onClick={() => onUpdateStrategy({ timeframe: tf })}
                   className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold transition-colors ${
                     strategy.timeframe === tf
-                      ? "bg-[#2E7D5B] text-white"
-                      : "text-[#70877A] hover:text-[#E8F3EC]"
+                      ? "bg-[#2563EB] text-white"
+                      : "text-[#52627A] hover:text-[#F7FAFC]"
                   }`}
                 >
                   {tf}
@@ -278,8 +278,8 @@ export function StrategyTopBar({
 
         {/* Direction Mode Badges */}
         <div className="flex items-center gap-1.5">
-          <span className="text-[#A8BDB0] font-medium">Strategy Type:</span>
-          <div className="flex items-center bg-[#07110D] p-0.5 rounded-lg border border-[#1B3328]">
+          <span className="text-[#7C8CA3] font-medium">Strategy Type:</span>
+          <div className="flex items-center bg-[#07101A] p-0.5 rounded-lg border border-[#122033]">
             {directions.map((d) => (
               <button
                 key={d}
@@ -295,7 +295,7 @@ export function StrategyTopBar({
                       : d === "FUTURES"
                       ? "bg-amber-600 text-white"
                       : "bg-blue-600 text-white"
-                    : "text-[#70877A] hover:text-[#E8F3EC]"
+                    : "text-[#52627A] hover:text-[#F7FAFC]"
                 }`}
               >
                 {d.replace("_", " ")}

@@ -10,6 +10,7 @@ import {
   Copy,
   GitBranch,
   Download,
+  Upload,
   Trash2,
   Undo2,
   Redo2,
@@ -26,13 +27,19 @@ import {
   AlertCircle,
   RefreshCw,
   Sparkles,
+  ShieldCheck,
+  Radio,
+  FileCode,
+  Zap,
 } from "lucide-react";
 import {
   StrategyIdeDefinition,
   StrategyMarketType,
   RuleTimeframe,
   StrategyDirection,
+  TradingExecutionMode,
 } from "@/types/strategy-ide";
+import { QosBadge, QosButton } from "@/components/ui/QosComponents";
 
 interface StrategyIdeHeaderProps {
   strategy: StrategyIdeDefinition;
@@ -42,6 +49,7 @@ interface StrategyIdeHeaderProps {
   autosaveTime: string | null;
   onOpenTest: () => void;
   isTesting: boolean;
+  onOpenForwardTest?: () => void;
   onOpenCatalog: () => void;
   onOpenVersionsModal: () => void;
   onOpenDiffModal?: () => void;
@@ -64,19 +72,27 @@ const ASSET_CLASSES: { id: StrategyMarketType; label: string; icon: any }[] = [
   { id: "options", label: "Options", icon: Layers },
   { id: "commodity", label: "Commodities", icon: Globe },
   { id: "forex", label: "Forex", icon: DollarSign },
+  { id: "etf", label: "ETFs", icon: Briefcase },
 ];
 
 const POPULAR_SYMBOLS: Record<StrategyMarketType, string[]> = {
-  crypto: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT", "PEPE/USDT"],
+  crypto: ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT"],
   equity: ["RELIANCE", "TCS", "HDFCBANK", "INFY", "AAPL", "MSFT", "NVDA", "TSLA"],
-  futures: ["BTC-PERP", "ETH-PERP", "SOL-PERP", "NIFTY-FUT", "BANKNIFTY-FUT", "ES-FUT"],
-  options: ["NIFTY 24400 CE", "BANKNIFTY 51000 CE", "FINNIFTY 23000 CE", "BTC-260925-70000-C", "ETH-260925-3500-C"],
+  futures: ["BTC-PERP", "ETH-PERP", "SOL-PERP", "NIFTY-FUT", "BANKNIFTY-FUT"],
+  options: ["NIFTY 24400 CE", "BANKNIFTY 51000 CE", "BTC-260925-70000-C"],
   commodity: ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS"],
   forex: ["EUR/USD", "GBP/USD", "USD/JPY", "USD/INR"],
+  etf: ["SPY", "QQQ", "NIFTYBEES", "GOLDBEES"],
 };
 
 const COMMON_TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"];
-const MORE_TIMEFRAMES: RuleTimeframe[] = ["1w"];
+
+const BROKERS = [
+  { id: "Delta", label: "Delta Exchange", dataProvider: "Delta" },
+  { id: "Dhan", label: "Dhan Multi-Broker", dataProvider: "Dhan" },
+  { id: "Upstox", label: "Upstox V2", dataProvider: "Upstox" },
+  { id: "Paper", label: "Paper Engine", dataProvider: "Binance" },
+];
 
 export function StrategyIdeHeader({
   strategy,
@@ -86,6 +102,7 @@ export function StrategyIdeHeader({
   autosaveTime,
   onOpenTest,
   isTesting,
+  onOpenForwardTest,
   onOpenCatalog,
   onOpenVersionsModal,
   onOpenDiffModal,
@@ -101,16 +118,21 @@ export function StrategyIdeHeader({
   onToggleInterfaceMode,
 }: StrategyIdeHeaderProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState(strategy.name);
   const [isSymbolDropdownOpen, setIsSymbolDropdownOpen] = useState(false);
   const [symbolSearch, setSymbolSearch] = useState("");
   const [isMarketDropdownOpen, setIsMarketDropdownOpen] = useState(false);
-  const [isTimeframeMoreOpen, setIsTimeframeMoreOpen] = useState(false);
 
   const moreMenuRef = useRef<HTMLDivElement>(null);
   const symbolMenuRef = useRef<HTMLDivElement>(null);
   const marketMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Close dropdowns on outside click
+  useEffect(() => {
+    setNameInput(strategy.name);
+  }, [strategy.name]);
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) {
@@ -136,428 +158,456 @@ export function StrategyIdeHeader({
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(strategy, null, 2));
     const downloadAnchor = document.createElement("a");
     downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `${strategy.name.replace(/\s+/g, "_")}_strategy.json`);
+    downloadAnchor.setAttribute("download", `${strategy.name.replace(/\s+/g, "_")}_v${strategy.active_version || "1.0"}.json`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
     setIsMoreOpen(false);
   };
 
-  const getMarketLabel = (type: StrategyMarketType) => {
-    const found = ASSET_CLASSES.find((a) => a.id === type);
-    return found ? found.label : type.toUpperCase();
+  const handleImportJson = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (parsed.name && parsed.entry) {
+          onUpdateStrategy(parsed);
+        }
+      } catch (err) {
+        console.error("Invalid Strategy JSON format", err);
+      }
+    };
+    reader.readAsText(file);
+    setIsMoreOpen(false);
   };
 
+  const handleNameSave = () => {
+    if (nameInput.trim()) {
+      onUpdateStrategy({ name: nameInput.trim() });
+    }
+    setIsEditingName(false);
+  };
+
+  const selectedBroker = strategy.broker_config?.execution_broker || (strategy.market_type === "crypto" ? "Delta" : "Upstox");
+  const selectedDataProvider = strategy.broker_config?.data_provider || (strategy.market_type === "crypto" ? "Delta" : "Upstox");
+  const currentMode: TradingExecutionMode = strategy.broker_config?.mode || "PAPER";
+
   return (
-    <header className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-4 shadow-xl space-y-3 font-sans select-none text-xs">
-      
-      {/* 1. TOP LINE: Strategy Title, Subtitle Meta, Autosave & Primary Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#142B21] pb-3">
-        
-        {/* Left: Strategy Name + Status Pill + Undo/Redo + Subtitle */}
-        <div className="flex items-center gap-3 min-w-[280px] flex-1">
-          <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-md shrink-0">
-            <Activity className="h-4 w-4" />
+    <div className="space-y-2 select-none">
+      {/* 1. TOP STRATEGY WORKSPACE HEADER */}
+      <header className="bg-[#0A1422] border border-[#12304A] rounded-xl p-3 shadow-sm flex flex-wrap items-center justify-between gap-3 font-sans text-xs">
+        {/* LEFT: Strategy Icon, Name, Subtitle, Status */}
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="h-9 w-9 rounded-lg bg-[#168BFF]/10 text-[#168BFF] border border-[#168BFF]/30 flex items-center justify-center shrink-0">
+            <Sparkles className="h-4 w-4 text-[#22D3EE]" />
           </div>
 
-          <div className="flex-1 max-w-xl">
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={strategy.name}
-                onChange={(e) => onUpdateStrategy({ name: e.target.value })}
-                placeholder="Strategy Name..."
-                className="bg-transparent text-sm sm:text-base font-black text-white focus:outline-none border-b border-transparent focus:border-[#55C98A] transition-all w-full truncate"
-              />
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#142B21] text-[#55C98A] border border-[#275841] font-mono font-bold uppercase shrink-0">
-                {strategy.status || "DRAFT"}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {isEditingName ? (
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleNameSave()}
+                    onBlur={handleNameSave}
+                    autoFocus
+                    className="h-7 px-2 bg-[#0C1727] border border-[#22D3EE] rounded text-sm font-bold text-[#F8FAFC] font-sans focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleNameSave}
+                    className="p-1 rounded bg-[#00E89A]/20 text-[#00E89A] hover:bg-[#00E89A]/30"
+                  >
+                    <Check className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <h1
+                  onClick={() => setIsEditingName(true)}
+                  className="text-sm sm:text-base font-bold text-[#F8FAFC] tracking-tight cursor-pointer hover:text-[#22D3EE] transition-colors truncate max-w-[320px] sm:max-w-[450px]"
+                  title="Click to rename strategy"
+                >
+                  {strategy.name}
+                </h1>
+              )}
+
+              <QosBadge status={strategy.status as any || "DRAFT"} dot={true} />
+
+              <span className="px-1.5 py-0.5 rounded bg-[#07111F] border border-[#12304A] font-mono text-[10px] text-[#7D8EA5]">
+                {strategy.active_version || "v1.0.0"}
               </span>
             </div>
 
-            <div className="flex items-center gap-2 text-[11px] text-[#8BA596] font-mono mt-0.5">
+            <div className="flex items-center gap-2 text-[11px] text-[#7D8EA5] font-sans mt-0.5">
               <span>{strategy.symbol}</span>
               <span>•</span>
-              <span>{getMarketLabel(strategy.market_type)}</span>
+              <span className="capitalize">{strategy.market_type}</span>
               <span>•</span>
-              <span>{strategy.base_timeframe}</span>
+              <span className="font-mono">{strategy.base_timeframe}</span>
               <span>•</span>
               <span
-                className={`font-bold ${
+                className={`font-mono font-bold ${
                   strategy.direction === "LONG"
-                    ? "text-[#55C98A]"
+                    ? "text-[#00E89A]"
                     : strategy.direction === "SHORT"
-                    ? "text-red-400"
-                    : "text-amber-400"
+                    ? "text-[#FF3B5C]"
+                    : "text-[#22D3EE]"
                 }`}
               >
                 {strategy.direction}
               </span>
               {autosaveTime && (
-                <>
-                  <span className="text-[#3A5548]">•</span>
-                  <span className="text-[10px] text-[#607D6E]">Saved {autosaveTime}</span>
-                </>
+                <span className="text-[10px] text-[#7D8EA5] hidden md:inline font-mono">
+                  (Saved {autosaveTime})
+                </span>
               )}
             </div>
           </div>
-
-          {/* Undo / Redo Small Buttons */}
-          <div className="hidden sm:flex items-center gap-1 bg-[#0C1713] p-0.5 rounded-lg border border-[#1A3127]">
-            <button
-              type="button"
-              onClick={onUndo}
-              disabled={!canUndo}
-              className={`p-1.5 rounded transition-colors ${
-                canUndo ? "text-[#8BA596] hover:text-white hover:bg-[#123C2A]" : "text-[#2A4537] cursor-not-allowed"
-              }`}
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={onRedo}
-              disabled={!canRedo}
-              className={`p-1.5 rounded transition-colors ${
-                canRedo ? "text-[#8BA596] hover:text-white hover:bg-[#123C2A]" : "text-[#2A4537] cursor-not-allowed"
-              }`}
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <Redo2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
 
-        {/* Right: Only 3 Primary Action Buttons + More Menu + Simple/Advanced Toggle */}
-        <div className="flex items-center gap-2">
-          
-          {/* Simple / Advanced Toggle */}
+        {/* CENTER: Undo / Redo */}
+        <div className="flex items-center gap-1 bg-[#07111F] border border-[#12304A] rounded-lg p-0.5">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            title="Undo (Ctrl+Z)"
+            className="p-1.5 rounded text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0C1727] disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+          >
+            <Undo2 className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            title="Redo (Ctrl+Shift+Z)"
+            className="p-1.5 rounded text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0C1727] disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+          >
+            <Redo2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+
+        {/* RIGHT: Actions (Mode, Save, Backtest, Forward Test, Assign, More) */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {/* Mode Switch: SIMPLE / ADVANCED */}
           {onToggleInterfaceMode && (
             <button
               type="button"
               onClick={onToggleInterfaceMode}
-              className="px-2.5 py-1.5 rounded-xl border border-[#1F392D] bg-[#0C1713] hover:bg-[#14271F] text-[11px] font-mono font-bold transition-all text-[#8BA596] hover:text-white"
-              title="Toggle Simple / Advanced Workstation Interface"
+              className={`h-8 px-2.5 rounded-lg text-xs font-mono font-bold border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                interfaceMode === "ADVANCED"
+                  ? "bg-[#168BFF]/20 text-[#168BFF] border-[#168BFF]/50"
+                  : "bg-[#0A1422] text-[#7D8EA5] border-[#12304A] hover:text-[#F8FAFC]"
+              }`}
             >
-              {interfaceMode === "SIMPLE" ? "SIMPLE" : "ADVANCED"}
+              <FileCode className="h-3.5 w-3.5" />
+              <span>{interfaceMode}</span>
             </button>
           )}
 
-          {/* 1. [Save] */}
-          <button
-            type="button"
+          {/* Save Draft */}
+          <QosButton
+            variant="secondary"
+            size="md"
             onClick={onSaveDraft}
-            disabled={isSaving}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-white border border-[#1F392D] font-bold font-mono text-xs transition-all shadow-sm active:scale-98"
-            title="Save Strategy Draft (Ctrl+S)"
+            isLoading={isSaving}
+            className="gap-1.5"
           >
-            <Save className="h-3.5 w-3.5 text-[#55C98A]" />
-            <span>{isSaving ? "Saving..." : "Save"}</span>
-          </button>
+            <Save className="h-3.5 w-3.5 text-[#22D3EE]" />
+            <span>Save</span>
+          </QosButton>
 
-          {/* 2. [Test Strategy] */}
-          <button
-            type="button"
+          {/* Run Backtest */}
+          <QosButton
+            variant="secondary"
+            size="md"
             onClick={onOpenTest}
-            disabled={isTesting}
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold font-mono text-xs transition-all shadow-md active:scale-98"
-            title="Compile & Run Deterministic Zero-Lookahead Backtest"
+            isLoading={isTesting}
+            className="gap-1.5 hover:border-[#168BFF]"
           >
-            {isTesting ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            ) : (
-              <Play className="h-3.5 w-3.5 fill-current" />
-            )}
-            <span>{isTesting ? "Testing..." : "Test Strategy"}</span>
-          </button>
+            <Play className="h-3.5 w-3.5 text-[#168BFF]" />
+            <span>Backtest</span>
+          </QosButton>
 
-          {/* 3. [Assign to Bot] */}
-          <button
-            type="button"
+          {/* Forward Test */}
+          {onOpenForwardTest && (
+            <QosButton
+              variant="secondary"
+              size="md"
+              onClick={onOpenForwardTest}
+              className="gap-1.5 hover:border-[#00E89A]"
+            >
+              <Radio className="h-3.5 w-3.5 text-[#00E89A]" />
+              <span>Forward Test</span>
+            </QosButton>
+          )}
+
+          {/* Assign to Bot */}
+          <QosButton
+            variant="primary"
+            size="md"
             onClick={onOpenAssignModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 font-bold font-mono text-xs transition-all shadow-sm active:scale-98"
-            title="Assign Strategy to Quantitative Bot (Requires User to Start Bot)"
+            className="gap-1.5"
           >
-            <Bot className="h-3.5 w-3.5 text-blue-400" />
+            <Bot className="h-3.5 w-3.5" />
             <span>Assign to Bot</span>
-          </button>
+          </QosButton>
 
-          {/* 4. [••• More Menu] */}
+          {/* More Menu Dropdown */}
           <div className="relative" ref={moreMenuRef}>
             <button
               type="button"
               onClick={() => setIsMoreOpen(!isMoreOpen)}
-              className="flex items-center justify-center min-w-[34px] min-h-[34px] p-1.5 rounded-xl border border-[#1F392D] bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white transition-all shadow-sm cursor-pointer font-bold tracking-widest leading-none text-xs"
-              title="More Actions & Tools"
+              className="h-8 w-8 rounded-lg bg-[#0A1422] border border-[#12304A] hover:border-[#1A3E61] flex items-center justify-center text-[#7D8EA5] hover:text-[#F8FAFC] transition-colors cursor-pointer"
             >
-              •••
+              <MoreVertical className="h-4 w-4" />
             </button>
 
             {isMoreOpen && (
-              <div className="absolute right-0 top-full mt-2 z-50 bg-[#09110E] border border-[#1F392D] rounded-2xl p-2 shadow-2xl w-60 flex flex-col gap-1 text-xs font-sans animate-fadeIn">
-                {/* Templates Catalog */}
+              <div className="absolute right-0 mt-1.5 w-52 bg-[#0C1727] border border-[#12304A] rounded-xl shadow-xl p-1.5 space-y-0.5 z-50 animate-fadeIn font-sans text-xs">
                 <button
                   type="button"
                   onClick={() => {
                     onOpenCatalog();
                     setIsMoreOpen(false);
                   }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#8BA596] hover:text-white hover:bg-[#123C2A] font-semibold transition-colors text-left"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#F8FAFC] flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Sparkles className="h-4 w-4 text-[#55C98A]" />
+                  <Sparkles className="h-3.5 w-3.5 text-[#22D3EE]" />
                   <span>Templates & Catalog</span>
                 </button>
 
-                {/* New Strategy */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onNewStrategy();
-                    setIsMoreOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#8BA596] hover:text-white hover:bg-[#123C2A] font-semibold transition-colors text-left"
-                >
-                  <Activity className="h-4 w-4 text-cyan-400" />
-                  <span>New Blank Strategy</span>
-                </button>
-
-                {/* Duplicate Strategy */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onCloneStrategy();
-                    setIsMoreOpen(false);
-                  }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#8BA596] hover:text-white hover:bg-[#123C2A] font-semibold transition-colors text-left"
-                >
-                  <Copy className="h-4 w-4 text-amber-400" />
-                  <span>Duplicate Strategy</span>
-                </button>
-
-                {/* Version History & Diff */}
                 <button
                   type="button"
                   onClick={() => {
                     onOpenVersionsModal();
                     setIsMoreOpen(false);
                   }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#8BA596] hover:text-white hover:bg-[#123C2A] font-semibold transition-colors text-left border-t border-[#142B21]"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#F8FAFC] flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <GitBranch className="h-4 w-4 text-blue-400" />
-                  <span>Version History & Rollback</span>
+                  <GitBranch className="h-3.5 w-3.5 text-[#168BFF]" />
+                  <span>Versions & History</span>
                 </button>
 
-                {/* Export JSON */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onCloneStrategy();
+                    setIsMoreOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#F8FAFC] flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Copy className="h-3.5 w-3.5 text-[#00E89A]" />
+                  <span>Duplicate Strategy</span>
+                </button>
+
+                <div className="my-1 border-t border-[#12304A]" />
+
                 <button
                   type="button"
                   onClick={handleExportJson}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-[#8BA596] hover:text-white hover:bg-[#123C2A] font-semibold transition-colors text-left"
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#F8FAFC] flex items-center gap-2 transition-colors cursor-pointer"
                 >
-                  <Download className="h-4 w-4 text-indigo-400" />
+                  <Download className="h-3.5 w-3.5 text-[#7D8EA5]" />
                   <span>Export Strategy JSON</span>
                 </button>
 
-                {/* Delete Strategy (Safely in More Menu) */}
-                {onDeleteStrategy && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (confirm("Are you sure you want to delete this strategy?")) {
-                        onDeleteStrategy();
-                        setIsMoreOpen(false);
-                      }
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-red-400 hover:bg-red-950/30 font-semibold transition-colors text-left border-t border-[#142B21]"
-                  >
-                    <Trash2 className="h-4 w-4 text-red-400" />
-                    <span>Delete Strategy</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#F8FAFC] flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Upload className="h-3.5 w-3.5 text-[#7D8EA5]" />
+                  <span>Import Strategy JSON</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImportJson}
+                  accept=".json"
+                  className="hidden"
+                />
+
+                <div className="my-1 border-t border-[#12304A]" />
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNewStrategy();
+                    setIsMoreOpen(false);
+                  }}
+                  className="w-full text-left px-2.5 py-1.5 rounded-lg hover:bg-[#12304A] text-[#22D3EE] flex items-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Create New Blank</span>
+                </button>
               </div>
             )}
           </div>
-
         </div>
+      </header>
 
-      </div>
-
-      {/* 2. COMPACT MARKET BAR: MARKET | SYMBOL | TIMEFRAME | DIRECTION */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-[#060D0A] border border-[#14271F] rounded-xl px-3 py-2 text-xs font-mono">
-        
-        <div className="flex flex-wrap items-center gap-4">
-          
-          {/* MARKET Dropdown */}
-          <div className="relative" ref={marketMenuRef}>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[#8BA596] uppercase font-bold">MARKET:</span>
+      {/* 2. COMPACT MARKET CONTROL BAR */}
+      <div className="bg-[#0A1422] border border-[#12304A] rounded-xl px-3 py-2 flex flex-wrap items-center justify-between gap-3 font-sans text-xs">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* MARKET / ASSET CLASS */}
+          <div className="flex items-center gap-1.5" ref={marketMenuRef}>
+            <span className="text-[10px] font-mono uppercase text-[#7D8EA5] font-bold">MARKET:</span>
+            <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsMarketDropdownOpen(!isMarketDropdownOpen)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0C1713] hover:bg-[#14271F] border border-[#1A3127] text-white font-bold transition-all"
+                className="h-7 px-2 bg-[#0C1727] border border-[#12304A] hover:border-[#1A3E61] rounded-lg text-xs font-semibold text-[#F8FAFC] flex items-center gap-1.5 transition-colors cursor-pointer"
               >
-                <span>{getMarketLabel(strategy.market_type)}</span>
-                <ChevronDown className="h-3 w-3 text-[#55C98A]" />
+                <span className="capitalize">{strategy.market_type}</span>
+                <ChevronDown className="h-3 w-3 text-[#7D8EA5]" />
               </button>
-            </div>
 
-            {isMarketDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-40 bg-[#09110E] border border-[#1F392D] rounded-xl p-1.5 shadow-2xl w-44 flex flex-col gap-0.5 animate-fadeIn">
-                {ASSET_CLASSES.map((asset) => {
-                  const Icon = asset.icon;
-                  return (
-                    <button
-                      key={asset.id}
-                      type="button"
-                      onClick={() => {
-                        onUpdateStrategy({
-                          market_type: asset.id,
-                          symbol: POPULAR_SYMBOLS[asset.id]?.[0] || "BTC/USDT",
-                        });
-                        setIsMarketDropdownOpen(false);
-                      }}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-left transition-colors ${
-                        strategy.market_type === asset.id
-                          ? "bg-[#123C2A] text-[#55C98A] font-bold"
-                          : "text-[#8BA596] hover:bg-[#0C1713] hover:text-white"
-                      }`}
-                    >
-                      <span className="flex items-center gap-1.5">
+              {isMarketDropdownOpen && (
+                <div className="absolute left-0 mt-1 w-44 bg-[#0C1727] border border-[#12304A] rounded-xl shadow-xl p-1 z-40">
+                  {ASSET_CLASSES.map((cls) => {
+                    const Icon = cls.icon;
+                    return (
+                      <button
+                        key={cls.id}
+                        type="button"
+                        onClick={() => {
+                          onUpdateStrategy({
+                            market_type: cls.id,
+                            symbol: POPULAR_SYMBOLS[cls.id]?.[0] || strategy.symbol,
+                          });
+                          setIsMarketDropdownOpen(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-xs cursor-pointer ${
+                          strategy.market_type === cls.id
+                            ? "bg-[#168BFF] text-white font-bold"
+                            : "hover:bg-[#12304A] text-[#F8FAFC]"
+                        }`}
+                      >
                         <Icon className="h-3.5 w-3.5" />
-                        <span>{asset.label}</span>
-                      </span>
-                      {strategy.market_type === asset.id && <Check className="h-3.5 w-3.5" />}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+                        <span>{cls.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* SYMBOL Dropdown */}
-          <div className="relative" ref={symbolMenuRef}>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] text-[#8BA596] uppercase font-bold">SYMBOL:</span>
+          {/* SYMBOL SELECTION */}
+          <div className="flex items-center gap-1.5" ref={symbolMenuRef}>
+            <span className="text-[10px] font-mono uppercase text-[#7D8EA5] font-bold">SYMBOL:</span>
+            <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsSymbolDropdownOpen(!isSymbolDropdownOpen)}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0C1713] hover:bg-[#14271F] border border-[#1A3127] text-[#55C98A] font-bold transition-all"
+                className="h-7 px-2.5 bg-[#0C1727] border border-[#12304A] hover:border-[#1A3E61] rounded-lg text-xs font-mono font-bold text-[#22D3EE] flex items-center gap-1.5 transition-colors cursor-pointer"
               >
                 <span>{strategy.symbol}</span>
-                <ChevronDown className="h-3 w-3 text-[#55C98A]" />
+                <ChevronDown className="h-3 w-3 text-[#7D8EA5]" />
               </button>
-            </div>
 
-            {isSymbolDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 z-40 bg-[#09110E] border border-[#1F392D] rounded-xl p-2 shadow-2xl w-60 space-y-1.5 animate-fadeIn">
-                <div className="flex items-center gap-1.5 px-2 py-1 bg-[#060D0A] border border-[#14271F] rounded-lg text-xs">
-                  <Search className="h-3.5 w-3.5 text-[#8BA596]" />
+              {isSymbolDropdownOpen && (
+                <div className="absolute left-0 mt-1 w-52 bg-[#0C1727] border border-[#12304A] rounded-xl shadow-xl p-2 z-40 space-y-2">
                   <input
                     type="text"
+                    placeholder="Search symbol..."
                     value={symbolSearch}
                     onChange={(e) => setSymbolSearch(e.target.value)}
-                    placeholder="Search symbol..."
-                    className="bg-transparent text-white focus:outline-none w-full text-xs"
-                    autoFocus
+                    className="w-full h-7 px-2 bg-[#0A1422] border border-[#12304A] rounded text-xs text-[#F8FAFC] font-mono focus:outline-none focus:border-[#22D3EE]"
                   />
-                </div>
-
-                <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-none">
-                  {filteredSymbols.map((sym) => (
-                    <button
-                      key={sym}
-                      type="button"
-                      onClick={() => {
-                        onUpdateStrategy({ symbol: sym });
-                        setIsSymbolDropdownOpen(false);
-                        setSymbolSearch("");
-                      }}
-                      className={`w-full flex items-center justify-between px-2 py-1 rounded-lg text-left transition-colors ${
-                        strategy.symbol === sym
-                          ? "bg-[#123C2A] text-[#55C98A] font-bold"
-                          : "text-[#8BA596] hover:bg-[#0C1713] hover:text-white"
-                      }`}
-                    >
-                      <span>{sym}</span>
-                      {strategy.symbol === sym && <Check className="h-3.5 w-3.5" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* TIMEFRAME Bar */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[10px] text-[#8BA596] uppercase font-bold">TIMEFRAME:</span>
-            <div className="flex items-center gap-1 bg-[#0C1713] p-0.5 rounded-lg border border-[#1A3127]">
-              {COMMON_TIMEFRAMES.map((tf) => (
-                <button
-                  key={tf}
-                  type="button"
-                  onClick={() => onUpdateStrategy({ base_timeframe: tf })}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-all ${
-                    strategy.base_timeframe === tf
-                      ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                      : "text-[#8BA596] hover:text-white"
-                  }`}
-                >
-                  {tf}
-                </button>
-              ))}
-
-              {/* More Timeframes */}
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsTimeframeMoreOpen(!isTimeframeMoreOpen)}
-                  className={`px-1.5 py-0.5 rounded text-[11px] transition-colors flex items-center gap-0.5 ${
-                    MORE_TIMEFRAMES.includes(strategy.base_timeframe as any)
-                      ? "bg-[#123C2A] text-[#55C98A] font-bold"
-                      : "text-[#607D6E] hover:text-white"
-                  }`}
-                >
-                  <span>{MORE_TIMEFRAMES.includes(strategy.base_timeframe as any) ? strategy.base_timeframe : "More"}</span>
-                  <ChevronDown className="h-2.5 w-2.5" />
-                </button>
-
-                {isTimeframeMoreOpen && (
-                  <div className="absolute right-0 top-full mt-1 z-40 bg-[#09110E] border border-[#1F392D] rounded-xl p-1 shadow-2xl w-24 flex flex-col gap-0.5">
-                    {MORE_TIMEFRAMES.map((tf) => (
+                  <div className="max-h-44 overflow-y-auto space-y-0.5 scrollbar-thin">
+                    {filteredSymbols.map((sym) => (
                       <button
-                        key={tf}
+                        key={sym}
                         type="button"
                         onClick={() => {
-                          onUpdateStrategy({ base_timeframe: tf });
-                          setIsTimeframeMoreOpen(false);
+                          onUpdateStrategy({ symbol: sym });
+                          setIsSymbolDropdownOpen(false);
+                          setSymbolSearch("");
                         }}
-                        className={`px-2 py-1 rounded text-left ${
-                          strategy.base_timeframe === tf
-                            ? "bg-[#123C2A] text-[#55C98A] font-bold"
-                            : "text-[#8BA596] hover:bg-[#0C1713] hover:text-white"
+                        className={`w-full text-left px-2 py-1 rounded text-xs font-mono transition-colors flex items-center justify-between cursor-pointer ${
+                          strategy.symbol === sym
+                            ? "bg-[#168BFF] text-white font-bold"
+                            : "hover:bg-[#12304A] text-[#F8FAFC]"
                         }`}
                       >
-                        {tf}
+                        <span>{sym}</span>
+                        {strategy.symbol === sym && <Check className="h-3 w-3" />}
                       </button>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* BROKER SELECTION */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono uppercase text-[#7D8EA5] font-bold">BROKER:</span>
+            <select
+              value={selectedBroker}
+              onChange={(e) => {
+                const broker = e.target.value as any;
+                const found = BROKERS.find((b) => b.id === broker);
+                onUpdateStrategy({
+                  broker_config: {
+                    execution_broker: broker,
+                    data_provider: (found?.dataProvider || "Delta") as any,
+                    mode: currentMode,
+                  },
+                });
+              }}
+              className="h-7 px-2 bg-[#0C1727] border border-[#12304A] rounded-lg text-xs font-semibold text-[#F8FAFC] focus:outline-none focus:border-[#22D3EE] cursor-pointer"
+            >
+              {BROKERS.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* TIMEFRAME */}
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono uppercase text-[#7D8EA5] font-bold">TIMEFRAME:</span>
+            <div className="flex items-center gap-0.5 bg-[#07111F] border border-[#12304A] rounded-lg p-0.5">
+              {COMMON_TIMEFRAMES.map((tf) => {
+                const isSelected = strategy.base_timeframe === tf;
+                return (
+                  <button
+                    key={tf}
+                    type="button"
+                    onClick={() => onUpdateStrategy({ base_timeframe: tf })}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#22D3EE] text-[#05101A]"
+                        : "text-[#7D8EA5] hover:text-[#F8FAFC]"
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* DIRECTION Toggle (LONG / SHORT / BOTH) */}
-        <div className="flex items-center gap-1.5">
-          <span className="text-[10px] text-[#8BA596] uppercase font-bold">DIRECTION:</span>
-          <div className="flex items-center bg-[#0C1713] p-0.5 rounded-lg border border-[#1A3127]">
+        {/* DIRECTION BUTTONS (LONG green, SHORT red, BOTH neutral/cyan) */}
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase text-[#7D8EA5] font-bold">DIRECTION:</span>
+          <div className="flex items-center gap-1 bg-[#07111F] border border-[#12304A] rounded-lg p-0.5 font-mono text-xs font-bold">
             <button
               type="button"
               onClick={() => onUpdateStrategy({ direction: "LONG" })}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
                 strategy.direction === "LONG"
-                  ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-sm"
-                  : "text-[#8BA596] hover:text-white"
+                  ? "bg-[#00E89A] text-[#05101A] shadow-sm"
+                  : "text-[#7D8EA5] hover:text-[#00E89A]"
               }`}
             >
               LONG
@@ -565,10 +615,10 @@ export function StrategyIdeHeader({
             <button
               type="button"
               onClick={() => onUpdateStrategy({ direction: "SHORT" })}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
                 strategy.direction === "SHORT"
-                  ? "bg-red-950 text-red-400 border border-red-500/60 shadow-sm"
-                  : "text-[#8BA596] hover:text-white"
+                  ? "bg-[#FF3B5C] text-white shadow-sm"
+                  : "text-[#7D8EA5] hover:text-[#FF3B5C]"
               }`}
             >
               SHORT
@@ -576,19 +626,23 @@ export function StrategyIdeHeader({
             <button
               type="button"
               onClick={() => onUpdateStrategy({ direction: "BOTH" })}
-              className={`px-2.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+              className={`px-2.5 py-1 rounded transition-all cursor-pointer ${
                 strategy.direction === "BOTH"
-                  ? "bg-amber-950 text-amber-300 border border-amber-500/60 shadow-sm"
-                  : "text-[#8BA596] hover:text-white"
+                  ? "bg-[#22D3EE] text-[#05101A] shadow-sm"
+                  : "text-[#7D8EA5] hover:text-[#22D3EE]"
               }`}
             >
               BOTH
             </button>
           </div>
+
+          {/* Mode Pill (Guarded Paper mode) */}
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 text-[#22D3EE] font-mono font-bold text-[10px] uppercase">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#22D3EE]" />
+            <span>PAPER MODE</span>
+          </div>
         </div>
-
       </div>
-
-    </header>
+    </div>
   );
 }

@@ -104,9 +104,9 @@ export function ContextInspector({
   };
 
   return (
-    <aside className="fixed top-0 right-0 bottom-0 w-[420px] max-w-[90vw] bg-[#0A101D] border-l border-[#1E293B] shadow-2xl z-50 flex flex-col font-sans text-slate-200 animate-in slide-in-from-right duration-200">
+    <aside className="fixed top-0 right-0 bottom-0 w-[420px] max-w-[90vw] bg-[#0A101D] border-l border-[#1A2A3F] shadow-2xl z-50 flex flex-col font-sans text-slate-200 animate-in slide-in-from-right duration-200">
       {/* Header */}
-      <div className="p-4 border-b border-[#1E293B] bg-[#0D1526] flex items-center justify-between shrink-0">
+      <div className="p-4 border-b border-[#1A2A3F] bg-[#0D1526] flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400">
             <Layers className="h-4 w-4" />
@@ -136,7 +136,7 @@ export function ContextInspector({
       {/* Body / Sections */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs scrollbar-thin">
         {/* Identifiers & Metadata */}
-        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] space-y-2">
+        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-2">
           <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
             <Cpu className="h-3 w-3 text-sky-400" />
             <span>Canonical & Provider Identity</span>
@@ -168,7 +168,7 @@ export function ContextInspector({
         </div>
 
         {/* 1. Market Data Reference */}
-        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] space-y-2">
+        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
               <Activity className="h-3 w-3 text-emerald-400" />
@@ -224,7 +224,7 @@ export function ContextInspector({
         </div>
 
         {/* 2. Portfolio Position Reference */}
-        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] space-y-2">
+        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
               <DollarSign className="h-3 w-3 text-cyan-400" />
@@ -270,7 +270,7 @@ export function ContextInspector({
         </div>
 
         {/* 3. P&L Engine Reference */}
-        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] space-y-2">
+        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
               <TrendingUp className="h-3 w-3 text-emerald-400" />
@@ -310,7 +310,7 @@ export function ContextInspector({
         </div>
 
         {/* 4. Risk Engine Reference */}
-        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1E293B] space-y-2">
+        <div className="p-3 rounded-xl bg-[#0F172A]/80 border border-[#1A2A3F] space-y-2">
           <div className="flex items-center justify-between">
             <div className="text-[10px] uppercase tracking-wider text-slate-400 font-bold flex items-center gap-1.5">
               <Shield className="h-3 w-3 text-amber-400" />
@@ -350,7 +350,7 @@ export function ContextInspector({
       </div>
 
       {/* Footer Info */}
-      <div className="p-3 border-t border-[#1E293B] bg-[#0D1526] text-[10px] font-mono text-slate-500 flex items-center justify-between shrink-0">
+      <div className="p-3 border-t border-[#1A2A3F] bg-[#0D1526] text-[10px] font-mono text-slate-500 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <Clock className="h-3 w-3 text-slate-400" />
           <span>Strict Department Isolation Enforced</span>

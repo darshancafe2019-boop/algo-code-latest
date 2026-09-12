@@ -20,7 +20,7 @@ export function AdvancedAnalysisSection({
   const [activeTab, setActiveTab] = useState<"mtf" | "diagnostics" | "tools">("mtf");
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl shadow-xl overflow-hidden transition-all">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl shadow-xl overflow-hidden transition-all">
       {/* Collapsible Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}

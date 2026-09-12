@@ -90,9 +90,9 @@ export function IndicatorLibraryDrawer({ isOpen, bot, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-black/80 backdrop-blur-sm">
-      <div className="w-full max-w-md bg-[#121824] border-l border-[#1E293B] h-full p-6 flex flex-col justify-between shadow-2xl">
+      <div className="w-full max-w-md bg-[#121824] border-l border-[#1A2A3F] h-full p-6 flex flex-col justify-between shadow-2xl">
         <div>
-          <div className="flex items-center justify-between border-b border-[#1E293B] pb-4 mb-4">
+          <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-4 mb-4">
             <div className="flex items-center gap-2 text-cyan-400">
               <Sliders className="h-5 w-5" />
               <div>
@@ -143,7 +143,7 @@ export function IndicatorLibraryDrawer({ isOpen, bot, onClose }: Props) {
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${
                     isSelected
                       ? "bg-cyan-950/30 border-cyan-500/50 text-white"
-                      : "bg-[#0B0F17] border-[#1E293B] hover:border-slate-700 text-slate-300"
+                      : "bg-[#0B0F17] border-[#1A2A3F] hover:border-slate-700 text-slate-300"
                   }`}
                 >
                   <div className="flex items-center justify-between mb-1">
@@ -169,7 +169,7 @@ export function IndicatorLibraryDrawer({ isOpen, bot, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1E293B] mt-4">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1A2A3F] mt-4">
           <button
             onClick={onClose}
             className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium"

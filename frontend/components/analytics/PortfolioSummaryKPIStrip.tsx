@@ -58,7 +58,7 @@ export function PortfolioSummaryKPIStrip({
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 font-mono select-none">
       {/* 1. Total Net Equity */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Net Equity</span>
           <DollarSign className="w-3.5 h-3.5 text-cyan-400" />
@@ -72,7 +72,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 2. Today's Net P&L */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Today P&L</span>
           {todayMeta.isPositive ? (
@@ -92,7 +92,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 3. Total Net P&L */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Total Net P&L</span>
           {netMeta.isPositive ? (
@@ -112,7 +112,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 4. Realized P&L */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Realized P&L</span>
           <Target className="w-3.5 h-3.5 text-cyan-400" />
@@ -128,7 +128,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 5. Unrealized MTM P&L */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Unrealized MTM</span>
           <ActivityIcon className="w-3.5 h-3.5 text-purple-400" />
@@ -144,7 +144,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 6. Available Margin */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Available Margin</span>
           <Gauge className="w-3.5 h-3.5 text-cyan-400" />
@@ -158,7 +158,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 7. Quant Ratios (Sharpe & Sortino) */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Quant Ratios</span>
           <Award className="w-3.5 h-3.5 text-amber-400" />
@@ -172,7 +172,7 @@ export function PortfolioSummaryKPIStrip({
       </div>
 
       {/* 8. Daily Target / Loss Gauge */}
-      <div className="bg-[#0B111E] border border-[#1E293B] rounded-xl p-3 space-y-1">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-xl p-3 space-y-1">
         <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
           <span>Daily Target HUD</span>
           <Zap className="w-3.5 h-3.5 text-emerald-400" />

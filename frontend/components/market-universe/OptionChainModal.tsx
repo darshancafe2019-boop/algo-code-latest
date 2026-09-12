@@ -41,9 +41,9 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-3 sm:p-6 overflow-y-auto">
-      <div className="bg-[#0B0E14] border border-[#1E293B] rounded-2xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="bg-[#0B0E14] border border-[#1A2A3F] rounded-2xl w-full max-w-6xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header Bar */}
-        <div className="p-4 bg-[#121824] border-b border-[#1E293B] flex flex-wrap items-center justify-between gap-3">
+        <div className="p-4 bg-[#121824] border-b border-[#1A2A3F] flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
               <Layers className="h-5 w-5" />
@@ -71,7 +71,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
             <select
               value={selectedUnderlying}
               onChange={(e) => setSelectedUnderlying(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1E293B] text-xs font-semibold text-white focus:outline-none focus:border-cyan-500"
+              className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1A2A3F] text-xs font-semibold text-white focus:outline-none focus:border-cyan-500"
             >
               <option value="NIFTY50">NIFTY 50</option>
               <option value="BANKNIFTY">BANK NIFTY</option>
@@ -85,7 +85,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
               <select
                 value={activeExpiry}
                 onChange={(e) => setSelectedExpiry(e.target.value)}
-                className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1E293B] text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500"
+                className="px-3 py-1.5 rounded-lg bg-[#0F141F] border border-[#1A2A3F] text-xs font-semibold text-cyan-300 focus:outline-none focus:border-cyan-500"
               >
                 {normalizedExpiries.map((opt) => (
                   <option key={opt.key} value={opt.value}>
@@ -97,7 +97,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
 
             <button
               onClick={() => refetch()}
-              className="p-2 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1E293B] text-slate-300 hover:text-white"
+              className="p-2 rounded-lg bg-[#0F141F] hover:bg-slate-800 border border-[#1A2A3F] text-slate-300 hover:text-white"
               title="Refresh Option Chain"
             >
               <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
@@ -105,7 +105,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
 
             <button
               onClick={onClose}
-              className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1E293B] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
+              className="p-2 rounded-lg bg-[#0F141F] hover:bg-red-500/20 border border-[#1A2A3F] hover:border-red-500/40 text-slate-400 hover:text-red-400 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -128,18 +128,18 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
           ) : (
             <table className="w-full text-left text-xs border-collapse font-mono">
               <thead>
-                <tr className="bg-[#121824] border-b border-[#1E293B] text-[11px] text-slate-400">
-                  <th colSpan={7} className="text-center py-2 bg-emerald-950/20 text-emerald-300 font-bold border-r border-[#1E293B]">
+                <tr className="bg-[#121824] border-b border-[#1A2A3F] text-[11px] text-slate-400">
+                  <th colSpan={7} className="text-center py-2 bg-emerald-950/20 text-emerald-300 font-bold border-r border-[#1A2A3F]">
                     CALL OPTIONS (CE)
                   </th>
                   <th className="text-center py-2 px-3 bg-[#0B0E14] text-white font-bold tracking-wider">
                     STRIKE
                   </th>
-                  <th colSpan={7} className="text-center py-2 bg-rose-950/20 text-rose-300 font-bold border-l border-[#1E293B]">
+                  <th colSpan={7} className="text-center py-2 bg-rose-950/20 text-rose-300 font-bold border-l border-[#1A2A3F]">
                     PUT OPTIONS (PE)
                   </th>
                 </tr>
-                <tr className="bg-[#0D121C] border-b border-[#1E293B] text-[10px] text-slate-400">
+                <tr className="bg-[#0D121C] border-b border-[#1A2A3F] text-[10px] text-slate-400">
                   {/* Call Columns */}
                   <th className="py-2 px-2 text-right">OI (Lots)</th>
                   <th className="py-2 px-2 text-right">OI Chg</th>
@@ -147,13 +147,13 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                   <th className="py-2 px-2 text-right">Delta</th>
                   <th className="py-2 px-2 text-right">LTP (₹)</th>
                   <th className="py-2 px-2 text-right">Chg%</th>
-                  <th className="py-2 px-2 text-center border-r border-[#1E293B]">Action</th>
+                  <th className="py-2 px-2 text-center border-r border-[#1A2A3F]">Action</th>
 
                   {/* Strike Column */}
                   <th className="py-2 px-3 text-center bg-[#121824] text-white font-bold">Strike</th>
 
                   {/* Put Columns */}
-                  <th className="py-2 px-2 text-center border-l border-[#1E293B]">Action</th>
+                  <th className="py-2 px-2 text-center border-l border-[#1A2A3F]">Action</th>
                   <th className="py-2 px-2 text-left">Chg%</th>
                   <th className="py-2 px-2 text-left">LTP (₹)</th>
                   <th className="py-2 px-2 text-left">Delta</th>
@@ -214,7 +214,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                         )}
                       </td>
                       {/* Call Quick Buy */}
-                      <td className="py-1 px-2 text-center border-r border-[#1E293B]">
+                      <td className="py-1 px-2 text-center border-r border-[#1A2A3F]">
                         {s.call && (
                           <button
                             onClick={() =>
@@ -239,7 +239,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                       </td>
 
                       {/* Put Quick Buy */}
-                      <td className="py-1 px-2 text-center border-l border-[#1E293B]">
+                      <td className="py-1 px-2 text-center border-l border-[#1A2A3F]">
                         {s.put && (
                           <button
                             onClick={() =>
@@ -303,7 +303,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
         </div>
 
         {/* Footer info */}
-        <div className="p-3 bg-[#0D121C] border-t border-[#1E293B] flex items-center justify-between text-[11px] text-slate-400">
+        <div className="p-3 bg-[#0D121C] border-t border-[#1A2A3F] flex items-center justify-between text-[11px] text-slate-400">
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1">
               <span className="h-2 w-2 rounded-full bg-emerald-400 inline-block" /> ITM Calls (Green Shading)

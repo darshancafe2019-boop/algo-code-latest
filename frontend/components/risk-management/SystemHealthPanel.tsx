@@ -29,11 +29,11 @@ export function SystemHealthPanel() {
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Risk & Market Data Health Architecture
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Continuous verification of feed latency, socket heartbeats, tick staleness, and database integrity.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           All Systems Operational
         </span>
       </div>
@@ -43,11 +43,11 @@ export function SystemHealthPanel() {
         {healthItems.map((item, idx) => (
           <div
             key={idx}
-            className="p-3.5 rounded-2xl bg-[#0D1914] border border-[#1B3328] space-y-2 hover:border-[#2E7D5B] transition-colors"
+            className="p-3.5 rounded-2xl bg-[#0A1422] border border-[#122033] space-y-2 hover:border-[#2563EB] transition-colors"
           >
             <div className="flex items-center justify-between">
-              <span className="text-[9px] text-[#70877A] uppercase font-bold">{item.type}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#123C2A] text-[#55C98A] font-bold border border-[#39B978]/40 flex items-center gap-1">
+              <span className="text-[9px] text-[#52627A] uppercase font-bold">{item.type}</span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(37,99,235,0.18)] text-[#22D3EE] font-bold border border-[#00E890]/40 flex items-center gap-1">
                 <CheckCircle2 className="h-2.5 w-2.5" />
                 <span>{item.status}</span>
               </span>
@@ -58,9 +58,9 @@ export function SystemHealthPanel() {
               <span className="text-[10px] text-cyan-300">Latency: {item.latency}</span>
             </div>
 
-            <div className="pt-1 text-[10px] text-[#70877A] border-t border-[#1B3328]/60 flex justify-between">
+            <div className="pt-1 text-[10px] text-[#52627A] border-t border-[#122033]/60 flex justify-between">
               <span>Freshness:</span>
-              <span className="text-[#55C98A] font-bold">{item.tick_age}</span>
+              <span className="text-[#22D3EE] font-bold">{item.tick_age}</span>
             </div>
           </div>
         ))}

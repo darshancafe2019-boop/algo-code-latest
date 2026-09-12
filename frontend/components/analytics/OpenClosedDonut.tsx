@@ -14,8 +14,8 @@ export function OpenClosedDonut({ data }: Props) {
   const closedPct = total > 0 ? 100 - openPct : 100;
 
   return (
-    <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] shadow-xl flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-4 border-b border-[#1E293B] pb-3">
+    <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] shadow-xl flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-4 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-purple-400" />
           <h3 className="text-sm font-bold text-white">Open vs Closed Trades</h3>

@@ -35,7 +35,7 @@ export function RiskAlerts() {
   };
 
   return (
-    <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+    <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-cyan-400" />
@@ -48,7 +48,7 @@ export function RiskAlerts() {
           <select
             value={filterSeverity}
             onChange={(e) => setFilterSeverity(e.target.value)}
-            className="bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+            className="bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
           >
             <option value="ALL">All Severity Tiers</option>
             <option value="ORDER_BLOCKED">Order Blocked Events</option>
@@ -69,7 +69,7 @@ export function RiskAlerts() {
           events.map((evt) => (
             <div
               key={evt.id}
-              className="p-3 bg-[#0E1524] border border-[#1E293B] rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono"
+              className="p-3 bg-[#0E1524] border border-[#1A2A3F] rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs font-mono"
             >
               <div className="flex items-start gap-2.5">
                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSeverityBadge(evt.severity)}`}>

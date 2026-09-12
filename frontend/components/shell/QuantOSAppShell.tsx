@@ -250,7 +250,7 @@ export function QuantOSAppShell({
       }}
     >
       <AuthGuard>
-        <div className="min-h-screen h-screen bg-[#070B14] text-[#F4F7FA] flex flex-col font-sans overflow-hidden">
+        <div className="min-h-screen h-screen bg-[#060B14] text-[#F7FAFC] flex flex-col font-sans overflow-hidden">
           {/* 1. TOP GLOBAL HEADER */}
           <ErrorBoundary title="Global Header Failed">
             <GlobalHeader
@@ -271,7 +271,7 @@ export function QuantOSAppShell({
             </ErrorBoundary>
 
             {/* Main Center Workspace */}
-            <main className="flex-1 overflow-y-auto bg-[#070B14] p-3 sm:p-4 pb-20 md:pb-4 min-w-0">
+            <main className="flex-1 overflow-y-auto bg-[#060B14] p-3 sm:p-4 pb-20 md:pb-4 min-w-0">
               <ErrorBoundary title="Workspace View Failed">{children}</ErrorBoundary>
             </main>
           </div>

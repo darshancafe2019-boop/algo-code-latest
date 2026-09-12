@@ -8,7 +8,7 @@ export function AlertSkeleton() {
       {[1, 2, 3, 4, 5].map((i) => (
         <div
           key={i}
-          className="p-4 rounded-xl bg-[#121824]/60 border border-[#1E293B]/80 flex items-start justify-between gap-4"
+          className="p-4 rounded-xl bg-[#121824]/60 border border-[#1A2A3F]/80 flex items-start justify-between gap-4"
         >
           <div className="flex items-start gap-3.5 flex-1">
             <div className="w-9 h-9 rounded-lg bg-slate-800/70 shrink-0" />

@@ -10931,6 +10931,33 @@ def update_user_password(user_id: str, password_hash: str, salt: str, must_chang
     )
 
 
+def update_user_username(user_id: str, new_username: str) -> bool:
+    """Updates user username."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET username = ?, updated_at = ? WHERE id = ?",
+        (new_username.strip(), now_iso, user_id)
+    )
+
+
+def update_user_email(user_id: str, new_email: str) -> bool:
+    """Updates user email address."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET email = ?, updated_at = ? WHERE id = ?",
+        (new_email.strip().lower(), now_iso, user_id)
+    )
+
+
+def update_user_passkeys(user_id: str, passkeys_json: str) -> bool:
+    """Updates user passkeys JSON array."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_execute(
+        "UPDATE users SET passkeys_json = ?, updated_at = ? WHERE id = ?",
+        (passkeys_json, now_iso, user_id)
+    )
+
+
 def set_user_2fa_settings(user_id: str, is_2fa_enabled: int, totp_secret_encrypted: str = "", recovery_codes_json: str = "[]") -> bool:
     """Updates user 2FA status, secret, and recovery codes."""
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -11677,7 +11704,7 @@ def get_delta_contracts(
         query += " AND (expiry_date = ? OR settlement_time LIKE ?)"
         params.extend([expiry, f"{expiry}%"])
     if active_only:
-        query += " AND is_active = 1 AND state = 'live'"
+        query += " AND is_active = 1 AND state IN ('live', 'upcoming')"
     query += " ORDER BY strike_price ASC, contract_type ASC"
     return safe_query(query, tuple(params))
 

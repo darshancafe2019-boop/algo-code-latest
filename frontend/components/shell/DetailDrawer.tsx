@@ -94,13 +94,13 @@ export function DetailDrawer({
               <h3 className="text-sm font-bold font-mono text-[#F4F7FA] truncate mt-1">
                 {title}
               </h3>
-              {subtitle && <p className="text-[11px] font-mono text-[#94A3B8] truncate">{subtitle}</p>}
+              {subtitle && <p className="text-[11px] font-mono text-[#7C8CA3] truncate">{subtitle}</p>}
             </div>
 
             <button
               type="button"
               onClick={onClose}
-              className="p-1 rounded-md text-[#94A3B8] hover:text-white hover:bg-[#121C2C] transition-colors cursor-pointer shrink-0"
+              className="p-1 rounded-md text-[#7C8CA3] hover:text-white hover:bg-[#121C2C] transition-colors cursor-pointer shrink-0"
               aria-label="Close drawer"
             >
               <X className="h-4 w-4" />
@@ -114,13 +114,13 @@ export function DetailDrawer({
             {/* Structured Metadata Grid if provided */}
             {metadata && Object.keys(metadata).length > 0 && (
               <div className="rounded-lg bg-[#0A101C] border border-[#213047] p-3 space-y-2">
-                <h5 className="text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider">
+                <h5 className="text-[11px] font-bold text-[#7C8CA3] uppercase tracking-wider">
                   Telemetry & Attributes
                 </h5>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
                   {Object.entries(metadata).map(([k, v]) => (
                     <div key={k} className="flex flex-col">
-                      <span className="text-[#64748B] text-[10px] uppercase truncate">{k}</span>
+                      <span className="text-[#52627A] text-[10px] uppercase truncate">{k}</span>
                       <span className="text-[#F4F7FA] font-medium truncate tabular-nums">
                         {v !== undefined && v !== null ? String(v) : "—"}
                       </span>
@@ -134,7 +134,7 @@ export function DetailDrawer({
             {rawJson && (
               <div className="rounded-lg bg-[#070B14] border border-[#213047] overflow-hidden">
                 <div className="px-3 py-1.5 bg-[#0A101C] border-b border-[#213047] flex items-center justify-between">
-                  <span className="text-[10px] text-[#64748B] font-bold uppercase tracking-wider">
+                  <span className="text-[10px] text-[#52627A] font-bold uppercase tracking-wider">
                     Raw Payload
                   </span>
                   <button
@@ -146,7 +146,7 @@ export function DetailDrawer({
                     <span>{copied ? "Copied" : "Copy JSON"}</span>
                   </button>
                 </div>
-                <pre className="p-3 text-[11px] text-[#94A3B8] overflow-x-auto max-h-60 leading-relaxed font-mono">
+                <pre className="p-3 text-[11px] text-[#7C8CA3] overflow-x-auto max-h-60 leading-relaxed font-mono">
                   {JSON.stringify(rawJson, null, 2)}
                 </pre>
               </div>

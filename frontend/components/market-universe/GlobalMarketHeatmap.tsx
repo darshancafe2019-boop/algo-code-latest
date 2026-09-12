@@ -34,13 +34,13 @@ export function GlobalMarketHeatmap({ onSelectInstrument }: GlobalMarketHeatmapP
     if (change <= -5.0) return "bg-rose-950/80 border-rose-600 text-rose-200";
     if (change <= -2.0) return "bg-rose-950/60 border-rose-700 text-rose-300";
     if (change < 0.0) return "bg-rose-950/40 border-rose-900 text-rose-400";
-    return "bg-[#070D14] border-[#1E293B] text-slate-300";
+    return "bg-[#070D14] border-[#1A2A3F] text-slate-300";
   };
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
       {/* 1. Header & Group Switcher */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
             <Grid className="h-4 w-4" />
@@ -56,7 +56,7 @@ export function GlobalMarketHeatmap({ onSelectInstrument }: GlobalMarketHeatmapP
         </div>
 
         {/* Group Selector */}
-        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1E293B] text-[11px] font-mono overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1A2A3F] text-[11px] font-mono overflow-x-auto scrollbar-none">
           {(categories.length > 0 ? categories : ["Crypto", "Indian Equities", "Global Equities", "Forex", "Commodities"]).map((cat) => (
             <button
               key={cat}
@@ -77,11 +77,11 @@ export function GlobalMarketHeatmap({ onSelectInstrument }: GlobalMarketHeatmapP
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 animate-pulse">
           {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-            <div key={i} className="h-16 bg-[#070D14] rounded-xl border border-[#1E293B]" />
+            <div key={i} className="h-16 bg-[#070D14] rounded-xl border border-[#1A2A3F]" />
           ))}
         </div>
       ) : activeList.length === 0 ? (
-        <div className="p-6 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1E293B]">
+        <div className="p-6 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1A2A3F]">
           No assets available for this market category.
         </div>
       ) : (

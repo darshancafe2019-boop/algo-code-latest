@@ -179,6 +179,81 @@ export interface OptionTerminalSnapshot {
   timestamp: number;
 }
 
+export interface ActionableOptionContract {
+  broker: "DELTA" | "DHAN" | "UPSTOX" | "PAPER";
+  source: string;
+  symbol: string;
+  productId?: number | string;
+  instrumentId?: string;
+  securityId?: string;
+  underlying: string;
+  expiry: string;
+  strike: number;
+  optionType: OptionType;
+  side: "BUY" | "SELL";
+  ltp: number;
+  bid: number;
+  ask: number;
+  bidSize?: number;
+  askSize?: number;
+  markPrice?: number;
+  iv?: number;
+  lotSize: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+  oi?: number;
+  volume?: number;
+  dataAgeMs?: number;
+  freshnessStatus?: "LIVE" | "RECENT" | "STALE" | "OFFLINE";
+}
+
+export interface OrderBookLevel {
+  price: number;
+  quantity: number;
+  orders?: number;
+}
+
+export interface OrderBookDepthData {
+  broker: string;
+  source: string;
+  symbol: string;
+  underlying: string;
+  expiry: string;
+  strike: number;
+  optionType: OptionType;
+  bids: OrderBookLevel[];
+  asks: OrderBookLevel[];
+  ltp: number;
+  markPrice?: number;
+  spread: number;
+  spreadPct: number;
+  totalBidQty: number;
+  totalAskQty: number;
+  imbalanceRatio: number;
+  volume?: number;
+  oi?: number;
+  iv?: number;
+  timestamp: number;
+  dataAgeMs: number;
+  status: "LIVE" | "STALE" | "DISCONNECTED";
+}
+
+export interface OptionPositionInfo {
+  symbol: string;
+  strike: number;
+  optionType: OptionType;
+  quantity: number;
+  lots: number;
+  averagePrice: number;
+  ltp: number;
+  unrealizedPnl: number;
+  realizedPnl?: number;
+  pnlPct: number;
+  broker: string;
+}
+
 export interface ColumnVisibilityConfig {
   oi: boolean;
   oiChange: boolean;
@@ -213,3 +288,4 @@ export interface OptionFilterConfig {
   sentiment: "ALL" | "BULLISH" | "BEARISH" | "NEUTRAL";
   minPremium: number;
 }
+

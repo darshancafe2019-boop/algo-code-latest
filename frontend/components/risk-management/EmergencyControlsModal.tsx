@@ -104,7 +104,7 @@ export function EmergencyControlsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn select-none font-sans">
-      <div className="bg-[#0D1914] border border-red-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
+      <div className="bg-[#0A1422] border border-red-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-red-900/60 bg-red-950/40 flex items-center justify-between">
           <div className="flex items-center gap-3 text-red-400 font-bold">
@@ -137,10 +137,10 @@ export function EmergencyControlsModal({
 
           <div className="space-y-2.5">
             {/* 1. Pause New Orders */}
-            <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] flex items-center justify-between">
               <div>
                 <span className="font-bold text-white block">Pause New Orders</span>
-                <span className="text-[11px] text-[#A8BDB0]">Suspends signal dispatch across all running bots.</span>
+                <span className="text-[11px] text-[#7C8CA3]">Suspends signal dispatch across all running bots.</span>
               </div>
               <button
                 onClick={() => pauseMutation.mutate()}
@@ -153,10 +153,10 @@ export function EmergencyControlsModal({
             </div>
 
             {/* 2. Cancel Open Orders */}
-            <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] flex items-center justify-between">
               <div>
                 <span className="font-bold text-white block">Cancel Open Orders</span>
-                <span className="text-[11px] text-[#A8BDB0]">Cancels all resting limit and stop orders in flight.</span>
+                <span className="text-[11px] text-[#7C8CA3]">Cancels all resting limit and stop orders in flight.</span>
               </div>
               <button
                 onClick={() => cancelOrdersMutation.mutate()}
@@ -169,10 +169,10 @@ export function EmergencyControlsModal({
             </div>
 
             {/* 3. Close All Paper Positions */}
-            <div className="p-3 rounded-xl bg-[#07110D] border border-[#1B3328] flex items-center justify-between">
+            <div className="p-3 rounded-xl bg-[#07101A] border border-[#122033] flex items-center justify-between">
               <div>
                 <span className="font-bold text-white block">Close Paper Positions</span>
-                <span className="text-[11px] text-[#A8BDB0]">Instantly squares off all open simulated positions.</span>
+                <span className="text-[11px] text-[#7C8CA3]">Instantly squares off all open simulated positions.</span>
               </div>
               <button
                 onClick={() => closePositionsMutation.mutate()}
@@ -228,10 +228,10 @@ export function EmergencyControlsModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#1B3328] bg-[#0A130F] flex justify-end">
+        <div className="p-4 border-t border-[#122033] bg-[#0A130F] flex justify-end">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-[#07110D] hover:bg-[#123C2A] text-slate-300 font-bold text-xs transition-colors"
+            className="px-4 py-2 rounded-xl bg-[#07101A] hover:bg-[rgba(37,99,235,0.18)] text-slate-300 font-bold text-xs transition-colors"
           >
             Close Emergency Panel
           </button>

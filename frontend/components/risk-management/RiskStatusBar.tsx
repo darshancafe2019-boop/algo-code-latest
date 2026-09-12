@@ -12,7 +12,7 @@ interface RiskStatusBarProps {
 
 export function RiskStatusBar({ analytics, isConnected, onOpenEmergencyModal }: RiskStatusBarProps) {
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 shadow-xl select-none font-sans text-xs">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 shadow-xl select-none font-sans text-xs">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Engine & Policy Status */}
         <div className="flex items-center gap-3">
@@ -32,7 +32,7 @@ export function RiskStatusBar({ analytics, isConnected, onOpenEmergencyModal }: 
             </span>
           </div>
 
-          <div className="h-3.5 w-px bg-[#1E293B]" />
+          <div className="h-3.5 w-px bg-[#1A2A3F]" />
 
           <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px]">
             <ShieldCheck className="h-3.5 w-3.5 text-cyan-400" />
@@ -41,7 +41,7 @@ export function RiskStatusBar({ analytics, isConnected, onOpenEmergencyModal }: 
             <span className="text-[10px] text-slate-500">(v2.8.0)</span>
           </div>
 
-          <div className="h-3.5 w-px bg-[#1E293B]" />
+          <div className="h-3.5 w-px bg-[#1A2A3F]" />
 
           <div className="flex items-center gap-1.5 text-slate-300 font-mono text-[11px]">
             <span className="text-slate-400">Policy:</span>
@@ -59,7 +59,7 @@ export function RiskStatusBar({ analytics, isConnected, onOpenEmergencyModal }: 
             </span>
           </div>
 
-          <div className="h-3.5 w-px bg-[#1E293B]" />
+          <div className="h-3.5 w-px bg-[#1A2A3F]" />
 
           <div className="flex items-center gap-1.5 font-mono text-[11px]">
             <Server className="h-3.5 w-3.5 text-cyan-400" />

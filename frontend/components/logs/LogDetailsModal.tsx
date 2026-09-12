@@ -32,9 +32,9 @@ export function LogDetailsModal({ log, onClose }: LogDetailsModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Modal Header */}
-        <div className="px-5 py-4 border-b border-[#1E293B] flex items-center justify-between">
+        <div className="px-5 py-4 border-b border-[#1A2A3F] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800 text-cyan-400">
               <Terminal className="h-4 w-4" />
@@ -47,14 +47,14 @@ export function LogDetailsModal({ log, onClose }: LogDetailsModalProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopy}
-              className="p-1.5 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-400 hover:text-white transition-colors"
               title="Copy JSON"
             >
               {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
             </button>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-slate-400 hover:text-white transition-colors"
+              className="p-1.5 rounded-lg bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-slate-400 hover:text-white transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
@@ -64,7 +64,7 @@ export function LogDetailsModal({ log, onClose }: LogDetailsModalProps) {
         {/* Modal Body */}
         <div className="p-5 overflow-y-auto space-y-4 text-xs font-mono">
           {!isString && (
-            <div className="grid grid-cols-2 gap-3 bg-[#0B0F17] p-3.5 rounded-xl border border-[#1E293B]">
+            <div className="grid grid-cols-2 gap-3 bg-[#0B0F17] p-3.5 rounded-xl border border-[#1A2A3F]">
               <div>
                 <span className="text-[10px] font-sans font-bold text-slate-500 uppercase">Event Type</span>
                 <p className="text-purple-300 font-bold mt-0.5">{log.event_type || "SYSTEM_EVENT"}</p>
@@ -89,7 +89,7 @@ export function LogDetailsModal({ log, onClose }: LogDetailsModalProps) {
             <span className="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider block mb-1">
               Formatted Message Payload
             </span>
-            <div className="bg-[#0B0F17] p-3 rounded-xl border border-[#1E293B] text-slate-200 break-all leading-relaxed">
+            <div className="bg-[#0B0F17] p-3 rounded-xl border border-[#1A2A3F] text-slate-200 break-all leading-relaxed">
               {isString ? sanitizeLogString(log) : sanitizeLogString(log.message)}
             </div>
           </div>
@@ -99,14 +99,14 @@ export function LogDetailsModal({ log, onClose }: LogDetailsModalProps) {
             <span className="text-[10px] font-sans font-bold text-slate-400 uppercase tracking-wider block mb-1 flex items-center gap-1">
               <Code className="h-3 w-3 text-cyan-400" /> Full Structured JSON Payload
             </span>
-            <pre className="bg-[#0B0F17] p-3 rounded-xl border border-[#1E293B] text-cyan-300 text-[11px] overflow-x-auto leading-relaxed scrollbar-thin">
+            <pre className="bg-[#0B0F17] p-3 rounded-xl border border-[#1A2A3F] text-cyan-300 text-[11px] overflow-x-auto leading-relaxed scrollbar-thin">
               {JSON.stringify(rawData, null, 2)}
             </pre>
           </div>
         </div>
 
         {/* Modal Footer */}
-        <div className="px-5 py-3 border-t border-[#1E293B] flex items-center justify-between text-[10px] text-slate-500 font-sans">
+        <div className="px-5 py-3 border-t border-[#1A2A3F] flex items-center justify-between text-[10px] text-slate-500 font-sans">
           <span>Protected Sandbox Log Record</span>
           <button
             onClick={onClose}

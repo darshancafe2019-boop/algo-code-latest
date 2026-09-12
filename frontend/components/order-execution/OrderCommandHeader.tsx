@@ -24,23 +24,23 @@ export function OrderCommandHeader({
   onResetPaperAccount,
 }: OrderCommandHeaderProps) {
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-xl space-y-3">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-5 font-sans space-y-3">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         {/* Title & Badge */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500/20 to-blue-600/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shadow-md">
+          <div className="w-10 h-10 rounded-lg bg-[#2563EB]/10 border border-[#2563EB]/30 flex items-center justify-center text-[#22D3EE]">
             <Zap className="w-5 h-5" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-bold text-white tracking-tight">
+              <h2 className="text-base font-bold text-[#F7FAFC] tracking-tight">
                 ORDER & EXECUTION COMMAND CENTER
               </h2>
-              <span className="px-2 py-0.5 text-[10px] font-mono font-bold rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+              <span className="px-2 py-0.5 text-[10px] font-semibold rounded-md bg-[#101B2D] text-[#22D3EE] border border-[#1A2A3F]">
                 14-STAGE OMS
               </span>
             </div>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-[#7C8CA3] mt-0.5">
               Server-authoritative pre-trade risk checks, margin validation, and idempotent execution
             </p>
           </div>
@@ -51,7 +51,7 @@ export function OrderCommandHeader({
           {executionMode === "PAPER" && onResetPaperAccount && (
             <button
               onClick={onResetPaperAccount}
-              className="px-2.5 py-1 text-[11px] font-mono rounded-lg bg-[#141E33] hover:bg-[#1C2A47] text-slate-300 border border-slate-700 transition-all flex items-center gap-1"
+              className="px-2.5 py-1 text-[11px] rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F7FAFC] border border-[#1A2A3F] hover:border-[#29415F] transition-all flex items-center gap-1 font-medium"
               title="Reset simulated paper trading account balance"
             >
               <RefreshCw className="w-3 h-3" />
@@ -61,10 +61,10 @@ export function OrderCommandHeader({
 
           <button
             onClick={onToggleMode}
-            className={`px-3 py-1.5 rounded-xl text-xs font-mono font-bold transition-all flex items-center gap-1.5 shadow-sm ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
               executionMode === "PAPER"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30"
-                : "bg-red-950 text-red-400 border border-red-800 hover:bg-red-900 animate-pulse"
+                ? "bg-[#19C5FF]/10 text-[#19C5FF] border border-[#19C5FF]/30 hover:bg-[#19C5FF]/20"
+                : "bg-[#FF3B5C]/10 text-[#FF3B5C] border border-[#FF3B5C]/30 hover:bg-[#FF3B5C]/20 animate-pulse"
             }`}
           >
             {executionMode === "PAPER" ? (
@@ -83,35 +83,36 @@ export function OrderCommandHeader({
       </div>
 
       {/* Telemetry Status Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-800/80 text-xs font-mono">
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-lg p-2 flex items-center justify-between">
-          <span className="text-slate-400">Broker Link:</span>
-          <span className="text-emerald-400 font-bold flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-[#1A2A3F] text-xs">
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5 flex items-center justify-between">
+          <span className="text-[#52627A]">Broker Link:</span>
+          <span className="text-[#00E890] font-semibold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#00E890]" />
             {brokerStatus}
           </span>
         </div>
 
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-lg p-2 flex items-center justify-between">
-          <span className="text-slate-400">Market Data:</span>
-          <span className="text-cyan-400 font-bold flex items-center gap-1">
-            <Radio className="w-3 h-3 text-cyan-400" />
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5 flex items-center justify-between">
+          <span className="text-[#52627A]">Market Data:</span>
+          <span className="text-[#22D3EE] font-semibold flex items-center gap-1 font-mono tabular-nums">
+            <Radio className="w-3 h-3 text-[#22D3EE]" />
             {dataFeedStatus} ({latencyMs}ms)
           </span>
         </div>
 
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-lg p-2 flex items-center justify-between">
-          <span className="text-slate-400">Risk Engine:</span>
-          <span className={riskGatePassed ? "text-emerald-400 font-bold" : "text-amber-400 font-bold"}>
-            {riskGatePassed ? "✓ 14/14 GATES" : "⚠ BLOCKED"}
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5 flex items-center justify-between">
+          <span className="text-[#52627A]">Risk Engine:</span>
+          <span className={riskGatePassed ? "text-[#00E890] font-semibold" : "text-[#F59E0B] font-semibold"}>
+            {riskGatePassed ? "14/14 GATES" : "BLOCKED"}
           </span>
         </div>
 
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-lg p-2 flex items-center justify-between">
-          <span className="text-slate-400">Execution Engine:</span>
-          <span className="text-white font-bold">READY</span>
+        <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5 flex items-center justify-between">
+          <span className="text-[#52627A]">Execution Engine:</span>
+          <span className="text-[#F7FAFC] font-semibold">READY</span>
         </div>
       </div>
     </div>
   );
 }
+

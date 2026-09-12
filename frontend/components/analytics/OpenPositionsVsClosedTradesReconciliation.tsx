@@ -32,7 +32,7 @@ export function OpenPositionsVsClosedTradesReconciliation({
   const realMeta = formatPnL(realizedPnl, currency, 2);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
       {/* Header & Reconciliation Status */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
@@ -66,7 +66,7 @@ export function OpenPositionsVsClosedTradesReconciliation({
       {/* 2-Column Split: Open Positions vs Closed Trades */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Open Positions Card */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-4 space-y-3">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-300 uppercase flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
@@ -102,7 +102,7 @@ export function OpenPositionsVsClosedTradesReconciliation({
         </div>
 
         {/* Closed Trades Card */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-4 space-y-3">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-300 uppercase flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-400" />

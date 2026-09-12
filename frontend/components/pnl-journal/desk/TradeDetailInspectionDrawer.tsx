@@ -30,12 +30,20 @@ export const TradeDetailInspectionDrawer: React.FC<TradeDetailInspectionDrawerPr
   onSaveNotes,
   currencySymbol = "₹",
 }) => {
-  if (!trade) return null;
-
-  const [notes, setNotes] = useState(trade.notes || "");
+  const [notes, setNotes] = useState(trade?.notes || "");
   const [tagInput, setTagInput] = useState("");
-  const [tags, setTags] = useState<string[]>(trade.tags || []);
+  const [tags, setTags] = useState<string[]>(trade?.tags || []);
   const [isSaved, setIsSaved] = useState(false);
+
+  React.useEffect(() => {
+    if (trade) {
+      setNotes(trade.notes || "");
+      setTags(trade.tags || []);
+      setIsSaved(false);
+    }
+  }, [trade]);
+
+  if (!trade) return null;
 
   const fees = trade.feeBreakdown;
   const isProfit = trade.netPnl > 0;

@@ -4,8 +4,8 @@ import React from "react";
 
 export function TradeJournalSkeleton() {
   return (
-    <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] animate-pulse space-y-4">
-      <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+    <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] animate-pulse space-y-4">
+      <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
         <div className="h-5 w-48 bg-slate-800 rounded" />
         <div className="h-8 w-32 bg-slate-800 rounded" />
       </div>

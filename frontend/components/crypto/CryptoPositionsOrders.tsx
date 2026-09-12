@@ -88,7 +88,7 @@ export function CryptoPositionsOrders() {
             refetchPos();
             refetchOrd();
           }}
-          className="p-1.5 rounded-lg bg-[#1E293B] hover:bg-slate-700 text-slate-300 border border-slate-700"
+          className="p-1.5 rounded-lg bg-[#1A2A3F] hover:bg-slate-700 text-slate-300 border border-slate-700"
           title="Refresh Positions"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isFetchingPos || isFetchingOrd ? "animate-spin text-blue-400" : ""}`} />

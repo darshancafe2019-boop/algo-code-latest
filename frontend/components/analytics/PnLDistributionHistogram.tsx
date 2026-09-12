@@ -164,7 +164,7 @@ export function PnLDistributionHistogram({
   }, [normalizedTrades]);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-5 font-mono">
       {/* 1. Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3">

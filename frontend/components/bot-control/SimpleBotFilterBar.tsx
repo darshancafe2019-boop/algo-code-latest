@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Search,
-  Filter,
   ChevronDown,
   Check,
   Table,
@@ -12,10 +11,10 @@ import {
   Download,
   FileSpreadsheet,
   FileCode,
-  Layers,
   Radio,
 } from "lucide-react";
 import { BotViewMode } from "@/types/bot-control";
+import { cn } from "@/lib/utils";
 
 interface SimpleBotFilterBarProps {
   search: string;
@@ -78,7 +77,6 @@ export function SimpleBotFilterBar({
   onExportJson,
 }: SimpleBotFilterBarProps) {
   const [showMoreDropdown, setShowMoreDropdown] = useState(false);
-  const [showFilterDrawer, setShowFilterDrawer] = useState(false);
   const [showExportDropdown, setShowExportDropdown] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -98,24 +96,24 @@ export function SimpleBotFilterBar({
   }, []);
 
   return (
-    <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-2xl p-3 sm:p-4 backdrop-blur-md shadow-xl font-sans select-none space-y-3">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-3 sm:p-4 font-sans select-none space-y-3">
       {/* Primary Top Bar: Search, Market Filter Pills, Export & Views */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Search Bar with '/' Shortcut */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] rounded-xl max-w-sm w-full shadow-inner">
-          <Search className="w-3.5 h-3.5 text-[var(--theme-text-muted)] shrink-0" />
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] focus-within:border-[#22D3EE] rounded-lg max-w-sm w-full transition-colors">
+          <Search className="w-4 h-4 text-[#52627A] shrink-0" />
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search bot, symbol, strategy, broker (Press '/' to focus)..."
+            placeholder="Search bot, symbol, strategy (Press '/' to focus)..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-transparent text-[var(--theme-text-primary)] text-xs focus:outline-none placeholder:text-[var(--theme-text-muted)] font-sans"
+            className="w-full bg-transparent text-[#F7FAFC] text-xs focus:outline-none placeholder:text-[#52627A] font-sans"
           />
           {search && (
             <button
               onClick={() => onSearchChange("")}
-              className="text-[10px] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] px-1 rounded"
+              className="text-[10px] text-[#52627A] hover:text-[#F7FAFC] px-1 rounded cursor-pointer"
             >
               Clear
             </button>
@@ -133,11 +131,12 @@ export function SimpleBotFilterBar({
                   onSelectMarket(m.id);
                   setShowMoreDropdown(false);
                 }}
-                className={`px-2.5 py-1 rounded-lg font-bold transition border text-[11px] ${
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border cursor-pointer",
                   selectedMarket === m.id && !isMoreSelected
-                    ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)] shadow-sm"
-                    : "bg-[var(--theme-elevated)] border-[var(--theme-border-subtle)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
-                }`}
+                    ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
+                    : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
+                )}
               >
                 {m.label}
               </button>
@@ -147,18 +146,19 @@ export function SimpleBotFilterBar({
             <div className="relative">
               <button
                 onClick={() => setShowMoreDropdown(!showMoreDropdown)}
-                className={`px-2 py-1 rounded-lg font-bold transition border text-[11px] flex items-center gap-1 ${
+                className={cn(
+                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border flex items-center gap-1 cursor-pointer",
                   isMoreSelected
-                    ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)] shadow-sm"
-                    : "bg-[var(--theme-elevated)] border-[var(--theme-border-subtle)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
-                }`}
+                    ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
+                    : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
+                )}
               >
                 <span>{isMoreSelected ? activeMoreLabel : "More"}</span>
                 <ChevronDown className="w-3 h-3" />
               </button>
 
               {showMoreDropdown && (
-                <div className="absolute right-0 top-full mt-1.5 w-40 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl z-30 py-1 font-sans text-xs">
+                <div className="absolute right-0 top-full mt-1.5 w-40 bg-[#0A1422] border border-[#1A2A3F] rounded-lg shadow-xl z-30 py-1 font-sans text-xs">
                   {MORE_MARKETS.map((m) => (
                     <button
                       key={m.id}
@@ -166,10 +166,10 @@ export function SimpleBotFilterBar({
                         onSelectMarket(m.id);
                         setShowMoreDropdown(false);
                       }}
-                      className="w-full px-3 py-2 text-left hover:bg-[var(--theme-elevated)] text-[var(--theme-text-primary)] font-medium flex items-center justify-between"
+                      className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center justify-between cursor-pointer"
                     >
                       <span>{m.label}</span>
-                      {selectedMarket === m.id && <Check className="w-3.5 h-3.5 text-[var(--theme-accent)]" />}
+                      {selectedMarket === m.id && <Check className="w-3.5 h-3.5 text-[#22D3EE]" />}
                     </button>
                   ))}
                 </div>
@@ -181,23 +181,23 @@ export function SimpleBotFilterBar({
           <div className="relative">
             <button
               onClick={() => setShowExportDropdown(!showExportDropdown)}
-              className="p-1.5 rounded-lg bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-border)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] transition"
+              className="p-1.5 rounded-md bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#7C8CA3] hover:text-[#F7FAFC] transition-colors cursor-pointer"
               title="Export Bot Fleet Data"
             >
               <Download className="w-3.5 h-3.5" />
             </button>
 
             {showExportDropdown && (
-              <div className="absolute right-0 top-full mt-1.5 w-40 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-xl shadow-2xl z-30 py-1 font-mono text-xs">
+              <div className="absolute right-0 top-full mt-1.5 w-40 bg-[#0A1422] border border-[#1A2A3F] rounded-lg shadow-xl z-30 py-1 font-mono text-xs">
                 {onExportCsv && (
                   <button
                     onClick={() => {
                       setShowExportDropdown(false);
                       onExportCsv();
                     }}
-                    className="w-full px-3 py-2 text-left hover:bg-[var(--theme-elevated)] text-[var(--theme-text-primary)] flex items-center gap-2"
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-[var(--theme-profit)]" />
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#00E890]" />
                     <span>Export CSV</span>
                   </button>
                 )}
@@ -207,9 +207,9 @@ export function SimpleBotFilterBar({
                       setShowExportDropdown(false);
                       onExportJson();
                     }}
-                    className="w-full px-3 py-2 text-left hover:bg-[var(--theme-elevated)] text-[var(--theme-text-primary)] flex items-center gap-2"
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileCode className="w-3.5 h-3.5 text-[var(--theme-accent)]" />
+                    <FileCode className="w-3.5 h-3.5 text-[#19C5FF]" />
                     <span>Export JSON</span>
                   </button>
                 )}
@@ -218,36 +218,39 @@ export function SimpleBotFilterBar({
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] rounded-lg">
+          <div className="flex items-center gap-0.5 p-0.5 bg-[#0D1727] border border-[#1A2A3F] rounded-md">
             <button
               onClick={() => onViewModeChange("table")}
-              className={`p-1 rounded ${
+              className={cn(
+                "p-1 rounded cursor-pointer",
                 viewMode === "table"
-                  ? "bg-[var(--theme-accent)] text-[var(--theme-bg)] shadow-sm"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
-              }`}
+                  ? "bg-[#2563EB] text-[#F7FAFC]"
+                  : "text-[#52627A] hover:text-[#F7FAFC]"
+              )}
               title="Table View"
             >
               <Table className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onViewModeChange("cards")}
-              className={`p-1 rounded ${
+              className={cn(
+                "p-1 rounded cursor-pointer",
                 viewMode === "cards"
-                  ? "bg-[var(--theme-accent)] text-[var(--theme-bg)] shadow-sm"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
-              }`}
+                  ? "bg-[#2563EB] text-[#F7FAFC]"
+                  : "text-[#52627A] hover:text-[#F7FAFC]"
+              )}
               title="Card Grid View"
             >
               <LayoutGrid className="w-3.5 h-3.5" />
             </button>
             <button
               onClick={() => onViewModeChange("matrix")}
-              className={`p-1 rounded ${
+              className={cn(
+                "p-1 rounded cursor-pointer",
                 viewMode === "matrix"
-                  ? "bg-[var(--theme-accent)] text-[var(--theme-bg)] shadow-sm"
-                  : "text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)]"
-              }`}
+                  ? "bg-[#2563EB] text-[#F7FAFC]"
+                  : "text-[#52627A] hover:text-[#F7FAFC]"
+              )}
               title="Strategy Matrix View"
             >
               <PieChart className="w-3.5 h-3.5" />
@@ -257,22 +260,23 @@ export function SimpleBotFilterBar({
       </div>
 
       {/* Secondary Bar: Broker Source Filter Pills & Status Counters */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[var(--theme-border-subtle)] text-[11px] font-mono">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#122033] text-xs font-mono">
         {/* Source Broker Filter Pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-[var(--theme-text-muted)] uppercase font-bold mr-1 flex items-center gap-1">
-            <Radio className="w-3 h-3 text-[var(--theme-accent)]" />
+          <span className="text-[10px] text-[#52627A] uppercase font-semibold mr-1 flex items-center gap-1">
+            <Radio className="w-3 h-3 text-[#22D3EE]" />
             <span>Sources:</span>
           </span>
           {BROKER_FILTERS.map((b) => (
             <button
               key={b.id}
               onClick={() => onSelectBroker && onSelectBroker(b.id)}
-              className={`px-2 py-0.5 rounded text-[10px] font-extrabold transition border ${
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors border cursor-pointer",
                 selectedBroker === b.id
-                  ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)] shadow-sm"
-                  : "bg-[var(--theme-elevated)] border-[var(--theme-border-subtle)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)]"
-              }`}
+                  ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
+                  : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC]"
+              )}
             >
               {b.label}
             </button>
@@ -280,8 +284,8 @@ export function SimpleBotFilterBar({
         </div>
 
         {/* Showing Count */}
-        <div className="text-[10px] text-[var(--theme-text-muted)]">
-          Showing <span className="font-extrabold text-[var(--theme-text-primary)]">{showingCount}</span> of {totalCount} bots
+        <div className="text-[11px] text-[#52627A]">
+          Showing <span className="font-semibold text-[#F7FAFC]">{showingCount}</span> of {totalCount} bots
         </div>
       </div>
     </div>

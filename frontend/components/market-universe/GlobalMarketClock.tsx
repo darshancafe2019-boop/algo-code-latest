@@ -30,7 +30,7 @@ export function GlobalMarketClock() {
   ];
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5 font-mono text-xs select-none shadow-md">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-xl p-3 flex flex-wrap items-center justify-between gap-2.5 font-mono text-xs select-none shadow-md">
       <div className="flex items-center gap-2 text-slate-400">
         <Clock className="h-4 w-4 text-cyan-400" />
         <span className="text-[11px] uppercase tracking-wider font-bold text-slate-300">

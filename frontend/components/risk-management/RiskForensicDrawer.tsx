@@ -80,9 +80,9 @@ export function RiskForensicDrawer({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/70 backdrop-blur-sm flex justify-end font-sans">
-      <div className="w-full max-w-2xl bg-[#070D14] border-l border-[#1E293B] h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200">
+      <div className="w-full max-w-2xl bg-[#070D14] border-l border-[#1A2A3F] h-full shadow-2xl flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200">
         {/* Drawer Header */}
-        <div className="p-4 border-b border-[#1E293B] bg-[#0B131E] flex items-center justify-between">
+        <div className="p-4 border-b border-[#1A2A3F] bg-[#0B131E] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <span
               className={`p-2 rounded-xl ${
@@ -116,7 +116,7 @@ export function RiskForensicDrawer({
                     LIVE ACCOUNT
                   </span>
                 ) : (
-                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#070D14] text-slate-400 border border-[#1E293B]">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#070D14] text-slate-400 border border-[#1A2A3F]">
                     PAPER SIMULATION
                   </span>
                 )}
@@ -129,14 +129,14 @@ export function RiskForensicDrawer({
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl hover:bg-[#1E293B] text-slate-400 hover:text-white transition-colors"
+            className="p-1.5 rounded-xl hover:bg-[#1A2A3F] text-slate-400 hover:text-white transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Tab Navigation Strip */}
-        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar px-4 py-2 bg-[#09111C] border-b border-[#1E293B] text-xs font-mono">
+        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar px-4 py-2 bg-[#09111C] border-b border-[#1A2A3F] text-xs font-mono">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -179,8 +179,8 @@ export function RiskForensicDrawer({
               </div>
 
               {/* Plain-English Explanation with Fact/Derived Labels */}
-              <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 space-y-2.5">
-                <div className="flex items-center justify-between border-b border-[#1E293B] pb-2">
+              <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 space-y-2.5">
+                <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
                   <span className="text-[11px] font-bold text-slate-100 uppercase tracking-wider font-mono flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
                     Structured Risk Reason & Evidence
@@ -193,7 +193,7 @@ export function RiskForensicDrawer({
                   {decision.plain_explanation.split("\n").map((line, idx) => {
                     if (line.startsWith("[FACT]")) {
                       return (
-                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1E293B]">
+                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1A2A3F]">
                           <span className="px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 text-[9px] font-bold border border-blue-800 shrink-0">
                             FACT
                           </span>
@@ -203,7 +203,7 @@ export function RiskForensicDrawer({
                     }
                     if (line.startsWith("[DERIVED]")) {
                       return (
-                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1E293B]">
+                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1A2A3F]">
                           <span className="px-1.5 py-0.5 rounded bg-purple-950 text-purple-300 text-[9px] font-bold border border-purple-800 shrink-0">
                             DERIVED
                           </span>
@@ -213,7 +213,7 @@ export function RiskForensicDrawer({
                     }
                     if (line.startsWith("[EXPLANATION]")) {
                       return (
-                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1E293B]">
+                        <div key={idx} className="flex items-start gap-2 bg-[#070D14] p-2 rounded-xl border border-[#1A2A3F]">
                           <span className="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 text-[9px] font-bold border border-amber-800 shrink-0">
                             EXPLANATION
                           </span>
@@ -237,7 +237,7 @@ export function RiskForensicDrawer({
                     <span className="text-[10px] text-cyan-500 font-mono">Mathematical Cap</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono pt-1">
-                    <div className="bg-[#070D14] p-2.5 rounded-xl border border-[#1E293B]">
+                    <div className="bg-[#070D14] p-2.5 rounded-xl border border-[#1A2A3F]">
                       <span className="text-[10px] text-slate-500 block">REQUESTED NOTIONAL</span>
                       <span className="text-slate-200 font-bold">
                         ${decision.requested_notional ? decision.requested_notional.toLocaleString() : "4,500.00"}
@@ -266,7 +266,7 @@ export function RiskForensicDrawer({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <Link
                     href={`/what-if?symbol=${encodeURIComponent(decision.symbol)}`}
-                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1E293B] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
+                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1A2A3F] hover:border-cyan-700 text-slate-300 hover:text-cyan-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
                   >
                     <span>What-If</span>
                     <ExternalLink className="h-3 w-3" />
@@ -274,7 +274,7 @@ export function RiskForensicDrawer({
 
                   <Link
                     href={`/bots`}
-                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1E293B] hover:border-purple-700 text-slate-300 hover:text-purple-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
+                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1A2A3F] hover:border-purple-700 text-slate-300 hover:text-purple-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
                   >
                     <span>Bot Control</span>
                     <ExternalLink className="h-3 w-3" />
@@ -282,7 +282,7 @@ export function RiskForensicDrawer({
 
                   <Link
                     href={`/risk`}
-                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1E293B] hover:border-emerald-700 text-slate-300 hover:text-emerald-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
+                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1A2A3F] hover:border-emerald-700 text-slate-300 hover:text-emerald-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
                   >
                     <span>Risk Profile</span>
                     <ExternalLink className="h-3 w-3" />
@@ -290,7 +290,7 @@ export function RiskForensicDrawer({
 
                   <Link
                     href={`/logs`}
-                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1E293B] hover:border-amber-700 text-slate-300 hover:text-amber-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
+                    className="p-2 rounded-xl bg-[#0B131E] border border-[#1A2A3F] hover:border-amber-700 text-slate-300 hover:text-amber-300 flex items-center justify-center gap-1.5 text-[11px] font-bold transition-colors text-center"
                   >
                     <span>Global Audit</span>
                     <ExternalLink className="h-3 w-3" />
@@ -318,7 +318,7 @@ export function RiskForensicDrawer({
                           ? "bg-rose-950/30 border-rose-800 text-rose-300"
                           : isGateWarn
                           ? "bg-amber-950/30 border-amber-800 text-amber-300"
-                          : "bg-[#0B131E] border-[#1E293B] text-slate-300"
+                          : "bg-[#0B131E] border-[#1A2A3F] text-slate-300"
                       }`}
                     >
                       <div className="space-y-0.5">
@@ -359,8 +359,8 @@ export function RiskForensicDrawer({
               </span>
               <div className="grid grid-cols-2 gap-3">
                 {/* BEFORE */}
-                <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 space-y-2">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block border-b border-[#1E293B] pb-1">
+                <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 space-y-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block border-b border-[#1A2A3F] pb-1">
                     BEFORE PROPOSED ORDER
                   </span>
                   <div className="space-y-1.5 text-xs">
@@ -393,7 +393,7 @@ export function RiskForensicDrawer({
 
                 {/* PROPOSED AFTER */}
                 <div className="bg-[#0B131E] border border-cyan-900/60 rounded-2xl p-3.5 space-y-2">
-                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block border-b border-[#1E293B] pb-1">
+                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block border-b border-[#1A2A3F] pb-1">
                     PROPOSED AFTER ORDER
                   </span>
                   <div className="space-y-1.5 text-xs">
@@ -426,8 +426,8 @@ export function RiskForensicDrawer({
               </div>
 
               {/* RISK DELTA */}
-              <div className="bg-[#070D14] border border-[#1E293B] rounded-2xl p-3.5 space-y-2">
-                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block border-b border-[#1E293B] pb-1">
+              <div className="bg-[#070D14] border border-[#1A2A3F] rounded-2xl p-3.5 space-y-2">
+                <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider block border-b border-[#1A2A3F] pb-1">
                   ORDER RISK IMPACT DELTA
                 </span>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
@@ -458,8 +458,8 @@ export function RiskForensicDrawer({
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                 Order Intent & Broker Routing Evidence
               </span>
-              <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 space-y-2 text-xs">
-                <div className="flex justify-between border-b border-[#1E293B] pb-1.5">
+              <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 space-y-2 text-xs">
+                <div className="flex justify-between border-b border-[#1A2A3F] pb-1.5">
                   <span className="text-slate-500">Execution Status:</span>
                   <span
                     className={`font-bold ${
@@ -486,7 +486,7 @@ export function RiskForensicDrawer({
                   <span className="text-slate-400 text-[11px]">{decision.correlation_id}</span>
                 </div>
                 {decision.execution_message && (
-                  <div className="pt-2 border-t border-[#1E293B] text-[11px] text-slate-400 font-sans">
+                  <div className="pt-2 border-t border-[#1A2A3F] text-[11px] text-slate-400 font-sans">
                     <strong className="text-slate-300">Router Log:</strong> {decision.execution_message}
                   </div>
                 )}
@@ -500,7 +500,7 @@ export function RiskForensicDrawer({
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                 Market Data Provenance & Latency Trace
               </span>
-              <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 space-y-2 text-xs">
+              <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Provider Source:</span>
                   <span className="text-cyan-300 font-bold">{decision.data_source}</span>
@@ -531,7 +531,7 @@ export function RiskForensicDrawer({
               <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider block">
                 Active Risk Policy Configuration
               </span>
-              <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 space-y-2 text-xs">
+              <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-500">Policy Profile:</span>
                   <span className="text-purple-300 font-bold">{decision.policy_name || "Conservative Intraday"}</span>
@@ -568,7 +568,7 @@ export function RiskForensicDrawer({
               </span>
               <div className="space-y-2">
                 {(decision.timeline || []).map((t, idx) => (
-                  <div key={idx} className="flex items-start gap-2.5 bg-[#0B131E] p-2.5 rounded-xl border border-[#1E293B]">
+                  <div key={idx} className="flex items-start gap-2.5 bg-[#0B131E] p-2.5 rounded-xl border border-[#1A2A3F]">
                     <span className="text-cyan-400 font-bold text-[11px] shrink-0">{t.time}</span>
                     <span className="text-slate-300 text-xs font-sans">{t.event}</span>
                   </div>
@@ -578,12 +578,12 @@ export function RiskForensicDrawer({
           )}
 
           {/* Operator Notes & Actions */}
-          <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 space-y-2.5 font-mono">
+          <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 space-y-2.5 font-mono">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
               Operator Forensic Notes & Audit Log
             </span>
             {decision.notes ? (
-              <div className="p-2.5 bg-[#070D14] border border-[#1E293B] rounded-xl text-slate-300 text-[11px] whitespace-pre-wrap font-mono">
+              <div className="p-2.5 bg-[#070D14] border border-[#1A2A3F] rounded-xl text-slate-300 text-[11px] whitespace-pre-wrap font-mono">
                 {decision.notes}
               </div>
             ) : (
@@ -596,7 +596,7 @@ export function RiskForensicDrawer({
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Add operator forensic note..."
-                className="flex-1 bg-[#070D14] border border-[#1E293B] rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                className="flex-1 bg-[#070D14] border border-[#1A2A3F] rounded-xl px-3 py-1.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
               />
               <button
                 onClick={handleSaveNote}
@@ -609,7 +609,7 @@ export function RiskForensicDrawer({
         </div>
 
         {/* Drawer Footer Actions */}
-        <div className="p-4 border-t border-[#1E293B] bg-[#0B131E] flex items-center justify-between font-mono text-xs">
+        <div className="p-4 border-t border-[#1A2A3F] bg-[#0B131E] flex items-center justify-between font-mono text-xs">
           <div className="flex items-center gap-2">
             {!decision.is_acknowledged && isWarning && (
               <button
@@ -633,7 +633,7 @@ export function RiskForensicDrawer({
 
           <button
             onClick={onClose}
-            className="px-4 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] text-slate-300 hover:text-white font-bold transition-colors"
+            className="px-4 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] text-slate-300 hover:text-white font-bold transition-colors"
           >
             Close Forensic Dossier
           </button>
@@ -663,7 +663,7 @@ export function RiskForensicDrawer({
                   type="text"
                   value={overrideUser}
                   onChange={(e) => setOverrideUser(e.target.value)}
-                  className="w-full bg-[#070D14] border border-[#1E293B] rounded-xl px-3 py-2 text-slate-100 font-mono"
+                  className="w-full bg-[#070D14] border border-[#1A2A3F] rounded-xl px-3 py-2 text-slate-100 font-mono"
                 />
               </div>
 
@@ -675,7 +675,7 @@ export function RiskForensicDrawer({
                   value={overrideReason}
                   onChange={(e) => setOverrideReason(e.target.value)}
                   placeholder="State the regulatory/operational justification for this trade override..."
-                  className="w-full bg-[#070D14] border border-[#1E293B] rounded-xl p-3 text-slate-100 font-sans text-xs h-20 focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#070D14] border border-[#1A2A3F] rounded-xl p-3 text-slate-100 font-sans text-xs h-20 focus:outline-none focus:border-purple-500"
                 />
               </div>
             </div>
@@ -683,7 +683,7 @@ export function RiskForensicDrawer({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setIsOverrideModalOpen(false)}
-                className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] text-slate-400 hover:text-white text-xs font-bold"
+                className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] text-slate-400 hover:text-white text-xs font-bold"
               >
                 Cancel
               </button>

@@ -148,7 +148,7 @@ export function AppearanceDrawer() {
               {(
                 [
                   { id: "obsidian-blue", name: "Obsidian Blue", sub: "Dark Default", bg: "#070B14", surf: "#0E1626", acc: "#4F8CFF", pro: "#34D399", los: "#FB7185" },
-                  { id: "midnight-emerald", name: "Midnight Emerald", sub: "Dark Financial", bg: "#07110D", surf: "#0D1B15", acc: "#2FD07F", pro: "#3DDC97", los: "#FF647C" },
+                  { id: "midnight-emerald", name: "Midnight Emerald", sub: "Dark Financial", bg: "#07101A", surf: "#0D1B15", acc: "#2FD07F", pro: "#3DDC97", los: "#FF647C" },
                   { id: "graphite", name: "Graphite", sub: "Minimal Dark", bg: "#0B0B0E", surf: "#141418", acc: "#8B5CF6", pro: "#34D399", los: "#FB7185" },
                   { id: "light-professional", name: "Light Professional", sub: "Light Mode", bg: "#F4F7FB", surf: "#FFFFFF", acc: "#1368E8", pro: "#078A55", los: "#D92D20" },
                 ] as const

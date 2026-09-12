@@ -114,11 +114,11 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
   const contracts = futuresData?.contracts || [];
 
   return (
-    <div className="bg-[#0D1914] border border-[#294238] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl select-none font-sans space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1B3328] pb-3">
+      <div className="flex items-center justify-between border-b border-[#122033] pb-3">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+          <div className="p-2 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
             <Activity className="h-4 w-4" />
           </div>
           <div>
@@ -126,11 +126,11 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                 Futures & Perpetual Contracts
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-[#07110D] text-cyan-300 font-mono font-bold border border-[#1B3328]">
+              <span className="text-[10px] px-2 py-0.5 rounded bg-[#07101A] text-cyan-300 font-mono font-bold border border-[#122033]">
                 {symbol}
               </span>
             </div>
-            <p className="text-[11px] text-[#A8BDB0]">
+            <p className="text-[11px] text-[#7C8CA3]">
               Term structure, basis spread, annualized cost of carry, and perpetual funding rate tracking.
             </p>
           </div>
@@ -138,10 +138,10 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
       </div>
 
       {/* Futures Table */}
-      <div className="bg-[#07110D] border border-[#1B3328] rounded-2xl overflow-hidden shadow-inner">
+      <div className="bg-[#07101A] border border-[#122033] rounded-2xl overflow-hidden shadow-inner">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#0A130F] text-[#70877A] text-[10px] uppercase tracking-wider border-b border-[#1B3328]">
+            <thead className="bg-[#0A130F] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#122033]">
               <tr>
                 <th className="py-2.5 px-3">Contract</th>
                 <th className="py-2.5 px-3">Exchange</th>
@@ -153,18 +153,18 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
                 <th className="py-2.5 px-3 text-right">24H Volume</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1B3328]/60 text-slate-200">
+            <tbody className="divide-y divide-[#122033]/60 text-slate-200">
               {contracts.map((c, idx) => (
-                <tr key={idx} className="hover:bg-[#123C2A]/30 transition-colors">
+                <tr key={idx} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
                   <td className="py-3 px-3 font-bold text-white">
                     <span>{c.display_symbol || c.canonical_symbol}</span>
-                    <span className="text-[10px] text-[#70877A] block">{c.instrument_type}</span>
+                    <span className="text-[10px] text-[#52627A] block">{c.instrument_type}</span>
                   </td>
                   <td className="py-3 px-3 text-cyan-300">{c.exchange}</td>
                   <td className="py-3 px-3 text-right font-bold text-white">
                     ${c.last_price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
-                  <td className="py-3 px-3 text-right font-bold text-[#55C98A]">
+                  <td className="py-3 px-3 text-right font-bold text-[#22D3EE]">
                     +${c.basis?.toFixed(2)}
                   </td>
                   <td className="py-3 px-3 text-right text-purple-300 font-bold">
@@ -176,7 +176,7 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
                   <td className="py-3 px-3 text-right text-cyan-300">
                     {c.open_interest?.toLocaleString()}
                   </td>
-                  <td className="py-3 px-3 text-right text-[#A8BDB0]">
+                  <td className="py-3 px-3 text-right text-[#7C8CA3]">
                     {c.volume_24h?.toLocaleString()}
                   </td>
                 </tr>

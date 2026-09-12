@@ -114,7 +114,7 @@ export function MultiLegStrategyBuilder({
   const requiredMargin = Math.max(15000.0, legs.length * 12000.0);
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-5 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-5 font-mono">
       {/* Header & Templates */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-2">
@@ -216,7 +216,7 @@ export function MultiLegStrategyBuilder({
       </div>
 
       {/* Payoff Analytics Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#141E33] border border-[#1E293B] rounded-xl p-4 text-xs">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#141E33] border border-[#1A2A3F] rounded-xl p-4 text-xs">
         <div>
           <div className="text-[10px] text-slate-400 uppercase">Net Premium / Cashflow</div>
           <div className={`text-base font-bold mt-0.5 ${netPremium >= 0 ? "text-emerald-400" : "text-amber-400"}`}>

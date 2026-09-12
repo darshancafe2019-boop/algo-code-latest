@@ -28,41 +28,41 @@ export function EcoMetric({
   const isNegative = changePct !== undefined && changePct < 0;
 
   const variantBorderClasses = {
-    default: "border-[#294238] bg-[#0D1914]",
-    profit: "border-[#39B978]/40 bg-[#0B1F17]/80",
-    loss: "border-[#E26D6D]/40 bg-[#191010]/80",
-    highlight: "border-[#2E7D5B]/60 bg-[#12221B]",
+    default: "border-[#1A2A3F] bg-[#0A1422]",
+    profit: "border-[#00E890]/30 bg-[#0A1422]",
+    loss: "border-[#FF3B5C]/30 bg-[#0A1422]",
+    highlight: "border-[#22D3EE]/40 bg-[#0D1727]",
   };
 
   return (
     <div
-      className={`p-4 rounded-2xl border ${variantBorderClasses[variant]} font-sans select-none space-y-2 shadow-lg ${className}`}
+      className={`p-3.5 rounded-xl border ${variantBorderClasses[variant]} font-sans select-none space-y-2 shadow-sm ${className}`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[10px] uppercase font-mono tracking-wider text-[#70877A] block">
+        <span className="text-[11px] font-semibold text-[#7C8CA3] block tracking-wide">
           {label}
         </span>
         {Icon && (
-          <div className="p-1.5 rounded-lg bg-[#07110D] border border-[#1B3328] text-[#78A88A]">
+          <div className="p-1.5 rounded-lg bg-[#07101A] border border-[#1A2A3F] text-[#22D3EE]">
             <Icon className="h-3.5 w-3.5" />
           </div>
         )}
       </div>
 
-      <div className="space-y-1">
-        <div className="text-xl font-extrabold font-mono text-[#E8F3EC] tracking-tight">
+      <div className="space-y-0.5">
+        <div className="text-xl font-bold font-mono text-[#F7FAFC] tracking-tight tabular-nums">
           {value}
         </div>
         {(subValue || changePct !== undefined) && (
-          <div className="flex items-center gap-2 text-xs font-mono">
+          <div className="flex items-center gap-1.5 text-xs font-mono">
             {changePct !== undefined && (
               <span
-                className={`inline-flex items-center gap-0.5 font-bold ${
+                className={`inline-flex items-center gap-0.5 font-bold tabular-nums ${
                   isPositive
-                    ? "text-[#39B978]"
+                    ? "text-[#00E890]"
                     : isNegative
-                    ? "text-[#E26D6D]"
-                    : "text-[#70877A]"
+                    ? "text-[#FF3B5C]"
+                    : "text-[#7C8CA3]"
                 }`}
               >
                 {isPositive ? (
@@ -76,10 +76,10 @@ export function EcoMetric({
               </span>
             )}
             {changeLabel && (
-              <span className="text-[10px] text-[#70877A]">{changeLabel}</span>
+              <span className="text-[10px] text-[#52627A]">{changeLabel}</span>
             )}
             {subValue && (
-              <span className="text-[10px] text-[#A8BDB0]">{subValue}</span>
+              <span className="text-[11px] text-[#7C8CA3]">{subValue}</span>
             )}
           </div>
         )}
@@ -110,16 +110,16 @@ export function EcoProgress({
   };
 
   const variantGradients = {
-    leaf: "bg-gradient-to-r from-[#123C2A] to-[#55C98A]",
-    profit: "bg-gradient-to-r from-[#123C2A] to-[#39B978]",
-    loss: "bg-gradient-to-r from-[#3A1818] to-[#E26D6D]",
-    warning: "bg-gradient-to-r from-[#33250E] to-[#D9A441]",
-    cyan: "bg-gradient-to-r from-[#0F2D35] to-[#62B8C4]",
+    leaf: "bg-gradient-to-r from-[#2563EB] to-[#22D3EE]",
+    profit: "bg-gradient-to-r from-[#166534] to-[#00E890]",
+    loss: "bg-gradient-to-r from-[#991B1B] to-[#FF3B5C]",
+    warning: "bg-gradient-to-r from-[#92400E] to-[#F59E0B]",
+    cyan: "bg-gradient-to-r from-[#0E7490] to-[#22D3EE]",
   };
 
   return (
     <div
-      className={`w-full bg-[#07110D] border border-[#1B3328] rounded-full overflow-hidden ${sizeClasses[size]} ${className}`}
+      className={`w-full bg-[#07101A] border border-[#1A2A3F] rounded-full overflow-hidden ${sizeClasses[size]} ${className}`}
     >
       <div
         className={`h-full rounded-full transition-all duration-500 ease-out ${variantGradients[variant]}`}

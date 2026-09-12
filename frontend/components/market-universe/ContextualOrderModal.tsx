@@ -20,9 +20,9 @@ export function ContextualOrderModal({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 font-sans">
+      <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 font-sans">
         {/* Header */}
-        <div className="p-4 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+        <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
               <Zap className="w-4 h-4" />

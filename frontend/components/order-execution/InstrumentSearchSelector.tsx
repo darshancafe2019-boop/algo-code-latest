@@ -56,35 +56,35 @@ export function InstrumentSearchSelector({
   const currencySymbol = isINR ? "₹" : "$";
 
   return (
-    <div className="bg-[#141E33] border border-[#1E293B] rounded-2xl p-4 space-y-3 relative">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3 font-sans relative">
       {/* Top Bar: Selector trigger and live price */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="relative">
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-[#0B111E] border border-slate-700 hover:border-cyan-500 text-white text-sm font-bold font-mono transition-all"
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#F7FAFC] text-sm font-semibold transition-all"
           >
-            <Coins className="w-4 h-4 text-cyan-400" />
+            <Coins className="w-4 h-4 text-[#22D3EE]" />
             <span>{selectedSymbol}</span>
-            <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+            <ChevronDown className={`w-3.5 h-3.5 text-[#7C8CA3] transition-transform ${isOpen ? "rotate-180" : ""}`} />
           </button>
 
           {/* Dropdown Menu */}
           {isOpen && (
-            <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-[#0B111E] border border-slate-700 rounded-xl shadow-2xl z-50 p-3 space-y-2 max-h-80 overflow-y-auto">
+            <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-[#0D1727] border border-[#1A2A3F] rounded-lg shadow-2xl z-50 p-3 space-y-2 max-h-80 overflow-y-auto">
               <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#52627A]" />
                 <input
                   type="text"
                   placeholder="Search symbol, underlying, index..."
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="w-full bg-[#141E33] border border-slate-700 rounded-lg pl-9 pr-3 py-1.5 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-md pl-9 pr-3 py-1.5 text-xs text-[#F7FAFC] placeholder-[#52627A] focus:outline-none focus:border-[#22D3EE]"
                   autoFocus
                 />
               </div>
 
-              <div className="space-y-1 divide-y divide-slate-800/60">
+              <div className="space-y-1 divide-y divide-[#1A2A3F]/60">
                 {filtered.map((item) => (
                   <button
                     key={item.symbol}
@@ -93,19 +93,19 @@ export function InstrumentSearchSelector({
                       setIsOpen(false);
                       setQuery("");
                     }}
-                    className={`w-full text-left p-2 rounded-lg flex items-center justify-between transition-colors ${
-                      item.symbol === selectedSymbol ? "bg-[#142342] text-cyan-400" : "hover:bg-[#141E33] text-slate-200"
+                    className={`w-full text-left p-2.5 rounded-md flex items-center justify-between transition-colors ${
+                      item.symbol === selectedSymbol ? "bg-[#101B2D] text-[#22D3EE]" : "hover:bg-[#101B2D] text-[#7C8CA3]"
                     }`}
                   >
                     <div>
-                      <div className="text-xs font-bold font-mono">{item.symbol}</div>
-                      <div className="text-[10px] text-slate-400">{item.name} • {item.exchange}</div>
+                      <div className="text-xs font-semibold text-[#F7FAFC]">{item.symbol}</div>
+                      <div className="text-[10px] text-[#7C8CA3]">{item.name} • {item.exchange}</div>
                     </div>
                     <div className="text-right">
-                      <div className="text-xs font-bold font-mono text-white">
+                      <div className="text-xs font-semibold text-[#F7FAFC] font-mono tabular-nums">
                         {item.symbol.includes("NIFTY") || item.symbol.includes(".NS") ? "₹" : "$"}{item.price.toLocaleString()}
                       </div>
-                      <div className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                      <div className="text-[9px] px-1.5 py-0.2 rounded bg-[#101B2D] text-[#7C8CA3]">
                         {item.assetClass}
                       </div>
                     </div>
@@ -117,12 +117,12 @@ export function InstrumentSearchSelector({
         </div>
 
         {/* Live Quote Strip */}
-        <div className="flex items-center gap-4 text-xs font-mono">
+        <div className="flex items-center gap-4 text-xs">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase">Last Traded Price</div>
-            <div className="text-lg font-bold text-white tracking-tight flex items-center gap-1.5">
+            <div className="text-[10px] text-[#7C8CA3] uppercase">Last Traded Price</div>
+            <div className="text-base font-bold text-[#F7FAFC] tracking-tight flex items-center gap-1.5 font-mono tabular-nums">
               <span>{currencySymbol}{(Number(currentPrice) || 64500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              <span className={`text-xs font-semibold flex items-center ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
+              <span className={`text-xs font-semibold flex items-center ${isPositive ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {isPositive ? "+" : ""}{(Number(priceChange24h) || 0).toFixed(2)}%
               </span>
@@ -130,10 +130,10 @@ export function InstrumentSearchSelector({
           </div>
 
           {bidPrice !== undefined && askPrice !== undefined && (
-            <div className="hidden sm:block border-l border-slate-700 pl-4">
-              <div className="text-[10px] text-slate-400 uppercase">Bid / Ask Spread</div>
-              <div className="text-xs font-bold text-slate-300">
-                <span className="text-emerald-400">{currencySymbol}{(Number(bidPrice) || 0).toFixed(2)}</span> / <span className="text-red-400">{currencySymbol}{(Number(askPrice) || 0).toFixed(2)}</span>
+            <div className="hidden sm:block border-l border-[#1A2A3F] pl-4">
+              <div className="text-[10px] text-[#7C8CA3] uppercase">Bid / Ask Spread</div>
+              <div className="text-xs font-medium text-[#7C8CA3] font-mono tabular-nums">
+                <span className="text-[#00E890]">{currencySymbol}{(Number(bidPrice) || 0).toFixed(2)}</span> / <span className="text-[#FF3B5C]">{currencySymbol}{(Number(askPrice) || 0).toFixed(2)}</span>
               </div>
             </div>
           )}
@@ -142,3 +142,4 @@ export function InstrumentSearchSelector({
     </div>
   );
 }
+

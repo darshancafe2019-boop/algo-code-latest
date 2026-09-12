@@ -160,7 +160,7 @@ export function DailyProfitabilityBarChart({
       const isFlat = !isPositive && !isNegative;
 
       // Color mapping with intensity
-      let fillColor = "#64748B"; // Neutral Slate
+      let fillColor = "#52627A"; // Neutral Slate
       let strokeColor = "#475569";
 
       if (isPositive) {
@@ -180,11 +180,11 @@ export function DailyProfitabilityBarChart({
         // Red spectrum based on intensity
         const int = bar.intensity || 0.7;
         if (int > 0.8) {
-          fillColor = "#EF4444"; // Strong Red
+          fillColor = "#FF3B5C"; // Strong Red
           strokeColor = "#DC2626";
         } else if (int > 0.5) {
           fillColor = "#F87171"; // Medium Red
-          strokeColor = "#EF4444";
+          strokeColor = "#FF3B5C";
         } else {
           fillColor = "#FCA5A5"; // Soft Red
           strokeColor = "#F87171";
@@ -336,7 +336,7 @@ export function DailyProfitabilityBarChart({
           </linearGradient>
           <linearGradient id="lossGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#DC2626" stopOpacity="0.7" />
-            <stop offset="100%" stopColor="#EF4444" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#FF3B5C" stopOpacity="0.9" />
           </linearGradient>
           <linearGradient id="pureEquityAreaGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#06B6D4" stopOpacity="0.25" />
@@ -358,7 +358,7 @@ export function DailyProfitabilityBarChart({
               y1={t.y}
               x2={svgWidth - padding.right}
               y2={t.y}
-              stroke="#334155"
+              stroke="#29415F"
               strokeDasharray="2,3"
               strokeWidth="1"
             />
@@ -391,8 +391,8 @@ export function DailyProfitabilityBarChart({
                 cx={b.centerX}
                 cy={b.equityY}
                 r={b.isSelected ? 5 : 3.5}
-                fill={b.isSelected ? "#38BDF8" : "#080D18"}
-                stroke={b.isSelected ? "#38BDF8" : "#06B6D4"}
+                fill={b.isSelected ? "#19C5FF" : "#080D18"}
+                stroke={b.isSelected ? "#19C5FF" : "#06B6D4"}
                 strokeWidth={b.isSelected ? 3 : 2}
                 className="cursor-pointer transition-all hover:scale-125"
                 onClick={() => onSelectDate?.(b.bar.date)}
@@ -441,7 +441,7 @@ export function DailyProfitabilityBarChart({
                       height={b.height + 8}
                       rx={6}
                       fill="none"
-                      stroke="#38BDF8"
+                      stroke="#19C5FF"
                       strokeWidth="2"
                       filter="url(#glowSelect)"
                       className="animate-pulse"
@@ -453,7 +453,7 @@ export function DailyProfitabilityBarChart({
                     d={barPath}
                     fill={b.fillColor}
                     fillOpacity={b.isIncomplete ? 0.55 : 0.9}
-                    stroke={b.isUnreconciled ? "#F59E0B" : b.isSelected ? "#38BDF8" : b.strokeColor}
+                    stroke={b.isUnreconciled ? "#F59E0B" : b.isSelected ? "#19C5FF" : b.strokeColor}
                     strokeWidth={b.isSelected || b.isUnreconciled ? 2 : 1}
                     strokeDasharray={b.isIncomplete ? "3,2" : "none"}
                     className="cursor-pointer transition-all duration-150 hover:brightness-125 focus:brightness-125"

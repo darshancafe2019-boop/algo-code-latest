@@ -1,39 +1,28 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   LineChart,
-  Globe,
-  Radar,
-  Brain,
+  Radio,
   Bot,
+  Code,
   Zap,
   TrendingUp,
-  Code,
-  Shield,
-  Send,
-  CheckCircle2,
-  DollarSign,
+  Coins,
+  Landmark,
+  FileText,
   Bell,
-  Activity,
-  Cpu,
+  Network,
   Sliders,
   ChevronLeft,
   ChevronRight,
-  ChevronDown,
-  Terminal,
-  Menu,
+  Lock,
   X,
-  BookOpen,
-  History,
-  Landmark,
-  Scale,
-  ShieldCheck,
-  Radio,
-  FileText,
+  Menu,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface LeftNavigationSidebarProps {
   isCollapsed: boolean;
@@ -42,28 +31,28 @@ interface LeftNavigationSidebarProps {
   onTabSelect?: (tabId: string) => void;
 }
 
-export interface NavChildItem {
-  id: string;
-  label: string;
-  path: string;
-  badge?: string;
-}
-
 export interface NavItem {
   id: string;
   label: string;
-  subtitle?: string;
   path: string;
   icon: React.ComponentType<{ className?: string }>;
-  badge?: string;
-  shortcut?: string;
-  children?: NavChildItem[];
 }
 
-interface NavGroup {
-  groupName: string;
-  items: NavItem[];
-}
+export const CANONICAL_NAV_ITEMS: NavItem[] = [
+  { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { id: "markets", label: "Markets", path: "/markets", icon: LineChart },
+  { id: "live", label: "Live Feed", path: "/live", icon: Radio },
+  { id: "bots", label: "Bots", path: "/bots", icon: Bot },
+  { id: "strategies", label: "Strategies", path: "/strategies", icon: Code },
+  { id: "options", label: "Options", path: "/options", icon: Zap },
+  { id: "futures", label: "Futures", path: "/futures", icon: TrendingUp },
+  { id: "crypto", label: "Crypto", path: "/crypto", icon: Coins },
+  { id: "portfolio", label: "Portfolio", path: "/portfolio", icon: Landmark },
+  { id: "reports", label: "Tax", path: "/tax-intelligence", icon: FileText },
+  { id: "alerts", label: "Alerts", path: "/alerts", icon: Bell },
+  { id: "providers", label: "API & Integrations", path: "/providers", icon: Network },
+  { id: "settings", label: "Settings", path: "/settings", icon: Sliders },
+];
 
 export function LeftNavigationSidebar({
   isCollapsed,
@@ -74,124 +63,6 @@ export function LeftNavigationSidebar({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({
-    options: true,
-    futures: true,
-  });
-
-  useEffect(() => {
-    if (pathname?.startsWith("/options")) {
-      setExpandedItems((prev) => ({ ...prev, options: true }));
-    }
-    if (pathname?.startsWith("/futures") || pathname?.startsWith("/crypto/futures")) {
-      setExpandedItems((prev) => ({ ...prev, futures: true }));
-    }
-  }, [pathname]);
-
-  const toggleExpand = (id: string, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setExpandedItems((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
-  };
-
-  const navGroups: NavGroup[] = [
-    {
-      groupName: "CORE TERMINAL",
-      items: [
-        { id: "dashboard", label: "DASHBOARD", subtitle: "Executive Summary", path: "/", icon: LayoutDashboard },
-        { id: "live", label: "LIVE FEED", subtitle: "Dhan HQ Real-Time", path: "/live", icon: Radio, badge: "DHAN" },
-        { id: "markets", label: "MARKETS", subtitle: "Spot & Indices Discovery", path: "/markets", icon: LineChart },
-        {
-          id: "options",
-          label: "OPTIONS",
-          subtitle: "Chains, Greeks & Spreads",
-          path: "/options",
-          icon: Zap,
-          children: [
-            { id: "options-all", label: "All Options Overview", path: "/options" },
-            { id: "options-dhan", label: "Dhan Options", path: "/options/dhan", badge: "NSE" },
-            { id: "options-upstox", label: "Upstox Options", path: "/options/upstox", badge: "NSE" },
-            { id: "options-delta", label: "Delta Exchange", path: "/options/delta", badge: "CRYPTO" },
-            { id: "options-binance", label: "Binance Options", path: "/options/binance", badge: "CRYPTO" },
-            { id: "options-other", label: "Other Providers", path: "/options/other", badge: "MORE" },
-          ],
-        },
-        {
-          id: "futures",
-          label: "FUTURES",
-          subtitle: "Perpetuals & Term Structure",
-          path: "/futures",
-          icon: TrendingUp,
-          children: [
-            { id: "futures-all", label: "All Futures Universe", path: "/futures" },
-            { id: "futures-binance", label: "Binance Futures", path: "/futures/binance", badge: "CRYPTO" },
-            { id: "futures-delta", label: "Delta Exchange", path: "/futures/delta", badge: "INDIA" },
-            { id: "futures-dhan", label: "Dhan Futures", path: "/futures/dhan", badge: "NSE" },
-            { id: "futures-upstox", label: "Upstox Futures", path: "/futures/upstox", badge: "NSE" },
-            { id: "futures-global", label: "CME / Global", path: "/futures/global", badge: "GLOBAL" },
-            { id: "futures-other", label: "Other Providers", path: "/futures/other", badge: "MORE" },
-          ],
-        },
-      ],
-    },
-    {
-      groupName: "ALGO ENGINES",
-      items: [
-        { id: "strategies", label: "STRATEGIES", subtitle: "Signal & Execution Logic", path: "/strategies", icon: Code },
-        { id: "bots", label: "BOTS", subtitle: "Runtime Machine Fleet", path: "/bots", icon: Bot, badge: "LIVE" },
-      ],
-    },
-    {
-      groupName: "FINANCIAL LEDGER",
-      items: [
-        { id: "portfolio", label: "PORTFOLIO", subtitle: "Capital, Margin & Positions", path: "/portfolio", icon: Landmark, shortcut: "⌘P" },
-        { id: "pnl", label: "P&L JOURNAL", subtitle: "Trade Ledger & Attribution", path: "/pnl", icon: DollarSign },
-      ],
-    },
-    {
-      groupName: "CONTROL & GOVERNANCE",
-      items: [
-        { id: "research", label: "RESEARCH", subtitle: "Backtest & Monte Carlo", path: "/research", icon: Brain },
-        { id: "risk", label: "RISK", subtitle: "Exposure & Kill Switch", path: "/risk", icon: Shield, shortcut: "⌘R" },
-        { id: "security", label: "SECURITY", subtitle: "Auth, Sessions & RBAC", path: "/security", icon: ShieldCheck },
-        { id: "settings", label: "SETTINGS", subtitle: "Brokers, Feeds & Config", path: "/settings", icon: Sliders },
-      ],
-    },
-  ];
-
-  useEffect(() => {
-    const idlePrefetch = () => {
-      const paths = [
-        "/",
-        "/terminal",
-        "/bots",
-        "/markets",
-        "/options",
-        "/futures",
-        "/capital",
-        "/pnl",
-        "/positions",
-        "/orders",
-        "/risk",
-        "/scanner",
-        "/tax",
-      ];
-      paths.forEach((p) => {
-        try {
-          router.prefetch(p);
-        } catch { }
-      });
-    };
-    if (typeof window !== "undefined") {
-      if ("requestIdleCallback" in window) {
-        (window as any).requestIdleCallback(idlePrefetch, { timeout: 3000 });
-      } else {
-        setTimeout(idlePrefetch, 1500);
-      }
-    }
-  }, [router]);
 
   const handleNavClick = (item: NavItem) => {
     if (onTabSelect) {
@@ -201,359 +72,139 @@ export function LeftNavigationSidebar({
     setMobileDrawerOpen(false);
   };
 
-  const handleItemClick = (item: NavItem) => {
-    if (item.children && item.children.length > 0) {
-      if (isCollapsed) {
-        handleNavClick(item);
-      } else {
-        toggleExpand(item.id);
-        if (!pathname?.startsWith(item.path)) {
-          handleNavClick(item);
-        }
-      }
-    } else {
-      handleNavClick(item);
-    }
-  };
-
   const isItemActive = (item: NavItem) => {
-    if (pathname === item.path) return true;
-    if (item.id === "futures" && (pathname?.startsWith("/futures") || pathname?.startsWith("/crypto/futures"))) return true;
-    if (item.children && item.children.some((c) => pathname === c.path || (c.path === "/options" && (pathname === "/options/all" || pathname === "/options")) || (c.path === "/futures" && (pathname === "/futures" || pathname === "/crypto/futures")))) return true;
-    if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
+    if (item.path === "/" && (pathname === "/" || pathname === "/dashboard")) {
+      return !activeTab || activeTab === "home" || activeTab === "dashboard";
+    }
     if (activeTab === item.id) return true;
-    if (item.id === "portfolio" && (activeTab === "positions" || activeTab === "orders" || activeTab === "capital" || activeTab === "funds" || activeTab === "capital-funds" || pathname === "/positions" || pathname === "/orders" || pathname === "/capital")) return true;
-    if (item.id === "pnl" && (activeTab === "trade-journal" || activeTab === "tax" || pathname === "/trade-journal" || pathname === "/tax")) return true;
-    if (item.id === "research" && (activeTab === "backtest" || pathname === "/backtest")) return true;
+    if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
+    if (item.id === "strategies" && (pathname === "/strategies" || pathname === "/strategy-builder" || activeTab === "strategies" || activeTab === "strategy-builder")) return true;
+    if (item.id === "crypto" && (pathname?.startsWith("/crypto") || activeTab === "crypto-derivatives" || activeTab === "crypto-futures" || activeTab === "crypto-options" || activeTab === "crypto-options-chain")) return true;
+    if (item.id === "portfolio" && (pathname === "/positions" || pathname === "/orders" || pathname === "/capital" || pathname === "/capital-funds" || pathname === "/pnl" || pathname === "/journal" || activeTab === "positions" || activeTab === "orders" || activeTab === "portfolio" || activeTab === "pnl" || activeTab === "trade-journal")) return true;
+    if (item.id === "reports" && (pathname === "/reports" || pathname === "/tax" || pathname === "/tax-intelligence" || activeTab === "reports" || activeTab === "tax" || activeTab === "research" || activeTab === "backtesting")) return true;
+    if (item.id === "providers" && (pathname === "/providers" || pathname === "/api-integrations" || pathname === "/integrations" || activeTab === "providers")) return true;
     return false;
   };
 
-  const isChildActive = (child: NavChildItem) => {
-    if (child.path === "/options") {
-      return pathname === "/options" || pathname === "/options/all";
-    }
-    if (child.path === "/futures") {
-      return pathname === "/futures" || pathname === "/crypto/futures";
-    }
-    return pathname === child.path;
-  };
-
-  // Quick Mobile Bottom Bar Items
-  const mobileBarItems = [
-    { id: "home", label: "Home", path: "/", icon: LayoutDashboard },
-    { id: "markets", label: "Markets", path: "/charts", icon: LineChart },
-    { id: "bots", label: "Bots", path: "/bots", icon: Bot },
-    { id: "positions", label: "Positions", path: "/positions", icon: CheckCircle2 },
-    { id: "menu", label: "More", path: "#", icon: Menu, isMenu: true },
-  ];
-
   return (
     <>
-      {/* Desktop & Tablet Adaptive Sidebar */}
+      {/* Desktop Sidebar (182px) */}
       <aside
-        className={`hidden md:flex flex-col bg-[#050B18]/95 backdrop-blur-md border-r border-[#162238] transition-all duration-200 select-none z-20 shrink-0 ${isCollapsed ? "w-16" : "w-16 xl:w-60"
-          }`}
+        className={cn(
+          "hidden md:flex flex-col bg-[#07111F] border-r border-[#12304A] transition-all duration-150 select-none z-20 shrink-0 font-sans",
+          isCollapsed ? "w-16" : "w-[182px]"
+        )}
       >
-        {/* Navigation Groups */}
-        <div className="flex-1 overflow-y-auto py-4 px-2.5 space-y-5 scrollbar-thin">
-          {navGroups.map((group) => (
-            <div key={group.groupName} className="space-y-1">
-              {!isCollapsed && (
-                <span className="hidden xl:block px-3 text-[9px] font-mono font-bold tracking-widest text-[#64748B] uppercase mb-2">
-                  {group.groupName}
-                </span>
-              )}
+        {/* Navigation Item List */}
+        <div className="flex-1 overflow-y-auto py-2 px-1.5 space-y-0.5 scrollbar-thin">
+          {CANONICAL_NAV_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const active = isItemActive(item);
 
-              {group.items.map((item) => {
-                const Icon = item.icon;
-                const active = isItemActive(item);
-                const hasChildren = Boolean(item.children && item.children.length > 0);
-                const isExpanded = Boolean(expandedItems[item.id]);
+            return (
+              <button
+                key={item.id}
+                onClick={() => handleNavClick(item)}
+                title={isCollapsed ? item.label : undefined}
+                className={cn(
+                  "w-full h-[50px] flex items-center gap-2.5 px-3 rounded-lg text-[13px] font-medium transition-colors relative group cursor-pointer text-left",
+                  active
+                    ? "bg-[#0A2A47] text-[#22D3EE] font-semibold border-l-[3px] border-l-[#22D3EE]"
+                    : "text-[#B7C6D8] font-medium hover:text-[#F8FAFC] hover:bg-[#0F1C2F] border-l-[3px] border-l-transparent"
+                )}
+              >
+                <Icon
+                  className={cn(
+                    "h-[18px] w-[18px] shrink-0 transition-colors",
+                    active ? "text-[#22D3EE]" : "text-[#7D8EA5] group-hover:text-[#B7C6D8]"
+                  )}
+                />
 
-                return (
-                  <div key={item.id} className="space-y-0.5">
-                    <button
-                      onClick={() => handleItemClick(item)}
-                      onMouseEnter={() => {
-                        try {
-                          router.prefetch(item.path);
-                        } catch { }
-                      }}
-                      title={isCollapsed ? (item.subtitle ? `${item.label} (${item.subtitle})` : item.label) : undefined}
-                      aria-label={item.label}
-                      aria-expanded={hasChildren ? isExpanded : undefined}
-                      data-nav-id={item.id}
-                      data-nav-path={item.path}
-                      className={`w-full min-h-[38px] flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-mono transition-all duration-150 relative group cursor-pointer ${active
-                        ? "bg-[#00E5FF]/10 text-[#00E5FF] font-semibold border border-[#00E5FF]/30 shadow-[0_0_12px_rgba(0,229,255,0.12)]"
-                        : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#0A1426] border border-transparent"
-                        }`}
-                    >
-                      {/* Active Left Indicator Bar */}
-                      {active && (
-                        <span className="absolute left-0 top-2 bottom-2 w-1 bg-[#00E5FF] rounded-r-full shadow-[0_0_8px_#00E5FF]" />
-                      )}
-
-                      <Icon
-                        className={`h-4 w-4 shrink-0 transition-colors ${active ? "text-[#00E5FF]" : "text-[#64748B] group-hover:text-[#94A3B8]"
-                          }`}
-                      />
-
-                      {!isCollapsed && (
-                        <>
-                          <div className="hidden xl:flex flex-col flex-1 text-left min-w-0">
-                            <span className="tracking-wide truncate font-semibold text-xs">{item.label}</span>
-                            {item.subtitle && (
-                              <span className="text-[9px] text-[#64748B] truncate font-sans font-normal -mt-0.5">
-                                {item.subtitle}
-                              </span>
-                            )}
-                          </div>
-                          {item.badge && (
-                            <span className="hidden xl:inline-block px-1.5 py-0.5 rounded bg-[#00E5FF]/10 text-[#00E5FF] text-[8px] font-bold tracking-wider border border-[#00E5FF]/30 font-mono">
-                              {item.badge}
-                            </span>
-                          )}
-                          {hasChildren && (
-                            <div
-                              onClick={(e) => toggleExpand(item.id, e)}
-                              className="p-1 rounded hover:bg-[#162238] text-[#64748B] hover:text-[#F8FAFC] transition"
-                            >
-                              <ChevronDown
-                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-[#00E5FF]" : ""}`}
-                              />
-                            </div>
-                          )}
-                          {item.shortcut && !hasChildren && (
-                            <kbd className="text-[9px] text-[#475569] font-mono hidden 2xl:inline bg-[#0A1426] px-1 py-0.5 rounded border border-[#162238]">
-                              {item.shortcut}
-                            </kbd>
-                          )}
-                        </>
-                      )}
-                    </button>
-
-                    {/* Children Dropdown (Desktop Expanded) */}
-                    {!isCollapsed && hasChildren && isExpanded && (
-                      <div className="hidden xl:flex flex-col pl-7 pr-1 py-1 space-y-0.5 animate-fadeIn border-l border-[#162238] ml-4 my-1">
-                        {item.children!.map((child) => {
-                          const childActive = isChildActive(child);
-                          return (
-                            <button
-                              key={child.id}
-                              onClick={() => {
-                                if (onTabSelect) onTabSelect(child.id);
-                                router.push(child.path);
-                                setMobileDrawerOpen(false);
-                              }}
-                              onMouseEnter={() => {
-                                try {
-                                  router.prefetch(child.path);
-                                } catch { }
-                              }}
-                              data-nav-child-id={child.id}
-                              data-nav-child-path={child.path}
-                              className={`w-full min-h-[30px] flex items-center justify-between px-2.5 py-1 rounded text-[11px] font-mono transition-all duration-150 relative cursor-pointer ${childActive
-                                ? "bg-[#00E5FF]/15 text-[#00E5FF] font-semibold border border-[#00E5FF]/30 shadow-sm"
-                                : "text-[#94A3B8] hover:text-[#F8FAFC] hover:bg-[#0A1426] border border-transparent"
-                                }`}
-                            >
-                              {childActive && (
-                                <span className="absolute -left-[17px] top-2 bottom-2 w-1 bg-[#00E5FF] rounded-full shadow-[0_0_6px_#00E5FF]" />
-                              )}
-                              <span className="truncate">{child.label}</span>
-                              {child.badge && (
-                                <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-[#0A1426] text-[#94A3B8] border border-[#162238]">
-                                  {child.badge}
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ))}
+                {!isCollapsed && (
+                  <span className="truncate text-[13px] tracking-tight">
+                    {item.label}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Bottom Collapse Toggle Footer */}
-        <div className="p-3 border-t border-[#162238] bg-[#030712]/50 flex items-center justify-between">
+        {/* Bottom Sidebar Status & Controls */}
+        <div className="p-2.5 border-t border-[#12304A] bg-[#040A12]/80 space-y-2 shrink-0">
           {!isCollapsed && (
-            <div className="hidden xl:flex items-center gap-2 text-[10px] font-mono text-[#64748B]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse shadow-[0_0_8px_#10B981]" />
-              <span className="tracking-wider">CORE SYNCED</span>
+            <div className="space-y-1 font-mono text-[11px] rounded-lg p-1.5 bg-[#0A1422] border border-[#12304A]">
+              {/* Paper Trading Status Pill */}
+              <div className="flex items-center justify-between px-2 py-1 rounded bg-[#17C5FF]/10 border border-[#17C5FF]/20 text-[#17C5FF]">
+                <div className="flex items-center gap-1.5 truncate">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#17C5FF] animate-pulse" />
+                  <span className="font-semibold text-[10px] tracking-wide">PAPER TRADING</span>
+                </div>
+              </div>
+
+              {/* Live Trading Locked */}
+              <div className="flex items-center justify-between px-2 py-1 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/20 text-[#F59E0B]">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Lock className="h-3 w-3 text-[#F59E0B]" />
+                  <span className="font-semibold text-[10px] tracking-wide">Live Trading: LOCKED</span>
+                </div>
+              </div>
             </div>
           )}
 
+          {/* Collapse Toggle Button */}
           <button
             onClick={onToggleCollapse}
-            className="min-w-[32px] min-h-[32px] flex items-center justify-center p-1 rounded-lg bg-[#0A1426] hover:bg-[#0E1A30] text-[#94A3B8] hover:text-[#00E5FF] border border-[#162238] hover:border-[#00E5FF]/40 transition-all ml-auto cursor-pointer"
-            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-            aria-label={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            className="w-full flex items-center justify-center p-1.5 rounded-lg text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0F1C2F] transition-colors cursor-pointer text-xs border border-transparent hover:border-[#12304A]"
+            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
-            {isCollapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
+            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
           </button>
         </div>
       </aside>
 
-      {/* Mobile Drawer (Full Navigation Menu) */}
+      {/* Mobile Drawer */}
       {mobileDrawerOpen && (
         <div className="fixed inset-0 z-50 md:hidden flex font-sans">
           <div
-            className="fixed inset-0 bg-[#030712]/80 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => setMobileDrawerOpen(false)}
           />
-          <div className="fixed left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-[#050B18] border-r border-[#162238] p-4 flex flex-col z-50 text-[#F8FAFC] shadow-2xl overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-[#162238] pb-3 mb-4 shrink-0">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#00E5FF] animate-pulse shadow-[0_0_8px_#00E5FF]" />
-                <span className="text-xs font-mono font-bold text-[#00E5FF] tracking-wider">QUANT.OS NAVIGATION</span>
-              </div>
+          <div className="relative w-64 max-w-[80vw] bg-[#07111F] border-r border-[#13263A] flex flex-col z-50 h-full p-3 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#13263A] mb-2">
+              <span className="font-bold text-sm text-[#F7FAFC] font-sans">Quant.OS Terminal</span>
               <button
                 onClick={() => setMobileDrawerOpen(false)}
-                className="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-lg bg-[#0A1426] text-[#94A3B8] hover:text-[#F8FAFC] border border-[#162238] active:scale-95"
-                aria-label="Close Menu"
+                className="p-1 rounded text-[#7C8CA3] hover:text-[#F7FAFC]"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex-1 space-y-4">
-              {navGroups.map((group) => (
-                <div key={group.groupName} className="space-y-1">
-                  <span className="text-[9px] font-mono text-[#64748B] uppercase tracking-wider block px-2">
-                    {group.groupName}
-                  </span>
-                  {group.items.map((item) => {
-                    const Icon = item.icon;
-                    const active = isItemActive(item);
-                    const hasChildren = Boolean(item.children && item.children.length > 0);
-                    const isExpanded = Boolean(expandedItems[item.id]);
-
-                    return (
-                      <div key={item.id} className="space-y-1">
-                        <button
-                          onClick={() => handleItemClick(item)}
-                          onMouseEnter={() => {
-                            try {
-                              router.prefetch(item.path);
-                            } catch { }
-                          }}
-                          data-mobile-nav-id={item.id}
-                          data-mobile-nav-path={item.path}
-                          className={`w-full min-h-[40px] flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-mono transition-all ${active
-                            ? "bg-[#00E5FF]/15 text-[#00E5FF] font-semibold border border-[#00E5FF]/35 shadow-[0_0_10px_rgba(0,229,255,0.1)]"
-                            : "text-[#94A3B8] active:bg-[#0A1426]"
-                            }`}
-                        >
-                          <Icon className="h-4 w-4 shrink-0" />
-                          <div className="flex flex-col flex-1 text-left min-w-0">
-                            <span className="font-semibold text-xs">{item.label}</span>
-                            {item.subtitle && (
-                              <span className="text-[10px] text-[#64748B] font-sans font-normal">
-                                {item.subtitle}
-                              </span>
-                            )}
-                          </div>
-                          {item.badge && (
-                            <span className="px-1.5 py-0.2 rounded bg-[#0A1426] text-[#00E5FF] text-[8px] font-bold border border-[#00E5FF]/30 font-mono">
-                              {item.badge}
-                            </span>
-                          )}
-                          {hasChildren && (
-                            <div
-                              onClick={(e) => toggleExpand(item.id, e)}
-                              className="p-1 rounded bg-[#0A1426] text-[#94A3B8]"
-                            >
-                              <ChevronDown
-                                className={`h-3.5 w-3.5 transition-transform duration-200 ${isExpanded ? "rotate-180 text-[#00E5FF]" : ""}`}
-                              />
-                            </div>
-                          )}
-                        </button>
-
-                        {/* Mobile Children List */}
-                        {hasChildren && isExpanded && (
-                          <div className="pl-6 space-y-1 my-1 border-l border-[#162238] ml-4">
-                            {item.children!.map((child) => {
-                              const childActive = isChildActive(child);
-                              return (
-                                <button
-                                  key={child.id}
-                                  onClick={() => {
-                                    if (onTabSelect) onTabSelect(child.id);
-                                    router.push(child.path);
-                                    setMobileDrawerOpen(false);
-                                  }}
-                                  data-mobile-child-id={child.id}
-                                  data-mobile-child-path={child.path}
-                                  className={`w-full min-h-[34px] flex items-center justify-between px-3 py-1.5 rounded-md text-xs font-mono transition-all ${childActive
-                                    ? "bg-[#00E5FF]/20 text-[#00E5FF] font-semibold border border-[#00E5FF]/40"
-                                    : "text-[#94A3B8] active:bg-[#0A1426]"
-                                    }`}
-                                >
-                                  <span>{child.label}</span>
-                                  {child.badge && (
-                                    <span className="px-1.5 py-0.2 rounded text-[8px] font-bold bg-[#0A1426] text-[#94A3B8] border border-[#162238]">
-                                      {child.badge}
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+            <div className="flex-1 overflow-y-auto space-y-1">
+              {CANONICAL_NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const active = isItemActive(item);
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => handleNavClick(item)}
+                    className={cn(
+                      "w-full h-10 flex items-center gap-3 px-3 rounded-lg text-xs font-medium transition-colors text-left",
+                      active
+                        ? "bg-[rgba(14,165,233,0.12)] text-[#32D7FF] font-semibold border-l-[3px] border-l-[#22D3EE]"
+                        : "text-[#A8B6C9] hover:text-[#F7FAFC] hover:bg-[rgba(30,64,95,0.18)]"
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>
       )}
-
-      {/* Mobile Bottom Quick Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#050B18]/95 backdrop-blur-xl border-t border-[#162238] flex items-center justify-around px-2 py-1 select-none pb-[calc(0.25rem+var(--safe-bottom))]">
-        {mobileBarItems.map((barItem) => {
-          const Icon = barItem.icon;
-          const active = barItem.isMenu ? false : (pathname === barItem.path || (barItem.path !== "/" && pathname?.startsWith(barItem.path)));
-
-          return (
-            <button
-              key={barItem.id}
-              onClick={() => {
-                if (barItem.isMenu) {
-                  setMobileDrawerOpen(true);
-                } else {
-                  if (onTabSelect) {
-                    onTabSelect(barItem.id);
-                  }
-                  router.push(barItem.path);
-                }
-              }}
-              onMouseEnter={() => {
-                if (!barItem.isMenu) {
-                  try {
-                    router.prefetch(barItem.path);
-                  } catch { }
-                }
-              }}
-              className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center gap-0.5 px-2 py-1 rounded-xl font-mono text-[10px] transition-all active:scale-95 ${active
-                ? "text-[#00E5FF] font-semibold"
-                : "text-[#64748B] hover:text-[#F8FAFC]"
-                }`}
-              aria-label={barItem.label}
-            >
-              <Icon className={`h-4 w-4 ${active ? "text-[#00E5FF]" : "text-[#64748B]"}`} />
-              <span className="truncate">{barItem.label}</span>
-            </button>
-          );
-        })}
-      </nav>
     </>
   );
 }

@@ -34,9 +34,9 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
   const movers = moversData?.movers || [];
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl select-none font-sans space-y-4">
       {/* 1. Header & Preset Selector */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1E293B] pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2.5">
           <div className="p-1.5 rounded-lg bg-cyan-950 text-cyan-400 border border-cyan-800">
             <Flame className="h-4 w-4" />
@@ -52,7 +52,7 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
         </div>
 
         {/* Preset Tabs */}
-        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1E293B] text-[11px] font-mono overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-[#070D14] p-1 rounded-xl border border-[#1A2A3F] text-[11px] font-mono overflow-x-auto scrollbar-none">
           {[
             { id: "gainers", label: "Top Gainers" },
             { id: "losers", label: "Top Losers" },
@@ -80,11 +80,11 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 animate-pulse">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-20 bg-[#070D14] rounded-xl border border-[#1E293B]" />
+            <div key={i} className="h-20 bg-[#070D14] rounded-xl border border-[#1A2A3F]" />
           ))}
         </div>
       ) : movers.length === 0 ? (
-        <div className="p-6 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1E293B]">
+        <div className="p-6 text-center text-xs font-mono text-slate-500 bg-[#070D14] rounded-xl border border-[#1A2A3F]">
           No instruments matched the liquidity and category thresholds.
         </div>
       ) : (
@@ -98,7 +98,7 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
               <div
                 key={idx}
                 onClick={() => onSelectInstrument(inst)}
-                className="p-3 bg-[#070D14] hover:bg-[#0F1B2A] border border-[#1E293B] hover:border-cyan-700 rounded-xl transition-all cursor-pointer space-y-1.5 group shadow-md"
+                className="p-3 bg-[#070D14] hover:bg-[#0F1B2A] border border-[#1A2A3F] hover:border-cyan-700 rounded-xl transition-all cursor-pointer space-y-1.5 group shadow-md"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">

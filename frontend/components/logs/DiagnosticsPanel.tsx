@@ -27,7 +27,7 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
       {/* Top Latency Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Execution Latency */}
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Total Execution Latency</span>
             <div className="p-1.5 rounded-lg bg-cyan-950/80 text-cyan-400">
@@ -45,7 +45,7 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
         </div>
 
         {/* Database Write Latency */}
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">DB Write Latency</span>
             <div className="p-1.5 rounded-lg bg-purple-950/80 text-purple-400">
@@ -63,7 +63,7 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
         </div>
 
         {/* Broker / Exchange Latency */}
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Broker Exchange RTT</span>
             <div className="p-1.5 rounded-lg bg-emerald-950/80 text-emerald-400">
@@ -81,7 +81,7 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
         </div>
 
         {/* Signal & Evaluation Latency */}
-        <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 flex flex-col justify-between">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Signal Evaluation</span>
             <div className="p-1.5 rounded-lg bg-blue-950/80 text-blue-400">
@@ -103,8 +103,8 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
       <SystemReliabilityCenter />
 
       {/* Full Diagnostic Report */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 flex flex-col justify-between space-y-3">
-        <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-col justify-between space-y-3">
+        <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-950 border border-cyan-800/80 text-cyan-400">
               <FileText className="h-4 w-4" />
@@ -116,14 +116,14 @@ export function DiagnosticsPanel({ diagnostics, systemErrors = [], reportText = 
 
           <button
             onClick={handleCopyReport}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1E293B] text-xs font-bold text-cyan-300 transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#0B0F17] hover:bg-slate-800 border border-[#1A2A3F] text-xs font-bold text-cyan-300 transition-colors"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
             <span>{copied ? "Copied Report" : "Copy Diagnostic Report"}</span>
           </button>
         </div>
 
-        <pre className="bg-[#0B0F17] p-3.5 rounded-xl border border-[#1E293B] text-cyan-300 text-xs font-mono overflow-y-auto max-h-72 whitespace-pre-wrap leading-relaxed">
+        <pre className="bg-[#0B0F17] p-3.5 rounded-xl border border-[#1A2A3F] text-cyan-300 text-xs font-mono overflow-y-auto max-h-72 whitespace-pre-wrap leading-relaxed">
           {reportText || "Loading system status diagnostic report..."}
         </pre>
       </div>

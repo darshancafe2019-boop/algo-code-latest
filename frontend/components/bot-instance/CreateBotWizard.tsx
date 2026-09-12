@@ -545,7 +545,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40 shadow-md">
+            <div className="p-3 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-md">
               <Bot className="h-6 w-6" />
             </div>
             <div>
@@ -553,11 +553,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 <h1 className="text-base font-black text-white uppercase tracking-wider">
                   {isEditMode ? `Edit Bot Instance: ${name}` : "Create Bot Instance Wizard"}
                 </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#142B21] text-[#55C98A] border border-[#275841]">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#142B21] text-[#22D3EE] border border-[#275841]">
                   VERSION 2.0 • DETERMINISTIC BOT FACTORY
                 </span>
               </div>
-              <p className="text-xs text-[#8BA596]">
+              <p className="text-xs text-[#7C8CA3]">
                 Configure capital bounds, asset selection, indicator rules, 20-stage risk gates, and paper-safe execution.
               </p>
             </div>
@@ -568,9 +568,9 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               type="button"
               onClick={() => saveDraftMutation.mutate()}
               disabled={saveDraftMutation.isPending}
-              className="px-3.5 py-2 rounded-xl bg-[#0C1B15] hover:bg-[#14271F] text-[#8BA596] hover:text-white border border-[#1A3127] font-bold text-xs transition flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-xl bg-[#0C1B15] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white border border-[#1A2A3F] font-bold text-xs transition flex items-center gap-1.5"
             >
-              <Save className="h-3.5 w-3.5 text-[#55C98A]" />
+              <Save className="h-3.5 w-3.5 text-[#22D3EE]" />
               <span>{saveDraftMutation.isPending ? "Saving Draft..." : "Save Draft"}</span>
             </button>
           </div>
@@ -588,15 +588,15 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 onClick={() => setActiveStep(s.num)}
                 className={`p-2.5 rounded-xl text-left font-bold transition-all flex items-center gap-2 ${
                   isCurrent
-                    ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md ring-1 ring-[#55C98A]/30"
+                    ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-md ring-1 ring-[#22D3EE]/30"
                     : isCompleted
-                    ? "bg-[#0C1B15] text-[#8BA596] hover:text-white border border-[#183126]"
-                    : "bg-[#060D0A] text-[#42584C] border border-[#11221A] opacity-60"
+                    ? "bg-[#0C1B15] text-[#7C8CA3] hover:text-white border border-[#183126]"
+                    : "bg-[#07101A] text-[#42584C] border border-[#101B2D] opacity-60"
                 }`}
               >
                 <div
                   className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
-                    isCompleted ? "bg-[#55C98A] text-black" : isCurrent ? "bg-[#256B4A] text-white" : "bg-[#14271F] text-[#607D6E]"
+                    isCompleted ? "bg-[#22D3EE] text-black" : isCurrent ? "bg-[#256B4A] text-white" : "bg-[#101B2D] text-[#52627A]"
                   }`}
                 >
                   {isCompleted ? <Check className="h-3 w-3 stroke-[3]" /> : s.num}
@@ -614,31 +614,31 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         {/* STEP 1: IDENTITY, INSTITUTIONAL HIERARCHY & CAPITAL */}
         {activeStep === 1 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                <Bot className="h-4 w-4 text-[#55C98A]" />
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                <Bot className="h-4 w-4 text-[#22D3EE]" />
                 <span>Institutional Hierarchy & Identity</span>
               </h3>
 
               {/* Tier 1 & 2: Customer & Department */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Customer Account</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Customer Account</label>
                   <select
                     value={customerId}
                     onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                   >
                     <option value="cust_default">Customer Default (Institutional)</option>
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Department Division</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Department Division</label>
                   <select
                     value={departmentId}
                     onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                   >
                     <option value="dept_algo_trading">Algorithmic Trading (₹1,000,000)</option>
                     <option value="dept_derivatives">Derivatives & Options (₹500,000)</option>
@@ -649,7 +649,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               {/* Tier 3 & 4: Broker Folder & Broker Account */}
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Broker Folder</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Folder</label>
                   <select
                     value={brokerFolderId}
                     onChange={(e) => {
@@ -677,7 +677,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                         setBrokerId("paper_simulator");
                       }
                     }}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                   >
                     <option value="bf_paper">Paper Trading Sandbox</option>
                     <option value="bf_dhan">Dhan HQ Folder (NSE/BSE)</option>
@@ -687,11 +687,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Broker Funding Account</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Funding Account</label>
                   <select
                     value={brokerAccountId}
                     onChange={(e) => setBrokerAccountId(e.target.value)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
                   >
                     <option value="ba_paper_primary">ba_paper_primary (Paper Sandbox)</option>
                     <option value="ba_dhan_primary">ba_dhan_primary (Dhan HQ Primary)</option>
@@ -702,7 +702,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                   <span>Bot Instance Name *</span>
                   <span className="text-cyan-400 font-mono text-[10px]">Slug: {slug}</span>
                 </label>
@@ -710,17 +710,17 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#55C98A]"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#22D3EE]"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Base Currency</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Base Currency</label>
                   <select
                     value={currency}
                     onChange={(e) => setCurrency(e.target.value as any)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
                   >
                     <option value="INR">INR (₹)</option>
                     <option value="USD">USD ($)</option>
@@ -729,11 +729,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Trading Timezone</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Trading Timezone</label>
                   <select
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none"
                   >
                     <option value="UTC">UTC (Global Crypto)</option>
                     <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
@@ -743,13 +743,13 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Execution Mode</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Mode</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setEnvironment("PAPER")}
                     className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all ${
-                      environment === "PAPER" ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]" : "bg-[#060D0A] text-[#8BA596]"
+                      environment === "PAPER" ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]" : "bg-[#07101A] text-[#7C8CA3]"
                     }`}
                   >
                     PAPER SIMULATOR (Safe Default)
@@ -758,7 +758,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     type="button"
                     onClick={() => setEnvironment("LIVE")}
                     className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all ${
-                      environment === "LIVE" ? "bg-red-950/60 text-red-400 border border-red-700" : "bg-[#060D0A] text-[#8BA596]"
+                      environment === "LIVE" ? "bg-red-950/60 text-red-400 border border-red-700" : "bg-[#07101A] text-[#7C8CA3]"
                     }`}
                   >
                     LIVE TRADING (Gate Locked)
@@ -767,51 +767,51 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
             </div>
 
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                <DollarSign className="h-4 w-4 text-[#55C98A]" />
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                <DollarSign className="h-4 w-4 text-[#22D3EE]" />
                 <span>Capital Sizing & Risk Reserve</span>
               </h3>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Department Budget</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Department Budget</label>
                   <input
                     type="number"
                     value={totalCapital}
                     onChange={(e) => setTotalCapital(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Bot Capital Allocation *</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Bot Capital Allocation *</label>
                   <input
                     type="number"
                     value={allocatedCapital}
                     onChange={(e) => setAllocatedCapital(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2.5 text-xs text-cyan-400 font-mono font-bold"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-cyan-400 font-mono font-bold"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Risk Reserve Hold</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Risk Reserve Hold</label>
                   <input
                     type="number"
                     value={riskReserve}
                     onChange={(e) => setRiskReserve(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-amber-400 font-mono font-bold"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-amber-400 font-mono font-bold"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#8BA596] font-semibold">Position Sizing Method</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Position Sizing Method</label>
                   <select
                     value={sizingMethod}
                     onChange={(e) => setSizingMethod(e.target.value as any)}
-                    className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none"
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none"
                   >
                     <option value="RISK_PER_TRADE">Risk Per Trade %</option>
                     <option value="FIXED_QUANTITY">Fixed Lot Size</option>
@@ -820,21 +820,21 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
               </div>
 
-              <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2 text-xs font-mono">
+              <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2 text-xs font-mono">
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Allocated / Dept Budget:</span>
+                  <span className="text-[#7C8CA3]">Allocated / Dept Budget:</span>
                   <span className="text-white font-bold">{formatCurrency(allocatedCapital, currency)} / {formatCurrency(totalCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Remaining Dept Capital:</span>
-                  <span className="text-[#55C98A] font-bold">{formatCurrency(remainingCapital, currency)}</span>
+                  <span className="text-[#7C8CA3]">Remaining Dept Capital:</span>
+                  <span className="text-[#22D3EE] font-bold">{formatCurrency(remainingCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Allocation Ratio:</span>
+                  <span className="text-[#7C8CA3]">Allocation Ratio:</span>
                   <span className="text-cyan-400 font-bold">{allocationPct}%</span>
                 </div>
-                <div className="flex justify-between border-t border-[#1A3127] pt-1.5">
-                  <span className="text-[#8BA596]">Max Per-Trade Risk:</span>
+                <div className="flex justify-between border-t border-[#1A2A3F] pt-1.5">
+                  <span className="text-[#7C8CA3]">Max Per-Trade Risk:</span>
                   <span className="text-yellow-400 font-bold">{formatCurrency(maxRiskAmount, currency)} ({riskPerTradePct}%)</span>
                 </div>
               </div>
@@ -868,8 +868,8 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     }}
                     className={`p-2.5 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-center ${
                       isSelected
-                        ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/60 shadow-md ring-1 ring-[#55C98A]/30"
-                        : "bg-[#0C1713] text-[#8BA596] hover:text-white border border-[#1A3127]"
+                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-md ring-1 ring-[#22D3EE]/30"
+                        : "bg-[#0A1422] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
                     }`}
                   >
                     <IconComp className="h-4 w-4" />
@@ -905,7 +905,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
             )}
 
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-xs font-bold text-white uppercase">Select Trading Instrument ({assetClass})</span>
                 <input
@@ -913,7 +913,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   placeholder="Filter symbols..."
                   value={instrumentSearch}
                   onChange={(e) => setInstrumentSearch(e.target.value)}
-                  className="bg-[#060D0A] border border-[#1A3127] rounded-lg px-2.5 py-1 text-xs text-white"
+                  className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2.5 py-1 text-xs text-white"
                 />
               </div>
 
@@ -930,15 +930,15 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                       }}
                       className={`p-3 rounded-xl border text-left transition-all ${
                         symbol === item.symbol
-                          ? "bg-[#123C2A] border-[#39B978] text-white"
-                          : "bg-[#060D0A] border-[#1A3127] text-[#8BA596] hover:text-white"
+                          ? "bg-[rgba(37,99,235,0.18)] border-[#00E890] text-white"
+                          : "bg-[#07101A] border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
                       }`}
                     >
                       <div className="flex justify-between">
                         <span className="font-mono font-bold text-cyan-400">{item.symbol}</span>
-                        <span className="text-[9px] px-1 rounded bg-[#11221A] text-[#607D6E]">{item.exchange}</span>
+                        <span className="text-[9px] px-1 rounded bg-[#101B2D] text-[#52627A]">{item.exchange}</span>
                       </div>
-                      <p className="text-[10px] text-[#8BA596] truncate mt-1">{item.name}</p>
+                      <p className="text-[10px] text-[#7C8CA3] truncate mt-1">{item.name}</p>
                     </button>
                   ))}
               </div>
@@ -949,18 +949,18 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         {/* STEP 3: STRATEGY ENGINE */}
         {activeStep === 3 && (
           <div className="space-y-5 animate-fadeIn">
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-3">
-              <div className="flex justify-between items-center border-b border-[#1A3127] pb-2">
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
+              <div className="flex justify-between items-center border-b border-[#1A2A3F] pb-2">
                 <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#55C98A]" />
+                  <Clock className="h-4 w-4 text-[#22D3EE]" />
                   <span>Primary Execution Timeframe & Trigger Mode</span>
                 </h3>
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[#8BA596]">Execution Trigger:</span>
+                  <span className="text-[11px] text-[#7C8CA3]">Execution Trigger:</span>
                   <select
                     value={executionTrigger}
                     onChange={(e) => setExecutionTrigger(e.target.value as any)}
-                    className="bg-[#060D0A] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-cyan-400 font-mono font-bold"
+                    className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-cyan-400 font-mono font-bold"
                   >
                     <option value="CANDLE_CLOSE">CANDLE CLOSE (Deterministic)</option>
                     <option value="INTRABAR">INTRABAR (Tick Scalping)</option>
@@ -976,8 +976,8 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     onClick={() => setPrimaryTimeframe(tf.id)}
                     className={`py-2 rounded-xl text-xs font-mono font-bold transition-all ${
                       primaryTimeframe === tf.id
-                        ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]"
-                        : "bg-[#060D0A] text-[#8BA596] border border-[#1A3127]"
+                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]"
+                        : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
                     }`}
                   >
                     {tf.label}
@@ -987,16 +987,16 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-3">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
                 <h3 className="text-xs font-bold text-white uppercase">Quantitative Indicators</h3>
                 <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar">
                   {AVAILABLE_INDICATORS.map((ind) => {
                     const isAdded = selectedIndicators.some((i) => i.id === ind.id);
                     return (
-                      <div key={ind.id} className="p-2 rounded-xl bg-[#060D0A] border border-[#1A3127] flex justify-between items-center">
+                      <div key={ind.id} className="p-2 rounded-xl bg-[#07101A] border border-[#1A2A3F] flex justify-between items-center">
                         <div>
                           <span className="font-bold text-xs text-white">{ind.name}</span>
-                          <span className="ml-2 text-[9px] px-1 rounded bg-[#11221A] text-[#607D6E]">{ind.category}</span>
+                          <span className="ml-2 text-[9px] px-1 rounded bg-[#101B2D] text-[#52627A]">{ind.category}</span>
                         </div>
                         {isAdded ? (
                           <button
@@ -1010,7 +1010,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                           <button
                             type="button"
                             onClick={() => setSelectedIndicators([...selectedIndicators, { id: ind.id, name: ind.name, category: ind.category, timeframe: primaryTimeframe, params: { ...ind.defaultParams } }])}
-                            className="text-[#55C98A] p-1 hover:bg-[#123C2A] rounded"
+                            className="text-[#22D3EE] p-1 hover:bg-[rgba(37,99,235,0.18)] rounded"
                           >
                             <Plus className="h-3.5 w-3.5" />
                           </button>
@@ -1021,13 +1021,13 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
               </div>
 
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-3">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs font-bold text-white uppercase">Rule Confluence Tree</h3>
                   <select
                     value={ruleConjunction}
                     onChange={(e) => setRuleConjunction(e.target.value as any)}
-                    className="bg-[#060D0A] border border-[#1A3127] rounded-lg px-2 py-0.5 text-xs text-[#55C98A] font-bold"
+                    className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2 py-0.5 text-xs text-[#22D3EE] font-bold"
                   >
                     <option value="AND">ALL Rules (AND)</option>
                     <option value="OR">ANY Rule (OR)</option>
@@ -1035,7 +1035,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
                 <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
                   {strategyRules.map((rule, idx) => (
-                    <div key={rule.id} className="p-2.5 bg-[#060D0A] border border-[#1A3127] rounded-xl flex items-center justify-between font-mono text-xs">
+                    <div key={rule.id} className="p-2.5 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex items-center justify-between font-mono text-xs">
                       <span className="text-cyan-400 font-bold">{rule.leftIndicatorId} {rule.operator} {rule.rightValue || rule.rightIndicatorId}</span>
                       <span className="px-1.5 py-0.5 rounded text-[9px] bg-yellow-950/60 text-yellow-400 border border-yellow-800">
                         {rule.isMandatory ? "MANDATORY" : "OPTIONAL"}
@@ -1051,14 +1051,14 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         {/* STEP 4: RISK & EXITS */}
         {activeStep === 4 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                <Shield className="h-4 w-4 text-[#55C98A]" />
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                <Shield className="h-4 w-4 text-[#22D3EE]" />
                 <span>Stop Loss & Take Profit Target</span>
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                   <span>Stop Loss (%) *</span>
                   <span className="text-red-400 font-mono">Max Loss: {formatCurrency(estimatedMaxLoss, currency)}</span>
                 </label>
@@ -1067,12 +1067,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   step={0.1}
                   value={stopLossPct}
                   onChange={(e) => setStopLossPct(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-red-400 font-mono font-bold"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-red-400 font-mono font-bold"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold flex justify-between">
+                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
                   <span>Take Profit Target (%) *</span>
                   <span className="text-emerald-400 font-mono">R:R Ratio = {riskRewardRatio}</span>
                 </label>
@@ -1081,40 +1081,40 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   step={0.1}
                   value={takeProfitPct}
                   onChange={(e) => setTakeProfitPct(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold"
                 />
               </div>
 
-              <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-2">
+              <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="text-xs font-bold text-white">Trailing Stop Loss</span>
                   <input
                     type="checkbox"
                     checked={trailingStopEnabled}
                     onChange={(e) => setTrailingStopEnabled(e.target.checked)}
-                    className="accent-[#55C98A]"
+                    className="accent-[#22D3EE]"
                   />
                 </div>
                 {trailingStopEnabled && (
                   <div className="grid grid-cols-2 gap-2 pt-1">
                     <div>
-                      <span className="text-[10px] text-[#8BA596]">Trailing Dist (%)</span>
+                      <span className="text-[10px] text-[#7C8CA3]">Trailing Dist (%)</span>
                       <input
                         type="number"
                         step={0.1}
                         value={trailingStopPct}
                         onChange={(e) => setTrailingStopPct(parseFloat(e.target.value) || 0.5)}
-                        className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
+                        className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
                       />
                     </div>
                     <div>
-                      <span className="text-[10px] text-[#8BA596]">Activation Profit (%)</span>
+                      <span className="text-[10px] text-[#7C8CA3]">Activation Profit (%)</span>
                       <input
                         type="number"
                         step={0.1}
                         value={activationProfitPct}
                         onChange={(e) => setActivationProfitPct(parseFloat(e.target.value) || 1.0)}
-                        className="w-full bg-[#0C1713] border border-[#1A3127] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
+                        className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
                       />
                     </div>
                   </div>
@@ -1122,41 +1122,41 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
             </div>
 
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
                 <AlertTriangle className="h-4 w-4 text-yellow-400" />
                 <span>Drawdown & Position Bounds</span>
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Max Daily Drawdown (%)</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Daily Drawdown (%)</label>
                 <input
                   type="number"
                   step={0.5}
                   value={maxDailyDrawdownPct}
                   onChange={(e) => setMaxDailyDrawdownPct(parseFloat(e.target.value) || 3.0)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Max Open Positions</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Open Positions</label>
                 <input
                   type="number"
                   value={maxOpenPositions}
                   onChange={(e) => setMaxOpenPositions(parseInt(e.target.value) || 1)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Max Slippage Tolerance (%)</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Slippage Tolerance (%)</label>
                 <input
                   type="number"
                   step={0.05}
                   value={maxSlippagePct}
                   onChange={(e) => setMaxSlippagePct(parseFloat(e.target.value) || 0.2)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
                 />
               </div>
             </div>
@@ -1166,32 +1166,32 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         {/* STEP 5: BROKER & EXECUTION */}
         {activeStep === 5 && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                <Building2 className="h-4 w-4 text-[#55C98A]" />
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                <Building2 className="h-4 w-4 text-[#22D3EE]" />
                 <span>Broker Routing & Capability</span>
               </h3>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Active Broker Account</label>
-                <div className="p-3 bg-[#060D0A] border border-[#1A3127] rounded-xl space-y-1 text-xs font-mono">
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Active Broker Account</label>
+                <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-1 text-xs font-mono">
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Account ID:</span>
+                    <span className="text-[#7C8CA3]">Account ID:</span>
                     <span className="text-cyan-400 font-bold">{brokerAccountId}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Broker Provider:</span>
+                    <span className="text-[#7C8CA3]">Broker Provider:</span>
                     <span className="text-white font-bold uppercase">{brokerProvider}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Folder:</span>
+                    <span className="text-[#7C8CA3]">Folder:</span>
                     <span className="text-white">{brokerFolderId}</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Execution Leverage</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Leverage</label>
                 <div className="grid grid-cols-5 gap-2">
                   {[1, 2, 3, 5, 10].map((lev) => (
                     <button
@@ -1199,7 +1199,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                       type="button"
                       onClick={() => setLeverage(lev)}
                       className={`py-1.5 rounded-lg text-xs font-mono font-bold ${
-                        leverage === lev ? "bg-[#123C2A] text-[#55C98A] border border-[#39B978]" : "bg-[#060D0A] text-[#8BA596]"
+                        leverage === lev ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]" : "bg-[#07101A] text-[#7C8CA3]"
                       }`}
                     >
                       {lev}x
@@ -1209,11 +1209,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[11px] text-[#8BA596] font-semibold">Order Execution Type</label>
+                <label className="text-[11px] text-[#7C8CA3] font-semibold">Order Execution Type</label>
                 <select
                   value={orderType}
                   onChange={(e) => setOrderType(e.target.value as any)}
-                  className="w-full bg-[#060D0A] border border-[#1A3127] rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono"
                 >
                   <option value="MARKET">MARKET</option>
                   <option value="LIMIT">LIMIT</option>
@@ -1235,47 +1235,47 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               )}
             </div>
 
-            <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-5 space-y-4 text-xs font-mono">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                <Shield className="h-4 w-4 text-[#55C98A]" />
+            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4 text-xs font-mono">
+              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                <Shield className="h-4 w-4 text-[#22D3EE]" />
                 <span>Pre-Flight Hierarchical Capital Breakdown</span>
               </h3>
 
               <div className="space-y-1.5">
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Customer Total Capital:</span>
+                  <span className="text-[#7C8CA3]">Customer Total Capital:</span>
                   <span className="text-slate-100 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.net_equity ?? totalCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Verified Broker Balance:</span>
+                  <span className="text-[#7C8CA3]">Verified Broker Balance:</span>
                   <span className="text-cyan-300 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.broker_balance ?? totalCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Department Budget:</span>
+                  <span className="text-[#7C8CA3]">Department Budget:</span>
                   <span className="text-white font-bold">{formatCurrency(totalCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">New Bot Allocation:</span>
-                  <span className="text-[#55C98A] font-bold">{formatCurrency(allocatedCapital, currency)}</span>
+                  <span className="text-[#7C8CA3]">New Bot Allocation:</span>
+                  <span className="text-[#22D3EE] font-bold">{formatCurrency(allocatedCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Remaining Dept Capital:</span>
+                  <span className="text-[#7C8CA3]">Remaining Dept Capital:</span>
                   <span className="text-white font-bold">{formatCurrency(remainingCapital, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Risk Reserve Hold:</span>
+                  <span className="text-[#7C8CA3]">Risk Reserve Hold:</span>
                   <span className="text-amber-400 font-bold">{formatCurrency(riskReserve, currency)}</span>
                 </div>
-                <div className="flex justify-between border-t border-[#1A3127] pt-1.5">
-                  <span className="text-[#8BA596]">Required Margin ({leverage}x):</span>
+                <div className="flex justify-between border-t border-[#1A2A3F] pt-1.5">
+                  <span className="text-[#7C8CA3]">Required Margin ({leverage}x):</span>
                   <span className="text-yellow-400 font-bold">{formatCurrency(requiredMargin, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Max Possible Loss (SL {stopLossPct}%):</span>
+                  <span className="text-[#7C8CA3]">Max Possible Loss (SL {stopLossPct}%):</span>
                   <span className="text-rose-400 font-bold">{formatCurrency(estimatedMaxLoss, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[#8BA596]">Estimated Brokerage Expense:</span>
+                  <span className="text-[#7C8CA3]">Estimated Brokerage Expense:</span>
                   <span className="text-rose-300 font-bold">{formatCurrency(currency === "INR" ? 20.0 : 1.5, currency)}</span>
                 </div>
               </div>
@@ -1307,9 +1307,9 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               
               {/* Configuration Summary Card */}
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3 text-xs font-mono">
-                <div className="flex items-center gap-2 border-b border-[#1A3127] pb-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#55C98A]" />
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3 text-xs font-mono">
+                <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                  <CheckCircle2 className="h-4 w-4 text-[#22D3EE]" />
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                     Configuration Summary
                   </h3>
@@ -1317,40 +1317,40 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
 
                 <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Bot Name:</span>
+                    <span className="text-[#7C8CA3]">Bot Name:</span>
                     <span className="text-white font-bold truncate max-w-[200px]">{name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Slug:</span>
+                    <span className="text-[#7C8CA3]">Slug:</span>
                     <span className="text-cyan-400 font-bold">{slug}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Instrument & TF:</span>
+                    <span className="text-[#7C8CA3]">Instrument & TF:</span>
                     <span className="text-cyan-400 font-bold">{symbol} ({primaryTimeframe})</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Asset Class:</span>
+                    <span className="text-[#7C8CA3]">Asset Class:</span>
                     <span className="text-yellow-400 font-bold">{assetClass}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Capital Allocation:</span>
-                    <span className="text-[#55C98A] font-bold">
+                    <span className="text-[#7C8CA3]">Capital Allocation:</span>
+                    <span className="text-[#22D3EE] font-bold">
                       {formatCurrency(allocatedCapital, currency)} ({allocationPct}% of {formatCurrency(totalCapital, currency)})
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Risk / Reward:</span>
+                    <span className="text-[#7C8CA3]">Risk / Reward:</span>
                     <span className="text-white font-bold">
                       SL {stopLossPct}% / TP {takeProfitPct}% ({riskRewardRatio})
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-[#8BA596]">Execution Broker:</span>
+                    <span className="text-[#7C8CA3]">Execution Broker:</span>
                     <span className="text-cyan-400 font-bold">{brokerId} ({leverage}x)</span>
                   </div>
-                  <div className="flex justify-between border-t border-[#1A3127] pt-2">
-                    <span className="text-[#8BA596]">Environment:</span>
-                    <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-[#55C98A]"}`}>
+                  <div className="flex justify-between border-t border-[#1A2A3F] pt-2">
+                    <span className="text-[#7C8CA3]">Environment:</span>
+                    <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-[#22D3EE]"}`}>
                       {environment} MODE
                     </span>
                   </div>
@@ -1358,10 +1358,10 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               {/* Real Backend Evidence Telemetry */}
-              <div className="bg-[#0C1713] border border-[#1A3127] rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#1A3127] pb-2">
+              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
                   <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-[#55C98A]" />
+                    <Shield className="h-4 w-4 text-[#22D3EE]" />
                     <h3 className="text-xs font-bold text-white uppercase tracking-wider">
                       Authoritative Backend Safety Evidence
                     </h3>
@@ -1369,7 +1369,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   <button
                     type="button"
                     onClick={() => revalidateConfig()}
-                    className="text-[#55C98A] hover:text-white flex items-center gap-1 text-[10px]"
+                    className="text-[#22D3EE] hover:text-white flex items-center gap-1 text-[10px]"
                   >
                     <RefreshCw className={`h-3 w-3 ${isValidating ? "animate-spin" : ""}`} />
                     <span>Re-Validate</span>
@@ -1379,11 +1379,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 <div className="space-y-2 text-[11px]">
                   {validationData?.evidence && validationData.evidence.length > 0 ? (
                     validationData.evidence.map((item) => (
-                      <div key={item.id} className="p-2 rounded-lg bg-[#060D0A] border border-[#1A3127] space-y-0.5">
+                      <div key={item.id} className="p-2 rounded-lg bg-[#07101A] border border-[#1A2A3F] space-y-0.5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1.5">
                             {item.status === "PASSED" ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-[#55C98A] shrink-0" />
+                              <CheckCircle2 className="h-3.5 w-3.5 text-[#22D3EE] shrink-0" />
                             ) : item.status === "WARNING" ? (
                               <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
                             ) : (
@@ -1392,17 +1392,17 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                             <span className="font-bold text-white text-[11px]">{item.label}</span>
                           </div>
                           <span className={`text-[9px] px-1 rounded font-mono font-bold ${
-                            item.status === "PASSED" ? "bg-[#123C2A] text-[#55C98A]" : "bg-yellow-950/60 text-yellow-400"
+                            item.status === "PASSED" ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE]" : "bg-yellow-950/60 text-yellow-400"
                           }`}>
                             {item.status}
                           </span>
                         </div>
-                        <p className="text-[10px] text-[#8BA596] pl-5">{item.evidence_text}</p>
+                        <p className="text-[10px] text-[#7C8CA3] pl-5">{item.evidence_text}</p>
                       </div>
                     ))
                   ) : (
-                    <div className="py-4 text-center text-[#8BA596]">
-                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-[#55C98A]" />
+                    <div className="py-4 text-center text-[#7C8CA3]">
+                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-[#22D3EE]" />
                       <span>Validating 20-stage safety precheck gates with server...</span>
                     </div>
                   )}
@@ -1420,7 +1420,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           </div>
         )}
         {successMessage && (
-          <div className="p-3 bg-[#123C2A] text-[#55C98A] border border-[#39B978] rounded-xl text-xs flex items-center gap-2">
+          <div className="p-3 bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890] rounded-xl text-xs flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>{successMessage}</span>
           </div>
@@ -1432,7 +1432,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
             type="button"
             onClick={() => setActiveStep(Math.max(1, activeStep - 1))}
             disabled={activeStep === 1 || saveMutation.isPending}
-            className="px-5 py-2.5 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-bold transition-colors disabled:opacity-30 flex items-center gap-2"
+            className="px-5 py-2.5 rounded-xl bg-[#0A1422] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white font-bold transition-colors disabled:opacity-30 flex items-center gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
@@ -1454,7 +1454,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   type="button"
                   onClick={() => saveDraftMutation.mutate()}
                   disabled={saveDraftMutation.isPending || saveMutation.isPending}
-                  className="px-4 py-2.5 rounded-xl bg-[#0C1713] hover:bg-[#14271F] text-[#8BA596] hover:text-white font-bold transition-colors border border-[#182C23] text-xs flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-xl bg-[#0A1422] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white font-bold transition-colors border border-[#182C23] text-xs flex items-center gap-1.5"
                 >
                   <Save className="h-4 w-4" />
                   <span>{saveDraftMutation.isPending ? "Saving Draft..." : "Save Draft"}</span>
@@ -1464,7 +1464,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   type="button"
                   onClick={() => saveMutation.mutate("STOPPED")}
                   disabled={saveMutation.isPending}
-                  className="px-5 py-2.5 rounded-xl bg-[#14271F] hover:bg-[#1A3127] text-cyan-400 font-bold transition-all border border-cyan-800/40 text-xs flex items-center gap-2"
+                  className="px-5 py-2.5 rounded-xl bg-[#101B2D] hover:bg-[#1A2A3F] text-cyan-400 font-bold transition-all border border-cyan-800/40 text-xs flex items-center gap-2"
                 >
                   {saveMutation.isPending ? (
                     <RefreshCw className="h-4 w-4 animate-spin" />

@@ -19,7 +19,7 @@ interface EcoTabsProps {
 export function EcoTabs({ tabs, activeTab, onChange, className = "" }: EcoTabsProps) {
   return (
     <div
-      className={`flex items-center gap-1.5 p-1 bg-[#07110D] border border-[#1B3328] rounded-xl font-mono text-xs select-none ${className}`}
+      className={`flex items-center gap-1 p-1 bg-[#07101A] border border-[#1A2A3F] rounded-lg font-mono text-xs select-none ${className}`}
     >
       {tabs.map((tab) => {
         const Icon = tab.icon;
@@ -28,10 +28,10 @@ export function EcoTabs({ tabs, activeTab, onChange, className = "" }: EcoTabsPr
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all duration-150 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-bold transition-all duration-150 cursor-pointer ${
               isSelected
-                ? "bg-[#2E7D5B] text-[#07110D] shadow-sm shadow-[#2E7D5B]/30"
-                : "text-[#A8BDB0] hover:text-[#E8F3EC] hover:bg-[#12221B]"
+                ? "bg-[#2563EB] text-white shadow-sm"
+                : "text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
             }`}
           >
             {Icon && <Icon className="h-3.5 w-3.5" />}
@@ -40,8 +40,8 @@ export function EcoTabs({ tabs, activeTab, onChange, className = "" }: EcoTabsPr
               <span
                 className={`px-1.5 py-0.2 rounded text-[10px] ${
                   isSelected
-                    ? "bg-[#07110D] text-[#55C98A]"
-                    : "bg-[#12221B] text-[#70877A]"
+                    ? "bg-[#1E40AF] text-[#93C5FD]"
+                    : "bg-[#101B2D] text-[#52627A]"
                 }`}
               >
                 {tab.count}

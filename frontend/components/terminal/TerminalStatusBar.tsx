@@ -42,28 +42,28 @@ export function TerminalStatusBar({
   }, []);
 
   return (
-    <footer className="h-6 bg-[#131722] border-t border-[#2A2E39] px-3 flex items-center justify-between text-[10px] font-mono text-[#787B86] select-none shrink-0 z-30">
+    <footer className="h-6 bg-[#07101A] border-t border-[#1A2A3F] px-3 flex items-center justify-between text-[10px] font-mono text-[#7C8CA3] select-none shrink-0 z-30">
       {/* Left Telemetry: Broker, WebSocket, Latency */}
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
-              isConnected ? "bg-[#26A69A] animate-pulse" : "bg-[#EF5350]"
+              isConnected ? "bg-[#00E890] animate-pulse" : "bg-[#FF3B5C]"
             }`}
           />
-          <span className="text-[#D1D4DC] font-semibold">{brokerName}</span>
+          <span className="text-[#F7FAFC] font-semibold">{brokerName}</span>
         </div>
 
-        <div className="hidden sm:flex items-center gap-1 border-l border-[#2A2E39] pl-3">
-          <Radio className="w-3 h-3 text-[#2962FF]" />
-          <span>WS STREAM: </span>
-          <span className="text-[#26A69A] font-bold">NORMALIZED</span>
+        <div className="hidden sm:flex items-center gap-1 border-l border-[#1A2A3F] pl-3">
+          <Radio className="w-3 h-3 text-[#19C5FF]" />
+          <span className="text-[#52627A]">WS STREAM: </span>
+          <span className="text-[#00E890] font-bold">NORMALIZED</span>
         </div>
 
-        <div className="hidden md:flex items-center gap-1 border-l border-[#2A2E39] pl-3">
-          <Activity className="w-3 h-3 text-[#26A69A]" />
-          <span>LATENCY: </span>
-          <span className="text-[#D1D4DC] tabular-nums font-semibold">{latencyMs}ms</span>
+        <div className="hidden md:flex items-center gap-1 border-l border-[#1A2A3F] pl-3">
+          <Activity className="w-3 h-3 text-[#00E890]" />
+          <span className="text-[#52627A]">LATENCY: </span>
+          <span className="text-[#F7FAFC] tabular-nums font-semibold">{latencyMs}ms</span>
         </div>
       </div>
 
@@ -71,24 +71,24 @@ export function TerminalStatusBar({
       <div className="hidden lg:flex items-center gap-3">
         <div className="flex items-center gap-1">
           <Cpu className="w-3 h-3 text-amber-400" />
-          <span>EVALUATION: </span>
-          <span className="text-[#D1D4DC] font-semibold">{candleMode}</span>
+          <span className="text-[#52627A]">EVALUATION: </span>
+          <span className="text-[#F7FAFC] font-semibold">{candleMode}</span>
         </div>
 
-        <div className="flex items-center gap-1 border-l border-[#2A2E39] pl-3">
-          <Shield className="w-3 h-3 text-[#26A69A]" />
-          <span>RISK GATE: </span>
-          <span className="text-[#26A69A] font-semibold">{riskStatus}</span>
+        <div className="flex items-center gap-1 border-l border-[#1A2A3F] pl-3">
+          <Shield className="w-3 h-3 text-[#00E890]" />
+          <span className="text-[#52627A]">RISK GATE: </span>
+          <span className="text-[#00E890] font-semibold">{riskStatus}</span>
         </div>
       </div>
 
       {/* Right: Real-time Clocks */}
       <div className="flex items-center gap-3 tabular-nums">
         <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3 text-[#787B86]" />
-          <span className="text-[#D1D4DC]">{timeIst}</span>
+          <Clock className="w-3 h-3 text-[#52627A]" />
+          <span className="text-[#F7FAFC]">{timeIst}</span>
         </div>
-        <div className="hidden sm:block text-[#787B86] border-l border-[#2A2E39] pl-3">
+        <div className="hidden sm:block text-[#52627A] border-l border-[#1A2A3F] pl-3">
           {timeUtc}
         </div>
       </div>

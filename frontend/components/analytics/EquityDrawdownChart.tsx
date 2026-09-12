@@ -14,7 +14,7 @@ export function EquityDrawdownChart({ data = [] }: Props) {
 
   if (safeData.length === 0) {
     return (
-      <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] flex flex-col items-center justify-center min-h-[250px] text-xs text-slate-400">
+      <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] flex flex-col items-center justify-center min-h-[250px] text-xs text-slate-400">
         No equity curve records available.
       </div>
     );
@@ -31,8 +31,8 @@ export function EquityDrawdownChart({ data = [] }: Props) {
   const milestones = safeData.filter((_, idx) => idx % sampleStep === 0 || idx === safeData.length - 1);
 
   return (
-    <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] shadow-xl flex flex-col justify-between">
-      <div className="flex flex-wrap items-center justify-between mb-4 border-b border-[#1E293B] pb-3 gap-2">
+    <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] shadow-xl flex flex-col justify-between">
+      <div className="flex flex-wrap items-center justify-between mb-4 border-b border-[#1A2A3F] pb-3 gap-2">
         <div className="flex items-center gap-2">
           <TrendingUp className="h-4 w-4 text-emerald-400" />
           <h3 className="text-sm font-bold text-white">Equity & Drawdown Progression Ledger</h3>
@@ -47,7 +47,7 @@ export function EquityDrawdownChart({ data = [] }: Props) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs font-sans">
-          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1E293B]">
+          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1A2A3F]">
             <tr>
               <th className="py-2 px-3">Timeline Milestone</th>
               <th className="py-2 px-3 text-right">Portfolio Equity</th>

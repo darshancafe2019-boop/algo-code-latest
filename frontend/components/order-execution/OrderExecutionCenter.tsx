@@ -222,7 +222,7 @@ export function OrderExecutionCenter({
   });
 
   return (
-    <div className="card-specular bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 font-sans select-none">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-6 space-y-4 font-sans select-none">
       {/* 1. Header with Mode Switch & Latency */}
       <OrderCommandHeader
         executionMode={executionMode}
@@ -331,10 +331,10 @@ export function OrderExecutionCenter({
       {/* Execution Feedback Notification */}
       {orderFeedback && (
         <div
-          className={`p-3 rounded-xl border text-xs font-mono flex items-center justify-between gap-2 ${
+          className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 ${
             orderFeedback.status === "success"
-              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-              : "bg-red-500/10 border-red-500/30 text-red-400"
+              ? "bg-[#00E890]/10 border-[#00E890]/30 text-[#00E890]"
+              : "bg-[#FF3B5C]/10 border-[#FF3B5C]/30 text-[#FF3B5C]"
           }`}
         >
           <div className="flex items-center gap-2">
@@ -345,7 +345,7 @@ export function OrderExecutionCenter({
             )}
             <span>{orderFeedback.message}</span>
           </div>
-          <button onClick={() => setOrderFeedback(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setOrderFeedback(null)} className="text-[#7C8CA3] hover:text-[#F7FAFC]">
             ✕
           </button>
         </div>
@@ -355,10 +355,10 @@ export function OrderExecutionCenter({
       <button
         onClick={() => setIsPreviewOpen(true)}
         disabled={!allGatesPassed || executeOrderMutation.isPending}
-        className={`w-full py-3.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-xl disabled:opacity-50 ${
+        className={`w-full py-3 rounded-lg text-xs font-semibold tracking-wide transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 ${
           orderSide === "BUY"
-            ? "bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 shadow-emerald-950/40"
-            : "bg-gradient-to-r from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white shadow-rose-950/40"
+            ? "bg-[#00E890] hover:bg-[#16a34a] text-slate-950"
+            : "bg-[#FF3B5C] hover:bg-[#dc2626] text-white"
         }`}
       >
         <Send className="w-4 h-4" />
@@ -368,20 +368,20 @@ export function OrderExecutionCenter({
       </button>
 
       {/* 9. Canonical Order Lifecycle & Executions Ledger */}
-      <div className="bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans mt-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--theme-border-subtle)] pb-3">
+      <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl overflow-hidden font-sans mt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#0A1422] border-b border-[#1A2A3F]">
           <div className="flex items-center gap-2">
-            <Send className="h-4 w-4 text-[var(--theme-accent)]" />
-            <h3 className="text-sm font-bold tracking-tight">Active & Historical Order Lifecycle</h3>
+            <Send className="h-4 w-4 text-[#22D3EE]" />
+            <h3 className="text-xs font-bold text-[#F7FAFC] tracking-tight">Active & Historical Order Lifecycle</h3>
           </div>
-          <span className="text-[11px] font-mono text-[var(--theme-text-muted)]">
+          <span className="text-[11px] text-[#52627A]">
             Server Idempotency Protected
           </span>
         </div>
 
-        <div className="overflow-x-auto custom-scrollbar">
-          <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[var(--theme-elevated)] text-[var(--theme-text-secondary)] text-[10px] uppercase tracking-wider border-b border-[var(--theme-border-subtle)]">
+        <div className="overflow-x-auto max-h-[340px]">
+          <table className="w-full text-left text-xs border-collapse">
+            <thead className="bg-[#101B2D] text-[#7C8CA3] text-[11px] uppercase tracking-wider font-medium border-b border-[#1A2A3F]">
               <tr>
                 <th className="py-2.5 px-3">Order / Client ID</th>
                 <th className="py-2.5 px-3">Instrument</th>
@@ -393,10 +393,10 @@ export function OrderExecutionCenter({
                 <th className="py-2.5 px-3 text-right">Time (UTC)</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[var(--theme-border-subtle)]">
+            <tbody className="divide-y divide-[#1A2A3F]/60">
               {(!tradesData?.trades || tradesData.trades.length === 0) ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-[var(--theme-text-muted)] italic">
+                  <td colSpan={8} className="py-10 text-center text-[#52627A]">
                     No active or historical order records in execution ledger.
                   </td>
                 </tr>
@@ -405,44 +405,44 @@ export function OrderExecutionCenter({
                   const isBuy = (ord.direction || ord.side || "BUY").toUpperCase().includes("BUY") || ord.direction === "LONG";
                   const status = (ord.status || "FILLED").toUpperCase();
                   return (
-                    <tr key={ord.id} className="hover:bg-[var(--theme-elevated)]/50 transition">
-                      <td className="py-3 px-3 font-bold text-[var(--theme-text-primary)]">
+                    <tr key={ord.id} className="hover:bg-[#101B2D]/60 transition">
+                      <td className="py-2.5 px-3 font-semibold text-[#F7FAFC]">
                         #{ord.id}
-                        <span className="text-[9px] text-[var(--theme-text-muted)] block">
+                        <span className="text-[9px] text-[#52627A] block font-mono">
                           {ord.client_order_id || `CLI-${ord.id}`}
                         </span>
                       </td>
-                      <td className="py-3 px-3 font-bold text-[var(--theme-text-primary)]">
+                      <td className="py-2.5 px-3 font-semibold text-[#F7FAFC]">
                         {ord.symbol || selectedSymbol}
                       </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isBuy ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)]" : "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)]"
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                          isBuy ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30" : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
                         }`}>
                           {isBuy ? "BUY" : "SELL"} {ord.order_type || "MARKET"}
                         </span>
                       </td>
-                      <td className="py-3 px-3 tabular-nums font-bold">
+                      <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-[#F7FAFC]">
                         ${Number(ord.entry_price || ord.price || currentPrice).toLocaleString()}
                       </td>
-                      <td className="py-3 px-3 tabular-nums">
+                      <td className="py-2.5 px-3 font-mono tabular-nums text-[#F7FAFC]">
                         {ord.quantity || ord.position_size || "0.05"}
                       </td>
-                      <td className="py-3 px-3 text-[11px] tabular-nums">
-                        <span className="text-[var(--theme-loss)]">${ord.stop_loss || "—"}</span> / <span className="text-[var(--theme-profit)]">${ord.take_profit || "—"}</span>
+                      <td className="py-2.5 px-3 text-[11px] font-mono tabular-nums">
+                        <span className="text-[#FF3B5C]">${ord.stop_loss || "—"}</span> / <span className="text-[#00E890]">${ord.take_profit || "—"}</span>
                       </td>
-                      <td className="py-3 px-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${
                           status === "OPEN" || status === "WORKING"
-                            ? "bg-[var(--theme-info)]/15 text-[var(--theme-info)] border border-[var(--theme-info)]/30 animate-pulse"
+                            ? "bg-[#22D3EE]/15 text-[#22D3EE] border border-[#22D3EE]/30 animate-pulse"
                             : status === "FILLED"
-                            ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border border-[var(--theme-profit)]/30"
-                            : "bg-[var(--theme-text-muted)]/15 text-[var(--theme-text-muted)]"
+                            ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30"
+                            : "bg-[#101B2D] text-[#7C8CA3]"
                         }`}>
                           {status}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-right text-[11px] text-[var(--theme-text-muted)]">
+                      <td className="py-2.5 px-3 text-right text-[11px] text-[#52627A] font-mono tabular-nums">
                         {ord.timestamp ? String(ord.timestamp).replace("T", " ").slice(0, 19) : "Recent"}
                       </td>
                     </tr>

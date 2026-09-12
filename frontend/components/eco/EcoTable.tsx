@@ -11,7 +11,7 @@ export function EcoTable({ children, className = "", ...props }: EcoTableProps) 
   return (
     <div className="overflow-x-auto w-full">
       <table
-        className={`w-full text-left border-collapse font-mono text-xs ${className}`}
+        className={`w-full text-left border-collapse font-sans text-xs ${className}`}
         {...props}
       >
         {children}
@@ -22,14 +22,14 @@ export function EcoTable({ children, className = "", ...props }: EcoTableProps) 
 
 export function EcoTableHead({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
-    <thead className={`border-b border-[#1B3328] bg-[#0B1F17]/60 text-[10px] text-[#70877A] uppercase tracking-wider sticky top-0 backdrop-blur-md ${className}`}>
+    <thead className={`border-b border-[#122033] bg-[#07101A] text-[10px] text-[#52627A] uppercase tracking-wider font-semibold sticky top-0 backdrop-blur-md ${className}`}>
       {children}
     </thead>
   );
 }
 
 export function EcoTableBody({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <tbody className={`divide-y divide-[#12221B] text-[#E8F3EC] ${className}`}>{children}</tbody>;
+  return <tbody className={`divide-y divide-[#122033] text-[#F7FAFC] ${className}`}>{children}</tbody>;
 }
 
 export function EcoTableRow({
@@ -44,7 +44,7 @@ export function EcoTableRow({
   return (
     <tr
       onClick={onClick}
-      className={`hover:bg-[#12221B]/70 transition-colors duration-100 ${
+      className={`hover:bg-[#101B2D] transition-colors duration-100 ${
         onClick ? "cursor-pointer" : ""
       } ${className}`}
     >
@@ -64,7 +64,7 @@ export function EcoTableCell({
 }) {
   const alignClass =
     align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
-  return <td className={`py-3 px-4 ${alignClass} ${className}`}>{children}</td>;
+  return <td className={`py-2.5 px-3 ${alignClass} ${className}`}>{children}</td>;
 }
 
 export function EcoTableHeadCell({
@@ -78,5 +78,5 @@ export function EcoTableHeadCell({
 }) {
   const alignClass =
     align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
-  return <th className={`py-3 px-4 font-bold ${alignClass} ${className}`}>{children}</th>;
+  return <th className={`py-2.5 px-3 font-semibold ${alignClass} ${className}`}>{children}</th>;
 }

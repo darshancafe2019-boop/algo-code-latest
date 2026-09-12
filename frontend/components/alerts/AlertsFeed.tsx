@@ -16,7 +16,7 @@ export function AlertsFeed({ alerts, onDismiss, dismissingId, isFiltered }: Aler
   if (alerts.length === 0) {
     if (isFiltered) {
       return (
-        <div className="p-12 text-center bg-[#121824]/60 border border-[#1E293B] rounded-2xl flex flex-col items-center justify-center">
+        <div className="p-12 text-center bg-[#121824]/60 border border-[#1A2A3F] rounded-2xl flex flex-col items-center justify-center">
           <div className="w-12 h-12 rounded-full bg-slate-800/80 border border-slate-700 flex items-center justify-center mb-3">
             <Inbox className="w-6 h-6 text-slate-400" />
           </div>
@@ -31,7 +31,7 @@ export function AlertsFeed({ alerts, onDismiss, dismissingId, isFiltered }: Aler
     }
 
     return (
-      <div className="p-12 text-center bg-[#121824]/60 border border-[#1E293B] rounded-2xl flex flex-col items-center justify-center">
+      <div className="p-12 text-center bg-[#121824]/60 border border-[#1A2A3F] rounded-2xl flex flex-col items-center justify-center">
         <div className="w-12 h-12 rounded-full bg-emerald-950/60 border border-emerald-500/40 flex items-center justify-center mb-3">
           <ShieldCheck className="w-6 h-6 text-emerald-400" />
         </div>

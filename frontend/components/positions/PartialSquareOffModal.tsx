@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, PieChart, AlertTriangle, CheckCircle2, ArrowRight } from "lucide-react";
+import { X, PieChart, AlertTriangle } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
 import { PositionRecord, calculateUnrealizedPnl } from "@/types/positions";
@@ -53,7 +53,6 @@ export function PartialSquareOffModal({
 
   const entryP = Number(position.entry_price || 0);
   const currP = Number(position.current_price || position.mark_price || entryP);
-  const isLong = (position.direction || position.side || "LONG").toUpperCase().includes("LONG") || (position.direction || position.side || "LONG").toUpperCase().includes("BUY");
 
   const effectiveCloseQty = useCustomQty
     ? Math.min(totalQty, Math.max(0, customQty))
@@ -65,24 +64,24 @@ export function PartialSquareOffModal({
   const isProfit = estimatedPnl >= 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-in fade-in duration-150 font-sans select-none">
-      <div className="w-full max-w-md bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 text-[var(--theme-text-primary)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150 font-sans select-none">
+      <div className="w-full max-w-md bg-[#0A1422] border border-[#1A2A3F] rounded-xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 text-[#F7FAFC]">
         {/* Header */}
-        <div className="p-5 border-b border-[var(--theme-border)] flex items-center justify-between bg-[var(--theme-elevated)]">
+        <div className="p-5 border-b border-[#1A2A3F] flex items-center justify-between bg-[#07101A]">
           <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border border-[var(--theme-warning)]/30">
+            <div className="p-2.5 rounded-lg bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30">
               <PieChart className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-base font-bold">Scale Out / Partial Close</h2>
-              <p className="text-xs text-[var(--theme-text-secondary)] font-mono">
+              <h2 className="text-base font-semibold">Scale Out / Partial Close</h2>
+              <p className="text-xs text-[#52627A]">
                 {position.symbol} • Total: {totalQty} units
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-xl text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] hover:bg-[var(--theme-surface)] transition"
+            className="p-1.5 rounded-lg text-[#52627A] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition"
           >
             <X className="h-4 w-4" />
           </button>
@@ -91,7 +90,7 @@ export function PartialSquareOffModal({
         {/* Content */}
         <div className="p-5 space-y-4">
           {errorMessage && (
-            <div className="p-3 rounded-2xl bg-[var(--theme-loss)]/10 border border-[var(--theme-loss)]/30 text-[var(--theme-loss)] text-xs flex items-center gap-2 font-mono">
+            <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 text-[#FF3B5C] text-xs flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 shrink-0" />
               <span>{errorMessage}</span>
             </div>
@@ -99,30 +98,30 @@ export function PartialSquareOffModal({
 
           {/* Percentage Selector Buttons */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between text-xs font-mono">
-              <label className="font-bold text-[var(--theme-text-secondary)] uppercase tracking-wider">
+            <div className="flex items-center justify-between text-xs">
+              <label className="font-semibold text-[#7C8CA3] uppercase">
                 Select Exit Portion
               </label>
               <button
                 type="button"
                 onClick={() => setUseCustomQty(!useCustomQty)}
-                className="text-[10px] text-[var(--theme-accent)] hover:underline"
+                className="text-xs text-[#19C5FF] hover:underline"
               >
                 {useCustomQty ? "Use Percentage Chips" : "Specify Exact Quantity"}
               </button>
             </div>
 
             {!useCustomQty ? (
-              <div className="grid grid-cols-4 gap-2 font-mono text-xs">
+              <div className="grid grid-cols-4 gap-2 text-xs">
                 {[25, 50, 75, 100].map((pct) => (
                   <button
                     key={pct}
                     type="button"
                     onClick={() => setPercentage(pct)}
-                    className={`py-2.5 rounded-2xl font-bold border transition ${
+                    className={`py-2 rounded-lg font-semibold border transition ${
                       percentage === pct
-                        ? "bg-[var(--theme-accent)] text-[var(--theme-bg)] border-[var(--theme-accent)] shadow-md shadow-[var(--theme-accent)]/20"
-                        : "bg-[var(--theme-elevated)] text-[var(--theme-text-secondary)] border-[var(--theme-border-subtle)] hover:bg-[var(--theme-surface)]"
+                        ? "bg-[#2563EB] text-white border-[#2563EB] shadow-sm"
+                        : "bg-[#0D1727] text-[#7C8CA3] border-[#1A2A3F] hover:bg-[#101B2D] hover:text-[#F7FAFC]"
                     }`}
                   >
                     {pct}% {pct === 100 ? "MAX" : ""}
@@ -139,31 +138,31 @@ export function PartialSquareOffModal({
                   value={customQty}
                   onChange={(e) => setCustomQty(parseFloat(e.target.value) || 0)}
                   placeholder={`Max: ${totalQty}`}
-                  className="w-full px-3.5 py-2 bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] focus:border-[var(--theme-accent)] rounded-2xl text-sm font-mono font-bold text-[var(--theme-text-primary)] focus:outline-none transition"
+                  className="w-full px-3.5 py-2 bg-[#0D1727] border border-[#1A2A3F] focus:border-[#2563EB] rounded-lg text-sm font-semibold tabular-nums text-[#F7FAFC] focus:outline-none transition"
                 />
               </div>
             )}
           </div>
 
           {/* Sizing Breakdown Box */}
-          <div className="p-4 rounded-3xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-2.5 font-mono text-xs shadow-inner">
+          <div className="p-4 rounded-lg bg-[#0D1727] border border-[#1A2A3F] space-y-2.5 text-xs shadow-inner">
             <div className="flex items-center justify-between">
-              <span className="text-[var(--theme-text-muted)]">Closing Size:</span>
-              <span className="font-extrabold text-[var(--theme-text-primary)] tabular-nums">
+              <span className="text-[#52627A]">Closing Size:</span>
+              <span className="font-semibold text-[#F7FAFC] tabular-nums">
                 {effectiveCloseQty} units ({useCustomQty ? `${Math.round((effectiveCloseQty / totalQty) * 100)}%` : `${percentage}%`})
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[var(--theme-text-muted)]">Remaining Position:</span>
-              <span className="font-bold text-[var(--theme-text-primary)] tabular-nums">
+              <span className="text-[#52627A]">Remaining Position:</span>
+              <span className="font-semibold text-[#F7FAFC] tabular-nums">
                 {remainingQty} units
               </span>
             </div>
-            <div className="flex items-center justify-between border-t border-[var(--theme-border-subtle)] pt-2">
-              <span className="text-[var(--theme-text-muted)]">Estimated Realized P&L:</span>
+            <div className="flex items-center justify-between border-t border-[#122033] pt-2">
+              <span className="text-[#52627A]">Estimated Realized P&L:</span>
               <span
-                className={`font-black tabular-nums text-sm ${
-                  isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                className={`font-bold tabular-nums text-sm ${
+                  isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
                 }`}
               >
                 {isProfit ? "+" : ""}${estimatedPnl.toFixed(2)}
@@ -173,11 +172,11 @@ export function PartialSquareOffModal({
         </div>
 
         {/* Footer */}
-        <div className="p-5 border-t border-[var(--theme-border)] bg-[var(--theme-elevated)] flex items-center justify-end gap-2.5">
+        <div className="p-5 border-t border-[#1A2A3F] bg-[#07101A] flex items-center justify-end gap-2.5">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--theme-text-secondary)] hover:bg-[var(--theme-surface)] transition"
+            className="px-4 py-2 rounded-lg text-xs font-medium text-[#7C8CA3] hover:bg-[#101B2D] hover:text-[#F7FAFC] transition"
           >
             Cancel
           </button>
@@ -185,7 +184,7 @@ export function PartialSquareOffModal({
             type="button"
             onClick={() => closeMutation.mutate()}
             disabled={closeMutation.isPending || effectiveCloseQty <= 0}
-            className="px-5 py-2.5 rounded-2xl bg-[var(--theme-warning)] text-black font-bold text-xs shadow-md transition disabled:opacity-50 flex items-center gap-1.5 active:scale-95"
+            className="px-5 py-2.5 rounded-lg bg-[#F59E0B] hover:bg-[#D97706] text-black font-semibold text-xs shadow-sm transition disabled:opacity-50 flex items-center gap-1.5 active:scale-95"
           >
             {closeMutation.isPending ? "Executing..." : `Confirm Scale Exit (${effectiveCloseQty} units)`}
           </button>

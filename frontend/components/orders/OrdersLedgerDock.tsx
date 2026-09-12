@@ -11,7 +11,7 @@ export function OrdersLedgerDock() {
   const [activeTab, setActiveTab] = useState<"open" | "filled" | "all">("open");
   const [showColumnsDropdown, setShowColumnsDropdown] = useState(false);
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    client_id: false,
+    client_id: true,
     order_type: true,
     fees: false,
     bot_id: false,
@@ -23,7 +23,7 @@ export function OrdersLedgerDock() {
 
   const openOrders = useMemo(() => {
     return orders.filter(
-      (o) => o.status === "OPEN" || o.status === "PARTIALLY_FILLED"
+      (o) => (o.status as string) === "OPEN" || (o.status as string) === "PARTIALLY_FILLED" || (o.status as string) === "WORKING"
     );
   }, [orders]);
 
@@ -38,48 +38,54 @@ export function OrdersLedgerDock() {
   }, [activeTab, openOrders, filledOrders, orders]);
 
   return (
-    <div className="bg-[#0B132B]/85 border border-slate-800 rounded-2xl overflow-hidden backdrop-blur-md shadow-xl font-mono text-xs">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl overflow-hidden font-sans text-xs">
       {/* Header Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-slate-900/80 border-b border-slate-800">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-[#0A1422] border-b border-[#1A2A3F]">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setActiveTab("open")}
-            className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
               activeTab === "open"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[#2563EB] text-white shadow-sm"
+                : "bg-[#0D1727] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
             }`}
           >
             <span>Open Orders</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] text-slate-300">
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono tabular-nums ${
+              activeTab === "open" ? "bg-white/20 text-white" : "bg-[#101B2D] text-[#7C8CA3]"
+            }`}>
               {openOrders.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("filled")}
-            className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
               activeTab === "filled"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[#2563EB] text-white shadow-sm"
+                : "bg-[#0D1727] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
             }`}
           >
             <span>Filled Orders</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] text-slate-300">
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono tabular-nums ${
+              activeTab === "filled" ? "bg-white/20 text-white" : "bg-[#101B2D] text-[#7C8CA3]"
+            }`}>
               {filledOrders.length}
             </span>
           </button>
 
           <button
             onClick={() => setActiveTab("all")}
-            className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg font-medium transition flex items-center gap-1.5 ${
               activeTab === "all"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                : "text-slate-400 hover:text-white"
+                ? "bg-[#2563EB] text-white shadow-sm"
+                : "bg-[#0D1727] border border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
             }`}
           >
             <span>Full History</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] text-slate-300">
+            <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono tabular-nums ${
+              activeTab === "all" ? "bg-white/20 text-white" : "bg-[#101B2D] text-[#7C8CA3]"
+            }`}>
               {orders.length}
             </span>
           </button>
@@ -89,7 +95,7 @@ export function OrdersLedgerDock() {
         <div className="flex items-center gap-2 relative">
           <button
             onClick={() => setShowColumnsDropdown(!showColumnsDropdown)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg border border-slate-700 bg-slate-800/80 text-slate-300 hover:text-white transition"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border border-[#1A2A3F] bg-[#0D1727] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F] transition"
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
             <span>Columns</span>
@@ -97,7 +103,7 @@ export function OrdersLedgerDock() {
           </button>
 
           {showColumnsDropdown && (
-            <div className="absolute right-12 top-8 w-44 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in duration-150">
+            <div className="absolute right-12 top-10 w-48 bg-[#0D1727] border border-[#1A2A3F] rounded-lg shadow-2xl p-2 z-50 animate-in fade-in duration-150">
               {[
                 { key: "client_id", label: "Client Order ID" },
                 { key: "order_type", label: "Order Type" },
@@ -107,10 +113,10 @@ export function OrdersLedgerDock() {
                 <button
                   key={c.key}
                   onClick={() => toggleColumn(c.key)}
-                  className="flex items-center justify-between w-full px-2 py-1.5 rounded-lg text-left text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                  className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-md text-left text-[#7C8CA3] hover:bg-[#101B2D] hover:text-[#F7FAFC] transition"
                 >
                   <span>{c.label}</span>
-                  {visibleColumns[c.key] && <Check className="w-3.5 h-3.5 text-cyan-400" />}
+                  {visibleColumns[c.key] && <Check className="w-3.5 h-3.5 text-[#22D3EE]" />}
                 </button>
               ))}
             </div>
@@ -118,7 +124,7 @@ export function OrdersLedgerDock() {
 
           <button
             onClick={() => refreshAll()}
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-1.5 rounded-lg border border-[#1A2A3F] bg-[#0D1727] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F] transition"
             title="Refresh Orders"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -126,7 +132,7 @@ export function OrdersLedgerDock() {
 
           <Link
             href="/trade-journal"
-            className="flex items-center gap-1 text-[11px] text-cyan-400 hover:text-cyan-300 transition ml-1"
+            className="flex items-center gap-1 text-[11px] text-[#22D3EE] hover:text-[#19C5FF] transition ml-1 font-medium"
           >
             <span>Journal</span>
             <ExternalLink className="w-3 h-3" />
@@ -135,75 +141,80 @@ export function OrdersLedgerDock() {
       </div>
 
       {/* Main Table */}
-      <div className="overflow-x-auto max-h-[300px]">
+      <div className="overflow-x-auto max-h-[340px]">
         {displayedOrders.length === 0 ? (
-          <div className="py-8 text-center text-slate-400 font-mono">
+          <div className="py-10 text-center text-[#52627A]">
             No {activeTab} orders recorded in {tradingMode} mode.
           </div>
         ) : (
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-900/90 text-slate-400 border-b border-slate-800 text-[11px]">
+            <thead className="bg-[#101B2D] text-[#7C8CA3] border-b border-[#1A2A3F] text-[11px] uppercase tracking-wider font-medium">
               <tr>
                 <th className="py-2.5 px-3">Time</th>
-                {visibleColumns.client_id && <th className="py-2.5 px-3">Order ID</th>}
-                <th className="py-2.5 px-3 font-semibold">Instrument</th>
-                <th className="py-2.5 px-3 font-semibold">Side</th>
+                {visibleColumns.client_id && <th className="py-2.5 px-3">Order / Client ID</th>}
+                <th className="py-2.5 px-3">Instrument</th>
+                <th className="py-2.5 px-3">Side</th>
                 {visibleColumns.order_type && <th className="py-2.5 px-3">Type</th>}
-                <th className="py-2.5 px-3 text-right font-semibold">Size</th>
-                <th className="py-2.5 px-3 text-right font-semibold">Price</th>
-                <th className="py-2.5 px-3 text-right font-semibold">Status</th>
+                <th className="py-2.5 px-3 text-right">Size</th>
+                <th className="py-2.5 px-3 text-right">Price</th>
+                <th className="py-2.5 px-3 text-right">Status</th>
                 {visibleColumns.bot_id && <th className="py-2.5 px-3 text-right">Origin</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/40">
+            <tbody className="divide-y divide-[#1A2A3F]/60">
               {displayedOrders.map((ord, idx) => {
-                const isBuy = ord.direction === "BUY" || ord.direction === "LONG";
+                const isBuy = (ord.direction || "").toUpperCase().includes("BUY") || (ord.direction || "") === "LONG";
                 const isFilled = ord.status === "FILLED";
+                const isRejected = ord.status === "REJECTED" || ord.status === "CANCELLED";
                 const timeStr = ord.created_at
                   ? ord.created_at.substring(11, 19)
                   : "Recent";
 
                 return (
-                  <tr key={ord.id || idx} className="hover:bg-slate-800/30 transition">
-                    <td className="py-2.5 px-3 text-slate-400">{timeStr}</td>
+                  <tr key={ord.id || idx} className="hover:bg-[#101B2D]/60 transition">
+                    <td className="py-2.5 px-3 text-[#52627A] font-mono tabular-nums text-[11px]">{timeStr}</td>
                     {visibleColumns.client_id && (
-                      <td className="py-2.5 px-3 text-slate-400 font-mono text-[10px]">
+                      <td className="py-2.5 px-3 text-[#7C8CA3] font-mono tabular-nums text-[11px]">
                         #{ord.id.substring(0, 8)}
                       </td>
                     )}
-                    <td className="py-2.5 px-3 font-bold text-white">{ord.symbol}</td>
+                    <td className="py-2.5 px-3 font-semibold text-[#F7FAFC]">{ord.symbol}</td>
                     <td className="py-2.5 px-3">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          isBuy ? "bg-emerald-500/20 text-emerald-400" : "bg-rose-500/20 text-rose-400"
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-semibold ${
+                          isBuy
+                            ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30"
+                            : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
                         }`}
                       >
                         {isBuy ? "BUY" : "SELL"}
                       </span>
                     </td>
                     {visibleColumns.order_type && (
-                      <td className="py-2.5 px-3 text-slate-400">{ord.order_type}</td>
+                      <td className="py-2.5 px-3 text-[#7C8CA3]">{ord.order_type || "MARKET"}</td>
                     )}
-                    <td className="py-2.5 px-3 text-right text-slate-300 font-mono">
+                    <td className="py-2.5 px-3 text-right text-[#F7FAFC] font-mono tabular-nums">
                       {ord.requested_quantity}
                     </td>
-                    <td className="py-2.5 px-3 text-right text-slate-300 font-mono font-bold">
+                    <td className="py-2.5 px-3 text-right text-[#F7FAFC] font-mono tabular-nums font-semibold">
                       ${ord.price ? ord.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "MARKET"}
                     </td>
-                    <td className="py-2.5 px-3 text-right font-mono">
+                    <td className="py-2.5 px-3 text-right font-sans">
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-medium ${
                           isFilled
-                            ? "bg-emerald-500/10 text-emerald-400"
-                            : "bg-cyan-500/10 text-cyan-400 animate-pulse"
+                            ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30"
+                            : isRejected
+                            ? "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
+                            : "bg-[#22D3EE]/15 text-[#22D3EE] border border-[#22D3EE]/30 animate-pulse"
                         }`}
                       >
                         {ord.status}
                       </span>
                     </td>
                     {visibleColumns.bot_id && (
-                      <td className="py-2.5 px-3 text-right text-slate-400 text-[10px]">
-                        {ord.bot_id}
+                      <td className="py-2.5 px-3 text-right text-[#52627A] text-[11px] font-mono">
+                        {ord.bot_id || "manual"}
                       </td>
                     )}
                   </tr>
@@ -216,3 +227,4 @@ export function OrdersLedgerDock() {
     </div>
   );
 }
+

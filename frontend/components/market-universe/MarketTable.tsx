@@ -49,7 +49,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
 
   if (!instruments || instruments.length === 0) {
     return (
-      <div className="p-12 text-center rounded-xl bg-[#121824] border border-[#1E293B] text-slate-400">
+      <div className="p-12 text-center rounded-xl bg-[#121824] border border-[#1A2A3F] text-slate-400">
         <Activity className="h-8 w-8 mx-auto mb-2 text-cyan-400 opacity-60" />
         <h4 className="text-sm font-bold text-white mb-1">No Instruments Discovered</h4>
         <p className="text-xs text-slate-400">
@@ -61,10 +61,10 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
 
   return (
     <div className="space-y-3">
-      <div className="rounded-xl border border-[#1E293B] overflow-hidden bg-[#0F141F] shadow-xl">
+      <div className="rounded-xl border border-[#1A2A3F] overflow-hidden bg-[#0F141F] shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#121824] text-slate-400 text-[11px] border-b border-[#1E293B]">
+            <thead className="bg-[#121824] text-slate-400 text-[11px] border-b border-[#1A2A3F]">
               <tr>
                 <th className="py-3 px-3">Instrument & Company</th>
                 <th className="py-3 px-3">Asset Class / Type</th>
@@ -211,7 +211,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                           className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
                             paperActive
                               ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                              : "bg-[#1E293B] text-slate-500 border border-transparent"
+                              : "bg-[#1A2A3F] text-slate-500 border border-transparent"
                           }`}
                           title="Toggle Paper Trading"
                         >
@@ -224,7 +224,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                           className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
                             strategyActive
                               ? "bg-purple-500/20 text-purple-300 border border-purple-500/40"
-                              : "bg-[#1E293B] text-slate-500 border border-transparent"
+                              : "bg-[#1A2A3F] text-slate-500 border border-transparent"
                           }`}
                           title="Toggle Strategy Scan"
                         >
@@ -237,7 +237,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                           className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
                             liveActive
                               ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                              : "bg-[#1E293B] text-slate-500 border border-transparent"
+                              : "bg-[#1A2A3F] text-slate-500 border border-transparent"
                           }`}
                           title="Toggle Live Trading"
                         >

@@ -87,20 +87,20 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
           <h3 className="text-xs font-bold text-white uppercase tracking-wider">
             Open Position Risk Ledger
           </h3>
-          <p className="text-[11px] text-[#A8BDB0]">
+          <p className="text-[11px] text-[#7C8CA3]">
             Live mark-to-market valuations, distance to stop-loss, risk in dollars, and protection bounds.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
           {mockOpenPositions.length} Positions Active
         </span>
       </div>
 
       {/* Table */}
-      <div className="bg-[#0D1914] border border-[#294238] rounded-2xl overflow-hidden shadow-xl">
+      <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl">
         <div className="overflow-x-auto custom-scrollbar">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#0A130F] text-[#70877A] text-[10px] uppercase tracking-wider border-b border-[#1B3328]">
+            <thead className="bg-[#0A130F] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#122033]">
               <tr>
                 <th className="py-3 px-4">Symbol / Asset</th>
                 <th className="py-3 px-3">Side</th>
@@ -114,16 +114,16 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                 <th className="py-3 px-4 text-right">Protection Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#1B3328]/60 text-slate-200">
+            <tbody className="divide-y divide-[#122033]/60 text-slate-200">
               {mockOpenPositions.map((pos) => {
                 const isLong = pos.direction.toUpperCase() === "LONG";
                 const isProfit = (pos.unrealized_pnl || 0) >= 0;
                 return (
-                  <tr key={pos.id} className="hover:bg-[#123C2A]/30 transition-colors">
+                  <tr key={pos.id} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
                     {/* Symbol */}
                     <td className="py-3.5 px-4 font-bold text-white">
                       <span className="block">{pos.symbol}</span>
-                      <span className="text-[10px] text-[#70877A] font-normal">{pos.asset_class}</span>
+                      <span className="text-[10px] text-[#52627A] font-normal">{pos.asset_class}</span>
                     </td>
 
                     {/* Side */}
@@ -131,7 +131,7 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                           isLong
-                            ? "bg-emerald-950 text-[#55C98A] border border-emerald-800"
+                            ? "bg-emerald-950 text-[#22D3EE] border border-emerald-800"
                             : "bg-red-950 text-red-400 border border-red-800"
                         }`}
                       >
@@ -140,7 +140,7 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                     </td>
 
                     {/* Qty */}
-                    <td className="py-3.5 px-3 font-semibold text-[#E8F3EC]">
+                    <td className="py-3.5 px-3 font-semibold text-[#F7FAFC]">
                       {pos.quantity}
                     </td>
 
@@ -155,7 +155,7 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                     {/* Exposure / Margin */}
                     <td className="py-3.5 px-3">
                       <span className="text-white block">${pos.position_value.toLocaleString()}</span>
-                      <span className="text-[10px] text-[#70877A] block">
+                      <span className="text-[10px] text-[#52627A] block">
                         Margin: ${pos.margin_used.toLocaleString()} ({pos.leverage}x)
                       </span>
                     </td>
@@ -163,7 +163,7 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                     {/* SL / TP */}
                     <td className="py-3.5 px-3">
                       <span className="text-red-400 block">SL: ${pos.stop_loss.toLocaleString()}</span>
-                      <span className="text-[#55C98A] text-[10px] block">
+                      <span className="text-[#22D3EE] text-[10px] block">
                         TP: ${pos.take_profit ? pos.take_profit.toLocaleString() : "Auto Trailing"}
                       </span>
                     </td>
@@ -171,26 +171,26 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                     {/* Risk $ / % */}
                     <td className="py-3.5 px-3">
                       <span className="text-purple-300 font-bold block">${pos.risk_amount.toFixed(2)}</span>
-                      <span className="text-[10px] text-[#70877A] block">{pos.risk_pct || 1.0}% Equity</span>
+                      <span className="text-[10px] text-[#52627A] block">{pos.risk_pct || 1.0}% Equity</span>
                     </td>
 
                     {/* Unrealized P&L */}
                     <td className="py-3.5 px-3">
                       <span
                         className={`font-bold block ${
-                          isProfit ? "text-[#55C98A]" : "text-red-400"
+                          isProfit ? "text-[#22D3EE]" : "text-red-400"
                         }`}
                       >
                         {isProfit ? "+" : ""}${pos.unrealized_pnl.toFixed(2)}
                       </span>
-                      <span className="text-[10px] text-[#70877A] block">
+                      <span className="text-[10px] text-[#52627A] block">
                         {pos.distance_to_sl_pct ? `${pos.distance_to_sl_pct.toFixed(1)}% to SL` : "Protected"}
                       </span>
                     </td>
 
                     {/* Risk Status */}
                     <td className="py-3.5 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
                         {pos.risk_status || "SAFE"}
                       </span>
                     </td>

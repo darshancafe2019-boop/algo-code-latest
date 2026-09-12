@@ -20,7 +20,7 @@ export function AccountOverview({ apiKeys, executionGate, liveOverview }: Accoun
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {/* Account Trading Mode */}
-      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1E293B] flex flex-col justify-between shadow-lg relative overflow-hidden">
+      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1A2A3F] flex flex-col justify-between shadow-lg relative overflow-hidden">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-slate-400 font-medium">Trading Environment</span>
           <div className={`p-2 rounded-xl ${isLive ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"}`}>
@@ -45,7 +45,7 @@ export function AccountOverview({ apiKeys, executionGate, liveOverview }: Accoun
       </div>
 
       {/* Exchange Connection Status */}
-      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1E293B] flex flex-col justify-between shadow-lg">
+      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1A2A3F] flex flex-col justify-between shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-slate-400 font-medium">Connected Exchange</span>
           <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -64,7 +64,7 @@ export function AccountOverview({ apiKeys, executionGate, liveOverview }: Accoun
       </div>
 
       {/* Execution Gate Status */}
-      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1E293B] flex flex-col justify-between shadow-lg">
+      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1A2A3F] flex flex-col justify-between shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-slate-400 font-medium">Execution Gate</span>
           <div className={`p-2 rounded-xl ${isArmed ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-slate-800 text-slate-400 border border-slate-700"}`}>
@@ -89,7 +89,7 @@ export function AccountOverview({ apiKeys, executionGate, liveOverview }: Accoun
       </div>
 
       {/* Safety System Status */}
-      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1E293B] flex flex-col justify-between shadow-lg">
+      <div className="p-5 rounded-2xl bg-[#121824] border border-[#1A2A3F] flex flex-col justify-between shadow-lg">
         <div className="flex items-center justify-between mb-3">
           <span className="text-xs text-slate-400 font-medium">Safety Engine</span>
           <div className={`p-2 rounded-xl ${isKillSwitch ? "bg-red-500/10 text-red-400 border border-red-500/20" : "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"}`}>

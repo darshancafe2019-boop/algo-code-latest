@@ -50,10 +50,10 @@ export function RiskDecisionTable({
   });
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl overflow-hidden shadow-xl font-sans select-none">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl font-sans select-none">
       <div className="overflow-x-auto custom-scrollbar">
         <table className="w-full text-left text-xs font-mono">
-          <thead className="bg-[#070D14] text-slate-400 text-[10px] uppercase tracking-wider border-b border-[#1E293B]">
+          <thead className="bg-[#070D14] text-slate-400 text-[10px] uppercase tracking-wider border-b border-[#1A2A3F]">
             <tr>
               <th className="py-3 px-3.5 cursor-pointer hover:text-cyan-300" onClick={() => handleSort("evaluated_at")}>
                 <div className="flex items-center gap-1">
@@ -102,7 +102,7 @@ export function RiskDecisionTable({
               <th className="py-3 px-4 text-right">Inspect</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#1E293B] text-slate-200">
+          <tbody className="divide-y divide-[#1A2A3F] text-slate-200">
             {isLoading ? (
               <tr>
                 <td colSpan={10} className="py-12 text-center text-xs text-slate-400 font-mono">
@@ -158,7 +158,7 @@ export function RiskDecisionTable({
                             LIVE
                           </span>
                         ) : (
-                          <span className="px-1.5 py-0.2 rounded bg-[#070D14] text-slate-400 text-[9px] font-bold border border-[#1E293B]">
+                          <span className="px-1.5 py-0.2 rounded bg-[#070D14] text-slate-400 text-[9px] font-bold border border-[#1A2A3F]">
                             PAPER
                           </span>
                         )}
@@ -269,7 +269,7 @@ export function RiskDecisionTable({
                           e.stopPropagation();
                           onSelectDecision(d);
                         }}
-                        className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-cyan-950 text-cyan-300 border border-[#1E293B] hover:border-cyan-800 text-[10px] font-bold transition-colors inline-flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-[#070D14] hover:bg-cyan-950 text-cyan-300 border border-[#1A2A3F] hover:border-cyan-800 text-[10px] font-bold transition-colors inline-flex items-center gap-1"
                       >
                         <span>Evidence</span>
                         <ChevronRight className="h-3 w-3" />

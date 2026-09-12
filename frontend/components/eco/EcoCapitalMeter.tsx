@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Wallet, PieChart, ArrowUpRight } from "lucide-react";
+import { Wallet } from "lucide-react";
 
 interface EcoCapitalMeterProps {
   totalCapital?: number;
@@ -27,33 +27,33 @@ export function EcoCapitalMeter({
 
   return (
     <div
-      className={`p-4 bg-[#0D1914] border border-[#294238] rounded-2xl flex flex-wrap items-center justify-between gap-4 font-sans select-none ${className}`}
+      className={`p-4 bg-[#0A1422] border border-[#1A2A3F] rounded-xl flex flex-wrap items-center justify-between gap-4 font-sans select-none ${className}`}
     >
       {/* Left: Metric Numbers */}
       <div className="space-y-3 flex-1 min-w-[200px]">
-        <div className="flex items-center gap-2 text-[#70877A] text-[10px] font-mono uppercase tracking-wider">
-          <Wallet className="h-3.5 w-3.5 text-[#55C98A]" />
+        <div className="flex items-center gap-2 text-[#7C8CA3] text-[10px] font-mono uppercase tracking-wider">
+          <Wallet className="h-3.5 w-3.5 text-[#22D3EE]" />
           <span>Capital Allocation Matrix</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2 font-mono">
           <div>
-            <span className="text-[9px] text-[#70877A] uppercase block">Total Capital</span>
-            <span className="text-xs font-extrabold text-[#E8F3EC]">
+            <span className="text-[9px] text-[#52627A] uppercase block">Total Capital</span>
+            <span className="text-xs font-bold text-[#F7FAFC] tabular-nums">
               {currency}{totalCapital.toLocaleString()}
             </span>
           </div>
 
           <div>
-            <span className="text-[9px] text-[#70877A] uppercase block">Allocated / Used</span>
-            <span className="text-xs font-bold text-[#D9A441]">
+            <span className="text-[9px] text-[#52627A] uppercase block">Allocated / Used</span>
+            <span className="text-xs font-bold text-[#F59E0B] tabular-nums">
               {currency}{usedCapital.toLocaleString()}
             </span>
           </div>
 
           <div>
-            <span className="text-[9px] text-[#70877A] uppercase block">Available Cash</span>
-            <span className="text-xs font-bold text-[#55C98A]">
+            <span className="text-[9px] text-[#52627A] uppercase block">Available Cash</span>
+            <span className="text-xs font-bold text-[#00E890] tabular-nums">
               {currency}{availableCapital.toLocaleString()}
             </span>
           </div>
@@ -62,14 +62,14 @@ export function EcoCapitalMeter({
 
       {/* Right: Circular Ring Meter */}
       <div className="flex items-center gap-3 pr-2">
-        <div className="relative w-18 h-18 flex items-center justify-center">
-          <svg className="w-18 h-18 transform -rotate-90" viewBox="0 0 80 80">
+        <div className="relative w-16 h-16 flex items-center justify-center">
+          <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 80 80">
             {/* Background Track */}
             <circle
               cx="40"
               cy="40"
               r={radius}
-              stroke="#1B3328"
+              stroke="#122033"
               strokeWidth="6"
               fill="transparent"
             />
@@ -78,7 +78,7 @@ export function EcoCapitalMeter({
               cx="40"
               cy="40"
               r={radius}
-              stroke="#55C98A"
+              stroke="#22D3EE"
               strokeWidth="6"
               strokeDasharray={circumference}
               strokeDashoffset={strokeDashoffset}
@@ -90,8 +90,8 @@ export function EcoCapitalMeter({
 
           {/* Centered Percentage */}
           <div className="absolute flex flex-col items-center justify-center font-mono">
-            <span className="text-xs font-black text-[#E8F3EC]">{clampedPct.toFixed(0)}%</span>
-            <span className="text-[7px] text-[#70877A] uppercase tracking-tighter">USED</span>
+            <span className="text-xs font-bold text-[#F7FAFC] tabular-nums">{clampedPct.toFixed(0)}%</span>
+            <span className="text-[7px] text-[#52627A] uppercase tracking-tighter">USED</span>
           </div>
         </div>
       </div>

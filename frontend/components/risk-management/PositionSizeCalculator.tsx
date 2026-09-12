@@ -83,7 +83,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Form Panel */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
         <div className="flex items-center gap-2">
           <Calculator className="h-4 w-4 text-cyan-400" />
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">
@@ -102,7 +102,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 type="number"
                 value={balance}
                 onChange={(e) => setBalance(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
             <div>
@@ -110,7 +110,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
               <select
                 value={method}
                 onChange={(e) => setMethod(e.target.value)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               >
                 <option value="percent_equity">Percent Equity (Standard)</option>
                 <option value="fixed_fractional">Fixed Fractional Risk</option>
@@ -131,7 +131,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 type="number"
                 value={entryPrice}
                 onChange={(e) => setEntryPrice(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
             <div>
@@ -140,7 +140,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 type="number"
                 value={stopLossPrice}
                 onChange={(e) => setStopLossPrice(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
@@ -153,7 +153,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 step="0.1"
                 value={riskPct}
                 onChange={(e) => setRiskPct(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
             <div>
@@ -163,7 +163,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 step="1"
                 value={leverage}
                 onChange={(e) => setLeverage(parseFloat(e.target.value) || 1)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
             <div>
@@ -172,13 +172,13 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                 type="number"
                 value={atr}
                 onChange={(e) => setAtr(parseFloat(e.target.value) || 0)}
-                className="w-full bg-[#0E1524] border border-[#1E293B] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
+                className="w-full bg-[#0E1524] border border-[#1A2A3F] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-cyan-500"
               />
             </div>
           </div>
 
           {method === "kelly_criterion" && (
-            <div className="grid grid-cols-2 gap-3 p-2 bg-[#0E1524] rounded-xl border border-[#1E293B]">
+            <div className="grid grid-cols-2 gap-3 p-2 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
               <div>
                 <label className="text-slate-400 block mb-1">Win Rate (0.0-1.0)</label>
                 <input
@@ -186,7 +186,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                   step="0.01"
                   value={winRate}
                   onChange={(e) => setWinRate(parseFloat(e.target.value) || 0.5)}
-                  className="w-full bg-[#121824] border border-[#1E293B] rounded-lg px-2 py-1 text-white"
+                  className="w-full bg-[#121824] border border-[#1A2A3F] rounded-lg px-2 py-1 text-white"
                 />
               </div>
               <div>
@@ -196,7 +196,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
                   step="0.1"
                   value={profitFactor}
                   onChange={(e) => setProfitFactor(parseFloat(e.target.value) || 1.5)}
-                  className="w-full bg-[#121824] border border-[#1E293B] rounded-lg px-2 py-1 text-white"
+                  className="w-full bg-[#121824] border border-[#1A2A3F] rounded-lg px-2 py-1 text-white"
                 />
               </div>
             </div>
@@ -223,7 +223,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
         )}
 
         {result ? (
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 space-y-4">
+          <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 text-emerald-400" />
@@ -237,28 +237,28 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B]">
+              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Recommended Quantity</span>
                 <span className="text-xl font-bold text-emerald-400">
                   {result.position_quantity} Units
                 </span>
               </div>
 
-              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B]">
+              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Total Risk ($)</span>
                 <span className="text-xl font-bold text-red-400">
                   ${result.risk_amount?.toFixed(2)}
                 </span>
               </div>
 
-              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B]">
+              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Notional Value ($)</span>
                 <span className="text-base font-bold text-white">
                   ${result.notional_value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                 </span>
               </div>
 
-              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1E293B]">
+              <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Margin Required ($)</span>
                 <span className="text-base font-bold text-cyan-400">
                   ${result.margin_required?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -275,12 +275,12 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
 
             {/* What-If Side-by-Side Projection */}
             {whatIfResult && (
-              <div className="border-t border-[#1E293B] pt-4 space-y-2">
+              <div className="border-t border-[#1A2A3F] pt-4 space-y-2">
                 <span className="text-xs font-bold text-slate-300 uppercase tracking-wide block">
                   What-If Portfolio Impact Projection
                 </span>
                 <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                  <div className="p-2.5 rounded-lg bg-[#0E1524] border border-[#1E293B] space-y-1">
+                  <div className="p-2.5 rounded-lg bg-[#0E1524] border border-[#1A2A3F] space-y-1">
                     <span className="text-slate-500 block">Current Portfolio Risk:</span>
                     <span className="text-slate-200">${whatIfResult.current.portfolio_risk.toFixed(2)} ({whatIfResult.current.portfolio_risk_pct}%)</span>
                   </div>
@@ -293,7 +293,7 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
             )}
           </div>
         ) : (
-          <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-8 text-center text-xs text-slate-500 font-mono">
+          <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-8 text-center text-xs text-slate-500 font-mono">
             Enter trade parameters and click calculate to execute institutional quant risk modeling.
           </div>
         )}

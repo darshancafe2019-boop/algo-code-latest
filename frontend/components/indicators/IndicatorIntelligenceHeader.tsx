@@ -38,7 +38,7 @@ export function IndicatorIntelligenceHeader({
   const totalCount = statusData?.total_indicators_count || 18;
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-6 shadow-2xl space-y-4">
       {/* Top Row: Title, Bot Selector, Global Actions */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -91,7 +91,7 @@ export function IndicatorIntelligenceHeader({
           <button
             onClick={onRefresh}
             disabled={isSyncing}
-            className="p-2 text-xs rounded-lg bg-[#1E293B] hover:bg-slate-700 text-slate-300 transition-all disabled:opacity-50"
+            className="p-2 text-xs rounded-lg bg-[#1A2A3F] hover:bg-slate-700 text-slate-300 transition-all disabled:opacity-50"
             title="Refresh calculations"
           >
             <RefreshCw className={`w-4 h-4 ${isSyncing ? "animate-spin text-cyan-400" : ""}`} />
@@ -100,9 +100,9 @@ export function IndicatorIntelligenceHeader({
       </div>
 
       {/* Bot Context & Telemetry Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-[#1E293B]">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 pt-3 border-t border-[#1A2A3F]">
         {/* 1. Bot Selector */}
-        <div className="col-span-2 sm:col-span-1 bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5 flex flex-col justify-center">
+        <div className="col-span-2 sm:col-span-1 bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5 flex flex-col justify-center">
           <label className="text-[10px] font-mono uppercase text-slate-400 mb-1 flex items-center gap-1">
             <Layers className="w-3 h-3 text-cyan-400" />
             Target Bot Instance
@@ -125,7 +125,7 @@ export function IndicatorIntelligenceHeader({
         </div>
 
         {/* 2. Symbol & Exchange */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5">
           <div className="text-[10px] font-mono uppercase text-slate-400">Underlying Asset</div>
           <div className="text-sm font-bold text-white mt-0.5 flex items-center gap-1.5">
             {activeBotData?.symbol || "BTC/USDT"}
@@ -139,7 +139,7 @@ export function IndicatorIntelligenceHeader({
         </div>
 
         {/* 3. Timeframes */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5">
           <div className="text-[10px] font-mono uppercase text-slate-400">Primary Timeframe</div>
           <div className="text-sm font-bold text-cyan-400 mt-0.5 font-mono">
             {activeBotData?.timeframe || "15m"}
@@ -150,7 +150,7 @@ export function IndicatorIntelligenceHeader({
         </div>
 
         {/* 4. Active Count */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5">
           <div className="text-[10px] font-mono uppercase text-slate-400">Active Indicators</div>
           <div className="text-sm font-bold text-emerald-400 mt-0.5 font-mono">
             {activeCount} <span className="text-xs text-slate-500 font-normal">/ {totalCount} total</span>
@@ -161,7 +161,7 @@ export function IndicatorIntelligenceHeader({
         </div>
 
         {/* 5. Calculation Latency */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5">
           <div className="text-[10px] font-mono uppercase text-slate-400">Engine Latency</div>
           <div className="text-sm font-bold text-cyan-400 mt-0.5 font-mono flex items-center gap-1">
             <Zap className="w-3.5 h-3.5 text-amber-400" />
@@ -174,7 +174,7 @@ export function IndicatorIntelligenceHeader({
         </div>
 
         {/* 6. Health Status */}
-        <div className="bg-[#141E33] border border-[#1E293B] rounded-xl p-2.5">
+        <div className="bg-[#141E33] border border-[#1A2A3F] rounded-xl p-2.5">
           <div className="text-[10px] font-mono uppercase text-slate-400">Engine Status</div>
           <div className="text-sm font-bold text-white mt-0.5 flex items-center gap-1.5">
             {isHealthy ? (

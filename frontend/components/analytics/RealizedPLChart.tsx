@@ -13,7 +13,7 @@ export function RealizedPLChart({ data = [] }: Props) {
 
   if (safeData.length === 0) {
     return (
-      <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] flex flex-col items-center justify-center min-h-[250px] text-xs text-slate-400">
+      <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] flex flex-col items-center justify-center min-h-[250px] text-xs text-slate-400">
         No symbol P&L records found in current history.
       </div>
     );
@@ -22,8 +22,8 @@ export function RealizedPLChart({ data = [] }: Props) {
   const totalPnL = safeData.reduce((acc, curr) => acc + (Number(curr?.pnl) || 0), 0);
 
   return (
-    <div className="p-5 rounded-xl bg-[#121824] border border-[#1E293B] shadow-xl flex flex-col justify-between">
-      <div className="flex items-center justify-between mb-4 border-b border-[#1E293B] pb-3">
+    <div className="p-5 rounded-xl bg-[#121824] border border-[#1A2A3F] shadow-xl flex flex-col justify-between">
+      <div className="flex items-center justify-between mb-4 border-b border-[#1A2A3F] pb-3">
         <div className="flex items-center gap-2">
           <DollarSign className="h-4 w-4 text-emerald-400" />
           <h3 className="text-sm font-bold text-white">Realized P&L by Symbol</h3>
@@ -38,7 +38,7 @@ export function RealizedPLChart({ data = [] }: Props) {
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs font-sans">
-          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1E293B]">
+          <thead className="bg-[#0B0F17] text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-[#1A2A3F]">
             <tr>
               <th className="py-2 px-3">Symbol</th>
               <th className="py-2 px-3 text-right">Trades</th>

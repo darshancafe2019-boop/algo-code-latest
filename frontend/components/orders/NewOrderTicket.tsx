@@ -7,12 +7,11 @@ import {
   ShieldCheck,
   ShieldAlert,
   ChevronDown,
-  ChevronUp,
   Search,
   Sliders,
   Layers,
-  ArrowRight,
-  RotateCcw,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
@@ -62,7 +61,6 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
   // 4. Leverage State
   const [leverage, setLeverage] = useState<number>(1);
-  const [customLeverage, setCustomLeverage] = useState<boolean>(false);
 
   // 5. SL / TP State
   const [slMode, setSlMode] = useState<"PERCENTAGE" | "PRICE">("PERCENTAGE");
@@ -70,12 +68,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   const [tpMode, setTpMode] = useState<"PERCENTAGE" | "PRICE">("PERCENTAGE");
   const [tpValue, setTpValue] = useState<number>(2.0); // 2.0%
 
-  // 6. Advanced Controls Collapsible
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const [trailingStop, setTrailingStop] = useState(false);
-  const [reduceOnly, setReduceOnly] = useState(false);
-
-  // 7. Modal & Execution State
+  // 6. Modal & Execution State
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [executionState, setExecutionState] = useState<"READY" | "EXECUTING" | "SUCCESS" | "FAILED" | "UNKNOWN">("READY");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -113,7 +106,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           }
         }
       } catch {
-        // Fallback gracefully to existing price
+        // Fallback gracefully
       } finally {
         if (isMounted) setIsPriceLoading(false);
       }
@@ -155,7 +148,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
     return 0.05;
   }, [sizeMode, quantity, notionalInput, riskPercentInput, activePrice, slValue, portfolioSnapshot]);
 
-  // Derived Financials via Pure Calculations
+  // Derived Financials
   const calculatedNotional = useMemo(() => calculateNotional(effectiveQty, activePrice), [effectiveQty, activePrice]);
   const requiredMargin = useMemo(() => calculateRequiredMargin(calculatedNotional, leverage), [calculatedNotional, leverage]);
 
@@ -234,7 +227,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
       }, {
         idempotencyKey,
         timeoutMs: 12000,
-        retries: 0, // State-changing trade submissions must never auto-retry blindly
+        retries: 0,
       });
 
       if (!res.ok || !res.data || !res.data.success) {
@@ -299,30 +292,30 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   );
 
   return (
-    <div className="bg-[#0B132B]/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-2xl backdrop-blur-md font-mono text-xs space-y-4">
+    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-5 font-sans text-xs space-y-4">
       {/* 1. Top Instrument Selector & Price Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-900/90 border border-slate-800 rounded-xl">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-[#07101A] border border-[#1A2A3F] rounded-lg">
         {/* Searchable Instrument Dropdown */}
         <div className="relative">
           <button
             type="button"
             onClick={() => setIsSearchOpen(!isSearchOpen)}
-            className="flex items-center gap-2 px-3 py-1.5 bg-slate-950 border border-slate-700 hover:border-cyan-400 rounded-xl text-white font-extrabold text-sm transition"
+            className="flex items-center gap-2 px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] rounded-lg text-[#F7FAFC] font-semibold text-sm transition"
           >
             <span>{selectedSymbol}</span>
-            <ChevronDown className="w-3.5 h-3.5 text-cyan-400" />
+            <ChevronDown className="w-3.5 h-3.5 text-[#22D3EE]" />
           </button>
 
           {isSearchOpen && (
-            <div className="absolute left-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in duration-150">
-              <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-950 rounded-lg border border-slate-800 mb-2">
-                <Search className="w-3.5 h-3.5 text-slate-400" />
+            <div className="absolute left-0 mt-2 w-72 bg-[#0D1727] border border-[#1A2A3F] rounded-lg shadow-2xl p-2 z-50 animate-in fade-in duration-150">
+              <div className="flex items-center gap-2 px-2.5 py-1.5 bg-[#07101A] rounded-md border border-[#1A2A3F] mb-2">
+                <Search className="w-3.5 h-3.5 text-[#52627A]" />
                 <input
                   type="text"
                   placeholder="Search BTC, ETH, NIFTY..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-transparent text-white text-xs focus:outline-none"
+                  className="w-full bg-transparent text-[#F7FAFC] text-xs focus:outline-none placeholder-[#52627A]"
                   autoFocus
                 />
               </div>
@@ -332,15 +325,15 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                   <button
                     key={inst.symbol}
                     onClick={() => handleSelectInstrument(inst)}
-                    className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-lg text-left hover:bg-slate-800 transition"
+                    className="flex items-center justify-between w-full px-2.5 py-1.5 rounded-md text-left hover:bg-[#101B2D] transition"
                   >
                     <div>
-                      <div className="font-bold text-white">{inst.symbol}</div>
-                      <div className="text-[10px] text-slate-400 font-sans">{inst.name}</div>
+                      <div className="font-semibold text-[#F7FAFC]">{inst.symbol}</div>
+                      <div className="text-[10px] text-[#7C8CA3]">{inst.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-bold text-cyan-400">${inst.price.toLocaleString()}</div>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                      <div className="font-semibold text-[#22D3EE] font-mono tabular-nums">${inst.price.toLocaleString()}</div>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#101B2D] text-[#7C8CA3]">
                         {inst.assetClass}
                       </span>
                     </div>
@@ -354,59 +347,61 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         {/* Live Market Price Badges */}
         <div className="flex items-center gap-4 text-right">
           <div>
-            <div className="text-[10px] text-slate-400 uppercase font-sans">Last Market Price</div>
-            <div className="text-base font-extrabold text-white">
+            <div className="text-[10px] text-[#7C8CA3] uppercase">Last Traded Price</div>
+            <div className="text-base font-bold text-[#F7FAFC] font-mono tabular-nums">
               {currencySymbol}{marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
           </div>
 
           <div className="hidden sm:block">
-            <div className="text-[10px] text-slate-400 uppercase font-sans">Mark Price</div>
-            <div className="text-sm font-bold text-slate-300">
+            <div className="text-[10px] text-[#7C8CA3] uppercase">Mark Price</div>
+            <div className="text-sm font-medium text-[#7C8CA3] font-mono tabular-nums">
               {currencySymbol}{(marketPrice * 0.9998).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </div>
           </div>
         </div>
       </div>
 
-      {/* 2. Clear Direction Controls: [ BUY / LONG ] and [ SELL / SHORT ] */}
-      <div className="grid grid-cols-2 gap-2 p-1 bg-slate-900 rounded-xl border border-slate-800">
+      {/* 2. Direction Controls: [ BUY / LONG ] and [ SELL / SHORT ] */}
+      <div className="grid grid-cols-2 gap-2 p-1 bg-[#07101A] rounded-lg border border-[#1A2A3F]">
         <button
           type="button"
           onClick={() => setSide("BUY")}
-          className={`py-2.5 text-xs font-black rounded-lg transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 ${
             isBuy
-              ? "bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20"
-              : "text-slate-400 hover:text-white"
+              ? "bg-[#00E890]/15 border border-[#00E890]/40 text-[#00E890]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC]"
           }`}
         >
+          <TrendingUp className="w-3.5 h-3.5" />
           <span>BUY / LONG</span>
         </button>
         <button
           type="button"
           onClick={() => setSide("SELL")}
-          className={`py-2.5 text-xs font-black rounded-lg transition flex items-center justify-center gap-1.5 ${
+          className={`py-2 text-xs font-semibold rounded-md transition flex items-center justify-center gap-1.5 ${
             !isBuy
-              ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-              : "text-slate-400 hover:text-white"
+              ? "bg-[#FF3B5C]/15 border border-[#FF3B5C]/40 text-[#FF3B5C]"
+              : "text-[#7C8CA3] hover:text-[#F7FAFC]"
           }`}
         >
+          <TrendingDown className="w-3.5 h-3.5" />
           <span>SELL / SHORT</span>
         </button>
       </div>
 
       {/* 3. Order Type Selector */}
       <div className="flex items-center gap-2">
-        <span className="text-[11px] text-slate-400 font-sans mr-1">Order Type:</span>
+        <span className="text-[11px] text-[#7C8CA3] mr-1">Order Type:</span>
         {(["MARKET", "LIMIT", "STOP"] as const).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setOrderType(t)}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition border ${
+            className={`px-3 py-1 rounded-md text-xs font-medium transition border ${
               orderType === t
-                ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300"
-                : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                ? "bg-[#2563EB] border-[#2563EB] text-white"
+                : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
             }`}
           >
             {t.charAt(0) + t.slice(1).toLowerCase()}
@@ -415,14 +410,14 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
       </div>
 
       {orderType === "LIMIT" && (
-        <div className="p-3 bg-slate-900/80 border border-slate-800 rounded-xl">
-          <label className="block text-[10px] text-slate-400 mb-1 font-sans">Limit Execution Price</label>
+        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-lg">
+          <label className="block text-[10px] text-[#7C8CA3] mb-1">Limit Execution Price</label>
           <input
             type="number"
             step="0.1"
             value={limitPrice}
             onChange={(e) => setLimitPrice(parseFloat(e.target.value) || 0)}
-            className="w-full px-3 py-1.5 bg-slate-950 border border-slate-700 rounded-lg text-white font-bold text-xs focus:border-cyan-400 focus:outline-none"
+            className="w-full px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] rounded-md text-[#F7FAFC] font-semibold text-xs font-mono tabular-nums focus:border-[#22D3EE] focus:outline-none"
           />
         </div>
       )}
@@ -430,15 +425,15 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
       {/* 4. Sizing: Size & Quick Percentage Buttons */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] text-slate-400 font-sans">Order Size</label>
-          <div className="flex items-center gap-1">
+          <label className="text-[11px] text-[#7C8CA3]">Position Sizing & Quantity</label>
+          <div className="flex items-center gap-1 bg-[#07101A] p-0.5 rounded-md border border-[#1A2A3F]">
             {(["UNITS", "NOTIONAL", "RISK"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
                 onClick={() => setSizeMode(m)}
-                className={`px-2 py-0.5 text-[10px] rounded transition ${
-                  sizeMode === m ? "bg-cyan-500/20 text-cyan-400 font-bold" : "text-slate-500 hover:text-slate-300"
+                className={`px-2 py-0.5 text-[10px] rounded font-medium transition ${
+                  sizeMode === m ? "bg-[#2563EB] text-white" : "text-[#7C8CA3] hover:text-[#F7FAFC]"
                 }`}
               >
                 {m}
@@ -460,17 +455,17 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                 else if (sizeMode === "NOTIONAL") setNotionalInput(val);
                 else setRiskPercentInput(val);
               }}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-white font-bold text-sm focus:border-cyan-400 focus:outline-none pr-14"
+              className="w-full px-3 py-2 bg-[#0D1727] border border-[#1A2A3F] rounded-lg text-[#F7FAFC] font-semibold text-sm font-mono tabular-nums focus:border-[#22D3EE] focus:outline-none pr-14"
             />
-            <span className="absolute right-3 top-2.5 text-xs text-slate-400 font-bold">
+            <span className="absolute right-3 top-2.5 text-xs text-[#7C8CA3] font-medium">
               {sizeMode === "UNITS" ? selectedSymbol.split("/")[0] : sizeMode === "NOTIONAL" ? "USD" : "% RISK"}
             </span>
           </div>
 
           {/* Expected Notional Preview */}
-          <div className="px-3 py-2 bg-slate-900/60 border border-slate-800 rounded-xl flex items-center justify-between text-xs">
-            <span className="text-slate-400">Notional:</span>
-            <span className="text-cyan-400 font-extrabold">
+          <div className="px-3 py-2 bg-[#07101A] border border-[#1A2A3F] rounded-lg flex items-center justify-between text-xs">
+            <span className="text-[#7C8CA3]">Notional Value:</span>
+            <span className="text-[#22D3EE] font-bold font-mono tabular-nums">
               ≈ ${calculatedNotional.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
@@ -489,9 +484,9 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                 setQuantity(Number(computedQty.toFixed(4)));
                 setSizeMode("UNITS");
               }}
-              className="flex-1 py-1 rounded bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-[10px] font-bold transition"
+              className="flex-1 py-1 rounded-md bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#7C8CA3] hover:text-[#F7FAFC] text-[10px] font-semibold transition"
             >
-              {pct === 100 ? "MAX" : `${pct}%`}
+              {pct === 100 ? "MAX (100%)" : `${pct}%`}
             </button>
           ))}
         </div>
@@ -500,9 +495,9 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
       {/* 5. Leverage Multiplier & Required Margin */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-[11px] text-slate-400 font-sans">Leverage Multiplier</label>
-          <span className="text-[10px] text-slate-400">
-            Req. Margin: <strong className="text-white">${requiredMargin.toLocaleString()}</strong>
+          <label className="text-[11px] text-[#7C8CA3]">Leverage & Margin</label>
+          <span className="text-[10px] text-[#7C8CA3]">
+            Required Margin: <strong className="text-[#F7FAFC] font-mono tabular-nums">${requiredMargin.toLocaleString()}</strong>
           </span>
         </div>
 
@@ -512,10 +507,10 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
               key={lev}
               type="button"
               onClick={() => setLeverage(lev)}
-              className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition border ${
+              className={`flex-1 py-1.5 rounded-md text-xs font-semibold transition border ${
                 leverage === lev
-                  ? "bg-cyan-500 text-slate-950 font-black border-cyan-400 shadow-sm"
-                  : "bg-slate-900 border-slate-800 text-slate-400 hover:text-white"
+                  ? "bg-[#2563EB] text-white border-[#2563EB]"
+                  : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:border-[#29415F]"
               }`}
             >
               {lev}x
@@ -525,13 +520,13 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
       </div>
 
       {/* 6. Stop Loss & Take Profit Protection */}
-      <div className="space-y-2 pt-1 border-t border-slate-800/80">
+      <div className="space-y-2 pt-1 border-t border-[#1A2A3F]">
         <div className="grid grid-cols-2 gap-3">
           {/* Stop Loss Input */}
-          <div>
+          <div className="bg-[#07101A] p-3 rounded-lg border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] text-slate-400 font-sans">Stop Loss</label>
-              <span className="text-[10px] text-rose-400 font-bold">${stopLossPrice.toLocaleString()}</span>
+              <label className="text-[11px] text-[#7C8CA3]">Stop Loss</label>
+              <span className="text-[10px] text-[#FF3B5C] font-semibold font-mono tabular-nums">${stopLossPrice.toLocaleString()}</span>
             </div>
             <div className="relative">
               <input
@@ -539,17 +534,17 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                 step="0.1"
                 value={slValue}
                 onChange={(e) => setSlValue(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold text-xs focus:border-rose-400 focus:outline-none pr-7"
+                className="w-full px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] rounded-md text-[#F7FAFC] font-semibold text-xs font-mono tabular-nums focus:border-[#FF3B5C] focus:outline-none pr-7"
               />
-              <span className="absolute right-2.5 top-1.5 text-xs text-slate-400">%</span>
+              <span className="absolute right-2.5 top-1.5 text-xs text-[#52627A]">%</span>
             </div>
-            <div className="flex items-center gap-1 mt-1">
+            <div className="flex items-center gap-1 mt-1.5">
               {[0.5, 1.0, 2.0, 3.0].map((v) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setSlValue(v)}
-                  className="flex-1 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-[9px]"
+                  className="flex-1 py-0.5 rounded bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#7C8CA3] hover:text-[#F7FAFC] text-[9px] font-mono"
                 >
                   {v}%
                 </button>
@@ -558,10 +553,10 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           </div>
 
           {/* Take Profit Input */}
-          <div>
+          <div className="bg-[#07101A] p-3 rounded-lg border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] text-slate-400 font-sans">Take Profit</label>
-              <span className="text-[10px] text-emerald-400 font-bold">${takeProfitPrice.toLocaleString()}</span>
+              <label className="text-[11px] text-[#7C8CA3]">Take Profit</label>
+              <span className="text-[10px] text-[#00E890] font-semibold font-mono tabular-nums">${takeProfitPrice.toLocaleString()}</span>
             </div>
             <div className="relative">
               <input
@@ -569,17 +564,17 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                 step="0.1"
                 value={tpValue}
                 onChange={(e) => setTpValue(parseFloat(e.target.value) || 0)}
-                className="w-full px-3 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-white font-bold text-xs focus:border-emerald-400 focus:outline-none pr-7"
+                className="w-full px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] rounded-md text-[#F7FAFC] font-semibold text-xs font-mono tabular-nums focus:border-[#00E890] focus:outline-none pr-7"
               />
-              <span className="absolute right-2.5 top-1.5 text-xs text-slate-400">%</span>
+              <span className="absolute right-2.5 top-1.5 text-xs text-[#52627A]">%</span>
             </div>
-            <div className="flex items-center gap-1 mt-1">
+            <div className="flex items-center gap-1 mt-1.5">
               {[1.0, 2.0, 3.0, 5.0].map((v) => (
                 <button
                   key={v}
                   type="button"
                   onClick={() => setTpValue(v)}
-                  className="flex-1 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-[9px]"
+                  className="flex-1 py-0.5 rounded bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#7C8CA3] hover:text-[#F7FAFC] text-[9px] font-mono"
                 >
                   {v}%
                 </button>
@@ -589,50 +584,50 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         </div>
 
         {/* Risk / Reward & Capital Summary Card */}
-        <div className="p-2.5 bg-slate-950/60 border border-slate-800 rounded-xl text-xs space-y-1">
-          <div className="flex items-center justify-between text-slate-400 text-[11px]">
+        <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-lg text-xs space-y-1.5">
+          <div className="flex items-center justify-between text-[#7C8CA3] text-[11px]">
             <span>Maximum Defined Risk:</span>
-            <span className="text-rose-400 font-bold">-${riskUsd.toFixed(2)}</span>
+            <span className="text-[#FF3B5C] font-semibold font-mono tabular-nums">-${riskUsd.toFixed(2)}</span>
           </div>
-          <div className="flex items-center justify-between text-slate-400 text-[11px]">
+          <div className="flex items-center justify-between text-[#7C8CA3] text-[11px]">
             <span>Potential Profit Target:</span>
-            <span className="text-emerald-400 font-bold">+${rewardUsd.toFixed(2)}</span>
+            <span className="text-[#00E890] font-semibold font-mono tabular-nums">+${rewardUsd.toFixed(2)}</span>
           </div>
-          <div className="flex items-center justify-between text-slate-400 text-[11px] pt-1 border-t border-slate-800/80">
+          <div className="flex items-center justify-between text-[#7C8CA3] text-[11px] pt-1.5 border-t border-[#1A2A3F]">
             <span>Risk : Reward Ratio:</span>
-            <span className="text-cyan-400 font-extrabold">1 : {rrRatio}</span>
+            <span className="text-[#22D3EE] font-bold font-mono tabular-nums">1 : {rrRatio}</span>
           </div>
         </div>
       </div>
 
       {/* 7. Current Position & Projected After-Fill Preview */}
-      <div className="p-3 bg-slate-900/70 border border-slate-800 rounded-xl space-y-1.5">
-        <div className="flex items-center justify-between text-slate-400 text-[11px]">
+      <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-lg space-y-1.5">
+        <div className="flex items-center justify-between text-[#7C8CA3] text-[11px]">
           <span>Current Position:</span>
-          <span className="font-bold text-white">
+          <span className="font-semibold text-[#F7FAFC] font-mono tabular-nums">
             {currentPosition ? `${currentPosition.direction} ${currentPosition.quantity}` : "FLAT (0.00)"}
           </span>
         </div>
 
-        <div className="flex items-center justify-between text-slate-400 text-[11px]">
+        <div className="flex items-center justify-between text-[#7C8CA3] text-[11px]">
           <span>Projected After Fill:</span>
-          <span className="font-extrabold text-cyan-300">{projectedPosition.summary}</span>
+          <span className="font-semibold text-[#22D3EE] font-mono tabular-nums">{projectedPosition.summary}</span>
         </div>
       </div>
 
       {/* 8. Pre-Trade Risk Status Badge */}
       <div
-        className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs border ${
+        className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs border ${
           riskCheck.passed
-            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-            : "bg-rose-500/10 border-rose-500/30 text-rose-400"
+            ? "bg-[#00E890]/10 border-[#00E890]/30 text-[#00E890]"
+            : "bg-[#FF3B5C]/10 border-[#FF3B5C]/30 text-[#FF3B5C]"
         }`}
       >
         <div className="flex items-center gap-2">
           {riskCheck.passed ? (
-            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <CheckCircle2 className="w-4 h-4 text-[#00E890] shrink-0" />
           ) : (
-            <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+            <ShieldAlert className="w-4 h-4 text-[#FF3B5C] shrink-0" />
           )}
           <span className="truncate">{riskCheck.reason}</span>
         </div>
@@ -640,32 +635,32 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         <button
           type="button"
           onClick={onOpenDetailsDrawer}
-          className="text-[10px] text-cyan-400 hover:text-cyan-300 underline font-sans shrink-0 ml-2"
+          className="text-[11px] text-[#22D3EE] hover:text-[#19C5FF] underline shrink-0 ml-2 font-medium"
         >
-          View Checks
+          View Health
         </button>
       </div>
 
       {/* Execution Feedback Notification */}
       {orderFeedback && (
         <div
-          className={`p-3 rounded-xl border text-xs flex items-center justify-between gap-2 animate-in fade-in duration-150 ${
+          className={`p-3 rounded-lg border text-xs flex items-center justify-between gap-2 animate-in fade-in duration-150 ${
             orderFeedback.status === "success"
-              ? "bg-emerald-950/80 border-emerald-500/40 text-emerald-300"
+              ? "bg-[#00E890]/10 border-[#00E890]/30 text-[#00E890]"
               : orderFeedback.status === "unknown"
-              ? "bg-amber-950/80 border-amber-500/40 text-amber-300"
-              : "bg-rose-950/80 border-rose-500/40 text-rose-300"
+              ? "bg-[#F59E0B]/10 border-[#F59E0B]/30 text-[#F59E0B]"
+              : "bg-[#FF3B5C]/10 border-[#FF3B5C]/30 text-[#FF3B5C]"
           }`}
         >
           <div className="flex items-center gap-2">
             {orderFeedback.status === "success" ? (
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-[#00E890]" />
             ) : (
-              <ShieldAlert className="w-4 h-4 shrink-0 text-rose-400" />
+              <ShieldAlert className="w-4 h-4 shrink-0 text-[#FF3B5C]" />
             )}
             <span>{orderFeedback.message}</span>
           </div>
-          <button onClick={() => setOrderFeedback(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setOrderFeedback(null)} className="text-[#7C8CA3] hover:text-[#F7FAFC]">
             ✕
           </button>
         </div>
@@ -673,31 +668,31 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
       {/* Post-Execution Transaction Summary */}
       {lastExecutedOrder && (
-        <div className="p-3 bg-slate-950/90 border border-cyan-500/30 rounded-xl space-y-2 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-            <span className="text-[11px] font-extrabold text-cyan-400">LAST EXECUTED TRANSACTION</span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-bold border border-cyan-500/20">
+        <div className="p-3 bg-[#07101A] border border-[#22D3EE]/30 rounded-lg space-y-2 animate-in fade-in duration-200">
+          <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-1.5">
+            <span className="text-[11px] font-bold text-[#22D3EE]">LAST EXECUTED TRANSACTION</span>
+            <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#19C5FF]/10 text-[#19C5FF] font-semibold border border-[#19C5FF]/20">
               {lastExecutedOrder.mode} • {lastExecutedOrder.status}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
             <div>
-              <span className="text-slate-500 block">Order ID</span>
-              <span className="text-slate-200 font-bold font-mono truncate block">#{lastExecutedOrder.orderId}</span>
+              <span className="text-[#52627A] block">Order ID</span>
+              <span className="text-[#F7FAFC] font-semibold font-mono tabular-nums truncate block">#{lastExecutedOrder.orderId}</span>
             </div>
             <div>
-              <span className="text-slate-500 block">Execution</span>
-              <span className={`font-bold ${lastExecutedOrder.side === "BUY" ? "text-emerald-400" : "text-rose-400"}`}>
+              <span className="text-[#52627A] block">Execution</span>
+              <span className={`font-semibold ${lastExecutedOrder.side === "BUY" ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
                 {lastExecutedOrder.side} {lastExecutedOrder.quantity} {lastExecutedOrder.symbol.split("/")[0]}
               </span>
             </div>
             <div>
-              <span className="text-slate-500 block">Fill Price</span>
-              <span className="text-white font-bold">${lastExecutedOrder.executionPrice.toLocaleString()}</span>
+              <span className="text-[#52627A] block">Fill Price</span>
+              <span className="text-[#F7FAFC] font-semibold font-mono tabular-nums">${lastExecutedOrder.executionPrice.toLocaleString()}</span>
             </div>
             <div>
-              <span className="text-slate-500 block">Timestamp</span>
-              <span className="text-slate-300">{lastExecutedOrder.timestamp}</span>
+              <span className="text-[#52627A] block">Timestamp</span>
+              <span className="text-[#7C8CA3] font-mono tabular-nums">{lastExecutedOrder.timestamp}</span>
             </div>
           </div>
         </div>
@@ -705,19 +700,19 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
       {/* 9. Action Buttons with Execution State Machine */}
       <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between px-1 text-[11px] text-slate-400">
+        <div className="flex items-center justify-between px-1 text-[11px] text-[#7C8CA3]">
           <span>Execution Engine State:</span>
           <span
-            className={`font-black px-2 py-0.5 rounded text-[10px] tracking-wider ${
+            className={`font-semibold px-2 py-0.5 rounded-md text-[10px] ${
               executionState === "EXECUTING"
-                ? "bg-amber-500/20 text-amber-300 animate-pulse border border-amber-500/30"
+                ? "bg-[#F59E0B]/15 text-[#F59E0B] animate-pulse border border-[#F59E0B]/30"
                 : executionState === "SUCCESS"
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                ? "bg-[#00E890]/15 text-[#00E890] border border-[#00E890]/30"
                 : executionState === "FAILED"
-                ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                ? "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
                 : executionState === "UNKNOWN"
-                ? "bg-yellow-500/20 text-yellow-300 border border-yellow-500/30"
-                : "bg-slate-800 text-slate-300"
+                ? "bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30"
+                : "bg-[#101B2D] text-[#7C8CA3]"
             }`}
           >
             ● {executionState}
@@ -730,7 +725,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
             type="button"
             disabled={!riskCheck.passed || isSubmitting}
             onClick={() => handleExecuteOrder("BUY")}
-            className="py-3 px-3 rounded-xl font-black font-mono text-xs tracking-wide transition flex items-center justify-center gap-1.5 shadow-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="py-2.5 px-3 rounded-lg font-semibold text-xs tracking-wide transition flex items-center justify-center gap-1.5 bg-[#00E890] hover:bg-[#16a34a] text-slate-950 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <Zap className="w-3.5 h-3.5" />
             <span>
@@ -743,7 +738,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
             type="button"
             disabled={!riskCheck.passed || isSubmitting}
             onClick={() => handleExecuteOrder("SELL")}
-            className="py-3 px-3 rounded-xl font-black font-mono text-xs tracking-wide transition flex items-center justify-center gap-1.5 shadow-lg bg-rose-500 hover:bg-rose-400 text-white shadow-rose-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="py-2.5 px-3 rounded-lg font-semibold text-xs tracking-wide transition flex items-center justify-center gap-1.5 bg-[#FF3B5C] hover:bg-[#dc2626] text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             <Zap className="w-3.5 h-3.5" />
             <span>
@@ -757,7 +752,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           type="button"
           disabled={!riskCheck.passed || isSubmitting}
           onClick={() => setIsReviewModalOpen(true)}
-          className="w-full py-2 px-3 rounded-xl font-bold font-mono text-xs text-slate-300 bg-slate-900 border border-slate-700 hover:bg-slate-800 hover:text-white transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-2 px-3 rounded-lg font-medium text-xs text-[#7C8CA3] bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] hover:text-[#F7FAFC] transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <span>REVIEW & CUSTOMIZE ORDER DETAILS</span>
         </button>
@@ -788,3 +783,4 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
     </div>
   );
 }
+

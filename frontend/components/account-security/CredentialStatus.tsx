@@ -36,9 +36,9 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
   };
 
   return (
-    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1E293B] shadow-xl flex flex-col justify-between">
+    <div className="p-6 rounded-2xl bg-[#121824] border border-[#1A2A3F] shadow-xl flex flex-col justify-between">
       <div>
-        <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1E293B]">
+        <div className="flex items-center justify-between gap-4 mb-6 pb-4 border-b border-[#1A2A3F]">
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
               <Key className="w-5 h-5" />
@@ -52,7 +52,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
           <button
             id="btn-open-update-credentials"
             onClick={() => setShowModal(true)}
-            className="px-3 py-1.5 bg-[#0B0F17] hover:bg-cyan-950/40 border border-[#1E293B] hover:border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition-all flex items-center gap-1.5 cursor-pointer"
+            className="px-3 py-1.5 bg-[#0B0F17] hover:bg-cyan-950/40 border border-[#1A2A3F] hover:border-cyan-500/40 rounded-xl text-xs font-semibold text-cyan-300 transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Edit3 className="w-3.5 h-3.5 text-cyan-400" />
             <span>Update Key</span>
@@ -68,7 +68,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
 
         {/* Masked Credentials Display */}
         <div className="space-y-3.5 mb-6">
-          <div className="p-3.5 rounded-xl bg-[#0B0F17] border border-[#1E293B]">
+          <div className="p-3.5 rounded-xl bg-[#0B0F17] border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Exchange API Key</span>
               <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md">
@@ -80,7 +80,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
             </div>
           </div>
 
-          <div className="p-3.5 rounded-xl bg-[#0B0F17] border border-[#1E293B]">
+          <div className="p-3.5 rounded-xl bg-[#0B0F17] border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
               <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Exchange API Secret</span>
               <span className="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2 py-0.5 rounded-md">
@@ -94,17 +94,17 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
         </div>
 
         {/* API Permissions Audit */}
-        <div className="p-4 rounded-xl bg-[#0B0F17]/60 border border-[#1E293B] space-y-2.5">
+        <div className="p-4 rounded-xl bg-[#0B0F17]/60 border border-[#1A2A3F] space-y-2.5">
           <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
             Credential Permission Scopes
           </div>
 
-          <div className="flex items-center justify-between text-xs py-1 border-b border-[#1E293B]/60">
+          <div className="flex items-center justify-between text-xs py-1 border-b border-[#1A2A3F]/60">
             <span className="text-slate-400">Read & Market Data</span>
             <span className="text-emerald-400 font-mono font-semibold">ENABLED</span>
           </div>
 
-          <div className="flex items-center justify-between text-xs py-1 border-b border-[#1E293B]/60">
+          <div className="flex items-center justify-between text-xs py-1 border-b border-[#1A2A3F]/60">
             <span className="text-slate-400">Order Execution & Spot Trading</span>
             <span className="text-emerald-400 font-mono font-semibold">ENABLED (Gate Protected)</span>
           </div>
@@ -120,7 +120,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
           <div className="w-full max-w-md bg-[#121824] border border-cyan-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-[#1E293B] pb-3">
+            <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-3">
               <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm uppercase tracking-wider">
                 <Lock className="w-4 h-4" />
                 <span>Update Exchange Credentials</span>
@@ -149,7 +149,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
                   value={newApiKey}
                   onChange={(e) => setNewApiKey(e.target.value)}
                   placeholder="Enter exchange API key..."
-                  className="w-full px-3 py-2 bg-[#0B0F17] border border-[#1E293B] rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                  className="w-full px-3 py-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
                   required
                 />
               </div>
@@ -164,7 +164,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
                   value={newSecretKey}
                   onChange={(e) => setNewSecretKey(e.target.value)}
                   placeholder="Enter exchange API secret..."
-                  className="w-full px-3 py-2 bg-[#0B0F17] border border-[#1E293B] rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
+                  className="w-full px-3 py-2 bg-[#0B0F17] border border-[#1A2A3F] rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500 font-mono"
                   required
                 />
               </div>
@@ -182,7 +182,7 @@ export function CredentialStatus({ apiKeys, onUpdateCredentials, isUpdating }: C
                 </label>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1E293B]">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#1A2A3F]">
                 <button
                   type="button"
                   id="btn-cancel-update-credentials"

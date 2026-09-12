@@ -22,7 +22,7 @@ export function TradePagination({
   const end = Math.min(page * perPage, totalCount);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#1E293B] text-xs font-mono text-slate-400">
+    <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-[#1A2A3F] text-xs font-mono text-slate-400">
       <div>
         Showing <strong className="text-white">{start}</strong> to <strong className="text-white">{end}</strong> of{" "}
         <strong className="text-white">{totalCount}</strong> trades

@@ -505,8 +505,8 @@ export function MarketUniverse() {
       {/* Explore View Modals */}
       {exploreModalView === "top_movers" && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                 <h3 className="text-sm font-bold text-white font-sans">Top Market Movers</h3>
@@ -533,8 +533,8 @@ export function MarketUniverse() {
 
       {exploreModalView === "heatmap" && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Grid className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-bold text-white font-sans">Global Market Heatmap</h3>
@@ -561,8 +561,8 @@ export function MarketUniverse() {
 
       {exploreModalView === "scanner" && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Radar className="w-4 h-4 text-blue-400" />
                 <h3 className="text-sm font-bold text-white font-sans">Quantitative Market Scanner</h3>
@@ -590,8 +590,8 @@ export function MarketUniverse() {
       {/* Diagnostics Modal */}
       {isDiagnosticsModalOpen && (
         <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1E293B] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1E293B] bg-[#080D17] flex items-center justify-between">
+          <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-bold text-white font-sans">Market Data Ingestion &amp; Provider Status</h3>

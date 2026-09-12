@@ -173,7 +173,7 @@ class DeltaOptionsService:
 
         raw_products = self.client.get_products(
             contract_types=["call_options", "put_options"],
-            states=["live"],
+            states=["live", "upcoming"],
             force_refresh=force,
         )
 

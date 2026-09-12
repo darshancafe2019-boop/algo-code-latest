@@ -121,7 +121,7 @@ export function LogsDebugging() {
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold font-mono tracking-wider bg-cyan-950 border border-cyan-800 text-cyan-400">
@@ -191,8 +191,8 @@ export function LogsDebugging() {
       {!isLoading && !isError && (
         <>
           {source === "AUDIT_EVENTS" && (
-            <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-2">
-              <div className="flex items-center justify-between px-2 pb-2 text-[11px] font-bold font-mono text-slate-500 border-b border-[#1E293B]">
+            <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between px-2 pb-2 text-[11px] font-bold font-mono text-slate-500 border-b border-[#1A2A3F]">
                 <span>STRUCTURED AUDIT EVENTS FEED</span>
                 <span>CLICK ANY ROW FOR FULL PAYLOAD INSPECTION</span>
               </div>
@@ -217,8 +217,8 @@ export function LogsDebugging() {
           )}
 
           {source === "SYSTEM_LOGS" && (
-            <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-4 space-y-2">
-              <div className="flex items-center justify-between px-2 pb-2 text-[11px] font-bold font-mono text-slate-500 border-b border-[#1E293B]">
+            <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-4 space-y-2">
+              <div className="flex items-center justify-between px-2 pb-2 text-[11px] font-bold font-mono text-slate-500 border-b border-[#1A2A3F]">
                 <span>RAW SYSTEM & RUNNER LOGS</span>
                 <span>APPEND-ONLY CONSOLE OUTPUT</span>
               </div>

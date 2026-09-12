@@ -46,7 +46,7 @@ export function BotPerformanceMatrix({
       ];
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-5 shadow-2xl space-y-4 font-mono">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <Cpu className="w-5 h-5 text-cyan-400" />

@@ -4,21 +4,13 @@ import React from "react";
 import {
   ArrowUpRight,
   ArrowDownRight,
-  Shield,
-  Target,
   Sliders,
-  XCircle,
   ExternalLink,
-  Clock,
   AlertTriangle,
-  Flame,
-  Zap,
   Radio,
-  Building2,
-  Server,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { PositionRecord, formatPositionDuration } from "@/types/positions";
+import { PositionRecord } from "@/types/positions";
 
 interface PositionsCompactTableProps {
   positions: PositionRecord[];
@@ -67,39 +59,39 @@ const PositionTableRow = React.memo(function PositionTableRow({
 
   return (
     <tr
-      className="hover:bg-[var(--theme-elevated)]/60 transition-colors group cursor-pointer border-b border-[var(--theme-border-subtle)]"
+      className="hover:bg-[#101B2D] transition-colors group cursor-pointer border-b border-[#122033]"
       onClick={() => onSelectPosition(pos)}
     >
       {/* 1. Instrument & Bot Origin */}
       <td className="py-3 px-3.5">
         <div className="flex items-center gap-1.5">
-          <span className="font-bold text-xs text-[var(--theme-text-primary)] font-sans group-hover:text-[var(--theme-accent)] transition-colors">
+          <span className="font-semibold text-xs text-[#F7FAFC] group-hover:text-[#19C5FF] transition-colors">
             {pos.symbol}
           </span>
           {hasWarnings && (
             <span title={pos.risk_warnings?.join(", ")}>
-              <AlertTriangle className="h-3 w-3 text-[var(--theme-warning)] shrink-0 animate-bounce" />
+              <AlertTriangle className="h-3.5 w-3.5 text-[#F59E0B] shrink-0" />
             </span>
           )}
         </div>
-        <div className="text-[10px] text-[var(--theme-text-secondary)] truncate max-w-[130px] font-sans">
+        <div className="text-xs text-[#52627A] truncate max-w-[130px]">
           {pos.bot_name || pos.bot_id || "Fleet OMS"}
         </div>
       </td>
 
       {/* 2. Source Identification: Market Data vs Execution vs Account */}
       <td className="py-3 px-3">
-        <div className="flex flex-col gap-0.5 text-[10px]">
+        <div className="flex flex-col gap-0.5 text-xs">
           <div className="flex items-center gap-1">
-            <span className="text-[9px] text-[var(--theme-text-muted)] font-mono uppercase">DATA:</span>
-            <span className="font-bold text-[var(--theme-text-primary)] truncate max-w-[120px]" title={pos.market_data_source}>
+            <span className="text-[10px] text-[#52627A] font-medium uppercase">Data:</span>
+            <span className="font-medium text-[#F7FAFC] truncate max-w-[120px]" title={pos.market_data_source}>
               {pos.market_data_source}
             </span>
           </div>
-          <div className="flex items-center gap-1 text-[var(--theme-text-secondary)]">
-            <span className="text-[9px] text-[var(--theme-text-muted)] font-mono uppercase">EXEC:</span>
-            <span className="font-medium truncate max-w-[110px]" title={`${pos.execution_broker} (${pos.broker_account_id})`}>
-              {pos.execution_broker} • <span className="font-mono text-[9px]">{pos.broker_account_id}</span>
+          <div className="flex items-center gap-1 text-[#7C8CA3]">
+            <span className="text-[10px] text-[#52627A] font-medium uppercase">Exec:</span>
+            <span className="font-normal truncate max-w-[110px]" title={`${pos.execution_broker} (${pos.broker_account_id})`}>
+              {pos.execution_broker} • <span className="text-[10px] text-[#52627A]">{pos.broker_account_id}</span>
             </span>
           </div>
         </div>
@@ -107,11 +99,11 @@ const PositionTableRow = React.memo(function PositionTableRow({
 
       {/* 3. Exchange & Segment */}
       <td className="py-3 px-2.5">
-        <div className="flex flex-col gap-0.5 font-mono text-[10px]">
-          <span className="font-bold text-[var(--theme-text-primary)]">
+        <div className="flex flex-col gap-0.5 text-xs">
+          <span className="font-semibold text-[#F7FAFC]">
             {pos.exchange}
           </span>
-          <span className="text-[9px] text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] px-1 py-0.2 rounded border border-[var(--theme-border-subtle)] w-fit">
+          <span className="text-[10px] text-[#52627A] bg-[#0D1727] px-1.5 py-0.5 rounded border border-[#1A2A3F] w-fit">
             {pos.segment}
           </span>
         </div>
@@ -121,15 +113,15 @@ const PositionTableRow = React.memo(function PositionTableRow({
       <td className="py-3 px-2.5">
         <div className="flex items-center gap-1">
           <span
-            className={`px-1.5 py-0.5 rounded text-[9px] font-extrabold border ${
+            className={`px-1.5 py-0.5 rounded-md text-xs font-semibold border ${
               isLong
-                ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
-                : "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/30"
+                ? "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
+                : "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30"
             }`}
           >
             {isLong ? "LONG" : "SHORT"}
           </span>
-          <span className="text-[9px] text-[var(--theme-text-muted)] bg-[var(--theme-elevated)] px-1 py-0.5 rounded border border-[var(--theme-border-subtle)] font-bold">
+          <span className="text-xs text-[#7C8CA3] bg-[#0D1727] px-1.5 py-0.5 rounded-md border border-[#1A2A3F] font-medium">
             {lev}x
           </span>
         </div>
@@ -137,43 +129,43 @@ const PositionTableRow = React.memo(function PositionTableRow({
 
       {/* 5. Entry / Current Mark Price */}
       <td className="py-3 px-2.5 text-right tabular-nums">
-        <div className="font-extrabold text-xs text-[var(--theme-text-primary)]">
+        <div className="font-bold text-xs text-[#F7FAFC]">
           {currencySymbol}{currP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
-        <div className="text-[9px] text-[var(--theme-text-muted)]">
+        <div className="text-[11px] text-[#52627A]">
           Entry: {currencySymbol}{entryP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
       </td>
 
       {/* 6. Quantity & Notional */}
       <td className="py-3 px-2.5 text-right tabular-nums">
-        <div className="text-[var(--theme-text-primary)] font-bold text-xs">{qty}</div>
-        <div className="text-[9px] text-[var(--theme-text-muted)]">
+        <div className="text-[#F7FAFC] font-semibold text-xs">{qty}</div>
+        <div className="text-[11px] text-[#52627A]">
           {currencySymbol}{notional.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
         </div>
       </td>
 
       {/* 7. Stop Loss & Breakeven Status */}
       <td className="py-3 px-2.5 text-right tabular-nums">
-        <div className="text-[var(--theme-loss)] font-bold text-xs flex items-center justify-end gap-1">
+        <div className="text-[#FF3B5C] font-semibold text-xs flex items-center justify-end gap-1">
           {isAtBreakeven && (
-            <span className="text-[8px] px-1 rounded bg-[var(--theme-accent)]/20 text-[var(--theme-accent)] border border-[var(--theme-accent)]/30 font-sans font-bold">
+            <span className="text-[10px] px-1 rounded bg-[#2563EB]/20 text-[#19C5FF] border border-[#2563EB]/30 font-bold">
               BE
             </span>
           )}
           <span>{currencySymbol}{slP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
         </div>
-        <div className="text-[9px] text-[var(--theme-loss)] opacity-80">
+        <div className="text-[11px] text-[#FF3B5C] opacity-80">
           -{pos.sl_distance_pct?.toFixed(2) || "2.00"}%
         </div>
       </td>
 
       {/* 8. Take Profit */}
       <td className="py-3 px-2.5 text-right tabular-nums">
-        <div className="text-[var(--theme-profit)] font-bold text-xs">
+        <div className="text-[#00E890] font-semibold text-xs">
           {currencySymbol}{tpP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </div>
-        <div className="text-[9px] text-[var(--theme-profit)] opacity-80">
+        <div className="text-[11px] text-[#00E890] opacity-80">
           +{pos.tp_distance_pct?.toFixed(2) || "4.00"}%
         </div>
       </td>
@@ -181,16 +173,16 @@ const PositionTableRow = React.memo(function PositionTableRow({
       {/* 9. Floating P&L */}
       <td className="py-3 px-3 text-right tabular-nums">
         <div
-          className={`text-xs font-black flex items-center justify-end gap-0.5 ${
-            isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+          className={`text-xs font-bold flex items-center justify-end gap-0.5 ${
+            isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
           }`}
         >
-          {isProfit ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+          {isProfit ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
           <span>{isProfit ? "+" : ""}{currencySymbol}{pos.unrealized_pnl.toFixed(2)}</span>
         </div>
         <div
-          className={`text-[9px] font-bold ${
-            isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+          className={`text-[11px] font-semibold ${
+            isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
           }`}
         >
           {isProfit ? "+" : ""}{pos.unrealized_pnl_pct.toFixed(2)}%
@@ -200,12 +192,12 @@ const PositionTableRow = React.memo(function PositionTableRow({
       {/* 10. R-Multiple */}
       <td className="py-3 px-2 text-center tabular-nums">
         <span
-          className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold border ${
+          className={`px-2 py-0.5 rounded-md text-xs font-semibold border ${
             rMult >= 1.0
-              ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
+              ? "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
               : rMult <= -1.0
-              ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/30"
-              : "bg-[var(--theme-elevated)] text-[var(--theme-text-secondary)] border-[var(--theme-border-subtle)]"
+              ? "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30"
+              : "bg-[#0D1727] text-[#7C8CA3] border-[#1A2A3F]"
           }`}
         >
           {rMult >= 0 ? "+" : ""}{rMult.toFixed(2)} R
@@ -214,20 +206,20 @@ const PositionTableRow = React.memo(function PositionTableRow({
 
       {/* 11. Latency & Truthful Status */}
       <td className="py-3 px-2 text-center">
-        <div className="flex flex-col items-center gap-0.5 font-mono">
+        <div className="flex flex-col items-center gap-0.5">
           <span
-            className={`px-1.5 py-0.2 rounded text-[9px] font-bold border ${
+            className={`px-2 py-0.5 rounded-md text-[11px] font-medium border ${
               isFeedLive
-                ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
+                ? "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
                 : isNotConfigured
-                ? "bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border-[var(--theme-warning)]/30"
-                : "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/30"
+                ? "bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30"
+                : "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/30"
             }`}
           >
             {feedStatus}
           </span>
-          <span className="text-[9px] text-[var(--theme-text-muted)] flex items-center gap-0.5">
-            <Radio className="h-2.5 w-2.5 text-[var(--theme-accent)]" />
+          <span className="text-[10px] text-[#52627A] flex items-center gap-0.5">
+            <Radio className="h-2.5 w-2.5 text-[#19C5FF]" />
             <span>{pos.latency_ms?.toFixed(0) || "18"}ms</span>
           </span>
         </div>
@@ -235,12 +227,12 @@ const PositionTableRow = React.memo(function PositionTableRow({
 
       {/* 12. Quick Action Controls */}
       <td className="py-3 px-3.5 text-right" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-end gap-1">
+        <div className="flex items-center justify-end gap-1.5">
           {/* 1-Click Breakeven Button */}
           {!isAtBreakeven && (
             <button
               onClick={() => onMoveToBreakeven(pos)}
-              className="px-1.5 py-1 rounded bg-[var(--theme-elevated)] hover:bg-[var(--theme-accent)]/20 text-[var(--theme-text-secondary)] hover:text-[var(--theme-accent)] border border-[var(--theme-border-subtle)] text-[9px] font-extrabold transition shadow-sm"
+              className="px-2 py-1 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#19C5FF] border border-[#1A2A3F] text-xs font-semibold transition shadow-sm"
               title="Move Stop Loss to Breakeven (Entry Price)"
             >
               BE
@@ -250,25 +242,25 @@ const PositionTableRow = React.memo(function PositionTableRow({
           {/* Protection SL/TP Modifier */}
           <button
             onClick={() => onModifyProtection(pos)}
-            className="p-1 rounded bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-accent)] border border-[var(--theme-border-subtle)] transition shadow-sm"
+            className="p-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#19C5FF] border border-[#1A2A3F] transition shadow-sm"
             title="Adjust SL / TP Protection Limits"
           >
-            <Sliders className="h-3 w-3" />
+            <Sliders className="h-3.5 w-3.5" />
           </button>
 
           {/* Market Navigation */}
           <button
             onClick={() => onNavigateMarket(pos.symbol)}
-            className="p-1 rounded bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-secondary)] hover:text-[var(--theme-text-primary)] border border-[var(--theme-border-subtle)] transition shadow-sm"
+            className="p-1.5 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F7FAFC] border border-[#1A2A3F] transition shadow-sm"
             title="Open in Markets"
           >
-            <ExternalLink className="h-3 w-3" />
+            <ExternalLink className="h-3.5 w-3.5" />
           </button>
 
           {/* Scale-Out Exit */}
           <button
             onClick={() => onPartialClose(pos)}
-            className="px-1.5 py-1 rounded bg-[var(--theme-elevated)] hover:bg-[var(--theme-warning)]/20 text-[var(--theme-text-secondary)] hover:text-[var(--theme-warning)] border border-[var(--theme-border-subtle)] text-[9px] font-extrabold transition shadow-sm"
+            className="px-2 py-1 rounded-lg bg-[#0D1727] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-[#F59E0B] border border-[#1A2A3F] text-xs font-semibold transition shadow-sm"
             title="Partial Scale Close"
           >
             SCALE
@@ -277,7 +269,7 @@ const PositionTableRow = React.memo(function PositionTableRow({
           {/* Full Square Off */}
           <button
             onClick={() => onSquareOff(pos)}
-            className="px-2 py-1 rounded bg-[var(--theme-loss)]/15 hover:bg-[var(--theme-loss)] text-[var(--theme-loss)] hover:text-white border border-[var(--theme-loss)]/30 text-[9px] font-extrabold transition shadow-sm active:scale-95"
+            className="px-2.5 py-1 rounded-lg bg-[#FF3B5C]/15 hover:bg-[#FF3B5C] text-[#FF3B5C] hover:text-white border border-[#FF3B5C]/30 text-xs font-semibold transition shadow-sm active:scale-95"
             title="Full Market Square Off"
           >
             CLOSE
@@ -306,28 +298,28 @@ export function PositionsCompactTable({
   );
 
   return (
-    <div className="w-full overflow-x-auto rounded-3xl bg-[var(--theme-surface)]/90 backdrop-blur-md border border-[var(--theme-border)] shadow-xl font-sans select-none">
+    <div className="w-full overflow-x-auto rounded-xl bg-[#0A1422] border border-[#1A2A3F] shadow-sm font-sans select-none">
       <table className="w-full text-left text-xs border-collapse">
         {/* Table Header */}
         <thead>
-          <tr className="border-b border-[var(--theme-border)] bg-[var(--theme-elevated)]/70 text-[var(--theme-text-muted)] font-mono text-[10px] uppercase tracking-wider">
-            <th className="py-3 px-3.5 font-bold">Instrument & Bot</th>
-            <th className="py-3 px-3 font-bold">Source & Exec Broker</th>
-            <th className="py-3 px-2.5 font-bold">Exchange</th>
-            <th className="py-3 px-2.5 font-bold">Side & Lev</th>
-            <th className="py-3 px-2.5 font-bold text-right">Entry / Mark</th>
-            <th className="py-3 px-2.5 font-bold text-right">Size / Value</th>
-            <th className="py-3 px-2.5 font-bold text-right">Stop Loss</th>
-            <th className="py-3 px-2.5 font-bold text-right">Take Profit</th>
-            <th className="py-3 px-3 font-bold text-right">Floating P&L</th>
-            <th className="py-3 px-2 font-bold text-center">R-Mult</th>
-            <th className="py-3 px-2 font-bold text-center">Status</th>
-            <th className="py-3 px-3.5 font-bold text-right">Safe Actions</th>
+          <tr className="border-b border-[#1A2A3F] bg-[#07101A] text-[#7C8CA3] text-xs font-semibold uppercase tracking-wider">
+            <th className="py-3 px-3.5">Instrument & Bot</th>
+            <th className="py-3 px-3">Source & Exec Broker</th>
+            <th className="py-3 px-2.5">Exchange</th>
+            <th className="py-3 px-2.5">Side & Lev</th>
+            <th className="py-3 px-2.5 text-right">Entry / Mark</th>
+            <th className="py-3 px-2.5 text-right">Size / Value</th>
+            <th className="py-3 px-2.5 text-right">Stop Loss</th>
+            <th className="py-3 px-2.5 text-right">Take Profit</th>
+            <th className="py-3 px-3 text-right">Floating P&L</th>
+            <th className="py-3 px-2 text-center">R-Mult</th>
+            <th className="py-3 px-2 text-center">Status</th>
+            <th className="py-3 px-3.5 text-right">Safe Actions</th>
           </tr>
         </thead>
 
         {/* Table Body */}
-        <tbody className="divide-y divide-[var(--theme-border-subtle)] font-mono">
+        <tbody className="divide-y divide-[#122033]">
           {positions.map((pos) => (
             <PositionTableRow
               key={pos.position_uid || `${pos.execution_broker}_${pos.id}`}

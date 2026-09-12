@@ -21,7 +21,7 @@ export function RiskTopBlockersBar({ analytics, onFilterByGate }: RiskTopBlocker
   if (topGates.length === 0) return null;
 
   return (
-    <div className="bg-[#0B131E] border border-[#1E293B] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-2">
+    <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-2">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <ShieldAlert className="h-4 w-4 text-rose-400" />
@@ -42,7 +42,7 @@ export function RiskTopBlockersBar({ analytics, onFilterByGate }: RiskTopBlocker
           <button
             key={idx}
             onClick={() => onFilterByGate && onFilterByGate(item.gate)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1E293B] hover:border-rose-800 text-slate-300 hover:text-rose-300 transition-all text-[11px]"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] hover:border-rose-800 text-slate-300 hover:text-rose-300 transition-all text-[11px]"
           >
             <span className="text-slate-400 font-bold">{idx + 1}.</span>
             <span className="font-semibold text-slate-200">{item.gate}</span>

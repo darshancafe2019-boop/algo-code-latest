@@ -4,6 +4,12 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingUp, TrendingDown, RefreshCw, Layers } from "lucide-react";
 import { NormalizedLtp } from "@/lib/upstox/types";
+import {
+  formatCurrency,
+  formatPercent,
+  formatDecimal,
+  toFiniteNumber,
+} from "@/lib/formatters";
 
 const TEST_INSTRUMENTS = [
   { key: "NSE_INDEX|Nifty 50", symbol: "NIFTY 50", name: "Nifty 50 Benchmark Index" },
@@ -26,7 +32,8 @@ function InstrumentQuoteCard({ inst }: { inst: { key: string; symbol: string; na
     refetchInterval: 10000,
   });
 
-  const isPositive = (data?.change || 0) >= 0;
+  const changeNum = toFiniteNumber(data?.change);
+  const isPositive = (changeNum ?? 0) >= 0;
 
   return (
     <div className="p-4 bg-slate-900/80 border border-slate-800 rounded-xl space-y-2 relative overflow-hidden">
@@ -59,7 +66,7 @@ function InstrumentQuoteCard({ inst }: { inst: { key: string; symbol: string; na
         <div className="space-y-1">
           <div className="flex items-baseline justify-between">
             <span className="text-base font-extrabold text-white font-mono tracking-tight">
-              ₹{(data?.ltp || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+              {formatCurrency(data?.ltp, "₹", 2)}
             </span>
             <span
               className={`flex items-center text-xs font-bold font-mono ${
@@ -68,13 +75,12 @@ function InstrumentQuoteCard({ inst }: { inst: { key: string; symbol: string; na
             >
               {isPositive ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
               {isPositive ? "+" : ""}
-              {(data?.change || 0).toFixed(2)} ({isPositive ? "+" : ""}
-              {(data?.changePct || 0).toFixed(2)}%)
+              {formatDecimal(data?.change, 2)} ({formatPercent(data?.changePct, 2, "—", false, true)})
             </span>
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-1 border-t border-slate-800/60">
-            <span>Prev: ₹{(data?.previousClose || 0).toFixed(2)}</span>
+            <span>Prev: {formatCurrency(data?.previousClose, "₹", 2)}</span>
             <span className="px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 text-[9px]">
               {data?.source || "SNAPSHOT"}
             </span>

@@ -336,14 +336,14 @@ export function EcoPositionsView() {
   };
 
   return (
-    <div className="space-y-4 font-sans select-none text-[var(--theme-text-primary)] pb-12">
+    <div className="space-y-4 font-sans select-none text-[#F7FAFC] pb-12">
       {/* Toast Notification */}
       {statusNotification && (
         <div
-          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl shadow-2xl backdrop-blur-md border text-xs font-mono transition-all animate-bounce ${
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl backdrop-blur-md border text-xs transition-all ${
             statusNotification.type === "success"
-              ? "bg-[var(--theme-profit)]/15 border-[var(--theme-profit)] text-[var(--theme-profit)]"
-              : "bg-[var(--theme-loss)]/15 border-[var(--theme-loss)] text-[var(--theme-loss)]"
+              ? "bg-[#00E890]/15 border-[#00E890] text-[#00E890]"
+              : "bg-[#FF3B5C]/15 border-[#FF3B5C] text-[#FF3B5C]"
           }`}
         >
           {statusNotification.type === "success" ? (
@@ -393,21 +393,21 @@ export function EcoPositionsView() {
 
       {/* 4. Main Body: Table / Cards / Ladder / Risk Matrix or Empty State */}
       {isPositionsLoading && rawPositions.length === 0 ? (
-        <div className="h-64 flex flex-col items-center justify-center gap-3 border border-[var(--theme-border)] rounded-3xl bg-[var(--theme-surface)]/90 font-mono text-xs text-[var(--theme-text-muted)]">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--theme-accent)] border-t-transparent animate-spin" />
+        <div className="h-64 flex flex-col items-center justify-center gap-3 border border-[#1A2A3F] rounded-xl bg-[#0A1422] text-xs text-[#52627A]">
+          <div className="w-8 h-8 rounded-full border-2 border-[#2563EB] border-t-transparent animate-spin" />
           <span>Synchronizing live OMS position books...</span>
         </div>
       ) : rawPositions.length === 0 ? (
         <PositionsEmptyState executionMode={executionMode} />
       ) : processedPositions.length === 0 ? (
-        <div className="p-12 text-center border border-[var(--theme-border)] rounded-3xl bg-[var(--theme-surface)]/90 space-y-2 font-mono text-xs">
-          <p className="text-[var(--theme-text-secondary)]">No positions matched your search or active filter.</p>
+        <div className="p-12 text-center border border-[#1A2A3F] rounded-xl bg-[#0A1422] space-y-2 text-xs">
+          <p className="text-[#7C8CA3]">No positions matched your search or active filter.</p>
           <button
             onClick={() => {
               setSearchQuery("");
               setSelectedCategory("ALL");
             }}
-            className="text-[var(--theme-accent)] font-bold hover:underline"
+            className="text-[#19C5FF] font-semibold hover:underline"
           >
             Reset Filters
           </button>

@@ -109,10 +109,10 @@ function SubPaneCanvasItem({
     ctx.clearRect(0, 0, width, height);
 
     // Background and subtle grid
-    ctx.fillStyle = "#131722";
+    ctx.fillStyle = "#060B14";
     ctx.fillRect(0, 0, width, height);
 
-    ctx.strokeStyle = "#1E222D";
+    ctx.strokeStyle = "#1A2A3F";
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
 
@@ -145,9 +145,9 @@ function SubPaneCanvasItem({
     }
 
     // Right Scale Bar
-    ctx.fillStyle = "#1E222D";
+    ctx.fillStyle = "#07101A";
     ctx.fillRect(chartWidth, 0, 60, height);
-    ctx.strokeStyle = "#2A2E39";
+    ctx.strokeStyle = "#1A2A3F";
     ctx.strokeRect(chartWidth, 0, 60, height);
   }, [pane, candles, result, viewStartIndex, viewEndIndex]);
 
@@ -178,20 +178,20 @@ function SubPaneCanvasItem({
   }
 
   return (
-    <div ref={containerRef} className="relative border-b border-[#2A2E39]">
+    <div ref={containerRef} className="relative border-b border-[#1A2A3F]">
       {/* Subpane Header Bar */}
-      <div className="absolute left-2 top-1.5 z-10 flex items-center gap-2 bg-[#131722]/80 backdrop-blur-sm px-2 py-0.5 rounded border border-[#2A2E39] text-[11px] font-mono">
-        <span className="font-bold text-[#D1D4DC]">{pane.title}</span>
-        {latestReadout && <span className="text-[#2962FF] font-semibold tabular-nums">{latestReadout}</span>}
+      <div className="absolute left-2 top-1.5 z-10 flex items-center gap-2 bg-[#0A1422]/90 backdrop-blur-sm px-2.5 py-0.5 rounded-lg border border-[#1A2A3F] text-[11px] font-mono">
+        <span className="font-bold text-[#F7FAFC]">{pane.title}</span>
+        {latestReadout && <span className="text-[#19C5FF] font-semibold tabular-nums">{latestReadout}</span>}
 
-        <div className="flex items-center gap-1 ml-2 border-l border-[#2A2E39] pl-1.5 text-[#787B86]">
-          <button onClick={onToggleHide} className="hover:text-[#D1D4DC]" title={pane.hidden ? "Show" : "Hide"}>
+        <div className="flex items-center gap-1 ml-2 border-l border-[#1A2A3F] pl-1.5 text-[#7C8CA3]">
+          <button onClick={onToggleHide} className="hover:text-[#F7FAFC]" title={pane.hidden ? "Show" : "Hide"}>
             {pane.hidden ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
           </button>
-          <button onClick={onConfigure} className="hover:text-[#D1D4DC]" title="Configure Parameters">
+          <button onClick={onConfigure} className="hover:text-[#F7FAFC]" title="Configure Parameters">
             <Settings className="w-3 h-3" />
           </button>
-          <button onClick={onRemove} className="hover:text-[#EF5350]" title="Remove Subpane">
+          <button onClick={onRemove} className="hover:text-[#FF3B5C]" title="Remove Subpane">
             <X className="w-3 h-3" />
           </button>
         </div>

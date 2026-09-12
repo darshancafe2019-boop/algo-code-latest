@@ -81,7 +81,7 @@ export function LivePnLCommandHeader({
   const isLive = tradingMode === "LIVE";
 
   return (
-    <div className="bg-[#0B111E] border border-[#1E293B] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 font-mono select-none">
+    <div className="bg-[#0B111E] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-2xl space-y-4 font-mono select-none">
       {/* Top Bar: Title & Telemetry Strip */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
         {/* Title & Terminal Identity */}
@@ -98,7 +98,7 @@ export function LivePnLCommandHeader({
                 className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase ${
                   isLive
                     ? "bg-red-950 text-red-400 border border-red-800"
-                    : "bg-[#123C2A] text-[#55C98A] border border-[#39B978]/40"
+                    : "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40"
                 }`}
               >
                 ● {tradingMode}
@@ -141,7 +141,7 @@ export function LivePnLCommandHeader({
             className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
               isLive
                 ? "bg-red-950/60 hover:bg-red-900 text-red-300 border-red-800"
-                : "bg-[#123C2A] hover:bg-[#1B4D36] text-[#55C98A] border-[#39B978]/40"
+                : "bg-[rgba(37,99,235,0.18)] hover:bg-[#1B4D36] text-[#22D3EE] border-[#00E890]/40"
             }`}
           >
             Switch to {isLive ? "PAPER" : "LIVE"}
@@ -165,7 +165,7 @@ export function LivePnLCommandHeader({
               onClick={onToggleAudioChimes}
               className={`p-2 rounded-xl border transition ${
                 audioChimesEnabled
-                  ? "bg-[#123C2A] text-emerald-400 border-emerald-600/40"
+                  ? "bg-[rgba(37,99,235,0.18)] text-emerald-400 border-emerald-600/40"
                   : "bg-[#141E33] text-slate-500 border-slate-700"
               }`}
               title={audioChimesEnabled ? "Audio chimes active for wins" : "Audio chimes muted"}

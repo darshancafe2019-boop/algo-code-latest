@@ -58,16 +58,16 @@ export function WorkspaceHeader({
         </div>
 
         {/* Subtitle & Telemetry Bar */}
-        <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-[#94A3B8] flex-wrap">
-          {subtitle && <span className="text-[#94A3B8]">{subtitle}</span>}
+        <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-[#7C8CA3] flex-wrap">
+          {subtitle && <span className="text-[#7C8CA3]">{subtitle}</span>}
           {account && (
-            <span className="hidden sm:inline-flex items-center gap-1 text-[#64748B]">
+            <span className="hidden sm:inline-flex items-center gap-1 text-[#52627A]">
               <span>ACCOUNT:</span>
               <span className="text-slate-300 font-semibold">{account}</span>
             </span>
           )}
           {(lastUpdated || latencyMs !== undefined) && (
-            <span className="inline-flex items-center gap-1 text-[#64748B]">
+            <span className="inline-flex items-center gap-1 text-[#52627A]">
               <span>LATENCY:</span>
               <DataAge timestamp={lastUpdated} latencyMs={latencyMs} />
             </span>

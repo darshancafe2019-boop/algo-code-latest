@@ -107,7 +107,7 @@ export function SystemHealthHub() {
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* Top Banner */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <div className={`p-3.5 rounded-2xl border ${
             isOverallHealthy
@@ -145,12 +145,12 @@ export function SystemHealthHub() {
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Subsystems Monitored</div>
           <div className="text-xl font-bold text-white mt-1 font-mono">10 / 10</div>
           <div className="text-[10px] text-emerald-400 mt-0.5">All Core Gateways Active</div>
         </div>
-        <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Active Bots</div>
           <div className="text-xl font-bold text-cyan-400 mt-1 font-mono">
             {data?.system_summary?.running_bots !== undefined ? (
@@ -161,7 +161,7 @@ export function SystemHealthHub() {
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Running Processes</div>
         </div>
-        <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Active Positions</div>
           <div className="text-xl font-bold text-emerald-400 mt-1 font-mono">
             {data?.system_summary?.open_trades !== undefined ? (
@@ -172,7 +172,7 @@ export function SystemHealthHub() {
           </div>
           <div className="text-[10px] text-slate-400 mt-0.5">Open Market Exposure</div>
         </div>
-        <div className="bg-[#121824] border border-[#1E293B] rounded-xl p-4 shadow-md">
+        <div className="bg-[#121824] border border-[#1A2A3F] rounded-xl p-4 shadow-md">
           <div className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">Emergency Kill Switch</div>
           <div className="text-xl font-bold font-mono mt-1">
             {data?.system_summary?.kill_switch_active ? (
@@ -191,8 +191,8 @@ export function SystemHealthHub() {
       <SelfHealingDashboardWidget />
 
       {/* 10 Subsystems Grid */}
-      <div className="bg-[#121824] border border-[#1E293B] rounded-2xl p-6 space-y-4 shadow-xl">
-        <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1E293B] pb-3">
+      <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-6 space-y-4 shadow-xl">
+        <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-3">
           <Sliders className="h-4 w-4 text-cyan-400" />
           10-Subsystem Telemetry Grid
         </h2>
@@ -206,7 +206,7 @@ export function SystemHealthHub() {
             return (
               <div
                 key={sub.id}
-                className="bg-[#0B0F17] border border-[#1E293B] hover:border-cyan-500/30 rounded-xl p-4.5 transition flex flex-col justify-between gap-3 shadow-md"
+                className="bg-[#0B0F17] border border-[#1A2A3F] hover:border-cyan-500/30 rounded-xl p-4.5 transition flex flex-col justify-between gap-3 shadow-md"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-3">

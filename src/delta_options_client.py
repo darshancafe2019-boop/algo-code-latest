@@ -275,30 +275,61 @@ class DeltaOptionsClient:
         force_refresh: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Discovers all products from official /v2/products endpoint.
-        Filters for option contracts (call_options, put_options), live states, and current/future settlements.
+        Discovers all products from official /v2/products endpoint by exhausting all pagination pages.
+        Filters for option contracts (call_options, put_options), live and upcoming states, and current/future settlements.
         """
         if contract_types is None:
             contract_types = ["call_options", "put_options"]
         if states is None:
-            states = ["live"]
+            states = ["live", "upcoming"]
 
-        res = self._request(
-            "/v2/products",
-            method="GET",
-            use_cache=not force_refresh,
-            cache_ttl=60.0,
-            weight=1.5,
-        )
+        contract_types_param = ",".join(contract_types) if contract_types else "call_options,put_options"
+        states_param = ",".join(states) if states else "live,upcoming"
 
-        raw_products = res.get("result", [])
-        if not isinstance(raw_products, list):
-            return []
+        all_raw_products: List[Dict[str, Any]] = []
+        after_cursor: Optional[str] = None
+        visited_cursors = set()
+        page = 0
+        max_pages = 50
+
+        while page < max_pages:
+            page += 1
+            params: Dict[str, Any] = {
+                "contract_types": contract_types_param,
+                "states": states_param,
+                "page_size": 100,
+            }
+            if after_cursor:
+                params["after"] = after_cursor
+
+            res = self._request(
+                "/v2/products",
+                params=params,
+                method="GET",
+                use_cache=not force_refresh and page == 1 and not after_cursor,
+                cache_ttl=60.0,
+                weight=1.5,
+            )
+
+            raw_products = res.get("result", [])
+            if not isinstance(raw_products, list) or len(raw_products) == 0:
+                break
+
+            all_raw_products.extend(raw_products)
+
+            meta = res.get("meta", {})
+            next_after = meta.get("after") if isinstance(meta, dict) else None
+
+            if not next_after or next_after in visited_cursors or len(raw_products) < 100:
+                break
+
+            visited_cursors.add(next_after)
+            after_cursor = next_after
 
         discovered: List[Dict[str, Any]] = []
         now_utc = datetime.now(timezone.utc)
 
-        for p in raw_products:
+        for p in all_raw_products:
             ctype = str(p.get("contract_type", "")).lower()
             state = str(p.get("state", "")).lower()
             settle_time = p.get("settlement_time")
@@ -323,6 +354,7 @@ class DeltaOptionsClient:
 
             discovered.append(p)
 
+        logger.info(f"Delta product discovery completed: fetched {len(all_raw_products)} raw products across {page} pages, {len(discovered)} active/upcoming option contracts.")
         return discovered
 
     def get_tickers(

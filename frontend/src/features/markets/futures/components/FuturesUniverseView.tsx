@@ -49,7 +49,6 @@ import { FuturesStrategiesView } from "./FuturesStrategiesView";
 import { FuturesPositionsView } from "./FuturesPositionsView";
 import { FuturesOrdersView } from "./FuturesOrdersView";
 import { FuturesRiskView } from "./FuturesRiskView";
-import { useUIStore } from "@/lib/store/useUIStore";
 
 export type FuturesTabId =
   | "UNIVERSE"
@@ -202,6 +201,9 @@ export function FuturesUniverseView({
     );
   });
 
+  // Default active contract for Trade Ticket
+  const activeContract = selectedContract || filteredContracts[0] || null;
+
   // Summary Metrics
   const totalVolume = universeData?.total_volume_usd ?? 13_780_000_000;
   const totalOI = universeData?.total_open_interest_usd ?? 6_103_000_000;
@@ -212,7 +214,6 @@ export function FuturesUniverseView({
   // Global Keyboard Shortcuts (B, S, O, Esc)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger shortcuts when typing inside form inputs
       const target = e.target as HTMLElement;
       if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
         if (e.key === "Escape") {
@@ -228,7 +229,7 @@ export function FuturesUniverseView({
         return;
       }
 
-      const active = selectedContract || filteredContracts[0];
+      const active = activeContract;
       if (!active) return;
 
       if (e.key === "b" || e.key === "B") {
@@ -250,11 +251,11 @@ export function FuturesUniverseView({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedContract, filteredContracts, setDetailsDrawerOpen, setOrderReviewOpen, setSelectedContract, setOrderSide]);
+  }, [activeContract, setDetailsDrawerOpen, setOrderReviewOpen, setSelectedContract, setOrderSide]);
 
   return (
-    <div className="w-full space-y-3 font-sans text-slate-100 select-none max-w-[1650px] mx-auto min-w-0">
-      {/* 1. Top High-Density Bar */}
+    <div className="w-full space-y-3 font-sans text-slate-100 select-none max-w-[1750px] mx-auto min-w-0">
+      {/* 1. Top High-Density Control & Filter Bar */}
       <FuturesTopBar
         selectedSource={effectiveSource}
         onChangeSource={(src) => setSelectedSource(src)}
@@ -274,8 +275,8 @@ export function FuturesUniverseView({
         lockSource={lockSource}
       />
 
-      {/* 2. Compact Navigation Tabs */}
-      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-slate-800/80 overflow-x-auto">
+      {/* 2. Compact Navigation Tabs & Telemetry Header */}
+      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-[#12304A] overflow-x-auto">
         <div className="flex items-center gap-1 min-w-0">
           {[
             { id: "UNIVERSE", label: "Overview", icon: Zap },
@@ -298,7 +299,7 @@ export function FuturesUniverseView({
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex-shrink-0 ${
                   isActive
                     ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-850"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" />
@@ -308,15 +309,23 @@ export function FuturesUniverseView({
           })}
         </div>
 
-        {/* Active Source Badge & Keyboard Hint */}
-        <div className="hidden sm:flex items-center gap-3 pr-2 flex-shrink-0 font-mono text-[10px] text-slate-400">
-          <span className="text-slate-500">
+        {/* Mobile/Tablet Open Trade Ticket Button & Active Source Hint */}
+        <div className="flex items-center gap-2 pr-2 flex-shrink-0 font-mono text-[10px]">
+          <button
+            type="button"
+            onClick={() => setDetailsDrawerOpen(true)}
+            className="xl:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold hover:bg-cyan-500/30 transition shadow-sm"
+          >
+            <Zap className="w-3 h-3 text-cyan-400" />
+            <span>Trade Ticket</span>
+          </button>
+
+          <span className="hidden sm:inline text-slate-500">
             Keys: <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">B</kbd> Buy •{" "}
             <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">S</kbd> Sell •{" "}
-            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">O</kbd> Book •{" "}
             <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">Esc</kbd>
           </span>
-          <span>Source: <strong className="text-cyan-300">{effectiveSource}</strong></span>
+          <span className="hidden md:inline">Source: <strong className="text-cyan-300">{effectiveSource}</strong></span>
         </div>
       </div>
 
@@ -333,95 +342,119 @@ export function FuturesUniverseView({
         </div>
       )}
 
-      {/* 3. Main Active Tab View Content */}
-      {currentTab === "UNIVERSE" || currentTab === "MARKETS" ? (
-        <div className="space-y-3">
-          {/* Market Summary Bar: 3 Clean Metrics */}
-          <FuturesMarketSummaryBar
-            totalVolumeUsd={totalVolume}
-            totalOpenInterestUsd={totalOI}
-            avgFundingRateApr={avgFundingAPR}
-          />
+      {/* 3. Non-Overlapping Main Grid Layout */}
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_400px] gap-3 xl:gap-4 items-start w-full min-w-0">
+        {/* Left Main Content Area */}
+        <div className="min-w-0 w-full space-y-3">
+          {currentTab === "UNIVERSE" || currentTab === "MARKETS" ? (
+            <div className="space-y-3 w-full min-w-0">
+              {/* Market Summary Bar: 3 Clean Metrics */}
+              <FuturesMarketSummaryBar
+                totalVolumeUsd={totalVolume}
+                totalOpenInterestUsd={totalOI}
+                avgFundingRateApr={avgFundingAPR}
+              />
 
-          {/* Simple, Fast, Non-overlapping Contracts Table */}
-          <SimpleFuturesTable
-            contracts={filteredContracts}
-            isLoading={isLoading}
-            selectedContractKey={selectedContract?.instrument_key}
-            onSelectContract={(contract) => {
-              setSelectedContract(contract);
-              setDetailsDrawerOpen(true);
-            }}
-            onTrade={(e, contract, side) => {
-              setSelectedContract(contract);
-              setOrderSide(side === "SELL" ? "SELL" : "BUY");
-              setDetailsDrawerOpen(true);
-            }}
-          />
+              {/* Fast, Clean, Non-overlapping Contracts Table */}
+              <div className="w-full min-w-0 overflow-hidden">
+                <SimpleFuturesTable
+                  contracts={filteredContracts}
+                  isLoading={isLoading}
+                  selectedContractKey={activeContract?.instrument_key}
+                  onSelectContract={(contract) => {
+                    setSelectedContract(contract);
+                  }}
+                  onTrade={(e, contract, side) => {
+                    setSelectedContract(contract);
+                    setOrderSide(side === "SELL" ? "SELL" : "BUY");
+                    // On mobile/tablet, open drawer
+                    setDetailsDrawerOpen(true);
+                  }}
+                />
+              </div>
 
-          {/* Collapsible Advanced Analytics Section */}
-          <FuturesAdvancedCollapsible
-            contracts={filteredContracts}
-            heatmapData={heatmapData}
-            isHeatmapLoading={isHeatmapLoading}
-          />
-        </div>
-      ) : currentTab === "FUNDING" ? (
-        <div className="space-y-4">
-          <div className="flex items-center gap-2 p-1.5 bg-[#080E1C] border border-slate-800 rounded-xl w-fit font-mono text-xs">
-            <button
-              type="button"
-              onClick={() => setFundingSubTab("HEATMAP")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                fundingSubTab === "HEATMAP" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              🔥 8-Hour Funding Rate Heatmap
-            </button>
-            <button
-              type="button"
-              onClick={() => setFundingSubTab("BASIS")}
-              className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                fundingSubTab === "BASIS" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
-              }`}
-            >
-              📊 Spot-Futures Basis Matrix
-            </button>
-          </div>
+              {/* Collapsible Advanced Analytics Section */}
+              <FuturesAdvancedCollapsible
+                contracts={filteredContracts}
+                heatmapData={heatmapData}
+                isHeatmapLoading={isHeatmapLoading}
+              />
+            </div>
+          ) : currentTab === "FUNDING" ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 p-1.5 bg-[#080E1C] border border-[#12304A] rounded-xl w-fit font-mono text-xs">
+                <button
+                  type="button"
+                  onClick={() => setFundingSubTab("HEATMAP")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                    fundingSubTab === "HEATMAP" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  🔥 8-Hour Funding Rate Heatmap
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFundingSubTab("BASIS")}
+                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
+                    fundingSubTab === "BASIS" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  📊 Spot-Futures Basis Matrix
+                </button>
+              </div>
 
-          {fundingSubTab === "HEATMAP" ? (
-            <FundingRateHeatmap data={heatmapData} isLoading={isHeatmapLoading} />
+              {fundingSubTab === "HEATMAP" ? (
+                <FundingRateHeatmap data={heatmapData} isLoading={isHeatmapLoading} />
+              ) : (
+                <BasisArbitrageMatrix contracts={filteredContracts} />
+              )}
+            </div>
+          ) : currentTab === "STRATEGIES" ? (
+            <FuturesStrategiesView contracts={contracts} />
+          ) : currentTab === "POSITIONS" ? (
+            <FuturesPositionsView />
+          ) : currentTab === "ORDERS" ? (
+            <FuturesOrdersView />
+          ) : currentTab === "RISK" ? (
+            <FuturesRiskView />
+          ) : currentTab === "SAVED" ? (
+            <FuturesSavedView contracts={contracts} />
           ) : (
-            <BasisArbitrageMatrix contracts={filteredContracts} />
+            <FuturesHealthView />
           )}
         </div>
-      ) : currentTab === "STRATEGIES" ? (
-        <FuturesStrategiesView contracts={contracts} />
-      ) : currentTab === "POSITIONS" ? (
-        <FuturesPositionsView />
-      ) : currentTab === "ORDERS" ? (
-        <FuturesOrdersView />
-      ) : currentTab === "RISK" ? (
-        <FuturesRiskView />
-      ) : currentTab === "SAVED" ? (
-        <FuturesSavedView contracts={contracts} />
-      ) : (
-        <FuturesHealthView />
-      )}
 
-      {/* 4. Details Drawer / Execution Ticket (Opens immediately when Buy/Sell or row is clicked) */}
-      <FuturesDetailsDrawer
-        contract={selectedContract}
-        isOpen={isDetailsDrawerOpen}
-        onClose={() => setDetailsDrawerOpen(false)}
-        initialSide={orderSide}
-        onOrderSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
-          queryClient.invalidateQueries({ queryKey: ["futuresOrdersList"] });
-        }}
-      />
+        {/* Right Sticky Universal Trade Ticket Column (Desktop >= 1280px) */}
+        <div className="hidden xl:block sticky top-[72px] self-start w-full">
+          <FuturesDetailsDrawer
+            contract={activeContract}
+            isOpen={true}
+            isInline={true}
+            initialSide={orderSide}
+            onOrderSuccess={() => {
+              queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
+              queryClient.invalidateQueries({ queryKey: ["futuresOrdersList"] });
+            }}
+          />
+        </div>
+      </div>
 
-      {/* 5. Safe Order Review Modal */}
+      {/* Mobile / Small Screen Slide-Over Drawer (< 1280px) */}
+      <div className="xl:hidden">
+        <FuturesDetailsDrawer
+          contract={activeContract}
+          isOpen={isDetailsDrawerOpen}
+          isInline={false}
+          onClose={() => setDetailsDrawerOpen(false)}
+          initialSide={orderSide}
+          onOrderSuccess={() => {
+            queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
+            queryClient.invalidateQueries({ queryKey: ["futuresOrdersList"] });
+          }}
+        />
+      </div>
+
+      {/* 5. Pre-Trade Safe Order Review Modal */}
       <OrderReviewModal
         contract={orderReviewContract}
         side={orderReviewSide}

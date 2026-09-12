@@ -44,20 +44,22 @@ import {
 
 interface FuturesDetailsDrawerProps {
   contract: CanonicalFuturesContract | null;
-  isOpen: boolean;
-  onClose: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
   initialSide?: "BUY" | "SELL" | "LONG" | "SHORT";
   initialTab?: "TRADE" | "BOOK" | "METRICS" | "RISK";
   onOrderSuccess?: (result: any) => void;
+  isInline?: boolean; // When true on desktop, renders as sticky column inside grid without overlay
 }
 
 export function FuturesDetailsDrawer({
   contract,
-  isOpen,
+  isOpen = true,
   onClose,
   initialSide = "BUY",
   initialTab = "TRADE",
   onOrderSuccess,
+  isInline = false,
 }: FuturesDetailsDrawerProps) {
   const {
     leverage,
@@ -67,6 +69,7 @@ export function FuturesDetailsDrawer({
     executionMode,
     orderSide,
     setOrderSide,
+    setOrderReviewOpen,
   } = useFuturesStore();
 
   const [activeSubTab, setActiveSubTab] = useState<"TRADE" | "BOOK" | "METRICS" | "RISK">(initialTab);
@@ -80,7 +83,7 @@ export function FuturesDetailsDrawer({
   const [stopLoss, setStopLoss] = useState<string>("");
   const [takeProfit, setTakeProfit] = useState<string>("");
   const [depthLimit, setDepthLimit] = useState<number>(10);
-  
+
   const [orderBook, setOrderBook] = useState<OrderBookData | null>(null);
   const [isBookLoading, setIsBookLoading] = useState<boolean>(false);
   const [accountMargins, setAccountMargins] = useState<Record<string, any>>({});
@@ -90,7 +93,6 @@ export function FuturesDetailsDrawer({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [executionState, setExecutionState] = useState<"IDLE" | "VALIDATING" | "SUBMITTING" | "FILLED" | "ERROR">("IDLE");
   const [feedback, setFeedback] = useState<{ status: "SUCCESS" | "ERROR"; message: string } | null>(null);
-  const [showPreviewModal, setShowPreviewModal] = useState<boolean>(false);
 
   // Sync state when contract changes
   useEffect(() => {
@@ -98,7 +100,7 @@ export function FuturesDetailsDrawer({
       setQuantity(contract.min_qty || 1.0);
       const ltp = contract.last_price || contract.mark_price || 0;
       setLimitPrice(ltp > 0 ? ltp.toString() : "");
-      
+
       // Fetch Account Margins
       fetchFuturesAccountMargins().then(setAccountMargins);
 
@@ -119,9 +121,9 @@ export function FuturesDetailsDrawer({
     }
   }, [initialSide]);
 
-  // Order Book Polling (Selective Subscription)
+  // Order Book Polling
   useEffect(() => {
-    if (!isOpen || !contract) return;
+    if ((!isInline && !isOpen) || !contract) return;
     let isMounted = true;
 
     const loadBook = async () => {
@@ -137,12 +139,12 @@ export function FuturesDetailsDrawer({
       if (isMounted) setIsBookLoading(false);
     });
 
-    const interval = setInterval(loadBook, 2500);
+    const interval = setInterval(loadBook, 3000);
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
-  }, [isOpen, contract, depthLimit]);
+  }, [isOpen, isInline, contract, depthLimit]);
 
   // Liquidation calculation
   const effectivePrice =
@@ -160,14 +162,13 @@ export function FuturesDetailsDrawer({
     }
   }, [contract, tradeSide, effectivePrice, leverage]);
 
-  // Keyboard shortcut listener (Esc to close, B for Buy, S for Sell, O for Order Book)
+  // Keyboard shortcuts (B, S, O, Esc)
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen && !isInline) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === "Escape") {
-        if (showPreviewModal) setShowPreviewModal(false);
-        else onClose();
+        if (onClose) onClose();
       } else if (e.key.toLowerCase() === "b") {
         setTradeSide("BUY");
         setActiveSubTab("TRADE");
@@ -180,62 +181,78 @@ export function FuturesDetailsDrawer({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, showPreviewModal, onClose]);
+  }, [isOpen, isInline, onClose]);
 
-  if (!isOpen || !contract) return null;
+  // If not open and not inline, don't render
+  if (!isInline && !isOpen) return null;
+
+  // Empty state if contract is not yet selected
+  if (!contract) {
+    const emptyContent = (
+      <div className="p-8 text-center flex flex-col items-center justify-center gap-3 bg-[#0A1422] border border-[#12304A] rounded-2xl shadow-xl font-sans text-slate-300">
+        <div className="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+          <Zap className="w-6 h-6 animate-pulse" />
+        </div>
+        <div className="space-y-1">
+          <h4 className="font-bold text-sm text-slate-100">Universal Trade Ticket</h4>
+          <p className="text-xs text-slate-400 font-mono max-w-xs">
+            Select any futures contract from the market table or click <span className="text-emerald-400 font-bold">BUY</span> / <span className="text-rose-400 font-bold">SELL</span> to configure and preview your order.
+          </p>
+        </div>
+      </div>
+    );
+
+    if (isInline) return emptyContent;
+    return (
+      <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="w-full max-w-md bg-[#0A1422] border-l border-[#12304A] p-6 flex items-center justify-center relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+          >
+            <X className="w-5 h-5" />
+          </button>
+          {emptyContent}
+        </div>
+      </div>
+    );
+  }
 
   const roundQty = (q: number) => Math.round(q * 10000) / 10000;
   const isStaleData = contract.freshness_status === "STALE" || contract.status === "STALE";
-
   const isIndian = contract.exchange === "NSE" || contract.currency === "INR";
   const currency = isIndian ? "₹" : "$";
-  const isConnected = contract.status === "CONNECTED" || contract.status === "LIVE";
-  const isDataOnly = !isConnected || contract.status === "NOT_CONFIGURED" || contract.status === "AUTH_REQUIRED";
-
   const multiplier = contract.contract_multiplier || 1.0;
-  const notionalValue = quantity * effectivePrice * multiplier;
-  const requiredInitialMargin = leverage > 0 ? notionalValue / leverage : notionalValue;
-  const maintenanceMargin = requiredInitialMargin * 0.5;
-  const estimatedFee = notionalValue * ((contract.taker_fee_pct || 0.05) / 100);
 
-  // Broker specific funds
-  const brokerKey = (contract.market_data_provider || contract.provider || "PAPER").toUpperCase();
-  const matchedAccountKey = brokerKey.includes("DELTA")
-    ? "DELTA"
-    : brokerKey.includes("DHAN")
-    ? "DHAN"
-    : brokerKey.includes("UPSTOX")
-    ? "UPSTOX"
-    : brokerKey.includes("BINANCE")
-    ? "BINANCE"
-    : "PAPER";
-  
-  const brokerAccount = accountMargins[matchedAccountKey] || {
-    available_margin: 100000.0,
-    currency: currency,
-    status: "CONNECTED",
-    displayName: `${contract.provider || "Broker"} Account`,
+  // Real-time calculations
+  const estimatedNotional = quantity * effectivePrice * multiplier;
+  const requiredInitialMargin = leverage > 0 ? estimatedNotional / leverage : estimatedNotional;
+  const estimatedTakerFee = estimatedNotional * ((contract.taker_fee_pct || 0.05) / 100);
+
+  // Broker Account Mapping
+  const brokerKey = contract.exchange === "NSE" ? (contract.provider?.toUpperCase().includes("DHAN") ? "DHAN" : "UPSTOX") : (contract.provider?.toUpperCase().includes("DELTA") ? "DELTA" : "BINANCE");
+  const brokerAccount = accountMargins[brokerKey] || {
+    displayName: contract.provider || "Exchange Gateway",
+    available_margin: isIndian ? 450000.0 : 14250.0,
+    margin_used: isIndian ? 125000.0 : 1945.0,
+    currency: isIndian ? "INR" : "USDT",
+    max_leverage: contract.max_leverage || 50,
   };
 
-  // Position after fill preview
-  const currentPosQty = currentPosition ? (currentPosition.side === "LONG" ? currentPosition.quantity : -currentPosition.quantity) : 0;
+  const isDataOnly = contract.status === "DATA_ONLY" || contract.market_data_provider === "UNCONFIGURED";
+
+  // Position impact calculations
+  const currQty = currentPosition ? (currentPosition.side === "LONG" ? currentPosition.quantity : -currentPosition.quantity) : 0;
   const tradeDelta = tradeSide === "BUY" ? quantity : -quantity;
-  const afterPosQty = currentPosQty + tradeDelta;
+  const afterPosQty = currQty + tradeDelta;
   const afterPosSide = afterPosQty > 0 ? "LONG" : afterPosQty < 0 ? "SHORT" : "FLAT";
 
-  // Handle book price click (populates limit price)
-  const handlePriceClick = (price: number) => {
-    setLimitPrice(price.toString());
-    setOrderType("LIMIT");
-    setActiveSubTab("TRADE");
-  };
-
-  // Handle Execution
-  const handleExecute = async () => {
+  // Handle Order Preview & Execution
+  const handleOpenOrderPreview = () => {
     if (isDataOnly) {
       setFeedback({
         status: "ERROR",
-        message: `Execution blocked: Data source ${contract.provider} is ${contract.status}.`,
+        message: `Order blocked: ${contract.provider} is currently configured as a Data-Only feed. Execution is disabled.`,
       });
       return;
     }
@@ -248,63 +265,25 @@ export function FuturesDetailsDrawer({
       return;
     }
 
-    setIsSubmitting(true);
-    setExecutionState("VALIDATING");
-    setFeedback(null);
-
-    const idempotencyKey = `idemp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    setTimeout(async () => {
-      setExecutionState("SUBMITTING");
-      const res = await submitFuturesOrderIntent({
-        symbol: contract.symbol,
-        side: tradeSide,
-        quantity,
-        order_type: orderType,
-        limit_price: orderType === "LIMIT" || orderType === "STOP_LIMIT" ? parseFloat(limitPrice) : undefined,
-        leverage,
-        margin_mode: marginMode,
-        stop_loss: stopLoss ? parseFloat(stopLoss) : undefined,
-        take_profit: takeProfit ? parseFloat(takeProfit) : undefined,
-        mode: executionMode,
-        idempotency_key: idempotencyKey,
-      });
-
-      setIsSubmitting(false);
-
-      if (res.status === "SUCCESS" && res.result) {
-        setExecutionState("FILLED");
-        setFeedback({
-          status: "SUCCESS",
-          message: res.result.message || `Successfully executed ${executionMode} ${tradeSide} order for ${quantity} ${contract.underlying}!`,
-        });
-        if (onOrderSuccess) onOrderSuccess(res.result);
-        setShowPreviewModal(false);
-        setTimeout(() => {
-          setExecutionState("IDLE");
-          setFeedback(null);
-        }, 3500);
-      } else {
-        setExecutionState("ERROR");
-        setFeedback({
-          status: "ERROR",
-          message: res.message || "Order execution rejected by risk engine.",
-        });
-      }
-    }, 400);
+    // Open Pre-Trade Order Review Modal for safe confirmation
+    setOrderReviewOpen(true, contract, tradeSide);
   };
 
-  return (
-    <div className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-[#070D1A] border-l border-slate-800 shadow-2xl flex flex-col font-sans text-slate-200 text-xs animate-in slide-in-from-right duration-200 select-none">
+  const ticketContent = (
+    <div className={`w-full bg-[#0A1422] border border-[#12304A] shadow-xl flex flex-col font-sans text-slate-200 text-xs select-none ${
+      isInline
+        ? "rounded-2xl max-h-[calc(100vh-88px)] overflow-hidden"
+        : "h-full overflow-hidden"
+    }`}>
       {/* 1. Header Bar */}
-      <div className="p-4 border-b border-slate-800/90 bg-[#0B1326] shrink-0 space-y-2">
+      <div className="p-3.5 border-b border-[#12304A] bg-[#0C1727] shrink-0 space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-lg bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center font-bold text-xs text-cyan-300 font-mono shrink-0">
               {contract.underlying.substring(0, 3)}
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-white font-mono text-sm truncate flex items-center gap-1.5">
+              <h3 className="font-bold text-white font-mono text-xs sm:text-sm truncate flex items-center gap-1.5">
                 <span>{contract.displayName || contract.symbol}</span>
                 <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-semibold border border-slate-700">
                   {contract.contract_type === "PERPETUAL" ? "PERP" : "FUT"}
@@ -318,42 +297,49 @@ export function FuturesDetailsDrawer({
                   {contract.status === "LIVE" || contract.status === "CONNECTED" ? "LIVE FEED" : contract.status}
                 </span>
                 <span>•</span>
-                <span className="text-slate-400">{executionMode} MODE</span>
+                <span className="text-cyan-400 font-semibold">{executionMode}</span>
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
-            title="Close Drawer (Esc)"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          {!isInline && onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              title="Close Drawer (Esc)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {/* Live Telemetry Summary */}
-        <div className="grid grid-cols-4 gap-1.5 p-2 bg-slate-900/90 rounded-xl border border-slate-800 font-mono text-[11px]">
+        {/* Live Telemetry Summary Grid */}
+        <div className="grid grid-cols-4 gap-1 p-2 bg-[#06101B] rounded-xl border border-[#12304A] font-mono text-[10px]">
           <div>
-            <span className="text-[9px] text-slate-500 block uppercase">LTP</span>
-            <strong className="text-white">
+            <span className="text-[8px] text-slate-500 block uppercase">LTP</span>
+            <strong className="text-white truncate block">
               {contract.last_price != null ? `${currency}${contract.last_price.toLocaleString()}` : "—"}
             </strong>
           </div>
           <div>
-            <span className="text-[9px] text-slate-500 block uppercase">Best Bid</span>
-            <strong className="text-emerald-400">
-              {contract.bid != null ? `${currency}${contract.bid.toLocaleString()}` : "—"}
+            <span className="text-[8px] text-slate-500 block uppercase">24H %</span>
+            <strong
+              className={`truncate block ${
+                (contract.change_24h_pct || 0) >= 0 ? "text-emerald-400" : "text-rose-400"
+              }`}
+            >
+              {(contract.change_24h_pct || 0) >= 0 ? "+" : ""}
+              {(contract.change_24h_pct || 0).toFixed(2)}%
             </strong>
           </div>
           <div>
-            <span className="text-[9px] text-slate-500 block uppercase">Best Ask</span>
-            <strong className="text-rose-400">
-              {contract.ask != null ? `${currency}${contract.ask.toLocaleString()}` : "—"}
+            <span className="text-[8px] text-slate-500 block uppercase">BID / ASK</span>
+            <strong className="text-slate-300 truncate block">
+              {contract.bid && contract.ask ? `${contract.bid} / ${contract.ask}` : "—"}
             </strong>
           </div>
           <div>
-            <span className="text-[9px] text-slate-500 block uppercase">Spread</span>
-            <strong className="text-cyan-300">
+            <span className="text-[8px] text-slate-500 block uppercase">SPREAD</span>
+            <strong className="text-cyan-300 truncate block">
               {contract.bid && contract.ask
                 ? `${currency}${(contract.ask - contract.bid).toFixed(2)}`
                 : "—"}
@@ -361,63 +347,39 @@ export function FuturesDetailsDrawer({
           </div>
         </div>
 
-        {/* Drawer Tabs */}
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs">
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("TRADE")}
-            className={`flex-1 py-1.5 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 ${
-              activeSubTab === "TRADE"
-                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-850"
-            }`}
-          >
-            <Zap className="w-3.5 h-3.5" />
-            <span>Trade Ticket</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("BOOK")}
-            className={`flex-1 py-1.5 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 ${
-              activeSubTab === "BOOK"
-                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-850"
-            }`}
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Order Book</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("METRICS")}
-            className={`flex-1 py-1.5 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 ${
-              activeSubTab === "METRICS"
-                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-850"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Metrics</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSubTab("RISK")}
-            className={`flex-1 py-1.5 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 ${
-              activeSubTab === "RISK"
-                ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-850"
-            }`}
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Risk Guard</span>
-          </button>
+        {/* Trade Ticket Subtabs */}
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-[#06101B] border border-[#12304A] font-mono text-xs">
+          {[
+            { id: "TRADE", label: "Trade Ticket", icon: Zap },
+            { id: "BOOK", label: "Order Book", icon: BookOpen },
+            { id: "METRICS", label: "Metrics", icon: Layers },
+            { id: "RISK", label: "Risk Guard", icon: Shield },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeSubTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveSubTab(tab.id as any)}
+                className={`flex-1 py-1 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 text-[11px] ${
+                  isActive
+                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {/* 2. Feedback Message */}
       {feedback && (
         <div
-          className={`mx-4 mt-3 p-3 rounded-xl border font-mono text-xs flex items-center justify-between gap-2 animate-in fade-in ${
+          className={`mx-3 mt-2 p-2.5 rounded-xl border font-mono text-xs flex items-center justify-between gap-2 animate-in fade-in ${
             feedback.status === "SUCCESS"
               ? "bg-emerald-950/80 border-emerald-500/50 text-emerald-200"
               : "bg-rose-950/80 border-rose-500/50 text-rose-200"
@@ -437,12 +399,12 @@ export function FuturesDetailsDrawer({
         </div>
       )}
 
-      {/* 3. Main Drawer Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
+      {/* 3. Main Drawer / Ticket Scrollable Body */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
         {activeSubTab === "TRADE" ? (
-          <div className="space-y-4 font-mono">
+          <div className="space-y-3.5 font-mono">
             {/* BUY / SELL Direction Tabs */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-950 rounded-xl border border-slate-800">
+            <div className="grid grid-cols-2 gap-2 p-1 bg-[#06101B] rounded-xl border border-[#12304A]">
               <button
                 type="button"
                 onClick={() => setTradeSide("BUY")}
@@ -468,7 +430,7 @@ export function FuturesDetailsDrawer({
             </div>
 
             {/* Order Type Tabs */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-950 rounded-xl border border-slate-800 text-[11px]">
+            <div className="flex items-center gap-1 p-1 bg-[#06101B] rounded-xl border border-[#12304A] text-[10px]">
               {(["MARKET", "LIMIT", "STOP", "STOP_LIMIT"] as const).map((t) => (
                 <button
                   key={t}
@@ -476,7 +438,7 @@ export function FuturesDetailsDrawer({
                   onClick={() => setOrderType(t)}
                   className={`flex-1 py-1.5 rounded-lg font-bold transition text-center ${
                     orderType === t
-                      ? "bg-slate-800 text-cyan-300 border border-slate-700"
+                      ? "bg-[#168BFF] text-white shadow-sm"
                       : "text-slate-400 hover:text-white"
                   }`}
                 >
@@ -495,8 +457,8 @@ export function FuturesDetailsDrawer({
                     step={contract.tick_size || 0.1}
                     value={limitPrice}
                     onChange={(e) => setLimitPrice(e.target.value)}
-                    placeholder="Enter limit price"
-                    className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
+                    placeholder="Limit price"
+                    className="w-full bg-[#06101B] border border-[#12304A] focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
                   />
                 </div>
                 {(orderType === "STOP" || orderType === "STOP_LIMIT") && (
@@ -508,7 +470,7 @@ export function FuturesDetailsDrawer({
                       value={stopPrice}
                       onChange={(e) => setStopPrice(e.target.value)}
                       placeholder="Stop trigger"
-                      className="w-full bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
+                      className="w-full bg-[#06101B] border border-[#12304A] focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
                     />
                   </div>
                 )}
@@ -520,14 +482,14 @@ export function FuturesDetailsDrawer({
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Order Quantity ({contract.underlying})</span>
                 <span className="text-slate-500 text-[10px]">
-                  Lot: {contract.lot_size || 1} • Multiplier: {multiplier}x
+                  Lot: {contract.lot_size || 1} • Mult: {multiplier}x
                 </span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setQuantity(Math.max(contract.min_qty || 0.01, roundQty(quantity - (contract.lot_size || 1.0))))}
-                  className="w-9 h-9 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-slate-700 flex items-center justify-center text-sm"
+                  className="w-8 h-8 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-[#12304A] flex items-center justify-center text-sm"
                 >
                   -
                 </button>
@@ -537,12 +499,12 @@ export function FuturesDetailsDrawer({
                   min={contract.min_qty || 0.01}
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(0.0001, parseFloat(e.target.value) || 0))}
-                  className="flex-1 bg-slate-950 border border-slate-800 focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs text-center outline-none"
+                  className="flex-1 bg-[#06101B] border border-[#12304A] focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs text-center outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setQuantity(roundQty(quantity + (contract.lot_size || 1.0)))}
-                  className="w-9 h-9 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-slate-700 flex items-center justify-center text-sm"
+                  className="w-8 h-8 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-[#12304A] flex items-center justify-center text-sm"
                 >
                   +
                 </button>
@@ -558,9 +520,9 @@ export function FuturesDetailsDrawer({
                       const avail = brokerAccount.available_margin || 10000;
                       const maxAffordableNotional = avail * leverage * 0.95;
                       const calculatedQty = maxAffordableNotional / Math.max(1, effectivePrice * multiplier);
-                      setQuantity(roundQty(calculatedQty * frac));
+                      setQuantity(roundQty(Math.max(contract.min_qty || 0.01, calculatedQty * frac)));
                     }}
-                    className="py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-slate-800 text-[10px] font-bold transition"
+                    className="py-1 rounded-md bg-[#06101B] hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-[#12304A] text-[10px] font-bold transition"
                   >
                     {frac * 100}%
                   </button>
@@ -569,19 +531,19 @@ export function FuturesDetailsDrawer({
             </div>
 
             {/* Leverage & Margin Controls */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2.5">
+            <div className="p-3 bg-[#06101B] rounded-xl border border-[#12304A] space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-bold text-white">Leverage: {leverage}x</span>
+                <span className="font-bold text-white">Leverage: <span className="text-cyan-400">{leverage}x</span></span>
                 <div className="flex items-center gap-1">
                   {(["ISOLATED", "CROSS"] as const).map((m) => (
                     <button
                       key={m}
                       type="button"
                       onClick={() => setMarginMode(m)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                      className={`px-2 py-0.5 rounded text-[9px] font-bold border transition ${
                         marginMode === m
                           ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-                          : "bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300"
+                          : "bg-slate-900 text-slate-500 border-[#12304A] hover:text-slate-300"
                       }`}
                     >
                       {m}
@@ -591,16 +553,16 @@ export function FuturesDetailsDrawer({
               </div>
 
               {/* Quick Leverage Preset Chips */}
-              <div className="flex items-center gap-1.5 overflow-x-auto">
+              <div className="flex items-center gap-1 overflow-x-auto pb-1">
                 {[1, 2, 3, 5, 10, 20, 50, 100].filter((l) => l <= (contract.max_leverage || 100)).map((lev) => (
                   <button
                     key={lev}
                     type="button"
                     onClick={() => setLeverage(lev)}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold border transition shrink-0 ${
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition shrink-0 ${
                       leverage === lev
-                        ? "bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold"
-                        : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                        ? "bg-cyan-500 text-slate-950 border-cyan-400 font-extrabold shadow-sm"
+                        : "bg-slate-900 text-slate-400 border-[#12304A] hover:text-white"
                     }`}
                   >
                     {lev}x
@@ -608,28 +570,28 @@ export function FuturesDetailsDrawer({
                 ))}
               </div>
 
-              {/* Margin & Liquidation Snapshot */}
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[11px]">
+              {/* Margin & Liquidation Snapshot 2-column Grid */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#12304A] text-[10px]">
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Required Initial Margin</span>
+                  <span className="text-slate-500 block text-[9px]">Required Initial Margin</span>
                   <strong className="text-white">
                     {currency}{requiredInitialMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Available Capital</span>
+                  <span className="text-slate-500 block text-[9px]">Available Capital</span>
                   <strong className="text-emerald-400">
                     {currency}{(brokerAccount.available_margin || 0).toLocaleString()}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Est. Liquidation Price</span>
+                  <span className="text-slate-500 block text-[9px]">Est. Liquidation Price</span>
                   <strong className="text-amber-400">
                     {liqResult?.liquidationPrice ? `${currency}${liqResult.liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
                   </strong>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px]">Liq Distance</span>
+                  <span className="text-slate-500 block text-[9px]">Liq Distance</span>
                   <strong className={liqResult?.liquidationDistancePct && liqResult.liquidationDistancePct < 5 ? "text-rose-400" : "text-slate-300"}>
                     {liqResult?.liquidationDistancePct ? `${liqResult.liquidationDistancePct}%` : "—"}
                   </strong>
@@ -638,12 +600,12 @@ export function FuturesDetailsDrawer({
             </div>
 
             {/* Position Impact Preview */}
-            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 space-y-1.5 text-[11px]">
+            <div className="p-2.5 bg-[#081220] rounded-xl border border-[#12304A] space-y-1.5 text-[10px]">
               <div className="text-slate-400 font-bold flex items-center justify-between">
-                <span>Position Impact Preview</span>
-                <span className="text-slate-500 text-[10px]">Auto-Calculated</span>
+                <span>POSITION IMPACT PREVIEW</span>
+                <span className="text-slate-500 text-[9px]">Auto-Calculated</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[10px]">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
                   <span className="text-slate-500 block">Current Position</span>
                   <span className="font-bold text-slate-300">
@@ -668,74 +630,41 @@ export function FuturesDetailsDrawer({
             </div>
 
             {/* Stop Loss & Take Profit (Optional Protection) */}
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2 text-[11px]">
+            <div className="p-2.5 bg-[#06101B] rounded-xl border border-[#12304A] space-y-2 text-[10px]">
               <span className="text-slate-400 font-bold block">Protection Targets (SL / TP)</span>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[10px] text-slate-500 block mb-1">Stop Loss ({currency})</label>
+                  <label className="text-[9px] text-slate-500 block mb-0.5">Stop Loss ({currency})</label>
                   <input
                     type="number"
                     step={contract.tick_size || 0.1}
                     value={stopLoss}
                     onChange={(e) => setStopLoss(e.target.value)}
                     placeholder="Optional SL price"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-rose-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
+                    className="w-full bg-slate-900 border border-[#12304A] focus:border-rose-500 rounded-lg p-1.5 text-white font-bold text-xs outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-slate-500 block mb-1">Take Profit ({currency})</label>
+                  <label className="text-[9px] text-slate-500 block mb-0.5">Take Profit ({currency})</label>
                   <input
                     type="number"
                     step={contract.tick_size || 0.1}
                     value={takeProfit}
                     onChange={(e) => setTakeProfit(e.target.value)}
                     placeholder="Optional TP price"
-                    className="w-full bg-slate-900 border border-slate-800 focus:border-emerald-500 rounded-lg p-2 text-white font-bold text-xs outline-none"
+                    className="w-full bg-slate-900 border border-[#12304A] focus:border-emerald-500 rounded-lg p-1.5 text-white font-bold text-xs outline-none"
                   />
                 </div>
               </div>
             </div>
-
-            {/* Action Buttons */}
-            <div className="pt-2 space-y-2">
-              <button
-                type="button"
-                onClick={() => setShowPreviewModal(true)}
-                disabled={isSubmitting || isDataOnly}
-                className={`w-full py-3 rounded-xl font-bold font-mono text-xs transition shadow-lg flex items-center justify-center gap-2 active:scale-98 ${
-                  isDataOnly
-                    ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
-                    : tradeSide === "BUY"
-                    ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
-                    : "bg-rose-500 hover:bg-rose-400 text-slate-950 shadow-rose-500/20"
-                }`}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Activity className="w-4 h-4 animate-spin" />
-                    <span>Processing {executionState}...</span>
-                  </>
-                ) : isDataOnly ? (
-                  <>
-                    <Lock className="w-4 h-4 text-slate-500" />
-                    <span>Data Only Feed (Execution Disabled)</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Preview & Submit {tradeSide === "BUY" ? "LONG / BUY" : "SHORT / SELL"}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
-                )}
-              </button>
-            </div>
           </div>
         ) : activeSubTab === "BOOK" ? (
           /* Live Interactive Order Book View */
-          <div className="space-y-4 font-mono">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-white flex items-center gap-1.5">
-                <BookOpen className="w-4 h-4 text-cyan-400" />
-                <span>Level-2 Order Book Depth</span>
+          <div className="space-y-3 font-mono text-xs">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="font-bold text-white flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Order Book Depth</span>
               </span>
               <div className="flex items-center gap-1">
                 {([5, 10, 20] as const).map((d) => (
@@ -743,10 +672,10 @@ export function FuturesDetailsDrawer({
                     key={d}
                     type="button"
                     onClick={() => setDepthLimit(d)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold border transition ${
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition ${
                       depthLimit === d
                         ? "bg-cyan-500/20 text-cyan-300 border-cyan-500/50"
-                        : "bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300"
+                        : "bg-slate-900 text-slate-500 border-[#12304A] hover:text-slate-300"
                     }`}
                   >
                     {d}L
@@ -757,7 +686,7 @@ export function FuturesDetailsDrawer({
 
             {/* Asks */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-500 uppercase px-2 font-semibold">
+              <div className="flex justify-between text-[9px] text-slate-500 uppercase px-1 font-semibold">
                 <span>Ask Price ({currency})</span>
                 <span>Size</span>
                 <span>Total</span>
@@ -772,27 +701,27 @@ export function FuturesDetailsDrawer({
                       setLimitPrice(level.price.toString());
                       setActiveSubTab("TRADE");
                     }}
-                    className="w-full flex justify-between items-center px-2 py-1 rounded bg-rose-500/5 hover:bg-rose-500/20 text-xs border border-rose-500/10 transition text-left group"
+                    className="w-full flex justify-between items-center px-2 py-0.5 rounded bg-rose-500/5 hover:bg-rose-500/20 text-[11px] border border-rose-500/10 transition text-left group"
                   >
                     <span className="font-bold text-rose-400 group-hover:underline">
                       {level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-slate-300">{level.quantity.toFixed(3)}</span>
-                    <span className="text-slate-500 text-[10px]">{(level.total || level.quantity).toFixed(3)}</span>
+                    <span className="text-slate-500 text-[9px]">{(level.total || level.quantity).toFixed(3)}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Mid Market / Spread */}
-            <div className="py-2.5 px-3 bg-slate-950 border-y border-slate-800/80 flex items-center justify-between text-xs font-bold">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400">LTP:</span>
-                <span className="text-white text-sm">
+            <div className="py-1.5 px-2 bg-[#06101B] border-y border-[#12304A] flex items-center justify-between text-xs font-bold">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 text-[10px]">LTP:</span>
+                <span className="text-white text-xs">
                   {currency}{(contract.last_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-[10px]">
+              <div className="flex items-center gap-1.5 text-[9px]">
                 <span className="text-slate-500">Spread:</span>
                 <span className="text-cyan-400 font-mono">
                   {currency}{((orderBook?.spread) || Math.abs((contract.ask || 0) - (contract.bid || 0))).toFixed(2)}
@@ -802,7 +731,7 @@ export function FuturesDetailsDrawer({
 
             {/* Bids */}
             <div className="space-y-1">
-              <div className="flex justify-between text-[10px] text-slate-500 uppercase px-2 font-semibold">
+              <div className="flex justify-between text-[9px] text-slate-500 uppercase px-1 font-semibold">
                 <span>Bid Price ({currency})</span>
                 <span>Size</span>
                 <span>Total</span>
@@ -817,56 +746,43 @@ export function FuturesDetailsDrawer({
                       setLimitPrice(level.price.toString());
                       setActiveSubTab("TRADE");
                     }}
-                    className="w-full flex justify-between items-center px-2 py-1 rounded bg-emerald-500/5 hover:bg-emerald-500/20 text-xs border border-emerald-500/10 transition text-left group"
+                    className="w-full flex justify-between items-center px-2 py-0.5 rounded bg-emerald-500/5 hover:bg-emerald-500/20 text-[11px] border border-emerald-500/10 transition text-left group"
                   >
                     <span className="font-bold text-emerald-400 group-hover:underline">
                       {level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="text-slate-300">{level.quantity.toFixed(3)}</span>
-                    <span className="text-slate-500 text-[10px]">{(level.total || level.quantity).toFixed(3)}</span>
+                    <span className="text-slate-500 text-[9px]">{(level.total || level.quantity).toFixed(3)}</span>
                   </button>
                 ))}
-              </div>
-            </div>
-
-            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-1.5 text-[11px]">
-              <div className="flex justify-between">
-                <span className="text-slate-500">Imbalance Ratio:</span>
-                <span className="text-white font-bold">{((orderBook?.imbalance_ratio || 1.0) * 100).toFixed(1)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-500">Sentiment:</span>
-                <span className={`font-bold ${orderBook?.sentiment === "BULLISH" ? "text-emerald-400" : orderBook?.sentiment === "BEARISH" ? "text-rose-400" : "text-slate-400"}`}>
-                  {orderBook?.sentiment || "NEUTRAL"}
-                </span>
               </div>
             </div>
           </div>
         ) : activeSubTab === "METRICS" ? (
           /* Metrics & Basis View */
-          <div className="space-y-3 font-mono text-xs">
-            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-3">
-              <div className="flex justify-between items-center">
+          <div className="space-y-2.5 font-mono text-xs">
+            <div className="p-3 bg-[#06101B] rounded-xl border border-[#12304A] space-y-2">
+              <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Funding Rate (8h):</span>
                 {(() => {
                   const rate = typeof contract.funding_rate === "number" ? contract.funding_rate : contract.funding_rate?.funding_rate_8h;
                   return (
-                    <span className={`font-bold text-sm ${rate && rate > 0 ? "text-emerald-400" : rate && rate < 0 ? "text-rose-400" : "text-slate-400"}`}>
+                    <span className={`font-bold ${rate && rate > 0 ? "text-emerald-400" : rate && rate < 0 ? "text-rose-400" : "text-slate-400"}`}>
                       {rate !== null && rate !== undefined ? `${(rate * 100).toFixed(4)}%` : "—"}
                     </span>
                   );
                 })()}
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Mark Price:</span>
                 <span className="text-white font-bold">{currency}{(contract.mark_price || contract.last_price || 0).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Index Price:</span>
                 <span className="text-slate-300">{currency}{(contract.index_price || contract.last_price || 0).toLocaleString()}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Basis (Mark - Index):</span>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-slate-400">Basis:</span>
                 {(() => {
                   const b = typeof contract.basis === "number" ? contract.basis : contract.basis?.basis_absolute;
                   return (
@@ -876,45 +792,33 @@ export function FuturesDetailsDrawer({
                   );
                 })()}
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Contract Type:</span>
-                <span className="text-slate-300 font-bold">{contract.contract_type}</span>
-              </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Provider Source:</span>
                 <span className="text-cyan-400 font-bold">{contract.provider || contract.venue}</span>
               </div>
-              <div className="flex justify-between items-center">
+              <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Lot Size:</span>
                 <span className="text-white">{contract.lot_size || 1}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-slate-400">Tick Size:</span>
-                <span className="text-white">{contract.tick_size || 0.1}</span>
               </div>
             </div>
           </div>
         ) : (
           /* Risk Guard View */
-          <div className="space-y-3 font-mono text-xs">
-            <div className="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
-              <span className="text-[11px] text-slate-400 font-bold uppercase block mb-2">Pre-Trade Risk Engine Status</span>
+          <div className="space-y-2.5 font-mono text-xs">
+            <div className="p-3 bg-[#06101B] rounded-xl border border-[#12304A] space-y-1.5">
+              <span className="text-[10px] text-slate-400 font-bold uppercase block mb-1">Pre-Trade Risk Engine Status</span>
               {[
-                { stage: "Broker Authentication", status: "PASS" },
-                { stage: "Market Data Freshness", status: isStaleData ? "FAIL" : "LIVE" },
-                { stage: "Order Book Depth", status: "LIVE" },
-                { stage: "Available Margin Funds", status: "PASS" },
-                { stage: "Leverage Limit Verification", status: "PASS" },
-                { stage: "Max Position Threshold", status: "PASS" },
-                { stage: "Daily Drawdown Monitor", status: "PASS" },
-                { stage: "Duplicate Replay Check", status: "CLEARED" },
-                { stage: "Emergency Kill Switch", status: "DISARMED" },
+                { stage: "Broker Auth", status: "PASS" },
+                { stage: "Data Freshness", status: isStaleData ? "FAIL" : "LIVE" },
+                { stage: "Available Margin", status: "PASS" },
+                { stage: "Leverage Limit", status: "PASS" },
+                { stage: "Kill Switch", status: "DISARMED" },
                 { stage: "OMS Readiness", status: "READY" },
               ].map((item, idx) => (
-                <div key={idx} className="flex justify-between items-center py-1 border-b border-slate-900">
-                  <span className="text-slate-400 text-[11px]">{item.stage}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                    item.status === "PASS" || item.status === "LIVE" || item.status === "CLEARED" || item.status === "READY"
+                <div key={idx} className="flex justify-between items-center py-0.5 border-b border-slate-900 text-[10px]">
+                  <span className="text-slate-400">{item.stage}</span>
+                  <span className={`font-bold px-1.5 py-0.2 rounded text-[9px] ${
+                    item.status === "PASS" || item.status === "LIVE" || item.status === "READY"
                       ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
                       : item.status === "DISARMED"
                       ? "bg-cyan-950 text-cyan-400 border border-cyan-800"
@@ -929,12 +833,52 @@ export function FuturesDetailsDrawer({
         )}
       </div>
 
-      {/* Footer */}
-      <div className="pt-3 border-t border-slate-800 flex items-center justify-between shrink-0 font-mono text-[11px]">
-        <div className="flex items-center gap-2 text-slate-400">
-          <Radio className={`w-3.5 h-3.5 ${isStaleData ? "text-amber-400 animate-pulse" : "text-emerald-400"}`} />
-          <span>{contract.provider || contract.venue} • {isStaleData ? "STALE DATA" : "LIVE FEED"}</span>
+      {/* 4. Sticky Bottom Action CTA */}
+      {activeSubTab === "TRADE" && (
+        <div className="p-3 border-t border-[#12304A] bg-[#0A1422] shrink-0">
+          <button
+            type="button"
+            onClick={handleOpenOrderPreview}
+            disabled={isSubmitting || isDataOnly}
+            className={`w-full py-2.5 rounded-xl font-bold font-mono text-xs transition shadow-lg flex items-center justify-center gap-2 active:scale-98 ${
+              isDataOnly
+                ? "bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700"
+                : tradeSide === "BUY"
+                ? "bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20"
+                : "bg-rose-500 hover:bg-rose-400 text-slate-950 shadow-rose-500/20"
+            }`}
+          >
+            {isSubmitting ? (
+              <>
+                <Activity className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
+              </>
+            ) : isDataOnly ? (
+              <>
+                <Lock className="w-4 h-4 text-slate-500" />
+                <span>Data Only Feed (Execution Disabled)</span>
+              </>
+            ) : (
+              <>
+                <span>PREVIEW & SUBMIT {tradeSide === "BUY" ? "LONG / BUY" : "SHORT / SELL"}</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
+          </button>
         </div>
+      )}
+    </div>
+  );
+
+  if (isInline) {
+    return ticketContent;
+  }
+
+  // Mobile / Tablet Drawer with semi-transparent backdrop
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="w-full max-w-md bg-[#0A1422] border-l border-[#12304A] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200">
+        {ticketContent}
       </div>
     </div>
   );

@@ -303,6 +303,194 @@ class LiveRunner:
                         and self.execution_mode == "PAPER"
                         and str(getattr(config, "TRADING_MODE", "PAPER")).upper() == "PAPER"
                     ):
+                        # Route the simulated exit through the same
+                        # centralized paper gateway.  A missing or rejected
+                        # fill never becomes a locally fabricated close.
+                        try:
+                            from src.execution_service import order_execution_service
+
+                            exit_res = order_execution_service.reduce_position(
+                                symbol=self.symbol,
+                                percentage=1.0,
+                                broker="PAPER",
+                                price=exit_price,
+                                bot_id=self.bot_id,
+                            )
+                        except Exception as exc:
+                            logger.error(
+                                "[%s] Paper exit gateway error; position remains open: %s",
+                                self.bot_id,
+                                exc,
+                                exc_info=True,
+                            )
+                            context.decision = "EXIT_REJECTED"
+                            return
+
+                        if not exit_res.get("success"):
+                            logger.warning(
+                                "[%s] Paper exit rejected; position remains open: %s",
+                                self.bot_id,
+                                exit_res.get("message") or "unknown reason",
+                            )
+                            context.decision = "EXIT_REJECTED"
+                            return
+
+                        closed_price = float(exit_res.get("exit_price") or 0.0)
+                        closed_trade_id = exit_res.get("trade_id", trade_id)
+                        if closed_price <= 0 or closed_trade_id is None:
+                            logger.error(
+                                "[%s] Paper exit gateway returned an incomplete result: %s",
+                                self.bot_id,
+                                exit_res,
+                            )
+                            context.decision = "EXIT_REJECTED"
+                            return
+
+                        db.log_bot_activity(
+                            self.bot_id,
+                            "TRADE_EXIT_AUTONOMOUS",
+                            f"PAPER EXIT: Closed Trade #{closed_trade_id} on {exit_reason} at {closed_price:,.2f}.",
+                            {
+                                "trade_id": closed_trade_id,
+                                "order_id": exit_res.get("order_id"),
+                                "exit_reason": exit_reason,
+                                "exit_price": closed_price,
+                                "realized_pnl": exit_res.get("net_pnl"),
+                                "execution_mode": "PAPER",
+                            },
+                        )
+
+                        self.telegram.send_message(
+                            f"🧪 <b>[PAPER EXECUTED EXIT]</b>\n"
+                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
+                            f"• <b>Symbol</b>: {self.symbol}\n"
+                            f"• <b>Reason</b>: {exit_reason}\n"
+                            f"• <b>Exit Price</b>: {closed_price:,.2f}\n"
+                            f"• <b>Realized P&amp;L</b>: <b>{exit_res.get("net_pnl", 0.0):+.2f}</b>\n"
+                            f"• <b>Status</b>: CLOSED"
+                        )
+
+                        context.signal = "EXIT_SIGNAL"
+                        context.decision = "CLOSED"
+                        context.open_trade = None
+                        return
+                    else:
+                        # Semi-Automated Approval Queue
+                        pending_exits = [p for p in db.get_pending_signal_approvals(self.bot_id) if p.get("signal_type") in ["EXIT_SIGNAL", "SQUARE_OFF"]]
+                        if not pending_exits:
+                            sig_id = db.create_pending_signal_approval(
+                                bot_id=self.bot_id,
+                                symbol=self.symbol,
+                                signal_type="EXIT_SIGNAL",
+                                price=close_price,
+                                confluence_pct=81.0,
+                                threshold_pct=75.0,
+                                sl_price=sl_price,
+                                tp_price=tp_price,
+                                position_size=size,
+                                strategy_details={"reason": exit_reason, "unrealized_pnl": exit_pnl, "entry_price": entry_price},
+                                timeframe=self.timeframe,
+                                strategy=self.bot_name
+                            )
+
+                            self.telegram.send_interactive_signal_alert(
+                                signal_id=sig_id,
+                                symbol=self.symbol,
+                                signal_type="EXIT_SIGNAL",
+                                price=close_price,
+                                confluence_pct=81.0,
+                                threshold_pct=75.0,
+                                current_position=direction,
+                                entry_price=entry_price
+                            )
+
+                            db.log_bot_activity(
+                                self.bot_id,
+                                "SIGNAL_APPROVAL_WAITING",
+                                f"🚨 POSITION ALERT: Strategy detected possible EXIT ({exit_reason}). Paused for user approval (ID: #{sig_id}).",
+                                {"signal_id": sig_id, "exit_reason": exit_reason, "unrealized_pnl": exit_pnl}
+                            )
+                        context.signal = "EXIT_SIGNAL"
+                        context.decision = "WAITING_APPROVAL"
+                        return
+                else:
+                    logger.info("[%s] Active trade SL/TP not hit. Holding position.", self.bot_id)
+                    context.signal = "HOLD"
+                    context.decision = "HOLD"
+                    db.log_signal(self.symbol, "HOLD", close_price, {}, False, "Holding open trade position")
+                    return
+
+            if not active_trade:
+                signal_row, filters, is_blocked, reason_row = self.strategy.evaluate_row(df, eval_idx)
+                direction_conf, score_conf, conf_details = self.strategy.evaluate_confluence(df, eval_idx, active_indicators=self.indicators)
+                
+                thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
+                if direction_conf == "SHORT":
+                    conf_pct = float(conf_details.get("bear_score_pct", 0.0))
+                elif direction_conf == "LONG":
+                    conf_pct = float(conf_details.get("bull_score_pct", 0.0))
+                else:
+                    conf_pct = max(float(conf_details.get("bull_score_pct", 0.0)), float(conf_details.get("bear_score_pct", 0.0)))
+                
+                if direction_conf in ["LONG", "SHORT"] and score_conf >= conf_details.get("threshold", 0.75):
+                    signal = direction_conf
+                    reason = f"Confluence score: {conf_pct:.0f}% ({direction_conf}) meets {thresh_pct:.0f}% threshold"
+                else:
+                    signal = signal_row
+                    reason = reason_row or f"Confluence score: {conf_pct:.0f}% ({signal})"
+
+                context.signal = signal
+                context.decision = signal if not is_blocked else "HOLD"
+
+                # Log decision breakdown for Advanced Logs transparency tab
+                counts = conf_details.get("summary_counts", {})
+                db.log_bot_decision(
+                    bot_id=self.bot_id,
+                    price=close_price,
+                    timeframe=self.timeframe,
+                    regime=conf_details.get("regime", "RANGING"),
+                    adx=conf_details.get("adx", 15.0),
+                    bullish_count=counts.get("bullish", 0),
+                    bearish_count=counts.get("bearish", 0),
+                    neutral_count=counts.get("neutral", 0),
+                    total_indicators=counts.get("total", 4),
+                    confluence_pct=conf_pct,
+                    threshold_pct=thresh_pct,
+                    decision=context.decision,
+                    reason=reason,
+                    indicators_details=conf_details.get("indicator_details", {})
+                )
+
+                todays_pnl = db.get_todays_pnl(self.symbol)
+                daily_limit_hit = self.risk_manager.check_daily_loss_limit(todays_pnl, balance)
+
+                if daily_limit_hit and signal in ["LONG", "SHORT"]:
+                    logger.warning("Daily loss limit exceeded. Entry signal blocked.")
+                    is_blocked = True
+                    reason = f"Daily Loss Limit hit (Today PnL: {todays_pnl:.2f} USDT). Signal {signal} blocked."
+                    signal = "HOLD"
+                    context.signal = signal
+                    context.decision = "HOLD"
+
+                db.log_signal(self.symbol, signal, close_price, filters, is_blocked, reason, {
+                    "timeframe": self.timeframe,
+                    "balance": balance,
+                    "close_price": close_price,
+                })
+
+                if signal in ["LONG", "SHORT"] and not is_blocked:
+                    sl_price, tp_price = self.risk_manager.calculate_trade_levels(df, eval_idx, signal, close_price)
+                    size = self.risk_manager.calculate_position_size(balance, close_price, sl_price)
+
+                    conf_pct = float(conf_details.get("bear_score_pct" if signal == "SHORT" else "bull_score_pct", 75.0))
+                    thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
+
+                    if (
+                        self.auto_execute
+                        and not self.require_manual_approval
+                        and self.execution_mode == "PAPER"
+                        and str(getattr(config, "TRADING_MODE", "PAPER")).upper() == "PAPER"
+                    ):
                         # The only autonomous path is the centralized paper
                         # adapter.  A broker failure must not become a local
                         # fabricated OPEN trade.
@@ -352,9 +540,9 @@ class LiveRunner:
                             return
 
                         order_id = str(order_res.get("order_id") or "")
-                        trade_id = order_res.get("trade_id")
+                        recorded_trade_id = order_res.get("trade_id")
                         exec_price = float(order_res.get("fill_price") or 0.0)
-                        if not order_id or trade_id is None or exec_price <= 0:
+                        if not order_id or recorded_trade_id is None or exec_price <= 0:
                             logger.error(
                                 "[%s] Paper gateway returned incomplete fill; no local trade was created: %s",
                                 self.bot_id,
@@ -366,10 +554,10 @@ class LiveRunner:
                         db.log_bot_activity(
                             self.bot_id,
                             "TRADE_ENTRY_AUTONOMOUS",
-                            f"PAPER EXECUTED: Opened {signal} position (Trade #{trade_id}) at {exec_price:,.2f} "
+                            f"PAPER EXECUTED: Opened {signal} position (Trade #{recorded_trade_id}) at {exec_price:,.2f} "
                             f"(SL: {sl_price:,.2f}, TP: {tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
                             {
-                                "trade_id": trade_id,
+                                "trade_id": recorded_trade_id,
                                 "order_id": order_id,
                                 "direction": signal,
                                 "entry_price": exec_price,
@@ -388,7 +576,7 @@ class LiveRunner:
                             f"• <b>Stop Loss</b>: {sl_price:,.2f}\n"
                             f"• <b>Take Profit</b>: {tp_price:,.2f}\n"
                             f"• <b>Confluence</b>: {conf_pct:.0f}% (Threshold: {thresh_pct:.0f}%)\n"
-                            f"• <b>Status</b>: PAPER / OPEN (Trade #{trade_id})"
+                            f"• <b>Status</b>: PAPER / OPEN (Trade #{recorded_trade_id})"
                         )
 
                         context.signal = signal
@@ -396,7 +584,7 @@ class LiveRunner:
                         logger.info(
                             "[%s] Paper order executed through centralized gateway (Trade #%s, %s at %.2f)",
                             self.bot_id,
-                            trade_id,
+                            recorded_trade_id,
                             signal,
                             exec_price,
                         )

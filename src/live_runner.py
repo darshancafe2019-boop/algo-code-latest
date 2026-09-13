@@ -24,7 +24,6 @@ from src.risk_manager import RiskManager
 from src.telegram_alert import TelegramAlert
 from src.monitoring import MonitoringService
 from src import db
-from src.execution import ExecutionEngine
 from src.audit import log_bot_event
 
 # Setup Logging
@@ -96,21 +95,22 @@ class LiveRunner:
                 cfg = {}
             self.indicators = cfg.get("indicators", ["ema", "macd", "vp"])
             self.risk_pct = float(cfg.get("risk_pct") or 0.02)
-            self.auto_execute = cfg.get("auto_execute", True)
-            self.require_manual_approval = cfg.get("require_manual_approval", False)
+            self.auto_execute = bool(cfg.get("auto_execute", False))
+            self.require_manual_approval = bool(cfg.get("require_manual_approval", True))
         else:
             self.symbol = config.SYMBOL
             self.timeframe = config.TIMEFRAME
             self.bot_name = f"Bot {self.bot_id}"
             self.indicators = ["ema", "macd", "vp"]
             self.risk_pct = 0.02
-            self.auto_execute = True
-            self.require_manual_approval = False
+            self.auto_execute = False
+            self.require_manual_approval = True
 
-        # Testnet data fetcher for balance checks and order simulation
+        # Keep market-data connectivity separate from order execution.  The
+        # runner never owns a direct broker order client; all paper orders must
+        # pass through OrderExecutionService.
         self.testnet_fetcher = get_testnet_fetcher()
-        # Execution engine for real orders on Binance Testnet (spot)
-        self.executor = ExecutionEngine(self.testnet_fetcher.exchange)
+        self.executor = None
         # Canonical Instrument Pre-Flight Resolution
         from src.instrument_resolver import global_instrument_resolver, ResolutionStatus
         from src.provider_manager import global_provider_manager
@@ -121,6 +121,12 @@ class LiveRunner:
         self.error_ledger = global_error_ledger
 
         exec_mode = b.get("execution_mode") or "PAPER" if row else "PAPER"
+        self.execution_mode = str(exec_mode or "PAPER").upper()
+        # A runner may auto-submit only through the paper adapter.  Live
+        # execution requires a separate, explicitly armed operator workflow.
+        if self.execution_mode != "PAPER" or str(getattr(config, "TRADING_MODE", "PAPER")).upper() != "PAPER":
+            self.auto_execute = False
+            self.require_manual_approval = True
         asset_class = b.get("asset_class") or "CRYPTO" if row else "CRYPTO"
         res = self.instrument_resolver.resolve_for_bot(self.symbol, execution_mode=exec_mode, asset_class=asset_class)
         if not res.is_valid:
@@ -291,210 +297,109 @@ class LiveRunner:
                 if exit_triggered:
                     logger.info("[%s] Active trade exit condition detected (%s)! Price: %.2f, PnL: %.2f.", self.bot_id, exit_reason, exit_price, exit_pnl)
                     
-                    if self.auto_execute and not self.require_manual_approval:
-                        # Fully Autonomous Exit Execution
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        conn = db.get_connection()
-                        c = conn.cursor()
-                        c.execute("""
-                            UPDATE trades_log SET
-                                exit_price = ?,
-                                exit_timestamp = ?,
-                                result_pnl = ?,
-                                net_pnl = ?,
-                                realized_pnl = ?,
-                                status = 'CLOSED',
-                                exit_reason = ?,
-                                remarks = ?
-                            WHERE id = ?
-                        """, (exit_price, now_iso, exit_pnl, exit_pnl, exit_pnl, exit_reason, f"Autonomous exit on {exit_reason}", trade_id))
+                    if (
+                        self.auto_execute
+                        and not self.require_manual_approval
+                        and self.execution_mode == "PAPER"
+                        and str(getattr(config, "TRADING_MODE", "PAPER")).upper() == "PAPER"
+                    ):
+                        # The only autonomous path is the centralized paper
+                        # adapter.  A broker failure must not become a local
+                        # fabricated OPEN trade.
                         try:
-                            c.execute("DELETE FROM positions WHERE bot_id = ? OR id = ?", (self.bot_id, trade_id))
-                        except Exception:
-                            pass
-                        conn.commit()
-                        conn.close()
+                            from src.execution_service import order_execution_service
 
-                        db.log_bot_activity(
-                            self.bot_id,
-                            "TRADE_EXIT_AUTONOMOUS",
-                            f"🎯 AUTO-EXECUTED EXIT: Closed Trade #{trade_id} on {exit_reason} at ${exit_price:,.2f} (PnL: {exit_pnl:+.2f} USDT).",
-                            {"trade_id": trade_id, "exit_reason": exit_reason, "exit_price": exit_price, "realized_pnl": exit_pnl}
-                        )
-
-                        self.telegram.send_message(
-                            f"🎯 <b>[AUTO-EXECUTED EXIT]</b>\n"
-                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
-                            f"• <b>Symbol</b>: {self.symbol}\n"
-                            f"• <b>Reason</b>: {exit_reason}\n"
-                            f"• <b>Exit Price</b>: ${exit_price:,.2f}\n"
-                            f"• <b>Realized P&L</b>: <b>{exit_pnl:+.2f} USDT</b>\n"
-                            f"• <b>Status</b>: CLOSED"
-                        )
-
-                        context.signal = "EXIT_SIGNAL"
-                        context.decision = "CLOSED"
-                        context.open_trade = None
-                        return
-                    else:
-                        # Semi-Automated Approval Queue
-                        pending_exits = [p for p in db.get_pending_signal_approvals(self.bot_id) if p.get("signal_type") in ["EXIT_SIGNAL", "SQUARE_OFF"]]
-                        if not pending_exits:
-                            sig_id = db.create_pending_signal_approval(
+                            order_res = order_execution_service.route_order(
+                                symbol=self.symbol,
+                                direction=signal,
+                                quantity=size,
+                                price=close_price,
+                                stop_loss=sl_price,
+                                take_profit=tp_price,
                                 bot_id=self.bot_id,
-                                symbol=self.symbol,
-                                signal_type="EXIT_SIGNAL",
-                                price=close_price,
-                                confluence_pct=81.0,
-                                threshold_pct=75.0,
-                                sl_price=sl_price,
-                                tp_price=tp_price,
-                                position_size=size,
-                                strategy_details={"reason": exit_reason, "unrealized_pnl": exit_pnl, "entry_price": entry_price},
-                                timeframe=self.timeframe,
-                                strategy=self.bot_name
+                                strategy=self.bot_name,
+                                confidence_score=conf_pct,
+                                mode="PAPER",
+                                broker="PAPER",
+                                client_order_id=f"{self.bot_id}:{self.symbol}:{candle_time}:{signal}",
                             )
-
-                            self.telegram.send_interactive_signal_alert(
-                                signal_id=sig_id,
-                                symbol=self.symbol,
-                                signal_type="EXIT_SIGNAL",
-                                price=close_price,
-                                confluence_pct=81.0,
-                                threshold_pct=75.0,
-                                current_position=direction,
-                                entry_price=entry_price
+                        except Exception as exc:
+                            logger.error(
+                                "[%s] Paper order gateway error; no trade was recorded: %s",
+                                self.bot_id,
+                                exc,
+                                exc_info=True,
                             )
-
                             db.log_bot_activity(
                                 self.bot_id,
-                                "SIGNAL_APPROVAL_WAITING",
-                                f"🚨 POSITION ALERT: Strategy detected possible EXIT ({exit_reason}). Paused for user approval (ID: #{sig_id}).",
-                                {"signal_id": sig_id, "exit_reason": exit_reason, "unrealized_pnl": exit_pnl}
+                                "ORDER_REJECTED",
+                                f"PAPER order gateway error: {exc}",
+                                {"symbol": self.symbol, "signal": signal, "error": str(exc)},
                             )
-                        context.signal = "EXIT_SIGNAL"
-                        context.decision = "WAITING_APPROVAL"
-                        return
-                else:
-                    logger.info("[%s] Active trade SL/TP not hit. Holding position.", self.bot_id)
-                    context.signal = "HOLD"
-                    context.decision = "HOLD"
-                    db.log_signal(self.symbol, "HOLD", close_price, {}, False, "Holding open trade position")
-                    return
+                            context.decision = "ORDER_REJECTED"
+                            return
 
-            if not active_trade:
-                signal_row, filters, is_blocked, reason_row = self.strategy.evaluate_row(df, eval_idx)
-                direction_conf, score_conf, conf_details = self.strategy.evaluate_confluence(df, eval_idx, active_indicators=self.indicators)
-                
-                thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
-                if direction_conf == "SHORT":
-                    conf_pct = float(conf_details.get("bear_score_pct", 0.0))
-                elif direction_conf == "LONG":
-                    conf_pct = float(conf_details.get("bull_score_pct", 0.0))
-                else:
-                    conf_pct = max(float(conf_details.get("bull_score_pct", 0.0)), float(conf_details.get("bear_score_pct", 0.0)))
-                
-                if direction_conf in ["LONG", "SHORT"] and score_conf >= conf_details.get("threshold", 0.75):
-                    signal = direction_conf
-                    reason = f"Confluence score: {conf_pct:.0f}% ({direction_conf}) meets {thresh_pct:.0f}% threshold"
-                else:
-                    signal = signal_row
-                    reason = reason_row or f"Confluence score: {conf_pct:.0f}% ({signal})"
+                        if not order_res.get("success"):
+                            reason = str(order_res.get("reason") or "Paper order rejected by execution gateway.")
+                            logger.warning("[%s] Paper order rejected: %s", self.bot_id, reason)
+                            db.log_bot_activity(
+                                self.bot_id,
+                                "ORDER_REJECTED",
+                                f"PAPER order rejected: {reason}",
+                                {"symbol": self.symbol, "signal": signal, "reason": reason},
+                            )
+                            context.decision = "ORDER_REJECTED"
+                            return
 
-                context.signal = signal
-                context.decision = signal if not is_blocked else "HOLD"
-
-                # Log decision breakdown for Advanced Logs transparency tab
-                counts = conf_details.get("summary_counts", {})
-                db.log_bot_decision(
-                    bot_id=self.bot_id,
-                    price=close_price,
-                    timeframe=self.timeframe,
-                    regime=conf_details.get("regime", "RANGING"),
-                    adx=conf_details.get("adx", 15.0),
-                    bullish_count=counts.get("bullish", 0),
-                    bearish_count=counts.get("bearish", 0),
-                    neutral_count=counts.get("neutral", 0),
-                    total_indicators=counts.get("total", 4),
-                    confluence_pct=conf_pct,
-                    threshold_pct=thresh_pct,
-                    decision=context.decision,
-                    reason=reason,
-                    indicators_details=conf_details.get("indicator_details", {})
-                )
-
-                todays_pnl = db.get_todays_pnl(self.symbol)
-                daily_limit_hit = self.risk_manager.check_daily_loss_limit(todays_pnl, balance)
-
-                if daily_limit_hit and signal in ["LONG", "SHORT"]:
-                    logger.warning("Daily loss limit exceeded. Entry signal blocked.")
-                    is_blocked = True
-                    reason = f"Daily Loss Limit hit (Today PnL: {todays_pnl:.2f} USDT). Signal {signal} blocked."
-                    signal = "HOLD"
-                    context.signal = signal
-                    context.decision = "HOLD"
-
-                db.log_signal(self.symbol, signal, close_price, filters, is_blocked, reason, {
-                    "timeframe": self.timeframe,
-                    "balance": balance,
-                    "close_price": close_price,
-                })
-
-                if signal in ["LONG", "SHORT"] and not is_blocked:
-                    sl_price, tp_price = self.risk_manager.calculate_trade_levels(df, eval_idx, signal, close_price)
-                    size = self.risk_manager.calculate_position_size(balance, close_price, sl_price)
-
-                    conf_pct = float(conf_details.get("bear_score_pct" if signal == "SHORT" else "bull_score_pct", 75.0))
-                    thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
-
-                    if self.auto_execute and not self.require_manual_approval:
-                        # Autonomous Auto-Trading Execution
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        try:
-                            order_res = self.executor.market_buy(self.symbol, size, close_price) if signal == "LONG" else self.executor.market_sell(self.symbol, size, close_price)
-                            order_id = str(order_res.get("order_id") or f"ORD_{int(datetime.now(timezone.utc).timestamp())}")
-                            exec_price = float(order_res.get("average_price") or close_price)
-                        except Exception as exc:
-                            logger.warning(f"Exchange execution fallback for {self.bot_id}: {exc}")
-                            order_id = f"ORD_{int(datetime.now(timezone.utc).timestamp())}"
-                            exec_price = close_price
-
-                        conn = db.get_connection()
-                        c = conn.cursor()
-                        c.execute(
-                            """INSERT INTO trades_log 
-                               (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🤖 Auto Algo', ?)""",
-                            (now_iso, self.symbol, signal, exec_price, sl_price, tp_price, size,
-                             json.dumps({"order_id": order_id, "auto_executed": True, "confluence_pct": conf_pct}),
-                             self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
-                        )
-                        trade_id = c.lastrowid
-                        conn.commit()
-                        conn.close()
+                        order_id = str(order_res.get("order_id") or "")
+                        trade_id = order_res.get("trade_id")
+                        exec_price = float(order_res.get("fill_price") or 0.0)
+                        if not order_id or trade_id is None or exec_price <= 0:
+                            logger.error(
+                                "[%s] Paper gateway returned incomplete fill; no local trade was created: %s",
+                                self.bot_id,
+                                order_res,
+                            )
+                            context.decision = "ORDER_REJECTED"
+                            return
 
                         db.log_bot_activity(
                             self.bot_id,
                             "TRADE_ENTRY_AUTONOMOUS",
-                            f"⚡ AUTO-EXECUTED: Opened {signal} position (Trade #{trade_id}) at ${exec_price:,.2f} (SL: ${sl_price:,.2f}, TP: ${tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
-                            {"trade_id": trade_id, "direction": signal, "entry_price": exec_price, "sl": sl_price, "tp": tp_price}
+                            f"PAPER EXECUTED: Opened {signal} position (Trade #{trade_id}) at {exec_price:,.2f} "
+                            f"(SL: {sl_price:,.2f}, TP: {tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
+                            {
+                                "trade_id": trade_id,
+                                "order_id": order_id,
+                                "direction": signal,
+                                "entry_price": exec_price,
+                                "sl": sl_price,
+                                "tp": tp_price,
+                                "execution_mode": "PAPER",
+                            },
                         )
 
                         self.telegram.send_message(
-                            f"⚡ <b>[AUTO-EXECUTED ENTRY]</b>\n"
+                            f"🧪 <b>[PAPER EXECUTED ENTRY]</b>\n"
                             f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
                             f"• <b>Symbol</b>: {self.symbol}\n"
                             f"• <b>Direction</b>: <b>{signal}</b>\n"
-                            f"• <b>Entry Price</b>: ${exec_price:,.2f}\n"
-                            f"• <b>Stop Loss</b>: ${sl_price:,.2f}\n"
-                            f"• <b>Take Profit</b>: ${tp_price:,.2f}\n"
+                            f"• <b>Entry Price</b>: {exec_price:,.2f}\n"
+                            f"• <b>Stop Loss</b>: {sl_price:,.2f}\n"
+                            f"• <b>Take Profit</b>: {tp_price:,.2f}\n"
                             f"• <b>Confluence</b>: {conf_pct:.0f}% (Threshold: {thresh_pct:.0f}%)\n"
-                            f"• <b>Status</b>: ACTIVE / OPEN (Trade #{trade_id})"
+                            f"• <b>Status</b>: PAPER / OPEN (Trade #{trade_id})"
                         )
 
                         context.signal = signal
                         context.decision = signal
-                        logger.info("[%s] Autonomous trade executed successfully (Trade #%s, %s at %.2f)", self.bot_id, trade_id, signal, exec_price)
+                        logger.info(
+                            "[%s] Paper order executed through centralized gateway (Trade #%s, %s at %.2f)",
+                            self.bot_id,
+                            trade_id,
+                            signal,
+                            exec_price,
+                        )
                         return
                     else:
                         # Semi-Automated Mode: Queue for trader approval

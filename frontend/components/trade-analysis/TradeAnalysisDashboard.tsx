@@ -124,7 +124,7 @@ export function TradeAnalysisDashboard({
       if (!instrument.underlying || !instrument.symbol) return null;
 
       const segment = (instrument.exchangeSegment || "").toUpperCase();
-      if (segment && !segment.includes("NSE") && !segment.includes("BSE")) {
+      if (!segment || (!segment.includes("NSE") && !segment.includes("BSE"))) {
         return null;
       }
 
@@ -183,6 +183,26 @@ export function TradeAnalysisDashboard({
   );
   const hasUnderlyingQuote = underlyingLtp !== undefined;
   const hasPremiumQuote = livePrice > 0;
+  const authoritativePremium = liveQuoteData?.instrument || (
+    instrument.dataAvailable === true ? instrument : undefined
+  );
+  const premiumBid = positiveNumber(authoritativePremium?.bid ?? authoritativePremium?.bid_price);
+  const premiumAsk = positiveNumber(authoritativePremium?.ask ?? authoritativePremium?.ask_price);
+  const premiumSpread = positiveNumber(
+    authoritativePremium?.spread ??
+      (premiumBid !== undefined && premiumAsk !== undefined ? premiumAsk - premiumBid : undefined)
+  );
+  const premiumVolume = positiveNumber(authoritativePremium?.volume);
+  const premiumOpenInterest = positiveNumber(
+    authoritativePremium?.open_interest ?? authoritativePremium?.openInterest
+  );
+  const premiumOiChange = finiteNumber(
+    authoritativePremium?.oi_change_pct ??
+      authoritativePremium?.oiChangePct ??
+      authoritativePremium?.oi_change
+  );
+  const premiumIv = positiveNumber(authoritativePremium?.iv);
+  const premiumGreeks = authoritativePremium?.greeks;
   const dataAgeSeconds =
     lastPacketTime === null
       ? null
@@ -556,37 +576,37 @@ export function TradeAnalysisDashboard({
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Bid / Ask</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              ₹{formatPositive(instrument.bid, 1)} / ₹{formatPositive(instrument.ask, 1)}
+              ₹{formatPositive(premiumBid, 1)} / ₹{formatPositive(premiumAsk, 1)}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Spread</span>
             <strong className="text-cyan-300 text-xs block mt-0.5">
-              ₹{formatPositive(instrument.spread)}
+              ₹{formatPositive(premiumSpread)}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Volume</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              {instrument.volume !== undefined ? (instrument.volume / 1000).toFixed(1) + "k" : "—"}
+              {premiumVolume !== undefined ? (premiumVolume / 1000).toFixed(1) + "k" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Open Interest</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              {instrument.openInterest !== undefined ? (instrument.openInterest / 100000).toFixed(2) + "L" : "—"}
+              {premiumOpenInterest !== undefined ? (premiumOpenInterest / 100000).toFixed(2) + "L" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">OI Change</span>
             <strong className="text-emerald-400 text-xs block mt-0.5">
-              {instrument.oiChangePct !== undefined ? (instrument.oiChangePct >= 0 ? "+" : "") + instrument.oiChangePct + "%" : "—"}
+              {premiumOiChange !== undefined ? (premiumOiChange >= 0 ? "+" : "") + premiumOiChange + "%" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Implied Vol (IV)</span>
             <strong className="text-purple-300 text-xs block mt-0.5">
-              {instrument.iv !== undefined ? (instrument.iv * 100).toFixed(1) + "%" : "—"}
+              {premiumIv !== undefined ? (premiumIv * 100).toFixed(1) + "%" : "—"}
             </strong>
           </div>
         </div>
@@ -595,19 +615,19 @@ export function TradeAnalysisDashboard({
         <div className="p-2.5 bg-[#06101B] rounded-xl border border-[#12304A] grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
           <div>
             <span className="text-slate-500 block">Delta (Δ)</span>
-            <strong className="text-cyan-300">{formatMaybe(instrument.greeks?.delta, 2)}</strong>
+            <strong className="text-cyan-300">{formatMaybe(premiumGreeks?.delta, 2)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Gamma (Γ)</span>
-            <strong className="text-slate-300">{formatMaybe(instrument.greeks?.gamma, 4)}</strong>
+            <strong className="text-slate-300">{formatMaybe(premiumGreeks?.gamma, 4)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Theta (Θ decay/day)</span>
-            <strong className="text-rose-400">{formatMaybe(instrument.greeks?.theta, 1)}</strong>
+            <strong className="text-rose-400">{formatMaybe(premiumGreeks?.theta, 1)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Vega (ν per 1% IV)</span>
-            <strong className="text-purple-300">{formatMaybe(instrument.greeks?.vega, 1)}</strong>
+            <strong className="text-purple-300">{formatMaybe(premiumGreeks?.vega, 1)}</strong>
           </div>
         </div>
       </div>

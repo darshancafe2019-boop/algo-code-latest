@@ -78,7 +78,7 @@ export function FuturesDetailsDrawer({
     initialSide === "SELL" || initialSide === "SHORT" ? "SELL" : "BUY"
   );
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP_LIMIT">("MARKET");
-  const [quantity, setQuantity] = useState<number>(contract?.min_qty || 1.0);
+  const [quantity, setQuantity] = useState<number>(contract?.min_qty ?? 0);
   const [limitPrice, setLimitPrice] = useState<string>("");
   const [stopPrice, setStopPrice] = useState<string>("");
   const [stopLoss, setStopLoss] = useState<string>("");
@@ -98,36 +98,57 @@ export function FuturesDetailsDrawer({
 
   const tradeAnalysisInstrument = useMemo(() => {
     if (!contract) return null;
-    const ltp = contract.last_price || contract.mark_price || 0;
+
+    const ltp = contract.last_price ?? contract.mark_price ?? 0;
+    const bid = contract.bid ?? undefined;
+    const ask = contract.ask ?? undefined;
+    const reportedAgeMs = Number(contract.data_age_ms);
+    const timestampMs = contract.last_update ? Date.parse(contract.last_update) : Date.parse(contract.timestamp);
+    const ageMs = Number.isFinite(reportedAgeMs)
+      ? reportedAgeMs
+      : Number.isFinite(timestampMs)
+      ? Math.max(0, Date.now() - timestampMs)
+      : Number.NaN;
+    const providerStatus = String(contract.freshness_status || contract.status || "").toUpperCase();
+    const source = contract.market_data_provider || contract.provider || contract.venue;
+    const hasFreshPrice =
+      Number.isFinite(ltp) &&
+      ltp > 0 &&
+      (providerStatus === "LIVE" || providerStatus === "CONNECTED") &&
+      Number.isFinite(ageMs) &&
+      ageMs >= 0 &&
+      ageMs <= 5000;
+
     return {
-      symbol: contract.displayName || contract.symbol,
+      symbol: contract.canonical_symbol || contract.symbol,
       underlying: contract.underlying,
-      securityId: contract.symbol || (contract as any).id || "",
-      exchangeSegment: contract.exchange === "NSE" ? "NSE_FNO" : (contract.exchange || "FUTURES"),
-      instrumentType: "FUTURES" as const,
-      expiry: (contract as any).expiry || "",
-      intent: tradeSide,
-      ltp: ltp,
-      bid: contract.bid,
-      ask: contract.ask,
-      spread: contract.bid && contract.ask ? (contract.ask - contract.bid) : undefined,
-      volume: contract.volume_24h_usd || (contract as any).volume_24h || 0,
-      openInterest: contract.open_interest_usd || (contract as any).open_interest || 0,
-      basis: typeof contract.basis === "number" ? contract.basis : contract.basis?.basis_absolute,
-      dayHigh: (contract as any).high_24h,
-      dayLow: (contract as any).low_24h,
-      previousClose: (contract as any).prev_close,
-      lotSize: contract.lot_size || 1,
-      tickSize: contract.tick_size || 0.05,
-      timestamp: new Date().toISOString(),
+      securityId: contract.provider_instrument_id || contract.symbol,
+      exchangeSegment: contract.segment || contract.exchange || "FUTURES",
+      assetClass: "FUTURES" as const,
+      side: tradeSide,
+      expiry: contract.expiry_date ?? undefined,
+      ltp: hasFreshPrice ? ltp : 0,
+      dataAvailable: hasFreshPrice && Boolean(source),
+      source,
+      bid,
+      ask,
+      spread: typeof bid === "number" && typeof ask === "number" ? ask - bid : undefined,
+      volume: contract.volume_24h_usd ?? undefined,
+      openInterest: contract.open_interest_usd ?? undefined,
+      basis: typeof contract.basis === "number" ? contract.basis : contract.basis?.basis_absolute ?? undefined,
+      dayHigh: (contract as any).high_24h ?? undefined,
+      dayLow: (contract as any).low_24h ?? undefined,
+      prevClose: (contract as any).prev_close ?? undefined,
+      lotSize: contract.lot_size ?? undefined,
+      tickSize: contract.tick_size ?? undefined,
     };
   }, [contract, tradeSide]);
 
   // Sync state when contract changes
   useEffect(() => {
     if (contract) {
-      setQuantity(contract.min_qty || 1.0);
-      const ltp = contract.last_price || contract.mark_price || 0;
+      setQuantity(contract.min_qty ?? 0);
+      const ltp = contract.last_price ?? contract.mark_price ?? 0;
       setLimitPrice(ltp > 0 ? ltp.toString() : "");
 
       // Fetch Account Margins
@@ -179,7 +200,7 @@ export function FuturesDetailsDrawer({
   const effectivePrice =
     orderType === "LIMIT" && parseFloat(limitPrice) > 0
       ? parseFloat(limitPrice)
-      : contract?.last_price || contract?.mark_price || 100.0;
+      : contract?.last_price ?? contract?.mark_price ?? 0;
 
   useEffect(() => {
     if (contract && effectivePrice > 0) {
@@ -248,27 +269,47 @@ export function FuturesDetailsDrawer({
   }
 
   const roundQty = (q: number) => Math.round(q * 10000) / 10000;
-  const isStaleData = contract.freshness_status === "STALE" || contract.status === "STALE";
-  const isIndian = contract.exchange === "NSE" || contract.currency === "INR";
-  const currency = isIndian ? "₹" : "$";
-  const multiplier = contract.contract_multiplier || 1.0;
+  const source = contract.market_data_provider || contract.provider || contract.venue || "";
+  const reportedAgeMs = Number(contract.data_age_ms);
+  const timestampMs = contract.last_update ? Date.parse(contract.last_update) : Date.parse(contract.timestamp);
+  const marketDataAgeMs = Number.isFinite(reportedAgeMs)
+    ? reportedAgeMs
+    : Number.isFinite(timestampMs)
+    ? Math.max(0, Date.now() - timestampMs)
+    : Number.NaN;
+  const providerStatus = String(contract.freshness_status || contract.status || "").toUpperCase();
+  const currentPrice = contract.last_price ?? contract.mark_price ?? 0;
+  const hasFreshMarketData =
+    Number.isFinite(currentPrice) &&
+    currentPrice > 0 &&
+    (providerStatus === "LIVE" || providerStatus === "CONNECTED") &&
+    Number.isFinite(marketDataAgeMs) &&
+    marketDataAgeMs >= 0 &&
+    marketDataAgeMs <= 5000;
+  const isStaleData = !hasFreshMarketData;
+  const isIndian = contract.exchange === "NSE" || (contract.currency || "").toUpperCase() === "INR";
+  const currencyCode = (contract.currency || contract.quote_currency || "").toUpperCase();
+  const currency = currencyCode === "INR" ? "₹" : currencyCode === "USD" || currencyCode === "USDT" ? "$" : "";
+  const multiplier = contract.contract_multiplier ?? 0;
+  const lotSize = contract.lot_size ?? 0;
+  const tickSize = contract.tick_size ?? 0;
+  const estimatedNotional =
+    hasFreshMarketData && quantity > 0 && multiplier > 0 ? quantity * effectivePrice * multiplier : 0;
+  const requiredInitialMargin = estimatedNotional > 0 && leverage > 0 ? estimatedNotional / leverage : 0;
 
-  // Real-time calculations
-  const estimatedNotional = quantity * effectivePrice * multiplier;
-  const requiredInitialMargin = leverage > 0 ? estimatedNotional / leverage : estimatedNotional;
-  const estimatedTakerFee = estimatedNotional * ((contract.taker_fee_pct || 0.05) / 100);
+  // Broker/account data is never substituted with demo balances.
+  const brokerKey = (contract.execution_broker || source).toUpperCase();
+  const brokerAccount = accountMargins[brokerKey] || null;
+  const availableMargin = Number(brokerAccount?.available_margin);
+  const hasAccountData = Number.isFinite(availableMargin) && availableMargin >= 0;
 
-  // Broker Account Mapping
-  const brokerKey = contract.exchange === "NSE" ? (contract.provider?.toUpperCase().includes("DHAN") ? "DHAN" : "UPSTOX") : (contract.provider?.toUpperCase().includes("DELTA") ? "DELTA" : "BINANCE");
-  const brokerAccount = accountMargins[brokerKey] || {
-    displayName: contract.provider || "Exchange Gateway",
-    available_margin: isIndian ? 450000.0 : 14250.0,
-    margin_used: isIndian ? 125000.0 : 1945.0,
-    currency: isIndian ? "INR" : "USDT",
-    max_leverage: contract.max_leverage || 50,
-  };
-
-  const isDataOnly = contract.status === "DATA_ONLY" || contract.market_data_provider === "UNCONFIGURED";
+  const isDataOnly =
+    contract.status === "DATA_ONLY" ||
+    contract.market_data_provider === "UNCONFIGURED" ||
+    !source ||
+    !hasFreshMarketData ||
+    lotSize <= 0 ||
+    tickSize <= 0;
 
   // Position impact calculations
   const currQty = currentPosition ? (currentPosition.side === "LONG" ? currentPosition.quantity : -currentPosition.quantity) : 0;
@@ -483,7 +524,7 @@ export function FuturesDetailsDrawer({
                   <label className="text-[10px] text-slate-400 block mb-1">Limit Price ({currency})</label>
                   <input
                     type="number"
-                    step={contract.tick_size || 0.1}
+                    step={contract.tick_size ?? undefined}
                     value={limitPrice}
                     onChange={(e) => setLimitPrice(e.target.value)}
                     placeholder="Limit price"
@@ -495,7 +536,7 @@ export function FuturesDetailsDrawer({
                     <label className="text-[10px] text-slate-400 block mb-1">Trigger Price ({currency})</label>
                     <input
                       type="number"
-                      step={contract.tick_size || 0.1}
+                      step={contract.tick_size ?? undefined}
                       value={stopPrice}
                       onChange={(e) => setStopPrice(e.target.value)}
                       placeholder="Stop trigger"
@@ -511,28 +552,31 @@ export function FuturesDetailsDrawer({
               <div className="flex items-center justify-between text-[11px]">
                 <span className="text-slate-400">Order Quantity ({contract.underlying})</span>
                 <span className="text-slate-500 text-[10px]">
-                  Lot: {contract.lot_size || 1} • Mult: {multiplier}x
+                  Lot: {lotSize > 0 ? contract.lot_size : "UNAVAILABLE"} • Mult: {multiplier > 0 ? `${multiplier}x` : "UNAVAILABLE"}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setQuantity(Math.max(contract.min_qty || 0.01, roundQty(quantity - (contract.lot_size || 1.0))))}
+                  onClick={() => setQuantity(Math.max(contract.min_qty ?? 0, roundQty(quantity - (contract.lot_size ?? 0))))}
                   className="w-8 h-8 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-[#12304A] flex items-center justify-center text-sm"
                 >
                   -
                 </button>
                 <input
                   type="number"
-                  step={contract.lot_size || 0.01}
-                  min={contract.min_qty || 0.01}
+                  step={contract.lot_size ?? undefined}
+                  min={contract.min_qty ?? 0}
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(0.0001, parseFloat(e.target.value) || 0))}
+                  onChange={(e) => {
+                    const parsed = Number(e.target.value);
+                    setQuantity(Number.isFinite(parsed) && parsed >= 0 ? parsed : 0);
+                  }}
                   className="flex-1 bg-[#06101B] border border-[#12304A] focus:border-cyan-500 rounded-lg p-2 text-white font-bold text-xs text-center outline-none"
                 />
                 <button
                   type="button"
-                  onClick={() => setQuantity(roundQty(quantity + (contract.lot_size || 1.0)))}
+                  onClick={() => setQuantity(roundQty(quantity + (contract.lot_size ?? 0)))}
                   className="w-8 h-8 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 font-bold border border-[#12304A] flex items-center justify-center text-sm"
                 >
                   +
@@ -546,10 +590,12 @@ export function FuturesDetailsDrawer({
                     key={frac}
                     type="button"
                     onClick={() => {
-                      const avail = brokerAccount.available_margin || 10000;
-                      const maxAffordableNotional = avail * leverage * 0.95;
-                      const calculatedQty = maxAffordableNotional / Math.max(1, effectivePrice * multiplier);
-                      setQuantity(roundQty(Math.max(contract.min_qty || 0.01, calculatedQty * frac)));
+                      if (!hasAccountData || effectivePrice <= 0 || multiplier <= 0 || leverage <= 0) return;
+                      const maxAffordableNotional = availableMargin * leverage * 0.95;
+                      const calculatedQty = maxAffordableNotional / (effectivePrice * multiplier);
+                      const minimumQuantity = contract.min_qty ?? 0;
+                      if (!Number.isFinite(calculatedQty) || calculatedQty <= 0 || minimumQuantity <= 0) return;
+                      setQuantity(roundQty(Math.max(minimumQuantity, calculatedQty * frac)));
                     }}
                     className="py-1 rounded-md bg-[#06101B] hover:bg-slate-800 text-slate-400 hover:text-cyan-300 border border-[#12304A] text-[10px] font-bold transition"
                   >
@@ -583,7 +629,7 @@ export function FuturesDetailsDrawer({
 
               {/* Quick Leverage Preset Chips */}
               <div className="flex items-center gap-1 overflow-x-auto pb-1">
-                {[1, 2, 3, 5, 10, 20, 50, 100].filter((l) => l <= (contract.max_leverage || 100)).map((lev) => (
+                {[1, 2, 3, 5, 10, 20, 50, 100].filter((l) => l <= (contract.max_leverage ?? 0)).map((lev) => (
                   <button
                     key={lev}
                     type="button"
@@ -610,7 +656,7 @@ export function FuturesDetailsDrawer({
                 <div>
                   <span className="text-slate-500 block text-[9px]">Available Capital</span>
                   <strong className="text-emerald-400">
-                    {currency}{(brokerAccount.available_margin || 0).toLocaleString()}
+                    {hasAccountData ? `${currency}${availableMargin.toLocaleString()}` : "UNAVAILABLE"}
                   </strong>
                 </div>
                 <div>
@@ -666,7 +712,7 @@ export function FuturesDetailsDrawer({
                   <label className="text-[9px] text-slate-500 block mb-0.5">Stop Loss ({currency})</label>
                   <input
                     type="number"
-                    step={contract.tick_size || 0.1}
+                    step={contract.tick_size ?? undefined}
                     value={stopLoss}
                     onChange={(e) => setStopLoss(e.target.value)}
                     placeholder="Optional SL price"
@@ -677,7 +723,7 @@ export function FuturesDetailsDrawer({
                   <label className="text-[9px] text-slate-500 block mb-0.5">Take Profit ({currency})</label>
                   <input
                     type="number"
-                    step={contract.tick_size || 0.1}
+                    step={contract.tick_size ?? undefined}
                     value={takeProfit}
                     onChange={(e) => setTakeProfit(e.target.value)}
                     placeholder="Optional TP price"
@@ -827,7 +873,7 @@ export function FuturesDetailsDrawer({
               </div>
               <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Lot Size:</span>
-                <span className="text-white">{contract.lot_size || 1}</span>
+                <span className="text-white">{contract.lot_size ?? "UNAVAILABLE"}</span>
               </div>
             </div>
           </div>

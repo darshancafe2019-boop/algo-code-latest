@@ -6,6 +6,7 @@ and broker position/order reconciliation.
 """
 
 import uuid
+import threading
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 from src.universal_risk_engine import universal_risk_engine
@@ -16,6 +17,7 @@ from app.errors import RiskBlockedError, ConflictError
 
 orders_bp = Blueprint("orders", __name__)
 _PROCESSED_IDEMPOTENCY_KEYS = {}
+_IDEMPOTENCY_LOCK = threading.RLock()
 
 
 @orders_bp.route("/api/orders", methods=["GET"])
@@ -42,10 +44,15 @@ def place_order():
     validated = validate_order_intent(data)
 
     # 1. Idempotency verification
-    idempotency_key = request.headers.get("X-Idempotency-Key") or validated.get("idempotencyKey")
+    idempotency_key = (
+        request.headers.get("X-Idempotency-Key")
+        or validated.get("idempotencyKey")
+        or validated.get("client_order_id")
+    )
     if idempotency_key:
-        if idempotency_key in _PROCESSED_IDEMPOTENCY_KEYS:
-            cached_resp = _PROCESSED_IDEMPOTENCY_KEYS[idempotency_key]
+        with _IDEMPOTENCY_LOCK:
+            cached_resp = _PROCESSED_IDEMPOTENCY_KEYS.get(idempotency_key)
+        if cached_resp is not None:
             return jsonify(cached_resp), 200
 
     # 2. Pre-Trade Risk Gate Validation
@@ -57,7 +64,7 @@ def place_order():
         )
 
     # 3. Execution Routing
-    mode = str(validated.get("mode", "PAPER")).upper()
+    mode = str(validated.get("mode") or validated.get("execution_mode") or "PAPER").upper()
     exec_res = execution_service.execute_order(
         symbol=validated["symbol"],
         side=validated["side"],
@@ -65,7 +72,7 @@ def place_order():
         order_type=validated.get("orderType", validated.get("order_type", "MARKET")),
         price=validated.get("price"),
         mode=mode,
-        broker=validated.get("broker", "DELTA"),
+        broker=validated.get("broker") or ("PAPER" if mode == "PAPER" else "DELTA"),
         strategy=validated.get("strategy", "MANUAL_DISPATCH"),
         client_order_id=idempotency_key
     )
@@ -79,19 +86,27 @@ def place_order():
         order_result = exec_res or {}
 
     now_iso = datetime.now(timezone.utc).isoformat()
+    success = bool(order_result.get("success", False))
+    order_id = str(order_result.get("order_id") or "")
     response_payload = {
-        "success": bool(order_result.get("success", True)),
-        "status": order_result.get("status", "SUBMITTED"),
-        "orderId": order_result.get("order_id", f"ord_{uuid.uuid4().hex[:10]}"),
+        "success": success,
+        "status": order_result.get("status", "REJECTED" if not success else "SUBMITTED"),
+        "orderId": order_id,
+        "order_id": order_id,
+        "execution_mode": order_result.get("execution_mode", mode),
+        "broker": order_result.get("broker", validated.get("broker") or ("PAPER" if mode == "PAPER" else "DELTA")),
         "order": order_result,
         "riskDecision": risk_decision,
         "timestamp": now_iso
     }
+    if not success:
+        response_payload["message"] = order_result.get("message") or "Order rejected by the execution gateway."
 
-    if idempotency_key:
-        _PROCESSED_IDEMPOTENCY_KEYS[idempotency_key] = response_payload
+    if idempotency_key and success:
+        with _IDEMPOTENCY_LOCK:
+            _PROCESSED_IDEMPOTENCY_KEYS[idempotency_key] = response_payload
 
-    return jsonify(response_payload), 201
+    return jsonify(response_payload), 201 if success else 400
 
 
 @orders_bp.route("/api/orders/<order_id>/cancel", methods=["POST"])

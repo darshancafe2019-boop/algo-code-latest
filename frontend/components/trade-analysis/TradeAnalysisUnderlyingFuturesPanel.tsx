@@ -43,9 +43,23 @@ export function TradeAnalysisUnderlyingFuturesPanel({
   const [showFullComparison, setShowFullComparison] = useState(false);
   const [showMacroChain, setShowMacroChain] = useState(false);
 
+  if (
+    !underlyingData.dataAvailable ||
+    !futuresData.dataAvailable ||
+    !chainStats.dataAvailable ||
+    !callPutComparison.dataAvailable
+  ) {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-3 text-xs text-amber-200">
+        Underlying, futures, and option-chain telemetry is unavailable from the selected provider.
+        Analysis and order review remain disabled until every required series is loaded.
+      </div>
+    );
+  }
+
   const isCall = instrument.optionType === "CE";
-  const strike = instrument.strike || 25000;
-  const spotPrice = underlyingData.spotPrice || 24856;
+  const strike = instrument.strike ?? 0;
+  const spotPrice = underlyingData.spotPrice;
 
   // Dynamic ATM / ITM / OTM calculation
   const calculatedMoneyness =

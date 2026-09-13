@@ -114,6 +114,9 @@ export function TradeAnalysisDashboard({
   const { data: liveQuoteData } = useQuery<{
     underlying?: any;
     instrument?: any;
+    futures?: any;
+    chain?: any;
+    call_put?: any;
     source?: string;
   } | null>({
     queryKey: ["tradeAnalysisQuote", instrument.symbol, instrument.underlying, instrument.exchangeSegment],
@@ -637,7 +640,7 @@ export function TradeAnalysisDashboard({
       <TradeAnalysisRiskReward
         side={instrument.side}
         currentLtp={livePrice}
-        lotSize={instrument.lotSize || 0}
+        lotSize={instrument.lotSize ?? 0}
         lots={lots}
         entryPrice={entryPrice}
         stopLoss={stopLoss}

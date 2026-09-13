@@ -17,7 +17,7 @@ import {
   ChevronUp,
   Filter,
 } from "lucide-react";
-import { ActiveIndicator, TradeSetupAnalysis } from "./TradeAnalysisTypes";
+import { ActiveIndicator } from "./TradeAnalysisTypes";
 import { cn } from "@/lib/utils";
 
 export const CANONICAL_INDICATORS_CATALOG: Omit<ActiveIndicator, "enabled">[] = [
@@ -59,6 +59,8 @@ interface TradeAnalysisIndicatorBuilderProps {
   underlyingLtp: number;
   activeIndicators: ActiveIndicator[];
   onUpdateIndicators: (indicators: ActiveIndicator[]) => void;
+  /** This panel must receive real historical candles before it evaluates anything. */
+  hasHistoricalData?: boolean;
 }
 
 export function TradeAnalysisIndicatorBuilder({
@@ -66,78 +68,26 @@ export function TradeAnalysisIndicatorBuilder({
   underlyingLtp,
   activeIndicators,
   onUpdateIndicators,
+  hasHistoricalData = false,
 }: TradeAnalysisIndicatorBuilderProps) {
   const [filterSeries, setFilterSeries] = useState<"ALL" | "UNDERLYING" | "OPTION_PREMIUM">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  // Evaluate indicator values depending on whether it targets underlying or option premium
+  // A snapshot price is not enough to calculate EMA, RSI, VWAP,
+  // MACD, volume, PCR, or max-pain.  Keep the UI explicit until a real
+  // historical provider series is supplied.
   const evaluatedIndicators = useMemo(() => {
-    return activeIndicators.map((ind) => {
-      const isUnderlying = ind.seriesTarget === "UNDERLYING";
-      const basePrice = isUnderlying ? underlyingLtp : currentLtp;
-
-      let signal: "BULLISH" | "BEARISH" | "NEUTRAL" = "NEUTRAL";
-      let calculatedValue: string | number = "—";
-      let description = "";
-
-      if (ind.id.includes("ema") || ind.id.includes("sma")) {
-        const len = ind.params.length || 20;
-        const offset = (len / 20) * (isUnderlying ? 0.004 : 0.025);
-        const val = basePrice * (1 - offset);
-        calculatedValue = Number(val.toFixed(2));
-        signal = basePrice >= val ? "BULLISH" : "BEARISH";
-        description = `${isUnderlying ? "Spot" : "Premium"} ${basePrice >= val ? "above" : "below"} ${len} EMA (₹${val.toFixed(1)})`;
-      } else if (ind.id === "vwap") {
-        const val = basePrice * 0.985;
-        calculatedValue = Number(val.toFixed(2));
-        signal = basePrice >= val ? "BULLISH" : "BEARISH";
-        description = `Option premium trading ${basePrice >= val ? "above" : "below"} VWAP (₹${val.toFixed(1)})`;
-      } else if (ind.id === "supertrend") {
-        const val = basePrice * 0.992;
-        calculatedValue = Number(val.toFixed(2));
-        signal = "BULLISH";
-        description = `Supertrend Green line support at ₹${val.toFixed(1)}`;
-      } else if (ind.id.includes("rsi")) {
-        const rsiVal = isUnderlying ? 58.4 : 61.2;
-        calculatedValue = rsiVal;
-        signal = rsiVal >= 50 ? "BULLISH" : "BEARISH";
-        description = `${isUnderlying ? "Underlying" : "Option Premium"} RSI in positive zone (${rsiVal})`;
-      } else if (ind.id === "macd") {
-        calculatedValue = "+3.85";
-        signal = "BULLISH";
-        description = "MACD line above signal line (+3.85)";
-      } else if (ind.id === "bollinger") {
-        calculatedValue = `₹${(basePrice * 0.92).toFixed(1)} - ₹${(basePrice * 1.08).toFixed(1)}`;
-        signal = "NEUTRAL";
-        description = "Premium expanding within Bollinger volatility bands";
-      } else if (ind.id.includes("volume")) {
-        calculatedValue = "2.1x Avg";
-        signal = "BULLISH";
-        description = "Volume expanding above 20 SMA baseline";
-      } else if (ind.id === "pcr") {
-        calculatedValue = "1.18";
-        signal = "BULLISH";
-        description = "PCR > 1.0 (Put writing dominance / Bullish)";
-      } else if (ind.id === "max_pain") {
-        const mpStrike = 24800;
-        calculatedValue = `₹${mpStrike}`;
-        signal = "NEUTRAL";
-        description = `Expiry Max Pain calculated at ${mpStrike}`;
-      } else {
-        calculatedValue = "Active";
-        signal = "NEUTRAL";
-        description = "Indicator synchronized with candle feed";
-      }
-
-      return {
-        ...ind,
-        calculatedValue,
-        signal,
-        description,
-      };
-    });
-  }, [activeIndicators, currentLtp, underlyingLtp]);
+    const dataReady = hasHistoricalData && currentLtp > 0 && underlyingLtp > 0;
+    return activeIndicators.map((ind) => ({
+      ...ind,
+      calculatedValue: dataReady ? "DATA REQUIRED" : "DATA UNAVAILABLE",
+      signal: "NEUTRAL" as const,
+      description: dataReady
+        ? "Provider historical series is required before this indicator can be evaluated."
+        : "Waiting for validated underlying and option-premium candle series.",
+    }));
+  }, [activeIndicators, currentLtp, underlyingLtp, hasHistoricalData]);
 
   const filteredIndicators = useMemo(() => {
     return evaluatedIndicators.filter((ind) => {

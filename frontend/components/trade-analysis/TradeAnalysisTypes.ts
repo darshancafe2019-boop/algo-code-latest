@@ -17,6 +17,9 @@ export interface TradeAnalysisInstrument {
   optionType?: "CE" | "PE";
   side: "BUY" | "SELL";
   ltp: number;
+  /** True only when this instrument snapshot came from its selected provider. */
+  dataAvailable?: boolean;
+  source?: string;
   bid?: number;
   ask?: number;
   spread?: number;
@@ -51,6 +54,7 @@ export interface UnderlyingMarketData {
   vwap?: number;
   status: "LIVE" | "STALE" | "DISCONNECTED";
   lastUpdate: string;
+  dataAvailable?: boolean;
 }
 
 export interface FuturesMarketData {
@@ -63,6 +67,7 @@ export interface FuturesMarketData {
   basis: number; // Futures LTP - Spot Price
   regime: "CONTANGO" | "BACKWARDATION" | "PARITY";
   isConfirmed: boolean;
+  dataAvailable?: boolean;
 }
 
 export interface OptionChainMacroStats {
@@ -82,10 +87,12 @@ export interface OptionChainMacroStats {
     description: string;
     color: string;
   };
+  dataAvailable?: boolean;
 }
 
 export interface CallPutComparisonData {
   strike: number;
+  dataAvailable?: boolean;
   call: {
     symbol: string;
     ltp: number;

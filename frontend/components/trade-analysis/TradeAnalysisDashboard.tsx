@@ -56,6 +56,26 @@ const DEFAULT_ACTIVE_INDICATORS: ActiveIndicator[] = [
   { id: "rsi_und", name: "Underlying Spot RSI (14)", category: "Momentum", seriesTarget: "UNDERLYING", enabled: true, timeframe: "15m", params: { period: 14, overbought: 70, oversold: 30 }, color: "#FB7185" },
 ];
 
+const finiteNumber = (value: unknown): number | undefined => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const positiveNumber = (value: unknown): number | undefined => {
+  const parsed = finiteNumber(value);
+  return parsed !== undefined && parsed > 0 ? parsed : undefined;
+};
+
+const formatMaybe = (value: unknown, digits = 2): string => {
+  const parsed = finiteNumber(value);
+  return parsed === undefined ? "—" : parsed.toFixed(digits);
+};
+
+const formatPositive = (value: unknown, digits = 2): string => {
+  const parsed = positiveNumber(value);
+  return parsed === undefined ? "—" : parsed.toFixed(digits);
+};
+
 export function TradeAnalysisDashboard({
   initialInstrument,
   onClose,
@@ -64,104 +84,196 @@ export function TradeAnalysisDashboard({
 
   // ── 1. Selected Instrument State ─────────────────────────────────
   const [instrument, setInstrument] = useState<TradeAnalysisInstrument>({
-    underlying: initialInstrument?.underlying || "NIFTY",
-    symbol: initialInstrument?.symbol || "NIFTY 25000 CE",
-    securityId: initialInstrument?.securityId || "OPT-25000-CE",
-    exchangeSegment: initialInstrument?.exchangeSegment || "NSE_FNO",
+    underlying: initialInstrument?.underlying || "",
+    symbol: initialInstrument?.symbol || "",
+    securityId: initialInstrument?.securityId,
+    exchangeSegment: initialInstrument?.exchangeSegment,
     assetClass: initialInstrument?.assetClass || "OPTION",
-    expiry: initialInstrument?.expiry || "11 Sep 2025",
-    strike: initialInstrument?.strike || 25000,
-    optionType: initialInstrument?.optionType || "CE",
+    expiry: initialInstrument?.expiry,
+    strike: initialInstrument?.strike,
+    optionType: initialInstrument?.optionType,
     side: initialInstrument?.side || "BUY",
-    ltp: initialInstrument?.ltp || 132.4,
-    bid: initialInstrument?.bid || 131.9,
-    ask: initialInstrument?.ask || 132.9,
-    spread: initialInstrument?.spread || 1.0,
-    volume: initialInstrument?.volume || 845000,
-    openInterest: initialInstrument?.openInterest || 6830000,
-    oiChangePct: initialInstrument?.oiChangePct || 18.9,
-    iv: initialInstrument?.iv || 0.142,
-    lotSize: initialInstrument?.lotSize || 25,
-    tickSize: initialInstrument?.tickSize || 0.05,
-    greeks: initialInstrument?.greeks || {
-      delta: 0.52,
-      gamma: 0.0018,
-      theta: -14.5,
-      vega: 18.2,
-    },
+    ltp: initialInstrument?.ltp ?? 0,
+    dataAvailable: initialInstrument?.dataAvailable === true,
+    source: initialInstrument?.source,
+    bid: initialInstrument?.bid,
+    ask: initialInstrument?.ask,
+    spread: initialInstrument?.spread,
+    volume: initialInstrument?.volume,
+    openInterest: initialInstrument?.openInterest,
+    oiChangePct: initialInstrument?.oiChangePct,
+    iv: initialInstrument?.iv,
+    lotSize: initialInstrument?.lotSize,
+    tickSize: initialInstrument?.tickSize,
+    greeks: initialInstrument?.greeks,
   });
 
-  // ── 2. Live Market Query (Single Gateway Connection) ─────────────
-  const [lastPacketTime, setLastPacketTime] = useState<Date>(new Date());
+  // ── 2. Live Market Query (single selected-provider connection) ─────
+  const [lastPacketTime, setLastPacketTime] = useState<Date | null>(null);
 
-  const { data: liveQuoteData } = useQuery({
-    queryKey: ["tradeAnalysisQuote", instrument.symbol, instrument.underlying],
+  const { data: liveQuoteData } = useQuery<{
+    underlying?: any;
+    instrument?: any;
+    source?: string;
+  } | null>({
+    queryKey: ["tradeAnalysisQuote", instrument.symbol, instrument.underlying, instrument.exchangeSegment],
     queryFn: async () => {
-      try {
-        const querySym = instrument.underlying || "NIFTY";
-        const res = await fetch(`/api/market-data/dhan/quotes?symbols=${encodeURIComponent(querySym)},NIFTY,BANKNIFTY`);
-        if (res.ok) {
-          const json = await res.json();
-          setLastPacketTime(new Date());
-          return json.quotes?.[querySym] || Object.values(json.quotes || {})[0];
-        }
-      } catch (err) {
-        console.debug("[TradeAnalysis] Quote query fallback:", err);
+      if (!instrument.underlying || !instrument.symbol) return null;
+
+      const segment = (instrument.exchangeSegment || "").toUpperCase();
+      if (segment && !segment.includes("NSE") && !segment.includes("BSE")) {
+        return null;
       }
-      return null;
+
+      const symbols = Array.from(new Set([instrument.underlying, instrument.symbol].filter(Boolean)));
+      try {
+        const res = await fetch(
+          "/api/market-data/dhan/quotes?symbols=" + encodeURIComponent(symbols.join(",")),
+          {
+            cache: "no-store",
+            signal: AbortSignal.timeout(5000),
+          }
+        );
+        if (!res.ok) {
+          throw new Error("Quote provider returned HTTP " + res.status);
+        }
+
+        const json = await res.json();
+        const quotes = json?.quotes && typeof json.quotes === "object" ? json.quotes : {};
+        const findQuote = (key: string) =>
+          quotes[key] || quotes[key.toUpperCase()] || quotes[key.toLowerCase()];
+        const underlyingQuote = findQuote(instrument.underlying);
+        const instrumentQuote =
+          findQuote(instrument.symbol) ||
+          (instrument.securityId ? findQuote(instrument.securityId) : undefined);
+
+        if (!underlyingQuote && !instrumentQuote) return null;
+
+        const receivedAt = Date.now();
+        setLastPacketTime(new Date(receivedAt));
+        return {
+          underlying: underlyingQuote,
+          instrument: instrumentQuote,
+          source: json?.source || json?.provider || instrument.source,
+        };
+      } catch (error) {
+        console.error("[TradeAnalysis] Quote request failed:", error);
+        return null;
+      }
     },
+    enabled: Boolean(instrument.underlying && instrument.symbol),
     refetchInterval: 3000,
+    staleTime: 1500,
   });
 
-  const livePrice = Number(instrument.ltp || liveQuoteData?.last_price || 132.4);
-  const dataAgeSeconds = Math.max(0, Math.floor((Date.now() - lastPacketTime.getTime()) / 1000));
-  const isDataFresh = dataAgeSeconds < 6;
-  const dataStatus: "CONNECTED" | "STALE" | "DISCONNECTED" = isDataFresh
-    ? "CONNECTED"
-    : dataAgeSeconds < 20
-    ? "STALE"
-    : "DISCONNECTED";
+  const exactPremiumLtp = positiveNumber(
+    liveQuoteData?.instrument?.last_price ??
+      liveQuoteData?.instrument?.ltp ??
+      liveQuoteData?.instrument?.price
+  );
+  const snapshotPremiumLtp =
+    instrument.dataAvailable === true ? positiveNumber(instrument.ltp) : undefined;
+  const livePrice = exactPremiumLtp ?? snapshotPremiumLtp ?? 0;
+  const underlyingQuote = liveQuoteData?.underlying;
+  const underlyingLtp = positiveNumber(
+    underlyingQuote?.last_price ?? underlyingQuote?.ltp ?? underlyingQuote?.price
+  );
+  const hasUnderlyingQuote = underlyingLtp !== undefined;
+  const hasPremiumQuote = livePrice > 0;
+  const dataAgeSeconds =
+    lastPacketTime === null
+      ? null
+      : Math.max(0, Math.floor((Date.now() - lastPacketTime.getTime()) / 1000));
+  const isDataFresh =
+    lastPacketTime !== null &&
+    hasUnderlyingQuote &&
+    hasPremiumQuote &&
+    dataAgeSeconds !== null &&
+    dataAgeSeconds < 6;
+  const dataStatus: "CONNECTED" | "STALE" | "DISCONNECTED" =
+    isDataFresh
+      ? "CONNECTED"
+      : lastPacketTime !== null && dataAgeSeconds !== null && dataAgeSeconds < 20
+      ? "STALE"
+      : "DISCONNECTED";
 
   // ── 3. Multi-Asset Context Derivations ───────────────────────────
-  const spotPrice = Number(liveQuoteData?.last_price || 24856.0);
+  const spotPrice = underlyingLtp ?? 0;
 
   const underlyingData: UnderlyingMarketData = useMemo(() => {
+    const dayHigh = positiveNumber(underlyingQuote?.high);
+    const dayLow = positiveNumber(underlyingQuote?.low);
+    const prevClose = positiveNumber(underlyingQuote?.prev_close ?? underlyingQuote?.previous_close);
+    const ready =
+      isDataFresh &&
+      spotPrice > 0 &&
+      dayHigh !== undefined &&
+      dayLow !== undefined &&
+      prevClose !== undefined;
+
     return {
-      symbol: instrument.underlying || "NIFTY",
+      symbol: instrument.underlying,
       spotPrice,
-      changePct: liveQuoteData?.change_24h_pct || 0.62,
-      dayHigh: liveQuoteData?.high || spotPrice * 1.008,
-      dayLow: liveQuoteData?.low || spotPrice * 0.994,
-      prevClose: liveQuoteData?.prev_close || spotPrice / 1.0062,
-      volume: liveQuoteData?.volume || 14250000,
-      vwap: spotPrice * 0.998,
-      status: isDataFresh ? "LIVE" : "STALE",
-      lastUpdate: lastPacketTime.toLocaleTimeString(),
+      changePct: finiteNumber(underlyingQuote?.change_24h_pct ?? underlyingQuote?.change_pct) ?? 0,
+      dayHigh: dayHigh ?? 0,
+      dayLow: dayLow ?? 0,
+      prevClose: prevClose ?? 0,
+      volume: positiveNumber(underlyingQuote?.volume),
+      vwap: positiveNumber(underlyingQuote?.vwap),
+      status: isDataFresh ? "LIVE" : lastPacketTime ? "STALE" : "DISCONNECTED",
+      lastUpdate: lastPacketTime ? lastPacketTime.toLocaleTimeString() : "—",
+      dataAvailable: ready,
     };
-  }, [instrument.underlying, spotPrice, liveQuoteData, isDataFresh, lastPacketTime]);
+  }, [instrument.underlying, underlyingQuote, spotPrice, isDataFresh, lastPacketTime]);
 
   const futuresData: FuturesMarketData = useMemo(() => {
-    const futLtp = spotPrice + 16.0;
+    const raw = liveQuoteData?.futures;
+    const futLtp = positiveNumber(raw?.last_price ?? raw?.ltp ?? raw?.price);
+    const basis = finiteNumber(raw?.basis);
+    const volume = positiveNumber(raw?.volume);
+    const openInterest = positiveNumber(raw?.open_interest ?? raw?.openInterest);
+    const oiChangePct = finiteNumber(raw?.oi_change_pct ?? raw?.oiChangePct);
+    const ready =
+      futLtp !== undefined &&
+      basis !== undefined &&
+      volume !== undefined &&
+      openInterest !== undefined &&
+      oiChangePct !== undefined;
+
     return {
-      symbol: `${instrument.underlying}-FUT`,
-      ltp: futLtp,
-      changePct: 0.68,
-      volume: 485000,
-      openInterest: 1845000,
-      oiChangePct: 4.8,
-      basis: 16.0,
-      regime: "CONTANGO",
-      isConfirmed: true,
+      symbol: instrument.underlying + "-FUT",
+      ltp: futLtp ?? 0,
+      changePct: finiteNumber(raw?.change_pct ?? raw?.changePct) ?? 0,
+      volume: volume ?? 0,
+      openInterest: openInterest ?? 0,
+      oiChangePct: oiChangePct ?? 0,
+      basis: basis ?? 0,
+      regime: basis === undefined ? "PARITY" : basis > 0 ? "CONTANGO" : basis < 0 ? "BACKWARDATION" : "PARITY",
+      isConfirmed: ready && isDataFresh,
+      dataAvailable: ready && isDataFresh,
     };
-  }, [instrument.underlying, spotPrice]);
+  }, [instrument.underlying, liveQuoteData, isDataFresh]);
 
   const chainStats: OptionChainMacroStats = useMemo(() => {
-    const isCall = instrument.optionType === "CE";
-    const strike = instrument.strike || 25000;
-    const moneyness =
-      Math.abs(spotPrice - strike) < 25
+    const raw = liveQuoteData?.chain;
+    const strike = instrument.strike ?? 0;
+    const chainReady =
+      raw &&
+      positiveNumber(raw.total_call_oi) !== undefined &&
+      positiveNumber(raw.total_put_oi) !== undefined &&
+      positiveNumber(raw.total_call_volume) !== undefined &&
+      positiveNumber(raw.total_put_volume) !== undefined &&
+      positiveNumber(raw.highest_call_oi_strike) !== undefined &&
+      positiveNumber(raw.highest_put_oi_strike) !== undefined &&
+      positiveNumber(raw.max_pain_strike) !== undefined &&
+      positiveNumber(raw.atm_strike) !== undefined;
+
+    const moneyness: "ITM" | "ATM" | "OTM" | "UNKNOWN" =
+      !chainReady || strike <= 0 || spotPrice <= 0
+        ? "UNKNOWN"
+        : Math.abs(spotPrice - strike) < 25
         ? "ATM"
-        : isCall
+        : instrument.optionType === "CE"
         ? spotPrice > strike
           ? "ITM"
           : "OTM"
@@ -170,211 +282,133 @@ export function TradeAnalysisDashboard({
         : "OTM";
 
     return {
-      totalCallOI: 18450000,
-      totalPutOI: 21780000,
-      totalCallVolume: 4890000,
-      totalPutVolume: 5620000,
-      pcr: 1.18,
-      highestCallOIStrike: 25200,
-      highestPutOIStrike: 24800,
-      maxPainStrike: 24800,
-      atmStrike: Math.round(spotPrice / 50) * 50,
+      totalCallOI: positiveNumber(raw?.total_call_oi) ?? 0,
+      totalPutOI: positiveNumber(raw?.total_put_oi) ?? 0,
+      totalCallVolume: positiveNumber(raw?.total_call_volume) ?? 0,
+      totalPutVolume: positiveNumber(raw?.total_put_volume) ?? 0,
+      pcr: positiveNumber(raw?.pcr) ?? 0,
+      highestCallOIStrike: positiveNumber(raw?.highest_call_oi_strike) ?? 0,
+      highestPutOIStrike: positiveNumber(raw?.highest_put_oi_strike) ?? 0,
+      maxPainStrike: positiveNumber(raw?.max_pain_strike) ?? 0,
+      atmStrike: positiveNumber(raw?.atm_strike) ?? 0,
       moneyness,
-      oiBuildup: {
-        type: "LONG_BUILDUP",
-        label: "LONG BUILDUP",
-        description: "Price UP (+2.4%) + OI UP (+18.9%) indicates aggressive buyer participation.",
-        color: "bg-emerald-950 text-emerald-300 border-emerald-500/40",
+      oiBuildup: raw?.oi_buildup || {
+        type: "NEUTRAL",
+        label: "DATA UNAVAILABLE",
+        description: "Option-chain buildup requires a validated chain payload.",
+        color: "bg-slate-900 text-slate-400 border-slate-800",
       },
+      dataAvailable: Boolean(chainReady && isDataFresh),
     };
-  }, [instrument.optionType, instrument.strike, spotPrice]);
+  }, [liveQuoteData, instrument.optionType, instrument.strike, spotPrice, isDataFresh]);
 
   const callPutComparison: CallPutComparisonData = useMemo(() => {
-    const strike = instrument.strike || 25000;
-    return {
-      strike,
-      call: {
-        symbol: `${instrument.underlying} ${strike} CE`,
-        ltp: 132.4,
-        changePct: 2.4,
-        oi: 6830000,
-        oiChangePct: 18.9,
-        volume: 845000,
-        iv: 0.142,
-        delta: 0.52,
-        gamma: 0.0018,
-        theta: -14.5,
-        vega: 18.2,
-      },
-      put: {
-        symbol: `${instrument.underlying} ${strike} PE`,
-        ltp: 86.8,
-        changePct: -3.8,
-        oi: 5210000,
-        oiChangePct: -8.4,
-        volume: 610000,
-        iv: 0.151,
-        delta: -0.48,
-        gamma: 0.0017,
-        theta: -13.8,
-        vega: 17.6,
-      },
-    };
-  }, [instrument.underlying, instrument.strike]);
+    const raw = liveQuoteData?.call_put;
+    const makeLeg = (leg: any) => ({
+      symbol: typeof leg?.symbol === "string" ? leg.symbol : "",
+      ltp: positiveNumber(leg?.ltp ?? leg?.last_price) ?? 0,
+      changePct: finiteNumber(leg?.change_pct) ?? 0,
+      oi: positiveNumber(leg?.oi ?? leg?.open_interest) ?? 0,
+      oiChangePct: finiteNumber(leg?.oi_change_pct) ?? 0,
+      volume: positiveNumber(leg?.volume) ?? 0,
+      iv: positiveNumber(leg?.iv) ?? 0,
+      delta: finiteNumber(leg?.delta) ?? 0,
+      gamma: finiteNumber(leg?.gamma) ?? 0,
+      theta: finiteNumber(leg?.theta) ?? 0,
+      vega: finiteNumber(leg?.vega) ?? 0,
+    });
+    const call = makeLeg(raw?.call);
+    const put = makeLeg(raw?.put);
+    const ready =
+      call.symbol.length > 0 &&
+      put.symbol.length > 0 &&
+      call.ltp > 0 &&
+      put.ltp > 0 &&
+      call.oi > 0 &&
+      put.oi > 0;
 
-  // ── 4. Indicators & 9-Factor Confirmation Matrix ─────────────────
+    return {
+      strike: instrument.strike ?? 0,
+      dataAvailable: Boolean(ready && isDataFresh),
+      call,
+      put,
+    };
+  }, [liveQuoteData, instrument.underlying, instrument.strike, isDataFresh]);
+
+  // ── 4. Indicators & 9-Factor Confirmation Matrix ────────────────
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>(DEFAULT_ACTIVE_INDICATORS);
 
   const setupAnalysis: TradeSetupAnalysis = useMemo(() => {
-    const confirmations: ConfirmationMatrixItem[] = [
-      {
-        id: "und_trend",
-        title: "1. Underlying Spot Trend",
-        targetSeries: "UNDERLYING",
-        passed: true,
-        valueDisplay: `Spot ₹${spotPrice.toFixed(1)} > 1H EMA 200 (₹${(spotPrice * 0.985).toFixed(1)})`,
-        interpretation: "BULLISH",
-        description: "Macro spot index is trading above the institutional 200-period baseline.",
-        evidence: `Spot price is +1.5% above the 200-EMA regression channel.`,
-      },
-      {
-        id: "prem_trend",
-        title: "2. Option Premium Trend",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `Premium ₹${livePrice.toFixed(2)} > 5M EMA 9/21`,
-        interpretation: "BULLISH",
-        description: "Option premium is displaying aggressive intraday upward momentum.",
-        evidence: `Fast EMA 9 (₹${(livePrice * 0.98).toFixed(1)}) crossed above Slow EMA 21 (₹${(livePrice * 0.96).toFixed(1)}).`,
-      },
-      {
-        id: "vwap_align",
-        title: "3. VWAP Benchmark Alignment",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `LTP ₹${livePrice.toFixed(2)} > VWAP ₹${(livePrice * 0.985).toFixed(2)}`,
-        interpretation: "BULLISH",
-        description: "Buyers are defending price above the volume weighted average price.",
-        evidence: `Premium has sustained above intraday VWAP for 4 consecutive 5m candles.`,
-      },
-      {
-        id: "rsi_mom",
-        title: "4. RSI Momentum Filter",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `Option RSI (14) = 61.2 (Bullish Zone)`,
-        interpretation: "BULLISH",
-        description: "Oscillator momentum is positive and not yet overbought (< 70).",
-        evidence: `RSI rising from 52.0 to 61.2 across the active session.`,
-      },
-      {
-        id: "macd_mom",
-        title: "5. MACD Momentum Histogram",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `MACD Line > Signal (+3.85)`,
-        interpretation: "BULLISH",
-        description: "MACD momentum expansion confirms direction.",
-        evidence: `Histogram expanded green for 3 bars.`,
-      },
-      {
-        id: "vol_surge",
-        title: "6. Volume Expansion",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `Volume 2.1x above 20-SMA`,
-        interpretation: "BULLISH",
-        description: "Breakout supported by institutional trading volume.",
-        evidence: `845k contracts traded against 402k 20-SMA baseline.`,
-      },
-      {
-        id: "oi_buildup",
-        title: "7. Open Interest Buildup",
-        targetSeries: "CHAIN",
-        passed: true,
-        valueDisplay: `Long Buildup (+18.9% OI, +2.4% Price)`,
-        interpretation: "BULLISH",
-        description: "New money flowing into Call strikes indicates institutional accumulation.",
-        evidence: `Net addition of 1.08M Call contracts on this strike today.`,
-      },
-      {
-        id: "iv_regime",
-        title: "8. Implied Volatility (IV)",
-        targetSeries: "OPTION_PREMIUM",
-        passed: true,
-        valueDisplay: `IV 14.2% (Fair Value Zone)`,
-        interpretation: "NEUTRAL",
-        description: "IV is balanced, neither excessively crushed nor overheated.",
-        evidence: `IV Rank at 42nd percentile over 252-day lookback.`,
-      },
-      {
-        id: "fut_conf",
-        title: "9. Futures Basis Confirmation",
-        targetSeries: "FUTURES",
-        passed: true,
-        valueDisplay: `Basis +16.00 pts (Contango)`,
-        interpretation: "BULLISH",
-        description: "Futures trading at premium to spot confirms institutional willingness to pay up.",
-        evidence: `Futures open interest up +4.8% alongside positive basis.`,
-      },
+    const specifications: Array<{
+      id: string;
+      title: string;
+      targetSeries: ConfirmationMatrixItem["targetSeries"];
+    }> = [
+      { id: "und_trend", title: "1. Underlying Spot Trend", targetSeries: "UNDERLYING" },
+      { id: "prem_trend", title: "2. Option Premium Trend", targetSeries: "OPTION_PREMIUM" },
+      { id: "vwap_align", title: "3. VWAP Benchmark Alignment", targetSeries: "OPTION_PREMIUM" },
+      { id: "rsi_mom", title: "4. RSI Momentum Filter", targetSeries: "OPTION_PREMIUM" },
+      { id: "macd_mom", title: "5. MACD Momentum Histogram", targetSeries: "OPTION_PREMIUM" },
+      { id: "vol_surge", title: "6. Volume Expansion", targetSeries: "OPTION_PREMIUM" },
+      { id: "oi_buildup", title: "7. Open Interest Buildup", targetSeries: "CHAIN" },
+      { id: "iv_regime", title: "8. Implied Volatility (IV)", targetSeries: "OPTION_PREMIUM" },
+      { id: "fut_conf", title: "9. Futures Basis Confirmation", targetSeries: "FUTURES" },
     ];
-
-    const passedCount = confirmations.filter((c) => c.passed).length;
-    const total = confirmations.length;
-    const confidencePct = Math.round((passedCount / total) * 100);
-
-    let state: "BULLISH" | "BEARISH" | "MIXED" | "NO_SETUP" | "INSUFFICIENT_DATA" = "MIXED";
-    if (confidencePct >= 70) state = "BULLISH";
-    else if (confidencePct <= 30) state = "BEARISH";
+    const confirmations: ConfirmationMatrixItem[] = specifications.map((item) => ({
+      ...item,
+      passed: false,
+      valueDisplay: "DATA REQUIRED",
+      interpretation: "NEUTRAL",
+      description: "This factor is not evaluated without a validated provider series.",
+      evidence: "No authoritative historical or chain evidence is available.",
+    }));
 
     return {
-      state,
-      score: passedCount,
-      totalCriteria: total,
-      confidencePct,
+      state: "INSUFFICIENT_DATA",
+      score: 0,
+      totalCriteria: confirmations.length,
+      confidencePct: 0,
       confirmations,
-      summary: `Quantitative analysis indicates ${state} alignment (${passedCount}/${total} factors confirmed).`,
-      underlyingSummary: "Spot index in solid bullish regime above 200 EMA.",
-      premiumSummary: "Option premium in strong momentum breakout.",
-      futuresSummary: "Futures basis in contango (+16 pts).",
+      summary: "Trade setup is unavailable: validated historical series are required.",
+      underlyingSummary: "Underlying historical series unavailable.",
+      premiumSummary: "Option-premium historical series unavailable.",
+      futuresSummary: "Futures and chain confirmation unavailable.",
     };
-  }, [spotPrice, livePrice]);
+  }, []);
 
   // ── 5. Order Config & Risk State ─────────────────────────────────
   const [lots, setLots] = useState<number>(1);
   const [product, setProduct] = useState<"MIS" | "NRML" | "CNC">("MIS");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "SL" | "SL-M">("LIMIT");
-  const [entryPrice, setEntryPrice] = useState<number>(livePrice);
-  const [stopLoss, setStopLoss] = useState<number>(
-    instrument.side === "BUY" ? Number((livePrice * 0.85).toFixed(2)) : Number((livePrice * 1.15).toFixed(2))
-  );
-  const [targetPrice, setTargetPrice] = useState<number>(
-    instrument.side === "BUY" ? Number((livePrice * 1.3).toFixed(2)) : Number((livePrice * 0.7).toFixed(2))
-  );
+  const [entryPrice, setEntryPrice] = useState<number>(0);
+  const [stopLoss, setStopLoss] = useState<number>(0);
+  const [targetPrice, setTargetPrice] = useState<number>(0);
 
-  // Sync entry price when instrument changes
+  // Merge a newly selected instrument without retaining removed demo values.
   useEffect(() => {
-    if (initialInstrument?.symbol) {
-      setInstrument((prev) => ({
-        ...prev,
-        ...initialInstrument,
-        ltp: initialInstrument.ltp || prev.ltp,
-      }));
-      setEntryPrice(initialInstrument.ltp || livePrice);
-    }
-  }, [initialInstrument, livePrice]);
+    if (!initialInstrument) return;
+    setInstrument((prev) => {
+      const next = { ...prev, ...initialInstrument };
+      return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+    });
+  }, [initialInstrument]);
 
-  // Order Preview Derived State
+  useEffect(() => {
+    if (entryPrice === 0 && livePrice > 0) {
+      setEntryPrice(livePrice);
+    }
+  }, [livePrice, entryPrice]);
+
+  // ── 6. Order Preview Derived State ─────────────────────────────────
   const orderPreview: OrderPreviewData = useMemo(() => {
-    const lotSize = instrument.lotSize || 25;
-    const totalQuantity = lots * lotSize;
-    const effPrice = orderType === "MARKET" ? livePrice : entryPrice || livePrice;
-    const estimatedValue = totalQuantity * effPrice;
-    const riskPerUnit = Math.abs(effPrice - stopLoss);
-    const rewardPerUnit = Math.abs(targetPrice - effPrice);
+    const lotSize = positiveNumber(instrument.lotSize) ?? 0;
+    const totalQuantity = lots > 0 && lotSize > 0 ? lots * lotSize : 0;
+    const effPrice = orderType === "MARKET" ? livePrice : entryPrice;
+    const safePrice = positiveNumber(effPrice) ?? 0;
+    const riskPerUnit = safePrice > 0 ? Math.abs(safePrice - stopLoss) : 0;
+    const rewardPerUnit = safePrice > 0 ? Math.abs(targetPrice - safePrice) : 0;
     const maxRiskAmount = totalQuantity * riskPerUnit;
     const potentialRewardAmount = totalQuantity * rewardPerUnit;
-    const riskRewardRatio = riskPerUnit > 0 ? Number((rewardPerUnit / riskPerUnit).toFixed(2)) : 0;
 
     return {
       symbol: instrument.symbol,
@@ -385,16 +419,31 @@ export function TradeAnalysisDashboard({
       quantity: totalQuantity,
       lots,
       lotSize,
-      price: effPrice,
+      price: safePrice,
       stopLoss,
       target: targetPrice,
-      estimatedValue,
+      estimatedValue: totalQuantity * safePrice,
       maxRiskAmount,
       potentialRewardAmount,
-      riskRewardRatio,
+      riskRewardRatio:
+        riskPerUnit > 0 ? Number((rewardPerUnit / riskPerUnit).toFixed(2)) : 0,
       executionMode: "PAPER",
     };
   }, [instrument, lots, product, orderType, livePrice, entryPrice, stopLoss, targetPrice]);
+
+  const executionReady =
+    dataStatus === "CONNECTED" &&
+    instrument.symbol.length > 0 &&
+    livePrice > 0 &&
+    positiveNumber(instrument.lotSize) !== undefined &&
+    positiveNumber(instrument.tickSize) !== undefined &&
+    orderPreview.quantity > 0 &&
+    orderPreview.price > 0 &&
+    orderPreview.stopLoss !== undefined &&
+    orderPreview.stopLoss > 0 &&
+    orderPreview.target !== undefined &&
+    orderPreview.target > 0 &&
+    setupAnalysis.state !== "INSUFFICIENT_DATA";
 
   return (
     <div className="space-y-3.5 font-sans text-slate-200 text-xs select-none max-w-7xl mx-auto pb-16">
@@ -457,12 +506,12 @@ export function TradeAnalysisDashboard({
                   ? "● LIVE DATA"
                   : dataStatus === "STALE"
                   ? "DATA STALE"
-                  : "DISCONNECTED"}
+                  : "DATA UNAVAILABLE"}
               </span>
             </div>
             <span className="text-slate-600">•</span>
             <span className="text-slate-400">
-              Age: <strong className="text-white">{dataAgeSeconds}s</strong>
+              Age: <strong className="text-white">{dataAgeSeconds === null ? "—" : dataAgeSeconds + "s"}</strong>
             </span>
           </div>
 
@@ -492,49 +541,49 @@ export function TradeAnalysisDashboard({
             OPTION PREMIUM TELEMETRY
           </span>
           <span className="text-[10px] text-slate-400">
-            Source: <strong className="text-slate-200">DHAN HQ NSE_FNO</strong>
+            Source: <strong className="text-slate-200">{liveQuoteData?.source || instrument.source || "UNAVAILABLE"}</strong>
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 text-[10px]">
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Premium LTP</span>
-            <strong className="text-white text-sm block mt-0.5">₹{livePrice.toFixed(2)}</strong>
+            <strong className="text-white text-sm block mt-0.5">₹{formatPositive(livePrice)}</strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Bid / Ask</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              ₹{instrument.bid?.toFixed(1) || "131.9"} / ₹{instrument.ask?.toFixed(1) || "132.9"}
+              ₹{formatPositive(instrument.bid, 1)} / ₹{formatPositive(instrument.ask, 1)}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Spread</span>
             <strong className="text-cyan-300 text-xs block mt-0.5">
-              ₹{(instrument.spread || 1.0).toFixed(2)}
+              ₹{formatPositive(instrument.spread)}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Volume</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              {((instrument.volume || 845000) / 1000).toFixed(1)}k
+              {instrument.volume !== undefined ? (instrument.volume / 1000).toFixed(1) + "k" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Open Interest</span>
             <strong className="text-slate-200 text-xs block mt-0.5">
-              {((instrument.openInterest || 6830000) / 100000).toFixed(2)}L
+              {instrument.openInterest !== undefined ? (instrument.openInterest / 100000).toFixed(2) + "L" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">OI Change</span>
             <strong className="text-emerald-400 text-xs block mt-0.5">
-              +{instrument.oiChangePct || 18.9}%
+              {instrument.oiChangePct !== undefined ? (instrument.oiChangePct >= 0 ? "+" : "") + instrument.oiChangePct + "%" : "—"}
             </strong>
           </div>
           <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
             <span className="text-slate-500 uppercase block text-[9px]">Implied Vol (IV)</span>
             <strong className="text-purple-300 text-xs block mt-0.5">
-              {((instrument.iv || 0.142) * 100).toFixed(1)}%
+              {instrument.iv !== undefined ? (instrument.iv * 100).toFixed(1) + "%" : "—"}
             </strong>
           </div>
         </div>
@@ -543,19 +592,19 @@ export function TradeAnalysisDashboard({
         <div className="p-2.5 bg-[#06101B] rounded-xl border border-[#12304A] grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10px]">
           <div>
             <span className="text-slate-500 block">Delta (Δ)</span>
-            <strong className="text-cyan-300">{(instrument.greeks?.delta || 0.52).toFixed(2)}</strong>
+            <strong className="text-cyan-300">{formatMaybe(instrument.greeks?.delta, 2)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Gamma (Γ)</span>
-            <strong className="text-slate-300">{(instrument.greeks?.gamma || 0.0018).toFixed(4)}</strong>
+            <strong className="text-slate-300">{formatMaybe(instrument.greeks?.gamma, 4)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Theta (Θ decay/day)</span>
-            <strong className="text-rose-400">{(instrument.greeks?.theta || -14.5).toFixed(1)}</strong>
+            <strong className="text-rose-400">{formatMaybe(instrument.greeks?.theta, 1)}</strong>
           </div>
           <div>
             <span className="text-slate-500 block">Vega (ν per 1% IV)</span>
-            <strong className="text-purple-300">{(instrument.greeks?.vega || 18.2).toFixed(1)}</strong>
+            <strong className="text-purple-300">{formatMaybe(instrument.greeks?.vega, 1)}</strong>
           </div>
         </div>
       </div>
@@ -574,6 +623,7 @@ export function TradeAnalysisDashboard({
         currentLtp={livePrice}
         underlyingLtp={spotPrice}
         activeIndicators={activeIndicators}
+        hasHistoricalData={false}
         onUpdateIndicators={setActiveIndicators}
       />
 
@@ -587,7 +637,7 @@ export function TradeAnalysisDashboard({
       <TradeAnalysisRiskReward
         side={instrument.side}
         currentLtp={livePrice}
-        lotSize={instrument.lotSize || 25}
+        lotSize={instrument.lotSize || 0}
         lots={lots}
         entryPrice={entryPrice}
         stopLoss={stopLoss}
@@ -595,7 +645,7 @@ export function TradeAnalysisDashboard({
         onChangeEntry={setEntryPrice}
         onChangeStopLoss={setStopLoss}
         onChangeTarget={setTargetPrice}
-        isLiveMarketFresh={isDataFresh}
+        isLiveMarketFresh={isDataFresh && hasUnderlyingQuote && hasPremiumQuote}
       />
 
       {/* ── 7. Order Preview & Paper Order Execution ── */}
@@ -604,7 +654,7 @@ export function TradeAnalysisDashboard({
         riskRewardRatio={orderPreview.riskRewardRatio}
         totalMaxRisk={orderPreview.maxRiskAmount}
         totalPotentialProfit={orderPreview.potentialRewardAmount}
-        isReadyForReview={true}
+        isReadyForReview={executionReady}
         onOrderExecuted={() => {
           if (refreshAll) refreshAll();
         }}

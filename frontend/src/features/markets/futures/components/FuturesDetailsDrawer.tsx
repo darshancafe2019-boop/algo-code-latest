@@ -41,6 +41,7 @@ import {
   fetchFuturesAccountMargins,
   fetchFuturesPositions,
 } from "../api/futures-api";
+import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
 
 interface FuturesDetailsDrawerProps {
   contract: CanonicalFuturesContract | null;
@@ -93,6 +94,34 @@ export function FuturesDetailsDrawer({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [executionState, setExecutionState] = useState<"IDLE" | "VALIDATING" | "SUBMITTING" | "FILLED" | "ERROR">("IDLE");
   const [feedback, setFeedback] = useState<{ status: "SUCCESS" | "ERROR"; message: string } | null>(null);
+  const [isTradeAnalysisOpen, setIsTradeAnalysisOpen] = useState<boolean>(false);
+
+  const tradeAnalysisInstrument = useMemo(() => {
+    if (!contract) return null;
+    const ltp = contract.last_price || contract.mark_price || 0;
+    return {
+      symbol: contract.displayName || contract.symbol,
+      underlying: contract.underlying,
+      securityId: contract.symbol || (contract as any).id || "",
+      exchangeSegment: contract.exchange === "NSE" ? "NSE_FNO" : (contract.exchange || "FUTURES"),
+      instrumentType: "FUTURES" as const,
+      expiry: (contract as any).expiry || "",
+      intent: tradeSide,
+      ltp: ltp,
+      bid: contract.bid,
+      ask: contract.ask,
+      spread: contract.bid && contract.ask ? (contract.ask - contract.bid) : undefined,
+      volume: contract.volume_24h_usd || (contract as any).volume_24h || 0,
+      openInterest: contract.open_interest_usd || (contract as any).open_interest || 0,
+      basis: typeof contract.basis === "number" ? contract.basis : contract.basis?.basis_absolute,
+      dayHigh: (contract as any).high_24h,
+      dayLow: (contract as any).low_24h,
+      previousClose: (contract as any).prev_close,
+      lotSize: contract.lot_size || 1,
+      tickSize: contract.tick_size || 0.05,
+      timestamp: new Date().toISOString(),
+    };
+  }, [contract, tradeSide]);
 
   // Sync state when contract changes
   useEffect(() => {
@@ -835,7 +864,16 @@ export function FuturesDetailsDrawer({
 
       {/* 4. Sticky Bottom Action CTA */}
       {activeSubTab === "TRADE" && (
-        <div className="p-3 border-t border-[#12304A] bg-[#0A1422] shrink-0">
+        <div className="p-3 border-t border-[#12304A] bg-[#0A1422] shrink-0 space-y-2">
+          <button
+            type="button"
+            onClick={() => setIsTradeAnalysisOpen(true)}
+            className="w-full py-2 rounded-xl font-bold font-mono text-[11px] bg-gradient-to-r from-cyan-950 via-[#0C2238] to-blue-950 hover:from-cyan-900/60 hover:to-blue-900/60 text-cyan-300 border border-cyan-500/40 hover:border-cyan-400 transition shadow flex items-center justify-center gap-1.5 active:scale-98"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Open Trade Analysis Dashboard & Indicators</span>
+          </button>
+
           <button
             type="button"
             onClick={handleOpenOrderPreview}
@@ -870,16 +908,25 @@ export function FuturesDetailsDrawer({
     </div>
   );
 
-  if (isInline) {
-    return ticketContent;
-  }
-
-  // Mobile / Tablet Drawer with semi-transparent backdrop
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="w-full max-w-md bg-[#0A1422] border-l border-[#12304A] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200">
-        {ticketContent}
-      </div>
-    </div>
+    <>
+      {isInline ? (
+        ticketContent
+      ) : (
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-[#0A1422] border-l border-[#12304A] shadow-2xl flex flex-col h-full overflow-hidden animate-in slide-in-from-right duration-200">
+            {ticketContent}
+          </div>
+        </div>
+      )}
+
+      {tradeAnalysisInstrument && (
+        <TradeAnalysisModal
+          isOpen={isTradeAnalysisOpen}
+          onClose={() => setIsTradeAnalysisOpen(false)}
+          instrument={tradeAnalysisInstrument}
+        />
+      )}
+    </>
   );
 }

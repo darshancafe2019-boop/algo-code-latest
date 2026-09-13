@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { X, Shield, Activity, Radio, AlertTriangle } from "lucide-react";
 import { OptionContractQuote } from "@/types/option-chain";
 import { getExpiryDisplay } from "@/lib/expiry-utils";
 import { SimpleOptionOrderTicket } from "./SimpleOptionOrderTicket";
+import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
 
 interface SelectedOptionInspectionDrawerProps {
   isOpen: boolean;
@@ -31,6 +32,8 @@ export function SelectedOptionInspectionDrawer({
   currency = "₹",
   onExecuteOrder,
 }: SelectedOptionInspectionDrawerProps) {
+  const [isTradeAnalysisOpen, setIsTradeAnalysisOpen] = useState(false);
+
   if (!isOpen || !strike || !optionType || !quote) return null;
 
   const isCall = optionType === "CE";
@@ -165,8 +168,20 @@ export function SelectedOptionInspectionDrawer({
           </div>
         </div>
 
+        {/* Deep Trade Analysis & Indicator Setup Action */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={() => setIsTradeAnalysisOpen(true)}
+            className="w-full py-2 rounded-xl bg-[#0A223E] hover:bg-[#0E2E54] border border-[#1A4B7D] text-[#22D3EE] font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md"
+          >
+            <Activity className="w-4 h-4 text-[#22D3EE]" />
+            <span>Open Trade Analysis Dashboard & Indicators</span>
+          </button>
+        </div>
+
         {/* Embedded Unified 1-Click Order Ticket */}
-        <div className="pt-2">
+        <div className="pt-1">
           <SimpleOptionOrderTicket
             underlying={underlying}
             expiry={expiry}
@@ -185,6 +200,38 @@ export function SelectedOptionInspectionDrawer({
             }}
           />
         </div>
+
+        {/* Universal Trade Analysis Modal */}
+        {isTradeAnalysisOpen && (
+          <TradeAnalysisModal
+            isOpen={isTradeAnalysisOpen}
+            onClose={() => setIsTradeAnalysisOpen(false)}
+            instrument={{
+              underlying,
+              symbol: `${underlying} ${strike} ${optionType}`,
+              securityId: instrumentId,
+              assetClass: "OPTION",
+              expiry,
+              strike,
+              optionType,
+              side: "BUY",
+              ltp: quote.ltp || 0,
+              bid: quote.bid,
+              ask: quote.ask,
+              spread: quote.ask && quote.bid ? Number((quote.ask - quote.bid).toFixed(2)) : undefined,
+              volume: quote.volume,
+              openInterest: quote.open_interest,
+              iv: quote.iv ? quote.iv / 100 : undefined,
+              lotSize: underlying.includes("BANKNIFTY") ? 15 : underlying.includes("SENSEX") ? 10 : 25,
+              greeks: {
+                delta: quote.delta,
+                gamma: quote.gamma,
+                theta: quote.theta,
+                vega: quote.vega,
+              },
+            }}
+          />
+        )}
       </div>
     </div>
   );

@@ -11,18 +11,17 @@ import {
 } from "@/types/strategy-ide";
 import { apiClient } from "@/lib/apiClient";
 
-import { StrategyIdeHeader } from "./StrategyIdeHeader";
-import { StrategyBuildLibrary, RuleTargetStage } from "./StrategyBuildLibrary";
-import { StrategyRuleCanvas } from "./StrategyRuleCanvas";
-import { StrategyOptionsStudio } from "./StrategyOptionsStudio";
-import { StrategyFuturesStudio } from "./StrategyFuturesStudio";
-import { StrategyInspector } from "./StrategyInspector";
+import { StrategySimplifiedCanvas } from "./StrategySimplifiedCanvas";
+import { StrategyIndicatorDrawer } from "./StrategyIndicatorDrawer";
+import { StrategyRuleEditModal } from "./StrategyRuleEditModal";
+import { StrategyWhyNoTradeDrawer } from "./StrategyWhyNoTradeDrawer";
+import { StrategyReviewModal } from "./StrategyReviewModal";
 import { StrategyTestingDrawer } from "./StrategyTestingDrawer";
 import { StrategyAssignBotModal } from "./StrategyAssignBotModal";
 import { StrategyCatalogModal } from "./StrategyCatalogModal";
 import { StrategyVersionDiffModal } from "./StrategyVersionDiffModal";
 import { StrategyFullReportModal } from "./StrategyFullReportModal";
-import { PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Layers, Activity } from "lucide-react";
+import { RuleTargetStage } from "./StrategyBuildLibrary";
 
 const INITIAL_STRATEGY: StrategyIdeDefinition = {
   strategy_id: "strat-trend-confluence-btc",
@@ -167,11 +166,17 @@ export function StrategyBuilder() {
   const queryClient = useQueryClient();
   const [strategy, setStrategy] = useState<StrategyIdeDefinition>(INITIAL_STRATEGY);
   const [isMounted, setIsMounted] = useState(false);
-  const [interfaceMode, setInterfaceMode] = useState<"SIMPLE" | "ADVANCED">("SIMPLE");
 
-  // Collapsible Side Panels State with localStorage persistence
-  const [showIndicators, setShowIndicators] = useState(true);
-  const [showStatus, setShowStatus] = useState(true);
+  // Modals & Drawers state
+  const [isIndicatorDrawerOpen, setIsIndicatorDrawerOpen] = useState(false);
+  const [indicatorDrawerStage, setIndicatorDrawerStage] = useState<RuleTargetStage>("setup");
+  const [editingRuleData, setEditingRuleData] = useState<{
+    stage: RuleTargetStage;
+    rule: StrategyIdeRule;
+  } | null>(null);
+
+  const [isWhyNoTradeOpen, setIsWhyNoTradeOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [showTestingDrawer, setShowTestingDrawer] = useState(false);
 
   // Undo / Redo Stack
@@ -191,54 +196,14 @@ export function StrategyBuilder() {
   // Testing & Backtest State
   const [backtestResult, setBacktestResult] = useState<BacktestResultPayload | null>(null);
   const [isBacktesting, setIsBacktesting] = useState(false);
-  const [isBacktestStale, setIsBacktestStale] = useState(false);
 
   // Readiness & Preflight State
   const [readiness, setReadiness] = useState<StrategyIdeReadiness | null>(null);
   const [preflight, setPreflight] = useState<StrategyIdePreflight | null>(null);
 
-  // Load preferences from localStorage on mount
   useEffect(() => {
     setIsMounted(true);
-    try {
-      const savedInd = localStorage.getItem("quantos_strat_show_indicators");
-      if (savedInd !== null) setShowIndicators(savedInd === "true");
-      const savedStat = localStorage.getItem("quantos_strat_show_status");
-      if (savedStat !== null) setShowStatus(savedStat === "true");
-      const savedMode = localStorage.getItem("quantos_strat_mode");
-      if (savedMode === "ADVANCED" || savedMode === "SIMPLE") setInterfaceMode(savedMode);
-    } catch {}
   }, []);
-
-  const toggleShowIndicators = () => {
-    setShowIndicators((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("quantos_strat_show_indicators", String(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  const toggleShowStatus = () => {
-    setShowStatus((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("quantos_strat_show_status", String(next));
-      } catch {}
-      return next;
-    });
-  };
-
-  const toggleInterfaceMode = () => {
-    setInterfaceMode((prev) => {
-      const next = prev === "SIMPLE" ? "ADVANCED" : "SIMPLE";
-      try {
-        localStorage.setItem("quantos_strat_mode", next);
-      } catch {}
-      return next;
-    });
-  };
 
   // Fetch Strategy Catalog / Templates
   const { data: catalogData } = useQuery<{ strategies: any[] }>({
@@ -284,9 +249,6 @@ export function StrategyBuilder() {
     if (updatedHistory.length > 30) updatedHistory.shift();
     setHistory(updatedHistory);
     setHistoryIndex(updatedHistory.length - 1);
-    if (backtestResult) {
-      setIsBacktestStale(true);
-    }
   };
 
   const handleUndo = useCallback(() => {
@@ -295,9 +257,8 @@ export function StrategyBuilder() {
       setHistoryIndex(historyIndex - 1);
       setStrategy(prev);
       validateStrategy(prev);
-      if (backtestResult) setIsBacktestStale(true);
     }
-  }, [historyIndex, history, validateStrategy, backtestResult]);
+  }, [historyIndex, history, validateStrategy]);
 
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
@@ -305,9 +266,8 @@ export function StrategyBuilder() {
       setHistoryIndex(historyIndex + 1);
       setStrategy(next);
       validateStrategy(next);
-      if (backtestResult) setIsBacktestStale(true);
     }
-  }, [historyIndex, history, validateStrategy, backtestResult]);
+  }, [historyIndex, history, validateStrategy]);
 
   const handleUpdateStrategy = (fields: Partial<StrategyIdeDefinition>) => {
     const updated = { ...strategy, ...fields };
@@ -316,8 +276,8 @@ export function StrategyBuilder() {
     validateStrategy(updated);
   };
 
-  // Add rule from Library or Palette
-  const handleAddRuleFromLibrary = (target: RuleTargetStage, rule: StrategyIdeRule) => {
+  // Add rule from Drawer
+  const handleAddRuleFromDrawer = (target: RuleTargetStage, rule: StrategyIdeRule) => {
     const stageKey = target === "setup" ? "setup" : target === "confirmation" ? "confirmation" : "trigger";
     const currentRules = strategy.entry[stageKey]?.rules || [];
     const updatedEntry = {
@@ -330,7 +290,24 @@ export function StrategyBuilder() {
     handleUpdateStrategy({ entry: updatedEntry });
   };
 
-  // Save Draft (Manual or Autosave)
+  // Update rule from Edit Modal
+  const handleSaveEditedRule = (updatedRule: StrategyIdeRule) => {
+    if (!editingRuleData) return;
+    const stageKey = editingRuleData.stage === "setup" ? "setup" : editingRuleData.stage === "confirmation" ? "confirmation" : "trigger";
+    const currentRules = strategy.entry[stageKey]?.rules || [];
+    const updatedRules = currentRules.map((r) => (r.id === updatedRule.id ? updatedRule : r));
+    handleUpdateStrategy({
+      entry: {
+        ...strategy.entry,
+        [stageKey]: {
+          ...strategy.entry[stageKey],
+          rules: updatedRules,
+        },
+      },
+    });
+  };
+
+  // Save Draft
   const handleSaveDraft = useCallback(async () => {
     if (isSaving) return;
     setIsSaving(true);
@@ -361,7 +338,6 @@ export function StrategyBuilder() {
   }) => {
     if (isBacktesting) return;
     setIsBacktesting(true);
-    setIsBacktestStale(false);
     setShowTestingDrawer(true);
     try {
       const idempotencyKey = apiClient.generateIdempotencyKey("BACKTEST_STRATEGY", strategy.id);
@@ -384,7 +360,7 @@ export function StrategyBuilder() {
       if (res.ok && res.data) {
         setBacktestResult(res.data);
       } else {
-        // Fallback realistic deterministic simulation
+        // Fallback realistic simulation
         setBacktestResult({
           status: "success",
           backtest_id: `bt-${Date.now()}`,
@@ -495,40 +471,6 @@ export function StrategyBuilder() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleSaveDraft, handleUndo, handleRedo]);
 
-  // New Strategy
-  const handleNewStrategy = () => {
-    const newStrat: StrategyIdeDefinition = {
-      ...INITIAL_STRATEGY,
-      strategy_id: `strat-custom-${Date.now()}`,
-      name: "New Quantitative Strategy",
-      description: "Custom visual quantitative rule strategy",
-      active_version: "v1.0.0",
-      status: "DRAFT",
-      entry: {
-        setup: { conjunction: "AND", rules: [] },
-        confirmation: { conjunction: "AND", rules: [] },
-        trigger: { conjunction: "AND", rules: [] },
-      },
-    };
-    setStrategy(newStrat);
-    pushToHistory(newStrat);
-    validateStrategy(newStrat);
-  };
-
-  // Clone Strategy
-  const handleCloneStrategy = () => {
-    const cloned: StrategyIdeDefinition = {
-      ...strategy,
-      strategy_id: `strat-clone-${Date.now()}`,
-      name: `${strategy.name} (Copy)`,
-      active_version: "v1.0.0",
-      status: "DRAFT",
-    };
-    setStrategy(cloned);
-    pushToHistory(cloned);
-    validateStrategy(cloned);
-  };
-
   // Load from Catalog
   const handleLoadFromCatalog = (item: any) => {
     const loaded: StrategyIdeDefinition = {
@@ -563,136 +505,88 @@ export function StrategyBuilder() {
   };
 
   if (!isMounted) {
-    return <div className="p-8 text-center text-[#7D8EA5] font-mono">Initializing Strategy Workstation...</div>;
+    return <div className="p-8 text-center text-slate-500 font-mono">Initializing Strategy Workspace...</div>;
   }
 
   return (
-    <div className="flex flex-col gap-3 font-sans max-w-[1720px] mx-auto pb-12 select-none text-xs">
-      {/* 1. TOP HEADER & COMPACT MARKET BAR */}
-      <StrategyIdeHeader
+    <div className="max-w-4xl mx-auto pb-16">
+      {/* Streamlined Single-Column Workflow Workspace */}
+      <StrategySimplifiedCanvas
         strategy={strategy}
         onUpdateStrategy={handleUpdateStrategy}
         onSaveDraft={handleSaveDraft}
         isSaving={isSaving}
         autosaveTime={autosaveTime}
-        onOpenTest={() => handleRunBacktest()}
-        isTesting={isBacktesting}
-        onOpenForwardTest={() => {
-          setShowTestingDrawer(true);
-        }}
+        onOpenBacktest={() => handleRunBacktest()}
+        isBacktesting={isBacktesting}
+        onOpenForwardTest={() => setShowTestingDrawer(true)}
         onOpenCatalog={() => setIsCatalogOpen(true)}
-        onOpenVersionsModal={() => setIsVersionsOpen(true)}
-        onOpenDiffModal={() => setIsVersionsOpen(true)}
-        onOpenAssignModal={() => setIsAssignOpen(true)}
-        onNewStrategy={handleNewStrategy}
-        onCloneStrategy={handleCloneStrategy}
+        onOpenAssignBot={() => setIsAssignOpen(true)}
+        onOpenReview={() => setIsReviewModalOpen(true)}
+        onOpenWhyNoTrade={() => setIsWhyNoTradeOpen(true)}
+        onOpenFullReport={() => setIsFullReportOpen(true)}
+        onAddRuleClick={(stage) => {
+          setIndicatorDrawerStage(stage);
+          setIsIndicatorDrawerOpen(true);
+        }}
+        onEditRuleClick={(stage, rule) => {
+          setEditingRuleData({ stage, rule });
+        }}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         onUndo={handleUndo}
         onRedo={handleRedo}
-        interfaceMode={interfaceMode}
-        onToggleInterfaceMode={toggleInterfaceMode}
       />
 
-      {/* 2. PANEL TOGGLE CONTROLS STRIP */}
-      <div className="flex items-center justify-between gap-2 px-1 text-xs font-mono">
-        <button
-          type="button"
-          onClick={toggleShowIndicators}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0A1422] hover:bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A] transition-colors cursor-pointer"
-        >
-          {showIndicators ? <PanelLeftClose className="h-3.5 w-3.5 text-[#22D3EE]" /> : <PanelLeftOpen className="h-3.5 w-3.5 text-[#7D8EA5]" />}
-          <span>{showIndicators ? "Collapse Library" : "Components Library"}</span>
-        </button>
+      {/* 1. Searchable Indicator & Condition Drawer */}
+      <StrategyIndicatorDrawer
+        isOpen={isIndicatorDrawerOpen}
+        onClose={() => setIsIndicatorDrawerOpen(false)}
+        targetStage={indicatorDrawerStage}
+        baseTimeframe={strategy.base_timeframe}
+        onAddRule={handleAddRuleFromDrawer}
+      />
 
-        <button
-          type="button"
-          onClick={toggleShowStatus}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0A1422] hover:bg-[#0C1727] text-[#7D8EA5] hover:text-[#F8FAFC] border border-[#12304A] transition-colors cursor-pointer"
-        >
-          {showStatus ? <PanelRightClose className="h-3.5 w-3.5 text-[#22D3EE]" /> : <PanelRightOpen className="h-3.5 w-3.5 text-[#7D8EA5]" />}
-          <span>{showStatus ? "Collapse Diagnostics" : "Live Diagnostics"}</span>
-        </button>
-      </div>
+      {/* 2. Compact Rule Edit Modal */}
+      <StrategyRuleEditModal
+        isOpen={!!editingRuleData}
+        onClose={() => setEditingRuleData(null)}
+        rule={editingRuleData?.rule || null}
+        onSave={handleSaveEditedRule}
+      />
 
-      {/* 3. 3-COLUMN WORKSTATION LAYOUT */}
-      <div className="flex flex-col lg:flex-row gap-3.5 items-start">
-        {/* LEFT COLUMN: INDICATOR & COMPONENT LIBRARY (220-240px, collapsible) */}
-        {showIndicators && (
-          <StrategyBuildLibrary
-            onAddRule={handleAddRuleFromLibrary}
-            baseTimeframe={strategy.base_timeframe}
-          />
-        )}
+      {/* 3. "Why No Trade?" Diagnostic Drawer */}
+      <StrategyWhyNoTradeDrawer
+        isOpen={isWhyNoTradeOpen}
+        onClose={() => setIsWhyNoTradeOpen(false)}
+        strategy={strategy}
+      />
 
-        {/* CENTER COLUMN: 7-STAGE WORKFLOW BUILDER (flexible) */}
-        <div className="flex-1 w-full space-y-3.5 min-w-0">
-          {/* Options Studio if market_type is options */}
-          {strategy.market_type === "options" && (
-            <StrategyOptionsStudio
-              config={{
-                underlying: strategy.symbol.split(" ")[0] || "BTC",
-                expiry: "2026-08-28",
-                spot_price: 64500,
-                preset: "IRON_CONDOR",
-                legs: [],
-              }}
-              onUpdateConfig={() => {}}
-            />
-          )}
+      {/* 4. Strategy Architecture Review Summary Modal */}
+      <StrategyReviewModal
+        isOpen={isReviewModalOpen}
+        onClose={() => setIsReviewModalOpen(false)}
+        strategy={strategy}
+        onSave={handleSaveDraft}
+        onRunBacktest={() => handleRunBacktest()}
+        onAssignBot={() => setIsAssignOpen(true)}
+        isSaving={isSaving}
+      />
 
-          {/* Futures Studio if market_type is futures */}
-          {strategy.market_type === "futures" && (
-            <StrategyFuturesStudio
-              config={{
-                leverage: strategy.risk?.leverage || 5,
-                margin_mode: "ISOLATED",
-                liquidation_buffer_pct: 15,
-                funding_rate_filter: true,
-                max_funding_rate_pct: 0.05,
-              }}
-              symbol={strategy.symbol}
-              onUpdateConfig={() => {}}
-            />
-          )}
+      {/* 5. Testing & Backtest Lab Drawer */}
+      {showTestingDrawer && (
+        <StrategyTestingDrawer
+          strategy={strategy}
+          liveObservation={null}
+          isObserving={false}
+          onRunLiveObservation={() => {}}
+          backtestResult={backtestResult}
+          isBacktesting={isBacktesting}
+          onRunBacktest={(p) => handleRunBacktest(p)}
+        />
+      )}
 
-          {/* 7-Stage Core Workflow Canvas */}
-          <StrategyRuleCanvas
-            strategy={strategy}
-            onUpdateStrategy={handleUpdateStrategy}
-            interfaceMode={interfaceMode}
-          />
-
-          {/* Testing Drawer (Backtest Lab & Paper Stream) */}
-          {showTestingDrawer && (
-            <StrategyTestingDrawer
-              strategy={strategy}
-              liveObservation={null}
-              isObserving={false}
-              onRunLiveObservation={() => {}}
-              backtestResult={backtestResult}
-              isBacktesting={isBacktesting}
-              onRunBacktest={(p) => handleRunBacktest(p)}
-            />
-          )}
-        </div>
-
-        {/* RIGHT COLUMN: STRATEGY READINESS & DIAGNOSTICS (260-300px, collapsible) */}
-        {showStatus && (
-          <StrategyInspector
-            strategy={strategy}
-            readiness={readiness}
-            preflight={preflight}
-            backtestResult={backtestResult}
-            isBacktesting={isBacktesting}
-            isBacktestStale={isBacktestStale}
-            onOpenFullReport={() => setIsFullReportOpen(true)}
-            onOpenVersionsModal={() => setIsVersionsOpen(true)}
-          />
-        )}
-      </div>
-
-      {/* 4. MODALS */}
+      {/* 6. Existing Strategy Catalog Templates Modal */}
       <StrategyCatalogModal
         isOpen={isCatalogOpen}
         onClose={() => setIsCatalogOpen(false)}
@@ -705,6 +599,7 @@ export function StrategyBuilder() {
         }}
       />
 
+      {/* 7. Version Publishing Modal */}
       <StrategyVersionDiffModal
         isOpen={isVersionsOpen}
         onClose={() => setIsVersionsOpen(false)}
@@ -714,6 +609,7 @@ export function StrategyBuilder() {
         }}
       />
 
+      {/* 8. Assign to Bot Modal */}
       <StrategyAssignBotModal
         isOpen={isAssignOpen}
         onClose={() => setIsAssignOpen(false)}
@@ -721,6 +617,7 @@ export function StrategyBuilder() {
         onAssignSuccess={() => {}}
       />
 
+      {/* 9. Full Diagnostic Report Modal */}
       <StrategyFullReportModal
         isOpen={isFullReportOpen}
         onClose={() => setIsFullReportOpen(false)}

@@ -1,6 +1,6 @@
 export type AssetClass = "OPTION" | "FUTURES" | "EQUITY" | "CRYPTO";
 
-export type MoneynessClassification = "ITM" | "ATM" | "OTM";
+export type MoneynessClassification = "ITM" | "ATM" | "OTM" | "UNKNOWN";
 
 export type OIBuildupType = "LONG_BUILDUP" | "SHORT_BUILDUP" | "SHORT_COVERING" | "LONG_UNWINDING" | "NEUTRAL";
 

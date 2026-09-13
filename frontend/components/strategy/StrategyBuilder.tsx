@@ -201,6 +201,7 @@ export function StrategyBuilder() {
   // Readiness & Preflight State
   const [readiness, setReadiness] = useState<StrategyIdeReadiness | null>(null);
   const [preflight, setPreflight] = useState<StrategyIdePreflight | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     setIsMounted(true);

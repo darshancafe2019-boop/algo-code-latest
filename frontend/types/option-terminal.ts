@@ -235,9 +235,12 @@ export interface OrderBookDepthData {
   volume?: number;
   oi?: number;
   iv?: number;
+  /** Provider timestamp in milliseconds; absent when the source did not provide one. */
   timestamp: number;
-  dataAgeMs: number;
-  status: "LIVE" | "STALE" | "DISCONNECTED";
+  /** Age computed from the provider timestamp, never a UI-generated placeholder. */
+  dataAgeMs?: number;
+  status: "LIVE" | "STALE" | "DISCONNECTED" | "UNAVAILABLE";
+  error?: string;
 }
 
 export interface OptionPositionInfo {

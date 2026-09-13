@@ -666,78 +666,212 @@ class OrderExecutionService:
             "message": f"Order {order_id} has been cancelled."
         }
 
-    def reduce_position(self, symbol: str, percentage: float, broker: str = "PAPER") -> Dict[str, Any]:
+    def reduce_position(
+        self,
+        symbol: str,
+        percentage: float,
+        broker: str = "PAPER",
+        price: Optional[float] = None,
+        bot_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Reduces open position by percentage (e.g. 0.25 for 25%, 0.50 for 50%, 1.0 for 100%).
-        Routes through authoritative Risk Engine and OMS.
+        Reduce or close one isolated open paper position.
+
+        Exits use an explicit validated price or a current ticker.  There is no
+        entry-price fallback because that would fabricate a fill and distort
+        P&L.  Live exits remain blocked here until a broker-specific,
+        reconciliation-aware close workflow is enabled.
         """
         symbol_clean = symbol.strip().upper()
-        positions = _execute_query(
-            "SELECT * FROM trades_log WHERE symbol = ? AND status IN ('OPEN', 'RUNNING') ORDER BY id DESC LIMIT 1",
-            (symbol_clean,)
+        if not symbol_clean:
+            return {"success": False, "message": "INVALID_SYMBOL: Symbol is required."}
+
+        try:
+            pct = float(percentage)
+        except (TypeError, ValueError):
+            return {"success": False, "message": "INVALID_PERCENTAGE: Percentage must be numeric."}
+        if not math.isfinite(pct) or pct <= 0:
+            return {"success": False, "message": "INVALID_PERCENTAGE: Percentage must be positive."}
+        pct = min(1.0, pct)
+
+        query = (
+            "SELECT * FROM trades_log "
+            "WHERE symbol = ? AND status IN ('OPEN', 'RUNNING')"
         )
+        params: list[Any] = [symbol_clean]
+        if bot_id:
+            query += " AND bot_id = ?"
+            params.append(bot_id)
+        query += " ORDER BY id DESC LIMIT 1"
+        positions = _execute_query(query, tuple(params))
         if not positions:
             return {
                 "success": False,
-                "message": f"No open position found for symbol {symbol_clean}."
+                "message": f"No open position found for symbol {symbol_clean}.",
             }
 
         pos = positions[0]
-        curr_qty = float(pos.get("position_size", 0.0) or pos.get("requested_quantity", 0.0))
-        if curr_qty <= 0:
-            return {"success": False, "message": "Position quantity is zero."}
+        try:
+            curr_qty = float(pos.get("position_size", 0.0) or pos.get("requested_quantity", 0.0))
+            entry_price = float(pos.get("entry_price", 0.0))
+        except (TypeError, ValueError):
+            return {"success": False, "message": "POSITION_DATA_INVALID: Stored position values are not numeric."}
+        if not math.isfinite(curr_qty) or curr_qty <= 0 or not math.isfinite(entry_price) or entry_price <= 0:
+            return {"success": False, "message": "POSITION_DATA_INVALID: Stored position values are invalid."}
 
-        pct = max(0.01, min(1.0, float(percentage)))
-        exit_qty = round(curr_qty * pct, 4)
-        direction = str(pos.get("direction", "BUY")).upper()
-        opposite_side = "SELL" if direction in ["BUY", "LONG"] else "BUY"
+        exit_qty = curr_qty if pct >= 0.99 else round(curr_qty * pct, 8)
+        if exit_qty <= 0:
+            return {"success": False, "message": "POSITION_QUANTITY_INVALID: Exit quantity is zero."}
 
-        # Current price resolution
-        from src.price_action_engine import price_action_engine
-        current_price = price_action_engine.get_ltp(symbol_clean) or float(pos.get("entry_price", 100.0))
+        try:
+            requested_price = float(price) if price is not None else 0.0
+        except (TypeError, ValueError):
+            requested_price = 0.0
+
+        current_price = requested_price
+        if not math.isfinite(current_price) or current_price <= 0:
+            try:
+                from src.price_action_engine import price_action_engine
+                current_price = float(price_action_engine.get_ltp(symbol_clean) or 0.0)
+            except Exception as exc:
+                logger.warning("Exit price resolution failed for %s: %s", symbol_clean, exc)
+                current_price = 0.0
+        if not math.isfinite(current_price) or current_price <= 0:
+            return {
+                "success": False,
+                "message": f"PRICE_UNAVAILABLE: No validated exit price is available for {symbol_clean}.",
+            }
+
+        normalized_mode = str(getattr(config, "TRADING_MODE", "PAPER") or "PAPER").upper()
+        if normalized_mode != "PAPER":
+            return {
+                "success": False,
+                "message": "LIVE_EXIT_BLOCKED: Position exits require the broker-specific reconciled execution workflow.",
+            }
+
+        normalized_broker = str(broker or "PAPER").strip().upper()
+        direction = str(pos.get("direction", "LONG")).upper()
+        opposite_side = "SELL" if direction in {"BUY", "LONG"} else "BUY"
+
+        # This adapter is deterministic and has no external side effects.
+        fill = self.paper_adapter.submit_order(
+            symbol_clean,
+            opposite_side,
+            exit_qty,
+            current_price,
+            broker=normalized_broker,
+        )
+        if not fill.get("success") or not fill.get("order_id"):
+            return {
+                "success": False,
+                "message": str(fill.get("message") or "Paper exit was rejected."),
+            }
+
+        fill_price = float(fill.get("average_price") or current_price)
+        fee = float(fill.get("fees") or 0.0)
+        gross_pnl = (
+            (fill_price - entry_price) * exit_qty
+            if direction in {"BUY", "LONG"}
+            else (entry_price - fill_price) * exit_qty
+        )
+        net_pnl = gross_pnl - fee
+        now_iso = datetime.now(timezone.utc).isoformat()
+        trade_id = pos.get("id")
 
         if pct >= 0.99:
-            # Full Exit
-            _execute_statement(
-                "UPDATE trades_log SET status = 'CLOSED', exit_price = ?, exit_time = ? WHERE id = ?",
-                (current_price, datetime.now(timezone.utc).isoformat(), pos.get("id"))
+            updated = _execute_statement(
+                """
+                UPDATE trades_log SET
+                    status = 'CLOSED',
+                    trade_status = 'CLOSED',
+                    trade_result = 'CLOSED',
+                    exit_price = ?,
+                    exit_timestamp = ?,
+                    exit_time = ?,
+                    gross_pnl = COALESCE(gross_pnl, 0) + ?,
+                    result_pnl = COALESCE(result_pnl, 0) + ?,
+                    net_pnl = COALESCE(net_pnl, 0) + ?,
+                    realized_pnl = COALESCE(realized_pnl, 0) + ?,
+                    fees = COALESCE(fees, 0) + ?,
+                    exit_reason = ?,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('OPEN', 'RUNNING')
+                """,
+                (
+                    fill_price,
+                    now_iso,
+                    now_iso,
+                    gross_pnl,
+                    gross_pnl,
+                    net_pnl,
+                    net_pnl,
+                    fee,
+                    "MANUAL_EXIT",
+                    now_iso,
+                    trade_id,
+                ),
             )
-            log_bot_event(
-                event_type="POSITION_EXIT_FULL",
-                symbol=symbol_clean,
-                status="SUCCESS",
-                message=f"Closed 100% position ({curr_qty} units) in {symbol_clean} @ {current_price}"
-            )
-            return {
-                "success": True,
-                "action": "FULL_EXIT",
-                "symbol": symbol_clean,
-                "quantity": curr_qty,
-                "exit_price": current_price,
-                "remaining_quantity": 0.0
-            }
+            action = "FULL_EXIT"
+            remaining = 0.0
         else:
-            # Partial Exit
-            rem_qty = round(curr_qty - exit_qty, 4)
-            _execute_statement(
-                "UPDATE trades_log SET position_size = ?, partially_filled_quantity = ? WHERE id = ?",
-                (rem_qty, exit_qty, pos.get("id"))
+            remaining = round(curr_qty - exit_qty, 8)
+            updated = _execute_statement(
+                """
+                UPDATE trades_log SET
+                    position_size = ?,
+                    remaining_quantity = ?,
+                    partially_filled_quantity = COALESCE(partially_filled_quantity, 0) + ?,
+                    gross_pnl = COALESCE(gross_pnl, 0) + ?,
+                    result_pnl = COALESCE(result_pnl, 0) + ?,
+                    net_pnl = COALESCE(net_pnl, 0) + ?,
+                    realized_pnl = COALESCE(realized_pnl, 0) + ?,
+                    fees = COALESCE(fees, 0) + ?,
+                    updated_at = ?
+                WHERE id = ? AND status IN ('OPEN', 'RUNNING')
+                """,
+                (
+                    remaining,
+                    remaining,
+                    exit_qty,
+                    gross_pnl,
+                    gross_pnl,
+                    net_pnl,
+                    net_pnl,
+                    fee,
+                    now_iso,
+                    trade_id,
+                ),
             )
-            log_bot_event(
-                event_type="POSITION_EXIT_PARTIAL",
-                symbol=symbol_clean,
-                status="SUCCESS",
-                message=f"Partially reduced position by {pct*100:.0f}% ({exit_qty} units) in {symbol_clean} @ {current_price}. Remaining: {rem_qty}"
-            )
+            action = "PARTIAL_EXIT"
+
+        if not updated:
             return {
-                "success": True,
-                "action": "PARTIAL_EXIT",
-                "symbol": symbol_clean,
-                "percentage": pct * 100,
-                "quantity": exit_qty,
-                "exit_price": current_price,
-                "remaining_quantity": rem_qty
+                "success": False,
+                "message": "POSITION_UPDATE_FAILED: Paper fill was not committed to the trade ledger.",
             }
+
+        log_bot_event(
+            event_type="POSITION_EXIT_FULL" if action == "FULL_EXIT" else "POSITION_EXIT_PARTIAL",
+            symbol=symbol_clean,
+            order_id=str(fill.get("order_id")),
+            status="SUCCESS",
+            message=f"{action} {symbol_clean} quantity={exit_qty} @ {fill_price}",
+        )
+        return {
+            "success": True,
+            "action": action,
+            "symbol": symbol_clean,
+            "quantity": exit_qty,
+            "exit_price": fill_price,
+            "order_id": str(fill.get("order_id")),
+            "trade_id": trade_id,
+            "remaining_quantity": remaining,
+            "gross_pnl": gross_pnl,
+            "net_pnl": net_pnl,
+            "fees": fee,
+            "execution_mode": "PAPER",
+            "broker": normalized_broker,
+        }
 
 
 order_execution_service = OrderExecutionService()

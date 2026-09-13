@@ -42,7 +42,7 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
 
   // Real-time order-book query.  The component never constructs depth
   // from L1 values: unavailable or stale provider data remains unavailable.
-  const { data: depthData, isLoading, isFetching } = useQuery<OrderBookDepthData>({
+  const { data: depthData, isLoading } = useQuery<OrderBookDepthData>({
     queryKey: ["optionOrderBookDepth", contract?.symbol, contract?.broker, contract?.strike, contract?.optionType],
     queryFn: async () => {
       if (!contract) {
@@ -208,12 +208,12 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
     depthData?.dataAgeMs !== undefined ? String(Math.round(depthData.dataAgeMs)) + "ms" : "UNAVAILABLE";
 
   const brokerSourceLabel = useMemo(() => {
-    if (!contract) return "PAPER ENGINE";
-    const src = (contract.source || contract.broker || "DELTA_EXCHANGE").toUpperCase();
+    if (!contract) return "SOURCE UNAVAILABLE";
+    const src = (contract.source || contract.broker || "").toUpperCase();
     if (src.includes("DELTA")) return "DELTA EXCHANGE";
     if (src.includes("DHAN")) return "DHAN HQ";
     if (src.includes("UPSTOX")) return "UPSTOX PRO";
-    return "PAPER ENGINE";
+    return "SOURCE UNAVAILABLE";
   }, [contract]);
 
   if (!isOpen || !contract) return null;

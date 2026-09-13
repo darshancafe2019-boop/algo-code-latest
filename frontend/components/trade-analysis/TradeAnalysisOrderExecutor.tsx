@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Send,
   Zap,
@@ -42,14 +42,33 @@ export function TradeAnalysisOrderExecutor({
     type: null,
     message: "",
   });
+  const idempotencyRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const handleExecutePaperOrder = async () => {
+    if (isSubmitting || !isReadyForReview) return;
+
     setIsSubmitting(true);
     setFeedback({ type: null, message: "" });
 
-    // Initial Submitted status
+    const fingerprint = [
+      orderPreview.symbol,
+      orderPreview.side,
+      orderPreview.orderType,
+      orderPreview.quantity,
+      orderPreview.price,
+      orderPreview.stopLoss || 0,
+      orderPreview.target || 0,
+    ].join("|");
+    if (!idempotencyRef.current || idempotencyRef.current.fingerprint !== fingerprint) {
+      idempotencyRef.current = {
+        fingerprint,
+        key: apiClient.generateIdempotencyKey("TRADE_ANALYSIS_ORDER", fingerprint),
+      };
+    }
+    const idempotencyKey = idempotencyRef.current.key;
+
     const initialRecord: ExecutionStatusRecord = {
-      orderId: `ORD-${Date.now().toString().slice(-6)}`,
+      orderId: "CLIENT-" + idempotencyKey,
       symbol: orderPreview.symbol,
       side: orderPreview.side,
       status: "SUBMITTED",
@@ -63,9 +82,11 @@ export function TradeAnalysisOrderExecutor({
 
     try {
       const orderPayload = {
+        client_order_id: idempotencyKey,
         symbol: orderPreview.symbol,
         side: orderPreview.side,
         order_type: orderPreview.orderType,
+        orderType: orderPreview.orderType,
         product: orderPreview.product,
         quantity: orderPreview.quantity,
         price: orderPreview.price,
@@ -73,98 +94,86 @@ export function TradeAnalysisOrderExecutor({
         stop_loss: orderPreview.stopLoss,
         target: orderPreview.target,
         validity: "DAY",
+        mode: "PAPER",
+        broker: "PAPER",
         execution_mode: "PAPER",
-        timestamp: new Date().toISOString(),
       };
 
-      const res = await apiClient.post<any>("/api/orders", orderPayload, { timeoutMs: 5000 });
+      const res = await apiClient.post<any>("/api/orders", orderPayload, {
+        timeoutMs: 5000,
+        idempotencyKey,
+      });
+      const body = res.data || {};
+      const order = body.order || body;
+      const accepted = res.ok && body.success === true && order.success !== false;
 
-      if (res.ok && res.data) {
-        const confirmedId = res.data.order_id || initialRecord.orderId;
-        const filledRecord: ExecutionStatusRecord = {
-          orderId: confirmedId,
-          symbol: orderPreview.symbol,
-          side: orderPreview.side,
-          status: "FILLED",
-          filledQuantity: orderPreview.quantity,
-          remainingQuantity: 0,
-          averagePrice: orderPreview.price,
-          totalValue: orderPreview.estimatedValue || 0,
+      if (!accepted) {
+        const errText =
+          res.error?.message ||
+          body.message ||
+          order.message ||
+          "Paper order was rejected by the execution gateway.";
+        const failedRecord: ExecutionStatusRecord = {
+          ...initialRecord,
+          status: "REJECTED",
+          message: String(errText),
           timestamp: new Date().toLocaleTimeString(),
-          message: `Paper order executed successfully: ${orderPreview.side} ${orderPreview.quantity} @ ₹${orderPreview.price.toFixed(2)}`,
         };
-        setExecutionRecord(filledRecord);
-        setFeedback({
-          type: "success",
-          message: filledRecord.message || "Order filled in Paper mode.",
-        });
-        if (onOrderExecuted) onOrderExecuted(filledRecord);
-        if (refreshAll) refreshAll();
-      } else {
-        const fallbackRes = await apiClient.post<any>("/api/paper-orders", orderPayload, { timeoutMs: 5000 });
-        if (fallbackRes.ok) {
-          const filledRecord: ExecutionStatusRecord = {
-            orderId: initialRecord.orderId,
-            symbol: orderPreview.symbol,
-            side: orderPreview.side,
-            status: "FILLED",
-            filledQuantity: orderPreview.quantity,
-            remainingQuantity: 0,
-            averagePrice: orderPreview.price,
-            totalValue: orderPreview.estimatedValue || 0,
-            timestamp: new Date().toLocaleTimeString(),
-            message: `Paper order executed: ${orderPreview.side} ${orderPreview.quantity} @ ₹${orderPreview.price.toFixed(2)}`,
-          };
-          setExecutionRecord(filledRecord);
-          setFeedback({
-            type: "success",
-            message: filledRecord.message || "Order executed.",
-          });
-          if (onOrderExecuted) onOrderExecuted(filledRecord);
-          if (refreshAll) refreshAll();
-        } else {
-          const errText =
-            (typeof fallbackRes.error === "object" ? (fallbackRes.error as any)?.message : fallbackRes.error) ||
-            (typeof res.error === "object" ? (res.error as any)?.message : res.error) ||
-            "Order execution failed. Please verify risk limits.";
-
-          const failedRecord: ExecutionStatusRecord = {
-            orderId: initialRecord.orderId,
-            symbol: orderPreview.symbol,
-            side: orderPreview.side,
-            status: "REJECTED",
-            filledQuantity: 0,
-            remainingQuantity: orderPreview.quantity,
-            averagePrice: orderPreview.price,
-            totalValue: orderPreview.estimatedValue || 0,
-            timestamp: new Date().toLocaleTimeString(),
-            message: String(errText),
-          };
-          setExecutionRecord(failedRecord);
-          setFeedback({
-            type: "error",
-            message: String(errText),
-          });
-        }
+        setExecutionRecord(failedRecord);
+        setFeedback({ type: "error", message: String(errText) });
+        return;
       }
-    } catch (err: any) {
-      const errRecord: ExecutionStatusRecord = {
-        orderId: initialRecord.orderId,
+
+      const rawStatus = String(order.status || body.status || "SUBMITTED").toUpperCase();
+      const filledQuantity = Number(
+        order.filled_quantity ?? order.filledAmount ?? order.filled ?? 0
+      );
+      const remainingQuantity = Number(
+        order.remaining_quantity ?? order.remainingQuantity ?? Math.max(0, orderPreview.quantity - filledQuantity)
+      );
+      const averagePrice = Number(
+        order.average_price ?? order.fill_price ?? order.price ?? orderPreview.price
+      );
+      const hasFill = rawStatus === "FILLED" && Number.isFinite(filledQuantity) && filledQuantity > 0;
+      const status: ExecutionStatusRecord["status"] = hasFill
+        ? "FILLED"
+        : rawStatus === "OPEN" || rawStatus === "PENDING"
+        ? "OPEN"
+        : "SUBMITTED";
+      const confirmedId = String(
+        body.orderId || body.order_id || order.order_id || order.orderId || initialRecord.orderId
+      );
+      const acceptedRecord: ExecutionStatusRecord = {
+        orderId: confirmedId,
         symbol: orderPreview.symbol,
         side: orderPreview.side,
-        status: "FAILED",
-        filledQuantity: 0,
-        remainingQuantity: orderPreview.quantity,
-        averagePrice: orderPreview.price,
+        status,
+        filledQuantity: Number.isFinite(filledQuantity) && filledQuantity >= 0 ? filledQuantity : 0,
+        remainingQuantity:
+          Number.isFinite(remainingQuantity) && remainingQuantity >= 0
+            ? remainingQuantity
+            : orderPreview.quantity,
+        averagePrice: Number.isFinite(averagePrice) && averagePrice > 0 ? averagePrice : orderPreview.price,
         totalValue: orderPreview.estimatedValue || 0,
         timestamp: new Date().toLocaleTimeString(),
-        message: err.message || "Order transmission failed.",
+        message: hasFill
+          ? "Paper order filled: " + orderPreview.side + " " + orderPreview.quantity + " @ " + averagePrice.toFixed(2)
+          : "Paper order accepted by the execution gateway; fill is pending broker confirmation.",
+      };
+      setExecutionRecord(acceptedRecord);
+      setFeedback({ type: "success", message: acceptedRecord.message || "Paper order accepted." });
+      if (onOrderExecuted) onOrderExecuted(acceptedRecord);
+      if (refreshAll) refreshAll();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Order transmission failed.";
+      const errRecord: ExecutionStatusRecord = {
+        ...initialRecord,
+        status: "FAILED",
+        message,
+        timestamp: new Date().toLocaleTimeString(),
       };
       setExecutionRecord(errRecord);
-      setFeedback({
-        type: "error",
-        message: err.message || "Order transmission failed.",
-      });
+      setFeedback({ type: "error", message });
     } finally {
       setIsSubmitting(false);
     }

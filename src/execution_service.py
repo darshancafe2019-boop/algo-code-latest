@@ -3,6 +3,7 @@ import sqlite3
 import uuid
 import json
 import time
+import math
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, Optional
 
@@ -53,13 +54,16 @@ def _is_indian_symbol(symbol: str) -> bool:
 
 
 class PaperExecutionAdapter:
-    """Simulated Paper Execution Adapter maintaining identical order contract as Live."""
+    """Deterministic paper adapter; it never calls a broker SDK or network endpoint."""
 
-    def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
-        if _is_indian_symbol(symbol):
-            from src.upstox_broker_adapter import global_upstox_broker_adapter
-            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
-
+    def submit_order(
+        self,
+        symbol: str,
+        side: str,
+        amount: float,
+        price: float,
+        broker: str = "PAPER",
+    ) -> Dict[str, Any]:
         sim_order_id = f"PAPER_ORD_{uuid.uuid4().hex[:10]}"
         return {
             "success": True,
@@ -68,13 +72,14 @@ class PaperExecutionAdapter:
             "client_order_id": sim_order_id,
             "symbol": symbol,
             "side": side,
+            "broker": str(broker or "PAPER").upper(),
             "requested_quantity": amount,
             "filled_quantity": amount,
             "remaining_quantity": 0.0,
             "average_price": price,
             "fees": round(amount * price * 0.001, 2),
             "status": "FILLED",
-            "execution_mode": "PAPER"
+            "execution_mode": "PAPER",
         }
 
 
@@ -308,21 +313,39 @@ class OrderExecutionService:
         Routes to Paper, Test, or Live execution after 14-Point Pre-Order Check.
         Supports both positional and keyword invocations across manual, bot, and API orders.
         """
-        effective_qty = float(quantity if quantity is not None else (amount if amount is not None else 1.0))
-        effective_mode = mode.upper() if mode else ("LIVE" if is_live else "PAPER")
-        effective_live = (effective_mode == "LIVE")
+        try:
+            effective_qty = float(quantity if quantity is not None else (amount if amount is not None else 1.0))
+        except (TypeError, ValueError):
+            return False, "INVALID_POSITION_SIZE: Quantity must be numeric.", {}
 
-        eff_price = price
-        if not eff_price or eff_price <= 0:
-            try:
-                from src.price_action_engine import price_action_engine
-                eff_price = price_action_engine.get_ltp(symbol) or 100.0
-            except Exception:
-                eff_price = 100.0
+        requested_mode = str(mode or "").strip().upper()
+        if is_live:
+            effective_mode = "LIVE"
+        elif requested_mode in {"PAPER", "TEST", "LIVE"}:
+            effective_mode = requested_mode
+        else:
+            return False, f"INVALID_EXECUTION_MODE: Unsupported mode '{mode}'.", {}
+
+        try:
+            eff_price = float(price) if price is not None else 0.0
+        except (TypeError, ValueError):
+            eff_price = 0.0
+        if not math.isfinite(eff_price) or eff_price <= 0:
+            return False, f"PRICE_UNAVAILABLE: A validated positive price is required for {symbol}.", {}
+
+        try:
+            safe_stop_loss = float(stop_loss or 0.0)
+            safe_take_profit = float(take_profit or 0.0)
+        except (TypeError, ValueError):
+            return False, "INVALID_PROTECTIVE_LEVELS: Stop loss and take profit must be numeric.", {}
+        if not math.isfinite(safe_stop_loss) or not math.isfinite(safe_take_profit):
+            return False, "INVALID_PROTECTIVE_LEVELS: Stop loss and take profit must be finite.", {}
+
+        effective_live = effective_mode == "LIVE"
 
         passed, reason = self.validate_14_point_pre_order_check(
             bot_id=bot_id, strategy=strategy, symbol=symbol, side=side, amount=effective_qty,
-            price=eff_price, stop_loss=stop_loss, take_profit=take_profit,
+            price=eff_price, stop_loss=safe_stop_loss, take_profit=safe_take_profit,
             confidence_score=confidence_score, market_tick_iso=market_tick_iso,
             account_balance=account_balance, is_live=effective_live,
             client_order_id=client_order_id
@@ -365,7 +388,7 @@ class OrderExecutionService:
 
             return False, reason, {}
 
-        mode = "LIVE" if effective_live else ("TEST" if getattr(config, "TEST_MODE", False) else "PAPER")
+        mode = effective_mode
         log_bot_event(
             event_type="ORDER_REQUESTED",
             message=f"Submitting {mode} order for {symbol} ({side}) amount={effective_qty} @ ${eff_price:,.2f}",
@@ -385,11 +408,14 @@ class OrderExecutionService:
             latency_ctx = TradeLatencyContext(trade_id=0, order_id=idem_key)
             latency_ctx.mark_stage("risk_check")
             latency_ctx.mark_stage("order_creation")
-            if str(broker).upper() == "DHAN":
+            normalized_broker = str(broker or "PAPER").strip().upper()
+            # Broker adapters are selected only after the execution mode is
+            # fixed.  PAPER can never delegate to Dhan, Upstox, Delta, or CCXT.
+            if mode == "LIVE" and normalized_broker == "DHAN":
                 from src.dhan_broker_adapter import dhan_broker_adapter
                 result = dhan_broker_adapter.place_order(
                     symbol=symbol, side=side, quantity=effective_qty,
-                    price=eff_price, stop_loss=stop_loss, take_profit=take_profit,
+                    price=eff_price, stop_loss=safe_stop_loss, take_profit=safe_take_profit,
                     client_order_id=client_order_id, order_type=order_type, **kwargs
                 )
                 if not result.get("success", True) or result.get("status") == "FAILED":
@@ -399,7 +425,15 @@ class OrderExecutionService:
             elif mode == "LIVE":
                 result = self.live_adapter.submit_order(symbol, side, effective_qty, eff_price)
             else:
-                result = self.paper_adapter.submit_order(symbol, side, effective_qty, eff_price)
+                result = self.paper_adapter.submit_order(
+                    symbol, side, effective_qty, eff_price, broker=normalized_broker
+                )
+
+            if not isinstance(result, dict) or not result.get("success", True):
+                failure_message = result.get("message", "Broker rejected the order.") if isinstance(result, dict) else "Invalid execution response."
+                return False, str(failure_message), result if isinstance(result, dict) else {}
+            result.setdefault("execution_mode", mode)
+            result.setdefault("broker", normalized_broker)
 
             latency_ctx.mark_stage("broker_ack")
             latency_ctx.mark_stage("fill")
@@ -511,7 +545,8 @@ class OrderExecutionService:
         strategy: str = "QUANT_CONFLUENCE_PRO",
         confidence_score: float = 0.85,
         mode: str = "PAPER",
-        client_order_id: Optional[str] = None
+        client_order_id: Optional[str] = None,
+        broker: str = "PAPER",
     ) -> Dict[str, Any]:
         """Routes and executes an order with automatic price resolution and fail-safe directional SL/TP."""
         eff_price = price
@@ -564,7 +599,9 @@ class OrderExecutionService:
             take_profit=eff_tp,
             confidence_score=confidence_score,
             account_balance=50000.0,
-            is_live=(mode == "LIVE"),
+            is_live=str(mode).upper() == "LIVE",
+            mode=str(mode or "PAPER").upper(),
+            broker=str(broker or "PAPER").upper(),
             client_order_id=client_order_id
         )
         notional = round(quantity * eff_price, 2)

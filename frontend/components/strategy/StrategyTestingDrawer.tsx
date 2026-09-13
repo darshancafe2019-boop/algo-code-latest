@@ -38,6 +38,7 @@ interface StrategyTestingDrawerProps {
   isObserving: boolean;
   onRunLiveObservation: () => void;
   backtestResult: BacktestResultPayload | null;
+  backtestError?: string | null;
   isBacktesting: boolean;
   onRunBacktest: (params: {
     startDate: string;
@@ -54,6 +55,7 @@ export function StrategyTestingDrawer({
   isObserving,
   onRunLiveObservation,
   backtestResult,
+  backtestError,
   isBacktesting,
   onRunBacktest,
 }: StrategyTestingDrawerProps) {
@@ -238,6 +240,12 @@ export function StrategyTestingDrawer({
                   <span>
                     Overfitting Warning: Strategy has {totalRules} rules. High rule density risks curve-fitting historical noise.
                   </span>
+                </div>
+              )}
+
+              {backtestError && (
+                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+                  Backtest unavailable: {backtestError}. No simulated result has been substituted.
                 </div>
               )}
 

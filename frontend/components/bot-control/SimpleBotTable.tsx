@@ -149,8 +149,8 @@ export function SimpleBotTable({
 
   if (isLoading && bots.length === 0) {
     return (
-      <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-12 text-center text-[var(--theme-text-muted)] font-mono text-xs shadow-xl space-y-3">
-        <div className="w-8 h-8 rounded-full border-2 border-[var(--theme-accent)] border-t-transparent animate-spin mx-auto" />
+      <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center text-[#7D8EA5] font-mono text-xs space-y-3">
+        <div className="w-7 h-7 rounded-full border-2 border-[#168BFF] border-t-transparent animate-spin mx-auto" />
         <p>Synchronizing fleet engine telemetry...</p>
       </div>
     );
@@ -159,18 +159,18 @@ export function SimpleBotTable({
   if (bots.length === 0) {
     const marketLabel = selectedMarket === "ALL" ? "" : `${selectedMarket} `;
     return (
-      <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl p-12 text-center font-mono text-xs shadow-xl space-y-4">
-        <div className="p-3.5 rounded-2xl bg-[var(--theme-elevated)] w-fit mx-auto text-[var(--theme-text-muted)]">
-          <Bot className="w-8 h-8" />
+      <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center font-mono text-xs space-y-3">
+        <div className="p-3 rounded-lg bg-[#05101A] border border-[#12304A] w-fit mx-auto text-[#7D8EA5]">
+          <Bot className="w-6 h-6" />
         </div>
-        <p className="text-[var(--theme-text-secondary)] font-sans text-sm max-w-md mx-auto">
-          No {marketLabel}bots match your current filter. Create a new automated trading bot to deploy strategies.
+        <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
+          No {marketLabel}bots match your current filter. Create an automated trading bot to deploy strategies.
         </p>
         <button
           onClick={onCreateBot}
-          className="px-4 py-2 rounded-xl bg-[var(--theme-accent)] hover:opacity-90 text-[var(--theme-bg)] font-extrabold text-xs transition inline-flex items-center gap-1.5 shadow-lg shadow-[var(--theme-accent)]/20 font-mono"
+          className="px-3.5 py-1.5 rounded-lg bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[11px] transition inline-flex items-center gap-1.5 shadow-xs font-sans cursor-pointer"
         >
-          <Plus className="w-4 h-4 stroke-[3]" />
+          <Plus className="w-3.5 h-3.5" />
           <span>+ Create a Bot</span>
         </button>
       </div>
@@ -178,42 +178,42 @@ export function SimpleBotTable({
   }
 
   return (
-    <div className="bg-[var(--theme-surface)]/90 border border-[var(--theme-border)] rounded-3xl overflow-visible backdrop-blur-md shadow-xl font-sans select-none text-xs">
-      <div className="overflow-x-auto rounded-3xl">
+    <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] overflow-hidden font-sans select-none text-[11px]">
+      <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-[var(--theme-elevated)] text-[var(--theme-text-muted)] border-b border-[var(--theme-border-subtle)] text-[11px] font-mono select-none">
+          <thead className="bg-[#08101A] text-[#7D8EA5] border-b border-[#10263A] text-[10px] font-medium uppercase h-[32px] select-none">
             <tr>
               {/* Checkbox Column */}
-              <th className="py-3.5 px-3 w-10 text-center">
+              <th className="py-2 px-3 w-8 text-center">
                 <button
                   type="button"
                   onClick={onToggleSelectAll}
-                  className={`w-4 h-4 rounded border flex items-center justify-center transition mx-auto ${
+                  className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition mx-auto cursor-pointer ${
                     allFilteredSelected
-                      ? "bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-bg)]"
+                      ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
                       : someFilteredSelected
-                      ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)]"
-                      : "border-[var(--theme-border-subtle)] bg-[var(--theme-surface)] hover:border-[var(--theme-border)] text-transparent"
+                      ? "bg-[#168BFF]/20 border-[#168BFF] text-[#22D3EE]"
+                      : "border-[#12304A] bg-[#05101A] hover:border-[#168BFF]/40 text-transparent"
                   }`}
                   title={allFilteredSelected ? "Deselect All" : "Select All"}
                 >
-                  {allFilteredSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                  {someFilteredSelected && <Minus className="w-3 h-3 stroke-[3]" />}
+                  {allFilteredSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+                  {someFilteredSelected && <Minus className="w-2.5 h-2.5 stroke-[3]" />}
                 </button>
               </th>
-              <th className="py-3.5 px-3 font-bold">BOT INSTANCE</th>
-              <th className="py-3.5 px-3 font-bold">MARKET & TF</th>
-              <th className="py-3.5 px-3 font-bold">MARKET DATA SOURCE</th>
-              <th className="py-3.5 px-3 font-bold">EXECUTION BROKER</th>
-              <th className="py-3.5 px-3 font-bold">ACCOUNT & ENV</th>
-              <th className="py-3.5 px-3 font-bold">LIFECYCLE STATUS</th>
-              <th className="py-3.5 px-3 font-bold">ACTIVE POSITION</th>
-              <th className="py-3.5 px-3 font-bold text-right">TODAY P&L</th>
-              <th className="py-3.5 px-3 font-bold text-center">HEALTH</th>
-              <th className="py-3.5 px-3 font-bold text-right w-24">ACTIONS</th>
+              <th className="py-2 px-3 font-semibold">BOT INSTANCE</th>
+              <th className="py-2 px-3 font-semibold">MARKET & TF</th>
+              <th className="py-2 px-3 font-semibold">MARKET DATA SOURCE</th>
+              <th className="py-2 px-3 font-semibold">EXECUTION BROKER</th>
+              <th className="py-2 px-3 font-semibold">ACCOUNT & ENV</th>
+              <th className="py-2 px-3 font-semibold">LIFECYCLE STATUS</th>
+              <th className="py-2 px-3 font-semibold">ACTIVE POSITION</th>
+              <th className="py-2 px-3 font-semibold text-right">TODAY P&L</th>
+              <th className="py-2 px-3 font-semibold text-center">HEALTH</th>
+              <th className="py-2 px-3 font-semibold text-right w-24">ACTIONS</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[var(--theme-border-subtle)]/60 font-mono">
+          <tbody className="divide-y divide-[#10263A] font-sans">
             {bots.map((bot) => {
               const state = (bot.status || bot.state || "STOPPED").toUpperCase();
               const isRunning = state === "RUNNING";
@@ -245,15 +245,15 @@ export function SimpleBotTable({
                 <tr
                   key={bot.bot_uid || bot.id}
                   onClick={() => onSelectBot(bot)}
-                  className={`transition cursor-pointer group ${
+                  className={`transition-colors h-[54px] cursor-pointer group ${
                     isSelected
-                      ? "bg-[var(--theme-accent)]/10 hover:bg-[var(--theme-accent)]/15"
-                      : "hover:bg-[var(--theme-elevated)]/50"
+                      ? "bg-[#168BFF]/10 hover:bg-[#168BFF]/15"
+                      : "hover:bg-[#0F1C2F]"
                   }`}
                 >
                   {/* Checkbox */}
                   <td
-                    className="py-3 px-3 text-center"
+                    className="py-2 px-3 text-center"
                     onClick={(e) => {
                       e.stopPropagation();
                       onToggleSelectBot(bot.id);
@@ -261,60 +261,60 @@ export function SimpleBotTable({
                   >
                     <button
                       type="button"
-                      className={`w-4 h-4 rounded border flex items-center justify-center transition mx-auto ${
+                      className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition mx-auto cursor-pointer ${
                         isSelected
-                          ? "bg-[var(--theme-accent)] border-[var(--theme-accent)] text-[var(--theme-bg)]"
-                          : "border-[var(--theme-border-subtle)] bg-[var(--theme-surface)] group-hover:border-[var(--theme-border)] text-transparent"
+                          ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
+                          : "border-[#12304A] bg-[#05101A] group-hover:border-[#168BFF]/40 text-transparent"
                       }`}
                     >
-                      {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
                     </button>
                   </td>
 
                   {/* 1. BOT INSTANCE */}
-                  <td className="py-3 px-3 font-sans">
-                    <div className="font-extrabold text-[var(--theme-text-primary)] group-hover:text-[var(--theme-accent)] transition text-xs flex items-center gap-1.5">
+                  <td className="py-2 px-3 font-sans">
+                    <div className="font-bold text-[#F8FAFC] group-hover:text-[#22D3EE] transition-colors text-[11px] flex items-center gap-1.5">
                       <span>{bot.name}</span>
                     </div>
-                    <div className="text-[10px] text-[var(--theme-text-muted)] font-mono truncate max-w-xs mt-0.5">
+                    <div className="text-[10px] text-[#7D8EA5] font-mono truncate max-w-xs mt-0.5">
                       ID: {bot.id} • {bot.strategy}
                     </div>
                   </td>
 
                   {/* 2. MARKET & TF */}
-                  <td className="py-3 px-3 font-mono">
-                    <div className="font-bold text-[var(--theme-text-primary)] text-xs">{bot.symbol}</div>
-                    <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
+                  <td className="py-2 px-3 font-mono">
+                    <div className="font-bold text-[#F8FAFC] text-[11px]">{bot.symbol}</div>
+                    <div className="text-[10px] text-[#7D8EA5] font-sans">
                       {bot.timeframe} • {bot.asset_class || "CRYPTO"}
                     </div>
                   </td>
 
                   {/* 3. MARKET DATA SOURCE */}
-                  <td className="py-3 px-3 font-mono">
-                    <div className="text-[11px] font-bold text-[var(--theme-text-primary)] flex items-center gap-1.5">
-                      <Radio className="w-3 h-3 text-[var(--theme-accent)]" />
+                  <td className="py-2 px-3 font-sans">
+                    <div className="text-[11px] font-medium text-[#F8FAFC] flex items-center gap-1.5">
+                      <Radio className="w-3 h-3 text-[#22D3EE]" />
                       <span>{mktSource}</span>
                     </div>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span
-                        className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold font-mono border ${
+                        className={`px-1.5 py-0.2 rounded text-[9px] font-semibold font-mono border ${
                           isFeedLive
-                            ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/30"
+                            ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
                             : isFeedUnconfigured
-                            ? "bg-[var(--theme-surface)] text-[var(--theme-text-muted)] border-[var(--theme-border-subtle)]"
-                            : "bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border-[var(--theme-warning)]/30"
+                            ? "bg-[#05101A] text-[#7D8EA5] border-[#12304A]"
+                            : "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
                         }`}
                       >
                         {isFeedLive ? `LIVE ${latencyDisplay}` : feedStatus}
                       </span>
-                      <span className="text-[9px] text-[var(--theme-text-muted)]">
+                      <span className="text-[9px] text-[#7D8EA5]">
                         {bot.exchange || "BINANCE"}
                       </span>
                     </div>
                   </td>
 
                   {/* 4. EXECUTION BROKER (Interactive Dropdown Selector) */}
-                  <td className="py-3 px-3 font-mono relative">
+                  <td className="py-2 px-3 font-sans relative">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -322,10 +322,10 @@ export function SimpleBotTable({
                         setActiveBrokerDropdownBotId(isBrokerDropdownOpen ? null : bot.id);
                         setActiveMenuBotId(null);
                       }}
-                      className="px-2.5 py-1 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] border border-[var(--theme-border-subtle)] hover:border-[var(--theme-accent)] text-[var(--theme-text-primary)] font-bold text-[11px] transition flex items-center justify-between gap-1.5 shadow-sm max-w-[155px]"
+                      className="px-2 py-1 rounded-md bg-[#05101A] hover:bg-[#0F1C2F] border border-[#12304A] hover:border-[#168BFF]/40 text-[#F8FAFC] font-medium text-[10px] transition-colors flex items-center justify-between gap-1.5 shadow-xs max-w-[150px] cursor-pointer"
                     >
                       <span className="truncate">{execBroker}</span>
-                      <ChevronDown className="w-3 h-3 shrink-0 text-[var(--theme-text-muted)]" />
+                      <ChevronDown className="w-3 h-3 shrink-0 text-[#7D8EA5]" />
                     </button>
 
                     {/* Broker Selector Dropdown Popup */}
@@ -333,9 +333,9 @@ export function SimpleBotTable({
                       <div
                         ref={brokerDropdownRef}
                         onClick={(e) => e.stopPropagation()}
-                        className="absolute left-3 top-full mt-1 z-40 w-52 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                        className="absolute left-3 top-full mt-1 z-40 w-48 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
                       >
-                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-[var(--theme-text-muted)] uppercase border-b border-[var(--theme-border-subtle)]">
+                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-[#7D8EA5] uppercase border-b border-[#10263A]">
                           Select Execution Broker
                         </div>
                         {BROKER_OPTIONS.map((opt) => {
@@ -345,14 +345,14 @@ export function SimpleBotTable({
                               key={opt.id}
                               type="button"
                               onClick={(e) => handleBrokerSelect(e, bot.id, opt.id, opt.defaultAccount)}
-                              className={`w-full px-3 py-2 text-left font-mono text-[11px] flex items-center justify-between transition ${
+                              className={`w-full px-3 py-1.5 text-left font-sans text-[11px] flex items-center justify-between transition-colors cursor-pointer ${
                                 isCurrent
-                                  ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] font-bold"
-                                  : "hover:bg-[var(--theme-elevated)] text-[var(--theme-text-primary)]"
+                                  ? "bg-[#168BFF]/15 text-[#22D3EE] font-semibold"
+                                  : "hover:bg-[#0F1C2F] text-[#F8FAFC]"
                               }`}
                             >
                               <span>{opt.label}</span>
-                              {isCurrent && <Check className="w-3 h-3 text-[var(--theme-accent)]" />}
+                              {isCurrent && <Check className="w-3 h-3 text-[#22D3EE]" />}
                             </button>
                           );
                         })}
@@ -361,89 +361,100 @@ export function SimpleBotTable({
                   </td>
 
                   {/* 5. ACCOUNT & ENV */}
-                  <td className="py-3 px-3 font-mono">
-                    <div className="font-bold text-[var(--theme-text-primary)] text-[11px] truncate max-w-[130px]">
+                  <td className="py-2 px-3 font-mono">
+                    <div className="font-semibold text-[#F8FAFC] text-[10px] truncate max-w-[120px]">
                       {brokerAcc}
                     </div>
                     <div className="mt-0.5">
                       <button
                         onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
                         disabled={isTogglingMode}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-extrabold font-mono border ${
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold font-mono border cursor-pointer transition-colors ${
                           isLive
-                            ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40 hover:bg-[var(--theme-loss)]/25"
-                            : "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40 hover:bg-[var(--theme-accent)]/25"
+                            ? "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/40 hover:bg-[#FF3B5C]/25"
+                            : "bg-[#168BFF]/15 text-[#22D3EE] border-[#168BFF]/30 hover:bg-[#168BFF]/25"
                         }`}
                         title={isLive ? "LIVE mode active. Click to switch to PAPER." : "PAPER simulation. Click to toggle."}
                       >
-                        <span className={`w-1 h-1 rounded-full ${isLive ? "bg-[var(--theme-loss)] animate-pulse" : "bg-[var(--theme-accent)]"}`} />
+                        <span className={`w-1 h-1 rounded-full ${isLive ? "bg-[#FF3B5C] animate-pulse" : "bg-[#22D3EE]"}`} />
                         <span>{isTogglingMode ? "..." : isLive ? "LIVE" : "PAPER"}</span>
                       </button>
                     </div>
                   </td>
 
                   {/* 6. STATUS */}
-                  <td className="py-3 px-3">
+                  <td className="py-2 px-3">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold font-mono border ${
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold font-mono border ${
                         isRunning
-                          ? "bg-[var(--theme-profit)]/15 text-[var(--theme-profit)] border-[var(--theme-profit)]/40 animate-pulse"
+                          ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
                           : isPaused
-                          ? "bg-[var(--theme-warning)]/15 text-[var(--theme-warning)] border-[var(--theme-warning)]/40"
+                          ? "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
                           : isError
-                          ? "bg-[var(--theme-loss)]/15 text-[var(--theme-loss)] border-[var(--theme-loss)]/40"
+                          ? "bg-[#FF3B5C]/10 text-[#FF3B5C] border-[#FF3B5C]/20"
                           : isRecovering
-                          ? "bg-[var(--theme-accent)]/15 text-[var(--theme-accent)] border-[var(--theme-accent)]/40"
-                          : "bg-[var(--theme-elevated)] text-[var(--theme-text-muted)] border-[var(--theme-border-subtle)]"
+                          ? "bg-[#168BFF]/10 text-[#22D3EE] border-[#168BFF]/20"
+                          : "bg-[#05101A] text-[#7D8EA5] border-[#12304A]"
                       }`}
                     >
-                      {state}
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          isRunning
+                            ? "bg-[#00E89A] animate-pulse"
+                            : isPaused
+                            ? "bg-[#F59E0B]"
+                            : isError
+                            ? "bg-[#FF3B5C]"
+                            : "bg-[#7D8EA5]"
+                        }`}
+                      />
+                      <span>{state}</span>
                     </span>
                   </td>
 
                   {/* 7. POSITION */}
-                  <td className="py-3 px-3">
+                  <td className="py-2 px-3 font-mono">
                     {pos.has_position ? (
                       <div>
                         <span
-                          className={`font-black text-xs ${
-                            pos.direction === "LONG" ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                          className={`font-bold text-[11px] ${
+                            pos.direction === "LONG" ? "text-[#00E89A]" : "text-[#FF3B5C]"
                           }`}
                         >
                           {pos.direction} {pos.size}
                         </span>
-                        <div className="text-[10px] text-[var(--theme-text-muted)] font-mono">
+                        <div className="text-[10px] text-[#7D8EA5]">
                           @ ${pos.entry_price ? pos.entry_price.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}
                         </div>
                       </div>
                     ) : (
-                      <span className="text-[var(--theme-text-muted)] font-sans text-xs">FLAT</span>
+                      <span className="text-[#7D8EA5] font-sans text-[11px]">FLAT</span>
                     )}
                   </td>
 
                   {/* 8. TODAY P&L */}
-                  <td className="py-3 px-3 text-right">
+                  <td className="py-2 px-3 text-right font-mono">
                     <div
-                      className={`font-black text-xs ${
-                        isPnlPositive ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"
+                      className={`font-bold text-[11px] tabular-nums ${
+                        isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
                       }`}
                     >
                       {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </div>
-                    <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
+                    <div className="text-[10px] text-[#7D8EA5] font-sans">
                       Cap: ${(bot.allocated_capital / 1000).toFixed(1)}K
                     </div>
                   </td>
 
                   {/* 9. HEALTH */}
-                  <td className="py-3 px-3 text-center">
+                  <td className="py-2 px-3 text-center">
                     <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
                         bot.health === "HEALTHY"
-                          ? "bg-[var(--theme-profit)]/10 text-[var(--theme-profit)]"
+                          ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
                           : bot.health === "ERROR"
-                          ? "bg-[var(--theme-loss)]/10 text-[var(--theme-loss)]"
-                          : "bg-[var(--theme-warning)]/10 text-[var(--theme-warning)]"
+                          ? "bg-[#FF3B5C]/10 text-[#FF3B5C] border-[#FF3B5C]/20"
+                          : "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
                       }`}
                     >
                       {bot.health || "HEALTHY"}
@@ -451,13 +462,13 @@ export function SimpleBotTable({
                   </td>
 
                   {/* 10. ACTIONS (Quick Trade Destination Button + Consolidated Menu) */}
-                  <td className="py-3 px-3 text-right relative">
+                  <td className="py-2 px-3 text-right relative">
                     <div className="inline-flex items-center justify-end gap-1.5 relative">
                       {/* Order Destination Trigger Button */}
                       <button
                         type="button"
                         onClick={(e) => handleQuickTradeClick(e, bot, "BUY")}
-                        className="px-2 py-1 rounded-lg bg-[var(--theme-profit)]/15 hover:bg-[var(--theme-profit)]/25 text-[var(--theme-profit)] border border-[var(--theme-profit)]/40 font-extrabold text-[10px] transition font-mono flex items-center gap-1 shadow-sm"
+                        className="px-2 py-1 rounded-md bg-[#00E89A]/15 hover:bg-[#00E89A]/25 text-[#00E89A] border border-[#00E89A]/30 font-semibold text-[10px] transition-colors font-mono flex items-center gap-1 shadow-xs cursor-pointer"
                         title="Open Order Destination & Send Trade"
                       >
                         <Zap className="w-3 h-3 fill-current" />
@@ -473,15 +484,15 @@ export function SimpleBotTable({
                           setActiveBrokerDropdownBotId(null);
                         }}
                         disabled={isActionLoading}
-                        className={`p-1.5 rounded-lg border transition flex items-center justify-center ${
+                        className={`p-1.5 rounded-md border transition-colors flex items-center justify-center cursor-pointer ${
                           isMenuOpen
-                            ? "bg-[var(--theme-accent)]/20 border-[var(--theme-accent)] text-[var(--theme-accent)] shadow-md"
-                            : "bg-[var(--theme-elevated)] border-[var(--theme-border-subtle)] text-[var(--theme-text-muted)] hover:text-[var(--theme-text-primary)] hover:border-[var(--theme-border)]"
+                            ? "bg-[#168BFF]/20 border-[#168BFF] text-[#22D3EE] shadow-xs"
+                            : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC] hover:border-[#168BFF]/40"
                         } disabled:opacity-50`}
                         title="Bot Actions"
                       >
                         {isActionLoading ? (
-                          <div className="w-3.5 h-3.5 border-2 border-[var(--theme-accent)] border-t-transparent rounded-full animate-spin" />
+                          <div className="w-3.5 h-3.5 border-2 border-[#168BFF] border-t-transparent rounded-full animate-spin" />
                         ) : (
                           <MoreVertical className="w-3.5 h-3.5" />
                         )}
@@ -492,14 +503,14 @@ export function SimpleBotTable({
                         <div
                           ref={menuRef}
                           onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-full mt-1 z-40 w-44 bg-[var(--theme-surface)] border border-[var(--theme-border)] rounded-2xl shadow-2xl overflow-hidden py-1.5 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                          className="absolute right-0 top-full mt-1 z-40 w-40 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
                         >
                           {/* Contextual Execution Controls */}
                           {isStopped && (
                             <button
                               type="button"
                               onClick={(e) => handleAction(e, bot.id, "START")}
-                              className="w-full px-3.5 py-2 text-[var(--theme-profit)] hover:bg-[var(--theme-profit)]/15 flex items-center gap-2 font-bold transition font-mono"
+                              className="w-full px-3 py-1.5 text-[#00E89A] hover:bg-[#00E89A]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                             >
                               <Play className="w-3.5 h-3.5 fill-current" />
                               <span>Start Bot</span>
@@ -511,7 +522,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "PAUSE")}
-                                className="w-full px-3.5 py-2 text-[var(--theme-warning)] hover:bg-[var(--theme-warning)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#F59E0B] hover:bg-[#F59E0B]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <Pause className="w-3.5 h-3.5 fill-current" />
                                 <span>Pause Bot</span>
@@ -519,7 +530,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                                 <span>Stop Bot</span>
@@ -532,7 +543,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "RESUME")}
-                                className="w-full px-3.5 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#22D3EE] hover:bg-[#168BFF]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <Play className="w-3.5 h-3.5 fill-current" />
                                 <span>Resume Bot</span>
@@ -540,7 +551,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <Square className="w-3.5 h-3.5 fill-current" />
                                 <span>Stop Bot</span>
@@ -553,7 +564,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleDetailsClick(e, bot)}
-                                className="w-full px-3.5 py-2 text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <AlertTriangle className="w-3.5 h-3.5" />
                                 <span>Review Incident</span>
@@ -561,7 +572,7 @@ export function SimpleBotTable({
                               <button
                                 type="button"
                                 onClick={(e) => handleAction(e, bot.id, "START")}
-                                className="w-full px-3.5 py-2 text-[var(--theme-accent)] hover:bg-[var(--theme-accent)]/15 flex items-center gap-2 font-bold transition font-mono"
+                                className="w-full px-3 py-1.5 text-[#22D3EE] hover:bg-[#168BFF]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
                               >
                                 <RotateCcw className="w-3.5 h-3.5" />
                                 <span>Retry / Start</span>
@@ -573,22 +584,22 @@ export function SimpleBotTable({
                           <button
                             type="button"
                             onClick={(e) => handleDetailsClick(e, bot)}
-                            className="w-full px-3.5 py-2 text-[var(--theme-text-secondary)] hover:bg-[var(--theme-elevated)] hover:text-[var(--theme-text-primary)] flex items-center gap-2 font-medium transition"
+                            className="w-full px-3 py-1.5 text-[#7D8EA5] hover:bg-[#0F1C2F] hover:text-[#F8FAFC] flex items-center gap-2 font-medium transition-colors cursor-pointer"
                           >
-                            <Eye className="w-3.5 h-3.5 text-[var(--theme-text-muted)]" />
+                            <Eye className="w-3.5 h-3.5 text-[#7D8EA5]" />
                             <span>View Details</span>
                           </button>
 
                           {/* Divider */}
-                          <div className="h-px bg-[var(--theme-border-subtle)] my-1" />
+                          <div className="h-px bg-[#10263A] my-1" />
 
                           {/* Delete / Force Delete Option */}
                           <button
                             type="button"
                             onClick={(e) => handleDeleteClick(e, bot)}
-                            className="w-full px-3.5 py-2 flex items-center gap-2 font-bold transition text-[var(--theme-loss)] hover:bg-[var(--theme-loss)]/20"
+                            className="w-full px-3 py-1.5 flex items-center gap-2 font-semibold transition-colors text-[#FF3B5C] hover:bg-[#FF3B5C]/20 cursor-pointer"
                           >
-                            <Trash2 className="w-3.5 h-3.5 text-[var(--theme-loss)]" />
+                            <Trash2 className="w-3.5 h-3.5 text-[#FF3B5C]" />
                             <span>{isError || isRecovering ? "Force Delete" : "Delete Bot"}</span>
                           </button>
                         </div>

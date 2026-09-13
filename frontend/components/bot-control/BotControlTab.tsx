@@ -14,8 +14,10 @@ import { DeleteBotModal } from "./DeleteBotModal";
 import { BulkDeleteBotsModal } from "./BulkDeleteBotsModal";
 import { MultiBotBulkActionBar } from "./MultiBotBulkActionBar";
 import { OrderDestinationModal } from "./OrderDestinationModal";
+import { DecisionLogFeed } from "./DecisionLogFeed";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { cn } from "@/lib/utils";
 import {
   BotRowItem,
   FleetMetrics,
@@ -698,10 +700,25 @@ export function BotControlTab() {
     } catch {}
   };
 
+  // Top performing bot
+  const topBot = useMemo(() => {
+    if (rawBots.length === 0) return null;
+    return [...rawBots].sort((a, b) => {
+      const pnlA = a.pnl?.today ?? a.live_pnl ?? 0;
+      const pnlB = b.pnl?.today ?? b.live_pnl ?? 0;
+      return pnlB - pnlA;
+    })[0];
+  }, [rawBots]);
+
+  // Active positions count
+  const activePositions = useMemo(() => {
+    return rawBots.filter((b) => b.position?.has_position).length;
+  }, [rawBots]);
+
   if (!isMounted) return null;
 
   return (
-    <div className="space-y-4 max-w-[1440px] mx-auto min-w-0 font-sans select-none pb-24 text-[var(--theme-text-primary)]">
+    <div className="w-full space-y-3.5 font-sans max-w-[1600px] mx-auto px-4 pt-4 pb-12 bg-[#05101A] select-none text-[#F8FAFC]">
       {/* 1. Top Summary Header & Essential Metric Cards */}
       <SimpleFleetSummaryHeader
         metrics={metrics}
@@ -714,9 +731,9 @@ export function BotControlTab() {
 
       {/* Feedback Alert Banners */}
       {actionError && (
-        <div className="p-3.5 rounded-2xl bg-[var(--theme-loss)]/10 border border-[var(--theme-loss)]/30 text-[var(--theme-loss)] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+        <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 text-[#FF3B5C] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">
-            <AlertTriangle className="w-4 h-4 text-[var(--theme-loss)] shrink-0 mt-0.5" />
+            <AlertTriangle className="w-4 h-4 text-[#FF3B5C] shrink-0 mt-0.5" />
             <div>
               <span className="font-bold uppercase tracking-wide">Action Notice: </span>
               <span className="font-sans leading-relaxed">{actionError}</span>
@@ -724,7 +741,7 @@ export function BotControlTab() {
           </div>
           <button
             onClick={() => setActionError(null)}
-            className="text-[var(--theme-loss)] hover:text-white p-1 rounded hover:bg-[var(--theme-loss)]/20 transition-colors shrink-0"
+            className="text-[#FF3B5C] hover:text-white p-1 rounded hover:bg-[#FF3B5C]/20 transition-colors shrink-0 cursor-pointer"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />
@@ -733,9 +750,9 @@ export function BotControlTab() {
       )}
 
       {actionSuccess && (
-        <div className="p-3.5 rounded-2xl bg-[var(--theme-profit)]/10 border border-[var(--theme-profit)]/30 text-[var(--theme-profit)] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+        <div className="p-3 rounded-lg bg-[#00E89A]/10 border border-[#00E89A]/30 text-[#00E89A] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">
-            <CheckCircle2 className="w-4 h-4 text-[var(--theme-profit)] shrink-0 mt-0.5" />
+            <CheckCircle2 className="w-4 h-4 text-[#00E89A] shrink-0 mt-0.5" />
             <div>
               <span className="font-bold uppercase tracking-wide">Success: </span>
               <span className="font-sans leading-relaxed">{actionSuccess}</span>
@@ -743,7 +760,7 @@ export function BotControlTab() {
           </div>
           <button
             onClick={() => setActionSuccess(null)}
-            className="text-[var(--theme-profit)] hover:text-white p-1 rounded hover:bg-[var(--theme-profit)]/20 transition-colors shrink-0"
+            className="text-[#00E89A] hover:text-white p-1 rounded hover:bg-[#00E89A]/20 transition-colors shrink-0 cursor-pointer"
             title="Dismiss"
           >
             <X className="w-3.5 h-3.5" />
@@ -808,7 +825,82 @@ export function BotControlTab() {
         />
       )}
 
-      {/* 4. Multi-Bot Floating Bulk Action Bar */}
+      {/* 4. Bottom Analytics & Activity Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+        {/* Left: Live Decision Log Feed (Col-span 7) */}
+        <div className="lg:col-span-7">
+          <DecisionLogFeed />
+        </div>
+
+        {/* Right: Fleet Telemetry & Quick Operations (Col-span 5) */}
+        <div className="lg:col-span-5 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#10263A]">
+              <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">
+                Fleet Performance & Ops
+              </span>
+              <span className="text-[10px] font-semibold text-[#00E89A] flex items-center gap-1">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
+                OMS Synchronized
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-[11px] mb-3 font-mono">
+              <div className="p-2 rounded-lg bg-[#05101A] border border-[#12304A]">
+                <span className="text-[10px] text-[#7D8EA5] block">Top Performer</span>
+                <span className="font-bold text-[#F8FAFC] text-[11px] truncate block">
+                  {topBot?.name || "None Active"}
+                </span>
+                <span className="text-[10px] text-[#00E89A] font-semibold">
+                  {topBot ? `+$${Math.abs(topBot.pnl?.today ?? topBot.live_pnl ?? 0).toFixed(2)}` : "—"}
+                </span>
+              </div>
+
+              <div className="p-2 rounded-lg bg-[#05101A] border border-[#12304A]">
+                <span className="text-[10px] text-[#7D8EA5] block">Open Positions</span>
+                <span className="font-bold text-[#22D3EE] text-[14px] leading-tight block">
+                  {activePositions}
+                </span>
+                <span className="text-[10px] text-[#7D8EA5]">across active bots</span>
+              </div>
+            </div>
+
+            <div className="space-y-1 text-[11px] border-t border-[#10263A] pt-2">
+              <div className="flex items-center justify-between text-[#7D8EA5]">
+                <span>Total Capital Allocated</span>
+                <span className="font-semibold text-[#F8FAFC] font-mono">${(metrics.allocated_capital / 1000).toFixed(1)}K</span>
+              </div>
+              <div className="flex items-center justify-between text-[#7D8EA5]">
+                <span>Active Capital In-Flight</span>
+                <span className="font-semibold text-[#F59E0B] font-mono">${(metrics.capital_used / 1000).toFixed(1)}K</span>
+              </div>
+              <div className="flex items-center justify-between text-[#7D8EA5]">
+                <span>Emergency Halt Protocol</span>
+                <span className={cn("font-semibold font-mono", metrics.emergency_halt_active ? "text-[#FF3B5C]" : "text-[#00E89A]")}>
+                  {metrics.emergency_halt_active ? "ENGAGED" : "ARMED / READY"}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-[#10263A] mt-2 flex items-center gap-2">
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex-1 h-7 rounded-md bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[10px] transition-colors flex items-center justify-center gap-1 cursor-pointer"
+            >
+              + New Bot
+            </button>
+            <button
+              onClick={() => setIsBulkStartModalOpen(true)}
+              className="flex-1 h-7 rounded-md bg-[#05101A] border border-[#12304A] hover:border-[#00E89A]/40 text-[#00E89A] font-semibold text-[10px] transition-colors flex items-center justify-center gap-1 cursor-pointer"
+            >
+              Start Eligible
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Multi-Bot Floating Bulk Action Bar */}
       <MultiBotBulkActionBar
         selectedCount={selectedBotIds.length}
         onClearSelection={handleClearSelection}
@@ -819,7 +911,7 @@ export function BotControlTab() {
         onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
       />
 
-      {/* 5. Slide-Out Details Drawer */}
+      {/* 6. Slide-Out Details Drawer */}
       <SimpleBotDetailsDrawer
         isOpen={isDetailsDrawerOpen}
         bot={selectedBot}
@@ -832,7 +924,7 @@ export function BotControlTab() {
         onRefresh={refetch}
       />
 
-      {/* 6. Order Destination Confirmation Modal */}
+      {/* 7. Order Destination Confirmation Modal */}
       <OrderDestinationModal
         isOpen={isOrderDestinationModalOpen}
         bot={orderDestinationBot}
@@ -847,7 +939,7 @@ export function BotControlTab() {
         }}
       />
 
-      {/* 7. Single Bot Delete Confirmation Modal */}
+      {/* 8. Single Bot Delete Confirmation Modal */}
       <DeleteBotModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -859,7 +951,7 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 8. Bulk Delete Confirmation Modal */}
+      {/* 9. Bulk Delete Confirmation Modal */}
       <BulkDeleteBotsModal
         isOpen={isBulkDeleteModalOpen}
         onClose={() => setIsBulkDeleteModalOpen(false)}
@@ -868,7 +960,7 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 9. Bulk Start Confirmation Modal */}
+      {/* 10. Bulk Start Confirmation Modal */}
       <BulkStartConfirmationModal
         isOpen={isBulkStartModalOpen}
         onClose={() => setIsBulkStartModalOpen(false)}
@@ -876,7 +968,7 @@ export function BotControlTab() {
         onConfirmStart={handleConfirmBulkStart}
       />
 
-      {/* 10. Create Bot Wizard Modal */}
+      {/* 11. Create Bot Wizard Modal */}
       <CreateBotWizardModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

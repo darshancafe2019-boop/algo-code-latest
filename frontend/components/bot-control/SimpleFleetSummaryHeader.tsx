@@ -4,16 +4,19 @@ import React from "react";
 import {
   Plus,
   Play,
-  Shield,
-  CheckCircle2,
-  ShieldCheck,
-  DollarSign,
-  TrendingUp,
-  Radio,
   Bot,
+  TrendingUp,
+  TrendingDown,
+  Layers,
+  Wallet,
+  ShieldCheck,
   AlertOctagon,
+  Radio,
+  Sliders,
 } from "lucide-react";
 import { FleetMetrics } from "@/types/bot-control";
+import { cn } from "@/lib/utils";
+import { formatCurrency, formatPercent } from "@/lib/formatters";
 
 interface SimpleFleetSummaryHeaderProps {
   metrics: FleetMetrics;
@@ -37,153 +40,198 @@ export function SimpleFleetSummaryHeader({
   const isLive = environment === "LIVE";
 
   // Capital utilization calculation
-  const capUtilPct = metrics.allocated_capital > 0
-    ? Math.min(100, Math.round((metrics.capital_used / metrics.allocated_capital) * 100))
-    : 0;
+  const capUtilPct =
+    metrics.allocated_capital > 0
+      ? Math.min(100, Math.round((metrics.capital_used / metrics.allocated_capital) * 100))
+      : 0;
 
   return (
-    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-5 font-sans select-none space-y-4">
-      {/* Top Strip: Fleet Status, Telemetry & Global Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#122033] pb-4">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 rounded-lg bg-[#0D1727] border border-[#1A2A3F] text-[#22D3EE]">
-            <Bot className="w-5 h-5" />
+    <div className="space-y-3.5 font-sans select-none">
+      {/* ── Top Header Strip: Fleet Title & Primary Execution Actions ── */}
+      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-[10px] bg-[#0A1422] border border-[#12304A]">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-[#168BFF]/10 border border-[#168BFF]/20 flex items-center justify-center text-[#22D3EE]">
+            <Bot className="h-4.5 w-4.5" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h1 className="text-base sm:text-lg font-bold text-[#F7FAFC] tracking-tight">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-bold text-[#F8FAFC] tracking-tight uppercase">
                 Bot Fleet Command Center
               </h1>
               <span
-                className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono border ${
+                className={cn(
+                  "px-2 py-0.5 rounded text-[10px] font-bold font-mono border",
                   isLive
                     ? "bg-[#FF3B5C]/15 border-[#FF3B5C]/40 text-[#FF3B5C] animate-pulse"
-                    : "bg-[#19C5FF]/10 border-[#19C5FF]/30 text-[#19C5FF]"
-                }`}
+                    : "bg-[#168BFF]/15 border-[#168BFF]/30 text-[#22D3EE]"
+                )}
               >
                 {environment} SIMULATION
               </span>
-              <div className="hidden sm:flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#0D1727] border border-[#1A2A3F] text-[10px] font-mono text-[#00E890]">
-                <Radio className="w-2.5 h-2.5 animate-pulse" />
-                <span>12ms Feed</span>
+              <div className="hidden sm:flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#05101A] border border-[#12304A] text-[10px] font-mono text-[#00E89A]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
+                <span>Gateway 5051</span>
               </div>
             </div>
-
-            {/* Invariant Count Strip */}
-            <div className="flex items-center gap-2 text-xs text-[#7C8CA3] font-mono mt-1 flex-wrap">
-              <span className="font-bold text-[#F7FAFC]">{metrics.total_bots} Total</span>
+            <div className="flex items-center gap-2 text-[11px] text-[#7D8EA5] font-mono mt-0.5">
+              <span className="font-semibold text-[#F8FAFC]">{metrics.total_bots} Total Fleet</span>
               <span>•</span>
-              <span className="text-[#00E890] font-medium">{metrics.running} Running</span>
+              <span className="text-[#00E89A] font-medium">{metrics.running} Active</span>
               <span>•</span>
               <span className="text-[#F59E0B] font-medium">{metrics.paused} Paused</span>
               <span>•</span>
-              <span className="text-[#52627A] font-medium">{metrics.stopped} Stopped</span>
+              <span className="text-[#7D8EA5] font-medium">{metrics.stopped} Stopped</span>
               {metrics.error > 0 && (
                 <>
                   <span>•</span>
-                  <span className="text-[#FF3B5C] font-medium">{metrics.error} Error</span>
+                  <span className="text-[#FF3B5C] font-semibold">{metrics.error} Error</span>
                 </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Global Primary Actions */}
+        {/* Global Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Create Bot */}
           <button
             onClick={onCreateBot}
-            className="h-9 px-4 rounded-lg bg-[#2563EB] hover:bg-[#3B82F6] text-[#F7FAFC] font-semibold text-xs transition-colors flex items-center gap-1.5 font-sans cursor-pointer"
+            className="h-8 px-3.5 rounded-lg bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[11px] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-3.5 w-3.5" />
             <span>+ Create Bot</span>
           </button>
 
           {/* Start Eligible */}
           <button
             onClick={onStartEligible}
-            className="h-9 px-3.5 rounded-lg bg-[#0D1727] border border-[#1A2A3F] hover:border-[#00E890]/40 text-[#00E890] font-semibold text-xs transition-colors flex items-center gap-1.5 font-sans cursor-pointer"
+            className="h-8 px-3 rounded-lg bg-[#05101A] border border-[#12304A] hover:border-[#00E89A]/40 text-[#00E89A] font-semibold text-[11px] transition-colors flex items-center gap-1.5 cursor-pointer"
           >
-            <Play className="w-3.5 h-3.5 fill-current" />
+            <Play className="h-3 w-3 fill-current" />
             <span>Start Eligible</span>
           </button>
 
           {/* Emergency Halt Toggle */}
           <button
             onClick={onToggleEmergencyHalt}
-            className={`h-9 px-3.5 rounded-lg font-semibold text-xs transition-colors flex items-center gap-1.5 border font-sans cursor-pointer ${
+            className={cn(
+              "h-8 px-3 rounded-lg font-semibold text-[11px] transition-colors flex items-center gap-1.5 border cursor-pointer",
               isHaltActive
                 ? "bg-[#FF3B5C] text-white border-[#FF3B5C] animate-pulse"
                 : "bg-[#FF3B5C]/10 border-[#FF3B5C]/30 text-[#FF3B5C] hover:bg-[#FF3B5C]/20"
-            }`}
+            )}
           >
-            <AlertOctagon className="w-4 h-4" />
+            <AlertOctagon className="h-3.5 w-3.5" />
             <span>{isHaltActive ? "HALT ACTIVE" : "Emergency Halt"}</span>
           </button>
         </div>
       </div>
 
-      {/* 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono">
-        {/* 1. TODAY P&L */}
-        <div className="p-3.5 bg-[#0D1727] border border-[#1A2A3F] rounded-xl space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-[#7C8CA3] font-sans">
-            <span className="font-semibold">Today P&L (Net)</span>
-            <TrendingUp className={`w-3.5 h-3.5 ${isPnlPositive ? "text-[#00E890]" : "text-[#FF3B5C]"}`} />
+      {/* ── 5 TOP KPI CARDS (HEIGHT 112px, RADIUS 10px, MATCHING DASHBOARD) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
+        {/* Card 1: Total Fleet Bots */}
+        <div className="h-[112px] p-3.5 rounded-[10px] bg-[#0A1422] border border-[#12304A] hover:border-[#168BFF]/40 transition-colors flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-[#7D8EA5]">
+            <span className="text-[11px] font-medium tracking-tight">Total Fleet Bots</span>
+            <div className="h-6 w-6 rounded-md bg-[#168BFF]/10 flex items-center justify-center group-hover:bg-[#168BFF]/20 transition-colors">
+              <Bot className="h-3.5 w-3.5 text-[#22D3EE]" />
+            </div>
           </div>
-          <div className={`text-lg font-bold tabular-nums ${isPnlPositive ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
-            {metrics.today_pnl >= 0 ? "+" : "-"}${Math.abs(metrics.today_pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div>
+            <span className="text-[24px] font-bold tracking-tight text-[#F8FAFC] tabular-nums leading-none">
+              {metrics.total_bots}
+            </span>
           </div>
-          <div className="text-[10px] text-[#52627A] font-sans flex items-center justify-between">
-            <span>Realized: {metrics.realized_pnl >= 0 ? "+" : "-"}${Math.abs(metrics.realized_pnl).toFixed(2)}</span>
-            <span>Unrealized: {metrics.unrealized_pnl >= 0 ? "+" : "-"}${Math.abs(metrics.unrealized_pnl).toFixed(2)}</span>
-          </div>
-        </div>
-
-        {/* 2. CURRENT EXPOSURE */}
-        <div className="p-3.5 bg-[#0D1727] border border-[#1A2A3F] rounded-xl space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-[#7C8CA3] font-sans">
-            <span className="font-semibold">Market Exposure</span>
-            <DollarSign className="w-3.5 h-3.5 text-[#19C5FF]" />
-          </div>
-          <div className="text-lg font-bold text-[#F7FAFC] tabular-nums">
-            ${metrics.current_exposure.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </div>
-          <div className="text-[10px] text-[#52627A] font-sans">
-            Active in Open OMS Positions
+          <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
+            <span className="text-[#00E89A] font-semibold">{metrics.running} running</span>
+            <span>• {metrics.paused} paused</span>
           </div>
         </div>
 
-        {/* 3. CAPITAL USED & UTILIZATION */}
-        <div className="p-3.5 bg-[#0D1727] border border-[#1A2A3F] rounded-xl space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-[#7C8CA3] font-sans">
-            <span className="font-semibold">Capital Allocation</span>
-            <Shield className="w-3.5 h-3.5 text-[#F59E0B]" />
+        {/* Card 2: Running & Active */}
+        <div className="h-[112px] p-3.5 rounded-[10px] bg-[#0A1422] border border-[#12304A] hover:border-[#168BFF]/40 transition-colors flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-[#7D8EA5]">
+            <span className="text-[11px] font-medium tracking-tight">Active Bots</span>
+            <div className="h-6 w-6 rounded-md bg-[#00E89A]/10 flex items-center justify-center group-hover:bg-[#00E89A]/20 transition-colors">
+              <Play className="h-3.5 w-3.5 text-[#00E89A] fill-current" />
+            </div>
           </div>
-          <div className="text-lg font-bold text-[#F7FAFC] flex items-baseline justify-between tabular-nums">
-            <span>${metrics.capital_used.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-            <span className="text-xs text-[#F59E0B]">{capUtilPct}%</span>
+          <div>
+            <span className="text-[24px] font-bold tracking-tight text-[#00E89A] tabular-nums leading-none">
+              {metrics.running}
+            </span>
           </div>
-          <div className="w-full h-1 bg-[#07101A] rounded-full overflow-hidden border border-[#122033]">
-            <div
-              className="h-full bg-[#F59E0B] transition-all duration-500 rounded-full"
-              style={{ width: `${capUtilPct}%` }}
-            />
+          <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
+            <span className="text-[#22D3EE] font-semibold">${metrics.current_exposure.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
+            <span>market exposure</span>
           </div>
         </div>
 
-        {/* 4. FLEET HEALTH */}
-        <div className="p-3.5 bg-[#0D1727] border border-[#1A2A3F] rounded-xl space-y-1">
-          <div className="flex items-center justify-between text-[11px] text-[#7C8CA3] font-sans">
-            <span className="font-semibold">Fleet Engine Health</span>
-            <ShieldCheck className="w-3.5 h-3.5 text-[#00E890]" />
+        {/* Card 3: Today's P&L */}
+        <div className="h-[112px] p-3.5 rounded-[10px] bg-[#0A1422] border border-[#12304A] hover:border-[#168BFF]/40 transition-colors flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-[#7D8EA5]">
+            <span className="text-[11px] font-medium tracking-tight">Today&apos;s Bot P&L</span>
+            <div className={cn("h-6 w-6 rounded-md flex items-center justify-center transition-colors", isPnlPositive ? "bg-[#00E89A]/10" : "bg-[#FF3B5C]/10")}>
+              {isPnlPositive ? (
+                <TrendingUp className="h-3.5 w-3.5 text-[#00E89A]" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5 text-[#FF3B5C]" />
+              )}
+            </div>
           </div>
-          <div className="text-lg font-bold text-[#00E890]">
-            {metrics.health_display}
+          <div>
+            <span
+              className={cn(
+                "text-[24px] font-bold tracking-tight tabular-nums leading-none",
+                isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
+              )}
+            >
+              {isPnlPositive ? `+${formatCurrency(metrics.today_pnl, "$", 2)}` : formatCurrency(metrics.today_pnl, "$", 2)}
+            </span>
           </div>
-          <div className="text-[10px] text-[#52627A] font-sans flex items-center gap-1">
-            <CheckCircle2 className="w-3 h-3 text-[#00E890] shrink-0" />
-            <span>Workers & Subsystems Synced</span>
+          <div className="text-[11px] text-[#7D8EA5] flex items-center justify-between font-medium">
+            <span>R: {metrics.realized_pnl >= 0 ? "+" : ""}${Math.abs(metrics.realized_pnl).toFixed(0)}</span>
+            <span>UR: {metrics.unrealized_pnl >= 0 ? "+" : ""}${Math.abs(metrics.unrealized_pnl).toFixed(0)}</span>
+          </div>
+        </div>
+
+        {/* Card 4: Allocated Capital */}
+        <div className="h-[112px] p-3.5 rounded-[10px] bg-[#0A1422] border border-[#12304A] hover:border-[#168BFF]/40 transition-colors flex flex-col justify-between group">
+          <div className="flex items-center justify-between text-[#7D8EA5]">
+            <span className="text-[11px] font-medium tracking-tight">Allocated Capital</span>
+            <div className="h-6 w-6 rounded-md bg-[#7C3AED]/10 flex items-center justify-center">
+              <Wallet className="h-3.5 w-3.5 text-[#7C3AED]" />
+            </div>
+          </div>
+          <div>
+            <span className="text-[24px] font-bold tracking-tight text-[#F8FAFC] tabular-nums leading-none">
+              ${(metrics.allocated_capital / 1000).toFixed(0)}K
+            </span>
+          </div>
+          <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
+            <span className="text-[#F59E0B] font-semibold">{capUtilPct}%</span>
+            <span>used (${(metrics.capital_used / 1000).toFixed(0)}K)</span>
+          </div>
+        </div>
+
+        {/* Card 5: Fleet Engine Health */}
+        <div className="h-[112px] p-3.5 rounded-[10px] bg-gradient-to-b from-[#00E89A]/5 to-[#0A1422] border border-[#00E89A]/30 hover:border-[#00E89A]/50 transition-colors flex flex-col justify-between">
+          <div className="flex items-center justify-between text-[#7D8EA5]">
+            <span className="text-[11px] font-medium tracking-tight">Fleet Engine Health</span>
+            <div className="h-6 w-6 rounded-md bg-[#00E89A]/15 flex items-center justify-center">
+              <ShieldCheck className="h-3.5 w-3.5 text-[#00E89A]" />
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#00E89A] animate-pulse" />
+              <span className="text-[22px] font-bold tracking-tight text-[#00E89A] leading-none">
+                {metrics.healthy_count}/{Math.max(1, metrics.total_bots)} HEALTHY
+              </span>
+            </div>
+          </div>
+          <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
+            <span>Workers & OMS Synced</span>
           </div>
         </div>
       </div>

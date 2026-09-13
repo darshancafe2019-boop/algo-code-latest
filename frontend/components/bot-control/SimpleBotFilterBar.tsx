@@ -12,6 +12,7 @@ import {
   FileSpreadsheet,
   FileCode,
   Radio,
+  SlidersHorizontal,
 } from "lucide-react";
 import { BotViewMode } from "@/types/bot-control";
 import { cn } from "@/lib/utils";
@@ -58,6 +59,13 @@ const BROKER_FILTERS = [
   { id: "DELTA_INDIA", label: "DELTA INDIA" },
 ];
 
+const BOT_TABS = [
+  { id: "ALL", label: "All Bots" },
+  { id: "RUNNING", label: "Active" },
+  { id: "PAUSED", label: "Paused" },
+  { id: "STOPPED", label: "Stopped" },
+];
+
 export function SimpleBotFilterBar({
   search,
   onSearchChange,
@@ -96,109 +104,74 @@ export function SimpleBotFilterBar({
   }, []);
 
   return (
-    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-3 sm:p-4 font-sans select-none space-y-3">
-      {/* Primary Top Bar: Search, Market Filter Pills, Export & Views */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Search Bar with '/' Shortcut */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] focus-within:border-[#22D3EE] rounded-lg max-w-sm w-full transition-colors">
-          <Search className="w-4 h-4 text-[#52627A] shrink-0" />
+    <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3 sm:p-3.5 font-sans select-none space-y-2.5">
+      {/* ── Row 1: Search, Bot Lifecycle Tabs, Export & View Modes ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        {/* Search Bar */}
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#05101A] border border-[#12304A] hover:border-[#168BFF]/40 focus-within:border-[#22D3EE] rounded-lg max-w-sm w-full transition-colors">
+          <Search className="h-3.5 w-3.5 text-[#7D8EA5] shrink-0" />
           <input
             ref={searchInputRef}
             type="text"
-            placeholder="Search bot, symbol, strategy (Press '/' to focus)..."
+            placeholder="Search bot, symbol, strategy..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-transparent text-[#F7FAFC] text-xs focus:outline-none placeholder:text-[#52627A] font-sans"
+            className="w-full bg-transparent text-[#F8FAFC] text-[11px] focus:outline-none placeholder:text-[#7D8EA5] font-sans"
           />
           {search && (
             <button
               onClick={() => onSearchChange("")}
-              className="text-[10px] text-[#52627A] hover:text-[#F7FAFC] px-1 rounded cursor-pointer"
+              className="text-[10px] text-[#7D8EA5] hover:text-[#F8FAFC] px-1 rounded cursor-pointer font-mono"
             >
               Clear
             </button>
           )}
         </div>
 
-        {/* Market Tabs & View Switcher */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Market Selection Buttons */}
-          <div className="flex items-center gap-1 flex-wrap font-mono">
-            {PRIMARY_MARKETS.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => {
-                  onSelectMarket(m.id);
-                  setShowMoreDropdown(false);
-                }}
-                className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border cursor-pointer",
-                  selectedMarket === m.id && !isMoreSelected
-                    ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
-                    : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
-                )}
-              >
-                {m.label}
-              </button>
-            ))}
-
-            {/* More Markets Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setShowMoreDropdown(!showMoreDropdown)}
-                className={cn(
-                  "px-2.5 py-1 rounded-md text-xs font-medium transition-colors border flex items-center gap-1 cursor-pointer",
-                  isMoreSelected
-                    ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
-                    : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC] hover:bg-[#101B2D]"
-                )}
-              >
-                <span>{isMoreSelected ? activeMoreLabel : "More"}</span>
-                <ChevronDown className="w-3 h-3" />
-              </button>
-
-              {showMoreDropdown && (
-                <div className="absolute right-0 top-full mt-1.5 w-40 bg-[#0A1422] border border-[#1A2A3F] rounded-lg shadow-xl z-30 py-1 font-sans text-xs">
-                  {MORE_MARKETS.map((m) => (
-                    <button
-                      key={m.id}
-                      onClick={() => {
-                        onSelectMarket(m.id);
-                        setShowMoreDropdown(false);
-                      }}
-                      className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center justify-between cursor-pointer"
-                    >
-                      <span>{m.label}</span>
-                      {selectedMarket === m.id && <Check className="w-3.5 h-3.5 text-[#22D3EE]" />}
-                    </button>
-                  ))}
-                </div>
+        {/* Bot Lifecycle Tabs (All Bots, Active, Paused, Stopped) */}
+        <div className="flex items-center gap-1 bg-[#05101A] p-0.5 rounded-md border border-[#12304A]">
+          {BOT_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onStatusFilterChange(tab.id)}
+              className={cn(
+                "px-2.5 py-1 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center gap-1",
+                statusFilter === tab.id
+                  ? "bg-[#168BFF] text-[#F8FAFC]"
+                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
               )}
-            </div>
-          </div>
+            >
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
 
+        {/* Right Utility: View Switcher & Export */}
+        <div className="flex items-center gap-1.5">
           {/* Export Dropdown */}
           <div className="relative">
             <button
               onClick={() => setShowExportDropdown(!showExportDropdown)}
-              className="p-1.5 rounded-md bg-[#0D1727] border border-[#1A2A3F] hover:border-[#29415F] text-[#7C8CA3] hover:text-[#F7FAFC] transition-colors cursor-pointer"
-              title="Export Bot Fleet Data"
+              className="p-1.5 rounded-md bg-[#05101A] border border-[#12304A] hover:border-[#168BFF]/40 text-[#7D8EA5] hover:text-[#F8FAFC] transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
+              title="Export Bot Fleet"
             >
-              <Download className="w-3.5 h-3.5" />
+              <Download className="h-3 w-3" />
+              <span>Export</span>
             </button>
 
             {showExportDropdown && (
-              <div className="absolute right-0 top-full mt-1.5 w-40 bg-[#0A1422] border border-[#1A2A3F] rounded-lg shadow-xl z-30 py-1 font-mono text-xs">
+              <div className="absolute right-0 top-full mt-1 w-36 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-xl z-30 py-1 font-mono text-[11px]">
                 {onExportCsv && (
                   <button
                     onClick={() => {
                       setShowExportDropdown(false);
                       onExportCsv();
                     }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center gap-2 cursor-pointer"
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileSpreadsheet className="w-3.5 h-3.5 text-[#00E890]" />
-                    <span>Export CSV</span>
+                    <FileSpreadsheet className="h-3 w-3 text-[#00E89A]" />
+                    <span>CSV Format</span>
                   </button>
                 )}
                 {onExportJson && (
@@ -207,10 +180,10 @@ export function SimpleBotFilterBar({
                       setShowExportDropdown(false);
                       onExportJson();
                     }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-[#101B2D] text-[#F7FAFC] flex items-center gap-2 cursor-pointer"
+                    className="w-full px-3 py-1.5 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
                   >
-                    <FileCode className="w-3.5 h-3.5 text-[#19C5FF]" />
-                    <span>Export JSON</span>
+                    <FileCode className="h-3 w-3 text-[#22D3EE]" />
+                    <span>JSON Format</span>
                   </button>
                 )}
               </div>
@@ -218,53 +191,109 @@ export function SimpleBotFilterBar({
           </div>
 
           {/* View Mode Switcher */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-[#0D1727] border border-[#1A2A3F] rounded-md">
+          <div className="flex items-center gap-0.5 p-0.5 bg-[#05101A] border border-[#12304A] rounded-md">
             <button
               onClick={() => onViewModeChange("table")}
               className={cn(
-                "p-1 rounded cursor-pointer",
+                "p-1 rounded transition-colors cursor-pointer",
                 viewMode === "table"
-                  ? "bg-[#2563EB] text-[#F7FAFC]"
-                  : "text-[#52627A] hover:text-[#F7FAFC]"
+                  ? "bg-[#168BFF] text-[#F8FAFC]"
+                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
               )}
               title="Table View"
             >
-              <Table className="w-3.5 h-3.5" />
+              <Table className="h-3 w-3" />
             </button>
             <button
               onClick={() => onViewModeChange("cards")}
               className={cn(
-                "p-1 rounded cursor-pointer",
+                "p-1 rounded transition-colors cursor-pointer",
                 viewMode === "cards"
-                  ? "bg-[#2563EB] text-[#F7FAFC]"
-                  : "text-[#52627A] hover:text-[#F7FAFC]"
+                  ? "bg-[#168BFF] text-[#F8FAFC]"
+                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
               )}
               title="Card Grid View"
             >
-              <LayoutGrid className="w-3.5 h-3.5" />
+              <LayoutGrid className="h-3 w-3" />
             </button>
             <button
               onClick={() => onViewModeChange("matrix")}
               className={cn(
-                "p-1 rounded cursor-pointer",
+                "p-1 rounded transition-colors cursor-pointer",
                 viewMode === "matrix"
-                  ? "bg-[#2563EB] text-[#F7FAFC]"
-                  : "text-[#52627A] hover:text-[#F7FAFC]"
+                  ? "bg-[#168BFF] text-[#F8FAFC]"
+                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
               )}
               title="Strategy Matrix View"
             >
-              <PieChart className="w-3.5 h-3.5" />
+              <PieChart className="h-3 w-3" />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Secondary Bar: Broker Source Filter Pills & Status Counters */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#122033] text-xs font-mono">
-        {/* Source Broker Filter Pills */}
-        <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[10px] text-[#52627A] uppercase font-semibold mr-1 flex items-center gap-1">
-            <Radio className="w-3 h-3 text-[#22D3EE]" />
+      {/* ── Row 2: Market Filter Pills & Sources Bar ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#10263A] text-xs">
+        {/* Market Filter Pills */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[10px] text-[#7D8EA5] uppercase font-semibold mr-1">Markets:</span>
+          {PRIMARY_MARKETS.map((m) => (
+            <button
+              key={m.id}
+              onClick={() => {
+                onSelectMarket(m.id);
+                setShowMoreDropdown(false);
+              }}
+              className={cn(
+                "px-2.5 py-0.5 rounded text-[10px] font-semibold transition-colors border cursor-pointer",
+                selectedMarket === m.id && !isMoreSelected
+                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
+                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC] hover:border-[#168BFF]/30"
+              )}
+            >
+              {m.label}
+            </button>
+          ))}
+
+          {/* More Markets Dropdown */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMoreDropdown(!showMoreDropdown)}
+              className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors border flex items-center gap-1 cursor-pointer",
+                isMoreSelected
+                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
+                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC]"
+              )}
+            >
+              <span>{isMoreSelected ? activeMoreLabel : "More"}</span>
+              <ChevronDown className="h-2.5 w-2.5" />
+            </button>
+
+            {showMoreDropdown && (
+              <div className="absolute left-0 top-full mt-1 w-36 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-xl z-30 py-1 font-sans text-[11px]">
+                {MORE_MARKETS.map((m) => (
+                  <button
+                    key={m.id}
+                    onClick={() => {
+                      onSelectMarket(m.id);
+                      setShowMoreDropdown(false);
+                    }}
+                    className="w-full px-3 py-1 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center justify-between cursor-pointer"
+                  >
+                    <span>{m.label}</span>
+                    {selectedMarket === m.id && <Check className="h-3 w-3 text-[#22D3EE]" />}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Broker Source Filter Pills */}
+        <div className="flex items-center gap-1 flex-wrap">
+          <span className="text-[10px] text-[#7D8EA5] uppercase font-semibold mr-1 flex items-center gap-1">
+            <Radio className="h-2.5 w-2.5 text-[#22D3EE]" />
             <span>Sources:</span>
           </span>
           {BROKER_FILTERS.map((b) => (
@@ -274,18 +303,16 @@ export function SimpleBotFilterBar({
               className={cn(
                 "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors border cursor-pointer",
                 selectedBroker === b.id
-                  ? "bg-[#2563EB]/20 border-[#2563EB]/40 text-[#19C5FF]"
-                  : "bg-[#0D1727] border-[#1A2A3F] text-[#7C8CA3] hover:text-[#F7FAFC]"
+                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
+                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC]"
               )}
             >
               {b.label}
             </button>
           ))}
-        </div>
-
-        {/* Showing Count */}
-        <div className="text-[11px] text-[#52627A]">
-          Showing <span className="font-semibold text-[#F7FAFC]">{showingCount}</span> of {totalCount} bots
+          <div className="text-[10px] text-[#7D8EA5] ml-2 font-mono">
+            (<span className="text-[#F8FAFC] font-semibold">{showingCount}</span>/{totalCount})
+          </div>
         </div>
       </div>
     </div>

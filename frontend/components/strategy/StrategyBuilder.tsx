@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   StrategyIdeDefinition,
@@ -195,6 +195,7 @@ export function StrategyBuilder() {
 
   // Testing & Backtest State
   const [backtestResult, setBacktestResult] = useState<BacktestResultPayload | null>(null);
+  const [backtestError, setBacktestError] = useState<string | null>(null);
   const [isBacktesting, setIsBacktesting] = useState(false);
 
   // Readiness & Preflight State
@@ -216,30 +217,67 @@ export function StrategyBuilder() {
     placeholderData: (prev) => prev,
   });
 
-  // Revalidate Strategy when changed
-  const validateStrategy = useCallback(async (currentStrat: StrategyIdeDefinition) => {
-    try {
-      const res = await apiClient.post<any>("/api/strategy/ide/validate", { strategy: currentStrat }, { timeoutMs: 5000 });
-      if (res.ok && res.data) {
-        const json = res.data;
-        setReadiness(json.readiness);
-        setPreflight(json.preflight);
-        if (json.compiled_expression) {
-          setStrategy((prev) => ({
-            ...prev,
-            compiled_expression: json.compiled_expression,
-            config_hash: json.config_hash,
-          }));
-        }
-      }
-    } catch (e) {
-      console.warn("Validation warning:", e);
-    }
+  // Revalidate only semantic strategy changes.  The compiled expression
+  // and config hash are server-derived fields, so they must not retrigger
+  // their own validation request.
+  const lastValidatedKeyRef = useRef<string>("");
+  const validationRequestRef = useRef(0);
+
+  const getStrategyValidationKey = useCallback((currentStrat: StrategyIdeDefinition) => {
+    const { compiled_expression: _compiled, config_hash: _hash, ...semanticStrategy } = currentStrat;
+    return JSON.stringify(semanticStrategy);
   }, []);
 
-  // Initial validation
+  const validateStrategy = useCallback(async (currentStrat: StrategyIdeDefinition) => {
+    const validationKey = getStrategyValidationKey(currentStrat);
+    if (lastValidatedKeyRef.current === validationKey) return;
+    lastValidatedKeyRef.current = validationKey;
+    const requestNumber = ++validationRequestRef.current;
+
+    try {
+      const res = await apiClient.post<any>(
+        "/api/strategy/ide/validate",
+        { strategy: currentStrat },
+        { timeoutMs: 5000, deduplicate: true }
+      );
+      if (requestNumber !== validationRequestRef.current) return;
+
+      if (res.ok && res.data) {
+        const json = res.data;
+        setReadiness(json.readiness ?? null);
+        setPreflight(json.preflight ?? null);
+        setValidationError(null);
+        if (json.compiled_expression || json.config_hash) {
+          setStrategy((prev) => {
+            if (
+              prev.compiled_expression === json.compiled_expression &&
+              prev.config_hash === json.config_hash
+            ) {
+              return prev;
+            }
+            return {
+              ...prev,
+              compiled_expression: json.compiled_expression || prev.compiled_expression,
+              config_hash: json.config_hash || prev.config_hash,
+            };
+          });
+        }
+      } else {
+        const message = res.error?.message || "Strategy validation returned no result.";
+        setValidationError(String(message));
+        console.error("[StrategyBuilder] Validation failed:", message);
+      }
+    } catch (error) {
+      if (requestNumber !== validationRequestRef.current) return;
+      const message = error instanceof Error ? error.message : "Strategy validation request failed.";
+      setValidationError(message);
+      console.error("[StrategyBuilder] Validation request failed:", error);
+    }
+  }, [getStrategyValidationKey]);
+
+  // Initial validation and validation after semantic edits.
   useEffect(() => {
-    validateStrategy(strategy);
+    void validateStrategy(strategy);
   }, [validateStrategy, strategy]);
 
   // Push to history
@@ -312,7 +350,7 @@ export function StrategyBuilder() {
     if (isSaving) return;
     setIsSaving(true);
     try {
-      const idempotencyKey = apiClient.generateIdempotencyKey("SAVE_STRATEGY", strategy.id);
+      const idempotencyKey = apiClient.generateIdempotencyKey("SAVE_STRATEGY", strategy.strategy_id);
       const res = await apiClient.post<any>("/api/strategy/ide/save", strategy, {
         idempotencyKey,
         timeoutMs: 8000,
@@ -338,9 +376,15 @@ export function StrategyBuilder() {
   }) => {
     if (isBacktesting) return;
     setIsBacktesting(true);
+    setBacktestError(null);
+    setBacktestResult(null);
     setShowTestingDrawer(true);
+
     try {
-      const idempotencyKey = apiClient.generateIdempotencyKey("BACKTEST_STRATEGY", strategy.id);
+      const idempotencyKey = apiClient.generateIdempotencyKey(
+        "BACKTEST_STRATEGY",
+        strategy.strategy_id
+      );
       const res = await apiClient.post<any>(
         "/api/strategy/ide/backtest",
         {
@@ -348,106 +392,27 @@ export function StrategyBuilder() {
           timeframe: strategy.base_timeframe,
           start_date: params?.startDate || "2026-01-01",
           end_date: params?.endDate || "2026-08-25",
-          capital: params?.capital || strategy.risk.capital || 10000,
-          fees_pct: params?.feesPct || 0.001,
-          slippage_pct: params?.slippagePct || 0.0005,
+          capital: params?.capital ?? strategy.risk.capital,
+          fees_pct: params?.feesPct ?? 0.001,
+          slippage_pct: params?.slippagePct ?? 0.0005,
           name: strategy.name,
           version: strategy.active_version,
           allow_shorts: strategy.direction !== "LONG",
         },
         { idempotencyKey, timeoutMs: 15000 }
       );
+
       if (res.ok && res.data) {
         setBacktestResult(res.data);
       } else {
-        // Fallback realistic simulation
-        setBacktestResult({
-          status: "success",
-          backtest_id: `bt-${Date.now()}`,
-          metrics: {
-            total_trades: 126,
-            winning_trades: 74,
-            losing_trades: 52,
-            win_rate_pct: 58.7,
-            initial_capital: strategy.risk.capital || 10000,
-            ending_equity: (strategy.risk.capital || 10000) * 1.184,
-            total_net_profit: (strategy.risk.capital || 10000) * 0.184,
-            return_pct: 18.4,
-            profit_factor: 1.72,
-            max_drawdown_pct: 6.8,
-            max_drawdown_usd: (strategy.risk.capital || 10000) * 0.068,
-            sharpe_ratio: 1.84,
-            sortino_ratio: 2.12,
-            expectancy: 0.41,
-            avg_win: 145.2,
-            avg_loss: 88.5,
-          },
-          trades: [
-            {
-              trade_id: 1,
-              side: "LONG",
-              entry_time: "2026-01-02 09:30",
-              entry_price: 64200.0,
-              exit_time: "2026-01-02 15:45",
-              exit_price: 65484.0,
-              quantity: 0.15,
-              gross_pnl: 192.6,
-              net_pnl: 183.4,
-              fees: 6.5,
-              slippage: 2.7,
-              return_pct: 2.0,
-              exit_reason: "TAKE_PROFIT",
-              holding_bars: 25,
-            },
-            {
-              trade_id: 2,
-              side: "LONG",
-              entry_time: "2026-01-05 10:15",
-              entry_price: 65100.0,
-              exit_time: "2026-01-05 11:30",
-              exit_price: 64449.0,
-              quantity: 0.15,
-              gross_pnl: -97.65,
-              net_pnl: -106.85,
-              fees: 6.5,
-              slippage: 2.7,
-              return_pct: -1.0,
-              exit_reason: "STOP_LOSS",
-              holding_bars: 5,
-            },
-            {
-              trade_id: 3,
-              side: "LONG",
-              entry_time: "2026-01-07 14:00",
-              entry_price: 64800.0,
-              exit_time: "2026-01-08 09:45",
-              exit_price: 66096.0,
-              quantity: 0.15,
-              gross_pnl: 194.4,
-              net_pnl: 185.2,
-              fees: 6.5,
-              slippage: 2.7,
-              return_pct: 2.0,
-              exit_reason: "TAKE_PROFIT",
-              holding_bars: 28,
-            },
-          ],
-          equity_curve: [
-            { time: "2026-01-01", equity: 10000, drawdown_pct: 0 },
-            { time: "2026-02-01", equity: 10450, drawdown_pct: 1.2 },
-            { time: "2026-03-01", equity: 10820, drawdown_pct: 2.4 },
-            { time: "2026-04-01", equity: 10650, drawdown_pct: 4.8 },
-            { time: "2026-05-01", equity: 11100, drawdown_pct: 1.8 },
-            { time: "2026-06-01", equity: 11350, drawdown_pct: 3.1 },
-            { time: "2026-07-01", equity: 11600, drawdown_pct: 2.0 },
-            { time: "2026-08-25", equity: 11840, drawdown_pct: 0.8 },
-          ],
-          config: strategy,
-          executed_at: new Date().toISOString(),
-        });
+        const message = res.error?.message || "Backtest service returned no result.";
+        setBacktestError(String(message));
+        console.error("[StrategyBuilder] Backtest rejected:", message);
       }
-    } catch (e) {
-      console.error("Backtest execution failed:", e);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Backtest request failed.";
+      setBacktestError(message);
+      console.error("[StrategyBuilder] Backtest request failed:", error);
     } finally {
       setIsBacktesting(false);
     }
@@ -510,6 +475,11 @@ export function StrategyBuilder() {
 
   return (
     <div className="max-w-4xl mx-auto pb-16">
+      {validationError && (
+        <div className="mb-3 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
+          Strategy validation unavailable: {validationError}. Review is not authoritative until validation succeeds.
+        </div>
+      )}
       {/* Streamlined Single-Column Workflow Workspace */}
       <StrategySimplifiedCanvas
         strategy={strategy}
@@ -581,6 +551,7 @@ export function StrategyBuilder() {
           isObserving={false}
           onRunLiveObservation={() => {}}
           backtestResult={backtestResult}
+          backtestError={backtestError}
           isBacktesting={isBacktesting}
           onRunBacktest={(p) => handleRunBacktest(p)}
         />

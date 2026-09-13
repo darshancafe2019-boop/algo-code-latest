@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
 import { TradeAnalysisDashboard } from "@/components/trade-analysis/TradeAnalysisDashboard";
@@ -9,32 +9,65 @@ import { TradeAnalysisInstrument } from "@/components/trade-analysis/TradeAnalys
 function TradeAnalysisContent() {
   const searchParams = useSearchParams();
 
-  const symbol = searchParams.get("symbol") || "NIFTY 25000 CE";
-  const underlying = searchParams.get("underlying") || "NIFTY";
-  const side = (searchParams.get("side")?.toUpperCase() === "SELL" ? "SELL" : "BUY") as "BUY" | "SELL";
-  const assetClass = (searchParams.get("type")?.toUpperCase() === "FUTURES" ? "FUTURES" : "OPTION") as any;
-  const strike = searchParams.get("strike") ? Number(searchParams.get("strike")) : 25000;
-  const expiry = searchParams.get("expiry") || "11 Sep 2025";
-  const ltp = searchParams.get("ltp") ? Number(searchParams.get("ltp")) : 132.4;
-  const optionType = (searchParams.get("optionType")?.toUpperCase() === "PE" ? "PE" : "CE") as "CE" | "PE";
+  const rawSymbol = searchParams.get("symbol")?.trim() || "";
+  const rawUnderlying = searchParams.get("underlying")?.trim() || "";
+  const rawType = searchParams.get("type")?.toUpperCase() || "OPTION";
+  const rawStrike = searchParams.get("strike");
+  const rawLtp = searchParams.get("ltp");
+  const rawLotSize = searchParams.get("lotSize");
+  const side = searchParams.get("side")?.toUpperCase() === "SELL" ? "SELL" : "BUY";
+  const assetClass = (["OPTION", "FUTURES", "EQUITY", "CRYPTO"] as const).includes(
+    rawType as "OPTION" | "FUTURES" | "EQUITY" | "CRYPTO"
+  )
+    ? (rawType as "OPTION" | "FUTURES" | "EQUITY" | "CRYPTO")
+    : "OPTION";
+  const strike = rawStrike !== null && Number.isFinite(Number(rawStrike)) ? Number(rawStrike) : undefined;
+  const ltp = rawLtp !== null && Number.isFinite(Number(rawLtp)) ? Number(rawLtp) : undefined;
+  const lotSize =
+    rawLotSize !== null && Number.isFinite(Number(rawLotSize)) ? Number(rawLotSize) : undefined;
+  const optionType = searchParams.get("optionType")?.toUpperCase();
+  const initialInstrument: Partial<TradeAnalysisInstrument> = useMemo(
+    () => ({
+      symbol: rawSymbol,
+      underlying: rawUnderlying,
+      side,
+      assetClass,
+      securityId: searchParams.get("securityId") || undefined,
+      exchangeSegment: searchParams.get("exchangeSegment") || undefined,
+      strike,
+      expiry: searchParams.get("expiry") || undefined,
+      ltp,
+      lotSize,
+      optionType: optionType === "CE" || optionType === "PE" ? optionType : undefined,
+    }),
+    [
+      rawSymbol,
+      rawUnderlying,
+      side,
+      assetClass,
+      strike,
+      ltp,
+      lotSize,
+      optionType,
+      searchParams,
+    ]
+  );
 
-  const initialInstrument: Partial<TradeAnalysisInstrument> = {
-    symbol,
-    underlying,
-    side,
-    assetClass,
-    strike,
-    expiry,
-    ltp,
-    optionType,
-    lotSize: underlying.includes("BANKNIFTY") ? 15 : underlying.includes("SENSEX") ? 10 : 25,
-  };
+  if (!rawSymbol || !rawUnderlying) {
+    return (
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-6 text-center text-sm text-amber-200">
+        Select a live instrument with a symbol and underlying before opening Trade Analysis.
+        No demo market values are loaded.
+      </div>
+    );
+  }
 
   return (
     <div className="p-2 sm:p-4 max-w-[1750px] mx-auto min-w-0 font-sans">
       <TradeAnalysisDashboard initialInstrument={initialInstrument} />
     </div>
   );
+
 }
 
 export default function TradeAnalysisPage() {

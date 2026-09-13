@@ -82,7 +82,7 @@ export function TradeAnalysisIndicatorBuilder({
     return activeIndicators.map((ind) => ({
       ...ind,
       calculatedValue: dataReady ? "DATA REQUIRED" : "DATA UNAVAILABLE",
-      signal: "NEUTRAL" as const,
+      signal: "NEUTRAL" as NonNullable<ActiveIndicator["signal"]>,
       description: dataReady
         ? "Provider historical series is required before this indicator can be evaluated."
         : "Waiting for validated underlying and option-premium candle series.",

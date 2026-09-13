@@ -40,126 +40,147 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
   const underlyingIsCrypto = contract ? ["BTC", "ETH", "SOL", "XRP"].includes(contract.underlying) : false;
   const curSymbol = underlyingIsCrypto ? "$" : currency;
 
-  // Real-time Order Book query
-  const { data: depthData, isLoading, isFetching, refetch } = useQuery<OrderBookDepthData>({
+  // Real-time order-book query.  The component never constructs depth
+  // from L1 values: unavailable or stale provider data remains unavailable.
+  const { data: depthData, isLoading, isFetching } = useQuery<OrderBookDepthData>({
     queryKey: ["optionOrderBookDepth", contract?.symbol, contract?.broker, contract?.strike, contract?.optionType],
     queryFn: async () => {
-      if (!contract) throw new Error("Contract is missing");
-      // 1. First probe centralized market-data orderbook endpoint
-      try {
-        const res = await fetch(`/api/market-data/orderbook?symbol=${encodeURIComponent(contract.symbol)}`, {
-          cache: "no-store",
-          signal: AbortSignal.timeout(3000),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          if (json?.orderbook?.bids && json?.orderbook?.asks) {
-            const rawBids = json.orderbook.bids || [];
-            const rawAsks = json.orderbook.asks || [];
-            const bids: OrderBookLevel[] = rawBids.map((b: any) => ({
-              price: typeof b === "object" ? b.price : b[0],
-              quantity: typeof b === "object" ? b.quantity || b.size : b[1],
-              orders: typeof b === "object" ? b.orders : undefined,
-            }));
-            const asks: OrderBookLevel[] = rawAsks.map((a: any) => ({
-              price: typeof a === "object" ? a.price : a[0],
-              quantity: typeof a === "object" ? a.quantity || a.size : a[1],
-              orders: typeof a === "object" ? a.orders : undefined,
-            }));
-
-            const bestBid = bids[0]?.price || contract.bid || 0;
-            const bestAsk = asks[0]?.price || contract.ask || 0;
-            const spread = Math.max(0, bestAsk - bestBid);
-            const ltp = contract.ltp || (bestBid + bestAsk) / 2;
-            const spreadPct = ltp > 0 ? (spread / ltp) * 100 : 0;
-            const totalBidQty = bids.reduce((acc, b) => acc + (b.quantity || 0), 0);
-            const totalAskQty = asks.reduce((acc, a) => acc + (a.quantity || 0), 0);
-            const total = totalBidQty + totalAskQty;
-            const imbalanceRatio = total > 0 ? Math.round((totalBidQty / total) * 100) : 50;
-
-            return {
-              broker: contract.broker,
-              source: contract.source || (underlyingIsCrypto ? "DELTA_EXCHANGE" : "DHAN"),
-              symbol: contract.symbol,
-              underlying: contract.underlying,
-              expiry: contract.expiry,
-              strike: contract.strike,
-              optionType: contract.optionType,
-              bids: bids.slice(0, 5),
-              asks: asks.slice(0, 5),
-              ltp,
-              markPrice: contract.markPrice,
-              spread,
-              spreadPct,
-              totalBidQty,
-              totalAskQty,
-              imbalanceRatio,
-              volume: contract.volume,
-              oi: contract.oi,
-              iv: contract.iv,
-              timestamp: Date.now(),
-              dataAgeMs: 120,
-              status: "LIVE" as const,
-            };
-          }
-        }
-      } catch {
-        // Fallback to synthesizing 5-tier L2 from contract L1 tick data
+      if (!contract) {
+        throw new Error("Contract is missing");
       }
 
-      // Synthesize calibrated 5-tier L2 Depth from authoritative contract ticks
-      const bestBid = contract.bid > 0 ? contract.bid : Math.max(0.1, contract.ltp * 0.995);
-      const bestAsk = contract.ask > 0 ? contract.ask : contract.ltp * 1.005;
-      const step = contract.ltp > 500 ? 1 : contract.ltp > 50 ? 0.25 : 0.05;
-
-      const bids: OrderBookLevel[] = [
-        { price: bestBid, quantity: contract.bidSize || 450, orders: 12 },
-        { price: Math.max(0.05, bestBid - step), quantity: Math.round((contract.bidSize || 450) * 1.8), orders: 18 },
-        { price: Math.max(0.05, bestBid - step * 2), quantity: Math.round((contract.bidSize || 450) * 2.6), orders: 24 },
-        { price: Math.max(0.05, bestBid - step * 3), quantity: Math.round((contract.bidSize || 450) * 3.4), orders: 31 },
-        { price: Math.max(0.05, bestBid - step * 4), quantity: Math.round((contract.bidSize || 450) * 4.9), orders: 45 },
-      ];
-
-      const asks: OrderBookLevel[] = [
-        { price: bestAsk, quantity: contract.askSize || 420, orders: 11 },
-        { price: bestAsk + step, quantity: Math.round((contract.askSize || 420) * 1.6), orders: 16 },
-        { price: bestAsk + step * 2, quantity: Math.round((contract.askSize || 420) * 2.3), orders: 22 },
-        { price: bestAsk + step * 3, quantity: Math.round((contract.askSize || 420) * 3.1), orders: 29 },
-        { price: bestAsk + step * 4, quantity: Math.round((contract.askSize || 420) * 4.5), orders: 41 },
-      ];
-
-      const spread = Math.max(0, bestAsk - bestBid);
-      const ltp = contract.ltp || (bestBid + bestAsk) / 2;
-      const spreadPct = ltp > 0 ? (spread / ltp) * 100 : 0;
-      const totalBidQty = bids.reduce((acc, b) => acc + b.quantity, 0);
-      const totalAskQty = asks.reduce((acc, a) => acc + a.quantity, 0);
-      const total = totalBidQty + totalAskQty;
-      const imbalanceRatio = total > 0 ? Math.round((totalBidQty / total) * 100) : 50;
-
-      return {
+      const unavailable = (
+        message: string,
+        status: OrderBookDepthData["status"] = "UNAVAILABLE"
+      ): OrderBookDepthData => ({
         broker: contract.broker,
-        source: contract.source || (underlyingIsCrypto ? "DELTA_EXCHANGE" : "DHAN"),
+        source: contract.source || "UNKNOWN",
         symbol: contract.symbol,
         underlying: contract.underlying,
         expiry: contract.expiry,
         strike: contract.strike,
         optionType: contract.optionType,
-        bids,
-        asks,
-        ltp,
+        bids: [],
+        asks: [],
+        ltp: Number.isFinite(contract.ltp) && contract.ltp > 0 ? contract.ltp : 0,
         markPrice: contract.markPrice,
-        spread,
-        spreadPct,
-        totalBidQty,
-        totalAskQty,
-        imbalanceRatio,
+        spread: 0,
+        spreadPct: 0,
+        totalBidQty: 0,
+        totalAskQty: 0,
+        imbalanceRatio: 0,
         volume: contract.volume,
         oi: contract.oi,
         iv: contract.iv,
-        timestamp: Date.now(),
-        dataAgeMs: contract.dataAgeMs || 150,
-        status: "LIVE" as const,
-      };
+        timestamp: 0,
+        status,
+        error: message,
+      });
+
+      try {
+        const res = await fetch(
+          "/api/market-data/orderbook?symbol=" + encodeURIComponent(contract.symbol),
+          {
+            cache: "no-store",
+            signal: AbortSignal.timeout(3000),
+          }
+        );
+        if (!res.ok) {
+          return unavailable("Order-book provider returned HTTP " + res.status + ".");
+        }
+
+        const json = await res.json();
+        const rawBook = json?.orderbook;
+        if (!Array.isArray(rawBook?.bids) || !Array.isArray(rawBook?.asks)) {
+          return unavailable("Order-book provider returned no bid/ask levels.");
+        }
+
+        const normalizeLevel = (level: any): OrderBookLevel | null => {
+          const rawPrice = typeof level === "object" && !Array.isArray(level) ? level.price : level?.[0];
+          const rawQuantity =
+            typeof level === "object" && !Array.isArray(level)
+              ? level.quantity ?? level.size
+              : level?.[1];
+          const price = Number(rawPrice);
+          const quantity = Number(rawQuantity);
+          if (!Number.isFinite(price) || price <= 0 || !Number.isFinite(quantity) || quantity <= 0) {
+            return null;
+          }
+          const rawOrders =
+            typeof level === "object" && !Array.isArray(level) ? Number(level.orders) : undefined;
+          return {
+            price,
+            quantity,
+            orders: rawOrders !== undefined && Number.isFinite(rawOrders) && rawOrders >= 0 ? rawOrders : undefined,
+          };
+        };
+
+        const bids = rawBook.bids.map(normalizeLevel).filter(Boolean) as OrderBookLevel[];
+        const asks = rawBook.asks.map(normalizeLevel).filter(Boolean) as OrderBookLevel[];
+        if (bids.length === 0 || asks.length === 0) {
+          return unavailable("Order-book provider returned no valid bid/ask levels.");
+        }
+
+        const bestBid = bids[0].price;
+        const bestAsk = asks[0].price;
+        if (bestAsk < bestBid) {
+          return unavailable("Order-book provider returned crossed prices.", "STALE");
+        }
+
+        const rawTimestamp = rawBook.timestamp ?? rawBook.updated_at ?? json?.timestamp;
+        let timestamp = Number(rawTimestamp);
+        if (typeof rawTimestamp === "string" && !Number.isFinite(timestamp)) {
+          timestamp = Date.parse(rawTimestamp);
+        }
+        if (Number.isFinite(timestamp) && timestamp > 0 && timestamp < 100000000000) {
+          timestamp *= 1000;
+        }
+        if (!Number.isFinite(timestamp) || timestamp <= 0) {
+          return unavailable("Order-book provider did not include a source timestamp.", "STALE");
+        }
+
+        const dataAgeMs = Math.max(0, Date.now() - timestamp);
+        const status: OrderBookDepthData["status"] = dataAgeMs <= 5000 ? "LIVE" : "STALE";
+        const ltpCandidate = Number(rawBook.ltp ?? rawBook.last_price ?? contract.ltp);
+        const ltp =
+          Number.isFinite(ltpCandidate) && ltpCandidate > 0
+            ? ltpCandidate
+            : (bestBid + bestAsk) / 2;
+        const spread = bestAsk - bestBid;
+        const spreadPct = ltp > 0 ? (spread / ltp) * 100 : 0;
+        const totalBidQty = bids.reduce((acc, level) => acc + level.quantity, 0);
+        const totalAskQty = asks.reduce((acc, level) => acc + level.quantity, 0);
+        const total = totalBidQty + totalAskQty;
+
+        return {
+          broker: contract.broker,
+          source: rawBook.source || contract.source || "UNKNOWN",
+          symbol: contract.symbol,
+          underlying: contract.underlying,
+          expiry: contract.expiry,
+          strike: contract.strike,
+          optionType: contract.optionType,
+          bids: bids.slice(0, 5),
+          asks: asks.slice(0, 5),
+          ltp,
+          markPrice: Number(rawBook.mark_price ?? contract.markPrice) || undefined,
+          spread,
+          spreadPct,
+          totalBidQty,
+          totalAskQty,
+          imbalanceRatio: total > 0 ? Math.round((totalBidQty / total) * 100) : 0,
+          volume: contract.volume,
+          oi: contract.oi,
+          iv: contract.iv,
+          timestamp,
+          dataAgeMs,
+          status,
+          error: status === "STALE" ? "Provider timestamp is older than 5 seconds." : undefined,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Order-book request failed.";
+        return unavailable("Order-book unavailable: " + message);
+      }
     },
     enabled: isOpen && !!contract,
     refetchInterval: 3000,
@@ -172,11 +193,19 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
   const maxAskQty = useMemo(() => (asks.length > 0 ? Math.max(1, ...asks.map((a) => a.quantity)) : 1), [asks]);
   const maxQty = Math.max(maxBidQty, maxAskQty);
 
-  const bestBid = bids[0]?.price ?? contract?.bid ?? 0;
-  const bestAsk = asks[0]?.price ?? contract?.ask ?? 0;
-  const spread = Math.max(0, bestAsk - bestBid);
-  const spreadPct = contract && contract.ltp > 0 ? (spread / contract.ltp) * 100 : 0;
-  const imbalance = depthData?.imbalanceRatio ?? 50;
+  const bestBid = bids[0]?.price ?? 0;
+  const bestAsk = asks[0]?.price ?? 0;
+  const spread = depthData?.spread ?? 0;
+  const spreadPct = depthData?.spreadPct ?? 0;
+  const imbalance = depthData?.imbalanceRatio ?? 0;
+  const depthIsTradable =
+    depthData?.status === "LIVE" &&
+    bids.length > 0 &&
+    asks.length > 0 &&
+    bestBid > 0 &&
+    bestAsk >= bestBid;
+  const feedAgeLabel =
+    depthData?.dataAgeMs !== undefined ? String(Math.round(depthData.dataAgeMs)) + "ms" : "UNAVAILABLE";
 
   const brokerSourceLabel = useMemo(() => {
     if (!contract) return "PAPER ENGINE";
@@ -233,13 +262,13 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
           <div>
             <div className="text-[9px] uppercase text-slate-500 font-bold">LTP</div>
             <div className="text-white font-extrabold">
-              {curSymbol}{contract.ltp.toFixed(2)}
+              {curSymbol}{(depthData?.ltp || contract.ltp).toFixed(2)}
             </div>
           </div>
           <div>
             <div className="text-[9px] uppercase text-slate-500 font-bold">Mark</div>
             <div className="text-slate-300 font-bold">
-              {curSymbol}{(contract.markPrice ?? contract.ltp).toFixed(2)}
+              {curSymbol}{(depthData?.markPrice ?? contract.markPrice ?? contract.ltp).toFixed(2)}
             </div>
           </div>
           <div>
@@ -250,12 +279,19 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
           </div>
           <div>
             <div className="text-[9px] uppercase text-slate-500 font-bold">Feed Age</div>
-            <div className="text-emerald-400 font-bold flex items-center justify-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              {depthData?.dataAgeMs || 120}ms
+            <div className={depthData?.status === "LIVE" ? "text-emerald-400 font-bold flex items-center justify-center gap-1" : "text-amber-400 font-bold flex items-center justify-center gap-1"}>
+              <span className={depthData?.status === "LIVE" ? "w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" : "w-1.5 h-1.5 rounded-full bg-amber-400"} />
+              {isLoading ? "LOADING" : feedAgeLabel}
             </div>
           </div>
         </div>
+
+        {depthData?.status !== "LIVE" && !isLoading && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-200">
+            Level 2 data is unavailable or stale. Trading actions remain disabled.
+            {depthData?.error ? " " + depthData.error : ""}
+          </div>
+        )}
 
         {/* Order Book Level 2 Table */}
         <div className="bg-[#080E1A] border border-slate-800/90 rounded-xl overflow-hidden">
@@ -358,11 +394,13 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             type="button"
+            disabled={!depthIsTradable}
             onClick={() => {
+              if (!depthIsTradable) return;
               if (onTradeAction) onTradeAction("BUY", contract);
               onClose();
             }}
-            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg transition active:scale-[0.98]"
+            className={depthIsTradable ? "flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-lg transition active:scale-[0.98]" : "flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-700 text-slate-400 font-extrabold text-xs cursor-not-allowed"}
           >
             <Zap className="w-3.5 h-3.5" />
             <span>BUY @ ASK ({curSymbol}{bestAsk.toFixed(2)})</span>
@@ -370,11 +408,13 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
 
           <button
             type="button"
+            disabled={!depthIsTradable}
             onClick={() => {
+              if (!depthIsTradable) return;
               if (onTradeAction) onTradeAction("SELL", contract);
               onClose();
             }}
-            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg transition active:scale-[0.98]"
+            className={depthIsTradable ? "flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg transition active:scale-[0.98]" : "flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-slate-700 text-slate-400 font-extrabold text-xs cursor-not-allowed"}
           >
             <Zap className="w-3.5 h-3.5" />
             <span>SELL @ BID ({curSymbol}{bestBid.toFixed(2)})</span>

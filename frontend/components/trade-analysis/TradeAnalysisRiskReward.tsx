@@ -43,8 +43,15 @@ export function TradeAnalysisRiskReward({
   isLiveMarketFresh,
 }: TradeAnalysisRiskRewardProps) {
   const calculation: RiskRewardCalculation = useMemo(() => {
-    const totalQuantity = Math.max(1, lots * (lotSize || 1));
-    const effectiveEntry = entryPrice > 0 ? entryPrice : currentLtp || 100;
+    const safeLots = Number.isFinite(lots) && lots > 0 ? lots : 0;
+    const safeLotSize = Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 0;
+    const totalQuantity = safeLots * safeLotSize;
+    const effectiveEntry =
+      Number.isFinite(entryPrice) && entryPrice > 0
+        ? entryPrice
+        : Number.isFinite(currentLtp) && currentLtp > 0
+        ? currentLtp
+        : 0;
 
     let riskPerUnit = 0;
     let rewardPerUnit = 0;
@@ -76,8 +83,8 @@ export function TradeAnalysisRiskReward({
       riskPerUnit,
       rewardPerUnit,
       riskRewardRatio,
-      lotSize: lotSize || 1,
-      lots,
+      lotSize: safeLotSize,
+      lots: safeLots,
       totalQuantity,
       totalEstimatedPremium,
       totalCapitalAtRisk,
@@ -90,9 +97,17 @@ export function TradeAnalysisRiskReward({
   // Pre-Trade Checklist Items
   const checklist = useMemo(() => {
     return [
-      { id: "live_data", label: "Live data available & connected", passed: currentLtp > 0 },
+      {
+        id: "live_data",
+        label: "Live data available & connected",
+        passed: Number.isFinite(currentLtp) && currentLtp > 0,
+      },
       { id: "freshness", label: "Market data fresh (latency < 2s)", passed: isLiveMarketFresh },
-      { id: "quantity", label: `Valid quantity (${calculation.totalQuantity} units / ${lots} lot${lots > 1 ? "s" : ""})`, passed: calculation.totalQuantity > 0 },
+      {
+        id: "quantity",
+        label: "Valid quantity (" + calculation.totalQuantity + " units / " + lots + " lot" + (lots > 1 ? "s" : "") + ")",
+        passed: calculation.totalQuantity > 0,
+      },
       { id: "stop_loss", label: `Stop Loss defined (${calculation.isStopLossValid ? `₹${stopLoss}` : "Invalid / Missing"})`, passed: calculation.isStopLossValid },
       { id: "target", label: `Target defined (${calculation.isTargetValid ? `₹${targetPrice}` : "Invalid / Missing"})`, passed: calculation.isTargetValid },
       { id: "risk_reward", label: `Risk/Reward Ratio (R:R 1:${calculation.riskRewardRatio})`, passed: calculation.riskRewardRatio >= 1.2 },

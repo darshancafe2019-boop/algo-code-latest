@@ -101,7 +101,7 @@ class FailoverManager:
             if adapter is None:
                 continue
             status = adapter.get_status()
-            if status in ("LIVE", "DELAYED", "STALE", "CONNECTED"):
+            if status in ("LIVE", "DELAYED", "STALE", "CONNECTED", "MARKET_CLOSED"):
                 # Record transition if provider changed
                 prev = self._active_provider.get(symbol)
                 if prev and prev != provider_id:
@@ -121,7 +121,7 @@ class FailoverManager:
         chain = FAILOVER_CHAINS.get(asset_class, ["yahoo_fallback"])
         for provider_id in chain:
             adapter = self._adapters.get(provider_id)
-            if adapter is None or adapter.get_status() not in ("LIVE", "DELAYED", "STALE"):
+            if adapter is None or adapter.get_status() not in ("LIVE", "DELAYED", "STALE", "CONNECTED", "MARKET_CLOSED"):
                 continue
             cache = getattr(adapter, "_quote_cache", {})
             if symbol in cache:

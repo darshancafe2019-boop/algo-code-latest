@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   X,
   Zap,
@@ -42,6 +43,7 @@ import {
   fetchFuturesPositions,
 } from "../api/futures-api";
 import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 interface FuturesDetailsDrawerProps {
   contract: CanonicalFuturesContract | null;
@@ -62,6 +64,7 @@ export function FuturesDetailsDrawer({
   onOrderSuccess,
   isInline = false,
 }: FuturesDetailsDrawerProps) {
+  const router = useRouter();
   const {
     leverage,
     setLeverage,
@@ -276,26 +279,43 @@ export function FuturesDetailsDrawer({
   const afterPosQty = currQty + tradeDelta;
   const afterPosSide = afterPosQty > 0 ? "LONG" : afterPosQty < 0 ? "SHORT" : "FLAT";
 
-  // Handle Order Preview & Execution
+  // Handle Order Preview & Execution -> Route to Bot Creation
   const handleOpenOrderPreview = () => {
-    if (isDataOnly) {
-      setFeedback({
-        status: "ERROR",
-        message: `Order blocked: ${contract.provider} is currently configured as a Data-Only feed. Execution is disabled.`,
-      });
-      return;
-    }
+    if (!contract) return;
+    const isIndian = contract.exchange === "NSE" || contract.currency === "INR";
+    const isPerp = contract.contract_type === "PERPETUAL" || !contract.expiry_date;
+    const provider = contract.market_data_provider || contract.provider || (isIndian ? "DHAN" : "DELTA");
 
-    if (executionMode === "LIVE") {
-      setFeedback({
-        status: "ERROR",
-        message: "Real-money LIVE trading is currently LOCKED by safety circuit (LIVE_TRADING_ENABLED=false). Please switch to PAPER mode.",
-      });
-      return;
-    }
-
-    // Open Pre-Trade Order Review Modal for safe confirmation
-    setOrderReviewOpen(true, contract, tradeSide);
+    dispatchBotCreation(router, {
+      symbol: contract.symbol,
+      canonicalSymbol: contract.canonical_symbol || contract.displayName || contract.symbol,
+      side: tradeSide,
+      assetClass: isPerp ? "PERPETUAL" : "FUTURE",
+      exchange: contract.exchange || (isIndian ? "NSE" : "BINANCE"),
+      market: isIndian ? "Indian Futures" : "Crypto Futures",
+      broker: provider.toUpperCase().includes("DHAN")
+        ? "DHAN"
+        : provider.toUpperCase().includes("UPSTOX")
+        ? "UPSTOX"
+        : provider.toUpperCase().includes("DELTA")
+        ? "DELTA"
+        : "BINANCE",
+      marketDataSource: provider,
+      instrumentId: contract.instrument_key || contract.symbol,
+      currentPrice: contract.last_price || contract.mark_price || null,
+      bid: contract.bid || null,
+      ask: contract.ask || null,
+      markPrice: contract.mark_price || null,
+      expiry: isPerp ? null : (contract.expiry_date || null),
+      lotSize: contract.lot_size || null,
+      tickSize: contract.tick_size || null,
+      openInterest: contract.open_interest_usd || null,
+      volume: contract.volume_24h_usd || null,
+      maxLeverage: contract.max_leverage || null,
+      fundingRate: contract.funding_rate?.funding_rate_8h || null,
+      origin: "FUTURES",
+      timestamp: Date.now(),
+    });
   };
 
   const ticketContent = (
@@ -898,7 +918,7 @@ export function FuturesDetailsDrawer({
               </>
             ) : (
               <>
-                <span>PREVIEW & SUBMIT {tradeSide === "BUY" ? "LONG / BUY" : "SHORT / SELL"}</span>
+                <span>CREATE BOT DRAFT ({tradeSide === "BUY" ? "LONG / BUY" : "SHORT / SELL"})</span>
                 <ArrowRight className="w-4 h-4" />
               </>
             )}

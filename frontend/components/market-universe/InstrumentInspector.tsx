@@ -39,6 +39,7 @@ import {
   formatNumber,
 } from "@/lib/formatters";
 import { useQueryClient } from "@tanstack/react-query";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 
 interface InstrumentInspectorProps {
   instrument: MarketInstrument | null;
@@ -61,6 +62,7 @@ export function InstrumentInspector({
 }: InstrumentInspectorProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { getQuote, connectionStatus } = useMarketGatewayContext();
   const [activeTab, setActiveTab] = useState<InspectorTab>("OVERVIEW");
 
   // Chart state
@@ -76,15 +78,21 @@ export function InstrumentInspector({
   const [isPlacingOrder, setIsPlacingOrder] = useState<boolean>(false);
   const [tradeFeedback, setTradeFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
-  const price = instrument?.last_price ?? 0;
-  const changePct = instrument?.change_pct_24h ?? instrument?.change_24h ?? 0;
-  const high24h = instrument?.high_24h;
-  const low24h = instrument?.low_24h;
+  const sym = instrument?.canonical_symbol || instrument?.provider_symbol || instrument?.symbol || "UNKNOWN";
+  const liveQuote = instrument ? (getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null)) : null;
 
-  // Quantitative Analysis metrics (Calculated deterministically from price action)
+  const price = (liveQuote?.last_price != null && liveQuote.last_price > 0) ? liveQuote.last_price : (instrument?.last_price ?? 0);
+  const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument?.change_pct_24h ?? instrument?.change_24h ?? 0);
+  const high24h = liveQuote?.high ?? instrument?.high_24h;
+  const low24h = liveQuote?.low ?? instrument?.low_24h;
+  const bid = (liveQuote?.bid != null && liveQuote.bid > 0) ? liveQuote.bid : instrument?.bid;
+  const ask = (liveQuote?.ask != null && liveQuote.ask > 0) ? liveQuote.ask : instrument?.ask;
+  const volume = (liveQuote?.volume != null && liveQuote.volume > 0) ? liveQuote.volume : (instrument?.volume_24h ?? 0);
+
+  // Quantitative Analysis metrics (Calculated deterministically from actual market data)
   const technicalAnalysis = useMemo(() => {
-    const high = high24h || price * 1.02;
-    const low = low24h || price * 0.98;
+    const high = high24h ?? (price > 0 ? price : 0);
+    const low = low24h ?? (price > 0 ? price : 0);
     const close = price;
     const pivot = (high + low + close) / 3;
     const r1 = 2 * pivot - low;
@@ -97,7 +105,7 @@ export function InstrumentInspector({
     const momentumStrength =
       Math.abs(changePct) > 3.0 ? "Strong" : Math.abs(changePct) > 0.8 ? "Moderate" : "Weak Consolidation";
     const volatilityCategory =
-      high > 0 && low > 0 ? (((high - low) / low) * 100 > 3.5 ? "High Volatility" : "Normal Volatility") : "Moderate";
+      high > 0 && low > 0 && high > low ? (((high - low) / low) * 100 > 3.5 ? "High Volatility" : "Normal Volatility") : "Moderate";
 
     return {
       trend: trendBias,
@@ -113,7 +121,6 @@ export function InstrumentInspector({
 
   if (!instrument) return null;
 
-  const sym = instrument.canonical_symbol || instrument.provider_symbol || instrument.symbol || "UNKNOWN";
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
   const isPositive = changePct >= 0;
@@ -140,13 +147,16 @@ export function InstrumentInspector({
     sym.endsWith("-PERP");
 
   // Real Data Quality Status
-  const dataAgeMs = instrument.data_age_ms ?? 120;
-  const isLiveFeed = instrument.data_status === "LIVE" || (dataAgeMs < 10000 && instrument.market_status !== "CLOSED");
-  const isStale = dataAgeMs >= 10000 && instrument.market_status !== "CLOSED";
+  const dataAgeMs = liveQuote?.age_seconds != null ? Math.round(liveQuote.age_seconds * 1000) : (instrument.data_age_ms ?? 120);
   const isMarketClosed = instrument.market_status === "CLOSED";
+  const isDisconnected = connectionStatus === "DISCONNECTED";
+  const isStale = (liveQuote?.is_stale || dataAgeMs >= 10000) && !isMarketClosed && !isDisconnected;
+  const isLiveFeed = (connectionStatus === "LIVE" || liveQuote?.data_mode === "REAL_TIME" || (dataAgeMs < 10000 && !isMarketClosed)) && !isStale && !isDisconnected;
 
   const statusLabel = isMarketClosed
     ? "MARKET CLOSED"
+    : isDisconnected
+    ? "DISCONNECTED"
     : isLiveFeed
     ? "LIVE"
     : isStale
@@ -155,6 +165,8 @@ export function InstrumentInspector({
 
   const statusColor = isMarketClosed
     ? "bg-slate-800 text-slate-400 border-slate-700"
+    : isDisconnected
+    ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
     : isLiveFeed
     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
     : isStale
@@ -311,21 +323,21 @@ export function InstrumentInspector({
         {activeTab === "OVERVIEW" && (
           <div className="space-y-4">
             {/* Bid / Ask Strip */}
-            {(instrument.bid !== undefined || instrument.ask !== undefined) && (
+            {(bid !== undefined || ask !== undefined) && (
               <div className="grid grid-cols-3 gap-2 p-2.5 bg-slate-900/80 border border-slate-800 rounded-xl">
                 <div>
                   <span className="text-[10px] text-slate-500 block uppercase">Bid</span>
-                  <span className="text-emerald-400 font-bold">{formatPrice(instrument.bid, currSymbol)}</span>
+                  <span className="text-emerald-400 font-bold">{formatPrice(bid, currSymbol)}</span>
                 </div>
                 <div className="text-center">
                   <span className="text-[10px] text-slate-500 block uppercase">Spread</span>
                   <span className="text-slate-300 font-bold">
-                    {formatPrice(instrument.spread ?? (instrument.ask && instrument.bid ? instrument.ask - instrument.bid : 0), currSymbol)}
+                    {formatPrice((ask && bid ? ask - bid : (instrument.spread ?? 0)), currSymbol)}
                   </span>
                 </div>
                 <div className="text-right">
                   <span className="text-[10px] text-slate-500 block uppercase">Ask</span>
-                  <span className="text-rose-400 font-bold">{formatPrice(instrument.ask, currSymbol)}</span>
+                  <span className="text-rose-400 font-bold">{formatPrice(ask, currSymbol)}</span>
                 </div>
               </div>
             )}
@@ -340,25 +352,25 @@ export function InstrumentInspector({
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h High</span>
                 <span className="text-slate-200 font-bold">
-                  {instrument.high_24h ? `${currSymbol}${instrument.high_24h.toLocaleString()}` : "—"}
+                  {high24h ? `${currSymbol}${high24h.toLocaleString()}` : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h Low</span>
                 <span className="text-slate-200 font-bold">
-                  {instrument.low_24h ? `${currSymbol}${instrument.low_24h.toLocaleString()}` : "—"}
+                  {low24h ? `${currSymbol}${low24h.toLocaleString()}` : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h Volume</span>
                 <span className="text-slate-200 font-bold">
-                  {formatQuantity(instrument.volume_24h)}
+                  {formatQuantity(volume)}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">Turnover</span>
                 <span className="text-slate-200 font-bold">
-                  {formatVolume(instrument.turnover_24h, currSymbol)}
+                  {formatVolume(instrument.turnover_24h || (price && volume ? price * volume : 0), currSymbol)}
                 </span>
               </div>
             </div>

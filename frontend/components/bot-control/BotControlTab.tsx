@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { SimpleFleetSummaryHeader } from "./SimpleFleetSummaryHeader";
 import { SimpleBotFilterBar } from "./SimpleBotFilterBar";
@@ -86,9 +87,25 @@ export function BotControlTab() {
     placeholderData: (prev) => prev,
   });
 
+  const searchParams = useSearchParams();
+  const selectedBotIdFromUrl = searchParams.get("selectedBotId");
+
   const rawBots: BotRowItem[] = useMemo(() => {
     return Array.isArray(fleetData?.bots) ? fleetData.bots : [];
   }, [fleetData?.bots]);
+
+  // Deep Link: Automatically open bot drawer if selectedBotId is provided in URL
+  useEffect(() => {
+    if (selectedBotIdFromUrl && rawBots.length > 0) {
+      const targetBot = rawBots.find(
+        (b) => b.id === selectedBotIdFromUrl || b.name.toLowerCase() === selectedBotIdFromUrl.toLowerCase()
+      );
+      if (targetBot) {
+        setSelectedBot(targetBot);
+        setIsDetailsDrawerOpen(true);
+      }
+    }
+  }, [selectedBotIdFromUrl, rawBots]);
 
   const metrics: FleetMetrics = useMemo(() => {
     return (

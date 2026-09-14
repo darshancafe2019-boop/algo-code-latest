@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Bot,
   Shield,
@@ -36,6 +36,14 @@ import {
   CheckCircle,
   HelpCircle,
   Play,
+  Radio,
+  Sparkles,
+  ExternalLink,
+  Compass,
+  ArrowUpRight,
+  ArrowDownRight,
+  ShieldCheck,
+  Eye,
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -52,6 +60,9 @@ import {
   formatCurrency,
 } from "@/types/bot-control";
 import { OptionsContractSelectorModal, SelectedOptionsContract } from "@/components/options/OptionsContractSelectorModal";
+import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
+import { BotCreationIntent } from "@/types/bot-creation-intent";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 
 interface Props {
   botId?: string;
@@ -154,11 +165,75 @@ const AVAILABLE_INDICATORS = [
   { id: "volume_ma", name: "Volume (20 MA)", category: "Volume" as const, defaultParams: { period: 20 } },
 ];
 
+const QUICK_STRATEGIES = [
+  {
+    id: "MOMENTUM_CONFLUENCE",
+    name: "Momentum Confluence (EMA + RSI)",
+    desc: "Fast EMA trend filter paired with RSI momentum threshold for high-probability setups.",
+    indicators: [
+      { id: "ema_fast", name: "EMA (Fast 9)", category: "Trend" as const, timeframe: "5m", params: { period: 9, source: "close" } },
+      { id: "ema_slow", name: "EMA (Slow 21)", category: "Trend" as const, timeframe: "5m", params: { period: 21, source: "close" } },
+      { id: "rsi_14", name: "RSI (14)", category: "Momentum" as const, timeframe: "5m", params: { period: 14, overbought: 70, oversold: 30 } },
+    ],
+    rules: [
+      { id: "q-rule-1", leftIndicatorId: "ema_fast", operator: ">" as const, rightType: "INDICATOR" as const, rightIndicatorId: "ema_slow", isMandatory: true },
+      { id: "q-rule-2", leftIndicatorId: "rsi_14", operator: ">" as const, rightType: "THRESHOLD" as const, rightValue: 50, isMandatory: true },
+    ],
+  },
+  {
+    id: "TREND_SUPERTREND_VWAP",
+    name: "Trend Master (Supertrend + VWAP)",
+    desc: "Institutional session VWAP anchor confirmed with dynamic ATR Supertrend trailing.",
+    indicators: [
+      { id: "supertrend", name: "Supertrend (10, 3.0)", category: "Trend" as const, timeframe: "5m", params: { period: 10, multiplier: 3.0 } },
+      { id: "vwap", name: "VWAP", category: "Volume" as const, timeframe: "5m", params: { anchor: "session" } },
+    ],
+    rules: [
+      { id: "q-rule-3", leftIndicatorId: "supertrend", operator: ">" as const, rightType: "THRESHOLD" as const, rightValue: 0, isMandatory: true },
+      { id: "q-rule-4", leftIndicatorId: "vwap", operator: ">=" as const, rightType: "THRESHOLD" as const, rightValue: 0, isMandatory: true },
+    ],
+  },
+  {
+    id: "MEAN_REVERSION_BB",
+    name: "Mean Reversion (Bollinger + RSI)",
+    desc: "Exploits standard deviation extreme stretches and overbought/oversold snap-backs.",
+    indicators: [
+      { id: "bollinger", name: "Bollinger Bands", category: "Volatility" as const, timeframe: "5m", params: { period: 20, stdDev: 2.0 } },
+      { id: "rsi_14", name: "RSI (14)", category: "Momentum" as const, timeframe: "5m", params: { period: 14, overbought: 70, oversold: 30 } },
+    ],
+    rules: [
+      { id: "q-rule-5", leftIndicatorId: "rsi_14", operator: "<" as const, rightType: "THRESHOLD" as const, rightValue: 35, isMandatory: true },
+    ],
+  },
+  {
+    id: "VOLATILITY_BREAKOUT",
+    name: "Volatility Breakout (ATR + MACD)",
+    desc: "Captures sudden expansion in ATR range aligned with MACD histogram acceleration.",
+    indicators: [
+      { id: "macd", name: "MACD (12, 26, 9)", category: "Momentum" as const, timeframe: "5m", params: { fast: 12, slow: 26, signal: 9 } },
+      { id: "atr_14", name: "ATR (14)", category: "Volatility" as const, timeframe: "5m", params: { period: 14, multiplier: 1.5 } },
+    ],
+    rules: [
+      { id: "q-rule-6", leftIndicatorId: "macd", operator: ">" as const, rightType: "THRESHOLD" as const, rightValue: 0, isMandatory: true },
+    ],
+  },
+];
+
 export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
 
+  // Mode: QUICK vs ADVANCED
+  const [wizardMode, setWizardMode] = useState<"QUICK" | "ADVANCED">("QUICK");
   const [activeStep, setActiveStep] = useState<number>(1);
+
+  // Intent State
+  const activeIntentFromStore = useBotCreationIntentStore((state) => state.activeIntent);
+  const loadStoredIntent = useBotCreationIntentStore((state) => state.loadStoredIntent);
+  const clearIntent = useBotCreationIntentStore((state) => state.clearIntent);
+
+  const [activeIntent, setActiveIntent] = useState<BotCreationIntent | null>(null);
 
   // INSTITUTIONAL 8-TIER HIERARCHY STATE
   const [customerId, setCustomerId] = useState<string>("cust_default");
@@ -169,7 +244,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const [riskReserve, setRiskReserve] = useState<number>(0);
 
   // STEP 1: IDENTITY & CAPITAL
-  const [name, setName] = useState<string>("BTC Momentum Alpha Bot");
+  const [name, setName] = useState<string>("Alpha Momentum Bot");
   const [description, setDescription] = useState<string>("Deterministic multi-indicator momentum bot with 20-stage risk gate.");
   const [groupName, setGroupName] = useState<string>("Crypto Scalping Bots");
   const [customGroup, setCustomGroup] = useState<string>("");
@@ -182,6 +257,230 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const [sizingMethod, setSizingMethod] = useState<"RISK_PER_TRADE" | "FIXED_QUANTITY" | "PERCENT_EQUITY">("RISK_PER_TRADE");
   const [lotSize, setLotSize] = useState<number>(1);
   const [lotsCount, setLotsCount] = useState<number>(1);
+
+  // STEP 2: MARKET & INSTRUMENT
+  const [assetClass, setAssetClass] = useState<WizardAssetClass>("CRYPTO");
+  const [symbol, setSymbol] = useState<string>("BTC/USDT");
+  const [tradeDirection, setTradeDirection] = useState<"BUY" | "SELL">("BUY");
+  const [instrumentSearch, setInstrumentSearch] = useState("");
+  const [exchange, setExchange] = useState<string>("ccxt_binance");
+
+  // Options & Derivatives
+  const [optionSide, setOptionSide] = useState<"CALL" | "PUT" | "BOTH">("BOTH");
+  const [optionExpiry, setOptionExpiry] = useState("Nearest Weekly");
+  const [strikeOffset, setStrikeOffset] = useState<number>(0);
+  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
+
+  // STEP 3: STRATEGY ENGINE
+  const [selectedQuickStrategy, setSelectedQuickStrategy] = useState<string>("MOMENTUM_CONFLUENCE");
+  const [primaryTimeframe, setPrimaryTimeframe] = useState<string>("5m");
+  const [additionalTimeframes, setAdditionalTimeframes] = useState<string[]>(["15m", "1h"]);
+  const [executionTrigger, setExecutionTrigger] = useState<"CANDLE_CLOSE" | "INTRABAR">("CANDLE_CLOSE");
+  const [warmUpBars, setWarmUpBars] = useState<number>(50);
+  const [cooldownBars, setCooldownBars] = useState<number>(2);
+  const [ruleConjunction, setRuleConjunction] = useState<"AND" | "OR">("AND");
+  const [activeRuleTab, setActiveRuleTab] = useState<"LONG_ENTRY" | "LONG_EXIT" | "SHORT_ENTRY">("LONG_ENTRY");
+
+  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorConfigItem[]>(
+    QUICK_STRATEGIES[0].indicators
+  );
+
+  const [strategyRules, setStrategyRules] = useState<StrategyRuleItem[]>(
+    QUICK_STRATEGIES[0].rules
+  );
+
+  // STEP 4: RISK & EXITS
+  const [stopLossPct, setStopLossPct] = useState<number>(1.5);
+  const [takeProfitPct, setTakeProfitPct] = useState<number>(3.0);
+  const [trailingStopEnabled, setTrailingStopEnabled] = useState<boolean>(true);
+  const [trailingStopPct, setTrailingStopPct] = useState<number>(0.5);
+  const [activationProfitPct, setActivationProfitPct] = useState<number>(1.0);
+  const [riskPerTradePct, setRiskPerTradePct] = useState<number>(2.0);
+  const [maxDailyDrawdownPct, setMaxDailyDrawdownPct] = useState<number>(3.0);
+  const [maxOpenPositions, setMaxOpenPositions] = useState<number>(1);
+  const [maxSlippagePct, setMaxSlippagePct] = useState<number>(0.2);
+
+  // STEP 5: BROKER & EXECUTION
+  const [brokerId, setBrokerId] = useState<string>("paper_simulator");
+  const [accountId, setAccountId] = useState<string>("ACC-PRIMARY");
+  const [leverage, setLeverage] = useState<number>(1.0);
+  const [executionMode, setExecutionMode] = useState<"MANUAL" | "AUTOMATIC">("AUTOMATIC");
+  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP-LIMIT">("MARKET");
+  const [liveSafetyConfirmed, setLiveSafetyConfirmed] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
+
+  // WebSocket Live Telemetry Feed
+  const { getQuote, subscribe, unsubscribe, connectionStatus } = useMarketGatewayContext();
+
+  // Subscribe to live market feed for current symbol
+  useEffect(() => {
+    if (!symbol) return;
+    subscribe(symbol, "RUNNING_BOT");
+    return () => {
+      unsubscribe(symbol, "RUNNING_BOT");
+    };
+  }, [symbol, subscribe, unsubscribe]);
+
+  const liveWsQuote = getQuote(symbol);
+
+  // Load Intent from Store or Session on mount
+  const hasIngestedIntent = useRef(false);
+  useEffect(() => {
+    if (hasIngestedIntent.current) return;
+
+    let intent = activeIntentFromStore || loadStoredIntent();
+
+    // Fallback: build from URL params if direct navigation
+    if (!intent) {
+      const urlSymbol = searchParams.get("symbol");
+      const urlSide = searchParams.get("side") as "BUY" | "SELL" | null;
+      const urlOrigin = searchParams.get("origin") as any;
+      if (urlSymbol && urlSide) {
+        intent = {
+          symbol: urlSymbol,
+          canonicalSymbol: urlSymbol,
+          side: urlSide,
+          assetClass: (searchParams.get("assetClass") as any) || "SPOT",
+          broker: searchParams.get("broker") || undefined,
+          origin: urlOrigin || "LIVE_FEED",
+          timestamp: Date.now(),
+        };
+      }
+    }
+
+    if (intent) {
+      hasIngestedIntent.current = true;
+      setActiveIntent(intent);
+
+      const sym = intent.symbol;
+      setSymbol(sym);
+      setTradeDirection(intent.side || "BUY");
+
+      // Set Name
+      const sideText = intent.side === "BUY" ? "Long" : "Short";
+      setName(`${sym} ${sideText} Alpha Bot`);
+      setDescription(`Deterministic 1-click ${sideText} bot originating from ${intent.origin || "Market Feed"}.`);
+
+      // Determine Asset Class
+      if (intent.assetClass === "OPTION" || intent.origin === "OPTIONS") {
+        setAssetClass("OPTIONS");
+        setGroupName("NSE Options Bots");
+      } else if (intent.assetClass === "FUTURE" || intent.assetClass === "PERPETUAL" || intent.origin === "FUTURES") {
+        setAssetClass("FUTURES");
+        setGroupName("Futures Trend Bots");
+      } else if (intent.assetClass === "CRYPTO_OPTIONS") {
+        setAssetClass("CRYPTO_OPTIONS");
+        setGroupName("Crypto Scalping Bots");
+      } else if (intent.assetClass === "COMMODITY") {
+        setAssetClass("COMMODITIES");
+        setGroupName("Commodity Momentum Bots");
+      } else if (sym.includes("NIFTY") || sym.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"].some((s) => sym.includes(s))) {
+        setAssetClass("INDEX");
+        setGroupName("NSE Options Bots");
+      } else if (sym.includes("BTC") || sym.includes("ETH") || sym.includes("SOL") || sym.includes("USDT")) {
+        setAssetClass("CRYPTO");
+        setGroupName("Crypto Scalping Bots");
+      }
+
+      // Currency & Capital
+      const isIndian = sym.includes("INR") || sym.includes("NIFTY") || sym.includes("BANK") || intent.broker === "dhan" || intent.broker === "upstox";
+      if (isIndian) {
+        setCurrency("INR");
+        setTimezone("Asia/Kolkata");
+        setTotalCapital(100000);
+        setAllocatedCapital(25000);
+      } else {
+        setCurrency("USD");
+        setTimezone("UTC");
+        setTotalCapital(50000);
+        setAllocatedCapital(5000);
+      }
+
+      // Lot Size
+      if (intent.lotSize && intent.lotSize > 0) {
+        setLotSize(intent.lotSize);
+      }
+
+      // Options Specifics
+      if (intent.optionType) {
+        setOptionSide(intent.optionType === "PUT" ? "PUT" : "CALL");
+      }
+      if (intent.strike) {
+        setStrikeOffset(intent.strike);
+      }
+      if (intent.expiry) {
+        setOptionExpiry(intent.expiry);
+      }
+
+      // Leverage
+      if (intent.maxLeverage && intent.maxLeverage > 1) {
+        setLeverage(Math.min(intent.maxLeverage, 5));
+      }
+
+      // Broker Mapping
+      if (intent.broker === "dhan" || intent.broker === "dhan_india") {
+        setBrokerFolderId("bf_dhan");
+        setBrokerAccountId("ba_dhan_primary");
+        setBrokerProvider("dhan");
+      } else if (intent.broker === "upstox") {
+        setBrokerFolderId("bf_upstox");
+        setBrokerAccountId("ba_upstox_primary");
+        setBrokerProvider("upstox");
+      } else if (intent.broker === "delta_india" || intent.broker === "delta_exchange") {
+        setBrokerFolderId("bf_delta");
+        setBrokerAccountId("ba_delta_primary");
+        setBrokerProvider("delta_exchange");
+      }
+
+      // Safe default: strictly PAPER
+      setEnvironment("PAPER");
+      setBrokerId("paper_simulator");
+
+      // Default to Quick Setup for high-speed streamlined review
+      setWizardMode("QUICK");
+    }
+  }, [activeIntentFromStore, loadStoredIntent, searchParams]);
+
+  // Derived Calculations
+  const slug = useMemo(() => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "bot", [name]);
+  const remainingCapital = useMemo(() => calculateRemainingCapital(totalCapital, allocatedCapital), [totalCapital, allocatedCapital]);
+  const allocationPct = useMemo(() => calculateAllocationPct(totalCapital, allocatedCapital), [totalCapital, allocatedCapital]);
+  const maxRiskAmount = useMemo(() => calculateRiskAmount(allocatedCapital, riskPerTradePct), [allocatedCapital, riskPerTradePct]);
+  const estimatedMaxLoss = useMemo(() => calculateRiskAmount(allocatedCapital, stopLossPct), [allocatedCapital, stopLossPct]);
+  const riskRewardRatio = useMemo(() => calculateRiskRewardRatio(stopLossPct, takeProfitPct), [stopLossPct, takeProfitPct]);
+  const estimatedNotional = useMemo(() => allocatedCapital * Math.max(1, leverage), [allocatedCapital, leverage]);
+  const requiredMargin = useMemo(() => Math.round((estimatedNotional / Math.max(1, leverage)) * 100) / 100, [estimatedNotional, leverage]);
+
+  // Effective Live Price Benchmark
+  const effectivePrice = Number(
+    liveWsQuote?.last_price ||
+    activeIntent?.currentPrice ||
+    activeIntent?.markPrice ||
+    (currency === "INR" ? 24500.0 : 65000.0)
+  );
+
+  const isPositiveChange = (liveWsQuote?.change_pct ?? 0) >= 0;
+
+  // Calculated Price Targets
+  const stopLossPrice = useMemo(() => {
+    if (!effectivePrice) return 0;
+    if (tradeDirection === "BUY") {
+      return effectivePrice * (1 - stopLossPct / 100);
+    } else {
+      return effectivePrice * (1 + stopLossPct / 100);
+    }
+  }, [effectivePrice, stopLossPct, tradeDirection]);
+
+  const takeProfitPrice = useMemo(() => {
+    if (!effectivePrice) return 0;
+    if (tradeDirection === "BUY") {
+      return effectivePrice * (1 + takeProfitPct / 100);
+    } else {
+      return effectivePrice * (1 - takeProfitPct / 100);
+    }
+  }, [effectivePrice, takeProfitPct, tradeDirection]);
 
   // Query Institutional Hierarchy Tree
   const { data: hierarchyData } = useQuery({
@@ -209,71 +508,6 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
     },
   });
 
-  // STEP 2: MARKET & INSTRUMENT
-  const [assetClass, setAssetClass] = useState<WizardAssetClass>("CRYPTO");
-  const [symbol, setSymbol] = useState<string>("BTC/USDT");
-  const [instrumentSearch, setInstrumentSearch] = useState("");
-  const [exchange, setExchange] = useState<string>("ccxt_binance");
-
-  // Options & Derivatives
-  const [optionSide, setOptionSide] = useState<"CALL" | "PUT" | "BOTH">("BOTH");
-  const [optionExpiry, setOptionExpiry] = useState("Nearest Weekly");
-  const [strikeOffset, setStrikeOffset] = useState<number>(0);
-  const [isOptionsModalOpen, setIsOptionsModalOpen] = useState(false);
-
-  // STEP 3: STRATEGY ENGINE
-  const [primaryTimeframe, setPrimaryTimeframe] = useState<string>("5m");
-  const [additionalTimeframes, setAdditionalTimeframes] = useState<string[]>(["15m", "1h"]);
-  const [executionTrigger, setExecutionTrigger] = useState<"CANDLE_CLOSE" | "INTRABAR">("CANDLE_CLOSE");
-  const [warmUpBars, setWarmUpBars] = useState<number>(50);
-  const [cooldownBars, setCooldownBars] = useState<number>(2);
-  const [ruleConjunction, setRuleConjunction] = useState<"AND" | "OR">("AND");
-  const [activeRuleTab, setActiveRuleTab] = useState<"LONG_ENTRY" | "LONG_EXIT" | "SHORT_ENTRY">("LONG_ENTRY");
-
-  const [selectedIndicators, setSelectedIndicators] = useState<IndicatorConfigItem[]>([
-    { id: "ema_fast", name: "EMA (Fast 9)", category: "Trend", timeframe: "5m", params: { period: 9, source: "close" } },
-    { id: "ema_slow", name: "EMA (Slow 21)", category: "Trend", timeframe: "5m", params: { period: 21, source: "close" } },
-    { id: "rsi_14", name: "RSI (14)", category: "Momentum", timeframe: "5m", params: { period: 14, overbought: 70, oversold: 30 } },
-    { id: "vwap", name: "VWAP", category: "Volume", timeframe: "5m", params: { anchor: "session" } },
-  ]);
-
-  const [strategyRules, setStrategyRules] = useState<StrategyRuleItem[]>([
-    { id: "rule-1", leftIndicatorId: "ema_fast", operator: ">", rightType: "INDICATOR", rightIndicatorId: "ema_slow", isMandatory: true },
-    { id: "rule-2", leftIndicatorId: "rsi_14", operator: ">", rightType: "THRESHOLD", rightValue: 52, isMandatory: true },
-  ]);
-
-  // STEP 4: RISK & EXITS
-  const [stopLossPct, setStopLossPct] = useState<number>(1.5);
-  const [takeProfitPct, setTakeProfitPct] = useState<number>(3.0);
-  const [trailingStopEnabled, setTrailingStopEnabled] = useState<boolean>(true);
-  const [trailingStopPct, setTrailingStopPct] = useState<number>(0.5);
-  const [activationProfitPct, setActivationProfitPct] = useState<number>(1.0);
-  const [riskPerTradePct, setRiskPerTradePct] = useState<number>(2.0);
-  const [maxDailyDrawdownPct, setMaxDailyDrawdownPct] = useState<number>(3.0);
-  const [maxOpenPositions, setMaxOpenPositions] = useState<number>(1);
-  const [maxSlippagePct, setMaxSlippagePct] = useState<number>(0.2);
-
-  // STEP 5: BROKER & EXECUTION
-  const [brokerId, setBrokerId] = useState<string>("paper_simulator");
-  const [accountId, setAccountId] = useState<string>("ACC-PRIMARY");
-  const [leverage, setLeverage] = useState<number>(1.0);
-  const [executionMode, setExecutionMode] = useState<"MANUAL" | "AUTOMATIC">("AUTOMATIC");
-  const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP" | "STOP-LIMIT">("MARKET");
-  const [liveSafetyConfirmed, setLiveSafetyConfirmed] = useState(false);
-
-  const [errorMessage, setErrorMessage] = useState<string>("");
-  const [successMessage, setSuccessMessage] = useState<string>("");
-
-  // Live Derived Calculations
-  const slug = useMemo(() => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "bot", [name]);
-  const remainingCapital = useMemo(() => calculateRemainingCapital(totalCapital, allocatedCapital), [totalCapital, allocatedCapital]);
-  const allocationPct = useMemo(() => calculateAllocationPct(totalCapital, allocatedCapital), [totalCapital, allocatedCapital]);
-  const maxRiskAmount = useMemo(() => calculateRiskAmount(allocatedCapital, riskPerTradePct), [allocatedCapital, riskPerTradePct]);
-  const estimatedMaxLoss = useMemo(() => calculateRiskAmount(allocatedCapital, stopLossPct), [allocatedCapital, stopLossPct]);
-  const riskRewardRatio = useMemo(() => calculateRiskRewardRatio(stopLossPct, takeProfitPct), [stopLossPct, takeProfitPct]);
-  const estimatedNotional = useMemo(() => allocatedCapital * Math.max(1, leverage), [allocatedCapital, leverage]);
-  const requiredMargin = useMemo(() => Math.round((estimatedNotional / Math.max(1, leverage)) * 100) / 100, [estimatedNotional, leverage]);
-
   // Query Live Brokers
   const { data: brokersData } = useQuery({
     queryKey: ["brokersStatus"],
@@ -291,7 +525,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       name,
       symbol,
       assetClass,
-      timeframeKey(primaryTimeframe),
+      primaryTimeframe,
       allocatedCapital,
       totalCapital,
       stopLossPct,
@@ -299,10 +533,6 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       leverage,
       brokerId,
       environment,
-      customerId,
-      departmentId,
-      brokerFolderId,
-      brokerAccountId,
     ],
     queryFn: async () => {
       const payload = {
@@ -329,7 +559,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         currency,
         risk_reserve: riskReserve,
         capital_source: brokerAccountId,
-        strategy_id: "strat_momentum_alpha",
+        strategy_id: selectedQuickStrategy,
         indicators: selectedIndicators,
         strategy_rules: strategyRules,
       };
@@ -340,13 +570,9 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       });
       return res.json();
     },
-    enabled: activeStep === 6,
+    enabled: activeStep === 6 || wizardMode === "QUICK",
     staleTime: 5000,
   });
-
-  function timeframeKey(tf: string) {
-    return tf || "5m";
-  }
 
   // Load Existing Bot Config if in Edit Mode
   const { data: existingBotData } = useQuery({
@@ -396,12 +622,22 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
     setStrikeOffset(contract.strike);
   };
 
+  const handleQuickStrategySelect = (stratId: string) => {
+    setSelectedQuickStrategy(stratId);
+    const found = QUICK_STRATEGIES.find((s) => s.id === stratId);
+    if (found) {
+      setSelectedIndicators(found.indicators);
+      setStrategyRules(found.rules);
+    }
+  };
+
   // Save Draft Mutation
   const saveDraftMutation = useMutation({
     mutationFn: async () => {
       const payload = {
         name,
         symbol,
+        trade_direction: tradeDirection,
         assetClass,
         allocatedCapital,
         totalCapital,
@@ -419,6 +655,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         broker_account_id: brokerAccountId,
         broker_provider: brokerProvider,
         currency,
+        creation_intent_id: activeIntent?.creationIntentId,
       };
       const res = await fetch("/api/bots/drafts", {
         method: "POST",
@@ -440,11 +677,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
 
   // Create / Update Bot Mutation
   const saveMutation = useMutation({
-    mutationFn: async (initialStatus: "STOPPED" | "DRAFT" = "STOPPED") => {
+    mutationFn: async (initialStatus: "STOPPED" | "RUNNING_PAPER" = "STOPPED") => {
       const payload = {
         name: name.trim(),
         description: description.trim(),
         symbol: symbol.toUpperCase(),
+        trade_direction: tradeDirection,
         strategy: strategyRules.map((r) => `${r.leftIndicatorId} ${r.operator} ${r.rightType === "INDICATOR" ? r.rightIndicatorId : r.rightValue}`).join(" AND ") || "EMA_MACD_VP",
         strategy_type: "DETERMINISTIC_RULES",
         primary_timeframe: primaryTimeframe,
@@ -465,7 +703,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         broker_account_id: brokerAccountId,
         broker_provider: brokerProvider,
         capital_source: brokerAccountId,
-        strategy_id: "strat_momentum_alpha",
+        strategy_id: selectedQuickStrategy || "strat_momentum_alpha",
         risk_reserve: riskReserve,
         department_trading_budget: capitalSummaryData?.capital_breakdown?.department_budget || totalCapital,
         group_name: isCreatingCustomGroup && customGroup ? customGroup.trim() : groupName,
@@ -499,6 +737,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           order_type: orderType,
           max_slippage_pct: maxSlippagePct,
         },
+        creation_intent_id: activeIntent?.creationIntentId,
       };
 
       const url = isEditMode && botId ? `/api/bots/${botId}` : "/api/bots/create";
@@ -519,10 +758,20 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["botsList"] });
       queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-      setSuccessMessage(data.message || "Bot instance created safely in STOPPED paper mode.");
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+
+      clearIntent();
+
+      const createdBotId = data.bot?.id || data.bot_id || data.id || (data.data && data.data.id) || botId;
+      setSuccessMessage(data.message || "Bot instance created safely in PAPER mode!");
+
       setTimeout(() => {
-        router.push("/bots");
-      }, 1200);
+        if (createdBotId) {
+          router.push(`/bots?selectedBotId=${encodeURIComponent(createdBotId)}`);
+        } else {
+          router.push("/bots");
+        }
+      }, 900);
     },
     onError: (err: any) => {
       setErrorMessage(err.message || "Error creating bot instance");
@@ -538,959 +787,1065 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
     { num: 6, label: "Review & Activate" },
   ];
 
+  const originUrl = useMemo(() => {
+    if (!activeIntent?.origin) return "/live";
+    if (activeIntent.origin === "OPTIONS") return "/options";
+    if (activeIntent.origin === "FUTURES") return "/futures";
+    return "/live";
+  }, [activeIntent]);
+
   return (
-    <div className="w-full max-w-6xl mx-auto space-y-6 font-sans text-xs">
+    <div className="w-full max-w-6xl mx-auto space-y-5 font-sans text-xs pb-12">
       
-      {/* Header Bar */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-        <div className="flex items-center justify-between">
+      {/* =========================================================================
+          1. TOP LIVE MARKET & ORIGINATION TELEMETRY STRIP
+          ========================================================================= */}
+      <div className="bg-[#09110E] border border-[#1A2A3F] rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#142233] pb-3">
+          
+          {/* Left: Origin & Symbol Badges */}
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40 shadow-md">
-              <Bot className="h-6 w-6" />
+            <button
+              type="button"
+              onClick={() => router.push(originUrl)}
+              className="px-2.5 py-1.5 rounded-lg bg-[#07101A] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white border border-[#1A2A3F] font-bold text-[11px] transition flex items-center gap-1.5"
+            >
+              <ArrowLeft className="h-3.5 w-3.5 text-cyan-400" />
+              <span>Back to {activeIntent?.origin === "OPTIONS" ? "Option Chain" : activeIntent?.origin === "FUTURES" ? "Futures" : "Live Market"}</span>
+            </button>
+
+            <div className="h-4 w-[1px] bg-[#1A2A3F] hidden sm:block" />
+
+            <div className="flex items-center gap-2">
+              <span className={`h-2.5 w-2.5 rounded-full ${liveWsQuote?.is_stale ? "bg-amber-400 animate-ping" : "bg-emerald-400 animate-pulse"}`} />
+              <span className="font-mono font-black text-sm text-white">{symbol}</span>
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#142B21] text-cyan-300 border border-[#275841]">
+                {assetClass}
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-black text-white uppercase tracking-wider">
-                  {isEditMode ? `Edit Bot Instance: ${name}` : "Create Bot Instance Wizard"}
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#142B21] text-[#22D3EE] border border-[#275841]">
-                  VERSION 2.0 • DETERMINISTIC BOT FACTORY
-                </span>
-              </div>
-              <p className="text-xs text-[#7C8CA3]">
-                Configure capital bounds, asset selection, indicator rules, 20-stage risk gates, and paper-safe execution.
-              </p>
+
+            {/* BUY / SELL Badge Toggle */}
+            <div className="flex items-center rounded-lg bg-[#07101A] p-0.5 border border-[#1A2A3F]">
+              <button
+                type="button"
+                onClick={() => {
+                  setTradeDirection("BUY");
+                  setName(`${symbol} Long Alpha Bot`);
+                }}
+                className={`px-3 py-1 rounded-md font-black text-xs transition flex items-center gap-1 ${
+                  tradeDirection === "BUY"
+                    ? "bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400/60"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <ArrowUpRight className="h-3.5 w-3.5" />
+                <span>BUY (LONG)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTradeDirection("SELL");
+                  setName(`${symbol} Short Alpha Bot`);
+                }}
+                className={`px-3 py-1 rounded-md font-black text-xs transition flex items-center gap-1 ${
+                  tradeDirection === "SELL"
+                    ? "bg-rose-600 text-white shadow-md ring-1 ring-rose-400/60"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <ArrowDownRight className="h-3.5 w-3.5" />
+                <span>SELL (SHORT)</span>
+              </button>
             </div>
           </div>
 
+          {/* Right: Quick vs Advanced Switcher & Mode Badges */}
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-xl bg-[#07101A] p-1 border border-[#1A2A3F]">
+              <button
+                type="button"
+                onClick={() => setWizardMode("QUICK")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  wizardMode === "QUICK"
+                    ? "bg-[rgba(37,99,235,0.22)] text-cyan-300 border border-cyan-500/40 shadow-sm"
+                    : "text-[#7C8CA3] hover:text-white"
+                }`}
+              >
+                <Zap className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Quick Setup</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setWizardMode("ADVANCED")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                  wizardMode === "ADVANCED"
+                    ? "bg-[rgba(37,99,235,0.22)] text-cyan-300 border border-cyan-500/40 shadow-sm"
+                    : "text-[#7C8CA3] hover:text-white"
+                }`}
+              >
+                <SlidersHorizontal className="h-3.5 w-3.5 text-cyan-400" />
+                <span>Advanced Mode</span>
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => saveDraftMutation.mutate()}
               disabled={saveDraftMutation.isPending}
-              className="px-3.5 py-2 rounded-xl bg-[#0C1B15] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white border border-[#1A2A3F] font-bold text-xs transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-xl bg-[#0C1B15] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white border border-[#1A2A3F] font-bold text-xs transition flex items-center gap-1.5"
             >
               <Save className="h-3.5 w-3.5 text-[#22D3EE]" />
-              <span>{saveDraftMutation.isPending ? "Saving Draft..." : "Save Draft"}</span>
+              <span>{saveDraftMutation.isPending ? "Saving..." : "Save Draft"}</span>
             </button>
           </div>
         </div>
 
-        {/* Stepper Breadcrumb Buttons */}
-        <div className="grid grid-cols-6 gap-2">
-          {STEPS_NAV.map((s) => {
-            const isCurrent = activeStep === s.num;
-            const isCompleted = activeStep > s.num;
-            return (
-              <button
-                key={s.num}
-                type="button"
-                onClick={() => setActiveStep(s.num)}
-                className={`p-2.5 rounded-xl text-left font-bold transition-all flex items-center gap-2 ${
-                  isCurrent
-                    ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-md ring-1 ring-[#22D3EE]/30"
-                    : isCompleted
-                    ? "bg-[#0C1B15] text-[#7C8CA3] hover:text-white border border-[#183126]"
-                    : "bg-[#07101A] text-[#42584C] border border-[#101B2D] opacity-60"
-                }`}
-              >
-                <div
-                  className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
-                    isCompleted ? "bg-[#22D3EE] text-black" : isCurrent ? "bg-[#256B4A] text-white" : "bg-[#101B2D] text-[#52627A]"
-                  }`}
-                >
-                  {isCompleted ? <Check className="h-3 w-3 stroke-[3]" /> : s.num}
-                </div>
-                <span className="truncate hidden sm:inline text-[11px]">{s.label}</span>
-              </button>
-            );
-          })}
+        {/* Live Telemetry Bar */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-[11px] font-mono">
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Live Benchmark (LTP)</span>
+            <span className="text-white font-black text-sm">
+              {currency === "INR" ? "₹" : "$"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Bid / Ask Spread</span>
+            <span className="text-cyan-300 font-bold truncate block">
+              {liveWsQuote?.bid !== undefined && liveWsQuote?.bid !== null ? `${liveWsQuote.bid} / ${liveWsQuote.ask}` : (activeIntent?.bid ? `${activeIntent.bid} / ${activeIntent.ask}` : "Tight Spread")}
+            </span>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Data Source</span>
+            <span className="text-emerald-400 font-bold truncate block">
+              {activeIntent?.broker ? activeIntent.broker.toUpperCase() : "LIVE GATEWAY"}
+            </span>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Feed Latency</span>
+            <div className="flex items-center gap-1 text-slate-200 font-bold">
+              <Radio className="h-3 w-3 text-cyan-400 animate-pulse" />
+              <span>{liveWsQuote ? Math.round(liveWsQuote.feed_latency_ms || 18) : 22}ms</span>
+            </div>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Execution Target</span>
+            <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-cyan-400"}`}>
+              {environment === "LIVE" ? "LIVE BROKER" : "PAPER SIMULATOR"}
+            </span>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">Stop Loss Level</span>
+            <span className="text-rose-400 font-bold">
+              {currency === "INR" ? "₹" : "$"}{stopLossPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Wizard Content Panels */}
-      <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-6 shadow-xl space-y-6">
-        
-        {/* STEP 1: IDENTITY, INSTITUTIONAL HIERARCHY & CAPITAL */}
-        {activeStep === 1 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <Bot className="h-4 w-4 text-[#22D3EE]" />
-                <span>Institutional Hierarchy & Identity</span>
-              </h3>
-
-              {/* Tier 1 & 2: Customer & Department */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Customer Account</label>
-                  <select
-                    value={customerId}
-                    onChange={(e) => setCustomerId(e.target.value)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
-                  >
-                    <option value="cust_default">Customer Default (Institutional)</option>
-                  </select>
+      {/* =========================================================================
+          2. QUICK SETUP MODE (STREAMLINED 1-CLICK MARKET FLOW)
+          ========================================================================= */}
+      {wizardMode === "QUICK" && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fadeIn">
+          
+          {/* Main Quick Configuration Left Column (2 Cols) */}
+          <div className="lg:col-span-2 space-y-5">
+            
+            {/* 1. Bot Strategy & Direction Preset */}
+            <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-[#142233] pb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-cyan-400" />
+                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                    1. Strategy Engine Preset
+                  </h2>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Department Division</label>
-                  <select
-                    value={departmentId}
-                    onChange={(e) => setDepartmentId(e.target.value)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
-                  >
-                    <option value="dept_algo_trading">Algorithmic Trading (₹1,000,000)</option>
-                    <option value="dept_derivatives">Derivatives & Options (₹500,000)</option>
-                  </select>
-                </div>
+                <span className="text-[10px] text-cyan-400 font-mono">NON-AI DETERMINISTIC</span>
               </div>
 
-              {/* Tier 3 & 4: Broker Folder & Broker Account */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Folder</label>
-                  <select
-                    value={brokerFolderId}
-                    onChange={(e) => {
-                      const fId = e.target.value;
-                      setBrokerFolderId(fId);
-                      if (fId === "bf_dhan") {
-                        setBrokerAccountId("ba_dhan_primary");
-                        setBrokerProvider("dhan");
-                        setCurrency("INR");
-                        setBrokerId("dhan_india");
-                      } else if (fId === "bf_upstox") {
-                        setBrokerAccountId("ba_upstox_primary");
-                        setBrokerProvider("upstox");
-                        setCurrency("INR");
-                        setBrokerId("upstox");
-                      } else if (fId === "bf_delta") {
-                        setBrokerAccountId("ba_delta_primary");
-                        setBrokerProvider("delta_exchange");
-                        setCurrency("USD");
-                        setBrokerId("delta_exchange");
-                      } else {
-                        setBrokerAccountId("ba_paper_primary");
-                        setBrokerProvider("paper_simulator");
-                        setCurrency("USD");
-                        setBrokerId("paper_simulator");
-                      }
-                    }}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
-                  >
-                    <option value="bf_paper">Paper Trading Sandbox</option>
-                    <option value="bf_dhan">Dhan HQ Folder (NSE/BSE)</option>
-                    <option value="bf_upstox">Upstox Pro Folder (NSE/BSE)</option>
-                    <option value="bf_delta">Delta Exchange Folder (Derivatives)</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Funding Account</label>
-                  <select
-                    value={brokerAccountId}
-                    onChange={(e) => setBrokerAccountId(e.target.value)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
-                  >
-                    <option value="ba_paper_primary">ba_paper_primary (Paper Sandbox)</option>
-                    <option value="ba_dhan_primary">ba_dhan_primary (Dhan HQ Primary)</option>
-                    <option value="ba_upstox_primary">ba_upstox_primary (Upstox Pro Primary)</option>
-                    <option value="ba_delta_primary">ba_delta_primary (Delta Primary USD)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
-                  <span>Bot Instance Name *</span>
-                  <span className="text-cyan-400 font-mono text-[10px]">Slug: {slug}</span>
-                </label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#22D3EE]"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Base Currency</label>
-                  <select
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value as any)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
-                  >
-                    <option value="INR">INR (₹)</option>
-                    <option value="USD">USD ($)</option>
-                    <option value="USDT">USDT</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Trading Timezone</label>
-                  <select
-                    value={timezone}
-                    onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none"
-                  >
-                    <option value="UTC">UTC (Global Crypto)</option>
-                    <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                    <option value="America/New_York">America/New_York (EST)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Mode</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEnvironment("PAPER")}
-                    className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all ${
-                      environment === "PAPER" ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]" : "bg-[#07101A] text-[#7C8CA3]"
-                    }`}
-                  >
-                    PAPER SIMULATOR (Safe Default)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setEnvironment("LIVE")}
-                    className={`p-2.5 rounded-xl text-xs font-bold font-mono transition-all ${
-                      environment === "LIVE" ? "bg-red-950/60 text-red-400 border border-red-700" : "bg-[#07101A] text-[#7C8CA3]"
-                    }`}
-                  >
-                    LIVE TRADING (Gate Locked)
-                  </button>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {QUICK_STRATEGIES.map((strat) => {
+                  const isSelected = selectedQuickStrategy === strat.id;
+                  return (
+                    <button
+                      key={strat.id}
+                      type="button"
+                      onClick={() => handleQuickStrategySelect(strat.id)}
+                      className={`p-3 rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? "bg-[rgba(37,99,235,0.18)] border-cyan-400/80 text-white shadow-md ring-1 ring-cyan-400/40"
+                          : "bg-[#07101A] border-[#1A2A3F] text-slate-300 hover:border-[#274435]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-xs text-white">{strat.name}</span>
+                        {isSelected && <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400 shrink-0" />}
+                      </div>
+                      <p className="text-[11px] text-[#7C8CA3] line-clamp-2 leading-relaxed">{strat.desc}</p>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <DollarSign className="h-4 w-4 text-[#22D3EE]" />
-                <span>Capital Sizing & Risk Reserve</span>
-              </h3>
+            {/* 2. Capital, Timeframe & Sizing */}
+            <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 border-b border-[#142233] pb-2">
+                <DollarSign className="h-4 w-4 text-emerald-400" />
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                  2. Capital Allocation & Sizing
+                </h2>
+              </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Department Budget</label>
-                  <input
-                    type="number"
-                    value={totalCapital}
-                    onChange={(e) => setTotalCapital(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Bot Capital Allocation *</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Allocated Capital ({currency})</label>
                   <input
                     type="number"
                     value={allocatedCapital}
-                    onChange={(e) => setAllocatedCapital(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-cyan-400 font-mono font-bold"
+                    onChange={(e) => setAllocatedCapital(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
                   />
+                  <span className="text-[10px] text-[#52627A]">Available: {currency} {totalCapital.toLocaleString()}</span>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Risk Reserve Hold</label>
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Lot Size / Multiplier</label>
                   <input
                     type="number"
-                    value={riskReserve}
-                    onChange={(e) => setRiskReserve(parseFloat(e.target.value) || 0)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-amber-400 font-mono font-bold"
+                    value={lotSize}
+                    onChange={(e) => setLotSize(Math.max(1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+                  />
+                  <span className="text-[10px] text-[#52627A]">1 Lot = {lotSize} units</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Timeframe</label>
+                  <select
+                    value={primaryTimeframe}
+                    onChange={(e) => setPrimaryTimeframe(e.target.value)}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+                  >
+                    {ALL_TIMEFRAMES.map((tf) => (
+                      <option key={tf.id} value={tf.id}>
+                        {tf.label} — {tf.desc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Risk Protection & Exit Rules */}
+            <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 border-b border-[#142233] pb-2">
+                <Shield className="h-4 w-4 text-rose-400" />
+                <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                  3. Risk Management & Exits
+                </h2>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
+                    <span>Stop Loss %</span>
+                    <span className="text-rose-400 font-mono font-bold">
+                      {currency === "INR" ? "₹" : "$"}{stopLossPrice.toFixed(1)}
+                    </span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={stopLossPct}
+                    onChange={(e) => setStopLossPct(Math.max(0.1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-rose-400"
                   />
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Position Sizing Method</label>
-                  <select
-                    value={sizingMethod}
-                    onChange={(e) => setSizingMethod(e.target.value as any)}
-                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-semibold focus:outline-none"
-                  >
-                    <option value="RISK_PER_TRADE">Risk Per Trade %</option>
-                    <option value="FIXED_QUANTITY">Fixed Lot Size</option>
-                    <option value="PERCENT_EQUITY">Percent of Bot Equity</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Allocated / Dept Budget:</span>
-                  <span className="text-white font-bold">{formatCurrency(allocatedCapital, currency)} / {formatCurrency(totalCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Remaining Dept Capital:</span>
-                  <span className="text-[#22D3EE] font-bold">{formatCurrency(remainingCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Allocation Ratio:</span>
-                  <span className="text-cyan-400 font-bold">{allocationPct}%</span>
-                </div>
-                <div className="flex justify-between border-t border-[#1A2A3F] pt-1.5">
-                  <span className="text-[#7C8CA3]">Max Per-Trade Risk:</span>
-                  <span className="text-yellow-400 font-bold">{formatCurrency(maxRiskAmount, currency)} ({riskPerTradePct}%)</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 2: MARKET & INSTRUMENT */}
-        {activeStep === 2 && (
-          <div className="space-y-5 animate-fadeIn">
-            <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
-              {ASSET_CLASSES.map((ac) => {
-                const isSelected = assetClass === ac.id;
-                const IconComp = ac.icon;
-                return (
-                  <button
-                    key={ac.id}
-                    type="button"
-                    onClick={() => {
-                      setAssetClass(ac.id);
-                      const defaultInst = POPULAR_INSTRUMENTS[ac.id]?.[0];
-                      if (defaultInst) {
-                        setSymbol(defaultInst.symbol);
-                        setExchange(defaultInst.exchange);
-                      }
-                      if (ac.id === "STOCKS" || ac.id === "INDEX" || ac.id === "OPTIONS") {
-                        setCurrency("INR");
-                      } else {
-                        setCurrency("USDT");
-                      }
-                    }}
-                    className={`p-2.5 rounded-xl flex flex-col items-center justify-center gap-1.5 transition-all text-center ${
-                      isSelected
-                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-md ring-1 ring-[#22D3EE]/30"
-                        : "bg-[#0A1422] text-[#7C8CA3] hover:text-white border border-[#1A2A3F]"
-                    }`}
-                  >
-                    <IconComp className="h-4 w-4" />
-                    <span className="text-[10px] font-bold uppercase">{ac.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Options Live Chain Trigger */}
-            {(assetClass === "OPTIONS" || assetClass === "CRYPTO_OPTIONS") && (
-              <div className="p-4 bg-[#0B182B]/90 border border-purple-500/40 rounded-xl flex flex-wrap items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <Layers className="h-4 w-4 text-purple-400" />
-                    <span className="text-xs font-bold text-white uppercase">Options Contract Chain & Strike Offset</span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40">
-                      LIVE CONTRACT MASTER
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
+                    <span>Take Profit Target %</span>
+                    <span className="text-emerald-400 font-mono font-bold">
+                      {currency === "INR" ? "₹" : "$"}{takeProfitPrice.toFixed(1)}
                     </span>
-                  </div>
-                  <p className="text-[11px] text-slate-400 font-sans">
-                    Selected contract: <strong className="text-cyan-400 font-mono">{symbol}</strong> ({exchange})
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsOptionsModalOpen(true)}
-                  className="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition shadow-md shadow-purple-500/30 flex items-center gap-1.5 shrink-0"
-                >
-                  <Zap className="h-3.5 w-3.5" />
-                  <span>Launch Options Chain</span>
-                </button>
-              </div>
-            )}
-
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold text-white uppercase">Select Trading Instrument ({assetClass})</span>
-                <input
-                  type="text"
-                  placeholder="Filter symbols..."
-                  value={instrumentSearch}
-                  onChange={(e) => setInstrumentSearch(e.target.value)}
-                  className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2.5 py-1 text-xs text-white"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-48 overflow-y-auto custom-scrollbar">
-                {(POPULAR_INSTRUMENTS[assetClass] || [])
-                  .filter((item) => item.symbol.toLowerCase().includes(instrumentSearch.toLowerCase()))
-                  .map((item) => (
-                    <button
-                      key={item.symbol}
-                      type="button"
-                      onClick={() => {
-                        setSymbol(item.symbol);
-                        setExchange(item.exchange);
-                      }}
-                      className={`p-3 rounded-xl border text-left transition-all ${
-                        symbol === item.symbol
-                          ? "bg-[rgba(37,99,235,0.18)] border-[#00E890] text-white"
-                          : "bg-[#07101A] border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
-                      }`}
-                    >
-                      <div className="flex justify-between">
-                        <span className="font-mono font-bold text-cyan-400">{item.symbol}</span>
-                        <span className="text-[9px] px-1 rounded bg-[#101B2D] text-[#52627A]">{item.exchange}</span>
-                      </div>
-                      <p className="text-[10px] text-[#7C8CA3] truncate mt-1">{item.name}</p>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: STRATEGY ENGINE */}
-        {activeStep === 3 && (
-          <div className="space-y-5 animate-fadeIn">
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
-              <div className="flex justify-between items-center border-b border-[#1A2A3F] pb-2">
-                <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#22D3EE]" />
-                  <span>Primary Execution Timeframe & Trigger Mode</span>
-                </h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-[#7C8CA3]">Execution Trigger:</span>
-                  <select
-                    value={executionTrigger}
-                    onChange={(e) => setExecutionTrigger(e.target.value as any)}
-                    className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-cyan-400 font-mono font-bold"
-                  >
-                    <option value="CANDLE_CLOSE">CANDLE CLOSE (Deterministic)</option>
-                    <option value="INTRABAR">INTRABAR (Tick Scalping)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 sm:grid-cols-8 gap-1.5">
-                {ALL_TIMEFRAMES.map((tf) => (
-                  <button
-                    key={tf.id}
-                    type="button"
-                    onClick={() => setPrimaryTimeframe(tf.id)}
-                    className={`py-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                      primaryTimeframe === tf.id
-                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]"
-                        : "bg-[#07101A] text-[#7C8CA3] border border-[#1A2A3F]"
-                    }`}
-                  >
-                    {tf.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
-                <h3 className="text-xs font-bold text-white uppercase">Quantitative Indicators</h3>
-                <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar">
-                  {AVAILABLE_INDICATORS.map((ind) => {
-                    const isAdded = selectedIndicators.some((i) => i.id === ind.id);
-                    return (
-                      <div key={ind.id} className="p-2 rounded-xl bg-[#07101A] border border-[#1A2A3F] flex justify-between items-center">
-                        <div>
-                          <span className="font-bold text-xs text-white">{ind.name}</span>
-                          <span className="ml-2 text-[9px] px-1 rounded bg-[#101B2D] text-[#52627A]">{ind.category}</span>
-                        </div>
-                        {isAdded ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedIndicators(selectedIndicators.filter((i) => i.id !== ind.id))}
-                            className="text-red-400 p-1 hover:bg-red-950/40 rounded"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedIndicators([...selectedIndicators, { id: ind.id, name: ind.name, category: ind.category, timeframe: primaryTimeframe, params: { ...ind.defaultParams } }])}
-                            className="text-[#22D3EE] p-1 hover:bg-[rgba(37,99,235,0.18)] rounded"
-                          >
-                            <Plus className="h-3.5 w-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-3">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xs font-bold text-white uppercase">Rule Confluence Tree</h3>
-                  <select
-                    value={ruleConjunction}
-                    onChange={(e) => setRuleConjunction(e.target.value as any)}
-                    className="bg-[#07101A] border border-[#1A2A3F] rounded-lg px-2 py-0.5 text-xs text-[#22D3EE] font-bold"
-                  >
-                    <option value="AND">ALL Rules (AND)</option>
-                    <option value="OR">ANY Rule (OR)</option>
-                  </select>
-                </div>
-                <div className="space-y-2 max-h-56 overflow-y-auto custom-scrollbar">
-                  {strategyRules.map((rule, idx) => (
-                    <div key={rule.id} className="p-2.5 bg-[#07101A] border border-[#1A2A3F] rounded-xl flex items-center justify-between font-mono text-xs">
-                      <span className="text-cyan-400 font-bold">{rule.leftIndicatorId} {rule.operator} {rule.rightValue || rule.rightIndicatorId}</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-yellow-950/60 text-yellow-400 border border-yellow-800">
-                        {rule.isMandatory ? "MANDATORY" : "OPTIONAL"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 4: RISK & EXITS */}
-        {activeStep === 4 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <Shield className="h-4 w-4 text-[#22D3EE]" />
-                <span>Stop Loss & Take Profit Target</span>
-              </h3>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
-                  <span>Stop Loss (%) *</span>
-                  <span className="text-red-400 font-mono">Max Loss: {formatCurrency(estimatedMaxLoss, currency)}</span>
-                </label>
-                <input
-                  type="number"
-                  step={0.1}
-                  value={stopLossPct}
-                  onChange={(e) => setStopLossPct(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-red-400 font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
-                  <span>Take Profit Target (%) *</span>
-                  <span className="text-emerald-400 font-mono">R:R Ratio = {riskRewardRatio}</span>
-                </label>
-                <input
-                  type="number"
-                  step={0.1}
-                  value={takeProfitPct}
-                  onChange={(e) => setTakeProfitPct(parseFloat(e.target.value) || 0)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-emerald-400 font-mono font-bold"
-                />
-              </div>
-
-              <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-bold text-white">Trailing Stop Loss</span>
+                  </label>
                   <input
-                    type="checkbox"
-                    checked={trailingStopEnabled}
-                    onChange={(e) => setTrailingStopEnabled(e.target.checked)}
-                    className="accent-[#22D3EE]"
+                    type="number"
+                    step="0.1"
+                    value={takeProfitPct}
+                    onChange={(e) => setTakeProfitPct(Math.max(0.1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-emerald-400"
                   />
                 </div>
-                {trailingStopEnabled && (
-                  <div className="grid grid-cols-2 gap-2 pt-1">
-                    <div>
-                      <span className="text-[10px] text-[#7C8CA3]">Trailing Dist (%)</span>
-                      <input
-                        type="number"
-                        step={0.1}
-                        value={trailingStopPct}
-                        onChange={(e) => setTrailingStopPct(parseFloat(e.target.value) || 0.5)}
-                        className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
-                      />
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-[#7C8CA3]">Activation Profit (%)</span>
-                      <input
-                        type="number"
-                        step={0.1}
-                        value={activationProfitPct}
-                        onChange={(e) => setActivationProfitPct(parseFloat(e.target.value) || 1.0)}
-                        className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-lg px-2 py-1 text-xs text-white font-mono mt-1"
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
 
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <AlertTriangle className="h-4 w-4 text-yellow-400" />
-                <span>Drawdown & Position Bounds</span>
-              </h3>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Daily Drawdown (%)</label>
-                <input
-                  type="number"
-                  step={0.5}
-                  value={maxDailyDrawdownPct}
-                  onChange={(e) => setMaxDailyDrawdownPct(parseFloat(e.target.value) || 3.0)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Open Positions</label>
-                <input
-                  type="number"
-                  value={maxOpenPositions}
-                  onChange={(e) => setMaxOpenPositions(parseInt(e.target.value) || 1)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Slippage Tolerance (%)</label>
-                <input
-                  type="number"
-                  step={0.05}
-                  value={maxSlippagePct}
-                  onChange={(e) => setMaxSlippagePct(parseFloat(e.target.value) || 0.2)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 5: BROKER & EXECUTION */}
-        {activeStep === 5 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <Building2 className="h-4 w-4 text-[#22D3EE]" />
-                <span>Broker Routing & Capability</span>
-              </h3>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Active Broker Account</label>
-                <div className="p-3 bg-[#07101A] border border-[#1A2A3F] rounded-xl space-y-1 text-xs font-mono">
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Account ID:</span>
-                    <span className="text-cyan-400 font-bold">{brokerAccountId}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Broker Provider:</span>
-                    <span className="text-white font-bold uppercase">{brokerProvider}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Folder:</span>
-                    <span className="text-white">{brokerFolderId}</span>
-                  </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Trailing Stop Lock</label>
+                  <button
+                    type="button"
+                    onClick={() => setTrailingStopEnabled(!trailingStopEnabled)}
+                    className={`w-full py-2 px-3 rounded-xl border font-bold text-xs transition flex items-center justify-between ${
+                      trailingStopEnabled
+                        ? "bg-cyan-950/40 text-cyan-300 border-cyan-500/40"
+                        : "bg-[#07101A] text-slate-400 border-[#1A2A3F]"
+                    }`}
+                  >
+                    <span>{trailingStopEnabled ? "Enabled (0.5% Trail)" : "Disabled"}</span>
+                    {trailingStopEnabled ? <CheckCircle2 className="h-4 w-4 text-cyan-400" /> : <Lock className="h-3.5 w-3.5 text-slate-500" />}
+                  </button>
                 </div>
               </div>
+            </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Leverage</label>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 5, 10].map((lev) => (
+            {/* 4. Execution Mode & Broker */}
+            <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-[#142233] pb-2">
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-cyan-400" />
+                  <h2 className="text-xs font-bold text-white uppercase tracking-wider">
+                    4. Execution Mode & Broker Routing
+                  </h2>
+                </div>
+                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#142B21] text-emerald-400 border border-[#275841]">
+                  DEFAULT: PAPER SAFE
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Environment</label>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      key={lev}
                       type="button"
-                      onClick={() => setLeverage(lev)}
-                      className={`py-1.5 rounded-lg text-xs font-mono font-bold ${
-                        leverage === lev ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]" : "bg-[#07101A] text-[#7C8CA3]"
+                      onClick={() => setEnvironment("PAPER")}
+                      className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        environment === "PAPER"
+                          ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/60 shadow-md"
+                          : "bg-[#07101A] text-slate-400 border-[#1A2A3F]"
                       }`}
                     >
-                      {lev}x
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                      <span>PAPER MODE</span>
                     </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-[#7C8CA3] font-semibold">Order Execution Type</label>
-                <select
-                  value={orderType}
-                  onChange={(e) => setOrderType(e.target.value as any)}
-                  className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono"
-                >
-                  <option value="MARKET">MARKET</option>
-                  <option value="LIMIT">LIMIT</option>
-                  <option value="STOP">STOP</option>
-                  <option value="STOP-LIMIT">STOP-LIMIT</option>
-                </select>
-              </div>
-
-              {allocatedCapital > remainingCapital && (
-                <div className="p-3 bg-red-950/40 border border-red-800 rounded-xl space-y-1 text-xs text-red-300 font-sans">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-                    <span>Insufficient Department Trading Capital</span>
+                    <button
+                      type="button"
+                      onClick={() => setEnvironment("LIVE")}
+                      className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        environment === "LIVE"
+                          ? "bg-rose-600/20 text-rose-300 border border-rose-500/60 shadow-md"
+                          : "bg-[#07101A] text-slate-400 border-[#1A2A3F]"
+                      }`}
+                    >
+                      <Zap className="h-4 w-4 text-rose-400" />
+                      <span>LIVE BROKER</span>
+                    </button>
                   </div>
-                  <p className="text-[11px]">
-                    Bot allocation ({formatCurrency(allocatedCapital, currency)}) exceeds remaining verified department budget ({formatCurrency(remainingCapital, currency)}).
-                  </p>
                 </div>
-              )}
-            </div>
 
-            <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4 text-xs font-mono">
-              <h3 className="text-xs font-bold text-white uppercase flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                <Shield className="h-4 w-4 text-[#22D3EE]" />
-                <span>Pre-Flight Hierarchical Capital Breakdown</span>
-              </h3>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Customer Total Capital:</span>
-                  <span className="text-slate-100 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.net_equity ?? totalCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Verified Broker Balance:</span>
-                  <span className="text-cyan-300 font-bold">{formatCurrency(capitalSummaryData?.capital_breakdown?.broker_balance ?? totalCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Department Budget:</span>
-                  <span className="text-white font-bold">{formatCurrency(totalCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">New Bot Allocation:</span>
-                  <span className="text-[#22D3EE] font-bold">{formatCurrency(allocatedCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Remaining Dept Capital:</span>
-                  <span className="text-white font-bold">{formatCurrency(remainingCapital, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Risk Reserve Hold:</span>
-                  <span className="text-amber-400 font-bold">{formatCurrency(riskReserve, currency)}</span>
-                </div>
-                <div className="flex justify-between border-t border-[#1A2A3F] pt-1.5">
-                  <span className="text-[#7C8CA3]">Required Margin ({leverage}x):</span>
-                  <span className="text-yellow-400 font-bold">{formatCurrency(requiredMargin, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Max Possible Loss (SL {stopLossPct}%):</span>
-                  <span className="text-rose-400 font-bold">{formatCurrency(estimatedMaxLoss, currency)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[#7C8CA3]">Estimated Brokerage Expense:</span>
-                  <span className="text-rose-300 font-bold">{formatCurrency(currency === "INR" ? 20.0 : 1.5, currency)}</span>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Broker</label>
+                  <select
+                    value={brokerId}
+                    onChange={(e) => setBrokerId(e.target.value)}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+                  >
+                    <option value="paper_simulator">Paper Trading Simulator (Instant Zero-Risk)</option>
+                    <option value="dhan_india">Dhan HQ Direct (NSE/BSE)</option>
+                    <option value="upstox">Upstox Pro Gateway (NSE)</option>
+                    <option value="delta_exchange">Delta Exchange India (Derivatives)</option>
+                    <option value="binance">Binance CCXT Gateway (Crypto)</option>
+                  </select>
                 </div>
               </div>
 
               {environment === "LIVE" && (
-                <div className="p-3 bg-red-950/40 border border-red-800 rounded-xl space-y-2 text-xs text-red-300 font-sans">
-                  <div className="flex items-center gap-2 font-bold">
-                    <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-                    <span>Live Trading Safety Gate</span>
+                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-800/80 space-y-2">
+                  <div className="flex items-center gap-2 text-rose-300 font-bold text-xs">
+                    <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+                    <span>Live Order Placement Safety Confirmation</span>
                   </div>
-                  <label className="flex items-center gap-2 text-xs text-white font-bold cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={liveSafetyConfirmed}
                       onChange={(e) => setLiveSafetyConfirmed(e.target.checked)}
-                      className="accent-red-500 rounded h-4 w-4"
+                      className="rounded text-rose-500 focus:ring-0 bg-[#07101A] border-rose-700"
                     />
-                    <span>I confirm live deployment under 20-stage risk precheck gates.</span>
+                    <span>I confirm this bot will place real monetary orders via the selected broker.</span>
                   </label>
                 </div>
               )}
             </div>
           </div>
-        )}
 
-        {/* STEP 6: REVIEW, VALIDATE & ACTIVATE */}
-        {activeStep === 6 && (
-          <div className="space-y-5 animate-fadeIn">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              
-              {/* Configuration Summary Card */}
-              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3 text-xs font-mono">
-                <div className="flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
-                  <CheckCircle2 className="h-4 w-4 text-[#22D3EE]" />
-                  <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                    Configuration Summary
-                  </h3>
+          {/* Right Column: Pre-Flight Review & Launch Card */}
+          <div className="space-y-5">
+            <div className="bg-[#09110E] border border-cyan-800/40 rounded-2xl p-5 shadow-2xl space-y-4 sticky top-4">
+              <div className="flex items-center gap-2 border-b border-[#142233] pb-3">
+                <Eye className="h-4 w-4 text-cyan-400" />
+                <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                  Bot Order Review Card
+                </h3>
+              </div>
+
+              {/* Bot Identity Summary */}
+              <div className="space-y-2.5 font-mono text-[11px]">
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Bot Name:</span>
+                  <span className="text-white font-bold truncate max-w-[170px]">{name}</span>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Bot Name:</span>
-                    <span className="text-white font-bold truncate max-w-[200px]">{name}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Slug:</span>
-                    <span className="text-cyan-400 font-bold">{slug}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Instrument & TF:</span>
-                    <span className="text-cyan-400 font-bold">{symbol} ({primaryTimeframe})</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Asset Class:</span>
-                    <span className="text-yellow-400 font-bold">{assetClass}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Capital Allocation:</span>
-                    <span className="text-[#22D3EE] font-bold">
-                      {formatCurrency(allocatedCapital, currency)} ({allocationPct}% of {formatCurrency(totalCapital, currency)})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Risk / Reward:</span>
-                    <span className="text-white font-bold">
-                      SL {stopLossPct}% / TP {takeProfitPct}% ({riskRewardRatio})
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[#7C8CA3]">Execution Broker:</span>
-                    <span className="text-cyan-400 font-bold">{brokerId} ({leverage}x)</span>
-                  </div>
-                  <div className="flex justify-between border-t border-[#1A2A3F] pt-2">
-                    <span className="text-[#7C8CA3]">Environment:</span>
-                    <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-[#22D3EE]"}`}>
-                      {environment} MODE
-                    </span>
-                  </div>
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Instrument:</span>
+                  <span className="text-white font-bold">{symbol}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Direction:</span>
+                  <span className={`font-bold ${tradeDirection === "BUY" ? "text-emerald-400" : "text-rose-400"}`}>
+                    {tradeDirection} ({tradeDirection === "BUY" ? "LONG" : "SHORT"})
+                  </span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Benchmark Price:</span>
+                  <span className="text-cyan-300 font-bold">
+                    {currency === "INR" ? "₹" : "$"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Allocated Capital:</span>
+                  <span className="text-emerald-400 font-bold">{currency} {allocatedCapital.toLocaleString()}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Max Trade Risk:</span>
+                  <span className="text-rose-400 font-bold">
+                    {currency} {maxRiskAmount.toLocaleString()} ({riskPerTradePct}%)
+                  </span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Target R:R Ratio:</span>
+                  <span className="text-cyan-300 font-bold">1 : {riskRewardRatio}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Environment:</span>
+                  <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-emerald-400"}`}>
+                    {environment} SANDBOX
+                  </span>
                 </div>
               </div>
 
-              {/* Real Backend Evidence Telemetry */}
-              <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
-                <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4 text-[#22D3EE]" />
-                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                      Authoritative Backend Safety Evidence
-                    </h3>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => revalidateConfig()}
-                    className="text-[#22D3EE] hover:text-white flex items-center gap-1 text-[10px]"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isValidating ? "animate-spin" : ""}`} />
-                    <span>Re-Validate</span>
-                  </button>
+              {/* Feedback Messages */}
+              {errorMessage && (
+                <div className="p-2.5 bg-red-950/80 text-red-300 border border-red-800 rounded-xl text-[11px] flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
+                  <span>{errorMessage}</span>
                 </div>
-
-                <div className="space-y-2 text-[11px]">
-                  {validationData?.evidence && validationData.evidence.length > 0 ? (
-                    validationData.evidence.map((item) => (
-                      <div key={item.id} className="p-2 rounded-lg bg-[#07101A] border border-[#1A2A3F] space-y-0.5">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5">
-                            {item.status === "PASSED" ? (
-                              <CheckCircle2 className="h-3.5 w-3.5 text-[#22D3EE] shrink-0" />
-                            ) : item.status === "WARNING" ? (
-                              <AlertTriangle className="h-3.5 w-3.5 text-yellow-400 shrink-0" />
-                            ) : (
-                              <AlertTriangle className="h-3.5 w-3.5 text-red-400 shrink-0" />
-                            )}
-                            <span className="font-bold text-white text-[11px]">{item.label}</span>
-                          </div>
-                          <span className={`text-[9px] px-1 rounded font-mono font-bold ${
-                            item.status === "PASSED" ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE]" : "bg-yellow-950/60 text-yellow-400"
-                          }`}>
-                            {item.status}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-[#7C8CA3] pl-5">{item.evidence_text}</p>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-4 text-center text-[#7C8CA3]">
-                      <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-[#22D3EE]" />
-                      <span>Validating 20-stage safety precheck gates with server...</span>
-                    </div>
-                  )}
+              )}
+              {successMessage && (
+                <div className="p-2.5 bg-[rgba(37,99,235,0.18)] text-cyan-300 border border-cyan-500 rounded-xl text-[11px] flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>{successMessage}</span>
                 </div>
-              </div>
-            </div>
-          </div>
-        )}
+              )}
 
-        {/* Feedback Messages */}
-        {errorMessage && (
-          <div className="p-3 bg-red-950/80 text-red-300 border border-red-800 rounded-xl text-xs flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-400 shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-        {successMessage && (
-          <div className="p-3 bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890] rounded-xl text-xs flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 shrink-0" />
-            <span>{successMessage}</span>
-          </div>
-        )}
-
-        {/* Footer Navigation */}
-        <div className="border-t border-[#182C23] pt-4 flex items-center justify-between">
-          <button
-            type="button"
-            onClick={() => setActiveStep(Math.max(1, activeStep - 1))}
-            disabled={activeStep === 1 || saveMutation.isPending}
-            className="px-5 py-2.5 rounded-xl bg-[#0A1422] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white font-bold transition-colors disabled:opacity-30 flex items-center gap-2"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back</span>
-          </button>
-
-          <div className="flex items-center gap-3">
-            {activeStep < 6 ? (
-              <button
-                type="button"
-                onClick={() => setActiveStep(Math.min(6, activeStep + 1))}
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition-all shadow-md flex items-center gap-2"
-              >
-                <span>Continue</span>
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => saveDraftMutation.mutate()}
-                  disabled={saveDraftMutation.isPending || saveMutation.isPending}
-                  className="px-4 py-2.5 rounded-xl bg-[#0A1422] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white font-bold transition-colors border border-[#182C23] text-xs flex items-center gap-1.5"
+                  onClick={() => saveMutation.mutate("RUNNING_PAPER")}
+                  disabled={saveMutation.isPending || (environment === "LIVE" && !liveSafetyConfirmed)}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  <Save className="h-4 w-4" />
-                  <span>{saveDraftMutation.isPending ? "Saving Draft..." : "Save Draft"}</span>
+                  {saveMutation.isPending ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
+                  <span>{saveMutation.isPending ? "Creating Bot..." : "Activate Paper Bot (Instant Run)"}</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => saveMutation.mutate("STOPPED")}
-                  disabled={saveMutation.isPending}
-                  className="px-5 py-2.5 rounded-xl bg-[#101B2D] hover:bg-[#1A2A3F] text-cyan-400 font-bold transition-all border border-cyan-800/40 text-xs flex items-center gap-2"
+                  disabled={saveMutation.isPending || (environment === "LIVE" && !liveSafetyConfirmed)}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[#101B2D] hover:bg-[#1A2A3F] text-cyan-300 font-bold text-xs transition border border-cyan-800/40 flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {saveMutation.isPending ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Bot className="h-4 w-4" />
-                  )}
-                  <span>{saveMutation.isPending ? "Creating..." : isEditMode ? "Save Changes" : "Create Bot Instance"}</span>
+                  <Bot className="h-4 w-4" />
+                  <span>Create Bot Instance (Stopped)</span>
                 </button>
 
-                {environment === "PAPER" && (
-                  <button
-                    type="button"
-                    onClick={() => saveMutation.mutate("RUNNING_PAPER")}
-                    disabled={saveMutation.isPending}
-                    className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition-all shadow-md text-xs flex items-center gap-2"
-                  >
-                    <Play className="h-4 w-4" />
-                    <span>Activate Paper Bot</span>
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => setWizardMode("ADVANCED")}
+                  className="w-full py-2 text-[11px] text-slate-400 hover:text-white flex items-center justify-center gap-1 transition"
+                >
+                  <span>Need granular rules? Switch to Advanced 12-Section Config</span>
+                  <ChevronRight className="h-3 w-3" />
+                </button>
               </div>
-            )}
+            </div>
           </div>
         </div>
+      )}
 
-      </div>
+      {/* =========================================================================
+          3. ADVANCED SETTINGS MODE (FULL 6-STEP MODULAR FACTORY)
+          ========================================================================= */}
+      {wizardMode === "ADVANCED" && (
+        <div className="space-y-5 animate-fadeIn">
+          
+          {/* Stepper Breadcrumb Buttons */}
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-3 shadow-xl">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {STEPS_NAV.map((s) => {
+                const isCurrent = activeStep === s.num;
+                const isCompleted = activeStep > s.num;
+                return (
+                  <button
+                    key={s.num}
+                    type="button"
+                    onClick={() => setActiveStep(s.num)}
+                    className={`p-2.5 rounded-xl text-left font-bold transition-all flex items-center gap-2 ${
+                      isCurrent
+                        ? "bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/60 shadow-md ring-1 ring-[#22D3EE]/30"
+                        : isCompleted
+                        ? "bg-[#0C1B15] text-[#7C8CA3] hover:text-white border border-[#183126]"
+                        : "bg-[#07101A] text-[#42584C] border border-[#101B2D] opacity-60"
+                    }`}
+                  >
+                    <div
+                      className={`h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
+                        isCompleted ? "bg-[#22D3EE] text-black" : isCurrent ? "bg-[#256B4A] text-white" : "bg-[#101B2D] text-[#52627A]"
+                      }`}
+                    >
+                      {isCompleted ? <Check className="h-3 w-3 stroke-[3]" /> : s.num}
+                    </div>
+                    <span className="truncate hidden sm:inline text-[11px]">{s.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Wizard Content Panels */}
+          <div className="bg-[#09110E] border border-[#1F392D] rounded-2xl p-6 shadow-xl space-y-6">
+            
+            {/* STEP 1: IDENTITY, INSTITUTIONAL HIERARCHY & CAPITAL */}
+            {activeStep === 1 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <Bot className="h-4 w-4 text-[#22D3EE]" />
+                    <span>Institutional Hierarchy & Identity</span>
+                  </h3>
+
+                  {/* Tier 1 & 2: Customer & Department */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Customer Account</label>
+                      <select
+                        value={customerId}
+                        onChange={(e) => setCustomerId(e.target.value)}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      >
+                        <option value="cust_default">Customer Default (Institutional)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Department Division</label>
+                      <select
+                        value={departmentId}
+                        onChange={(e) => setDepartmentId(e.target.value)}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      >
+                        <option value="dept_algo_trading">Algorithmic Trading (₹1,000,000)</option>
+                        <option value="dept_derivatives">Derivatives & Options (₹500,000)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Tier 3 & 4: Broker Folder & Broker Account */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Folder</label>
+                      <select
+                        value={brokerFolderId}
+                        onChange={(e) => {
+                          const fId = e.target.value;
+                          setBrokerFolderId(fId);
+                          if (fId === "bf_dhan") {
+                            setBrokerAccountId("ba_dhan_primary");
+                            setBrokerProvider("dhan");
+                            setCurrency("INR");
+                            setBrokerId("dhan_india");
+                          } else if (fId === "bf_upstox") {
+                            setBrokerAccountId("ba_upstox_primary");
+                            setBrokerProvider("upstox");
+                            setCurrency("INR");
+                            setBrokerId("upstox");
+                          } else if (fId === "bf_delta") {
+                            setBrokerAccountId("ba_delta_primary");
+                            setBrokerProvider("delta_exchange");
+                            setCurrency("USD");
+                            setBrokerId("delta_exchange");
+                          } else {
+                            setBrokerAccountId("ba_paper_primary");
+                            setBrokerProvider("paper_simulator");
+                            setCurrency("USD");
+                            setBrokerId("paper_simulator");
+                          }
+                        }}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      >
+                        <option value="bf_paper">Paper Trading Sandbox</option>
+                        <option value="bf_dhan">Dhan HQ Folder (NSE/BSE)</option>
+                        <option value="bf_upstox">Upstox Pro Folder (NSE/BSE)</option>
+                        <option value="bf_delta">Delta Exchange Folder (Derivatives)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Broker Funding Account</label>
+                      <select
+                        value={brokerAccountId}
+                        onChange={(e) => setBrokerAccountId(e.target.value)}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold focus:outline-none"
+                      >
+                        <option value="ba_paper_primary">ba_paper_primary (Paper Sandbox)</option>
+                        <option value="ba_dhan_primary">ba_dhan_primary (Dhan HQ Primary)</option>
+                        <option value="ba_upstox_primary">ba_upstox_primary (Upstox Pro Primary)</option>
+                        <option value="ba_delta_primary">ba_delta_primary (Delta Primary USD)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] text-[#7C8CA3] font-semibold flex justify-between">
+                      <span>Bot Instance Name *</span>
+                      <span className="text-cyan-400 font-mono text-[10px]">Slug: {slug}</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-bold focus:outline-none focus:border-[#22D3EE]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Base Currency</label>
+                      <select
+                        value={currency}
+                        onChange={(e) => setCurrency(e.target.value as any)}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-bold focus:outline-none"
+                      >
+                        <option value="INR">INR (₹)</option>
+                        <option value="USD">USD ($)</option>
+                        <option value="USDT">USDT</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Trading Timezone</label>
+                      <select
+                        value={timezone}
+                        onChange={(e) => setTimezone(e.target.value)}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono focus:outline-none"
+                      >
+                        <option value="UTC">UTC (Global Crypto)</option>
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                        <option value="America/New_York">America/New_York (EST)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Capital Allocation */}
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 space-y-4">
+                  <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-[#1A2A3F] pb-2">
+                    <DollarSign className="h-4 w-4 text-[#22D3EE]" />
+                    <span>Authoritative Capital & Allocation</span>
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Total Capital ({currency})</label>
+                      <input
+                        type="number"
+                        value={totalCapital}
+                        onChange={(e) => setTotalCapital(Math.max(1, Number(e.target.value)))}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] text-[#7C8CA3] font-semibold">Allocated Capital ({currency})</label>
+                      <input
+                        type="number"
+                        value={allocatedCapital}
+                        onChange={(e) => setAllocatedCapital(Math.max(1, Number(e.target.value)))}
+                        className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-[#07101A] rounded-xl border border-[#1A2A3F] space-y-2 text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-[#7C8CA3]">Allocation Share:</span>
+                      <span className="text-white font-bold">{allocationPct.toFixed(1)}%</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-[#7C8CA3]">Remaining Unallocated:</span>
+                      <span className="text-emerald-400 font-bold">{currency} {remainingCapital.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 2: MARKET & INSTRUMENT */}
+            {activeStep === 2 && (
+              <div className="space-y-5 animate-fadeIn">
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-2">
+                  {ASSET_CLASSES.map((ac) => {
+                    const isSelected = assetClass === ac.id;
+                    const Icon = ac.icon;
+                    return (
+                      <button
+                        key={ac.id}
+                        type="button"
+                        onClick={() => {
+                          setAssetClass(ac.id);
+                          const pops = POPULAR_INSTRUMENTS[ac.id];
+                          if (pops && pops.length > 0) {
+                            setSymbol(pops[0].symbol);
+                          }
+                        }}
+                        className={`p-3 rounded-xl border text-center transition-all flex flex-col items-center gap-1.5 ${
+                          isSelected
+                            ? "bg-[rgba(37,99,235,0.2)] border-cyan-400 text-white shadow-md ring-1 ring-cyan-400/40"
+                            : "bg-[#07101A] border-[#1A2A3F] text-slate-400 hover:text-white"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5 text-cyan-400" />
+                        <span className="font-bold text-[11px] truncate">{ac.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                    <label className="text-xs font-bold text-white uppercase tracking-wider block">
+                      Active Instrument Symbol
+                    </label>
+                    <input
+                      type="text"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2.5 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
+                    />
+
+                    {assetClass === "OPTIONS" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsOptionsModalOpen(true)}
+                        className="w-full py-2 px-3 rounded-xl bg-[#101B2D] hover:bg-[#1A2A3F] text-cyan-300 border border-cyan-800/40 font-bold text-xs transition flex items-center justify-center gap-2"
+                      >
+                        <Layers className="h-4 w-4" />
+                        <span>Open Options Strike Chain Picker</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-2">
+                    <span className="text-xs font-bold text-white uppercase tracking-wider block">Popular Shortcuts</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {POPULAR_INSTRUMENTS[assetClass]?.map((pop) => (
+                        <button
+                          key={pop.symbol}
+                          type="button"
+                          onClick={() => setSymbol(pop.symbol)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition ${
+                            symbol === pop.symbol
+                              ? "bg-cyan-950/60 border-cyan-500 text-cyan-300"
+                              : "bg-[#07101A] border-[#1A2A3F] text-slate-300 hover:text-white"
+                          }`}
+                        >
+                          {pop.symbol}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 3: STRATEGY ENGINE */}
+            {activeStep === 3 && (
+              <div className="space-y-5 animate-fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Sliders className="h-4 w-4 text-cyan-400" />
+                      <span>Configured Indicator Rules</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {strategyRules.map((rule, idx) => (
+                        <div key={rule.id} className="p-2.5 bg-[#07101A] rounded-xl border border-[#1A2A3F] flex items-center justify-between text-[11px]">
+                          <span className="font-mono font-bold text-white">
+                            {rule.leftIndicatorId} {rule.operator} {rule.rightType === "INDICATOR" ? rule.rightIndicatorId : rule.rightValue}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setStrategyRules(strategyRules.filter((r) => r.id !== rule.id))}
+                            className="text-rose-400 hover:text-rose-300 p-1"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">Add Rule Operator</h3>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStrategyRules([
+                            ...strategyRules,
+                            {
+                              id: `rule-${Date.now()}`,
+                              leftIndicatorId: "rsi_14",
+                              operator: ">",
+                              rightType: "THRESHOLD",
+                              rightValue: 50,
+                              isMandatory: true,
+                            },
+                          ]);
+                        }}
+                        className="px-3 py-2 rounded-xl bg-[#101B2D] text-cyan-300 border border-cyan-800/40 text-xs font-bold flex items-center gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Add Indicator Threshold Rule</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 4: RISK & EXITS */}
+            {activeStep === 4 && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5 animate-fadeIn">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-2">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Stop Loss %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={stopLossPct}
+                    onChange={(e) => setStopLossPct(Math.max(0.1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                  />
+                </div>
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-2">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Take Profit Target %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={takeProfitPct}
+                    onChange={(e) => setTakeProfitPct(Math.max(0.1, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                  />
+                </div>
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-2">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Max Daily Drawdown %</label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={maxDailyDrawdownPct}
+                    onChange={(e) => setMaxDailyDrawdownPct(Math.max(0.5, Number(e.target.value)))}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* STEP 5: BROKER & EXECUTION */}
+            {activeStep === 5 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 animate-fadeIn">
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Execution Broker</label>
+                  <select
+                    value={brokerId}
+                    onChange={(e) => setBrokerId(e.target.value)}
+                    className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none"
+                  >
+                    <option value="paper_simulator">Paper Trading Simulator (Instant Zero-Risk)</option>
+                    <option value="dhan_india">Dhan HQ Direct (NSE/BSE)</option>
+                    <option value="upstox">Upstox Pro Gateway (NSE)</option>
+                    <option value="delta_exchange">Delta Exchange India (Derivatives)</option>
+                    <option value="binance">Binance CCXT Gateway (Crypto)</option>
+                  </select>
+                </div>
+                <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                  <label className="text-[11px] text-[#7C8CA3] font-semibold">Environment Mode</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEnvironment("PAPER")}
+                      className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        environment === "PAPER"
+                          ? "bg-emerald-600/20 text-emerald-300 border border-emerald-500/60 shadow-md"
+                          : "bg-[#07101A] text-slate-400 border-[#1A2A3F]"
+                      }`}
+                    >
+                      <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                      <span>PAPER MODE</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnvironment("LIVE")}
+                      className={`p-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
+                        environment === "LIVE"
+                          ? "bg-rose-600/20 text-rose-300 border border-rose-500/60 shadow-md"
+                          : "bg-[#07101A] text-slate-400 border-[#1A2A3F]"
+                      }`}
+                    >
+                      <Zap className="h-4 w-4 text-rose-400" />
+                      <span>LIVE BROKER</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 6: REVIEW & ACTIVATE */}
+            {activeStep === 6 && (
+              <div className="space-y-5 animate-fadeIn">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-2.5 font-mono text-[11px]">
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider border-b border-[#1A2A3F] pb-2 font-sans">
+                      Complete Specification Review
+                    </h3>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Name:</span><span className="text-white font-bold">{name}</span></div>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Symbol:</span><span className="text-white font-bold">{symbol}</span></div>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Allocated:</span><span className="text-emerald-400 font-bold">{currency} {allocatedCapital.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Stop Loss:</span><span className="text-rose-400 font-bold">{stopLossPct}%</span></div>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Take Profit:</span><span className="text-emerald-400 font-bold">{takeProfitPct}%</span></div>
+                  </div>
+
+                  <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between border-b border-[#1A2A3F] pb-2">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-cyan-400" />
+                        <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                          Authoritative Pre-Flight Gates
+                        </h3>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => revalidateConfig()}
+                        className="text-cyan-400 hover:text-white flex items-center gap-1 text-[10px]"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${isValidating ? "animate-spin" : ""}`} />
+                        <span>Re-Validate</span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      {validationData?.evidence && validationData.evidence.length > 0 ? (
+                        validationData.evidence.map((item) => (
+                          <div key={item.id} className="p-2 rounded-lg bg-[#07101A] border border-[#1A2A3F] space-y-0.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                                <span className="font-bold text-white text-[11px]">{item.label}</span>
+                              </div>
+                              <span className="text-[9px] px-1 rounded font-mono font-bold bg-cyan-950/60 text-cyan-300">
+                                {item.status}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-[#7C8CA3] pl-5">{item.evidence_text}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="py-4 text-center text-[#7C8CA3]">
+                          <RefreshCw className="h-4 w-4 animate-spin mx-auto mb-1 text-cyan-400" />
+                          <span>Validating 20-stage safety precheck gates...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Step Navigation Controls */}
+            <div className="border-t border-[#182C23] pt-4 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setActiveStep(Math.max(1, activeStep - 1))}
+                disabled={activeStep === 1 || saveMutation.isPending}
+                className="px-5 py-2.5 rounded-xl bg-[#0A1422] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white font-bold transition-colors disabled:opacity-30 flex items-center gap-2"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back</span>
+              </button>
+
+              <div className="flex items-center gap-3">
+                {activeStep < 6 ? (
+                  <button
+                    type="button"
+                    onClick={() => setActiveStep(Math.min(6, activeStep + 1))}
+                    className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition-all shadow-md flex items-center gap-2"
+                  >
+                    <span>Continue</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => saveMutation.mutate("STOPPED")}
+                      disabled={saveMutation.isPending}
+                      className="px-5 py-2.5 rounded-xl bg-[#101B2D] hover:bg-[#1A2A3F] text-cyan-400 font-bold transition-all border border-cyan-800/40 text-xs flex items-center gap-2"
+                    >
+                      {saveMutation.isPending ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />}
+                      <span>{saveMutation.isPending ? "Creating..." : "Create Bot Instance"}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => saveMutation.mutate("RUNNING_PAPER")}
+                      disabled={saveMutation.isPending}
+                      className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold transition-all shadow-md text-xs flex items-center gap-2"
+                    >
+                      <Play className="h-4 w-4" />
+                      <span>Activate Paper Bot</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* Options Contract Selector Modal */}
       <OptionsContractSelectorModal

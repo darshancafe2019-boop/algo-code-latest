@@ -338,7 +338,7 @@ export function TerminalInspector({
               </div>
               <div className="flex justify-between p-1.5 rounded bg-slate-900/80 border border-slate-800">
                 <span className="text-slate-400">Volume Profile POC</span>
-                <span className="font-bold text-cyan-400 tabular-nums">{formatPrice(ltp ? ltp * 0.995 : null)}</span>
+                <span className="font-bold text-cyan-400 tabular-nums">{formatPrice(ltp)}</span>
               </div>
               <div className="flex justify-between p-1.5 rounded bg-slate-900/80 border border-slate-800">
                 <span className="text-slate-400">Support / Resistance</span>

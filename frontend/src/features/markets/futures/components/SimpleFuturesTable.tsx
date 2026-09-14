@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { CanonicalFuturesContract } from "../types/futures";
 import { useFuturesStore } from "../state/futures-store";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import {
   TrendingUp,
   TrendingDown,
@@ -59,8 +61,47 @@ export function SimpleFuturesTable({
   onTrade,
   onOpenBook,
 }: SimpleFuturesTableProps) {
+  const router = useRouter();
   const { savedContractKeys, toggleSaveContract, setOrderReviewOpen, setDetailsDrawerOpen, setSelectedContract } = useFuturesStore();
   
+  const handleFuturesBot = (c: CanonicalFuturesContract, side: "BUY" | "SELL", e: React.MouseEvent) => {
+    e.stopPropagation();
+    const isIndian = c.exchange === "NSE" || c.currency === "INR";
+    const isPerp = c.contract_type === "PERPETUAL" || !c.expiry_date;
+    const provider = c.market_data_provider || c.provider || (isIndian ? "DHAN" : "DELTA");
+
+    dispatchBotCreation(router, {
+      symbol: c.symbol,
+      canonicalSymbol: c.canonical_symbol || c.displayName || c.symbol,
+      side,
+      assetClass: isPerp ? "PERPETUAL" : "FUTURE",
+      exchange: c.exchange || (isIndian ? "NSE" : "BINANCE"),
+      market: isIndian ? "Indian Futures" : "Crypto Futures",
+      broker: provider.toUpperCase().includes("DHAN")
+        ? "DHAN"
+        : provider.toUpperCase().includes("UPSTOX")
+        ? "UPSTOX"
+        : provider.toUpperCase().includes("DELTA")
+        ? "DELTA"
+        : "BINANCE",
+      marketDataSource: provider,
+      instrumentId: c.instrument_key || c.symbol,
+      currentPrice: c.last_price || c.mark_price || null,
+      bid: c.bid || null,
+      ask: c.ask || null,
+      markPrice: c.mark_price || null,
+      expiry: isPerp ? null : (c.expiry_date || null),
+      lotSize: c.lot_size || null,
+      tickSize: c.tick_size || null,
+      openInterest: c.open_interest_usd || null,
+      volume: c.volume_24h_usd || null,
+      maxLeverage: c.max_leverage || null,
+      fundingRate: c.funding_rate?.funding_rate_8h || null,
+      origin: "FUTURES",
+      timestamp: Date.now(),
+    });
+  };
+
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
@@ -394,27 +435,17 @@ export function SimpleFuturesTable({
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
-                          onClick={(e) => {
-                            if (onTrade) onTrade(e, c, "BUY");
-                            else {
-                              setSelectedContract(c);
-                              setOrderReviewOpen(true, c, "BUY");
-                            }
-                          }}
-                          className="px-2.5 py-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/50 text-[11px] font-bold font-mono transition shadow-sm active:scale-95"
+                          onClick={(e) => handleFuturesBot(c, "BUY", e)}
+                          className="px-2.5 py-1 rounded-md bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 border border-emerald-500/50 text-[11px] font-bold font-mono transition shadow-sm active:scale-95"
+                          title="Create Long / Buy Bot"
                         >
                           BUY
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => {
-                            if (onTrade) onTrade(e, c, "SELL");
-                            else {
-                              setSelectedContract(c);
-                              setOrderReviewOpen(true, c, "SELL");
-                            }
-                          }}
-                          className="px-2.5 py-1 rounded-md bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/50 text-[11px] font-bold font-mono transition shadow-sm active:scale-95"
+                          onClick={(e) => handleFuturesBot(c, "SELL", e)}
+                          className="px-2.5 py-1 rounded-md bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 border border-rose-500/50 text-[11px] font-bold font-mono transition shadow-sm active:scale-95"
+                          title="Create Short / Sell Bot"
                         >
                           SELL
                         </button>

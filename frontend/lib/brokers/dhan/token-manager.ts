@@ -152,6 +152,19 @@ export class DhanTokenManager {
    * Evaluates current token freshness and returns computed status.
    */
   public checkStatus(): DhanAuthStatusType {
+    const currentEnvToken = process.env.DHAN_ACCESS_TOKEN || "";
+    if (currentEnvToken && currentEnvToken !== this.state.accessToken) {
+      let exp: number | undefined;
+      try {
+        const parts = currentEnvToken.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(Buffer.from(parts[1], "base64").toString("utf-8"));
+          if (payload.exp) exp = payload.exp * 1000;
+        }
+      } catch {}
+      this.setToken(currentEnvToken, exp, process.env.DHAN_CLIENT_ID || "");
+    }
+
     if (!this.state.accessToken) {
       this.state.status = "NOT_CONFIGURED";
       return "NOT_CONFIGURED";

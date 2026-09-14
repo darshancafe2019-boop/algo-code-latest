@@ -24,6 +24,7 @@ import { ProviderHealthDashboard } from "./ProviderHealthDashboard";
 import { MarketSkeleton } from "./MarketSkeleton";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { useWatchlist } from "@/hooks/useWatchlist";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { StocksUniverseView } from "@/src/features/markets/stocks";
 import {
   X,
@@ -41,6 +42,7 @@ export function MarketUniverse() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const { subscribe, unsubscribe, connectionStatus, providerHealth } = useMarketGatewayContext();
 
   // Read initial query params from URL if present
   const initialCategory = searchParams.get("asset")?.toUpperCase() || "ALL";
@@ -302,6 +304,25 @@ export function MarketUniverse() {
 
   // Default active selected instrument
   const activeSelected = selectedInstrument || (displayedInstruments.length > 0 ? displayedInstruments[0] : null);
+
+  // Dynamic visible-row WebSocket subscriptions via MarketGatewayContext
+  useEffect(() => {
+    const symbolsToSub = new Set<string>();
+    displayedInstruments.slice(0, 150).forEach((inst) => {
+      const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol;
+      if (sym) symbolsToSub.add(sym);
+    });
+    if (activeSelected) {
+      const selSym = activeSelected.canonical_symbol || activeSelected.symbol || activeSelected.provider_symbol;
+      if (selSym) symbolsToSub.add(selSym);
+    }
+
+    symbolsToSub.forEach((s) => subscribe(s, "WATCHLIST"));
+
+    return () => {
+      symbolsToSub.forEach((s) => unsubscribe(s, "WATCHLIST"));
+    };
+  }, [displayedInstruments, activeSelected, subscribe, unsubscribe]);
 
   const activeFiltersCount = [
     filters.exchange !== "ALL",

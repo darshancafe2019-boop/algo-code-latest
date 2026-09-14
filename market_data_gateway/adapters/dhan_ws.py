@@ -41,9 +41,22 @@ from src.dhan_service import (
     global_dhan_service,
     OFFICIAL_DHAN_KEYS,
 )
+from src.dhan_credential_manager import global_dhan_credential_manager
 
 logger = logging.getLogger("MDGateway.DhanWS")
 MAX_BACKOFF_SEC = 30.0
+
+
+SEGMENT_CODE_MAP = {
+    0: "IDX_I",
+    1: "NSE_EQ",
+    2: "NSE_FNO",
+    3: "NSE_CURRENCY",
+    4: "BSE_EQ",
+    5: "MCX_COMM",
+    7: "BSE_FNO",
+    8: "BSE_CURRENCY",
+}
 
 
 def is_indian_market_open() -> bool:
@@ -101,15 +114,68 @@ class DhanWSAdapter(BaseProviderAdapter):
             sec_id = str(meta["security_id"])
             self._sec_id_to_symbol[sec_id] = sym
 
+        # Register for dynamic credential hot-reload events
+        global_dhan_credential_manager.register_callback(self._on_credential_update)
+
+    def _on_credential_update(self, client_id: str, access_token: str, generation: int) -> None:
+        """Invoked when Dhan credentials update or renew."""
+        logger.info("DhanWSAdapter notified of credential change (Gen=%d). Triggering reconnect...", generation)
+        self._auth_error_reason = None
+        self._status = "REAUTHENTICATING"
+        if self._running:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.reconnect_with_new_credentials())
+            except RuntimeError:
+                pass
+
+    async def reconnect_with_new_credentials(self) -> None:
+        """Cleanly drops current socket and immediately reconnects with new token."""
+        self._status = "REAUTHENTICATING"
+        self._auth_error_reason = None
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+            self._ws = None
+        self._retry_count = 0
+        if not self._ws_task or self._ws_task.done():
+            self._ws_task = asyncio.create_task(self._ws_loop(), name="DhanWSLoop")
+
     @property
     def feed_state(self) -> str:
+        cred_status = global_dhan_credential_manager.get_status().get("status")
+        if cred_status in ("EXPIRED", "AUTH_REQUIRED", "INVALID_FORMAT", "NOT_CONFIGURED"):
+            return "AUTH_REQUIRED"
         if not global_dhan_service.is_authenticated:
-            return global_dhan_service._auth_status if global_dhan_service._auth_status != "INITIAL" else "CREDENTIALS_MISSING"
-        if self._auth_error_reason in ("AUTH_REQUIRED", "AUTH_ERROR", "INVALID_DHAN_CLIENT_ID"):
+            auth_st = global_dhan_service._auth_status
+            return auth_st if auth_st not in ("INITIAL", "OK", "HEALTHY") else "CREDENTIALS_MISSING"
+        if self._auth_error_reason in ("AUTH_REQUIRED", "AUTH_ERROR", "INVALID_DHAN_CLIENT_ID") or (self._auth_error_reason and "401" in self._auth_error_reason):
             return "AUTH_ERROR"
-        if not is_indian_market_open() and self._status == "CONNECTED":
-            return "MARKET_CLOSED"
+        if self._status == "REAUTHENTICATING":
+            return "REAUTHENTICATING"
+        if self._status == "CONNECTING":
+            return "CONNECTING"
+        if self._status == "DISCONNECTED":
+            return "DISCONNECTED"
+
+        # When socket is open and connected:
+        if self._status in ("CONNECTED", "LIVE"):
+            if not is_indian_market_open():
+                return "MARKET_CLOSED"
+            if self._ticks_received > 0 and self._last_msg_time > 0:
+                age_sec = time.monotonic() - self._last_msg_time
+                if age_sec > 10.0:
+                    return "STALE"
+                return "LIVE"
+            return "CONNECTED"
+
         return self._status
+
+    def get_status(self) -> str:
+        """Authoritative single status consistent with health_check."""
+        return self.feed_state
 
     # ─── Connection Lifecycle ────────────────────────────────────────────────
 
@@ -166,8 +232,8 @@ class DhanWSAdapter(BaseProviderAdapter):
         """Continuous reconnection loop with exponential backoff."""
         while self._running:
             try:
-                client_id = global_dhan_service.client_id
-                access_token = global_dhan_service.access_token
+                client_id = global_dhan_credential_manager.client_id or global_dhan_service.client_id
+                access_token = global_dhan_credential_manager.access_token or global_dhan_service.access_token
 
                 if not client_id or not access_token:
                     self._status = "DISCONNECTED"
@@ -200,6 +266,7 @@ class DhanWSAdapter(BaseProviderAdapter):
                 ) as ws:
                     self._ws = ws
                     self._status = "CONNECTED"
+                    self._auth_error_reason = None  # Crucial: clear any previous auth failure
                     self._retry_count = 0
                     self._last_latency_ms = round((time.monotonic() - start_conn_time) * 1000.0, 1)
                     logger.info("DhanWS: Connected successfully! Latency=%.1fms", self._last_latency_ms)
@@ -263,10 +330,12 @@ class DhanWSAdapter(BaseProviderAdapter):
         try:
             resp_code, msg_len, exch_seg, sec_id_int = struct.unpack_from("<BHBI", data, 0)
             sec_id_str = str(sec_id_int)
-            symbol = self._sec_id_to_symbol.get(sec_id_str)
+            symbol = self._sec_id_to_symbol.get(sec_id_str) or self._sec_id_to_symbol.get(f"{exch_seg}:{sec_id_str}")
+            exch_seg_str = SEGMENT_CODE_MAP.get(exch_seg, "NSE_EQ")
 
             now_iso = datetime.now(timezone.utc).isoformat()
             now_mono = time.monotonic()
+            self._last_msg_time = now_mono
 
             # ── 1. Ticker Packet (Response Code 2) ──────────────────────────
             if resp_code == 2 and len(data) >= 16:
@@ -276,7 +345,7 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    exchange=exch_seg_str,
                     provider="dhan",
                     last_price=round(float(ltp), 2),
                     volume=0.0,
@@ -287,6 +356,8 @@ class DhanWSAdapter(BaseProviderAdapter):
                 )
                 self._quote_cache[symbol] = quote
                 self._ticks_received += 1
+                if is_indian_market_open():
+                    self._status = "LIVE"
                 self._emit(quote)
 
             # ── 2. Quote Packet (Response Code 4) ───────────────────────────
@@ -306,7 +377,7 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    exchange=exch_seg_str,
                     provider="dhan",
                     last_price=ltp_f,
                     volume=float(volume),
@@ -323,6 +394,8 @@ class DhanWSAdapter(BaseProviderAdapter):
                 )
                 self._quote_cache[symbol] = quote
                 self._ticks_received += 1
+                if is_indian_market_open():
+                    self._status = "LIVE"
                 self._emit(quote)
 
             # ── 3. Full Depth Packet (Response Code 8) ──────────────────────
@@ -360,7 +433,7 @@ class DhanWSAdapter(BaseProviderAdapter):
 
                 quote = NormalizedQuote(
                     symbol=symbol,
-                    exchange=seg_str if 'seg_str' in locals() else "NSE_EQ",
+                    exchange=exch_seg_str,
                     provider="dhan",
                     last_price=ltp_f,
                     bid=best_bid or ltp_f,
@@ -380,6 +453,8 @@ class DhanWSAdapter(BaseProviderAdapter):
                 )
                 self._quote_cache[symbol] = quote
                 self._ticks_received += 1
+                if is_indian_market_open():
+                    self._status = "LIVE"
                 self._emit(quote)
 
         except Exception as exc:
@@ -606,7 +681,7 @@ class DhanWSAdapter(BaseProviderAdapter):
             else:
                 missing.append(sym)
 
-        if missing and global_dhan_service.is_authenticated:
+        if missing and global_dhan_service.is_authenticated and is_indian_market_open():
             await self._poll_rest_quotes(missing)
             for sym in missing:
                 if sym in self._quote_cache:

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -19,8 +20,11 @@ import {
   Sliders,
   CheckCircle2,
   XCircle,
+  Play,
+  Bot,
 } from "lucide-react";
 import { formatPrice, formatPercent, formatVolume } from "@/lib/formatters";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 interface DhanQuoteTick {
   provider: string;
@@ -135,6 +139,7 @@ function normalizeDhanQuote(data: any): DhanQuoteTick | null {
 }
 
 export function DhanLiveMarketFeed() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Record<string, DhanQuoteTick>>({});
   const [lastTickIso, setLastTickIso] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string>("RELIANCE");
@@ -143,6 +148,31 @@ export function DhanLiveMarketFeed() {
   const [streamError, setStreamError] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [localTickCount, setLocalTickCount] = useState<number>(0);
+
+  const handleCreateBot = (quote: DhanQuoteTick, side: "BUY" | "SELL", e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const isIndex =
+      quote.exchange_segment?.includes("IDX") ||
+      ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX"].some((idx) => quote.symbol.toUpperCase().includes(idx));
+    dispatchBotCreation(router, {
+      symbol: quote.symbol,
+      canonicalSymbol: quote.symbol,
+      side,
+      assetClass: isIndex ? "INDEX" : "EQUITY",
+      exchange: quote.exchange_segment?.startsWith("BSE") ? "BSE" : "NSE",
+      market: "Indian Equity",
+      broker: "DHAN",
+      marketDataSource: "DHAN",
+      instrumentId: quote.security_id || quote.symbol,
+      currentPrice: quote.last_price || null,
+      bid: quote.bid_price || null,
+      ask: quote.ask_price || null,
+      openInterest: quote.open_interest || null,
+      volume: quote.volume || null,
+      origin: "LIVE_FEED",
+      timestamp: Date.now(),
+    });
+  };
 
   // 1. Query Server-Side Dhan Feed Status (`GET /api/brokers/dhan/status`)
   const { data: dhanStatus, refetch: refetchStatus } = useQuery<DhanStatusResponse>({
@@ -478,8 +508,8 @@ export function DhanLiveMarketFeed() {
               </div>
             </div>
 
-            {/* Price Display */}
-            <div className="text-right">
+            {/* Price Display & Quick Action */}
+            <div className="flex flex-col items-end gap-2">
               <div
                 className={`text-4xl font-mono font-black transition-colors duration-300 ${
                   priceFlash[activeQuote.symbol] === "up"
@@ -491,11 +521,29 @@ export function DhanLiveMarketFeed() {
               >
                 ₹{activeQuote.last_price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs font-mono text-slate-400 mt-1 flex items-center justify-end gap-2">
+              <div className="text-xs font-mono text-slate-400 flex items-center justify-end gap-2">
                 <span>EVENT TIME: {activeQuote.event_time ? new Date(activeQuote.event_time).toLocaleTimeString() : "—"}</span>
                 {activeQuote.freshness_ms !== undefined && (
                   <span className="text-cyan-400 font-bold">• {activeQuote.freshness_ms}ms old</span>
                 )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => handleCreateBot(activeQuote, "BUY", e)}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs tracking-wider transition-all shadow-md shadow-emerald-950/40 flex items-center gap-1"
+                >
+                  <span>BUY</span>
+                  <Bot className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleCreateBot(activeQuote, "SELL", e)}
+                  className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-black text-xs tracking-wider transition-all shadow-md shadow-rose-950/40 flex items-center gap-1"
+                >
+                  <span>SELL</span>
+                  <Bot className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -577,6 +625,7 @@ export function DhanLiveMarketFeed() {
                 <th className="py-2.5 px-3 text-right">Volume</th>
                 <th className="py-2.5 px-3 text-right">Open Interest</th>
                 <th className="py-2.5 px-3 text-center">Status</th>
+                <th className="py-2.5 px-3 text-center">ACTION</th>
                 <th className="py-2.5 px-4 text-right">Last Received</th>
               </tr>
             </thead>
@@ -634,6 +683,24 @@ export function DhanLiveMarketFeed() {
                           {q.last_price > 0 && (!q.freshness_ms || q.freshness_ms < 10000) ? "LIVE" : "STALE"}
                         </span>
                       </td>
+                      <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleCreateBot(q, "BUY", e)}
+                            className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[10px] font-bold border border-emerald-500/40 transition-colors"
+                          >
+                            BUY
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCreateBot(q, "SELL", e)}
+                            className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[10px] font-bold border border-rose-500/40 transition-colors"
+                          >
+                            SELL
+                          </button>
+                        </div>
+                      </td>
                       <td className="py-3 px-4 text-right text-slate-400 text-[10px]">
                         {q.event_time ? new Date(q.event_time).toLocaleTimeString() : "—"}
                       </td>
@@ -642,7 +709,7 @@ export function DhanLiveMarketFeed() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={10} className="py-10 text-center text-slate-400 font-mono text-xs">
+                  <td colSpan={11} className="py-10 text-center text-slate-400 font-mono text-xs">
                     <div className="flex flex-col items-center justify-center gap-2">
                       <span className="font-bold text-rose-400 text-sm tracking-wider">NO_LIVE_TICK_RECEIVED</span>
                       <span className="text-slate-400 text-xs max-w-md">

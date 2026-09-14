@@ -351,14 +351,36 @@ class DhanService:
         timeout_sec: float = 8.0,
     ):
         self.secrets_mgr = SecretsManager()
-        self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
-        self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
         self.timeout_sec = float(timeout_sec)
         self._auth_status = "INITIAL"
         self._last_auth_check = 0.0
         self._auth_cached_result: Optional[Dict[str, Any]] = None
 
+        try:
+            from src.dhan_credential_manager import global_dhan_credential_manager
+            mgr_cid, mgr_tok, _ = global_dhan_credential_manager.get_credentials()
+            self.client_id = (client_id or mgr_cid or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+            self.access_token = (access_token or mgr_tok or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
+            global_dhan_credential_manager.register_callback(self._on_credential_update)
+        except Exception:
+            self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+            self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
+
         self._load_credentials_from_vault()
+
+    def _on_credential_update(self, client_id: str, access_token: str, generation: int) -> None:
+        """Callback invoked whenever Dhan credentials change or renew."""
+        self.reload_credentials(client_id, access_token)
+
+    def reload_credentials(self, client_id: Optional[str] = None, access_token: Optional[str] = None) -> None:
+        """Hot-reloads Dhan credentials in memory and invalidates cache."""
+        if client_id is not None:
+            self.client_id = client_id.strip()
+        if access_token is not None:
+            self.access_token = access_token.strip()
+        self._auth_cached_result = None
+        self._last_auth_check = 0.0
+        logger.info("DhanService credentials hot-reloaded (ClientId=%s)", self.client_id[:4] + "****" if self.client_id else "")
 
     def _load_credentials_from_vault(self) -> None:
         """Loads encrypted API credentials from SQLite broker_credentials if available."""

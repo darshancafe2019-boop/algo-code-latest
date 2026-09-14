@@ -18,13 +18,17 @@ from typing import Any, Callable, Dict, Optional, Set
 logger = logging.getLogger("MDGateway.SubscriptionRegistry")
 
 VALID_REASONS = frozenset({
-    "WATCHLIST",      # user's manual watchlist (default: ltpc)
-    "RUNNING_BOT",    # symbol monitored by an active bot instance (default: full)
-    "OPEN_POSITION",  # symbol with an open trade (default: full)
-    "CHART_VIEW",     # currently open chart in UI (default: full)
-    "BENCHMARK",      # configured index benchmarks (default: ltpc)
-    "OPTION_CHAIN",   # options chain & greeks view (default: option_greeks)
-    "DEPTH_VIEW",     # deep orderbook level view (default: full_d30)
+    "WATCHLIST",          # user's manual watchlist (default: ltpc)
+    "RUNNING_BOT",        # symbol monitored by an active bot instance (default: full)
+    "OPEN_POSITION",      # symbol with an open trade (default: full)
+    "CHART_VIEW",         # currently open chart in UI (default: full)
+    "BENCHMARK",          # configured index benchmarks (default: ltpc)
+    "OPTION_CHAIN",       # options chain & greeks view (default: option_greeks)
+    "DEPTH_VIEW",         # deep orderbook level view (default: full_d30)
+    "LIVE_MARKET_TEST",   # diagnostic test subscription
+    "QUANTOS_DIAGNOSTIC", # Quant.OS diagnostic tooling
+    "SYSTEM",             # system background subscription
+    "DIAGNOSTIC",         # generic diagnostic
 })
 
 MODE_PRIORITY: Dict[str, int] = {

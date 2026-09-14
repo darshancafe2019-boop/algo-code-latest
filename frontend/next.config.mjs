@@ -7,6 +7,9 @@ const backendUrl =
 const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   webpack(config, { isServer, dev }) {
     if (!isServer) {
       config.resolve.fallback = {

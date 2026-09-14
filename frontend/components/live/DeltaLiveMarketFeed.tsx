@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -24,8 +25,10 @@ import {
   DollarSign,
   ArrowUpRight,
   Sparkles,
+  Bot,
 } from "lucide-react";
 import { formatPrice, formatPercent, formatVolume } from "@/lib/formatters";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 export interface DeltaQuoteTick {
   provider: string;
@@ -172,6 +175,7 @@ function normalizeDeltaQuote(data: any): DeltaQuoteTick | null {
 }
 
 export function DeltaLiveMarketFeed() {
+  const router = useRouter();
   const [quotes, setQuotes] = useState<Record<string, DeltaQuoteTick>>({});
   const [lastTickIso, setLastTickIso] = useState<string | null>(null);
   const [selectedSymbol, setSelectedSymbol] = useState<string>("BTC");
@@ -182,6 +186,31 @@ export function DeltaLiveMarketFeed() {
   const [localTickCount, setLocalTickCount] = useState<number>(0);
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [categoryFilter, setCategoryFilter] = useState<"ALL" | "PERPS" | "MAJORS">("ALL");
+
+  const handleCreateBot = (quote: DeltaQuoteTick, side: "BUY" | "SELL", e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const isOption = Boolean(quote.contract_type?.includes("option"));
+    dispatchBotCreation(router, {
+      symbol: quote.symbol,
+      canonicalSymbol: quote.contract_symbol || quote.symbol,
+      side,
+      assetClass: isOption ? "CRYPTO_OPTIONS" : "PERPETUAL",
+      exchange: "DELTA",
+      market: "Crypto Derivatives",
+      broker: "DELTA",
+      marketDataSource: "DELTA",
+      instrumentId: quote.security_id || quote.symbol,
+      currentPrice: quote.last_price || null,
+      bid: quote.bid_price || null,
+      ask: quote.ask_price || null,
+      markPrice: quote.mark_price || null,
+      openInterest: quote.open_interest || null,
+      volume: quote.volume || null,
+      fundingRate: quote.funding_rate || null,
+      origin: "LIVE_FEED",
+      timestamp: Date.now(),
+    });
+  };
 
   // 1. Query Server-Side Delta Feed Status (`GET /api/brokers/delta/status`)
   const { data: deltaStatus, refetch: refetchStatus } = useQuery<DeltaStatusResponse>({
@@ -532,8 +561,8 @@ export function DeltaLiveMarketFeed() {
               </div>
             </div>
 
-            {/* Price Display */}
-            <div className="text-right">
+            {/* Price Display & Quick Action */}
+            <div className="flex flex-col items-end gap-2">
               <div
                 className={`text-4xl font-mono font-black transition-colors duration-300 ${
                   priceFlash[activeQuote.symbol] === "up"
@@ -547,7 +576,7 @@ export function DeltaLiveMarketFeed() {
                   ? activeQuote.last_price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                   : activeQuote.last_price.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
               </div>
-              <div className="text-xs font-mono text-slate-400 mt-1 flex items-center justify-end gap-2">
+              <div className="text-xs font-mono text-slate-400 flex items-center justify-end gap-2">
                 {activeQuote.change_24h !== undefined && (
                   <span className={`font-bold flex items-center gap-0.5 ${activeQuote.change_24h >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {activeQuote.change_24h >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -555,6 +584,24 @@ export function DeltaLiveMarketFeed() {
                   </span>
                 )}
                 <span>• EVENT: {activeQuote.event_time ? new Date(activeQuote.event_time).toLocaleTimeString() : "—"}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <button
+                  type="button"
+                  onClick={(e) => handleCreateBot(activeQuote, "BUY", e)}
+                  className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs tracking-wider transition-all shadow-md shadow-emerald-950/40 flex items-center gap-1"
+                >
+                  <span>BUY</span>
+                  <Bot className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleCreateBot(activeQuote, "SELL", e)}
+                  className="px-3.5 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 text-white font-black text-xs tracking-wider transition-all shadow-md shadow-rose-950/40 flex items-center gap-1"
+                >
+                  <span>SELL</span>
+                  <Bot className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           </div>
@@ -810,15 +857,30 @@ export function DeltaLiveMarketFeed() {
                       </td>
 
                       {/* Action */}
-                      <td className="py-3.5 px-3 text-center">
-                        <a
-                          href={`/options/delta`}
-                          onClick={(e) => e.stopPropagation()}
-                          className="px-2 py-1 rounded bg-[#142036] hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-[10px] font-bold transition-colors inline-flex items-center gap-1"
-                        >
-                          <span>CHAIN</span>
-                          <ArrowUpRight className="h-3 w-3" />
-                        </a>
+                      <td className="py-3.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => handleCreateBot(q, "BUY", e)}
+                            className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[10px] font-bold border border-emerald-500/40 transition-colors"
+                          >
+                            BUY
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleCreateBot(q, "SELL", e)}
+                            className="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[10px] font-bold border border-rose-500/40 transition-colors"
+                          >
+                            SELL
+                          </button>
+                          <a
+                            href={`/options/delta`}
+                            className="px-2 py-1 rounded bg-[#142036] hover:bg-amber-500 hover:text-slate-950 text-amber-400 text-[10px] font-bold transition-colors inline-flex items-center gap-0.5 border border-[#213047]"
+                          >
+                            <span>OPT</span>
+                            <ArrowUpRight className="h-3 w-3" />
+                          </a>
+                        </div>
                       </td>
                     </tr>
                   );

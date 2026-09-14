@@ -29,6 +29,7 @@ except ImportError:
 
 from src import config
 from src.dhan_service import global_dhan_service, OFFICIAL_DHAN_KEYS
+from src.dhan_credential_manager import global_dhan_credential_manager
 
 logger = logging.getLogger("DhanFeedManager")
 
@@ -124,6 +125,33 @@ class DhanFeedManager:
             seg = meta.get("exchange_segment", "NSE_EQ")
             self._sec_id_to_symbol[f"{seg}:{sec_id}"] = sym
             self._sec_id_to_symbol[sec_id] = sym
+
+        global_dhan_credential_manager.register_callback(self._on_credential_update)
+
+    def _on_credential_update(self, client_id: str, access_token: str, generation: int) -> None:
+        """Callback on Dhan credential renewal or manual update."""
+        logger.info("DhanFeedManager notified of credential update (Gen=%d)", generation)
+        self._auth_error = None
+        self._safe_error_message = None
+        if self._running:
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(self.reconnect_with_new_credentials())
+            except RuntimeError:
+                pass
+
+    async def reconnect_with_new_credentials(self) -> None:
+        """Cleanly drops current socket and immediately reconnects with new token."""
+        self._status = "REAUTHENTICATING"
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception:
+                pass
+            self._ws = None
+        self._retry_count = 0
+        if not self._ws_task or self._ws_task.done():
+            self._ws_task = asyncio.create_task(self._ws_loop(), name="DhanFeedLoop")
 
     def log_safe_runtime_config(self) -> None:
         """Prints official safe startup log per Section 5 specifications."""

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { OptionStrikeRow, OptionContractQuote } from "@/types/option-chain";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 interface SimpleLiveOptionChainTableProps {
   strikes: OptionStrikeRow[];
@@ -58,6 +60,59 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
   onSelectOption,
   onQuickTrade,
 }: SimpleLiveOptionChainTableProps) {
+  const router = useRouter();
+
+  const handleCreateOptionBot = (
+    strike: number,
+    type: "CE" | "PE",
+    side: "BUY" | "SELL",
+    quote: OptionContractQuote | null,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    const isCrypto = sourceName.toUpperCase().includes("DELTA") || currency === "$";
+    const underlying = quote?.symbol ? quote.symbol.split("-")[0] : isCrypto ? "BTC" : "NIFTY";
+    const sym = quote?.symbol || `${underlying} ${strike} ${type}`;
+    const ltp = quote?.ltp ?? (quote as any)?.last_price ?? quote?.markPrice ?? null;
+    const expiry = quote?.expiry || null;
+    const bid = quote?.bid ?? (quote as any)?.best_bid ?? null;
+    const ask = quote?.ask ?? (quote as any)?.best_ask ?? null;
+    const oi = quote?.open_interest ?? (quote as any)?.oi ?? null;
+    const vol = quote?.volume ?? null;
+    const delta = quote?.delta ?? null;
+    const gamma = quote?.gamma ?? null;
+    const theta = quote?.theta ?? null;
+    const vega = quote?.vega ?? null;
+    const iv = quote?.iv ?? (quote as any)?.mark_iv ?? null;
+
+    dispatchBotCreation(router, {
+      symbol: sym,
+      canonicalSymbol: sym,
+      side,
+      assetClass: isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS",
+      exchange: isCrypto ? "DELTA" : "NSE",
+      market: isCrypto ? "Crypto Options" : "Indian Index Options",
+      broker: isCrypto ? "DELTA" : sourceName.toUpperCase().includes("DHAN") ? "DHAN" : "UPSTOX",
+      marketDataSource: sourceName.toUpperCase().includes("DELTA") ? "DELTA" : "DHAN",
+      instrumentId: (quote as any)?.instrument_key || (quote as any)?.instrument_id || sym,
+      currentPrice: ltp,
+      bid,
+      ask,
+      expiry,
+      strike,
+      optionType: type === "CE" ? "CALL" : "PUT",
+      openInterest: oi,
+      volume: vol,
+      delta,
+      gamma,
+      theta,
+      vega,
+      iv,
+      origin: "OPTIONS",
+      timestamp: Date.now(),
+    });
+  };
+
   // Filter strikes according to moneyness
   const filteredStrikes = useMemo(() => {
     if (!strikes || strikes.length === 0) return [];
@@ -108,7 +163,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
             {/* Top Category Split */}
             <tr className="border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-center">
               <th
-                colSpan={showAdvancedColumns ? 7 : 4}
+                colSpan={showAdvancedColumns ? 8 : 5}
                 className="py-1.5 bg-rose-950/20 text-rose-300 border-r border-slate-800"
               >
                 CALLS (CE)
@@ -117,7 +172,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                 STRIKE
               </th>
               <th
-                colSpan={showAdvancedColumns ? 7 : 4}
+                colSpan={showAdvancedColumns ? 8 : 5}
                 className="py-1.5 bg-emerald-950/20 text-emerald-300"
               >
                 PUTS (PE)
@@ -133,7 +188,8 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
               {showAdvancedColumns && <th className="p-2 text-right text-cyan-400">Δ Delta</th>}
               <th className="p-2 text-right text-slate-400">Bid</th>
               <th className="p-2 text-right text-slate-400">Ask</th>
-              <th className="p-2 text-right font-bold text-white border-r border-slate-800">LTP</th>
+              <th className="p-2 text-right font-bold text-white">LTP</th>
+              <th className="p-2 text-center text-rose-300 font-bold border-r border-slate-800">TRADE</th>
 
               {/* Center Strike Column */}
               <th className="p-2 text-center font-black text-white bg-slate-900 border-r border-slate-800">
@@ -141,6 +197,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
               </th>
 
               {/* Put Columns */}
+              <th className="p-2 text-center text-emerald-300 font-bold">TRADE</th>
               <th className="p-2 text-left font-bold text-white">LTP</th>
               <th className="p-2 text-left text-slate-400">Bid</th>
               <th className="p-2 text-left text-slate-400 border-r border-slate-800/60">Ask</th>
@@ -245,7 +302,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                   {/* CALLS: LTP (Clickable) */}
                   <td
                     onClick={() => onSelectOption(row.strike, "CE", ce)}
-                    className={`p-2 text-right border-r border-slate-800 cursor-pointer transition ${
+                    className={`p-2 text-right cursor-pointer transition ${
                       ceITM ? "bg-rose-950/20" : ""
                     } ${
                       isCeSelected
@@ -255,6 +312,31 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                   >
                     <div className="flex items-center justify-end gap-1.5">
                       <span className="text-[11px]">{formatPrice(ceLtp, currency)}</span>
+                    </div>
+                  </td>
+
+                  {/* CALLS: TRADE BUTTONS */}
+                  <td
+                    className={`p-1 text-center border-r border-slate-800 ${ceITM ? "bg-rose-950/20" : ""}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => handleCreateOptionBot(row.strike, "CE", "BUY", ce, e)}
+                        className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
+                        title="Create Call BUY Bot"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCreateOptionBot(row.strike, "CE", "SELL", ce, e)}
+                        className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
+                        title="Create Call SELL Bot"
+                      >
+                        S
+                      </button>
                     </div>
                   </td>
 
@@ -273,6 +355,31 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                         </span>
                       )}
                       <span>{row.strike.toLocaleString()}</span>
+                    </div>
+                  </td>
+
+                  {/* PUTS: TRADE BUTTONS */}
+                  <td
+                    className={`p-1 text-center ${peITM ? "bg-emerald-950/20" : ""}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => handleCreateOptionBot(row.strike, "PE", "BUY", pe, e)}
+                        className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
+                        title="Create Put BUY Bot"
+                      >
+                        B
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleCreateOptionBot(row.strike, "PE", "SELL", pe, e)}
+                        className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
+                        title="Create Put SELL Bot"
+                      >
+                        S
+                      </button>
                     </div>
                   </td>
 

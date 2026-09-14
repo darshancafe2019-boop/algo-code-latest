@@ -2658,6 +2658,120 @@ def api_universe_summary():
     })
 
 
+@app.route("/api/universe/sessions", methods=["GET"])
+def api_universe_sessions():
+    """Computes real-time dynamic market trading sessions across all global exchanges."""
+    from datetime import time as dtime
+    now_utc = datetime.now(timezone.utc)
+    ist_offset = timedelta(hours=5, minutes=30)
+    now_ist = now_utc + ist_offset
+    weekday = now_ist.weekday()
+
+    is_weekday = weekday < 5
+    t_ist = now_ist.time()
+    nse_pre_open = is_weekday and (dtime(9, 0) <= t_ist < dtime(9, 15))
+    nse_open = is_weekday and (dtime(9, 15) <= t_ist <= dtime(15, 30))
+    nse_status = "OPEN" if nse_open else ("PRE_MARKET" if nse_pre_open else "CLOSED")
+    nse_badge = "emerald" if nse_open else ("amber" if nse_pre_open else "slate")
+
+    mcx_open = is_weekday and (dtime(9, 0) <= t_ist <= dtime(23, 30))
+    mcx_status = "OPEN" if mcx_open else "CLOSED"
+    mcx_badge = "emerald" if mcx_open else "slate"
+
+    t_utc = now_utc.time()
+    us_open = (now_utc.weekday() < 5) and (dtime(13, 30) <= t_utc <= dtime(20, 0))
+    us_pre = (now_utc.weekday() < 5) and (dtime(8, 0) <= t_utc < dtime(13, 30))
+    us_status = "OPEN" if us_open else ("PRE_MARKET" if us_pre else "CLOSED")
+    us_badge = "emerald" if us_open else ("amber" if us_pre else "slate")
+
+    forex_open = not (now_utc.weekday() == 5 or (now_utc.weekday() == 6 and t_utc < dtime(22, 0)) or (now_utc.weekday() == 4 and t_utc >= dtime(22, 0)))
+    forex_status = "OPEN" if forex_open else "CLOSED"
+    forex_badge = "emerald" if forex_open else "slate"
+
+    sessions = [
+        {
+            "market_id": "nse_india",
+            "exchange": "NSE",
+            "name": "NSE India",
+            "country": "India",
+            "timezone": "IST",
+            "local_time": "09:15 - 15:30",
+            "status": nse_status,
+            "status_label": nse_status if nse_status != "PRE_MARKET" else "PRE-OPEN",
+            "hours": "09:15 - 15:30 IST",
+            "badge_color": nse_badge
+        },
+        {
+            "market_id": "bse_india",
+            "exchange": "BSE",
+            "name": "BSE India",
+            "country": "India",
+            "timezone": "IST",
+            "local_time": "09:15 - 15:30",
+            "status": nse_status,
+            "status_label": nse_status if nse_status != "PRE_MARKET" else "PRE-OPEN",
+            "hours": "09:15 - 15:30 IST",
+            "badge_color": nse_badge
+        },
+        {
+            "market_id": "mcx_india",
+            "exchange": "MCX",
+            "name": "MCX India",
+            "country": "India",
+            "timezone": "IST",
+            "local_time": "09:00 - 23:30",
+            "status": mcx_status,
+            "status_label": mcx_status,
+            "hours": "09:00 - 23:30 IST",
+            "badge_color": mcx_badge
+        },
+        {
+            "market_id": "crypto_247",
+            "exchange": "CRYPTO",
+            "name": "Crypto 24/7",
+            "country": "Global",
+            "timezone": "UTC",
+            "local_time": "Live UTC",
+            "status": "OPEN",
+            "status_label": "OPEN 24/7",
+            "hours": "24/7",
+            "badge_color": "emerald"
+        },
+        {
+            "market_id": "us_nyse_nasdaq",
+            "exchange": "US",
+            "name": "US Markets",
+            "country": "US",
+            "timezone": "EDT",
+            "local_time": "09:30 - 16:00",
+            "status": us_status,
+            "status_label": us_status if us_status != "PRE_MARKET" else "PRE-MARKET",
+            "hours": "09:30 - 16:00 EDT",
+            "badge_color": us_badge
+        },
+        {
+            "market_id": "forex_global",
+            "exchange": "FOREX",
+            "name": "Forex Global",
+            "country": "Global",
+            "timezone": "UTC",
+            "local_time": "24/5",
+            "status": forex_status,
+            "status_label": forex_status,
+            "hours": "24/5 UTC",
+            "badge_color": forex_badge
+        }
+    ]
+
+    return jsonify({
+        "status": "success",
+        "sessions": sessions,
+        "timestamp": now_utc.isoformat()
+    })
+
+
+
+
 @app.route("/api/universe/<segment>", methods=["GET"])
 def api_universe_segment(segment: str):
     """Convenience endpoint returning instruments for a specific market segment."""
@@ -3187,20 +3301,6 @@ def api_universe_heatmaps():
     return jsonify({"status": "success", **data})
 
 
-@app.route("/api/universe/sessions", methods=["GET"])
-def api_universe_sessions():
-    """Returns authoritative real-time global exchange market session statuses and trading clock."""
-    try:
-        from src.market_session_service import global_market_session_service
-        sessions = global_market_session_service.get_market_sessions_snapshot()
-        return jsonify({
-            "status": "success",
-            "sessions": sessions,
-            "timestamp": datetime.now(timezone.utc).isoformat()
-        })
-    except Exception as exc:
-        logger.error("Error in api_universe_sessions: %s", exc)
-        return jsonify({"status": "error", "message": str(exc), "sessions": []}), 500
 
 
 @app.route("/api/universe/scanners", methods=["GET"])

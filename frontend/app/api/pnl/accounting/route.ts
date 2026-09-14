@@ -15,6 +15,8 @@ import {
   EquityCurvePoint,
 } from "@/types/pnl-journal";
 
+export const dynamic = "force-dynamic";
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
 
 export async function GET(request: NextRequest) {

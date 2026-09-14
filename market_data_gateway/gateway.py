@@ -37,6 +37,7 @@ from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapte
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
 from market_data_gateway.candle_store import global_candle_store
+from src.dhan_credential_manager import global_dhan_credential_manager
 
 logging.basicConfig(
     level=logging.INFO,
@@ -152,6 +153,9 @@ class MarketDataGateway:
         await global_candle_store.initialize()
         logger.info("Candle store backend: %s", global_candle_store.get_backend())
 
+        # Start Dhan background credential watcher
+        global_dhan_credential_manager.start_background_watcher(interval_sec=300)
+
         for name, adapter in self.adapters.items():
             try:
                 await adapter.connect()
@@ -239,6 +243,7 @@ class MarketDataGateway:
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "candle_backend": global_candle_store.get_backend(),
             "providers": healths,
+            "dhan_credentials": global_dhan_credential_manager.get_status(),
             "failover_transitions": self.failover.get_transitions(limit=10),
             "subscriptions": self.subscription_registry.dump(),
         })
@@ -324,7 +329,7 @@ class MarketDataGateway:
             adapter = self.failover.get_best_provider(sym)
             if adapter:
                 try:
-                    quotes = await asyncio.wait_for(adapter.get_snapshot([sym]), timeout=3.0)
+                    quotes = await asyncio.wait_for(adapter.get_snapshot([sym]), timeout=2.5)
                     if sym in quotes:
                         matched_q = quotes[sym]
                         self._quote_cache[sym] = matched_q
@@ -334,16 +339,8 @@ class MarketDataGateway:
                                 matched_q = quotes[a]
                                 self._quote_cache[a] = matched_q
                                 break
-                except asyncio.TimeoutError:
-                    return web.json_response({
-                        "ok": False,
-                        "code": "SOURCE_TIMEOUT",
-                        "symbol": sym,
-                        "source": adapter.provider_id.upper(),
-                        "message": f"Timeout querying quote from {adapter.provider_id}."
-                    }, status=504)
-                except Exception as ex:
-                    logger.warning("Error querying snapshot from adapter %s for %s: %s", adapter.provider_id, sym, ex)
+                except (asyncio.TimeoutError, Exception) as ex:
+                    logger.debug("Snapshot query note for %s from %s: %s", sym, adapter.provider_id, ex)
 
         if matched_q:
             matched_q.mark_stale(STALE_THRESHOLD_SEC)
@@ -355,12 +352,18 @@ class MarketDataGateway:
                 ts_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
                 age_ms = 0
 
+            quote_status = "LIVE" if not matched_q.is_stale else "STALE"
+            if matched_q.provider in ("dhan", "dhan_ws"):
+                from market_data_gateway.adapters.dhan_ws import is_indian_market_open
+                if not is_indian_market_open():
+                    quote_status = "MARKET_CLOSED"
+
             return web.json_response({
                 "ok": True,
                 "symbol": sym,
                 "price": matched_q.last_price,
                 "source": (matched_q.provider or "GATEWAY").upper(),
-                "status": "LIVE" if not matched_q.is_stale else "STALE",
+                "status": quote_status,
                 "timestamp": ts_ms,
                 "ageMs": age_ms,
                 "bid": matched_q.bid,
@@ -370,15 +373,48 @@ class MarketDataGateway:
 
         adapter = self.failover.get_best_provider(sym)
         if not adapter:
+            from market_data_gateway.failover_manager import _get_asset_class, FAILOVER_CHAINS
+            asset_class = _get_asset_class(sym)
+            chain = FAILOVER_CHAINS.get(asset_class, [])
+            for pid in chain:
+                cand = self.adapters.get(pid)
+                if cand:
+                    cand_status = cand.get_status()
+                    if cand_status in ("AUTH_REQUIRED", "AUTH_ERROR", "AUTH_FAILED"):
+                        return web.json_response({
+                            "ok": False,
+                            "code": "AUTH_REQUIRED",
+                            "symbol": sym,
+                            "source": cand.provider_id.upper(),
+                            "message": f"Provider {cand.provider_id} requires authentication.",
+                        }, status=401)
+                    if cand_status in ("DISCONNECTED", "ERROR"):
+                        return web.json_response({
+                            "ok": False,
+                            "code": "SOURCE_DISCONNECTED",
+                            "symbol": sym,
+                            "source": cand.provider_id.upper(),
+                            "message": f"Provider {cand.provider_id} is disconnected.",
+                        }, status=503)
+
             return web.json_response({
                 "ok": False,
                 "code": "SOURCE_NOT_CONFIGURED",
                 "symbol": sym,
                 "source": "UNKNOWN",
                 "message": f"No configured market data adapter for {sym}."
-            }, status=409)
+            }, status=404)
 
         status = adapter.get_status()
+        if status in ("AUTH_REQUIRED", "AUTH_ERROR", "AUTH_FAILED"):
+            return web.json_response({
+                "ok": False,
+                "code": "AUTH_REQUIRED",
+                "symbol": sym,
+                "source": adapter.provider_id.upper(),
+                "message": f"Provider {adapter.provider_id} requires authentication.",
+            }, status=401)
+
         if status in ("DISCONNECTED", "ERROR", "NOT_CONFIGURED"):
             return web.json_response({
                 "ok": False,
@@ -640,14 +676,19 @@ def create_app() -> tuple:
 
 
 async def main():
-    port = int(os.environ.get("MARKET_GATEWAY_PORT", os.environ.get("PORT", "5051")))
+    port = int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
     host = os.environ.get("HOST", "0.0.0.0")
     app, _ = create_app()
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()
-    site = web.TCPSite(runner, host, port)
-    await site.start()
-    logger.info("Market Data Gateway running on http://%s:%d", host, port)
+    try:
+        site = web.TCPSite(runner, host, port)
+        await site.start()
+        logger.info("Market Data Gateway running on http://%s:%d (Backend port: 5050)", host, port)
+    except OSError as oe:
+        logger.error("Market Data Gateway failed to bind on port %d: %s. Port may be occupied.", port, oe)
+        raise
+
     stop_event = asyncio.Event()
     try:
         await stop_event.wait()

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Layers,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import {
   OptionTerminalSnapshot,
   OptionStrikeRowData,
@@ -297,26 +299,60 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
   };
 
-  // Action Dispatchers
+  const router = useRouter();
+
+  // Action Dispatchers -> Route to Bot Creation Interface
   const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
-    if (oneClickMode) {
-      executeOneClickTrade("BUY", contract);
-    } else {
-      setTicketContract(contract);
-      setTicketSide("BUY");
-      setIsTicketOpen(true);
-    }
-  }, [oneClickMode, tradingMode]);
+    dispatchBotCreation(router, {
+      symbol: contract.symbol,
+      canonicalSymbol: contract.symbol,
+      side: "BUY",
+      assetClass: isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS",
+      exchange: isCrypto ? "DELTA" : "NSE",
+      market: isCrypto ? "Crypto Options" : "Indian Index Options",
+      broker: contract.broker || (isCrypto ? "DELTA" : "DHAN"),
+      marketDataSource: contract.source || (isCrypto ? "DELTA" : "DHAN"),
+      instrumentId: contract.instrumentId || contract.symbol,
+      currentPrice: contract.ltp || null,
+      bid: contract.bid || null,
+      ask: contract.ask || null,
+      expiry: contract.expiry || null,
+      strike: contract.strike || null,
+      optionType: contract.optionType === "CE" ? "CALL" : "PUT",
+      lotSize: contract.lotSize || 1,
+      delta: contract.delta || null,
+      theta: contract.theta || null,
+      iv: contract.iv || null,
+      origin: "OPTIONS",
+      timestamp: Date.now(),
+    });
+  }, [router, isCrypto]);
 
   const handleActionSell = useCallback((contract: ActionableOptionContract) => {
-    if (oneClickMode) {
-      executeOneClickTrade("SELL", contract);
-    } else {
-      setTicketContract(contract);
-      setTicketSide("SELL");
-      setIsTicketOpen(true);
-    }
-  }, [oneClickMode, tradingMode]);
+    dispatchBotCreation(router, {
+      symbol: contract.symbol,
+      canonicalSymbol: contract.symbol,
+      side: "SELL",
+      assetClass: isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS",
+      exchange: isCrypto ? "DELTA" : "NSE",
+      market: isCrypto ? "Crypto Options" : "Indian Index Options",
+      broker: contract.broker || (isCrypto ? "DELTA" : "DHAN"),
+      marketDataSource: contract.source || (isCrypto ? "DELTA" : "DHAN"),
+      instrumentId: contract.instrumentId || contract.symbol,
+      currentPrice: contract.ltp || null,
+      bid: contract.bid || null,
+      ask: contract.ask || null,
+      expiry: contract.expiry || null,
+      strike: contract.strike || null,
+      optionType: contract.optionType === "CE" ? "CALL" : "PUT",
+      lotSize: contract.lotSize || 1,
+      delta: contract.delta || null,
+      theta: contract.theta || null,
+      iv: contract.iv || null,
+      origin: "OPTIONS",
+      timestamp: Date.now(),
+    });
+  }, [router, isCrypto]);
 
   const handleActionDepth = useCallback((contract: ActionableOptionContract) => {
     setDepthContract(contract);

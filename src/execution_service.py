@@ -106,38 +106,101 @@ class TestExecutionAdapter:
 
 
 class LiveExecutionAdapter:
-    """Live Execution Adapter requiring strict server-side arming and 14-point validation."""
+    """Live execution adapter that refuses to report an unverified fill."""
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
-        if _is_indian_symbol(symbol):
-            from src.upstox_broker_adapter import global_upstox_broker_adapter
-            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+        try:
+            if _is_indian_symbol(symbol):
+                from src.upstox_broker_adapter import global_upstox_broker_adapter
+                raw_result = global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+                if not isinstance(raw_result, dict):
+                    return {
+                        "success": False,
+                        "status": "REJECTED",
+                        "message": "Upstox returned an invalid order response.",
+                    }
+                if raw_result.get("success") is False:
+                    return raw_result
+                order_id = raw_result.get("order_id") or raw_result.get("orderId")
+                filled = raw_result.get("filled_quantity", raw_result.get("filled", 0.0))
+                average = raw_result.get("average_price", raw_result.get("average", 0.0))
+                fees = raw_result.get("fees", 0.0)
+            else:
+                from src.execution import ExecutionEngine
+                from src.data_fetcher import get_testnet_fetcher
 
-        from src.execution import ExecutionEngine
-        from src.data_fetcher import get_testnet_fetcher
+                fetcher = get_testnet_fetcher()
+                engine = ExecutionEngine(fetcher.exchange)
+                raw_result = (
+                    engine.market_buy(symbol, amount, price)
+                    if side.upper() in {"BUY", "LONG"}
+                    else engine.market_sell(symbol, amount, price)
+                )
+                if not isinstance(raw_result, dict):
+                    return {
+                        "success": False,
+                        "status": "REJECTED",
+                        "message": "Exchange returned an invalid order response.",
+                    }
+                order_id = raw_result.get("order_id")
+                filled = raw_result.get("filled_amount", 0.0)
+                average = raw_result.get("average_price", 0.0)
+                fees = raw_result.get("fees", 0.0)
 
-        fetcher = get_testnet_fetcher()
-        engine = ExecutionEngine(fetcher.exchange)
-        if side.upper() in ["BUY", "LONG"]:
-            res = engine.market_buy(symbol, amount, price)
-        else:
-            res = engine.market_sell(symbol, amount, price)
-
-        return {
-            "success": True,
-            "order_id": res.get("order_id"),
-            "broker_order_id": res.get("order_id"),
-            "client_order_id": res.get("order_id"),
-            "symbol": symbol,
-            "side": side,
-            "requested_quantity": amount,
-            "filled_quantity": res.get("filled_amount", amount),
-            "remaining_quantity": 0.0,
-            "average_price": res.get("average_price", price),
-            "fees": 0.0,
-            "status": "FILLED",
-            "execution_mode": "LIVE"
-        }
+            try:
+                filled_num = float(filled)
+                average_num = float(average)
+                fees_num = float(fees or 0.0)
+            except (TypeError, ValueError):
+                return {
+                    "success": False,
+                    "status": "REJECTED",
+                    "message": "Live broker returned non-numeric fill data.",
+                    "broker_order_id": order_id,
+                }
+            if not order_id or not math.isfinite(filled_num) or filled_num <= 0:
+                return {
+                    "success": False,
+                    "status": "SUBMITTED",
+                    "message": "Live order has no verified fill quantity; reconciliation is required before retry.",
+                    "broker_order_id": order_id,
+                }
+            if not math.isfinite(average_num) or average_num <= 0:
+                return {
+                    "success": False,
+                    "status": "SUBMITTED",
+                    "message": "Live order has no verified fill price; reconciliation is required before retry.",
+                    "broker_order_id": order_id,
+                }
+            if not math.isfinite(fees_num) or fees_num < 0:
+                return {
+                    "success": False,
+                    "status": "REJECTED",
+                    "message": "Live broker returned invalid fee data.",
+                    "broker_order_id": order_id,
+                }
+            return {
+                "success": True,
+                "order_id": str(order_id),
+                "broker_order_id": str(order_id),
+                "client_order_id": str(order_id),
+                "symbol": symbol,
+                "side": side,
+                "requested_quantity": amount,
+                "filled_quantity": filled_num,
+                "remaining_quantity": max(0.0, float(amount) - filled_num),
+                "average_price": average_num,
+                "fees": fees_num,
+                "status": "FILLED",
+                "execution_mode": "LIVE",
+            }
+        except Exception as exc:
+            logger.error("Live broker submission failed for %s: %s", symbol, exc)
+            return {
+                "success": False,
+                "status": "REJECTED",
+                "message": "Live broker submission failed; no fill was recorded.",
+            }
 
 
 class OrderExecutionService:
@@ -169,7 +232,8 @@ class OrderExecutionService:
         market_tick_iso: Optional[str] = None,
         account_balance: float = 10000.0,
         is_live: bool = False,
-        client_order_id: Optional[str] = None
+        client_order_id: Optional[str] = None,
+        broker: str = "PAPER",
     ) -> Tuple[bool, str]:
         """Strict 14-Point Pre-Order Validation Check."""
 
@@ -280,10 +344,13 @@ class OrderExecutionService:
                 return False, f"LIVE_MARKET_FEED_STALE: Live execution blocked. Market feed for {symbol} is currently stale."
 
         # Broker-specific auth fail-closed check
-        from src.dhan_broker_adapter import dhan_broker_adapter
-        if dhan_broker_adapter.auth_status == "AUTH_FAILED":
-            # If Dhan is in auth failed state, block any Dhan execution
-            pass
+        normalized_broker = str(broker or "PAPER").strip().upper()
+        if is_live and normalized_broker == "PAPER":
+            return False, "BROKER_REQUIRED: Live execution requires an explicit broker."
+        if is_live and normalized_broker == "DHAN":
+            from src.dhan_broker_adapter import dhan_broker_adapter
+            if dhan_broker_adapter.auth_status == "AUTH_FAILED":
+                return False, "DHAN_AUTH_FAILED: Dhan authentication is not valid."
 
         return True, "ALL_14_SAFETY_CHECKS_PASSED"
 
@@ -348,7 +415,8 @@ class OrderExecutionService:
             price=eff_price, stop_loss=safe_stop_loss, take_profit=safe_take_profit,
             confidence_score=confidence_score, market_tick_iso=market_tick_iso,
             account_balance=account_balance, is_live=effective_live,
-            client_order_id=client_order_id
+            client_order_id=client_order_id,
+            broker=str(broker or "PAPER").strip().upper(),
         )
 
         if client_order_id:
@@ -434,6 +502,20 @@ class OrderExecutionService:
                 return False, str(failure_message), result if isinstance(result, dict) else {}
             result.setdefault("execution_mode", mode)
             result.setdefault("broker", normalized_broker)
+            try:
+                fill_qty = float(result.get("filled_quantity") or 0.0)
+                fill_price = float(result.get("average_price") or 0.0)
+            except (TypeError, ValueError):
+                return False, "INVALID_EXECUTION_RESPONSE: Fill quantity and price must be numeric.", result
+            order_id = str(result.get("order_id") or "")
+            if (
+                not order_id
+                or not math.isfinite(fill_qty)
+                or fill_qty <= 0
+                or not math.isfinite(fill_price)
+                or fill_price <= 0
+            ):
+                return False, "INVALID_EXECUTION_RESPONSE: A verified order id, fill quantity, and fill price are required.", result
 
             latency_ctx.mark_stage("broker_ack")
             latency_ctx.mark_stage("fill")
@@ -461,17 +543,23 @@ class OrderExecutionService:
                 "direction": side.upper(),
                 "entry_price": float(result.get("average_price") or eff_price),
                 "position_size": float(result.get("filled_quantity") or effective_qty),
-                "stop_loss": stop_loss,
-                "take_profit": take_profit,
+                "stop_loss": safe_stop_loss,
+                "take_profit": safe_take_profit,
                 "signal_confidence": float(confidence_score * 100.0 if confidence_score <= 1.0 else confidence_score),
                 "execution_mode": mode,
+                "broker_provider": normalized_broker,
+                "broker_account_id": f"ba_{mode.lower()}_{normalized_broker.lower()}",
+                "broker_folder_id": f"bf_{mode.lower()}_{normalized_broker.lower()}",
+                "exchange": normalized_broker,
                 "broker_order_id": str(result.get("broker_order_id") or result.get("order_id")),
                 "order_id": str(result.get("order_id")),
                 "idempotency_key": idem_key,
-                "fees": float(result.get("fees") or 1.50),
+                "fees": float(result.get("fees") or 0.0),
                 "remarks": f"Executed via {mode} OrderExecutionService"
             })
 
+            if not ok:
+                return False, f"TRADE_LEDGER_REJECTED: {msg}", {**result, "success": False}
             latency_ctx.trade_id = trade_id
             latency_ctx.mark_stage("db_write")
             latency_ctx.finalize()
@@ -548,7 +636,7 @@ class OrderExecutionService:
         client_order_id: Optional[str] = None,
         broker: str = "PAPER",
     ) -> Dict[str, Any]:
-        """Routes and executes an order with automatic price resolution and fail-safe directional SL/TP."""
+        """Route an order only with an authoritative price and explicit protective levels."""
         eff_price = price
         if not eff_price or eff_price <= 0:
             try:
@@ -580,13 +668,54 @@ class OrderExecutionService:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
+        try:
+            eff_sl = float(stop_loss)
+            eff_tp = float(take_profit)
+        except (TypeError, ValueError):
+            return {
+                "status": "error",
+                "success": False,
+                "reason": "INVALID_PROTECTIVE_LEVELS: Explicit stop-loss and take-profit values are required.",
+                "order_id": "",
+                "trade_id": None,
+                "symbol": symbol,
+                "direction": direction,
+                "quantity": quantity,
+                "mode": mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
+        if eff_sl <= 0 or eff_tp <= 0:
+            return {
+                "status": "error",
+                "success": False,
+                "reason": "INVALID_PROTECTIVE_LEVELS: Explicit positive stop-loss and take-profit values are required.",
+                "order_id": "",
+                "trade_id": None,
+                "symbol": symbol,
+                "direction": direction,
+                "quantity": quantity,
+                "mode": mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
         is_buy = direction.upper() in ["BUY", "LONG"]
-        if is_buy:
-            eff_sl = stop_loss if (stop_loss and stop_loss > 0 and stop_loss < eff_price) else round(eff_price * 0.985, 2)
-            eff_tp = take_profit if (take_profit and take_profit > 0 and take_profit > eff_price) else round(eff_price * 1.035, 2)
-        else:
-            eff_sl = stop_loss if (stop_loss and stop_loss > 0 and stop_loss > eff_price) else round(eff_price * 1.015, 2)
-            eff_tp = take_profit if (take_profit and take_profit > 0 and take_profit < eff_price) else round(eff_price * 0.965, 2)
+        if (is_buy and (eff_sl >= eff_price or eff_tp <= eff_price)) or (
+            not is_buy and (eff_sl <= eff_price or eff_tp >= eff_price)
+        ):
+            return {
+                "status": "error",
+                "success": False,
+                "reason": "INVALID_PROTECTIVE_LEVELS: Protective levels do not match order direction.",
+                "order_id": "",
+                "trade_id": None,
+                "symbol": symbol,
+                "direction": direction,
+                "quantity": quantity,
+                "mode": mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+
 
         success, reason, order_dict = self.execute_order(
             bot_id=bot_id,

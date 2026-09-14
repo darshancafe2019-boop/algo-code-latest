@@ -106,6 +106,12 @@ function normalizeDeltaQuote(data: any): DeltaQuoteTick | null {
   const last_price = Number(data.last_price || data.close || data.ltp || data.mark_price || 0);
   if (!rawSymbol || isNaN(last_price) || last_price <= 0) return null;
 
+  // Prevent Indian market equity/index symbols from bleeding into Delta feed
+  const rawProvider = String(data.provider || "delta").toLowerCase();
+  if (rawProvider === "dhan" || rawProvider === "dhan_ws" || rawProvider === "upstox" || rawProvider === "upstox_ws") {
+    return null;
+  }
+
   const symbol = rawSymbol;
   const quotesSub = data.quotes || {};
 
@@ -218,22 +224,38 @@ export function DeltaLiveMarketFeed() {
     queryFn: async () => {
       try {
         const res = await fetch("/api/brokers/delta/status");
-        if (res.ok) return await res.json();
+        if (res.ok) {
+          const json = await res.json();
+          const isConn = json.connected || json.status === "CONNECTED";
+          return {
+            provider: "delta",
+            account: "delta_india",
+            status: isConn ? "CONNECTED" : (json.status || "STANDALONE"),
+            subscribed_instruments: json.subscribed_instruments ?? (isConn ? 180 : 0),
+            last_tick_at: json.last_tick_at || null,
+            freshness_ms: json.latencyMs || null,
+            data_api_access: isConn ? "AVAILABLE" : "UNAVAILABLE",
+            execution_mode: "PAPER",
+            ticks_received: json.ticks_received || 0,
+            error_count: isConn ? 0 : 1,
+            error_message: json.error_message || null,
+          };
+        }
       } catch (err: any) {
         console.warn("[DELTA LIVE] Status fetch note:", err);
       }
       return {
         provider: "delta",
         account: "delta_india",
-        status: "CONNECTED",
-        subscribed_instruments: 180,
+        status: "UNKNOWN",
+        subscribed_instruments: 0,
         last_tick_at: null,
-        freshness_ms: 12,
-        data_api_access: "AVAILABLE",
-        execution_mode: "LIVE_AND_PAPER",
+        freshness_ms: null,
+        data_api_access: "UNAVAILABLE",
+        execution_mode: "PAPER",
         ticks_received: 0,
-        error_count: 0,
-        error_message: null,
+        error_count: 1,
+        error_message: "Unable to reach Delta status endpoint",
       };
     },
     refetchInterval: 3000,

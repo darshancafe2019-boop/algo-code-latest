@@ -369,8 +369,21 @@ class DhanFeedManager:
             low_p = None
             close_p = None
 
+            # 0. Index Packet (Response Code 1) -> 16 to 28 bytes
+            if resp_code == 1 and len(data) >= 16:
+                if len(data) >= 28:
+                    ltp, close_val, high_val, low_val, open_val = struct.unpack_from("<fffff", data, 8)
+                    last_price = round(float(ltp), 2)
+                    open_p = round(float(open_val), 2) if open_val > 0 else None
+                    close_p = round(float(close_val), 2) if close_val > 0 else None
+                    high_p = round(float(high_val), 2) if high_val > 0 else None
+                    low_p = round(float(low_val), 2) if low_val > 0 else None
+                else:
+                    ltp, ltt = struct.unpack_from("<fI", data, 8)
+                    last_price = round(float(ltp), 2)
+
             # 1. Ticker Packet (Response Code 2) -> 16 bytes
-            if resp_code == 2 and len(data) >= 16:
+            elif resp_code == 2 and len(data) >= 16:
                 ltp, ltt = struct.unpack_from("<fI", data, 8)
                 last_price = round(float(ltp), 2)
 

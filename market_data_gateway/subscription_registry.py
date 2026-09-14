@@ -29,6 +29,9 @@ VALID_REASONS = frozenset({
     "QUANTOS_DIAGNOSTIC", # Quant.OS diagnostic tooling
     "SYSTEM",             # system background subscription
     "DIAGNOSTIC",         # generic diagnostic
+    "SSE_CLIENT_STREAM",  # Next.js BFF server-sent event stream
+    "TEST_CLIENT",        # diagnostic and test client
+    "RESTORE_SUBSCRIPTIONS", # frontend reconnection restoration
 })
 
 MODE_PRIORITY: Dict[str, int] = {
@@ -43,6 +46,7 @@ class SubscriptionRegistry:
     """
     Reason-keyed and mode-managed subscription tracker with reference counting.
     Aggregates requested modes to the highest necessary mode.
+    Supports per-source subscription keys to prevent cross-client clobbering.
     """
 
     def __init__(
@@ -57,24 +61,28 @@ class SubscriptionRegistry:
         mode_change_callback(symbol, new_mode) -> called when highest mode changes
         """
         self._lock = threading.RLock()
-        # symbol -> {reason: (source_label, mode)}
-        self._subscriptions: Dict[str, Dict[str, tuple[str, str]]] = {}
+        # symbol -> {sub_key: (reason, source_label, mode)}
+        # sub_key is f"{reason}::{source}" if source else reason
+        self._subscriptions: Dict[str, Dict[str, tuple[str, str, str]]] = {}
         self._active_modes: Dict[str, str] = {}  # symbol -> aggregated mode
         self._add_callback = add_callback
         self._remove_callback = remove_callback
         self._mode_change_callback = mode_change_callback
 
-    def _calculate_highest_mode(self, reasons: Dict[str, tuple[str, str]]) -> str:
-        if not reasons:
+    def _calculate_highest_mode(self, reasons_dict: Dict[str, tuple[str, str, str]]) -> str:
+        if not reasons_dict:
             return "ltpc"
         highest_prio = 0
         chosen_mode = "ltpc"
-        for _, (_, mode) in reasons.items():
+        for _, (_, _, mode) in reasons_dict.items():
             prio = MODE_PRIORITY.get(mode.lower(), 1)
             if prio > highest_prio:
                 highest_prio = prio
                 chosen_mode = mode.lower()
         return chosen_mode
+
+    def _make_key(self, reason: str, source: str) -> str:
+        return f"{reason}::{source}" if source else reason
 
     def subscribe(self, symbol: str, reason: str, source: str = "", mode: str = "full") -> None:
         """Register a subscription for a symbol with a given reason and mode."""
@@ -84,13 +92,14 @@ class SubscriptionRegistry:
             return
 
         clean_mode = mode.lower() if mode.lower() in MODE_PRIORITY else "full"
+        sub_key = self._make_key(reason, source)
 
         with self._lock:
             is_new = sym not in self._subscriptions
             if is_new:
                 self._subscriptions[sym] = {}
 
-            self._subscriptions[sym][reason] = (source, clean_mode)
+            self._subscriptions[sym][sub_key] = (reason, source, clean_mode)
             new_mode = self._calculate_highest_mode(self._subscriptions[sym])
             old_mode = self._active_modes.get(sym)
 
@@ -113,13 +122,23 @@ class SubscriptionRegistry:
             else:
                 logger.debug("Added reason %s for existing subscription %s (mode=%s)", reason, sym, new_mode)
 
-    def unsubscribe(self, symbol: str, reason: str) -> None:
+    def unsubscribe(self, symbol: str, reason: str, source: str = "") -> None:
         """Remove a subscription reason for a symbol. Triggers mode adjustment or full unsubscribe."""
         sym = symbol.upper()
         with self._lock:
             if sym not in self._subscriptions:
                 return
-            self._subscriptions[sym].pop(reason, None)
+
+            sub_key = self._make_key(reason, source)
+            # If explicit key exists, remove it
+            if sub_key in self._subscriptions[sym]:
+                self._subscriptions[sym].pop(sub_key, None)
+            else:
+                # Also check matching by reason prefix if source was not specified
+                to_pop = [k for k, (r, s, _) in self._subscriptions[sym].items() if r == reason and (not source or s == source)]
+                for k in to_pop:
+                    self._subscriptions[sym].pop(k, None)
+
             if not self._subscriptions[sym]:
                 del self._subscriptions[sym]
                 self._active_modes.pop(sym, None)
@@ -135,21 +154,51 @@ class SubscriptionRegistry:
                     if self._mode_change_callback:
                         self._mode_change_callback(sym, new_mode)
 
+    def unsubscribe_all_for_source(self, source: str) -> None:
+        """Removes all subscriptions associated with a specific client source ID."""
+        if not source:
+            return
+        with self._lock:
+            to_remove_symbols = []
+            for sym, sub_dict in list(self._subscriptions.items()):
+                keys_to_pop = [k for k, (_, s, _) in sub_dict.items() if s == source]
+                for k in keys_to_pop:
+                    sub_dict.pop(k, None)
+
+                if not sub_dict:
+                    to_remove_symbols.append(sym)
+                else:
+                    new_mode = self._calculate_highest_mode(sub_dict)
+                    old_mode = self._active_modes.get(sym)
+                    if old_mode != new_mode:
+                        self._active_modes[sym] = new_mode
+                        if self._mode_change_callback:
+                            self._mode_change_callback(sym, new_mode)
+
+            for sym in to_remove_symbols:
+                del self._subscriptions[sym]
+                self._active_modes.pop(sym, None)
+                logger.info("Last subscription removed for %s (source=%s closed) — unsubscribing", sym, source)
+                if self._remove_callback:
+                    self._remove_callback(sym)
+
     def clear_reason(self, reason: str) -> None:
         """Remove a reason from all subscribed symbols (e.g. when a bot stops)."""
         with self._lock:
             to_remove = []
-            for sym, reasons in list(self._subscriptions.items()):
-                if reason in reasons:
-                    reasons.pop(reason)
-                    if not reasons:
-                        to_remove.append(sym)
-                    else:
-                        new_mode = self._calculate_highest_mode(reasons)
-                        if self._active_modes.get(sym) != new_mode:
-                            self._active_modes[sym] = new_mode
-                            if self._mode_change_callback:
-                                self._mode_change_callback(sym, new_mode)
+            for sym, sub_dict in list(self._subscriptions.items()):
+                keys_to_pop = [k for k, (r, _, _) in sub_dict.items() if r == reason]
+                for k in keys_to_pop:
+                    sub_dict.pop(k, None)
+
+                if not sub_dict:
+                    to_remove.append(sym)
+                else:
+                    new_mode = self._calculate_highest_mode(sub_dict)
+                    if self._active_modes.get(sym) != new_mode:
+                        self._active_modes[sym] = new_mode
+                        if self._mode_change_callback:
+                            self._mode_change_callback(sym, new_mode)
 
             for sym in to_remove:
                 del self._subscriptions[sym]
@@ -168,7 +217,11 @@ class SubscriptionRegistry:
 
     def get_reasons_for(self, symbol: str) -> Dict[str, tuple[str, str]]:
         with self._lock:
-            return dict(self._subscriptions.get(symbol.upper(), {}))
+            # Map sub_key or reason -> (source, mode)
+            result = {}
+            for k, (r, s, m) in self._subscriptions.get(symbol.upper(), {}).items():
+                result[k] = (s, m)
+            return result
 
     def dump(self) -> Dict[str, Any]:
         with self._lock:
@@ -177,8 +230,8 @@ class SubscriptionRegistry:
                 "symbols": {
                     sym: {
                         "active_mode": self._active_modes.get(sym, "ltpc"),
-                        "reasons": list(reasons.keys()),
+                        "reasons": [r for (r, _, _) in sub_dict.values()],
                     }
-                    for sym, reasons in self._subscriptions.items()
+                    for sym, sub_dict in self._subscriptions.items()
                 },
             }

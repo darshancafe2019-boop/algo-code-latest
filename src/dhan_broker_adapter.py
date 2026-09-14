@@ -424,6 +424,7 @@ class DhanBrokerAdapter(BrokerAdapter):
         """
         self.client_id = (client_id or "").strip()
         self.access_token = (access_token or "").strip()
+        self._auth_failed = False
         if is_sandbox is not None:
             os.environ["DHAN_SANDBOX"] = "true" if is_sandbox else "false"
             setattr(config, "DHAN_SANDBOX", bool(is_sandbox))

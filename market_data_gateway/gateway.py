@@ -535,7 +535,7 @@ class MarketDataGateway:
                         elif action == "unsubscribe":
                             for sym in syms:
                                 subscriptions.discard(sym)
-                                self.subscription_registry.unsubscribe(sym, reason)
+                                self.subscription_registry.unsubscribe(sym, reason, source=client_id)
                         elif action == "snapshot":
                             result = {}
                             for sym in syms:
@@ -550,10 +550,9 @@ class MarketDataGateway:
         finally:
             async with self._ws_lock:
                 self._ws_clients.pop(client_id, None)
-            # Clean up subscriptions from this client
-            for sym in list(subscriptions):
-                self.subscription_registry.unsubscribe(sym, "CHART_VIEW")
-            logger.info("WS client disconnected: %s", client_id)
+            # Clean up all subscriptions from this client source cleanly
+            self.subscription_registry.unsubscribe_all_for_source(client_id)
+            logger.info("WS client disconnected and cleaned up: %s", client_id)
 
         return ws
 

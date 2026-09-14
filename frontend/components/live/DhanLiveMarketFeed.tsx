@@ -92,6 +92,10 @@ function normalizeDhanQuote(data: any): DhanQuoteTick | null {
   if (!symbol || isNaN(last_price) || last_price <= 0) return null;
 
   const rawProvider = String(data.provider || "dhan").toLowerCase();
+  // Prevent any crypto provider (Delta/Binance) from bleeding into Dhan feed
+  if (rawProvider === "delta" || rawProvider === "delta_options_ws" || rawProvider === "binance" || rawProvider === "binance_ws") {
+    return null;
+  }
   const provider = rawProvider === "dhan_ws" ? "dhan" : rawProvider;
 
   const bid_price = Number(data.bid_price ?? data.bid ?? last_price);
@@ -174,28 +178,44 @@ export function DhanLiveMarketFeed() {
     });
   };
 
-  // 1. Query Server-Side Dhan Feed Status (`GET /api/brokers/dhan/status`)
+  // 1. Query Server-Side Dhan Feed Status (`GET /api/dhan/status` or `/api/brokers/dhan/status`)
   const { data: dhanStatus, refetch: refetchStatus } = useQuery<DhanStatusResponse>({
     queryKey: ["dhanFeedStatus"],
     queryFn: async () => {
       try {
-        const res = await fetch("/api/brokers/dhan/status");
-        if (res.ok) return await res.json();
+        const res = await fetch("/api/dhan/status");
+        if (res.ok) {
+          const json = await res.json();
+          const isConn = json.connected || json.status === "AUTHENTICATED" || json.status === "CONNECTED";
+          return {
+            provider: "dhan",
+            account: "dhan_primary",
+            status: isConn ? (json.marketDataStatus === "LIVE" ? "CONNECTED" : "SOCKET_CONNECTED_NO_TICK") : (json.status || "AUTH_REQUIRED"),
+            subscribed_instruments: json.supportedMarkets?.length || 0,
+            last_tick_at: json.last_tick_at || null,
+            freshness_ms: json.latencyMs || null,
+            data_api_access: json.dataPlanActive ? "AVAILABLE" : (isConn ? "AVAILABLE" : "UNAVAILABLE"),
+            execution_mode: "PAPER",
+            ticks_received: json.ticks_received || 0,
+            error_count: isConn ? 0 : 1,
+            error_message: json.errorMessage || (isConn ? null : "Authentication required"),
+          };
+        }
       } catch (err: any) {
         console.warn("[DHAN LIVE] Status fetch note:", err);
       }
       return {
         provider: "dhan",
         account: "dhan_primary",
-        status: "CONNECTED",
+        status: "UNKNOWN",
         subscribed_instruments: 0,
         last_tick_at: null,
         freshness_ms: null,
-        data_api_access: "AVAILABLE",
+        data_api_access: "UNAVAILABLE",
         execution_mode: "PAPER",
         ticks_received: 0,
-        error_count: 0,
-        error_message: null,
+        error_count: 1,
+        error_message: "Unable to reach Dhan status endpoint",
       };
     },
     refetchInterval: 3000,

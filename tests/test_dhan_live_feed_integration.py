@@ -44,7 +44,7 @@ def test_dhan_ws_adapter_initialization():
     adapter = DhanWSAdapter()
     assert adapter.provider_id == "dhan_ws"
     assert adapter.provider_name == "Dhan HQ Live Market Feed"
-    assert adapter.get_status() in ("DISCONNECTED", "NOT_CONFIGURED", "CONNECTED", "MARKET_CLOSED")
+    assert adapter.get_status() in ("DISCONNECTED", "NOT_CONFIGURED", "CONNECTED", "MARKET_CLOSED", "AUTH_REQUIRED")
 
 
 def test_dhan_ws_binary_ticker_decoding():

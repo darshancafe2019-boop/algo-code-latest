@@ -676,3 +676,5 @@ class AuthoritativeTradeLedger:
 
 
 trade_ledger = AuthoritativeTradeLedger()
+global_trade_ledger = trade_ledger
+TradeLedger = AuthoritativeTradeLedger

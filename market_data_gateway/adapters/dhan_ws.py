@@ -337,8 +337,52 @@ class DhanWSAdapter(BaseProviderAdapter):
             now_mono = time.monotonic()
             self._last_msg_time = now_mono
 
+            # ── 0. Index Packet (Response Code 1) ───────────────────────────
+            if resp_code == 1 and len(data) >= 16:
+                if not symbol:
+                    symbol = f"DHAN_{sec_id_str}"
+                
+                open_val, high_val, low_val, close_val = None, None, None, None
+                if len(data) >= 28:
+                    ltp, close_p, high_p, low_p, open_p = struct.unpack_from("<fffff", data, 8)
+                    ltp_f = round(float(ltp), 2)
+                    open_val = round(float(open_p), 2) if open_p > 0 else None
+                    high_val = round(float(high_p), 2) if high_p > 0 else None
+                    low_val = round(float(low_p), 2) if low_p > 0 else None
+                    close_val = round(float(close_p), 2) if close_p > 0 else None
+                else:
+                    ltp, ltt = struct.unpack_from("<fI", data, 8)
+                    ltp_f = round(float(ltp), 2)
+
+                prev_close = close_val if (close_val and close_val > 0) else ltp_f
+                change_pct = round(((ltp_f - prev_close) / prev_close) * 100.0, 2) if prev_close > 0 else 0.0
+
+                quote = NormalizedQuote(
+                    symbol=symbol,
+                    exchange=exch_seg_str if exch_seg_str != "NSE_EQ" else "IDX_I",
+                    provider="dhan",
+                    last_price=ltp_f,
+                    bid=ltp_f,
+                    ask=ltp_f,
+                    volume=0.0,
+                    open=open_val,
+                    high=high_val,
+                    low=low_val,
+                    close=close_val,
+                    change_pct=change_pct,
+                    data_mode="REAL_TIME",
+                    event_timestamp=now_iso,
+                    received_timestamp=now_iso,
+                    feed_latency_ms=round((time.monotonic() - now_mono) * 1000.0, 1),
+                )
+                self._quote_cache[symbol] = quote
+                self._ticks_received += 1
+                if is_indian_market_open():
+                    self._status = "LIVE"
+                self._emit(quote)
+
             # ── 1. Ticker Packet (Response Code 2) ──────────────────────────
-            if resp_code == 2 and len(data) >= 16:
+            elif resp_code == 2 and len(data) >= 16:
                 ltp, ltt = struct.unpack_from("<fI", data, 8)
                 if not symbol:
                     symbol = f"DHAN_{sec_id_str}"

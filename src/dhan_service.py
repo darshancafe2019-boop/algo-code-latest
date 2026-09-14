@@ -841,33 +841,110 @@ class DhanService:
                 "message": f"Dhan HQ v2 REST responded HTTP 200, awaiting live market ticks ({latency_ms}ms).",
             }
 
+    @property
+    def is_configured(self) -> bool:
+        """Returns True if both Client ID and Access Token are populated."""
+        return bool(self.client_id and self.access_token)
+
+    @property
+    def is_token_valid(self) -> bool:
+        """Checks local JWT expiry of access token without network request."""
+        if not self.access_token:
+            return False
+        try:
+            from src.dhan_credential_manager import global_dhan_credential_manager
+            exp_ts = global_dhan_credential_manager.decode_jwt_expiry(self.access_token)
+            return bool(exp_ts and exp_ts > time.time())
+        except Exception:
+            return False
+
+    def get_auth_state(self) -> Dict[str, Any]:
+        """Returns fine-grained, structured authentication and connectivity flags."""
+        val = self.validate_token()
+        is_val_ok = bool(val.get("valid"))
+        
+        ws_conn = False
+        ticks_cnt = 0
+        try:
+            from src.dhan_feed_manager import global_dhan_feed_manager
+            ws_conn = global_dhan_feed_manager.is_connected
+            ticks_cnt = global_dhan_feed_manager._ticks_received
+        except Exception:
+            pass
+
+        return {
+            "configured": self.is_configured,
+            "authenticated": is_val_ok,
+            "token_valid": self.is_token_valid,
+            "data_plan_active": val.get("data_plan") == "ACTIVE" or (is_val_ok and val.get("data_plan") != "INACTIVE"),
+            "ws_connected": ws_conn,
+            "tick_live": ticks_cnt > 0,
+            "status": val.get("status", "NOT_CONFIGURED"),
+        }
+
     def get_safe_diagnostic(self) -> Dict[str, Any]:
         """
         Produces an authoritative, sanitized diagnostic report for Dhan HQ API v2.
         Strictly excludes tokens, secrets, or sensitive headers.
+        Truthfully reports real WebSocket and binary decoder states.
         """
         val = self.validate_token()
-        is_conf = bool(self.client_id and self.access_token)
+        is_conf = self.is_configured
         status = val.get("status", "NOT_CONFIGURED")
         err_code = val.get("error_code")
         
         auth_status = "VALID" if status == "CONNECTED" else ("TOKEN_EXPIRED" if status == "TOKEN_EXPIRED" else ("NOT_CONFIGURED" if not is_conf else "AUTH_REQUIRED"))
-        token_status = "ACTIVE" if status == "CONNECTED" else ("EXPIRED" if status == "TOKEN_EXPIRED" else ("NOT_SET" if not is_conf else "INVALID"))
+        token_status = "ACTIVE" if (status == "CONNECTED" and self.is_token_valid) else ("EXPIRED" if not self.is_token_valid else ("NOT_SET" if not is_conf else "INVALID"))
         rest_status = "UP" if status == "CONNECTED" else "DOWN"
         data_entitlement = val.get("data_plan") or ("ACTIVE" if status == "CONNECTED" else "UNKNOWN")
+
+        ws_connected = False
+        ticks_received = 0
+        last_tick_iso = None
+        last_tick_age_ms = None
+        token_expiry_ist = ""
+        try:
+            from src.dhan_feed_manager import global_dhan_feed_manager
+            ws_connected = global_dhan_feed_manager.is_connected
+            ticks_received = global_dhan_feed_manager._ticks_received
+            last_tick_iso = global_dhan_feed_manager._last_tick_iso
+            if global_dhan_feed_manager._last_tick_time > 0:
+                last_tick_age_ms = round((time.monotonic() - global_dhan_feed_manager._last_tick_time) * 1000.0, 1)
+        except Exception:
+            pass
+
+        try:
+            from src.dhan_credential_manager import global_dhan_credential_manager
+            token_expiry_ist = global_dhan_credential_manager.get_status().get("token_expiry_ist", "")
+        except Exception:
+            pass
+
+        # WebSocket status is derived truthfully from actual feed manager / socket
+        if ws_connected and ticks_received > 0:
+            websocket_status = "LIVE"
+        elif ws_connected:
+            websocket_status = "CONNECTED_AWAITING_TICKS"
+        elif status == "CONNECTED":
+            websocket_status = "READY"
+        else:
+            websocket_status = "DISCONNECTED"
+
+        decoder_status = "BINARY_OK" if ticks_received > 0 else "DECODER_READY"
+        sub_status = "ACTIVE" if (ws_connected and ticks_received > 0) else ("STANDBY" if ws_connected else "INACTIVE")
 
         return {
             "configured": is_conf,
             "authentication_status": auth_status,
             "token_status": token_status,
-            "token_expiry": None,
+            "token_expiry": token_expiry_ist or None,
             "data_entitlement": data_entitlement,
             "rest_status": rest_status,
-            "websocket_status": "LIVE" if status == "CONNECTED" else "DOWN",
-            "subscription_status": "ACTIVE" if status == "CONNECTED" else "INACTIVE",
-            "decoder_status": "BINARY_OK" if status == "CONNECTED" else "DECODER_READY",
-            "last_real_tick_at": None,
-            "last_tick_age_ms": None,
+            "websocket_status": websocket_status,
+            "subscription_status": sub_status,
+            "decoder_status": decoder_status,
+            "last_real_tick_at": last_tick_iso,
+            "last_tick_age_ms": last_tick_age_ms,
+            "ticks_received": ticks_received,
             "error_code": err_code,
             "safe_error_message": val.get("message") if status != "CONNECTED" else None,
             "status": status,

@@ -9,7 +9,7 @@ are strictly logged server-side and never exposed to the client.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 from flask import jsonify, request, Response
 from werkzeug.exceptions import HTTPException
 

@@ -44,6 +44,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
   // Core Form State
   const [side, setSide] = useState<"BUY" | "SELL">(initialSide);
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT">("LIMIT");
+  const [productType, setProductType] = useState<"INTRADAY" | "NORMAL">("INTRADAY");
   const [lots, setLots] = useState<number>(1);
   const [limitPrice, setLimitPrice] = useState<number>(0);
   const [isPriceManuallyEdited, setIsPriceManuallyEdited] = useState<boolean>(false);
@@ -62,6 +63,19 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
   const [feedback, setFeedback] = useState<{ status: "success" | "error" | "warn"; message: string } | null>(null);
 
   const prevContractKeyRef = useRef<string>("");
+
+  // Dynamic lot size based on Dhan index specifications
+  const defaultLotSize = useMemo(() => {
+    if (!contract) return 1;
+    const und = (contract.underlying || "").toUpperCase();
+    if (["BTC", "ETH", "SOL", "XRP"].includes(und)) return 1;
+    if (und.includes("BANKNIFTY")) return 15;
+    if (und.includes("FINNIFTY")) return 25;
+    if (und.includes("MIDCPNIFTY")) return 75;
+    if (und.includes("SENSEX")) return 10;
+    if (und.includes("NIFTY")) return 50;
+    return contract.lotSize || 1;
+  }, [contract]);
 
   // Sync state when contract or initialSide changes
   useEffect(() => {
@@ -109,7 +123,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
   const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(contract.underlying);
   const curSymbol = isCrypto ? "$" : currency;
 
-  const lotSize = contract.lotSize || (contract.underlying.includes("NIFTY") ? 50 : 1);
+  const lotSize = defaultLotSize;
   const totalQuantity = lots * lotSize;
   const activePrice = orderType === "LIMIT" ? limitPrice : contract.ltp;
   const estimatedNotional = activePrice * totalQuantity;
@@ -182,6 +196,8 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
         symbol: contract.symbol,
         direction: side === "BUY" ? "LONG" : "SHORT",
         order_type: orderType,
+        product_type: productType,
+        product: productType,
         quantity: totalQuantity,
         price: orderType === "LIMIT" ? limitPrice : contract.ltp,
         stop_loss: stopLoss ? parseFloat(stopLoss) : undefined,
@@ -195,7 +211,10 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
         broker: contract.broker,
         broker_account_id: contract.broker === "DELTA" ? "ba_delta_primary" : "ba_dhan_primary",
         instrument_id: contract.instrumentId || contract.symbol,
-        product_id: contract.productId,
+        security_id: contract.securityId || contract.productId,
+        product_id: contract.productId || contract.securityId,
+        exchange_segment: isCrypto ? "DELTA" : "NSE_FNO",
+        segment: isCrypto ? "DELTA" : "NSE_FNO",
         underlying: contract.underlying,
         expiry: contract.expiry,
         strike: contract.strike,
@@ -381,14 +400,15 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
           </button>
         </div>
 
-        {/* Order Type & Price Input */}
+        {/* Order Type & Product Type Selectors */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-[11px]">
+          <div className="grid grid-cols-2 gap-2">
+            {/* Order Type (MARKET / LIMIT) */}
             <div className="flex items-center gap-1 bg-[#060A12] p-0.5 rounded-lg border border-slate-800">
               <button
                 type="button"
                 onClick={() => setOrderType("MARKET")}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex-1 text-center ${
                   orderType === "MARKET" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -397,7 +417,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
               <button
                 type="button"
                 onClick={() => setOrderType("LIMIT")}
-                className={`px-2.5 py-1 rounded text-[11px] font-bold transition ${
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex-1 text-center ${
                   orderType === "LIMIT" ? "bg-cyan-500 text-slate-950" : "text-slate-400 hover:text-white"
                 }`}
               >
@@ -405,22 +425,59 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
               </button>
             </div>
 
-            {orderType === "LIMIT" && (
-              <div className="flex items-center gap-1 text-[10px]">
-                <span className="text-slate-500">Suggested:</span>
+            {/* Product Type (INTRADAY / NORMAL) */}
+            <div className="flex items-center gap-1 bg-[#060A12] p-0.5 rounded-lg border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setProductType("INTRADAY")}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex-1 text-center ${
+                  productType === "INTRADAY" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
+                }`}
+                title="Intraday MIS product"
+              >
+                MIS (Intraday)
+              </button>
+              <button
+                type="button"
+                onClick={() => setProductType("NORMAL")}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition flex-1 text-center ${
+                  productType === "NORMAL" ? "bg-purple-600 text-white" : "text-slate-400 hover:text-white"
+                }`}
+                title="Normal Carryforward NRML product"
+              >
+                NRML (Carry)
+              </button>
+            </div>
+          </div>
+
+          {orderType === "LIMIT" && (
+            <div className="flex items-center justify-between text-[10px] px-1">
+              <span className="text-slate-500">Quick Fill:</span>
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() => {
-                    setLimitPrice(side === "BUY" ? (contract.ask || contract.ltp) : (contract.bid || contract.ltp));
+                    setLimitPrice(contract.ask || contract.ltp);
                     setIsPriceManuallyEdited(false);
                   }}
                   className="text-cyan-400 hover:underline font-bold"
                 >
-                  {side === "BUY" ? `Best Ask (${curSymbol}${contract.ask || contract.ltp})` : `Best Bid (${curSymbol}${contract.bid || contract.ltp})`}
+                  Ask ({curSymbol}{(contract.ask || contract.ltp).toFixed(2)})
+                </button>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLimitPrice(contract.bid || contract.ltp);
+                    setIsPriceManuallyEdited(false);
+                  }}
+                  className="text-cyan-400 hover:underline font-bold"
+                >
+                  Bid ({curSymbol}{(contract.bid || contract.ltp).toFixed(2)})
                 </button>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {orderType === "LIMIT" && (
             <div className="flex items-center gap-2">

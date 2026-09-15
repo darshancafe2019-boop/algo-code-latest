@@ -41,6 +41,7 @@ interface OptionChainTableProps {
   onActionBuy?: (contract: ActionableOptionContract) => void;
   onActionSell?: (contract: ActionableOptionContract) => void;
   onActionDepth?: (contract: ActionableOptionContract) => void;
+  onActionOrderBook?: (contract?: ActionableOptionContract) => void;
 }
 
 type SortField =
@@ -91,6 +92,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
   onActionBuy,
   onActionSell,
   onActionDepth,
+  onActionOrderBook,
 }) => {
   const [sortField, setSortField] = useState<SortField>("strike");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -821,7 +823,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
 
                     {/* CALL DIRECT ACTIONS CELL */}
-                    <td className={`py-1.5 px-1.5 text-right ${callBgClass} whitespace-nowrap`}>
+                    <td className={`py-1.5 px-2 text-right ${callBgClass} whitespace-nowrap`}>
                       {call ? (
                         <div className="flex items-center justify-end gap-1.5">
                           <button
@@ -834,10 +836,10 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "CE", "BUY", call.ltp);
                               }
                             }}
-                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
-                            title="Buy Call Option"
+                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
+                            title="Direct Buy Call Contract"
                           >
-                            B
+                            BUY
                           </button>
                           <button
                             type="button"
@@ -849,10 +851,10 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "CE", "SELL", call.ltp);
                               }
                             }}
-                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
-                            title="Sell Call Option"
+                            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
+                            title="Direct Sell Call Contract"
                           >
-                            S
+                            SELL
                           </button>
                           <button
                             type="button"
@@ -863,10 +865,23 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                               }
                             }}
                             className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
-                            title="View Call Market Depth / Order Book"
+                            title="View 5-Level Market Depth"
                           >
-                            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            <BookOpen className="w-3.5 h-3.5" />
                           </button>
+                          {onActionOrderBook && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onActionOrderBook(resolveContract(row.strike, "CE", call, "BUY"));
+                              }}
+                              className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-purple-950 hover:text-purple-300 hover:border-purple-500/50 text-slate-400 border border-slate-700/80 transition"
+                              title="Open Order Book for this contract"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>
@@ -892,65 +907,77 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                       </td>
                     )}
 
-                    {/* CENTER STRIKE COLUMN */}
+                    {/* CENTER STRIKE COLUMN WITH POSITION AWARENESS & QUICK EXIT */}
                     <td className="py-2 px-3 text-center bg-slate-900 font-black text-white border-x border-slate-800 whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1.5">
-                        {callPosition && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-bold ${
-                              callPosition.quantity > 0
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                                : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                            }`}
-                            title={`Held Call Position: ${callPosition.quantity} qty`}
-                          >
-                            POS:{callPosition.quantity > 0 ? `+${callPosition.quantity}` : callPosition.quantity}
+                      <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1.5">
+                          {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">←</span>}
+                          <span className={`text-sm sm:text-base md:text-lg 2xl:text-xl font-black ${isATM ? "text-cyan-300" : "text-white"}`}>
+                            {row.strike.toLocaleString("en-IN")}
                           </span>
-                        )}
+                          {isATM && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-black bg-cyan-500 text-slate-950">
+                              ATM
+                            </span>
+                          )}
+                          {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">→</span>}
+                        </div>
 
-                        {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">←</span>}
-                        <span className={`text-sm sm:text-base md:text-lg 2xl:text-xl font-black ${isATM ? "text-cyan-300" : "text-white"}`}>
-                          {row.strike.toLocaleString("en-IN")}
-                        </span>
-                        {isATM && (
-                          <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-black bg-cyan-500 text-slate-950">
-                            ATM
-                          </span>
-                        )}
-                        {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">→</span>}
+                        {/* Interactive Position Badges */}
+                        {(callPosition || putPosition) && (
+                          <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                            {callPosition && (
+                              <div className="flex items-center gap-1 bg-emerald-950/40 border border-emerald-500/40 rounded px-1.5 py-0.5 text-[9px]">
+                                <span className="text-emerald-300 font-bold">
+                                  CE:{callPosition.quantity > 0 ? `+${callPosition.quantity}` : callPosition.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (call && onActionSell) {
+                                      const oppSide = callPosition.quantity > 0 ? "SELL" : "BUY";
+                                      onActionSell(resolveContract(row.strike, "CE", call, oppSide));
+                                    }
+                                  }}
+                                  className="px-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[8px]"
+                                  title="Exit Call Position"
+                                >
+                                  EXIT
+                                </button>
+                              </div>
+                            )}
 
-                        {putPosition && (
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-bold ${
-                              putPosition.quantity > 0
-                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                                : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                            }`}
-                            title={`Held Put Position: ${putPosition.quantity} qty`}
-                          >
-                            POS:{putPosition.quantity > 0 ? `+${putPosition.quantity}` : putPosition.quantity}
-                          </span>
+                            {putPosition && (
+                              <div className="flex items-center gap-1 bg-rose-950/40 border border-rose-500/40 rounded px-1.5 py-0.5 text-[9px]">
+                                <span className="text-rose-300 font-bold">
+                                  PE:{putPosition.quantity > 0 ? `+${putPosition.quantity}` : putPosition.quantity}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    if (put && onActionSell) {
+                                      const oppSide = putPosition.quantity > 0 ? "SELL" : "BUY";
+                                      onActionSell(resolveContract(row.strike, "PE", put, oppSide));
+                                    }
+                                  }}
+                                  className="px-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[8px]"
+                                  title="Exit Put Position"
+                                >
+                                  EXIT
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
 
                     {/* PUT DIRECT ACTIONS CELL */}
-                    <td className={`py-1.5 px-1.5 text-left ${putBgClass} whitespace-nowrap`}>
+                    <td className={`py-1.5 px-2 text-left ${putBgClass} whitespace-nowrap`}>
                       {put ? (
                         <div className="flex items-center justify-start gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onActionDepth) {
-                                onActionDepth(resolveContract(row.strike, "PE", put, "BUY"));
-                              }
-                            }}
-                            className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
-                            title="View Put Market Depth / Order Book"
-                          >
-                            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
                           <button
                             type="button"
                             onClick={(e) => {
@@ -961,10 +988,10 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "PE", "BUY", put.ltp);
                               }
                             }}
-                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
-                            title="Buy Put Option"
+                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
+                            title="Direct Buy Put Contract"
                           >
-                            B
+                            BUY
                           </button>
                           <button
                             type="button"
@@ -976,11 +1003,37 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "PE", "SELL", put.ltp);
                               }
                             }}
-                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
-                            title="Sell Put Option"
+                            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
+                            title="Direct Sell Put Contract"
                           >
-                            S
+                            SELL
                           </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onActionDepth) {
+                                onActionDepth(resolveContract(row.strike, "PE", put, "BUY"));
+                              }
+                            }}
+                            className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
+                            title="View 5-Level Market Depth"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                          </button>
+                          {onActionOrderBook && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onActionOrderBook(resolveContract(row.strike, "PE", put, "BUY"));
+                              }}
+                              className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-purple-950 hover:text-purple-300 hover:border-purple-500/50 text-slate-400 border border-slate-700/80 transition"
+                              title="Open Order Book for this contract"
+                            >
+                              <Layers className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>

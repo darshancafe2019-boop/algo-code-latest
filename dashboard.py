@@ -1220,7 +1220,16 @@ def api_quick_trade_execute():
         strategy="QUICK_TRADE_MANUAL",
         confidence_score=0.85,
         mode=mode,
-        client_order_id=client_order_id
+        client_order_id=client_order_id,
+        broker=payload.get("broker") or payload.get("provider") or "DHAN",
+        order_type=order_type,
+        security_id=payload.get("security_id") or payload.get("securityId") or payload.get("instrument_id") or payload.get("productId") or "",
+        segment=payload.get("segment") or payload.get("exchange_segment") or payload.get("exchangeSegment") or "NSE_FNO",
+        product=payload.get("product") or payload.get("product_type") or payload.get("productType") or "INTRADAY",
+        underlying=payload.get("underlying"),
+        expiry=payload.get("expiry"),
+        strike=payload.get("strike"),
+        option_type=payload.get("option_type") or payload.get("optionType"),
     )
 
     if not res.get("success"):

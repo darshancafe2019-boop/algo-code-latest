@@ -404,13 +404,14 @@ class OrderExecutionService:
             latency_ctx.mark_stage("broker_ack")
             latency_ctx.mark_stage("fill")
 
+            fill_avg_price = float(result.get("average_price") or result.get("price") or eff_price)
             log_bot_event(
                 event_type="ORDER_FILLED",
-                message=f"Order FILLED: #{result['order_id']} {symbol} ({side}) avg_price=${result['average_price']:,.2f}",
+                message=f"Order FILLED: #{result.get('order_id', idem_key)} {symbol} ({side}) avg_price=${fill_avg_price:,.2f}",
                 bot_instance_id=bot_id,
                 severity="INFO",
                 status="SUCCESS",
-                order_id=str(result["order_id"]),
+                order_id=str(result.get("order_id", idem_key)),
                 strategy_name=strategy,
                 symbol=symbol,
                 confidence_score=confidence_score,
@@ -511,7 +512,8 @@ class OrderExecutionService:
         strategy: str = "QUANT_CONFLUENCE_PRO",
         confidence_score: float = 0.85,
         mode: str = "PAPER",
-        client_order_id: Optional[str] = None
+        client_order_id: Optional[str] = None,
+        **kwargs
     ) -> Dict[str, Any]:
         """Routes and executes an order with automatic price resolution and fail-safe directional SL/TP."""
         eff_price = price
@@ -565,7 +567,9 @@ class OrderExecutionService:
             confidence_score=confidence_score,
             account_balance=50000.0,
             is_live=(mode == "LIVE"),
-            client_order_id=client_order_id
+            client_order_id=client_order_id,
+            mode=mode,
+            **kwargs
         )
         notional = round(quantity * eff_price, 2)
         return {

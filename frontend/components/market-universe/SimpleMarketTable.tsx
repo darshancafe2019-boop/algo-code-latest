@@ -1,20 +1,16 @@
 "use client";
 
 import React, { useState, useEffect, memo } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ArrowUpRight,
-  ArrowDownRight,
-  Minus,
-  CheckCircle2,
-  AlertTriangle,
-  Sliders,
   Star,
-  Info,
-  Clock,
-  Radio,
+  Zap,
+  TrendingUp,
+  ExternalLink,
+  Layers,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
 import {
@@ -22,23 +18,149 @@ import {
   formatPercent,
   formatVolume,
   formatQuantity,
-  formatExactNumber,
   formatNumber,
 } from "@/lib/formatters";
+import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 
 interface SimpleMarketTableProps {
   instruments: MarketInstrument[];
   selectedInstrument: MarketInstrument | null;
-  onSelectInstrument: (inst: MarketInstrument) => void;
+  onSelectInstrument?: (inst: MarketInstrument) => void;
   onToggleWatchlist?: (inst: MarketInstrument) => void;
   watchlistSymbols?: Set<string>;
   activeCategory?: string;
   density?: "compact" | "comfortable";
   showColumnSettings?: boolean;
   onCloseColumnSettings?: () => void;
+  onOpenOptions?: (underlying: string, exchange?: string, provider?: string) => void;
+  onOpenTrade?: (inst: MarketInstrument) => void;
 }
 
-type SortField = string;
+export const COMPREHENSIVE_OPTION_UNDERLYINGS = new Set([
+  // Major Indian Indices
+  "NIFTY",
+  "NIFTY50",
+  "NIFTY 50",
+  "BANKNIFTY",
+  "FINNIFTY",
+  "MIDCPNIFTY",
+  "SENSEX",
+  "BANKEX",
+  // Top F&O Stocks (NSE / Dhan)
+  "RELIANCE",
+  "TCS",
+  "INFY",
+  "HDFCBANK",
+  "ICICIBANK",
+  "SBIN",
+  "BHARTIARTL",
+  "ITC",
+  "KOTAKBANK",
+  "LT",
+  "AXISBANK",
+  "TATAMOTORS",
+  "BAJFINANCE",
+  "MARUTI",
+  "SUNPHARMA",
+  "ASIANPAINT",
+  "TITAN",
+  "HCLTECH",
+  "WIPRO",
+  "NTPC",
+  "ONGC",
+  "POWERGRID",
+  "TATACONSUM",
+  "ULTRACEMCO",
+  "JSWSTEEL",
+  "TATASTEEL",
+  "COALINDIA",
+  "ADANIENT",
+  "ADANIPORTS",
+  "HINDALCO",
+  "TECHM",
+  "DRREDDY",
+  "CIPLA",
+  "DIVISLAB",
+  "EICHERMOT",
+  "GRASIM",
+  "HEROMOTOCO",
+  "HINDUNILVR",
+  "INDUSINDBK",
+  "NESTLEIND",
+  "SBILIFE",
+  "HDFCLIFE",
+  "BAJAJFINSV",
+  "BPCL",
+  "APOLLOHOSP",
+  "BRITANNIA",
+  "M&M",
+  "VEDL",
+  "DLF",
+  "PIDILITIND",
+  "SIEMENS",
+  "HAL",
+  "BEL",
+  "ZOMATO",
+  // Crypto Derivatives (Delta / Binance / Deribit)
+  "BTC",
+  "BTCUSDT",
+  "ETH",
+  "ETHUSDT",
+  "SOL",
+  "SOLUSDT",
+  "XRP",
+  "XRPUSDT",
+  "BNB",
+  "BNBUSDT",
+  "DOGE",
+  "DOGEUSDT",
+]);
+
+export function resolveOptionUnderlying(inst: MarketInstrument): {
+  hasOptions: boolean;
+  cleanUnderlying: string;
+  exchange: string;
+  provider: string;
+} {
+  const sym = (inst.canonical_symbol || inst.provider_symbol || inst.symbol || "").toUpperCase();
+  const rawClean = sym
+    .replace(/^BINANCE:/, "")
+    .replace(/^NSE:/, "")
+    .replace(/^BSE:/, "")
+    .replace(/^MCX:/, "")
+    .replace(/^DELTA:/, "")
+    .replace(/^OANDA:/, "")
+    .split("/")[0]
+    .split("-")[0]
+    .split(" ")[0]
+    .replace(/USDT$/, "")
+    .replace(/USD$/, "")
+    .trim();
+
+  const explicitOptions =
+    (inst as any).has_options === true ||
+    inst.asset_class === "OPTIONS" ||
+    (Array.isArray((inst as any).derivative_types) && (inst as any).derivative_types.includes("OPTIONS"));
+
+  const isMatched =
+    COMPREHENSIVE_OPTION_UNDERLYINGS.has(rawClean) ||
+    COMPREHENSIVE_OPTION_UNDERLYINGS.has(sym) ||
+    COMPREHENSIVE_OPTION_UNDERLYINGS.has((inst.symbol || "").toUpperCase()) ||
+    COMPREHENSIVE_OPTION_UNDERLYINGS.has(((inst as any).underlying || "").toUpperCase());
+
+  const hasOptions = explicitOptions || isMatched;
+  const cleanUnderlying = ((inst as any).underlying || rawClean || sym).toUpperCase();
+  const isCrypto = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"].includes(cleanUnderlying);
+  const exchange = inst.exchange || (isCrypto ? "DELTA" : "NSE");
+  const provider = isCrypto ? "DELTA_INDIA" : "DHAN";
+
+  return {
+    hasOptions,
+    cleanUnderlying,
+    exchange,
+    provider,
+  };
+}
 
 export function SimpleMarketTable({
   instruments = [],
@@ -50,11 +172,12 @@ export function SimpleMarketTable({
   density = "compact",
   showColumnSettings = false,
   onCloseColumnSettings,
+  onOpenOptions,
+  onOpenTrade,
 }: SimpleMarketTableProps) {
+  const router = useRouter();
   const [sortField, setSortField] = useState<string>("volume_24h");
   const [sortAsc, setSortAsc] = useState<boolean>(false);
-
-  // Column visibility state
   const [hiddenCols, setHiddenCols] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -100,20 +223,20 @@ export function SimpleMarketTable({
     return (
       <button
         type="button"
-        className={`flex items-center gap-1 cursor-pointer select-none transition-colors group/header ${
+        className={`flex items-center gap-1.5 cursor-pointer select-none transition-colors group/header ${
           align === "right" ? "justify-end ml-auto" : align === "center" ? "justify-center mx-auto" : "justify-start"
-        } ${isSorted ? "text-cyan-400 font-bold" : "hover:text-cyan-300 text-slate-400"}`}
+        } ${isSorted ? "text-cyan-400 font-black" : "hover:text-cyan-300 text-slate-200"}`}
         onClick={() => handleSort(field)}
       >
         <span>{label}</span>
         {isSorted ? (
           sortAsc ? (
-            <ArrowUp className="h-3 w-3 text-cyan-400 shrink-0" />
+            <ArrowUp className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
           ) : (
-            <ArrowDown className="h-3 w-3 text-cyan-400 shrink-0" />
+            <ArrowDown className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
           )
         ) : (
-          <ArrowUpDown className="h-2.5 w-2.5 opacity-30 group-hover/header:opacity-100 shrink-0" />
+          <ArrowUpDown className="h-3 w-3 opacity-40 group-hover/header:opacity-100 shrink-0 text-slate-400" />
         )}
       </button>
     );
@@ -121,24 +244,43 @@ export function SimpleMarketTable({
 
   const cat = activeCategory.toUpperCase();
 
+  const handleLaunchOptionChain = (sym: string, exchange?: string, provider?: string) => {
+    const cleanSym = sym.split(" ")[0].split("-")[0].replace("/", "").toUpperCase();
+    if (onOpenOptions) {
+      onOpenOptions(cleanSym, exchange, provider);
+    } else {
+      const params = new URLSearchParams({ underlying: cleanSym });
+      if (exchange) params.append("exchange", exchange);
+      if (provider) params.append("provider", provider);
+      router.push(`/trading/options?${params.toString()}`);
+    }
+  };
+
+  const handleLaunchTrade = (inst: MarketInstrument) => {
+    if (onOpenTrade) {
+      onOpenTrade(inst);
+    } else {
+      router.push(`/trading/options?underlying=${encodeURIComponent(inst.canonical_symbol || inst.symbol || "NIFTY")}`);
+    }
+  };
+
   return (
-    <div className="space-y-3 font-sans select-none flex-1 min-w-0">
+    <div className="space-y-3.5 font-sans select-none w-full min-w-0">
       {/* Column Customizer Panel */}
       {showColumnSettings && (
-        <div className="p-4 rounded-2xl bg-[#080E20] border border-cyan-500/30 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
-          <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 font-bold">
-            <Sliders className="w-4 h-4" />
+        <div className="p-4 sm:p-5 rounded-2xl bg-[#080E20] border border-cyan-500/30 flex flex-wrap items-center justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 text-[13px] font-mono text-cyan-400 font-bold">
             <span>CUSTOMIZE ACTIVE COLUMNS ({cat}):</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs font-mono">
-            {["volume", "bid_ask", "high_low", "trend", "oi", "greeks"].map((c) => (
-              <label key={c} className="flex items-center gap-1.5 cursor-pointer text-slate-300 hover:text-white">
+          <div className="flex flex-wrap items-center gap-4 text-[13px] font-mono">
+            {["volume", "bid_ask", "high_low", "trend", "oi"].map((c) => (
+              <label key={c} className="flex items-center gap-2 cursor-pointer text-slate-200 hover:text-white font-medium">
                 <input
                   type="checkbox"
                   checked={!hiddenCols[c]}
                   onChange={() => toggleColumnVisibility(c)}
-                  className="accent-cyan-400 rounded"
+                  className="accent-cyan-400 rounded w-4 h-4"
                 />
                 <span className="capitalize">{c.replace("_", " ")}</span>
               </label>
@@ -148,7 +290,7 @@ export function SimpleMarketTable({
           {onCloseColumnSettings && (
             <button
               onClick={onCloseColumnSettings}
-              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition"
+              className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white transition"
             >
               Done
             </button>
@@ -156,134 +298,116 @@ export function SimpleMarketTable({
         </div>
       )}
 
-      {/* Main Dynamic Table Container */}
-      <div className="bg-[#0B132B]/90 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm">
-        <div className="overflow-x-auto custom-scrollbar max-h-[680px]">
+      {/* Main Full-Width Dynamic Table Container */}
+      <div className="w-full bg-[#0B132B]/90 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden backdrop-blur-sm">
+        <div className="overflow-x-auto custom-scrollbar max-h-[750px] w-full">
           <table className="w-full text-left border-collapse text-xs font-mono">
-            {/* Sticky Table Header */}
-            <thead className="sticky top-0 z-20 bg-[#080E20] border-b border-slate-800/90 text-[11px] text-slate-400 uppercase font-bold tracking-wider">
+            {/* Sticky Table Header with Dedicated OPTIONS Column */}
+            <thead className="sticky top-0 z-20 bg-[#080E20] border-b border-slate-800/90 text-[13.5px] sm:text-[14px] text-slate-200 uppercase font-bold tracking-wider">
               <tr>
                 {/* Watchlist Star Column */}
-                <th className="py-2.5 px-3 w-10 text-center">★</th>
+                <th className="py-3.5 px-3 w-12 text-center text-slate-400 font-bold">★</th>
 
                 {/* DYNAMIC COLUMNS BY ASSET CLASS */}
                 {cat === "STOCKS" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Symbol / Name", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("LTP", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("24H Change", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Open", "open", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("High", "high_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Low", "low_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Volume", "volume_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Bid / Ask</th>
-                    <th className="py-2.5 px-3 text-center">Holding</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[240px]">{renderSortHeader("Symbol / Name", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("24H Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Open", "open", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("High", "high_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Low", "low_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Volume", "volume_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[130px]">Bid / Ask</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : cat === "FUTURES" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Underlying", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3">{renderSortHeader("Contract", "display_symbol")}</th>
-                    <th className="py-2.5 px-3">{renderSortHeader("Expiry", "expiry")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("LTP", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Bid / Ask</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Volume", "volume_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("OI", "open_interest", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("OI Chg", "oi_change", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Lot Size</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[180px]">{renderSortHeader("Underlying", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 min-w-[180px]">{renderSortHeader("Contract", "display_symbol")}</th>
+                    <th className="py-3.5 px-4 min-w-[110px]">{renderSortHeader("Expiry", "expiry")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[130px]">Bid / Ask</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Volume", "volume_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("OI", "open_interest", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[90px]">Lot Size</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : cat === "OPTIONS" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Underlying", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3">{renderSortHeader("Expiry", "expiry")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Strike", "strike", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Type</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("LTP", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Bid / Ask</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Volume", "volume_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("OI", "open_interest", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("IV", "implied_volatility", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Delta (Δ)", "delta", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[180px]">{renderSortHeader("Underlying", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 min-w-[110px]">{renderSortHeader("Expiry", "expiry")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Strike", "strike", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[80px]">Type</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[130px]">Bid / Ask</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Volume", "volume_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("OI", "open_interest", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[90px]">{renderSortHeader("IV", "implied_volatility", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : cat === "CRYPTO" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Pair", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("LTP", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("24H %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("24H High", "high_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("24H Low", "low_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Volume", "volume_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Bid / Ask</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Funding", "funding_rate", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("OI", "open_interest", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[240px]">{renderSortHeader("Pair", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("24H %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("24H High", "high_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("24H Low", "low_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Volume", "volume_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[130px]">Bid / Ask</th>
+                    <th className="py-3.5 px-4 text-right min-w-[100px]">{renderSortHeader("Funding", "funding_rate", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("OI", "open_interest", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : cat === "FOREX" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Currency Pair", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Bid", "bid", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Ask", "ask", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Mid Rate", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Day High", "high_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Day Low", "low_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[220px]">{renderSortHeader("Currency Pair", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Bid", "bid", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Ask", "ask", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Mid Rate", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Day High", "high_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Day Low", "low_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : cat === "INDICES" ? (
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Index Name", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("LTP", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change", "change_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Open", "open", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("High", "high_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Low", "low_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
-                  </>
-                ) : cat === "FUNDS" ? (
-                  <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Fund Name", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("NAV / Price", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Category</th>
-                    <th className="py-2.5 px-3 text-center">Provider</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
-                  </>
-                ) : cat === "BONDS" ? (
-                  <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Bond Instrument", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Yield (%)", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Price", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change", "change_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Maturity</th>
-                    <th className="py-2.5 px-3 text-center">Provider</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
-                  </>
-                ) : cat === "ECONOMY" ? (
-                  <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Economic Series", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Latest Value", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Previous", "high_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">Frequency</th>
-                    <th className="py-2.5 px-3 text-center">Country</th>
-                    <th className="py-2.5 px-3 text-center">Source</th>
+                    <th className="py-3.5 px-4 min-w-[240px]">{renderSortHeader("Index Name", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change", "change_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Open", "open", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("High", "high_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Low", "low_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 ) : (
-                  /* ALL / WATCHLIST DEFAULT UNIVERSAL COLUMNS */
+                  /* ALL / DEFAULT UNIVERSAL FULL-WIDTH COLUMNS */
                   <>
-                    <th className="py-2.5 px-3">{renderSortHeader("Instrument", "canonical_symbol")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Asset", "asset_class", "center")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-right">{renderSortHeader("Volume", "volume_24h", "right")}</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Market", "exchange", "center")}</th>
-                    <th className="py-2.5 px-3 text-center">Trend</th>
-                    <th className="py-2.5 px-3 text-center">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 min-w-[260px]">{renderSortHeader("Instrument", "canonical_symbol")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Asset", "asset_class", "center")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[130px]">{renderSortHeader("Price (LTP)", "last_price", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Change %", "change_pct_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Volume", "volume_24h", "right")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[110px]">{renderSortHeader("Market", "exchange", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[110px]">Trend</th>
+                    <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
+                    <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
+                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
                   </>
                 )}
               </tr>
@@ -300,8 +424,13 @@ export function SimpleMarketTable({
                 </tr>
               ) : (
                 sortedInstruments.map((inst) => {
-                  const isSelected = selectedInstrument?.canonical_symbol === inst.canonical_symbol || selectedInstrument?.instrument_id === inst.instrument_id;
-                  const isStar = watchlistSymbols.has(inst.canonical_symbol) || watchlistSymbols.has(inst.instrument_id) || watchlistSymbols.has(inst.symbol || "");
+                  const isSelected =
+                    selectedInstrument?.canonical_symbol === inst.canonical_symbol ||
+                    selectedInstrument?.instrument_id === inst.instrument_id;
+                  const isStar =
+                    watchlistSymbols.has(inst.canonical_symbol) ||
+                    watchlistSymbols.has(inst.instrument_id) ||
+                    watchlistSymbols.has(inst.symbol || "");
 
                   return (
                     <MemoizedMarketRow
@@ -311,8 +440,13 @@ export function SimpleMarketTable({
                       isStar={isStar}
                       category={cat}
                       density={density}
-                      onSelect={() => onSelectInstrument(inst)}
+                      onSelect={() => onSelectInstrument?.(inst)}
                       onToggleWatchlist={() => onToggleWatchlist?.(inst)}
+                      onLaunchOptionChain={() => {
+                        const opt = resolveOptionUnderlying(inst);
+                        handleLaunchOptionChain(opt.cleanUnderlying, opt.exchange, opt.provider);
+                      }}
+                      onLaunchTrade={() => handleLaunchTrade(inst)}
                     />
                   );
                 })
@@ -325,8 +459,6 @@ export function SimpleMarketTable({
   );
 }
 
-import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
-
 interface MarketRowProps {
   instrument: MarketInstrument;
   isSelected: boolean;
@@ -335,6 +467,8 @@ interface MarketRowProps {
   density: "compact" | "comfortable";
   onSelect: () => void;
   onToggleWatchlist: () => void;
+  onLaunchOptionChain: () => void;
+  onLaunchTrade: () => void;
 }
 
 const MemoizedMarketRow = memo(function MarketRow({
@@ -345,6 +479,8 @@ const MemoizedMarketRow = memo(function MarketRow({
   density,
   onSelect,
   onToggleWatchlist,
+  onLaunchOptionChain,
+  onLaunchTrade,
 }: MarketRowProps) {
   const { getQuote, connectionStatus } = useMarketGatewayContext();
   const sym = instrument.canonical_symbol || instrument.provider_symbol || instrument.symbol || "UNKNOWN";
@@ -352,51 +488,65 @@ const MemoizedMarketRow = memo(function MarketRow({
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
   // Real-time live quote lookup
-  const liveQuote = getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null);
+  const liveQuote =
+    getQuote(sym) ||
+    (instrument.symbol ? getQuote(instrument.symbol) : null) ||
+    (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null);
 
-  const price = (liveQuote?.last_price != null && liveQuote.last_price > 0) ? liveQuote.last_price : instrument.last_price;
-  const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument.change_pct_24h ?? instrument.change_24h ?? 0);
+  const price = liveQuote?.last_price != null && liveQuote.last_price > 0 ? liveQuote.last_price : instrument.last_price;
+  const changePct =
+    liveQuote?.change_pct != null
+      ? liveQuote.change_pct
+      : instrument.change_pct_24h ?? instrument.change_24h ?? 0;
   const isPositive = changePct >= 0;
-  const pyClass = density === "compact" ? "py-2" : "py-3";
+  const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
 
-  const bid = (liveQuote?.bid != null && liveQuote.bid > 0) ? liveQuote.bid : instrument.bid;
-  const ask = (liveQuote?.ask != null && liveQuote.ask > 0) ? liveQuote.ask : instrument.ask;
-  const volume = (liveQuote?.volume != null && liveQuote.volume > 0) ? liveQuote.volume : instrument.volume_24h;
+  const bid = liveQuote?.bid != null && liveQuote.bid > 0 ? liveQuote.bid : instrument.bid;
+  const ask = liveQuote?.ask != null && liveQuote.ask > 0 ? liveQuote.ask : instrument.ask;
+  const volume = liveQuote?.volume != null && liveQuote.volume > 0 ? liveQuote.volume : instrument.volume_24h;
   const high24h = liveQuote?.high ?? instrument.high_24h;
   const low24h = liveQuote?.low ?? instrument.low_24h;
   const openPrice = liveQuote?.open ?? (instrument as any).open;
 
   // Data Health status calculation
-  const dataAgeMs = liveQuote?.age_seconds != null ? Math.round(liveQuote.age_seconds * 1000) : (instrument.data_age_ms ?? 120);
+  const dataAgeMs =
+    liveQuote?.age_seconds != null ? Math.round(liveQuote.age_seconds * 1000) : instrument.data_age_ms ?? 120;
   const isMarketClosed = instrument.market_status === "CLOSED";
   const isDisconnected = connectionStatus === "DISCONNECTED";
   const isStale = (liveQuote?.is_stale || dataAgeMs >= 10000) && !isMarketClosed && !isDisconnected;
-  const isLiveFeed = (connectionStatus === "LIVE" || liveQuote?.data_mode === "REAL_TIME" || (dataAgeMs < 10000 && !isMarketClosed)) && !isStale && !isDisconnected;
+  const isLiveFeed =
+    (connectionStatus === "LIVE" || liveQuote?.data_mode === "REAL_TIME" || (dataAgeMs < 10000 && !isMarketClosed)) &&
+    !isStale &&
+    !isDisconnected;
 
   const statusBadge = isMarketClosed ? (
-    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-slate-800/90 text-slate-300 border border-slate-700">
+      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
       CLOSED
     </span>
   ) : isDisconnected ? (
-    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/40">
+      <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
       OFFLINE
     </span>
   ) : isLiveFeed ? (
-    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center gap-1 mx-auto">
-      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
+      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
       LIVE
     </span>
   ) : isStale ? (
-    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">
+      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
       STALE
     </span>
   ) : (
-    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40">
+      <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
       ACTIVE
     </span>
   );
 
-  // Trend determination based on calculated change / directional bias
+  // Trend determination based on calculated change
   const trend =
     changePct > 1.0
       ? { label: "↑ Bullish", color: "text-emerald-400" }
@@ -404,14 +554,56 @@ const MemoizedMarketRow = memo(function MarketRow({
       ? { label: "↓ Bearish", color: "text-rose-400" }
       : { label: "→ Neutral", color: "text-slate-400" };
 
+  const optInfo = resolveOptionUnderlying(instrument);
+
+  // Dedicated Options Button / Badge
+  const optionsCell = (
+    <td className="px-4 text-center">
+      {optInfo.hasOptions ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onLaunchOptionChain();
+          }}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[12.5px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+          title="Open live option chain"
+        >
+          <Layers className="w-3.5 h-3.5 text-purple-400" />
+          <span>⌁ Chain</span>
+        </button>
+      ) : (
+        <span
+          className="text-[12px] text-slate-500 font-medium select-none cursor-default"
+          title="No supported options available for this instrument"
+        >
+          — No Options —
+        </span>
+      )}
+    </td>
+  );
+
+  // Dedicated Action / Trade Button
+  const actionCell = (
+    <td className="px-5 text-right">
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onLaunchTrade();
+        }}
+        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[12.5px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98] ml-auto"
+        title="Trade Instrument"
+      >
+        <Zap className="w-3.5 h-3.5 text-cyan-400" />
+        <span>Trade</span>
+      </button>
+    </td>
+  );
+
   return (
     <tr
-      onClick={onSelect}
-      className={`cursor-pointer transition-all ${pyClass} ${
-        isSelected
-          ? "bg-cyan-950/40 border-l-2 border-cyan-400 text-white shadow-inner"
-          : "hover:bg-slate-900/60 text-slate-200"
-      }`}
+      className={`transition-all ${pyClass} hover:bg-slate-900/70 border-b border-slate-800/60 text-slate-200`}
     >
       {/* Star button */}
       <td
@@ -422,7 +614,7 @@ const MemoizedMarketRow = memo(function MarketRow({
         }}
       >
         <Star
-          className={`w-3.5 h-3.5 mx-auto transition-transform hover:scale-125 ${
+          className={`w-4 h-4 mx-auto transition-transform hover:scale-125 cursor-pointer ${
             isStar ? "text-amber-400 fill-amber-400" : "text-slate-600 hover:text-slate-400"
           }`}
         />
@@ -431,60 +623,52 @@ const MemoizedMarketRow = memo(function MarketRow({
       {/* DYNAMIC ROW RENDERING BY CATEGORY */}
       {category === "STOCKS" ? (
         <>
-          <td className="px-3">
-            <div className="font-bold text-cyan-300">{sym}</div>
-            <div className="text-[10px] text-slate-400 truncate max-w-[180px]">{name}</div>
+          <td className="px-4 py-3">
+            <div className="font-bold text-[15px] text-white tracking-wide">{sym}</div>
+            <div className="text-[12px] text-slate-400 font-normal truncate max-w-[260px]">{name}</div>
           </td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(high24h, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(low24h, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-3 text-center text-slate-400 text-[10px]">
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
+          <td className="px-4 text-center font-mono text-[12.5px] text-slate-300">
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
-          <td className="px-3 text-center">
-            {instrument.is_swing_candidate ? (
-              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                HELD
-              </span>
-            ) : (
-              <span className="text-slate-600">—</span>
-            )}
-          </td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : category === "FUTURES" ? (
         <>
-          <td className="px-3 font-bold text-cyan-300">{sym.split("-")[0] || sym}</td>
-          <td className="px-3 font-mono text-white">{sym}</td>
-          <td className="px-3 text-slate-300">{instrument.expiry || "Near Month"}</td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 py-3 font-bold text-[15px] text-cyan-300">{sym.split("-")[0] || sym}</td>
+          <td className="px-4 font-mono font-bold text-[13.5px] text-white">{sym}</td>
+          <td className="px-4 text-[13px] text-slate-300">{instrument.expiry || "Near Month"}</td>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-center text-slate-400 text-[10px]">
+          <td className="px-4 text-center font-mono text-[12.5px] text-slate-300">
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
-          <td className="px-3 text-right text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-3 text-right text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {formatPercent(changePct, 2, true)}
-          </td>
-          <td className="px-3 text-center text-slate-300 font-bold">{instrument.lot_size || 1}</td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-center text-slate-200 font-bold text-[13px]">{instrument.lot_size || 1}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : category === "OPTIONS" ? (
         <>
-          <td className="px-3 font-bold text-cyan-300">{sym.split(" ")[0] || sym.split("-")[0] || sym}</td>
-          <td className="px-3 text-slate-300">{instrument.expiry || "Weekly"}</td>
-          <td className="px-3 text-right font-bold text-white">{instrument.strike?.toLocaleString() || "—"}</td>
-          <td className="px-3 text-center">
+          <td className="px-4 py-3 font-bold text-[15px] text-cyan-300">{sym.split(" ")[0] || sym.split("-")[0] || sym}</td>
+          <td className="px-4 text-[13px] text-slate-300">{instrument.expiry || "Weekly"}</td>
+          <td className="px-4 text-right font-mono font-bold text-[15px] text-white">{instrument.strike?.toLocaleString() || "—"}</td>
+          <td className="px-4 text-center">
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
+              className={`px-2 py-0.5 rounded text-[11px] font-black ${
                 (instrument.option_type || sym).includes("CE") || (instrument.option_type || sym).includes("-C")
                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                   : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
@@ -493,142 +677,110 @@ const MemoizedMarketRow = memo(function MarketRow({
               {(instrument.option_type || sym).includes("PE") || (instrument.option_type || sym).includes("-P") ? "PE" : "CE"}
             </span>
           </td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-center text-slate-400 text-[10px]">
+          <td className="px-4 text-center font-mono text-[12.5px] text-slate-300">
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
-          <td className="px-3 text-right text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-3 text-right text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
-          <td className="px-3 text-right text-amber-400">{instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "—"}</td>
-          <td className="px-3 text-right text-cyan-400">{instrument.delta != null ? instrument.delta.toFixed(2) : "—"}</td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-right font-mono font-bold text-[13px] text-amber-400">{instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "—"}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : category === "CRYPTO" ? (
         <>
-          <td className="px-3">
-            <div className="font-bold text-cyan-300">{sym}</div>
-            <div className="text-[10px] text-slate-400 truncate max-w-[180px]">{name}</div>
+          <td className="px-4 py-3">
+            <div className="font-bold text-[15px] text-white tracking-wide">{sym}</div>
+            <div className="text-[12px] text-slate-400 font-normal truncate max-w-[260px]">{name}</div>
           </td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(high24h, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(low24h, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-3 text-center text-slate-400 text-[10px]">
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
+          <td className="px-4 text-center font-mono text-[12.5px] text-slate-300">
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
-          <td className="px-3 text-right text-emerald-400">
+          <td className="px-4 text-right font-mono font-bold text-[13px] text-emerald-400">
             {instrument.funding_rate != null ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "—"}
           </td>
-          <td className="px-3 text-right text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : category === "FOREX" ? (
         <>
-          <td className="px-3 font-bold text-cyan-300">{sym}</td>
-          <td className="px-3 text-right text-emerald-400 font-bold">{formatPrice(bid, "", 4)}</td>
-          <td className="px-3 text-right text-rose-400 font-bold">{formatPrice(ask, "", 4)}</td>
-          <td className="px-3 text-right text-white font-bold">{formatPrice(price, "", 4)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 py-3 font-bold text-[15px] text-cyan-300">{sym}</td>
+          <td className="px-4 text-right font-mono font-bold text-[14.5px] text-emerald-400">{formatPrice(bid, "", 4)}</td>
+          <td className="px-4 text-right font-mono font-bold text-[14.5px] text-rose-400">{formatPrice(ask, "", 4)}</td>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, "", 4)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(high24h, "", 4)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(low24h, "", 4)}</td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, "", 4)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, "", 4)}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : category === "INDICES" ? (
         <>
-          <td className="px-3">
-            <div className="font-bold text-cyan-300">{sym}</div>
-            <div className="text-[10px] text-slate-400">{name}</div>
+          <td className="px-4 py-3">
+            <div className="font-bold text-[15px] text-white tracking-wide">{sym}</div>
+            <div className="text-[12px] text-slate-400 font-normal truncate max-w-[260px]">{name}</div>
           </td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPrice(instrument.change_24h ?? 0, currSymbol, undefined, "—")}
           </td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(high24h, currSymbol)}</td>
-          <td className="px-3 text-right text-slate-300">{formatPrice(low24h, currSymbol)}</td>
-          <td className="px-3 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
-        </>
-      ) : category === "FUNDS" ? (
-        <>
-          <td className="px-3">
-            <div className="font-bold text-cyan-300">{sym}</div>
-            <div className="text-[10px] text-slate-400">{name}</div>
-          </td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {formatPercent(changePct, 2, true)}
-          </td>
-          <td className="px-3 text-center text-slate-300">Equity Index Fund</td>
-          <td className="px-3 text-center text-slate-400">{instrument.data_source || "GLOBAL"}</td>
-          <td className="px-3 text-center">{statusBadge}</td>
-        </>
-      ) : category === "BONDS" ? (
-        <>
-          <td className="px-3 font-bold text-cyan-300">{sym}</td>
-          <td className="px-3 text-right font-bold text-emerald-400">{price ? `${price.toFixed(3)}%` : "4.250%"}</td>
-          <td className="px-3 text-right font-bold text-white">{formatPrice(price, "$")}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {formatPercent(changePct, 2, true)}
-          </td>
-          <td className="px-3 text-center text-slate-300">10 Years</td>
-          <td className="px-3 text-center text-slate-400">{instrument.data_source || "TREASURY"}</td>
-          <td className="px-3 text-center">{statusBadge}</td>
-        </>
-      ) : category === "ECONOMY" ? (
-        <>
-          <td className="px-3">
-            <div className="font-bold text-cyan-300">{sym}</div>
-            <div className="text-[10px] text-slate-400">{name}</div>
-          </td>
-          <td className="px-3 text-right font-bold text-white">{formatNumber(price, 2)}</td>
-          <td className="px-3 text-right text-slate-300">{formatNumber(high24h, 2)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {formatPercent(changePct, 2, true)}
-          </td>
-          <td className="px-3 text-center text-slate-300">Monthly</td>
-          <td className="px-3 text-center text-slate-300">{instrument.country || "Global"}</td>
-          <td className="px-3 text-center text-slate-400">{instrument.data_source || "FRED / MOSPI"}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, currSymbol)}</td>
+          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
         </>
       ) : (
         /* ALL / DEFAULT UNIVERSAL COLUMNS */
         <>
-          <td className="px-3">
-            <div className="flex items-center gap-1.5">
-              <span className="font-bold text-cyan-300">{sym}</span>
-              <span className="text-[9px] px-1 rounded bg-slate-800 text-slate-400 border border-slate-700 uppercase">
+          <td className="px-4 py-3">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[15px] text-white tracking-wide">{sym}</span>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700 uppercase">
                 {instrument.exchange || "GLOBAL"}
               </span>
             </div>
-            <div className="text-[10px] text-slate-400 truncate max-w-[200px]">{name}</div>
+            <div className="text-[12px] text-slate-400 font-normal truncate max-w-[260px] mt-0.5">{name}</div>
           </td>
-          <td className="px-3 text-center">
-            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+          <td className="px-4 text-center">
+            <span className="px-2 py-0.5 rounded-md text-[11px] font-bold uppercase bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
               {instrument.asset_class || "CRYPTO"}
             </span>
           </td>
-          <td className="px-3 text-right font-bold text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
-          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-3 text-right text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-3 text-center text-slate-400">{instrument.exchange || "BINANCE"}</td>
-          <td className={`px-3 text-center font-bold ${trend.color}`} title="Trend calculated from EMA alignment & momentum">
+          <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
+          <td className="px-4 text-center font-medium text-[13.5px] text-slate-300">{instrument.exchange || "BINANCE"}</td>
+          <td className={`px-4 text-center font-medium text-[14px] ${trend.color}`} title="Trend calculated from EMA alignment & momentum">
             {trend.label}
           </td>
-          <td className="px-3 text-center" title={`Provider: ${instrument.data_source || 'FEED'} • Age: ${dataAgeMs}ms`}>
+          <td className="px-4 text-center" title={`Provider: ${instrument.data_source || 'FEED'} • Age: ${dataAgeMs}ms`}>
             {statusBadge}
           </td>
+          {optionsCell}
+          {actionCell}
         </>
       )}
     </tr>

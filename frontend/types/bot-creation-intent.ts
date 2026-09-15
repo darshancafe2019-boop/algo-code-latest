@@ -45,12 +45,16 @@ export interface BotCreationIntent {
   ask?: number | null;
   markPrice?: number | null;
 
+  underlying?: string;
+  securityId?: string;
+  tradingSymbol?: string;
+
   timeframe?: string;
 
   expiry?: string | null;
   strike?: number | null;
 
-  optionType?: "CALL" | "PUT" | null;
+  optionType?: "CALL" | "PUT" | "CE" | "PE" | null;
 
   lotSize?: number | null;
   tickSize?: number | null;
@@ -70,6 +74,8 @@ export interface BotCreationIntent {
   timestamp: number;
 
   origin: "LIVE_FEED" | "OPTIONS" | "FUTURES";
+
+  mode?: "new" | "addLeg";
 
   creationIntentId?: string;
 }

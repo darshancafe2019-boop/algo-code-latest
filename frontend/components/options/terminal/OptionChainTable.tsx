@@ -114,17 +114,34 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
         ? "UPSTOX"
         : "DHAN";
 
+    const u = underlying.toUpperCase();
     const defaultLotSize = isCrypto
       ? 1
-      : underlying.includes("BANKNIFTY")
+      : u.includes("BANKNIFTY")
       ? 15
-      : underlying.includes("FINNIFTY")
+      : u.includes("FINNIFTY")
       ? 25
-      : underlying.includes("MIDCPNIFTY")
+      : u.includes("MIDCPNIFTY")
       ? 75
-      : underlying.includes("SENSEX")
+      : u.includes("SENSEX")
       ? 10
-      : underlying.includes("NIFTY")
+      : u.includes("BANKEX")
+      ? 15
+      : u.includes("RELIANCE")
+      ? 250
+      : u.includes("TCS")
+      ? 175
+      : u.includes("INFY")
+      ? 400
+      : u.includes("HDFCBANK")
+      ? 550
+      : u.includes("ICICIBANK")
+      ? 700
+      : u.includes("SBIN")
+      ? 750
+      : u.includes("TATAMOTORS")
+      ? 575
+      : u.includes("NIFTY")
       ? 50
       : 1;
 
@@ -837,7 +854,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                               }
                             }}
                             className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Direct Buy Call Contract"
+                            title="Buy this option and open Bot Creation"
                           >
                             BUY
                           </button>
@@ -852,7 +869,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                               }
                             }}
                             className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Direct Sell Call Contract"
+                            title="Sell this option and open Bot Creation"
                           >
                             SELL
                           </button>
@@ -989,7 +1006,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                               }
                             }}
                             className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Direct Buy Put Contract"
+                            title="Buy this option and open Bot Creation"
                           >
                             BUY
                           </button>
@@ -1004,7 +1021,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                               }
                             }}
                             className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Direct Sell Put Contract"
+                            title="Sell this option and open Bot Creation"
                           >
                             SELL
                           </button>

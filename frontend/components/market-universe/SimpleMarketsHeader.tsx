@@ -79,7 +79,7 @@ export function SimpleMarketsHeader({
   onSyncUniverse,
   isSyncing = false,
   activeFiltersCount = 0,
-  density = "compact",
+  density = "comfortable",
   onChangeDensity,
 }: SimpleMarketsHeaderProps) {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
@@ -109,29 +109,29 @@ export function SimpleMarketsHeader({
   }, []);
 
   return (
-    <div className="bg-[#0B1224] border border-slate-800/90 rounded-2xl p-4 shadow-xl space-y-3 font-sans select-none">
+    <div className="bg-[#0B1224] border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3.5 font-sans select-none">
       {/* 1. Header First Row: Title & Status | Universal Search | Filters | More Menu */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         {/* Left: Title & Live Diagnostics Summary */}
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <div className="flex items-center gap-3">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
+            <h1 className="text-2xl sm:text-[26px] font-black tracking-tight text-white flex items-center gap-2.5">
               <span>MARKETS</span>
-              <span className="text-cyan-400 font-mono text-xs font-semibold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30">
+              <span className="text-cyan-400 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 tracking-wider">
                 UNIVERSE
               </span>
             </h1>
 
             {/* Calculated Data Health Badge */}
             <div
-              className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-extrabold border transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all ${
                 isLiveFeed
                   ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
                   : "bg-amber-500/10 border-amber-500/30 text-amber-400"
               }`}
             >
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
+                className={`w-2 h-2 rounded-full ${
                   isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
                 }`}
               />
@@ -139,48 +139,48 @@ export function SimpleMarketsHeader({
             </div>
           </div>
 
-          {/* Compact Telemetry Summary Sub-Row */}
-          <div className="flex items-center gap-2 text-[11px] font-mono text-slate-400">
+          {/* Telemetry Summary Sub-Row with Enhanced Contrast & Readability */}
+          <div className="flex items-center flex-wrap gap-2 text-[13px] font-mono text-slate-400">
             <span>
-              <strong className="text-slate-200">{totalInstruments}</strong> Instruments
+              <strong className="text-slate-100 font-bold">{totalInstruments}</strong> Instruments
             </span>
-            <span>•</span>
+            <span className="text-slate-600">•</span>
             <span>
-              <strong className="text-emerald-400">{liveCount}</strong> Live
+              <strong className="text-emerald-400 font-bold">{liveCount}</strong> Live
             </span>
-            <span>•</span>
+            <span className="text-slate-600">•</span>
             <span>
-              <strong className="text-slate-200">{providerCount}</strong> Providers
+              <strong className="text-slate-100 font-bold">{providerCount}</strong> Providers
             </span>
-            <span>•</span>
+            <span className="text-slate-600">•</span>
             <span>
-              Last update <strong className="text-cyan-400">{lastUpdateMs}ms</strong>
+              Last update <strong className="text-cyan-400 font-bold">{lastUpdateMs}ms</strong>
             </span>
           </div>
         </div>
 
         {/* Right: Search Box, Filter Button, and More Controls */}
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex items-center gap-2.5 w-full md:w-auto">
           {/* Universal Instant Search Box */}
-          <div className="relative flex-1 md:w-80">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="relative flex-1 md:w-84">
+            <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="Search symbol, NIFTY, BTC, options... (/)"
-              className="w-full bg-[#080E20] border border-slate-700/80 hover:border-slate-600 focus:border-cyan-500 text-xs font-mono text-white placeholder-slate-500 rounded-xl pl-9 pr-8 py-2 transition-all outline-none"
+              className="w-full bg-[#080E20] border border-slate-700/80 hover:border-slate-600 focus:border-cyan-500 text-[13.5px] font-mono text-white placeholder-slate-500 rounded-xl pl-10 pr-9 py-2.5 h-[42px] transition-all outline-none"
             />
             {searchQuery ? (
               <button
                 onClick={() => onSearchChange("")}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="w-4 h-4" />
               </button>
             ) : (
-              <kbd className="hidden sm:inline-block absolute right-2.5 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[9px] font-mono text-slate-400">
+              <kbd className="hidden sm:inline-block absolute right-3 top-1/2 -translate-y-1/2 px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] font-mono text-slate-400">
                 /
               </kbd>
             )}
@@ -189,14 +189,14 @@ export function SimpleMarketsHeader({
           {/* Filters Toggle Button */}
           <button
             onClick={onOpenFilters}
-            className={`px-3 py-2 text-xs font-mono font-bold rounded-xl border transition-all flex items-center gap-1.5 shrink-0 ${
+            className={`px-4 py-2.5 h-[42px] text-[13px] font-mono font-bold rounded-xl border transition-all flex items-center gap-2 shrink-0 ${
               activeFiltersCount > 0
                 ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300 shadow-[0_0_10px_rgba(6,182,212,0.25)]"
-                : "bg-[#080E20] hover:bg-slate-800 text-slate-300 border-slate-700/80 hover:border-slate-600"
+                : "bg-[#080E20] hover:bg-slate-800 text-slate-200 border-slate-700/80 hover:border-slate-600"
             }`}
             title="Filter instruments"
           >
-            <Filter className="w-3.5 h-3.5 text-cyan-400" />
+            <Filter className="w-4 h-4 text-cyan-400" />
             <span>Filters</span>
             {activeFiltersCount > 0 && (
               <span className="px-1.5 py-0.2 bg-cyan-400 text-slate-950 rounded-full text-[10px] font-black">
@@ -209,8 +209,8 @@ export function SimpleMarketsHeader({
           <div className="relative" ref={moreRef}>
             <button
               onClick={() => setIsMoreOpen(!isMoreOpen)}
-              className="p-2 rounded-xl bg-[#080E20] hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:border-slate-600 transition-all"
-              title="More options &amp; settings"
+              className="p-2.5 h-[42px] w-[42px] flex items-center justify-center rounded-xl bg-[#080E20] hover:bg-slate-800 text-slate-300 border border-slate-700/80 hover:border-slate-600 transition-all"
+              title="More options & settings"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -298,7 +298,7 @@ export function SimpleMarketsHeader({
       </div>
 
       {/* 2. Category Navigation Segmented Bar */}
-      <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 pt-1 border-t border-slate-800/80">
+      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 pt-1.5 border-t border-slate-800/80">
         {MARKET_CATEGORIES.map((cat) => {
           const isActive = activeCategory === cat.id;
           const count = categoryCounts[cat.id];
@@ -306,16 +306,16 @@ export function SimpleMarketsHeader({
             <button
               key={cat.id}
               onClick={() => onSelectCategory(cat.id)}
-              className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl font-mono text-[13px] font-bold whitespace-nowrap transition-all flex items-center gap-2 shrink-0 ${
                 isActive
                   ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black"
-                  : "bg-[#080E20] text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800/60"
+                  : "bg-[#080E20] text-slate-300 hover:text-white hover:bg-slate-800/90 border border-slate-800/70"
               }`}
             >
               <span>{cat.label}</span>
               {count !== undefined && count > 0 && (
                 <span
-                  className={`px-1.5 py-0.2 rounded-full text-[10px] ${
+                  className={`px-2 py-0.5 rounded-full text-[11px] font-mono font-bold ${
                     isActive ? "bg-slate-950 text-cyan-300" : "bg-slate-800 text-slate-400"
                   }`}
                 >

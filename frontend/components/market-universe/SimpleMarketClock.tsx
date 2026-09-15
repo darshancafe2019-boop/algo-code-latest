@@ -42,14 +42,14 @@ export function SimpleMarketClock({ onSelectMarket, selectedMarket }: SimpleMark
   return (
     <>
       {/* 1-Line Compact Market Clock Strip */}
-      <div className="bg-[#0B1224] border border-slate-800/80 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-2.5 font-mono text-xs select-none shadow-md">
-        <div className="flex items-center gap-2.5 overflow-x-auto custom-scrollbar py-0.5">
-          <div className="flex items-center gap-1.5 text-[10px] font-extrabold text-slate-400 uppercase tracking-wider font-sans shrink-0">
-            <Clock className="w-3.5 h-3.5 text-cyan-400" />
+      <div className="bg-[#0B1224] border border-slate-800/80 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 font-mono text-[12.5px] select-none shadow-md">
+        <div className="flex items-center gap-3 overflow-x-auto custom-scrollbar py-0.5">
+          <div className="flex items-center gap-1.5 text-[11.5px] font-extrabold text-slate-300 uppercase tracking-wider font-sans shrink-0">
+            <Clock className="w-4 h-4 text-cyan-400" />
             <span>SESSIONS</span>
           </div>
 
-          <div className="h-3.5 w-[1px] bg-slate-800 shrink-0" />
+          <div className="h-4 w-[1px] bg-slate-800 shrink-0" />
 
           {sessions.map((s, idx) => {
             const rawStatus = (s.status || "CLOSED").toUpperCase();
@@ -57,23 +57,23 @@ export function SimpleMarketClock({ onSelectMarket, selectedMarket }: SimpleMark
             const isPrePost = rawStatus === "PRE_MARKET" || rawStatus === "POST_MARKET" || rawStatus === "PRE-OPEN";
             const label = s.exchange || s.name || "MKT";
             const isSelected = selectedMarket === label;
-            const badgeLabel = s.status_label || (isOpen ? (s.hours?.includes("24/7") ? "OPEN" : "OPEN") : isPrePost ? "PRE-OPEN" : "CLOSED");
+            const badgeLabel = s.status_label || (isOpen ? (s.hours?.includes("24/7") ? "OPEN 24/7" : "OPEN") : isPrePost ? "PRE-OPEN" : "CLOSED");
 
             return (
               <button
                 key={s.market_id || s.exchange || `${label}-${idx}`}
                 type="button"
                 onClick={() => onSelectMarket?.(label)}
-                className={`flex items-center gap-1.5 shrink-0 px-2 py-1 rounded-lg text-xs transition border ${
+                className={`flex items-center gap-2 shrink-0 px-2.5 py-1.5 rounded-lg text-[12.5px] transition border ${
                   isSelected
-                    ? "bg-cyan-500/20 border-cyan-500/60 text-white shadow-[0_0_8px_rgba(6,182,212,0.3)]"
-                    : "bg-[#080E20] hover:bg-slate-800 text-slate-300 border-slate-800/80 hover:border-slate-700"
+                    ? "bg-cyan-500/20 border-cyan-500/60 text-white shadow-[0_0_8px_rgba(6,182,212,0.3)] font-bold"
+                    : "bg-[#080E20] hover:bg-slate-800 text-slate-200 border-slate-800/80 hover:border-slate-700"
                 }`}
                 title={`Click to filter by ${label} (${s.hours || "Trading Session"})`}
               >
                 <span className="font-bold">{label}</span>
                 <span
-                  className={`px-1 py-0.2 rounded text-[9px] font-black uppercase ${
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
                     isOpen
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
                       : isPrePost
@@ -92,7 +92,7 @@ export function SimpleMarketClock({ onSelectMarket, selectedMarket }: SimpleMark
         <button
           type="button"
           onClick={() => setIsModalOpen(true)}
-          className="text-xs font-semibold text-cyan-400 hover:text-cyan-300 font-sans flex items-center gap-1 transition-colors shrink-0"
+          className="text-[13px] font-bold text-cyan-400 hover:text-cyan-300 font-sans flex items-center gap-1.5 transition-colors shrink-0"
         >
           <span>View Sessions</span>
         </button>

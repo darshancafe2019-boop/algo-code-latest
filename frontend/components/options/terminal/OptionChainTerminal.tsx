@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Layers,
@@ -59,19 +59,53 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   initialSource = "DHAN",
   isSourceLocked = false,
 }) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { positions, orders = [], tradingMode, refreshAll } = useGlobalData();
 
+  const urlUnderlying = searchParams?.get("underlying");
+  const urlProvider = searchParams?.get("provider") || searchParams?.get("source");
+  const urlExpiry = searchParams?.get("expiry");
+
+  // Determine initial values prioritizing deep-link query parameters
+  const resolvedUnderlying = urlUnderlying ? urlUnderlying.toUpperCase() : initialUnderlying;
+  const isCryptoAsset = ["BTC", "ETH", "SOL", "XRP", "BNB"].includes(resolvedUnderlying);
+  const resolvedSource = urlProvider
+    ? urlProvider.toUpperCase()
+    : isCryptoAsset
+    ? "DELTA_INDIA"
+    : initialSource;
+
   // Primary State
-  const [underlying, setUnderlying] = useState<string>(initialUnderlying);
-  const [source, setSource] = useState<string>(initialSource);
+  const [underlying, setUnderlying] = useState<string>(resolvedUnderlying);
+  const [source, setSource] = useState<string>(resolvedSource);
   const [environment, setEnvironment] = useState<"LIVE" | "PAPER">("PAPER");
-  const [selectedExpiry, setSelectedExpiry] = useState<string>("");
+  const [selectedExpiry, setSelectedExpiry] = useState<string>(urlExpiry || "");
   const [strikeRange, setStrikeRange] = useState<number>(20);
   const [customStrikeFrom, setCustomStrikeFrom] = useState<string>("");
   const [customStrikeTo, setCustomStrikeTo] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [viewMode, setViewMode] = useState<TerminalViewMode>("STANDARD");
+
+  // Synchronize state when URL query parameters update
+  useEffect(() => {
+    if (urlUnderlying) {
+      const cleanUnd = urlUnderlying.toUpperCase();
+      setUnderlying(cleanUnd);
+      if (["BTC", "ETH", "SOL", "XRP", "BNB"].includes(cleanUnd)) {
+        setSource("DELTA_INDIA");
+      } else if (!urlProvider && (source === "DELTA_INDIA" || source === "BINANCE")) {
+        setSource("DHAN");
+      }
+    }
+    if (urlProvider) {
+      setSource(urlProvider.toUpperCase());
+    }
+    if (urlExpiry) {
+      setSelectedExpiry(urlExpiry);
+    }
+  }, [urlUnderlying, urlProvider, urlExpiry]);
 
   // Sub-tabs
   const [terminalTab, setTerminalTab] = useState<"CHAIN" | "FLOW" | "ANALYTICS">("CHAIN");
@@ -568,28 +602,74 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
   };
 
-  const router = useRouter();
-
-  // Action Dispatchers -> Direct Trading Order Ticket & One-Click Execution
+  // Action Dispatchers -> Direct Bot Creation from Option Chain
   const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
-    if (oneClickMode) {
-      executeOneClickTrade("BUY", contract);
-      return;
-    }
-    setTicketContract(contract);
-    setTicketSide("BUY");
-    setIsTicketOpen(true);
-  }, [oneClickMode]);
+    const isAddLeg = searchParams?.get("mode") === "addLeg";
+    dispatchBotCreation(router, {
+      symbol: contract.symbol,
+      canonicalSymbol: contract.symbol,
+      side: "BUY",
+      assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "OPTIONS",
+      underlying: contract.underlying,
+      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+      broker: contract.broker,
+      marketDataSource: contract.source,
+      instrumentId: contract.instrumentId,
+      securityId: contract.securityId,
+      tradingSymbol: contract.symbol,
+      currentPrice: contract.ltp,
+      bid: contract.bid,
+      ask: contract.ask,
+      strike: contract.strike,
+      expiry: contract.expiry,
+      optionType: contract.optionType,
+      lotSize: contract.lotSize,
+      delta: contract.delta,
+      gamma: contract.gamma,
+      theta: contract.theta,
+      vega: contract.vega,
+      iv: contract.iv,
+      openInterest: contract.oi,
+      volume: contract.volume,
+      timestamp: Date.now(),
+      origin: "OPTIONS",
+      mode: isAddLeg ? "addLeg" : "new",
+    });
+  }, [router, searchParams]);
 
   const handleActionSell = useCallback((contract: ActionableOptionContract) => {
-    if (oneClickMode) {
-      executeOneClickTrade("SELL", contract);
-      return;
-    }
-    setTicketContract(contract);
-    setTicketSide("SELL");
-    setIsTicketOpen(true);
-  }, [oneClickMode]);
+    const isAddLeg = searchParams?.get("mode") === "addLeg";
+    dispatchBotCreation(router, {
+      symbol: contract.symbol,
+      canonicalSymbol: contract.symbol,
+      side: "SELL",
+      assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "OPTIONS",
+      underlying: contract.underlying,
+      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+      broker: contract.broker,
+      marketDataSource: contract.source,
+      instrumentId: contract.instrumentId,
+      securityId: contract.securityId,
+      tradingSymbol: contract.symbol,
+      currentPrice: contract.ltp,
+      bid: contract.bid,
+      ask: contract.ask,
+      strike: contract.strike,
+      expiry: contract.expiry,
+      optionType: contract.optionType,
+      lotSize: contract.lotSize,
+      delta: contract.delta,
+      gamma: contract.gamma,
+      theta: contract.theta,
+      vega: contract.vega,
+      iv: contract.iv,
+      openInterest: contract.oi,
+      volume: contract.volume,
+      timestamp: Date.now(),
+      origin: "OPTIONS",
+      mode: isAddLeg ? "addLeg" : "new",
+    });
+  }, [router, searchParams]);
 
   const handleActionDepth = useCallback((contract: ActionableOptionContract) => {
     setDepthContract(contract);

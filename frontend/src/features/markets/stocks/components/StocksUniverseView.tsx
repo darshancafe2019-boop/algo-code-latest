@@ -49,26 +49,17 @@ export const StocksUniverseView: React.FC = () => {
       {/* 3. Active Filters Pills */}
       <ActiveFilterChips />
 
-      {/* 4. Table & Conditional Details Drawer */}
-      <div className="flex flex-col lg:flex-row items-start gap-4">
-        <div className="flex-1 w-full min-w-0">
-          <StocksTable
-            stocks={stocks}
-            total={meta?.total || stocks.length}
-            page={filters.page}
-            pageSize={filters.page_size}
-            isLoading={isLoading}
-            isError={isError}
-            onRefresh={() => refetch()}
-          />
-        </div>
-
-        {selectedStock && (
-          <StockDetailsDrawer
-            stock={selectedStock}
-            onClose={() => setSelectedStock(null)}
-          />
-        )}
+      {/* 4. Table (Full Width) */}
+      <div className="w-full min-w-0">
+        <StocksTable
+          stocks={stocks}
+          total={meta?.total || stocks.length}
+          page={filters.page}
+          pageSize={filters.page_size}
+          isLoading={isLoading}
+          isError={isError}
+          onRefresh={() => refetch()}
+        />
       </div>
 
       {/* 5. Filter Slide-out Drawer */}

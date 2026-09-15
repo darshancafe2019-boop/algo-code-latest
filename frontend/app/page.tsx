@@ -20,7 +20,7 @@ const BotControlTab = dynamic(
   { ssr: false, loading: () => null }
 );
 const StrategyBuilder = dynamic(
-  () => import("@/components/strategy/StrategyBuilder").then((m) => m.StrategyBuilder),
+  () => import("@/components/strategy/StrategyBotCreationWorkspace").then((m) => m.StrategyBotCreationWorkspace),
   { ssr: false, loading: () => null }
 );
 const IndicatorCenter = dynamic(

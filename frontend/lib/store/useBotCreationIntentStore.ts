@@ -54,7 +54,7 @@ export const useBotCreationIntentStore = create<BotCreationIntentState>((set) =>
  * Dispatches a typed BotCreationIntent:
  * 1. Generates an idempotency intent ID if missing
  * 2. Saves intent into central Zustand store and sessionStorage
- * 3. Navigates to `/bots/create` with minimal non-sensitive URL query params
+ * 3. Navigates to `/strategy/create` (for Options) or `/bots/create` with full non-sensitive URL query params
  */
 export function dispatchBotCreation(
   router: AppRouterInstance | { push: (url: string) => void },
@@ -74,6 +74,25 @@ export function dispatchBotCreation(
   queryParams.set("origin", intentWithId.origin);
   if (intentWithId.assetClass) queryParams.set("assetClass", intentWithId.assetClass);
   if (intentWithId.broker) queryParams.set("broker", intentWithId.broker);
+  if (intentWithId.underlying) queryParams.set("underlying", intentWithId.underlying);
+  if (intentWithId.expiry) queryParams.set("expiry", intentWithId.expiry);
+  if (intentWithId.strike != null) queryParams.set("strike", String(intentWithId.strike));
+  if (intentWithId.optionType) queryParams.set("optionType", intentWithId.optionType);
+  if (intentWithId.exchange) queryParams.set("exchange", intentWithId.exchange);
+  if (intentWithId.securityId) queryParams.set("securityId", intentWithId.securityId);
+  if (intentWithId.currentPrice != null) queryParams.set("ltp", String(intentWithId.currentPrice));
+  if (intentWithId.bid != null) queryParams.set("bid", String(intentWithId.bid));
+  if (intentWithId.ask != null) queryParams.set("ask", String(intentWithId.ask));
+  if (intentWithId.lotSize != null) queryParams.set("lotSize", String(intentWithId.lotSize));
+  if (intentWithId.mode) queryParams.set("mode", intentWithId.mode);
 
-  router.push(`/bots/create?${queryParams.toString()}`);
+  const isOptionOrigin =
+    intentWithId.origin === "OPTIONS" ||
+    intentWithId.assetClass === "OPTIONS" ||
+    intentWithId.assetClass === "OPTION" ||
+    intentWithId.assetClass === "CRYPTO_OPTIONS" ||
+    Boolean(intentWithId.strike);
+
+  const targetPath = isOptionOrigin ? "/strategy/create" : "/bots/create";
+  router.push(`${targetPath}?${queryParams.toString()}`);
 }

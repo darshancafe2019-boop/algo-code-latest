@@ -13,7 +13,6 @@ import {
 import { SimpleMarketsHeader } from "./SimpleMarketsHeader";
 import { SimpleMarketClock } from "./SimpleMarketClock";
 import { SimpleMarketTable } from "./SimpleMarketTable";
-import { InstrumentInspector } from "./InstrumentInspector";
 import { MarketFilterDrawer, MarketFilterState } from "./MarketFilterDrawer";
 import { OptionChainModal } from "./OptionChainModal";
 import { FuturesChainModal } from "./FuturesChainModal";
@@ -33,8 +32,6 @@ import {
   Radar,
   Activity,
   Layers,
-  ChevronDown,
-  Sparkles,
   Zap,
 } from "lucide-react";
 
@@ -51,14 +48,12 @@ export function MarketUniverse() {
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch);
   const [selectedInstrument, setSelectedInstrument] = useState<MarketInstrument | null>(null);
-  const [isInspectorOpen, setIsInspectorOpen] = useState<boolean>(true);
   const [activeWatchlistId, setActiveWatchlistId] = useState<string>("wl_main");
-  const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [density, setDensity] = useState<"compact" | "comfortable">("comfortable");
 
   // Options & Derivatives sub-filters
   const [optionsUnderlyingFilter, setOptionsUnderlyingFilter] = useState<string>("ALL");
   const [futuresUnderlyingFilter, setFuturesUnderlyingFilter] = useState<string>("ALL");
-  const [stocksExchangeFilter, setStocksExchangeFilter] = useState<string>("ALL");
 
   // Drawers and Modals
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -149,180 +144,145 @@ export function MarketUniverse() {
           ? "Futures"
           : "ALL";
 
-      const params = new URLSearchParams({
-        asset_class: assetClassParam,
-        exchange: filters.exchange !== "ALL" ? filters.exchange : "ALL",
-        search: debouncedSearch,
-        limit: "250",
-      });
+      const params = new URLSearchParams();
+      if (assetClassParam !== "ALL") params.set("asset_class", assetClassParam);
+      if (debouncedSearch) params.set("query", debouncedSearch);
+      if (filters.exchange !== "ALL") params.set("exchange", filters.exchange);
+      params.set("limit", "150");
 
-      const res = await apiClient.get<MarketUniverseResponse>(`/api/universe/instruments?${params.toString()}`, {
-        timeoutMs: 8000,
-      });
-
-      if (!res.ok) throw new Error(res.error?.message || "Failed to load instrument registry.");
-      return res.data as MarketUniverseResponse;
+      try {
+        const res = await apiClient.get<MarketUniverseResponse>(`/api/universe/instruments?${params.toString()}`);
+        return res.data as MarketUniverseResponse;
+      } catch {
+        return {
+          success: true,
+          instruments: [],
+          total_count: 0,
+        };
+      }
     },
-    staleTime: 5000,
-    refetchInterval: 8000,
-    placeholderData: (prev) => prev,
+    staleTime: 10000,
   });
 
-  // 2. Fetch Universe Summary Stats (`GET /api/universe/summary`)
-  const { data: summaryData } = useQuery<{ status: string; summary: UniverseSummaryStats }>({
-    queryKey: ["universeSummaryStats"],
+  // 2. Fetch Summary Statistics (`GET /api/universe/summary`)
+  const { data: summaryData } = useQuery<{ success: boolean; summary: UniverseSummaryStats }>({
+    queryKey: ["marketUniverseSummary"],
     queryFn: async () => {
-      const res = await apiClient.get<{ status: string; summary: UniverseSummaryStats }>("/api/universe/summary", {
-        timeoutMs: 6000,
-      });
-      if (!res.ok) {
+      try {
+        const res = await apiClient.get<{ success: boolean; summary: UniverseSummaryStats }>("/api/universe/summary");
+        return res.data as { success: boolean; summary: UniverseSummaryStats };
+      } catch {
         return {
-          status: "success",
+          success: true,
           summary: {
             total_instruments: 229,
-            active_instruments: 229,
-            total_exchanges: 5,
-            total_asset_classes: 6,
+            asset_classes_covered: 10,
+            active_markets: 7,
             providers_connected: 3,
             average_feed_latency_ms: 120,
-            overall_quality_pct: 99.8,
-            last_sync_timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString(),
           },
         };
       }
-      return res.data as { status: string; summary: UniverseSummaryStats };
     },
-    staleTime: 6000,
-    refetchInterval: 12000,
+    staleTime: 30000,
   });
 
-  // 3. Sync Universe Mutation (`POST /api/universe/sync`)
+  // 3. Background Database Sync Mutation (`POST /api/universe/sync`)
   const syncMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiClient.post("/api/universe/sync", { provider_id: "ALL" }, { timeoutMs: 12000 });
-      if (!res.ok) throw new Error(res.error?.message || "Failed to sync universe");
+      const res = await apiClient.post("/api/universe/sync", {});
       return res.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["marketUniverseMaster"] });
-      queryClient.invalidateQueries({ queryKey: ["universeSummaryStats"] });
+      queryClient.invalidateQueries({ queryKey: ["marketUniverseSummary"] });
     },
   });
 
-  const rawInstruments: MarketInstrument[] = useMemo(() => {
-    return Array.isArray(universeData?.instruments) ? universeData.instruments : [];
+  // 4. WebSocket Active Subscriptions Management
+  const rawInstruments = useMemo(() => {
+    return universeData?.instruments || [];
   }, [universeData]);
 
-  // Compute category counts
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      ALL: rawInstruments.length || 229,
-      STOCKS: 0,
-      FUNDS: 0,
-      FUTURES: 0,
-      FOREX: 0,
-      CRYPTO: 0,
-      INDICES: 0,
-      BONDS: 0,
-      ECONOMY: 0,
-      OPTIONS: 0,
-      WATCHLISTS: watchedItems.length,
+  useEffect(() => {
+    if (rawInstruments.length === 0) return;
+    const symbolsToSub = rawInstruments
+      .slice(0, 30)
+      .map((it) => it.canonical_symbol || it.provider_symbol || it.symbol)
+      .filter((s): s is string => Boolean(s));
+
+    symbolsToSub.forEach((sym) => subscribe(sym, "WATCHLIST"));
+    return () => {
+      symbolsToSub.forEach((sym) => unsubscribe(sym, "WATCHLIST"));
     };
+  }, [rawInstruments, subscribe, unsubscribe]);
 
-    rawInstruments.forEach((i) => {
-      const ac = (i.asset_class || i.canonical_asset_class || "").toUpperCase();
-      const sym = (i.canonical_symbol || i.symbol || "").toUpperCase();
-      if (ac.includes("EQUITY") || ac.includes("STOCK")) counts.STOCKS++;
-      else if (ac.includes("FUTURES") || sym.includes("FUT") || sym.includes("PERP")) counts.FUTURES++;
-      else if (ac.includes("OPTIONS") || sym.includes("CE") || sym.includes("PE") || sym.includes("-C")) counts.OPTIONS++;
-      else if (ac.includes("CRYPTO")) counts.CRYPTO++;
-      else if (ac.includes("FOREX")) counts.FOREX++;
-      else if (ac.includes("INDICES") || ac.includes("INDEX")) counts.INDICES++;
-      else if (ac.includes("FUNDS")) counts.FUNDS++;
-      else if (ac.includes("BONDS")) counts.BONDS++;
-      else if (ac.includes("ECONOMY")) counts.ECONOMY++;
-      else counts.CRYPTO++;
-    });
-
+  // Client-side Filtering & Category counts
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { ALL: rawInstruments.length };
+    for (const it of rawInstruments) {
+      const cls = it.asset_class?.toUpperCase() || "OTHER";
+      counts[cls] = (counts[cls] || 0) + 1;
+    }
+    counts["WATCHLISTS"] = watchlistSymbols.size;
     return counts;
-  }, [rawInstruments, watchedItems]);
+  }, [rawInstruments, watchlistSymbols]);
 
-  // Filter for watchlist & local price/volume/underlying filter criteria
   const displayedInstruments = useMemo(() => {
-    let list = rawInstruments;
+    let list = [...rawInstruments];
 
     if (activeCategory === "WATCHLISTS") {
-      const activeWl = watchlists.find((w) => w.id === activeWatchlistId);
-      if (activeWl && activeWl.items && activeWl.items.length > 0) {
-        list = activeWl.items;
-      } else {
-        list = watchedItems;
-      }
+      list = list.filter(
+        (it) =>
+          watchlistSymbols.has(it.canonical_symbol) ||
+          watchlistSymbols.has(it.instrument_id) ||
+          watchlistSymbols.has(it.symbol || "")
+      );
+    } else if (activeCategory === "OPTIONS") {
+      list = list.filter((it) => {
+        if (optionsUnderlyingFilter === "ALL") return true;
+        const sym = it.canonical_symbol || it.symbol || "";
+        return sym.toUpperCase().startsWith(optionsUnderlyingFilter);
+      });
+    } else if (activeCategory === "FUTURES") {
+      list = list.filter((it) => {
+        if (futuresUnderlyingFilter === "ALL") return true;
+        const sym = it.canonical_symbol || it.symbol || "";
+        return sym.toUpperCase().startsWith(futuresUnderlyingFilter);
+      });
     }
 
-    // Asset-specific underlying filters
-    if (activeCategory === "OPTIONS" && optionsUnderlyingFilter !== "ALL") {
-      list = list.filter((i) =>
-        (i.canonical_symbol || i.symbol || "").toUpperCase().startsWith(optionsUnderlyingFilter)
-      );
-    }
-    if (activeCategory === "FUTURES" && futuresUnderlyingFilter !== "ALL") {
-      list = list.filter((i) =>
-        (i.canonical_symbol || i.symbol || "").toUpperCase().startsWith(futuresUnderlyingFilter)
-      );
-    }
-    if (activeCategory === "STOCKS" && stocksExchangeFilter !== "ALL") {
-      list = list.filter((i) => (i.exchange || "").toUpperCase() === stocksExchangeFilter);
-    }
-
-    // Apply Client-side price / volume thresholds if set
+    // Price range filters
     if (filters.minPrice) {
-      const minP = parseFloat(filters.minPrice);
-      if (!isNaN(minP)) list = list.filter((i) => (i.last_price || 0) >= minP);
+      const min = parseFloat(filters.minPrice);
+      if (!isNaN(min)) list = list.filter((it) => (it.last_price || 0) >= min);
     }
     if (filters.maxPrice) {
-      const maxP = parseFloat(filters.maxPrice);
-      if (!isNaN(maxP)) list = list.filter((i) => (i.last_price || 0) <= maxP);
+      const max = parseFloat(filters.maxPrice);
+      if (!isNaN(max)) list = list.filter((it) => (it.last_price || 0) <= max);
     }
+
+    // Volume filter
     if (filters.minVolume) {
       const minV = parseFloat(filters.minVolume);
-      if (!isNaN(minV)) list = list.filter((i) => (i.volume_24h || 0) >= minV);
+      if (!isNaN(minV)) list = list.filter((it) => (it.volume_24h || 0) >= minV);
+    }
+
+    // Status filter
+    if (filters.status !== "ALL") {
+      list = list.filter((it) => it.market_status === filters.status);
     }
 
     return list;
   }, [
     rawInstruments,
     activeCategory,
-    activeWatchlistId,
-    watchlists,
-    watchedItems,
-    filters,
     optionsUnderlyingFilter,
     futuresUnderlyingFilter,
-    stocksExchangeFilter,
+    filters,
+    watchlistSymbols,
   ]);
-
-  // Default active selected instrument
-  const activeSelected = selectedInstrument || (displayedInstruments.length > 0 ? displayedInstruments[0] : null);
-
-  // Dynamic visible-row WebSocket subscriptions via MarketGatewayContext
-  useEffect(() => {
-    const symbolsToSub = new Set<string>();
-    displayedInstruments.slice(0, 150).forEach((inst) => {
-      const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol;
-      if (sym) symbolsToSub.add(sym);
-    });
-    if (activeSelected) {
-      const selSym = activeSelected.canonical_symbol || activeSelected.symbol || activeSelected.provider_symbol;
-      if (selSym) symbolsToSub.add(selSym);
-    }
-
-    symbolsToSub.forEach((s) => subscribe(s, "WATCHLIST"));
-
-    return () => {
-      symbolsToSub.forEach((s) => unsubscribe(s, "WATCHLIST"));
-    };
-  }, [displayedInstruments, activeSelected, subscribe, unsubscribe]);
 
   const activeFiltersCount = [
     filters.exchange !== "ALL",
@@ -336,13 +296,20 @@ export function MarketUniverse() {
     return rawInstruments.filter((i) => i.data_status === "LIVE" || (i.data_age_ms ?? 120) < 10000).length;
   }, [rawInstruments]);
 
-  const handleRowSelect = (inst: MarketInstrument) => {
-    setSelectedInstrument(inst);
-    setIsInspectorOpen(true);
+  const handleLaunchOptionChainDirect = (underlying: string, exchange?: string, provider?: string) => {
+    const params = new URLSearchParams({ underlying });
+    if (exchange) params.append("exchange", exchange);
+    if (provider) params.append("provider", provider);
+    router.push(`/trading/options?${params.toString()}`);
+  };
+
+  const handleLaunchTradeDirect = (inst: MarketInstrument) => {
+    const sym = inst.canonical_symbol || inst.symbol || "NIFTY";
+    router.push(`/trading/options?underlying=${encodeURIComponent(sym)}`);
   };
 
   return (
-    <div className="space-y-3.5 font-sans select-none text-slate-100 pb-16 max-w-[1600px] mx-auto">
+    <div className="space-y-3.5 font-sans select-none text-slate-100 pb-16 w-full max-w-[1750px] mx-auto px-2 sm:px-4">
       {/* 1. Header: Universal Search, Category Tabs, Telemetry & Filter Controls */}
       <ErrorBoundary title="Markets Header Error">
         <SimpleMarketsHeader
@@ -381,17 +348,17 @@ export function MarketUniverse() {
 
       {/* 3. Asset-Specific Sub-Filter Controls */}
       {activeCategory === "OPTIONS" && (
-        <div className="p-3 bg-[#0B132B] border border-purple-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2">
+        <div className="p-3.5 bg-[#0B132B] border border-purple-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 text-[13px] font-mono">
+          <div className="flex items-center flex-wrap gap-2">
             <span className="text-purple-400 font-bold uppercase">Underlying Chain:</span>
-            {(["ALL", "NIFTY", "BANKNIFTY", "BTC", "ETH", "SOL"] as const).map((und) => (
+            {(["ALL", "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "RELIANCE", "BTC", "ETH"] as const).map((und) => (
               <button
                 key={und}
                 onClick={() => setOptionsUnderlyingFilter(und)}
-                className={`px-2.5 py-1 rounded-lg font-bold transition border ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition border ${
                   optionsUnderlyingFilter === und
                     ? "bg-purple-600 text-white border-purple-400 shadow-sm"
-                    : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                    : "bg-slate-900 text-slate-300 border-slate-800 hover:text-white"
                 }`}
               >
                 {und}
@@ -400,27 +367,27 @@ export function MarketUniverse() {
           </div>
 
           <button
-            onClick={() => setOptionChainUnderlying(optionsUnderlyingFilter === "ALL" ? "NIFTY" : optionsUnderlyingFilter)}
-            className="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition flex items-center gap-1.5 shadow-md shadow-purple-500/20"
+            onClick={() => handleLaunchOptionChainDirect(optionsUnderlyingFilter === "ALL" ? "NIFTY" : optionsUnderlyingFilter)}
+            className="px-3.5 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold transition flex items-center gap-2 shadow-md shadow-purple-500/20"
           >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Launch Options Chain Matrix</span>
+            <Layers className="w-4 h-4" />
+            <span>Launch Direct Option Chain</span>
           </button>
         </div>
       )}
 
       {activeCategory === "FUTURES" && (
-        <div className="p-3 bg-[#0B132B] border border-cyan-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
-          <div className="flex items-center gap-2">
+        <div className="p-3.5 bg-[#0B132B] border border-cyan-500/30 rounded-xl flex flex-wrap items-center justify-between gap-3 text-[13px] font-mono">
+          <div className="flex items-center flex-wrap gap-2">
             <span className="text-cyan-400 font-bold uppercase">Underlying Asset:</span>
             {(["ALL", "BTC", "ETH", "SOL", "NIFTY", "BANKNIFTY"] as const).map((und) => (
               <button
                 key={und}
                 onClick={() => setFuturesUnderlyingFilter(und)}
-                className={`px-2.5 py-1 rounded-lg font-bold transition border ${
+                className={`px-3 py-1.5 rounded-lg font-bold transition border ${
                   futuresUnderlyingFilter === und
                     ? "bg-cyan-600 text-white border-cyan-400 shadow-sm"
-                    : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+                    : "bg-slate-900 text-slate-300 border-slate-800 hover:text-white"
                 }`}
               >
                 {und}
@@ -430,59 +397,40 @@ export function MarketUniverse() {
 
           <button
             onClick={() => setFuturesChainUnderlying(futuresUnderlyingFilter === "ALL" ? "BTC" : futuresUnderlyingFilter)}
-            className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition flex items-center gap-1.5 shadow-md shadow-cyan-500/20"
+            className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition flex items-center gap-2 shadow-md shadow-cyan-500/20"
           >
-            <Zap className="w-3.5 h-3.5" />
+            <Zap className="w-4 h-4" />
             <span>View Futures Term Structure</span>
           </button>
         </div>
       )}
 
-      {activeCategory === "STOCKS" ? (
-        <ErrorBoundary title="Stocks Universe Error">
-          <StocksUniverseView />
-        </ErrorBoundary>
-      ) : (
-        /* 4. Main Market Content Area: Dynamic Table (Left) + Right-Side Inspector */
-        <ErrorBoundary title="Market Table Error">
-          {isLoading && !universeData ? (
-            <MarketSkeleton />
-          ) : error && !universeData ? (
-            <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl text-xs text-rose-300 font-mono">
-              <span>Failed to load market universe: {(error as Error).message}</span>
-            </div>
-          ) : (
-            <div className="flex flex-col lg:flex-row items-start gap-3.5 w-full">
-              {/* Left: Dynamic Smart Market Table */}
-              <div className="w-full min-w-0 flex-1">
-                <SimpleMarketTable
-                  instruments={displayedInstruments}
-                  selectedInstrument={activeSelected}
-                  onSelectInstrument={handleRowSelect}
-                  onToggleWatchlist={(inst) => toggleWatchlist(inst)}
-                  watchlistSymbols={watchlistSymbols}
-                  activeCategory={activeCategory}
-                  density={density}
-                  showColumnSettings={showColumnSettings}
-                  onCloseColumnSettings={() => setShowColumnSettings(false)}
-                />
-              </div>
-
-              {/* Right: Responsive Instrument Inspector */}
-              {isInspectorOpen && activeSelected && (
-                <InstrumentInspector
-                  instrument={activeSelected}
-                  onClose={() => setIsInspectorOpen(false)}
-                  isInWatchlist={Boolean(isWatched(activeSelected))}
-                  onToggleWatchlist={() => toggleWatchlist(activeSelected)}
-                  onOpenOptions={setOptionChainUnderlying}
-                  onOpenFutures={setFuturesChainUnderlying}
-                />
-              )}
-            </div>
-          )}
-        </ErrorBoundary>
-      )}
+      {/* 4. Main Market Content Area: Unified Full-Width Table */}
+      <ErrorBoundary title="Market Table Error">
+        {isLoading && !universeData ? (
+          <MarketSkeleton />
+        ) : error && !universeData ? (
+          <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl text-xs text-rose-300 font-mono">
+            <span>Failed to load market universe: {(error as Error).message}</span>
+          </div>
+        ) : (
+          <div className="w-full min-w-0">
+            <SimpleMarketTable
+              instruments={displayedInstruments}
+              selectedInstrument={selectedInstrument}
+              onSelectInstrument={setSelectedInstrument}
+              onToggleWatchlist={(inst) => toggleWatchlist(inst)}
+              watchlistSymbols={watchlistSymbols}
+              activeCategory={activeCategory}
+              density={density}
+              showColumnSettings={showColumnSettings}
+              onCloseColumnSettings={() => setShowColumnSettings(false)}
+              onOpenOptions={handleLaunchOptionChainDirect}
+              onOpenTrade={handleLaunchTradeDirect}
+            />
+          </div>
+        )}
+      </ErrorBoundary>
 
       {/* --------------------------------------------------------------------- */}
       {/* On-Demand Modals & Drawers */}
@@ -543,7 +491,6 @@ export function MarketUniverse() {
               <TopMoversBoard
                 onSelectInstrument={(inst) => {
                   setSelectedInstrument(inst);
-                  setIsInspectorOpen(true);
                   setExploreModalView(null);
                 }}
               />
@@ -571,7 +518,6 @@ export function MarketUniverse() {
               <GlobalMarketHeatmap
                 onSelectInstrument={(inst) => {
                   setSelectedInstrument(inst);
-                  setIsInspectorOpen(true);
                   setExploreModalView(null);
                 }}
               />
@@ -599,7 +545,6 @@ export function MarketUniverse() {
               <MarketScannerWorkbench
                 onSelectInstrument={(inst) => {
                   setSelectedInstrument(inst);
-                  setIsInspectorOpen(true);
                   setExploreModalView(null);
                 }}
               />

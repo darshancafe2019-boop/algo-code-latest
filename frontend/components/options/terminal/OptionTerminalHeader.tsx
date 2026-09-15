@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {
   Activity,
   Zap,
@@ -10,6 +11,7 @@ import {
   TrendingUp,
   TrendingDown,
   ChevronDown,
+  ArrowLeft,
 } from "lucide-react";
 import { MarketSessionStatus } from "@/types/option-terminal";
 import { formatIndianCurrency } from "@/lib/options/options-analytics-engine";
@@ -38,8 +40,8 @@ interface OptionTerminalHeaderProps {
 
 const UNDERLYING_PRESETS = [
   { group: "NSE Indices", items: ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"] },
-  { group: "NSE Equities", items: ["RELIANCE", "HDFCBANK", "ICICIBANK", "TCS", "INFY", "TATAMOTORS", "SBIN"] },
-  { group: "Crypto Derivatives", items: ["BTC", "ETH", "SOL", "XRP"] },
+  { group: "NSE Equities", items: ["RELIANCE", "HDFCBANK", "ICICIBANK", "TCS", "INFY", "TATAMOTORS", "SBIN", "BHARTIARTL", "ITC", "AXISBANK", "MARUTI", "BAJFINANCE"] },
+  { group: "Crypto Derivatives", items: ["BTC", "ETH", "SOL", "XRP", "BNB"] },
 ];
 
 export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
@@ -64,8 +66,11 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
   onRefresh,
 }) => {
   const isPositive = spotChange >= 0;
-  const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying);
+  const isCrypto = ["BTC", "ETH", "SOL", "XRP", "BNB"].includes(underlying);
   const currency = isCrypto ? "$" : "₹";
+
+  const allPresetItems = new Set(UNDERLYING_PRESETS.flatMap((g) => g.items));
+  const isCustomUnderlying = !allPresetItems.has(underlying);
 
   const getMarketStatusBadge = () => {
     switch (marketStatus) {
@@ -129,8 +134,18 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
   return (
     <header className="bg-[#090E17] border border-slate-800/90 rounded-xl px-4 py-2.5 text-slate-100 shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Left: Underlying Selector + Live Spot Ticker */}
-        <div className="flex items-center gap-3.5 min-w-0">
+        {/* Left: Return to Markets + Underlying Selector + Live Spot Ticker */}
+        <div className="flex items-center gap-3.5 min-w-0 flex-wrap">
+          {/* Back to Markets button */}
+          <Link
+            href="/markets"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-mono font-bold transition shrink-0 shadow-sm"
+            title="Return to Markets"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 text-cyan-400" />
+            <span>Markets</span>
+          </Link>
+
           {/* Underlying dropdown */}
           <div className="relative">
             <select
@@ -138,6 +153,11 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
               onChange={(e) => onChangeUnderlying(e.target.value)}
               className="bg-[#0E1726] border border-cyan-500/40 text-cyan-300 font-mono font-extrabold text-sm sm:text-base md:text-lg rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer"
             >
+              {isCustomUnderlying && (
+                <option value={underlying} className="bg-slate-900 text-cyan-300 font-mono font-black">
+                  {underlying} (Selected)
+                </option>
+              )}
               {UNDERLYING_PRESETS.map((grp) => (
                 <optgroup key={grp.group} label={grp.group} className="bg-slate-900 text-slate-300">
                   {grp.items.map((item) => (

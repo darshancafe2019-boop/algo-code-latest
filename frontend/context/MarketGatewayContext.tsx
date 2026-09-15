@@ -21,6 +21,7 @@ import React, {
 } from "react";
 import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
+import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       reconnectAttemptRef.current = 0;
       lastHeartbeatRef.current = Date.now();
       setConnectionStatus("LIVE");
+      useMarketFeedStore.getState().setConnectionStatus("LIVE");
 
       // Re-subscribe to all active symbols
       const allSubs: string[] = [];
@@ -194,6 +196,27 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           const sym = quote.symbol.toUpperCase();
           quotesRef.current.set(sym, quote);
           pendingQuotesRef.current.set(sym, quote);
+
+          // Fast ingestion into central Zustand marketFeedStore
+          useMarketFeedStore.getState().ingestTick({
+            symbol: sym,
+            exchange: quote.exchange,
+            provider: quote.provider,
+            lastPrice: quote.last_price,
+            bid: quote.bid,
+            ask: quote.ask,
+            volume: quote.volume,
+            open: quote.open,
+            high: quote.high,
+            low: quote.low,
+            close: quote.close,
+            changePercent: quote.change_pct ?? 0,
+            eventTimestamp: quote.event_timestamp,
+            feedLatencyMs: quote.feed_latency_ms,
+            dataMode: quote.data_mode,
+            isStale: quote.is_stale,
+            ageMs: (quote.age_seconds || 0) * 1000,
+          });
 
           // Fast targeted notification to components listening specifically to this symbol
           const symListeners = symbolListenersRef.current.get(sym);
@@ -230,6 +253,27 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
             const sym = rawSym.toUpperCase();
             quotesRef.current.set(sym, q);
             pendingQuotesRef.current.set(sym, q);
+
+            useMarketFeedStore.getState().ingestTick({
+              symbol: sym,
+              exchange: q.exchange,
+              provider: q.provider,
+              lastPrice: q.last_price,
+              bid: q.bid,
+              ask: q.ask,
+              volume: q.volume,
+              open: q.open,
+              high: q.high,
+              low: q.low,
+              close: q.close,
+              changePercent: q.change_pct ?? 0,
+              eventTimestamp: q.event_timestamp,
+              feedLatencyMs: q.feed_latency_ms,
+              dataMode: q.data_mode,
+              isStale: q.is_stale,
+              ageMs: (q.age_seconds || 0) * 1000,
+            });
+
             const symListeners = symbolListenersRef.current.get(sym);
             if (symListeners && symListeners.size > 0) {
               symListeners.forEach((fn) => {
@@ -254,6 +298,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           }
         } else if (msg.type === "HEARTBEAT") {
           setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
+          useMarketFeedStore.getState().setConnectionStatus("LIVE");
         }
       } catch {
         // Safe: ignore malformed frames

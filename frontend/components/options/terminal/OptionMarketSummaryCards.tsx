@@ -39,17 +39,17 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
   const totalVolume = (pcr.totalCallVolume || 0) + (pcr.totalPutVolume || 0);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 font-mono text-xs">
+    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 font-mono text-xs sm:text-sm">
       {/* 1. CALL OI */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>CALL OI</span>
-          <span className="text-rose-400 text-[9px] font-bold">CE RES</span>
+          <span className="text-rose-400 text-[10px] sm:text-xs font-bold">CE RES</span>
         </div>
-        <div className="text-sm font-extrabold text-rose-300 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-rose-300 mt-1">
           {formatIndianQuantity(pcr.totalCallOI)}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>ΔOI</span>
           <span className={pcr.totalCallOIChange >= 0 ? "text-emerald-400" : "text-rose-400"}>
             {pcr.totalCallOIChange >= 0 ? "+" : ""}
@@ -59,15 +59,15 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       </div>
 
       {/* 2. PUT OI */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>PUT OI</span>
-          <span className="text-emerald-400 text-[9px] font-bold">PE SUP</span>
+          <span className="text-emerald-400 text-[10px] sm:text-xs font-bold">PE SUP</span>
         </div>
-        <div className="text-sm font-extrabold text-emerald-300 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-emerald-300 mt-1">
           {formatIndianQuantity(pcr.totalPutOI)}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>ΔOI</span>
           <span className={pcr.totalPutOIChange >= 0 ? "text-emerald-400" : "text-rose-400"}>
             {pcr.totalPutOIChange >= 0 ? "+" : ""}
@@ -77,36 +77,36 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       </div>
 
       {/* 3. PCR (Put-Call Ratio) */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>PCR (OI)</span>
           <span
-            className={`text-[9px] font-bold px-1 rounded ${
+            className={`text-[10px] sm:text-xs font-black px-1 rounded ${
               isPcrBullish ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
             }`}
           >
             {isPcrBullish ? "BULLISH" : "BEARISH"}
           </span>
         </div>
-        <div className={`text-sm font-extrabold mt-1 ${isPcrBullish ? "text-emerald-400" : "text-amber-400"}`}>
+        <div className={`text-sm sm:text-base md:text-lg font-black mt-1 ${isPcrBullish ? "text-emerald-400" : "text-amber-400"}`}>
           {pcr.pcrOI !== null ? pcr.pcrOI.toFixed(2) : "N/A"}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Vol PCR</span>
           <span className="text-slate-200">{pcr.pcrVolume !== null ? pcr.pcrVolume.toFixed(2) : "N/A"}</span>
         </div>
       </div>
 
       {/* 4. MAX PAIN */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>MAX PAIN</span>
-          <Target className="w-3 h-3 text-cyan-400" />
+          <Target className="w-3.5 h-3.5 text-cyan-400" />
         </div>
-        <div className="text-sm font-extrabold text-cyan-300 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-cyan-300 mt-1">
           {snapshot.maxPain !== null ? snapshot.maxPain.toLocaleString("en-IN") : "N/A"}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Spot Diff</span>
           <span className={snapshot.spotVsMaxPainDistance && snapshot.spotVsMaxPainDistance > 0 ? "text-emerald-400" : "text-rose-400"}>
             {snapshot.spotVsMaxPainDistance !== null
@@ -117,43 +117,43 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       </div>
 
       {/* 5. ATM STRIKE & IV */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>ATM STRIKE</span>
-          <span className="text-purple-400 text-[9px] font-bold">IV {snapshot.atmIV || "14.5"}%</span>
+          <span className="text-purple-400 text-[10px] sm:text-xs font-bold">IV {snapshot.atmIV || "14.5"}%</span>
         </div>
-        <div className="text-sm font-extrabold text-purple-300 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-purple-300 mt-1">
           {snapshot.atmStrike.toLocaleString("en-IN")}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Total OI</span>
           <span className="text-slate-300">{formatIndianQuantity(totalOI)}</span>
         </div>
       </div>
 
       {/* 6. CALL / PUT FLOW TURNOVER */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>OPTIONS FLOW</span>
-          <Activity className="w-3 h-3 text-cyan-400" />
+          <Activity className="w-3.5 h-3.5 text-cyan-400" />
         </div>
-        <div className="text-sm font-extrabold text-slate-100 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-slate-100 mt-1">
           {formatIndianCurrency(flow.totalFlowTurnover, currency)}
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span className="text-emerald-400">{flow.bullishPercentage}% Bull</span>
           <span className="text-rose-400">{flow.bearishPercentage}% Bear</span>
         </div>
       </div>
 
       {/* 7. FLOW SENTIMENT CONFIDENCE */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>FLOW SIGNAL</span>
-          <Sparkles className="w-3 h-3 text-amber-400" />
+          <Sparkles className="w-3.5 h-3.5 text-amber-400" />
         </div>
         <div
-          className={`text-sm font-extrabold mt-1 ${
+          className={`text-sm sm:text-base md:text-lg font-black mt-1 ${
             flow.overallSentiment === "BULLISH"
               ? "text-emerald-400"
               : flow.overallSentiment === "BEARISH"
@@ -163,22 +163,22 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
         >
           {flow.overallSentiment} ({flow.confidence}%)
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Classification</span>
-          <span className="text-cyan-300 text-[9px] font-bold">Rule-Based</span>
+          <span className="text-cyan-300 text-[10px] sm:text-xs font-bold">Rule-Based</span>
         </div>
       </div>
 
       {/* 8. UNUSUAL ACTIVITY DETECTOR */}
-      <div className="p-2.5 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
-        <div className="flex items-center justify-between text-[10px] text-slate-400">
+      <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
+        <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>UNUSUAL ACTIVITY</span>
-          <Flame className="w-3 h-3 text-orange-400 animate-pulse" />
+          <Flame className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
         </div>
-        <div className="text-sm font-extrabold text-orange-300 mt-1">
+        <div className="text-sm sm:text-base md:text-lg font-black text-orange-300 mt-1">
           {flow.unusualTradeCount} Anomalies
         </div>
-        <div className="text-[10px] text-slate-400 flex items-center justify-between mt-1">
+        <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Vol / OI Spike</span>
           <span className="text-orange-400 font-bold">&gt; 3.0x</span>
         </div>

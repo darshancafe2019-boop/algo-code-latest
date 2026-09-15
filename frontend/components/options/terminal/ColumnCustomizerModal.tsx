@@ -93,6 +93,34 @@ export const FULL_COLUMN_CONFIG: ColumnVisibilityConfig = {
   buildupBadge: true,
 };
 
+export const ALL_COLUMNS_CONFIG: ColumnVisibilityConfig = {
+  oi: true,
+  oiChange: true,
+  oiChangePercent: true,
+  volume: true,
+  volumeOiRatio: true,
+  iv: true,
+  intrinsicValue: true,
+  timeValue: true,
+  ltp: true,
+  change: true,
+  changePercent: true,
+  bid: true,
+  ask: true,
+  bidQty: true,
+  askQty: true,
+  delta: true,
+  gamma: true,
+  theta: true,
+  vega: true,
+  rho: true,
+  buildupBadge: true,
+  averagePrice: true,
+  previousOi: true,
+  previousVolume: true,
+  spread: true,
+};
+
 const COLUMN_GROUPS: Array<{
   group: string;
   columns: Array<{ key: keyof ColumnVisibilityConfig; label: string; desc: string }>;
@@ -107,6 +135,8 @@ const COLUMN_GROUPS: Array<{
       { key: "ask", label: "Ask", desc: "Best seller price" },
       { key: "bidQty", label: "Bid Qty", desc: "Quantity at best bid" },
       { key: "askQty", label: "Ask Qty", desc: "Quantity at best ask" },
+      { key: "averagePrice", label: "Avg Price", desc: "Weighted average trade price" },
+      { key: "spread", label: "Spread", desc: "Bid-Ask spread difference" },
     ],
   },
   {
@@ -115,7 +145,9 @@ const COLUMN_GROUPS: Array<{
       { key: "oi", label: "OI", desc: "Open Interest (Contracts)" },
       { key: "oiChange", label: "ΔOI", desc: "Open Interest change" },
       { key: "oiChangePercent", label: "ΔOI %", desc: "Percentage OI change" },
+      { key: "previousOi", label: "Prev OI", desc: "Previous session Open Interest" },
       { key: "volume", label: "Volume", desc: "Total traded volume" },
+      { key: "previousVolume", label: "Prev Vol", desc: "Previous session traded volume" },
       { key: "volumeOiRatio", label: "Vol / OI", desc: "Volume to OI activity ratio" },
       { key: "buildupBadge", label: "Buildup", desc: "Long/Short buildup tag" },
     ],
@@ -148,6 +180,14 @@ export const ColumnCustomizerModal: React.FC<ColumnCustomizerModalProps> = ({
     onChangeConfig(updated);
   };
 
+  const handleSelectAll = () => {
+    onChangeConfig(ALL_COLUMNS_CONFIG);
+  };
+
+  const handleResetDefaults = () => {
+    onChangeConfig(DEFAULT_COLUMN_CONFIG);
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 font-mono text-xs">
       <div className="bg-[#0B1222] border border-slate-700/80 rounded-2xl p-5 max-w-xl w-full space-y-4 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
@@ -166,9 +206,28 @@ export const ColumnCustomizerModal: React.FC<ColumnCustomizerModalProps> = ({
           </button>
         </div>
 
-        {/* Quick Presets */}
-        <div className="space-y-1.5">
-          <span className="text-[10px] text-slate-400 uppercase">Quick Presets:</span>
+        {/* Quick Presets & Batch Actions */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-slate-400 uppercase font-bold">Quick Presets:</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleSelectAll}
+                className="text-[11px] font-bold text-cyan-400 hover:text-cyan-300 underline"
+              >
+                Select All
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={handleResetDefaults}
+                className="text-[11px] font-bold text-slate-400 hover:text-white underline"
+              >
+                Reset Defaults
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
@@ -210,7 +269,7 @@ export const ColumnCustomizerModal: React.FC<ColumnCustomizerModalProps> = ({
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {grp.columns.map((col) => {
-                  const isChecked = config[col.key];
+                  const isChecked = !!config[col.key];
                   return (
                     <button
                       key={col.key}
@@ -247,11 +306,11 @@ export const ColumnCustomizerModal: React.FC<ColumnCustomizerModalProps> = ({
         <div className="flex items-center justify-between pt-3 border-t border-slate-800">
           <button
             type="button"
-            onClick={() => onChangeConfig(DEFAULT_COLUMN_CONFIG)}
+            onClick={handleResetDefaults}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 text-slate-300 hover:text-white transition text-xs"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset to Default</span>
+            <span>Reset Defaults</span>
           </button>
           <button
             type="button"

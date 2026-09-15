@@ -186,25 +186,218 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
 
   const rawStrikes = useMemo(() => snapshot?.strikes || [], [snapshot?.strikes]);
 
-  // Active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    if (filterConfig.moneyness !== "ALL") count++;
-    if (filterConfig.buildup !== "ALL") count++;
-    if (filterConfig.sentiment !== "ALL") count++;
-    if (filterConfig.unusualOnly) count++;
-    if (filterConfig.minVolume > 0) count++;
-    if (filterConfig.minOI > 0) count++;
-    return count;
+  // Active filter chips and count
+  const { activeFilterCount, activeFilterChips } = useMemo(() => {
+    const chips: { id: string; label: string; onRemove: () => void }[] = [];
+
+    // 1. Basic & Option Side
+    if (filterConfig.side === "CALLS_ONLY") {
+      chips.push({
+        id: "side_ce",
+        label: "CE Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, side: "ALL" })),
+      });
+    } else if (filterConfig.side === "PUTS_ONLY") {
+      chips.push({
+        id: "side_pe",
+        label: "PE Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, side: "ALL" })),
+      });
+    }
+
+    if (filterConfig.moneyness === "ATM_ONLY") {
+      chips.push({
+        id: "m_atm",
+        label: "ATM Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, moneyness: "ALL" })),
+      });
+    } else if (filterConfig.moneyness === "ITM_ONLY") {
+      chips.push({
+        id: "m_itm",
+        label: "ITM Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, moneyness: "ALL" })),
+      });
+    } else if (filterConfig.moneyness === "OTM_ONLY") {
+      chips.push({
+        id: "m_otm",
+        label: "OTM Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, moneyness: "ALL" })),
+      });
+    }
+
+    // 2. Price Filters
+    if (filterConfig.minLtp !== undefined && filterConfig.minLtp > 0) {
+      chips.push({
+        id: "ltp_min",
+        label: `LTP ≥ ${filterConfig.minLtp}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minLtp: undefined })),
+      });
+    }
+    if (filterConfig.maxLtp !== undefined && filterConfig.maxLtp > 0) {
+      chips.push({
+        id: "ltp_max",
+        label: `LTP ≤ ${filterConfig.maxLtp}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxLtp: undefined })),
+      });
+    }
+    if (filterConfig.minChangePct !== undefined) {
+      chips.push({
+        id: "chg_min",
+        label: `Chg% ≥ ${filterConfig.minChangePct}%`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minChangePct: undefined })),
+      });
+    }
+    if (filterConfig.maxChangePct !== undefined) {
+      chips.push({
+        id: "chg_max",
+        label: `Chg% ≤ ${filterConfig.maxChangePct}%`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxChangePct: undefined })),
+      });
+    }
+
+    // 3. Open Interest & Volume
+    if (filterConfig.minOI > 0) {
+      chips.push({
+        id: "oi_min",
+        label: `OI ≥ ${filterConfig.minOI.toLocaleString()}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minOI: 0 })),
+      });
+    }
+    if (filterConfig.maxOI !== undefined && filterConfig.maxOI > 0) {
+      chips.push({
+        id: "oi_max",
+        label: `OI ≤ ${filterConfig.maxOI.toLocaleString()}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxOI: undefined })),
+      });
+    }
+    if (filterConfig.minVolume > 0) {
+      chips.push({
+        id: "vol_min",
+        label: `Vol ≥ ${filterConfig.minVolume.toLocaleString()}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minVolume: 0 })),
+      });
+    }
+    if (filterConfig.maxVolume !== undefined && filterConfig.maxVolume > 0) {
+      chips.push({
+        id: "vol_max",
+        label: `Vol ≤ ${filterConfig.maxVolume.toLocaleString()}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxVolume: undefined })),
+      });
+    }
+    if (filterConfig.highOIOnly) {
+      chips.push({
+        id: "high_oi",
+        label: "High OI Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, highOIOnly: false })),
+      });
+    }
+    if (filterConfig.lowOIOnly) {
+      chips.push({
+        id: "low_oi",
+        label: "Low OI Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, lowOIOnly: false })),
+      });
+    }
+    if (filterConfig.highVolumeOnly) {
+      chips.push({
+        id: "high_vol",
+        label: "High Vol Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, highVolumeOnly: false })),
+      });
+    }
+    if (filterConfig.lowVolumeOnly) {
+      chips.push({
+        id: "low_vol",
+        label: "Low Vol Only",
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, lowVolumeOnly: false })),
+      });
+    }
+
+    // 4. Volatility & Greeks
+    if (filterConfig.minIV !== undefined && filterConfig.minIV > 0) {
+      chips.push({
+        id: "iv_min",
+        label: `IV ≥ ${filterConfig.minIV}%`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minIV: undefined })),
+      });
+    }
+    if (filterConfig.maxIV !== undefined && filterConfig.maxIV > 0) {
+      chips.push({
+        id: "iv_max",
+        label: `IV ≤ ${filterConfig.maxIV}%`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxIV: undefined })),
+      });
+    }
+    if (filterConfig.minDelta !== undefined) {
+      chips.push({
+        id: "delta_min",
+        label: `Δ ≥ ${filterConfig.minDelta}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, minDelta: undefined })),
+      });
+    }
+    if (filterConfig.maxDelta !== undefined) {
+      chips.push({
+        id: "delta_max",
+        label: `Δ ≤ ${filterConfig.maxDelta}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, maxDelta: undefined })),
+      });
+    }
+
+    // 5. Structure & Direction
+    if (filterConfig.marketDirection && filterConfig.marketDirection !== "ALL") {
+      chips.push({
+        id: "direction",
+        label: `Direction: ${filterConfig.marketDirection}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, marketDirection: "ALL" })),
+      });
+    }
+    if (filterConfig.buildup !== "ALL") {
+      chips.push({
+        id: "buildup",
+        label: `Buildup: ${filterConfig.buildup.replace(/_/g, " ")}`,
+        onRemove: () => setFilterConfig((prev) => ({ ...prev, buildup: "ALL" })),
+      });
+    }
+
+    return { activeFilterCount: chips.length, activeFilterChips: chips };
   }, [filterConfig]);
 
-  // Filtered Strikes calculation
+  // Filtered Strikes calculation with rigorous multi-dimensional criteria
   const displayedStrikes = useMemo(() => {
+    // Calculate percentiles for High/Low values
+    const oiValues = rawStrikes.map((r) => Math.max(r.call?.oi || 0, r.put?.oi || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    const volValues = rawStrikes.map((r) => Math.max(r.call?.volume || 0, r.put?.volume || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    const ivValues = rawStrikes.map((r) => Math.max(r.call?.iv || 0, r.put?.iv || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+
+    const highOiThreshold = oiValues.length > 0 ? oiValues[Math.floor(oiValues.length * 0.7)] : 0;
+    const lowOiThreshold = oiValues.length > 0 ? oiValues[Math.floor(oiValues.length * 0.3)] : 0;
+    const highVolThreshold = volValues.length > 0 ? volValues[Math.floor(volValues.length * 0.7)] : 0;
+    const lowVolThreshold = volValues.length > 0 ? volValues[Math.floor(volValues.length * 0.3)] : 0;
+    const highIvThreshold = ivValues.length > 0 ? ivValues[Math.floor(ivValues.length * 0.7)] : 0;
+    const lowIvThreshold = ivValues.length > 0 ? ivValues[Math.floor(ivValues.length * 0.3)] : 0;
+
     return rawStrikes.filter((row) => {
-      // 1. Search Query filter
+      const call = row.call;
+      const put = row.put;
+
+      // 1. Search Query filter (Strike, Symbol, Security ID, CE/PE)
       if (searchQuery) {
-        const q = searchQuery.trim();
-        if (!row.strike.toString().includes(q)) return false;
+        const q = searchQuery.trim().toLowerCase();
+        const strikeStr = row.strike.toString();
+        const callSym = call?.symbol?.toLowerCase() || "";
+        const putSym = put?.symbol?.toLowerCase() || "";
+        const callSecId = call?.securityId?.toString() || "";
+        const putSecId = put?.securityId?.toString() || "";
+
+        const matchStrike = strikeStr.includes(q);
+        const matchCall = callSym.includes(q) || callSecId.includes(q);
+        const matchPut = putSym.includes(q) || putSecId.includes(q);
+
+        if (!matchStrike && !matchCall && !matchPut) {
+          if (q === "ce" && !call) return false;
+          if (q === "pe" && !put) return false;
+          if (q !== "ce" && q !== "pe") return false;
+        }
       }
 
       // 2. Custom Strike From/To filter
@@ -217,35 +410,112 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         if (!isNaN(to) && row.strike > to) return false;
       }
 
-      // 3. Moneyness filter
+      // 3. Option Side filter
+      if (filterConfig.side === "CALLS_ONLY" && !call) return false;
+      if (filterConfig.side === "PUTS_ONLY" && !put) return false;
+
+      // 4. Moneyness filter
       if (filterConfig.moneyness === "ITM_ONLY") {
-        if (row.moneynessCall !== "ITM" && row.moneynessPut !== "ITM") return false;
+        if (filterConfig.side === "CALLS_ONLY") {
+          if (row.moneynessCall !== "ITM") return false;
+        } else if (filterConfig.side === "PUTS_ONLY") {
+          if (row.moneynessPut !== "ITM") return false;
+        } else {
+          if (row.moneynessCall !== "ITM" && row.moneynessPut !== "ITM") return false;
+        }
       } else if (filterConfig.moneyness === "ATM_ONLY") {
         if (!row.isATM) return false;
       } else if (filterConfig.moneyness === "OTM_ONLY") {
-        if (row.moneynessCall !== "OTM" && row.moneynessPut !== "OTM") return false;
+        if (filterConfig.side === "CALLS_ONLY") {
+          if (row.moneynessCall !== "OTM") return false;
+        } else if (filterConfig.side === "PUTS_ONLY") {
+          if (row.moneynessPut !== "OTM") return false;
+        } else {
+          if (row.moneynessCall !== "OTM" && row.moneynessPut !== "OTM") return false;
+        }
       }
 
-      // 4. Buildup filter
-      if (filterConfig.buildup !== "ALL") {
-        const callMatch = row.call?.oiBuildup === filterConfig.buildup;
-        const putMatch = row.put?.oiBuildup === filterConfig.buildup;
-        if (!callMatch && !putMatch) return false;
+      // Helper to evaluate price & greeks condition for target side
+      const testContractCondition = (c: typeof call | typeof put) => {
+        if (!c) return false;
+
+        // LTP
+        if (filterConfig.minLtp !== undefined && c.ltp < filterConfig.minLtp) return false;
+        if (filterConfig.maxLtp !== undefined && c.ltp > filterConfig.maxLtp) return false;
+
+        // Change %
+        if (filterConfig.minChangePct !== undefined && c.changePercent < filterConfig.minChangePct) return false;
+        if (filterConfig.maxChangePct !== undefined && c.changePercent > filterConfig.maxChangePct) return false;
+
+        // Bid / Ask
+        if (filterConfig.minBid !== undefined && c.bid < filterConfig.minBid) return false;
+        if (filterConfig.maxBid !== undefined && c.bid > filterConfig.maxBid) return false;
+        if (filterConfig.minAsk !== undefined && c.ask < filterConfig.minAsk) return false;
+        if (filterConfig.maxAsk !== undefined && c.ask > filterConfig.maxAsk) return false;
+
+        // OI
+        if (filterConfig.minOI > 0 && c.oi < filterConfig.minOI) return false;
+        if (filterConfig.maxOI !== undefined && c.oi > filterConfig.maxOI) return false;
+        if (filterConfig.minOIChange !== undefined && c.oiChange < filterConfig.minOIChange) return false;
+        if (filterConfig.maxOIChange !== undefined && c.oiChange > filterConfig.maxOIChange) return false;
+
+        // Volume
+        if (filterConfig.minVolume > 0 && c.volume < filterConfig.minVolume) return false;
+        if (filterConfig.maxVolume !== undefined && c.volume > filterConfig.maxVolume) return false;
+
+        // IV
+        if (filterConfig.minIV !== undefined && c.iv < filterConfig.minIV) return false;
+        if (filterConfig.maxIV !== undefined && c.iv > filterConfig.maxIV) return false;
+
+        // Greeks
+        if (filterConfig.minDelta !== undefined && (c.greeks?.delta ?? 0) < filterConfig.minDelta) return false;
+        if (filterConfig.maxDelta !== undefined && (c.greeks?.delta ?? 0) > filterConfig.maxDelta) return false;
+        if (filterConfig.minGamma !== undefined && (c.greeks?.gamma ?? 0) < filterConfig.minGamma) return false;
+        if (filterConfig.maxGamma !== undefined && (c.greeks?.gamma ?? 0) > filterConfig.maxGamma) return false;
+        if (filterConfig.minTheta !== undefined && (c.greeks?.theta ?? 0) < filterConfig.minTheta) return false;
+        if (filterConfig.maxTheta !== undefined && (c.greeks?.theta ?? 0) > filterConfig.maxTheta) return false;
+        if (filterConfig.minVega !== undefined && (c.greeks?.vega ?? 0) < filterConfig.minVega) return false;
+        if (filterConfig.maxVega !== undefined && (c.greeks?.vega ?? 0) > filterConfig.maxVega) return false;
+
+        // Spreads
+        const spread = c.ask > 0 && c.bid > 0 ? c.ask - c.bid : 0;
+        if (filterConfig.minSpread !== undefined && spread < filterConfig.minSpread) return false;
+        if (filterConfig.maxSpread !== undefined && spread > filterConfig.maxSpread) return false;
+
+        // Direction
+        if (filterConfig.marketDirection === "POSITIVE" && c.change <= 0) return false;
+        if (filterConfig.marketDirection === "NEGATIVE" && c.change >= 0) return false;
+        if (filterConfig.marketDirection === "UNCHANGED" && c.change !== 0) return false;
+
+        // Buildup
+        if (filterConfig.buildup !== "ALL" && c.oiBuildup !== filterConfig.buildup) return false;
+
+        return true;
+      };
+
+      if (filterConfig.side === "CALLS_ONLY") {
+        if (!testContractCondition(call)) return false;
+      } else if (filterConfig.side === "PUTS_ONLY") {
+        if (!testContractCondition(put)) return false;
+      } else {
+        const callPass = call ? testContractCondition(call) : false;
+        const putPass = put ? testContractCondition(put) : false;
+        if (!callPass && !putPass) return false;
       }
 
-      // 5. Min Volume & Min OI
-      if (filterConfig.minVolume > 0) {
-        const vol = Math.max(row.call?.volume || 0, row.put?.volume || 0);
-        if (vol < filterConfig.minVolume) return false;
-      }
-      if (filterConfig.minOI > 0) {
-        const oi = Math.max(row.call?.oi || 0, row.put?.oi || 0);
-        if (oi < filterConfig.minOI) return false;
-      }
+      // 5. Percentile Flags (High/Low OI, Volume, IV)
+      if (filterConfig.highOIOnly && Math.max(call?.oi || 0, put?.oi || 0) < highOiThreshold) return false;
+      if (filterConfig.lowOIOnly && Math.max(call?.oi || 0, put?.oi || 0) > lowOiThreshold) return false;
+      if (filterConfig.highVolumeOnly && Math.max(call?.volume || 0, put?.volume || 0) < highVolThreshold) return false;
+      if (filterConfig.lowVolumeOnly && Math.max(call?.volume || 0, put?.volume || 0) > lowVolThreshold) return false;
+      if (filterConfig.highIVOnly && Math.max(call?.iv || 0, put?.iv || 0) < highIvThreshold) return false;
+      if (filterConfig.lowIVOnly && Math.max(call?.iv || 0, put?.iv || 0) > lowIvThreshold) return false;
 
       return true;
     });
   }, [rawStrikes, searchQuery, customStrikeFrom, customStrikeTo, filterConfig]);
+
+
 
   // Direct One-Click Execution Handler
   const executeOneClickTrade = async (side: "BUY" | "SELL", contract: ActionableOptionContract) => {
@@ -436,8 +706,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       <OptionMarketSummaryCards snapshot={snapshot} currency={currency} />
 
       {/* 3. WORKSTATION SUB-TABS (Option Chain / Options Flow / Analytics) */}
-      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#090E17] border border-slate-800/90 overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-0">
+      <div className="flex items-center justify-between gap-3 p-2 rounded-xl bg-[#090E17] border border-slate-800/90 overflow-x-auto">
+        <div className="flex items-center gap-1.5 min-w-0">
           {[
             { id: "CHAIN", label: "Option Chain Ladder", icon: Layers },
             { id: "FLOW", label: `Options Order Flow (${snapshot?.flowTrades?.length || 0})`, icon: Activity },
@@ -450,22 +720,22 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
                 key={tab.id}
                 type="button"
                 onClick={() => setTerminalTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex-shrink-0 ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-mono font-bold transition flex-shrink-0 ${
                   isActive
                     ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                     : "text-slate-400 hover:text-white hover:bg-slate-800/60"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" />
+                <Icon className="w-4 h-4" />
                 <span>{tab.label}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="hidden sm:flex items-center pr-1 flex-shrink-0 text-slate-400 font-mono text-[11px] gap-3">
-          <span>Execution: <strong className={tradingMode === "LIVE" ? "text-rose-400" : "text-emerald-400"}>{tradingMode}</strong></span>
-          <span>Underlying: <strong className="text-cyan-300">{underlying}</strong></span>
+        <div className="hidden sm:flex items-center pr-2 flex-shrink-0 text-slate-400 font-mono text-xs sm:text-sm gap-4">
+          <span>Execution: <strong className={tradingMode === "LIVE" ? "text-rose-400 font-bold" : "text-emerald-400 font-bold"}>{tradingMode}</strong></span>
+          <span>Underlying: <strong className="text-cyan-300 font-bold">{underlying}</strong></span>
         </div>
       </div>
 
@@ -485,6 +755,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
             onOpenColumnCustomizer={() => setIsColumnModalOpen(true)}
             onOpenFilterModal={() => setIsFilterModalOpen(true)}
             activeFilterCount={activeFilterCount}
+            activeFilterChips={activeFilterChips}
+            onClearAllFilters={() => setFilterConfig(DEFAULT_FILTER_CONFIG)}
             searchQuery={searchQuery}
             onChangeSearchQuery={(q) => setSearchQuery(q)}
             totalStrikesCount={rawStrikes.length}

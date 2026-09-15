@@ -26,52 +26,72 @@ export async function GET(req: NextRequest) {
 
   const encoder = new TextEncoder();
 
+  let ws: WebSocket | null = null;
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+  let isCleanedUp = false;
+  let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null;
+
+  const cleanup = () => {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
+
+    // 1. Clear heartbeat timer
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+
+    // 2. Safely unsubscribe and close WebSocket connection
+    if (ws) {
+      try {
+        if (ws.readyState === WebSocket.OPEN && requestedSymbols.length > 0) {
+          ws.send(
+            JSON.stringify({
+              action: "unsubscribe",
+              symbols: requestedSymbols,
+              reason: "SSE_CLIENT_STREAM",
+            })
+          );
+        }
+      } catch {
+        // ignore send failure during teardown
+      }
+
+      try {
+        ws.removeAllListeners();
+        if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+          ws.close();
+        }
+      } catch {
+        // ignore close error
+      }
+      ws = null;
+    }
+
+    // 3. Safely close SSE controller
+    if (controllerRef) {
+      try {
+        controllerRef.close();
+      } catch {
+        // controller might already be closed/errored
+      }
+      controllerRef = null;
+    }
+  };
+
   const stream = new ReadableStream({
     start(controller) {
-      let isClosed = false;
-      let ws: WebSocket | null = null;
-      let heartbeatTimer: NodeJS.Timeout | null = null;
+      controllerRef = controller;
 
-      const safeEnqueue = (payloadStr: string) => {
-        if (isClosed) return;
+      const safeEnqueue = (payloadStr: string): boolean => {
+        if (isCleanedUp) return false;
         try {
           controller.enqueue(encoder.encode(payloadStr));
+          return true;
         } catch {
-          isClosed = true;
+          cleanup();
+          return false;
         }
-      };
-
-      const closeAll = () => {
-        if (isClosed) return;
-        isClosed = true;
-
-        if (heartbeatTimer) {
-          clearInterval(heartbeatTimer);
-          heartbeatTimer = null;
-        }
-
-        if (ws) {
-          try {
-            if (ws.readyState === WebSocket.OPEN && requestedSymbols.length > 0) {
-              ws.send(
-                JSON.stringify({
-                  action: "unsubscribe",
-                  symbols: requestedSymbols,
-                  reason: "SSE_CLIENT_STREAM",
-                })
-              );
-            }
-          } catch {}
-
-          try {
-            ws.close();
-          } catch {}
-          ws = null;
-        }
-
-        try {
-          controller.close();
-        } catch {}
       };
 
       // 1. Send immediate connecting status packet
@@ -87,7 +107,7 @@ export async function GET(req: NextRequest) {
         })}\n\n`
       );
 
-      // 2. Connect to Python Market Data Gateway WebSocket
+      // 2. Connect dedicated WebSocket to Python Market Data Gateway
       try {
         const wsUrl = new URL(GATEWAY_WS_URL);
         if (GATEWAY_SECRET) {
@@ -97,10 +117,11 @@ export async function GET(req: NextRequest) {
         ws = new WebSocket(wsUrl.toString(), {
           headers: GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : undefined,
           handshakeTimeout: 5000,
+          perMessageDeflate: false, // Ensure zero native bufferutil/zlib compression issues
         });
 
         ws.on("open", () => {
-          if (isClosed) {
+          if (isCleanedUp) {
             try {
               ws?.close();
             } catch {}
@@ -121,19 +142,33 @@ export async function GET(req: NextRequest) {
           );
 
           // Subscribe to requested symbols on the gateway
-          if (requestedSymbols.length > 0) {
-            ws?.send(
-              JSON.stringify({
-                action: "subscribe",
-                symbols: requestedSymbols,
-                reason: "SSE_CLIENT_STREAM",
-              })
-            );
+          if (requestedSymbols.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+            try {
+              ws.send(
+                JSON.stringify({
+                  action: "subscribe",
+                  symbols: requestedSymbols,
+                  reason: "SSE_CLIENT_STREAM",
+                })
+              );
+            } catch (sendErr: any) {
+              safeEnqueue(
+                `data: ${JSON.stringify({
+                  type: "STATUS",
+                  data: {
+                    status: "GATEWAY_ERROR",
+                    message: sendErr?.message || "Failed to dispatch symbol subscriptions to gateway",
+                    timestamp: new Date().toISOString(),
+                  },
+                })}\n\n`
+              );
+              cleanup();
+            }
           }
         });
 
         ws.on("message", (rawData: WebSocket.RawData) => {
-          if (isClosed) return;
+          if (isCleanedUp) return;
           try {
             const text = typeof rawData === "string" ? rawData : rawData.toString("utf-8");
             const msg = JSON.parse(text);
@@ -192,18 +227,18 @@ export async function GET(req: NextRequest) {
               safeEnqueue(`data: ${JSON.stringify(msg)}\n\n`);
             }
           } catch {
-            // non-JSON message ignored
+            // non-JSON or malformed message safely ignored
           }
         });
 
         ws.on("error", (err: Error) => {
-          if (isClosed) return;
+          if (isCleanedUp) return;
           safeEnqueue(
             `data: ${JSON.stringify({
               type: "STATUS",
               data: {
                 status: "GATEWAY_ERROR",
-                message: err.message,
+                message: err?.message || "Gateway WebSocket error",
                 timestamp: new Date().toISOString(),
               },
             })}\n\n`
@@ -211,7 +246,7 @@ export async function GET(req: NextRequest) {
         });
 
         ws.on("close", () => {
-          if (!isClosed) {
+          if (!isCleanedUp) {
             safeEnqueue(
               `data: ${JSON.stringify({
                 type: "STATUS",
@@ -221,6 +256,7 @@ export async function GET(req: NextRequest) {
                 },
               })}\n\n`
             );
+            cleanup();
           }
         });
       } catch (err: any) {
@@ -234,23 +270,37 @@ export async function GET(req: NextRequest) {
             },
           })}\n\n`
         );
+        cleanup();
       }
 
-      // 3. Heartbeat keepalive timer
+      // 3. Heartbeat keepalive timer (every 3s)
       heartbeatTimer = setInterval(() => {
-        if (isClosed) return;
+        if (isCleanedUp) {
+          if (heartbeatTimer) clearInterval(heartbeatTimer);
+          return;
+        }
         safeEnqueue(
           `data: ${JSON.stringify({
             type: "HEARTBEAT",
             timestamp: new Date().toISOString(),
           })}\n\n`
         );
-      }, 15000);
+      }, 3000);
 
-      // 4. Client disconnect cleanup
-      req.signal.addEventListener("abort", () => {
-        closeAll();
-      });
+      // 4. Request Abort Signal Listener
+      if (req.signal) {
+        if (req.signal.aborted) {
+          cleanup();
+        } else {
+          req.signal.addEventListener("abort", () => {
+            cleanup();
+          });
+        }
+      }
+    },
+    cancel() {
+      // 5. ReadableStream cancellation (e.g. client disconnects, curl aborted)
+      cleanup();
     },
   });
 
@@ -259,6 +309,7 @@ export async function GET(req: NextRequest) {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache, no-transform",
       Connection: "keep-alive",
+      "X-Accel-Buffering": "no",
     },
   });
 }

@@ -54,8 +54,10 @@ export interface OptionContractQuote {
   bidQty: number;
   askQty: number;
   volume: number;
+  previousVolume?: number;
   oi: number;
   previousOi?: number;
+  averagePrice?: number;
   oiChange: number;
   oiChangePercent: number;
   iv?: number;
@@ -71,6 +73,7 @@ export interface OptionContractQuote {
   instrumentId?: string;
   timestamp?: number;
 }
+
 
 export interface OptionStrikeRowData {
   strike: number;
@@ -276,6 +279,10 @@ export interface ColumnVisibilityConfig {
   vega: boolean;
   rho: boolean;
   buildupBadge: boolean;
+  averagePrice?: boolean;
+  previousOi?: boolean;
+  previousVolume?: boolean;
+  spread?: boolean;
 }
 
 export interface OptionFilterConfig {
@@ -283,9 +290,45 @@ export interface OptionFilterConfig {
   moneyness: "ALL" | "ITM_ONLY" | "ATM_ONLY" | "OTM_ONLY";
   buildup: "ALL" | "LONG_BUILDUP" | "SHORT_BUILDUP" | "LONG_UNWINDING" | "SHORT_COVERING";
   minVolume: number;
+  maxVolume?: number;
+  highVolumeOnly?: boolean;
+  lowVolumeOnly?: boolean;
   minOI: number;
+  maxOI?: number;
+  minOIChange?: number;
+  maxOIChange?: number;
+  minOIChangePct?: number;
+  maxOIChangePct?: number;
+  highOIOnly?: boolean;
+  lowOIOnly?: boolean;
+  highOIChangeOnly?: boolean;
+  minLtp?: number;
+  maxLtp?: number;
+  minChangePct?: number;
+  maxChangePct?: number;
+  minBid?: number;
+  maxBid?: number;
+  minAsk?: number;
+  maxAsk?: number;
+  minIV?: number;
+  maxIV?: number;
+  highIVOnly?: boolean;
+  lowIVOnly?: boolean;
+  minDelta?: number;
+  maxDelta?: number;
+  minGamma?: number;
+  maxGamma?: number;
+  minTheta?: number;
+  maxTheta?: number;
+  minVega?: number;
+  maxVega?: number;
+  minSpread?: number;
+  maxSpread?: number;
+  maxSpreadPct?: number;
+  marketDirection?: "ALL" | "POSITIVE" | "NEGATIVE" | "UNCHANGED";
   unusualOnly: boolean;
   sentiment: "ALL" | "BULLISH" | "BEARISH" | "NEUTRAL";
   minPremium: number;
 }
+
 

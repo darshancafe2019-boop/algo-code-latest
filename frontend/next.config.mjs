@@ -10,6 +10,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    serverComponentsExternalPackages: ["ws", "bufferutil", "utf-8-validate"],
+  },
   webpack(config, { isServer, dev }) {
     if (!isServer) {
       config.resolve.fallback = {
@@ -20,6 +23,7 @@ const nextConfig = {
         crypto: false,
       };
     }
+    config.externals = [...(config.externals || []), "bufferutil", "utf-8-validate"];
     return config;
   },
 };

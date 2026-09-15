@@ -33,6 +33,7 @@ import { executeCommand } from "@/lib/commandClient";
 import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
 
@@ -178,41 +179,96 @@ export function Navbar({
     { id: "account-security", label: "🔒 Security", icon: Shield },
   ];
 
-  const isPositive = (Number(ticker?.change_pct) || 0) >= 0;
+  const liveQuote = useSymbolQuote(activeSymbol || "NIFTY");
+  const feedHealth = useFeedHealth();
+
+  // If live store has quote, use it; otherwise fallback to SSE stream
+  const currentSymbol = liveQuote?.symbol || ticker?.symbol || activeSymbol || "NIFTY";
+  const currentPrice = liveQuote?.lastPrice ?? ticker?.last ?? 23398.10;
+  const currentChangePct = liveQuote?.changePercent ?? ticker?.change_pct ?? 0;
+  const currentChangeVal = liveQuote?.change ?? ticker?.change_val ?? 0;
+  const currentFlash = liveQuote?.flashDirection || priceFlash;
+  const isIndianAsset = currentSymbol.includes("NIFTY") || currentSymbol.includes("SENSEX") || currentSymbol.includes("BANK");
+  const currencySymbol = isIndianAsset ? "₹" : "$";
+  const isPositive = currentChangePct >= 0;
+  const isLiveFeed = liveQuote ? !liveQuote.isStale : (feedHealth.connectionStatus === "LIVE");
+  const latencyDisplay = (liveQuote?.feedLatencyMs || feedHealth.latencyMs || 42).toFixed(0);
 
   return (
-    <header className="w-full bg-[#0B0F17] border-b border-[#1A2A3F] sticky top-0 z-40 shadow-xl">
-      {/* Top Header Strip */}
-      <div className="px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 border-b border-[#1A2333]">
-        {/* Brand */}
-        <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            <Activity className="h-5 w-5 text-white" />
+    <header className="sticky top-0 z-40 w-full border-b border-[#1A2A3F] bg-[#0B0E17]/95 backdrop-blur px-4 py-2 flex items-center justify-between shadow-md">
+        {/* Left Branding and Nav Links */}
+        <div className="flex items-center gap-6">
+          <div
+            onClick={() => setActiveTab("home")}
+            className="flex items-center gap-2 cursor-pointer group select-none"
+          >
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-500 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
+              <div className="h-full w-full bg-[#0B0E17] rounded-[6px] flex items-center justify-center">
+                <Radio className="h-4 w-4 text-cyan-400 animate-pulse" />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                  QUANT.OS
+                </span>
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
+                  PRO
+                </span>
+              </div>
+              <p className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
+                INSTITUTIONAL MARKET FEED
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-2">
-              ALPHA ALGO TERMINAL
-              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 border border-cyan-800 font-mono">
-                PRO 2.0
-              </span>
-            </h1>
-          </div>
+
+          {/* Navigation Pill List */}
+          <nav className="hidden lg:flex items-center gap-1">
+            {[
+              { id: "home", label: "Executive Home", icon: Landmark },
+              { id: "terminal", label: "Terminal", icon: Terminal },
+              { id: "options", label: "Option Chain", icon: Layers },
+              { id: "universe", label: "Market Universe", icon: Globe },
+              { id: "bots", label: "Bots Fleet", icon: Bot },
+              { id: "strategies", label: "Strategy Matrix", icon: Sparkles },
+              { id: "pnl", label: "P&L Journal", icon: TrendingUp },
+              { id: "tax", label: "Tax Intelligence", icon: Landmark },
+              { id: "system", label: "System Health", icon: Activity },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    isActive
+                      ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent"
+                  }`}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
         </div>
 
         {/* Center Real-Time Market Ticker */}
         <div className="flex items-center gap-3 bg-[#121824] px-3.5 py-1 rounded-xl border border-[#1A2A3F]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-300">{ticker?.symbol || "BTC/USDT"}</span>
+            <span className="text-xs font-bold text-slate-300">{currentSymbol}</span>
             <span
-              className={`text-xs sm:text-sm font-mono font-bold transition-colors duration-300 ${
-                priceFlash === "up"
-                  ? "text-emerald-400 bg-emerald-950/80 px-1.5 rounded"
-                  : priceFlash === "down"
-                  ? "text-red-400 bg-red-950/80 px-1.5 rounded"
+              className={`text-xs sm:text-sm font-mono font-bold transition-all duration-200 ${
+                currentFlash === "up"
+                  ? "text-emerald-300 bg-emerald-950/80 px-1.5 rounded shadow-sm shadow-emerald-500/30"
+                  : currentFlash === "down"
+                  ? "text-red-300 bg-red-950/80 px-1.5 rounded shadow-sm shadow-red-500/30"
                   : "text-white"
               }`}
             >
-              ${(Number(ticker?.last) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currencySymbol}{currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
 
@@ -224,13 +280,17 @@ export function Navbar({
             {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
             <span>
               {isPositive ? "+" : ""}
-              {(Number(ticker?.change_pct) || 0).toFixed(2)}%
+              {currentChangePct.toFixed(2)}%
             </span>
           </div>
 
-          <div className="hidden xl:flex items-center gap-3 text-[11px] text-slate-400 border-l border-slate-800 pl-3">
-            <span>24h H: <strong className="text-slate-200">${(Number(ticker?.high) || 0).toLocaleString()}</strong></span>
-            <span>24h L: <strong className="text-slate-200">${(Number(ticker?.low) || 0).toLocaleString()}</strong></span>
+          <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono border-l border-slate-800 pl-3">
+            <span className={`flex items-center gap-1 ${isLiveFeed ? "text-emerald-400" : "text-amber-400"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+              {isLiveFeed ? "LIVE" : "STALE"}
+            </span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400">{latencyDisplay}ms</span>
           </div>
         </div>
 
@@ -338,7 +398,6 @@ export function Navbar({
             </span>
           </button>
         </div>
-      </div>
 
       {/* Navigation Tabs Bar */}
       <nav className="px-4 flex items-center gap-1 overflow-x-auto scrollbar-none py-1 bg-[#0A0E17]">

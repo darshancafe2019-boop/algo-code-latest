@@ -231,6 +231,7 @@ class SubscriptionRegistry:
                     sym: {
                         "active_mode": self._active_modes.get(sym, "ltpc"),
                         "reasons": [r for (r, _, _) in sub_dict.values()],
+                        "sources": [s for (_, s, _) in sub_dict.values() if s],
                     }
                     for sym, sub_dict in self._subscriptions.items()
                 },

@@ -36,9 +36,161 @@ import {
   NormalizedPosition,
   NormalizedOrder,
 } from "@/lib/normalizers/financialNormalizers";
+import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { cn } from "@/lib/utils";
 
 const INDEX_SYMBOLS = ["NIFTY 50", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"];
+
+function LiveMarketIndexRow({
+  symbol,
+  fallback,
+  onSelect,
+}: {
+  symbol: string;
+  fallback?: any;
+  onSelect: (sym: string) => void;
+}) {
+  const quote = useSymbolQuote(symbol);
+  const ltp = quote?.lastPrice ?? fallback?.ltp ?? 0;
+  const change = quote?.change ?? fallback?.change ?? 0;
+  const changePct = quote?.changePercent ?? fallback?.pct ?? 0;
+  const isUp = changePct >= 0;
+  const isLive = quote ? !quote.isStale : (fallback?.status === "LIVE");
+  const flash = quote?.flashDirection;
+
+  return (
+    <tr
+      onClick={() => onSelect(symbol)}
+      className="hover:bg-[#0F1C2F] transition-colors h-[34px] cursor-pointer"
+    >
+      <td className="font-semibold text-[#F8FAFC]">
+        <div className="flex items-center gap-1.5">
+          <span>{symbol}</span>
+          <span
+            className={cn(
+              "h-1.5 w-1.5 rounded-full transition-colors",
+              isLive ? "bg-[#00E89A] animate-pulse" : "bg-[#F59E0B]"
+            )}
+            title={isLive ? "Live Real-Time Feed" : "Cached / Stale"}
+          />
+        </div>
+      </td>
+      <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
+        <span
+          className={cn(
+            "transition-all duration-200 px-1 py-0.5 rounded",
+            flash === "up" && "bg-emerald-950/80 text-emerald-300 font-bold",
+            flash === "down" && "bg-red-950/80 text-red-300 font-bold"
+          )}
+        >
+          {formatDecimal(ltp, 2)}
+        </span>
+      </td>
+      <td className={cn("text-right tabular-nums font-medium", isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
+        {isUp ? "+" : ""}{formatDecimal(change, 2)}
+      </td>
+      <td className={cn("text-right tabular-nums font-semibold", isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
+        {formatPercent(changePct, 2, "—", false, true)}
+      </td>
+    </tr>
+  );
+}
+
+function LivePositionTableRow({
+  pos,
+  idx,
+  onClose,
+}: {
+  pos: NormalizedPosition;
+  idx: number;
+  onClose: (pos: NormalizedPosition) => void;
+}) {
+  const quote = useSymbolQuote(pos.symbol);
+  const livePrice = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (pos.currentPrice || pos.entryPrice || 0);
+  const isLong = pos.direction === "LONG";
+  const entryPrice = pos.entryPrice || 1;
+  const qty = pos.quantity || 1;
+  const livePnl = isLong ? (livePrice - entryPrice) * qty : (entryPrice - livePrice) * qty;
+  const livePnlPct = entryPrice > 0 ? (livePnl / (entryPrice * qty)) * 100 : 0;
+  const isPnlPositive = livePnl >= 0;
+  const flash = quote?.flashDirection;
+  const isLive = quote ? !quote.isStale : true;
+
+  return (
+    <tr className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
+      <td className="font-semibold text-[#F8FAFC]">
+        <div className="flex items-center gap-1.5">
+          <span>{pos.symbol}</span>
+          <span className="text-[9px] font-mono text-[#7D8EA5] px-1 py-0.2 rounded bg-[#10263A]">
+            {pos.executionBroker || "Paper"}
+          </span>
+          <span
+            className={cn("h-1.5 w-1.5 rounded-full", isLive ? "bg-[#00E89A]" : "bg-[#F59E0B]")}
+            title={isLive ? "Live Feed" : "Stale"}
+          />
+        </div>
+      </td>
+      <td className="text-center">
+        <span
+          className={cn(
+            "px-2 py-0.5 rounded-[6px] text-[10px] font-semibold",
+            isLong
+              ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
+              : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
+          )}
+        >
+          {pos.direction}
+        </span>
+      </td>
+      <td className="text-right text-[#F8FAFC] tabular-nums">
+        {formatQuantity(pos.quantity)}
+      </td>
+      <td className="text-right text-[#7D8EA5] tabular-nums">
+        {formatCurrency(pos.entryPrice, "₹", 2)}
+      </td>
+      <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
+        <span
+          className={cn(
+            "transition-all duration-200 px-1 py-0.5 rounded",
+            flash === "up" && "bg-emerald-950/80 text-emerald-300 font-bold",
+            flash === "down" && "bg-red-950/80 text-red-300 font-bold"
+          )}
+        >
+          {formatCurrency(livePrice, "₹", 2)}
+        </span>
+      </td>
+      <td
+        className={cn(
+          "text-right font-semibold tabular-nums",
+          isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
+        )}
+      >
+        {isPnlPositive ? `+${formatCurrency(livePnl, "₹", 2)}` : formatCurrency(livePnl, "₹", 2)}
+      </td>
+      <td
+        className={cn(
+          "text-right font-medium tabular-nums",
+          isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
+        )}
+      >
+        {formatPercent(livePnlPct, 2, "—", false, true)}
+      </td>
+      <td className="text-center">
+        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+          ● {pos.status || "OPEN"}
+        </span>
+      </td>
+      <td className="text-right">
+        <button
+          onClick={() => onClose(pos)}
+          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 transition"
+        >
+          Exit
+        </button>
+      </td>
+    </tr>
+  );
+}
 
 export function HomeExecutiveOverview() {
   const router = useRouter();
@@ -510,31 +662,12 @@ export function HomeExecutiveOverview() {
                 </thead>
                 <tbody className="divide-y divide-[#10263A]">
                   {marketIndices.map((idx) => (
-                    <tr
+                    <LiveMarketIndexRow
                       key={idx.symbol}
-                      onClick={() => router.push(`/charts?symbol=${encodeURIComponent(idx.symbol)}`)}
-                      className="hover:bg-[#0F1C2F] transition-colors h-[34px] cursor-pointer"
-                    >
-                      <td className="font-semibold text-[#F8FAFC]">
-                        <div className="flex items-center gap-1.5">
-                          <span>{idx.symbol}</span>
-                          {idx.status === "LIVE" ? (
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A]" title="Live Feed" />
-                          ) : (
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#F59E0B]" title="Cached" />
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
-                        {formatDecimal(idx.ltp, 2)}
-                      </td>
-                      <td className={cn("text-right tabular-nums font-medium", idx.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-                        {idx.isUp ? "+" : ""}{formatDecimal(idx.change, 2)}
-                      </td>
-                      <td className={cn("text-right tabular-nums font-semibold", idx.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-                        {formatPercent(idx.pct, 2, "—", false, true)}
-                      </td>
-                    </tr>
+                      symbol={idx.symbol}
+                      fallback={idx}
+                      onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -842,97 +975,14 @@ export function HomeExecutiveOverview() {
                     </td>
                   </tr>
                 ) : (
-                  normalizedPositions.map((pos, idx) => {
-                    if (!pos) return null;
-                    const isLong = pos.direction === "LONG";
-                    const hasPnl = pos.pnl !== null;
-                    const isPnlPositive = (pos.pnl ?? 0) >= 0;
-                    const hasPnlPct = pos.pnlPct !== null;
-                    const isPnlPctPositive = (pos.pnlPct ?? 0) >= 0;
-
-                    return (
-                      <tr key={pos.id || idx} className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
-                        <td className="font-semibold text-[#F8FAFC]">
-                          <div className="flex items-center gap-1.5">
-                            <span>{pos.symbol}</span>
-                            <span className="text-[9px] font-mono text-[#7D8EA5] px-1 py-0.2 rounded bg-[#10263A]">
-                              {pos.executionBroker || "Paper"}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="text-center">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-[6px] text-[10px] font-semibold",
-                              isLong
-                                ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
-                                : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
-                            )}
-                          >
-                            {pos.direction}
-                          </span>
-                        </td>
-                        <td className="text-right text-[#F8FAFC] tabular-nums">
-                          {formatQuantity(pos.quantity)}
-                        </td>
-                        <td className="text-right text-[#7D8EA5] tabular-nums">
-                          {formatCurrency(pos.entryPrice, "₹", 2)}
-                        </td>
-                        <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
-                          {formatCurrency(pos.currentPrice, "₹", 2)}
-                        </td>
-                        <td
-                          className={cn(
-                            "text-right tabular-nums font-semibold",
-                            hasPnl ? (isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]") : "text-[#7D8EA5]"
-                          )}
-                        >
-                          {hasPnl ? (
-                            `${isPnlPositive ? "+" : ""}${formatCurrency(pos.pnl, "₹", 2)}`
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td
-                          className={cn(
-                            "text-right tabular-nums font-medium",
-                            hasPnlPct ? (isPnlPctPositive ? "text-[#00E89A]" : "text-[#FF3B5C]") : "text-[#7D8EA5]"
-                          )}
-                        >
-                          {hasPnlPct ? (
-                            formatPercent(pos.pnlPct, 2, "—", false, true)
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="text-center">
-                          <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-semibold bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30">
-                            {pos.status}
-                          </span>
-                        </td>
-                        <td className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => router.push(`/charts?symbol=${encodeURIComponent(pos.symbol)}`)}
-                              className="h-[30px] w-[30px] rounded-[6px] bg-[#0A1422] hover:bg-[#168BFF]/20 border border-[#12304A] hover:border-[#168BFF]/40 text-[#7D8EA5] hover:text-[#22D3EE] flex items-center justify-center transition-colors cursor-pointer"
-                              title="View Chart"
-                            >
-                              <BarChart2 className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => router.push("/positions")}
-                              className="h-[30px] w-[30px] rounded-[6px] bg-[#0A1422] hover:bg-[#0F1C2F] border border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC] flex items-center justify-center transition-colors cursor-pointer"
-                              title="Manage Position"
-                            >
-                              <MoreVertical className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
+                  normalizedPositions.map((pos, idx) => (
+                    <LivePositionTableRow
+                      key={pos.id || idx}
+                      pos={pos}
+                      idx={idx}
+                      onClose={() => router.push("/positions")}
+                    />
+                  ))
                 )}
               </tbody>
             </table>

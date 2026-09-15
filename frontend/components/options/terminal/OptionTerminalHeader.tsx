@@ -71,30 +71,30 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
     switch (marketStatus) {
       case "OPEN":
         return (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-mono font-bold text-emerald-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-xs sm:text-sm font-mono font-bold text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             MARKET OPEN
           </span>
         );
       case "PRE_OPEN":
         return (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-[10px] font-mono font-bold text-amber-300">
-            <Clock className="w-3 h-3" />
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/15 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold text-amber-300">
+            <Clock className="w-3.5 h-3.5" />
             PRE-OPEN (IST)
           </span>
         );
       case "POST_MARKET":
         return (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-[10px] font-mono font-bold text-sky-300">
-            <Clock className="w-3 h-3" />
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-500/15 border border-sky-500/30 text-xs sm:text-sm font-mono font-bold text-sky-300">
+            <Clock className="w-3.5 h-3.5" />
             POST-MARKET
           </span>
         );
       case "CLOSED":
       default:
         return (
-          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-800 border border-slate-700 text-[10px] font-mono font-bold text-slate-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+          <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 border border-slate-700 text-xs sm:text-sm font-mono font-bold text-slate-400">
+            <span className="w-2 h-2 rounded-full bg-slate-500" />
             MARKET CLOSED
           </span>
         );
@@ -104,44 +104,44 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
   const getConnectionBadge = () => {
     if (freshnessStatus === "LIVE") {
       return (
-        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-mono font-bold">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           LIVE ({latencyMs}ms)
         </span>
       );
     }
     if (freshnessStatus === "STALE") {
       return (
-        <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-[10px] font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold">
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
           STALE ({Math.round(dataAgeMs / 1000)}s)
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-[10px] font-mono">
-        <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold">
+        <span className="w-2 h-2 rounded-full bg-rose-400" />
         OFFLINE
       </span>
     );
   };
 
   return (
-    <header className="bg-[#090E17] border border-slate-800/90 rounded-xl px-3 py-2 text-slate-100 shadow-md">
+    <header className="bg-[#090E17] border border-slate-800/90 rounded-xl px-4 py-2.5 text-slate-100 shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Underlying Selector + Live Spot Ticker */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-3.5 min-w-0">
           {/* Underlying dropdown */}
           <div className="relative">
             <select
               value={underlying}
               onChange={(e) => onChangeUnderlying(e.target.value)}
-              className="bg-[#0E1726] border border-cyan-500/40 text-cyan-300 font-mono font-bold text-sm rounded-lg px-2.5 py-1.5 outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer"
+              className="bg-[#0E1726] border border-cyan-500/40 text-cyan-300 font-mono font-extrabold text-sm sm:text-base md:text-lg rounded-lg px-3 py-1.5 outline-none focus:ring-1 focus:ring-cyan-400 cursor-pointer"
             >
               {UNDERLYING_PRESETS.map((grp) => (
                 <optgroup key={grp.group} label={grp.group} className="bg-slate-900 text-slate-300">
                   {grp.items.map((item) => (
-                    <option key={item} value={item} className="bg-slate-900 text-white font-mono">
+                    <option key={item} value={item} className="bg-slate-900 text-white font-mono font-bold">
                       {item}
                     </option>
                   ))}
@@ -151,16 +151,16 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
           </div>
 
           {/* Spot Price and Daily Change */}
-          <div className="flex items-baseline gap-2 font-mono">
-            <span className="text-lg font-extrabold text-white tracking-tight">
+          <div className="flex items-baseline gap-2.5 font-mono">
+            <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
               {formatIndianCurrency(spotPrice, currency)}
             </span>
             <div
-              className={`flex items-center gap-1 text-xs font-bold px-1.5 py-0.5 rounded ${
+              className={`flex items-center gap-1 text-xs sm:text-sm md:text-base font-bold px-2 py-0.5 rounded ${
                 isPositive ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
               }`}
             >
-              {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+              {isPositive ? <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
               <span>
                 {isPositive ? "+" : ""}
                 {spotChange.toFixed(2)} ({isPositive ? "+" : ""}
@@ -174,17 +174,17 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
         </div>
 
         {/* Right: Expiry + Mode + Telemetry + Refresh */}
-        <div className="flex items-center gap-2 flex-wrap font-mono text-xs">
+        <div className="flex items-center gap-2.5 flex-wrap font-mono text-xs sm:text-sm">
           {/* Expiry Selector */}
-          <div className="flex items-center gap-1.5 bg-[#0E1726] border border-slate-700/80 rounded-lg px-2.5 py-1">
-            <span className="text-[10px] text-slate-400 uppercase">EXPIRY:</span>
+          <div className="flex items-center gap-1.5 bg-[#0E1726] border border-slate-700/80 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-slate-400 uppercase font-bold">EXPIRY:</span>
             <select
               value={selectedExpiry}
               onChange={(e) => onChangeExpiry(e.target.value)}
-              className="bg-transparent text-white font-bold font-mono outline-none cursor-pointer text-xs"
+              className="bg-transparent text-white font-bold font-mono outline-none cursor-pointer text-xs sm:text-sm"
             >
               {availableExpiries.map((exp) => (
-                <option key={exp.expiry} value={exp.expiry} className="bg-slate-900 text-white">
+                <option key={exp.expiry} value={exp.expiry} className="bg-slate-900 text-white font-mono">
                   {exp.label} {exp.isWeekly ? "• W" : "• M"}
                 </option>
               ))}
@@ -196,7 +196,7 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
             <select
               value={source}
               onChange={(e) => onChangeSource(e.target.value)}
-              className="bg-[#0E1726] border border-slate-700/80 text-purple-300 font-bold rounded-lg px-2 py-1 outline-none cursor-pointer text-xs"
+              className="bg-[#0E1726] border border-slate-700/80 text-purple-300 font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer text-xs sm:text-sm"
             >
               <option value="ALL">ALL PROVIDERS</option>
               <option value="DHAN">DHAN HQ v2</option>
@@ -212,7 +212,7 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
             <button
               type="button"
               onClick={() => onChangeEnvironment(environment === "LIVE" ? "PAPER" : "LIVE")}
-              className={`px-2 py-1 rounded-lg font-bold text-[10px] transition border ${
+              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition border ${
                 environment === "LIVE"
                   ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
                   : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
@@ -230,10 +230,10 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
             type="button"
             onClick={onRefresh}
             disabled={isFetching}
-            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
+            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition"
             title="Refresh Option Chain"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin text-cyan-400" : ""}`} />
           </button>
         </div>
       </div>

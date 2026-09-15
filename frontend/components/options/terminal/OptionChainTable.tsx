@@ -47,20 +47,32 @@ type SortField =
   | "strike"
   | "call_oi"
   | "call_oiChange"
+  | "call_previousOi"
   | "call_volume"
+  | "call_previousVolume"
   | "call_iv"
   | "call_ltp"
   | "call_delta"
+  | "call_gamma"
   | "call_theta"
+  | "call_vega"
   | "call_volumeOiRatio"
+  | "call_averagePrice"
+  | "call_spread"
   | "put_ltp"
   | "put_iv"
   | "put_volume"
+  | "put_previousVolume"
   | "put_oiChange"
   | "put_oi"
+  | "put_previousOi"
   | "put_delta"
+  | "put_gamma"
   | "put_theta"
-  | "put_volumeOiRatio";
+  | "put_vega"
+  | "put_volumeOiRatio"
+  | "put_averagePrice"
+  | "put_spread";
 
 export const OptionChainTable: React.FC<OptionChainTableProps> = ({
   strikes,
@@ -177,9 +189,17 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.call?.oiChange || 0;
           valB = b.call?.oiChange || 0;
           break;
+        case "call_previousOi":
+          valA = (a.call?.oi || 0) - (a.call?.oiChange || 0);
+          valB = (b.call?.oi || 0) - (b.call?.oiChange || 0);
+          break;
         case "call_volume":
           valA = a.call?.volume || 0;
           valB = b.call?.volume || 0;
+          break;
+        case "call_previousVolume":
+          valA = a.call?.previousVolume || 0;
+          valB = b.call?.previousVolume || 0;
           break;
         case "call_iv":
           valA = a.call?.iv || 0;
@@ -193,13 +213,29 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.call?.greeks?.delta || 0;
           valB = b.call?.greeks?.delta || 0;
           break;
+        case "call_gamma":
+          valA = a.call?.greeks?.gamma || 0;
+          valB = b.call?.greeks?.gamma || 0;
+          break;
         case "call_theta":
           valA = a.call?.greeks?.theta || 0;
           valB = b.call?.greeks?.theta || 0;
           break;
+        case "call_vega":
+          valA = a.call?.greeks?.vega || 0;
+          valB = b.call?.greeks?.vega || 0;
+          break;
         case "call_volumeOiRatio":
           valA = a.call?.volumeOiRatio || 0;
           valB = b.call?.volumeOiRatio || 0;
+          break;
+        case "call_averagePrice":
+          valA = a.call?.averagePrice || a.call?.ltp || 0;
+          valB = b.call?.averagePrice || b.call?.ltp || 0;
+          break;
+        case "call_spread":
+          valA = (a.call?.ask || 0) - (a.call?.bid || 0);
+          valB = (b.call?.ask || 0) - (b.call?.bid || 0);
           break;
         case "put_ltp":
           valA = a.put?.ltp || 0;
@@ -213,6 +249,10 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.put?.volume || 0;
           valB = b.put?.volume || 0;
           break;
+        case "put_previousVolume":
+          valA = a.put?.previousVolume || 0;
+          valB = b.put?.previousVolume || 0;
+          break;
         case "put_oiChange":
           valA = a.put?.oiChange || 0;
           valB = b.put?.oiChange || 0;
@@ -221,17 +261,37 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.put?.oi || 0;
           valB = b.put?.oi || 0;
           break;
+        case "put_previousOi":
+          valA = (a.put?.oi || 0) - (a.put?.oiChange || 0);
+          valB = (b.put?.oi || 0) - (b.put?.oiChange || 0);
+          break;
         case "put_delta":
           valA = a.put?.greeks?.delta || 0;
           valB = b.put?.greeks?.delta || 0;
+          break;
+        case "put_gamma":
+          valA = a.put?.greeks?.gamma || 0;
+          valB = b.put?.greeks?.gamma || 0;
           break;
         case "put_theta":
           valA = a.put?.greeks?.theta || 0;
           valB = b.put?.greeks?.theta || 0;
           break;
+        case "put_vega":
+          valA = a.put?.greeks?.vega || 0;
+          valB = b.put?.greeks?.vega || 0;
+          break;
         case "put_volumeOiRatio":
           valA = a.put?.volumeOiRatio || 0;
           valB = b.put?.volumeOiRatio || 0;
+          break;
+        case "put_averagePrice":
+          valA = a.put?.averagePrice || a.put?.ltp || 0;
+          valB = b.put?.averagePrice || b.put?.ltp || 0;
+          break;
+        case "put_spread":
+          valA = (a.put?.ask || 0) - (a.put?.bid || 0);
+          valB = (b.put?.ask || 0) - (b.put?.bid || 0);
           break;
         default:
           valA = a.strike;
@@ -304,38 +364,46 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
   };
 
   return (
-    <div className="bg-[#090E17] border border-slate-800/90 rounded-2xl overflow-hidden shadow-xl font-mono text-xs select-none">
+    <div className="bg-[#090E17] border border-slate-800/90 rounded-2xl overflow-hidden shadow-xl font-mono text-xs sm:text-[13px] md:text-sm lg:text-[14px] 2xl:text-[15px] select-none">
       {/* Table Container with Horizontal Scroll and Sticky Header */}
       <div className="overflow-x-auto max-h-[72vh] relative">
         <table className="w-full text-left border-collapse">
           {/* Top Level Group Header */}
           <thead className="sticky top-0 z-30 bg-[#060A12] border-b border-slate-800">
-            <tr className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+            <tr className="text-xs sm:text-sm md:text-base uppercase font-extrabold text-slate-400 tracking-wider">
               {/* Calls Side Banner */}
               <th
-                colSpan={16}
-                className="py-1.5 px-4 text-center bg-rose-950/30 text-rose-300 border-r border-slate-800/80"
+                colSpan={25}
+                className="py-2 sm:py-2.5 px-4 text-center bg-rose-950/30 text-rose-300 border-r border-slate-800/80"
               >
                 CALL OPTIONS (CE)
               </th>
 
               {/* Center Strike Banner */}
-              <th className="py-1.5 px-4 text-center bg-purple-950/40 text-purple-300 font-extrabold border-x border-slate-800 min-w-[130px]">
+              <th className="py-2 sm:py-2.5 px-4 text-center bg-purple-950/40 text-purple-300 font-black border-x border-slate-800 min-w-[140px] sm:min-w-[160px]">
                 STRIKE LADDER
               </th>
 
               {/* Puts Side Banner */}
               <th
-                colSpan={16}
-                className="py-1.5 px-4 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800/80"
+                colSpan={25}
+                className="py-2 sm:py-2.5 px-4 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800/80"
               >
                 PUT OPTIONS (PE)
               </th>
             </tr>
 
             {/* Detailed Column Headers */}
-            <tr className="bg-[#0B1222] text-[10px] text-slate-400 border-b border-slate-800 uppercase tracking-tight">
+            <tr className="bg-[#0B1222] text-[11px] sm:text-xs md:text-sm text-slate-400 border-b border-slate-800 uppercase tracking-tight whitespace-nowrap">
               {/* CALLS COLUMNS */}
+              {columnConfig.previousOi && (
+                <th
+                  onClick={() => handleHeaderSort("call_previousOi")}
+                  className="py-2 px-2 text-right cursor-pointer hover:text-white"
+                >
+                  Prev OI {renderSortIndicator("call_previousOi")}
+                </th>
+              )}
               {columnConfig.oi && (
                 <th
                   onClick={() => handleHeaderSort("call_oi")}
@@ -350,6 +418,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   className="py-2 px-2 text-right cursor-pointer hover:text-white"
                 >
                   ΔOI {renderSortIndicator("call_oiChange")}
+                </th>
+              )}
+              {columnConfig.previousVolume && (
+                <th
+                  onClick={() => handleHeaderSort("call_previousVolume")}
+                  className="py-2 px-2 text-right cursor-pointer hover:text-white"
+                >
+                  Prev Vol {renderSortIndicator("call_previousVolume")}
                 </th>
               )}
               {columnConfig.volume && (
@@ -387,6 +463,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   Δ {renderSortIndicator("call_delta")}
                 </th>
               )}
+              {columnConfig.gamma && (
+                <th
+                  onClick={() => handleHeaderSort("call_gamma")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-purple-300"
+                >
+                  Γ {renderSortIndicator("call_gamma")}
+                </th>
+              )}
               {columnConfig.theta && (
                 <th
                   onClick={() => handleHeaderSort("call_theta")}
@@ -395,8 +479,34 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   Θ {renderSortIndicator("call_theta")}
                 </th>
               )}
+              {columnConfig.vega && (
+                <th
+                  onClick={() => handleHeaderSort("call_vega")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-purple-300"
+                >
+                  Vega {renderSortIndicator("call_vega")}
+                </th>
+              )}
+              {columnConfig.bidQty && <th className="py-2 px-1.5 text-right text-slate-400">B.Qty</th>}
               {columnConfig.bid && <th className="py-2 px-2 text-right text-slate-400">Bid</th>}
               {columnConfig.ask && <th className="py-2 px-2 text-right text-slate-400">Ask</th>}
+              {columnConfig.askQty && <th className="py-2 px-1.5 text-right text-slate-400">A.Qty</th>}
+              {columnConfig.spread && (
+                <th
+                  onClick={() => handleHeaderSort("call_spread")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-slate-400"
+                >
+                  Spread {renderSortIndicator("call_spread")}
+                </th>
+              )}
+              {columnConfig.averagePrice && (
+                <th
+                  onClick={() => handleHeaderSort("call_averagePrice")}
+                  className="py-2 px-2 text-right cursor-pointer hover:text-white text-slate-400"
+                >
+                  Avg {renderSortIndicator("call_averagePrice")}
+                </th>
+              )}
               {columnConfig.ltp && (
                 <th
                   onClick={() => handleHeaderSort("call_ltp")}
@@ -438,8 +548,26 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
               )}
               {columnConfig.change && <th className="py-2 px-2 text-left text-slate-400">Chg</th>}
               {columnConfig.changePercent && <th className="py-2 px-2 text-left text-slate-400">Chg%</th>}
+              {columnConfig.averagePrice && (
+                <th
+                  onClick={() => handleHeaderSort("put_averagePrice")}
+                  className="py-2 px-2 text-left cursor-pointer hover:text-white text-slate-400"
+                >
+                  Avg {renderSortIndicator("put_averagePrice")}
+                </th>
+              )}
+              {columnConfig.spread && (
+                <th
+                  onClick={() => handleHeaderSort("put_spread")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-slate-400"
+                >
+                  Spread {renderSortIndicator("put_spread")}
+                </th>
+              )}
+              {columnConfig.bidQty && <th className="py-2 px-1.5 text-left text-slate-400">B.Qty</th>}
               {columnConfig.bid && <th className="py-2 px-2 text-left text-slate-400">Bid</th>}
               {columnConfig.ask && <th className="py-2 px-2 text-left text-slate-400">Ask</th>}
+              {columnConfig.askQty && <th className="py-2 px-1.5 text-left text-slate-400">A.Qty</th>}
               {columnConfig.delta && (
                 <th
                   onClick={() => handleHeaderSort("put_delta")}
@@ -448,12 +576,28 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   Δ {renderSortIndicator("put_delta")}
                 </th>
               )}
+              {columnConfig.gamma && (
+                <th
+                  onClick={() => handleHeaderSort("put_gamma")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
+                >
+                  Γ {renderSortIndicator("put_gamma")}
+                </th>
+              )}
               {columnConfig.theta && (
                 <th
                   onClick={() => handleHeaderSort("put_theta")}
                   className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
                 >
                   Θ {renderSortIndicator("put_theta")}
+                </th>
+              )}
+              {columnConfig.vega && (
+                <th
+                  onClick={() => handleHeaderSort("put_vega")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
+                >
+                  Vega {renderSortIndicator("put_vega")}
                 </th>
               )}
               {columnConfig.iv && (
@@ -475,6 +619,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   V/OI {renderSortIndicator("put_volumeOiRatio")}
                 </th>
               )}
+              {columnConfig.previousVolume && (
+                <th
+                  onClick={() => handleHeaderSort("put_previousVolume")}
+                  className="py-2 px-2 text-left cursor-pointer hover:text-white"
+                >
+                  Prev Vol {renderSortIndicator("put_previousVolume")}
+                </th>
+              )}
               {columnConfig.volume && (
                 <th
                   onClick={() => handleHeaderSort("put_volume")}
@@ -489,6 +641,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   className="py-2 px-2 text-left cursor-pointer hover:text-white"
                 >
                   ΔOI {renderSortIndicator("put_oiChange")}
+                </th>
+              )}
+              {columnConfig.previousOi && (
+                <th
+                  onClick={() => handleHeaderSort("put_previousOi")}
+                  className="py-2 px-2 text-left cursor-pointer hover:text-white"
+                >
+                  Prev OI {renderSortIndicator("put_previousOi")}
                 </th>
               )}
               {columnConfig.oi && (
@@ -506,7 +666,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           <tbody className="divide-y divide-slate-800/60 font-mono">
             {sortedStrikes.length === 0 ? (
               <tr>
-                <td colSpan={34} className="py-12 text-center text-slate-500">
+                <td colSpan={40} className="py-12 text-center text-slate-500">
                   No options contracts matching filter criteria.
                 </td>
               </tr>
@@ -537,22 +697,32 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     ? "bg-purple-950/20"
                     : "bg-transparent";
 
+                const callPrevOi = call ? call.oi - call.oiChange : null;
+                const putPrevOi = put ? put.oi - put.oiChange : null;
+                const callSpread = call && call.ask > 0 && call.bid > 0 ? call.ask - call.bid : null;
+                const putSpread = put && put.ask > 0 && put.bid > 0 ? put.ask - put.bid : null;
+
                 return (
                   <tr
                     key={row.strike}
-                    className={`transition-colors hover:bg-slate-800/40 group ${
+                    className={`transition-colors hover:bg-slate-800/40 group whitespace-nowrap ${
                       isATM ? "ring-1 ring-inset ring-purple-500/40 font-semibold" : ""
                     }`}
                   >
                     {/* CALLS CELLS */}
+                    {columnConfig.previousOi && (
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
+                        {callPrevOi !== null ? formatIndianQuantity(callPrevOi) : "—"}
+                      </td>
+                    )}
                     {columnConfig.oi && (
-                      <td className={`py-1.5 px-2 text-right ${callBgClass} text-slate-200`}>
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-200 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {call ? formatIndianQuantity(call.oi) : "—"}
                       </td>
                     )}
                     {columnConfig.oiChange && (
                       <td
-                        className={`py-1.5 px-2 text-right ${callBgClass} ${
+                        className={`py-2 px-2 text-right ${callBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
                           call && call.oiChange > 0
                             ? "text-emerald-400"
                             : call && call.oiChange < 0
@@ -563,50 +733,85 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         {call ? `${call.oiChange > 0 ? "+" : ""}${formatIndianQuantity(call.oiChange)}` : "—"}
                       </td>
                     )}
+                    {columnConfig.previousVolume && (
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
+                        {call?.previousVolume !== undefined ? formatIndianQuantity(call.previousVolume) : "—"}
+                      </td>
+                    )}
                     {columnConfig.volume && (
-                      <td className={`py-1.5 px-2 text-right ${callBgClass} text-slate-400`}>
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {call ? formatIndianQuantity(call.volume) : "—"}
                       </td>
                     )}
                     {columnConfig.volumeOiRatio && (
-                      <td className={`py-1.5 px-1.5 text-right ${callBgClass} text-slate-300 font-bold`}>
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-300 font-bold text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {call ? `${call.volumeOiRatio.toFixed(1)}x` : "—"}
                       </td>
                     )}
                     {columnConfig.buildupBadge && (
-                      <td className={`py-1.5 px-1.5 text-center ${callBgClass}`}>
+                      <td className={`py-2 px-1.5 text-center ${callBgClass}`}>
                         {renderBuildupBadge(call?.oiBuildup)}
                       </td>
                     )}
                     {columnConfig.iv && (
-                      <td className={`py-1.5 px-2 text-right ${callBgClass} text-slate-300`}>
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-300 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {call?.iv ? `${call.iv.toFixed(1)}%` : "—"}
                       </td>
                     )}
                     {columnConfig.delta && (
-                      <td className={`py-1.5 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px]`}>
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {call?.greeks?.delta !== undefined ? call.greeks.delta.toFixed(3) : "—"}
                       </td>
                     )}
+                    {columnConfig.gamma && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.greeks?.gamma !== undefined ? call.greeks.gamma.toFixed(4) : "—"}
+                      </td>
+                    )}
                     {columnConfig.theta && (
-                      <td className={`py-1.5 px-1.5 text-right ${callBgClass} text-rose-300 text-[11px]`}>
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-rose-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {call?.greeks?.theta !== undefined ? call.greeks.theta.toFixed(2) : "—"}
                       </td>
                     )}
+                    {columnConfig.vega && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.greeks?.vega !== undefined ? call.greeks.vega.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.bidQty && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.bidQty ? formatIndianQuantity(call.bidQty) : "—"}
+                      </td>
+                    )}
                     {columnConfig.bid && (
-                      <td className={`py-1.5 px-2 text-right ${callBgClass} text-slate-400 text-[11px]`}>
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
                         {call?.bid ? call.bid.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.ask && (
-                      <td className={`py-1.5 px-2 text-right ${callBgClass} text-slate-400 text-[11px]`}>
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
                         {call?.ask ? call.ask.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.askQty && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.askQty ? formatIndianQuantity(call.askQty) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.spread && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {callSpread !== null ? callSpread.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.averagePrice && (
+                      <td className={`py-2 px-2 text-right ${callBgClass} text-slate-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.averagePrice ? formatIndianCurrency(call.averagePrice, currency) : "—"}
                       </td>
                     )}
                     {columnConfig.ltp && (
                       <td
                         onClick={() => call && onSelectOption(row.strike, "CE", call)}
-                        className={`py-1.5 px-2.5 text-right cursor-pointer font-bold text-rose-300 hover:text-white ${callBgClass} ${
+                        className={`py-2 px-2.5 text-right cursor-pointer font-extrabold text-rose-300 hover:text-white text-xs sm:text-sm md:text-base ${callBgClass} ${
                           isCallSelected ? "ring-2 ring-cyan-400 bg-cyan-500/20" : ""
                         }`}
                         title="Click to inspect Call quote"
@@ -616,9 +821,9 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
 
                     {/* CALL DIRECT ACTIONS CELL */}
-                    <td className={`py-1 px-1.5 text-right ${callBgClass} whitespace-nowrap`}>
+                    <td className={`py-1.5 px-1.5 text-right ${callBgClass} whitespace-nowrap`}>
                       {call ? (
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -629,7 +834,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "CE", "BUY", call.ltp);
                               }
                             }}
-                            className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] shadow-sm transition active:scale-95"
+                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
                             title="Buy Call Option"
                           >
                             B
@@ -644,7 +849,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "CE", "SELL", call.ltp);
                               }
                             }}
-                            className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] shadow-sm transition active:scale-95"
+                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
                             title="Sell Call Option"
                           >
                             S
@@ -657,20 +862,20 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onActionDepth(resolveContract(row.strike, "CE", call, "BUY"));
                               }
                             }}
-                            className="p-1 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
+                            className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
                             title="View Call Market Depth / Order Book"
                           >
-                            <BookOpen className="w-3 h-3" />
+                            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </div>
                       ) : (
-                        <span className="text-slate-600 text-[10px]">—</span>
+                        <span className="text-slate-600 text-xs">—</span>
                       )}
                     </td>
 
                     {columnConfig.change && (
                       <td
-                        className={`py-1.5 px-2 text-right text-[11px] ${callBgClass} ${
+                        className={`py-2 px-2 text-right text-[11px] sm:text-xs md:text-[13px] ${callBgClass} ${
                           call && call.change >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
@@ -679,7 +884,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.changePercent && (
                       <td
-                        className={`py-1.5 px-2 text-right text-[11px] ${callBgClass} ${
+                        className={`py-2 px-2 text-right text-[11px] sm:text-xs md:text-[13px] ${callBgClass} ${
                           call && call.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
@@ -688,11 +893,11 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
 
                     {/* CENTER STRIKE COLUMN */}
-                    <td className="py-1.5 px-2.5 text-center bg-slate-900 font-extrabold text-white border-x border-slate-800 whitespace-nowrap">
+                    <td className="py-2 px-3 text-center bg-slate-900 font-black text-white border-x border-slate-800 whitespace-nowrap">
                       <div className="flex items-center justify-center gap-1.5">
                         {callPosition && (
                           <span
-                            className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-bold ${
                               callPosition.quantity > 0
                                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                                 : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
@@ -703,20 +908,20 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           </span>
                         )}
 
-                        {isATM && <span className="text-[8px] font-bold text-cyan-400">←</span>}
-                        <span className={isATM ? "text-cyan-300 font-black text-sm" : ""}>
+                        {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">←</span>}
+                        <span className={`text-sm sm:text-base md:text-lg 2xl:text-xl font-black ${isATM ? "text-cyan-300" : "text-white"}`}>
                           {row.strike.toLocaleString("en-IN")}
                         </span>
                         {isATM && (
-                          <span className="px-1 py-0.2 rounded text-[8px] font-bold bg-cyan-500 text-slate-950">
+                          <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-black bg-cyan-500 text-slate-950">
                             ATM
                           </span>
                         )}
-                        {isATM && <span className="text-[8px] font-bold text-cyan-400">→</span>}
+                        {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">→</span>}
 
                         {putPosition && (
                           <span
-                            className={`px-1.5 py-0.2 rounded text-[8px] font-bold ${
+                            className={`px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-bold ${
                               putPosition.quantity > 0
                                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                                 : "bg-rose-500/20 text-rose-300 border border-rose-500/40"
@@ -730,9 +935,9 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     </td>
 
                     {/* PUT DIRECT ACTIONS CELL */}
-                    <td className={`py-1 px-1.5 text-left ${putBgClass} whitespace-nowrap`}>
+                    <td className={`py-1.5 px-1.5 text-left ${putBgClass} whitespace-nowrap`}>
                       {put ? (
-                        <div className="flex items-center justify-start gap-1">
+                        <div className="flex items-center justify-start gap-1.5">
                           <button
                             type="button"
                             onClick={(e) => {
@@ -741,10 +946,10 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onActionDepth(resolveContract(row.strike, "PE", put, "BUY"));
                               }
                             }}
-                            className="p-1 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
+                            className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-cyan-950 hover:text-cyan-300 hover:border-cyan-500/50 text-slate-400 border border-slate-700/80 transition"
                             title="View Put Market Depth / Order Book"
                           >
-                            <BookOpen className="w-3 h-3" />
+                            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                           <button
                             type="button"
@@ -756,7 +961,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "PE", "BUY", put.ltp);
                               }
                             }}
-                            className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] shadow-sm transition active:scale-95"
+                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
                             title="Buy Put Option"
                           >
                             B
@@ -771,14 +976,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 onQuickTrade(row.strike, "PE", "SELL", put.ltp);
                               }
                             }}
-                            className="px-1.5 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[10px] shadow-sm transition active:scale-95"
+                            className="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-black text-[11px] sm:text-xs md:text-xs shadow-sm transition active:scale-95"
                             title="Sell Put Option"
                           >
                             S
                           </button>
                         </div>
                       ) : (
-                        <span className="text-slate-600 text-[10px]">—</span>
+                        <span className="text-slate-600 text-xs">—</span>
                       )}
                     </td>
 
@@ -786,7 +991,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {columnConfig.ltp && (
                       <td
                         onClick={() => put && onSelectOption(row.strike, "PE", put)}
-                        className={`py-1.5 px-2.5 text-left cursor-pointer font-bold text-emerald-300 hover:text-white ${putBgClass} ${
+                        className={`py-2 px-2.5 text-left cursor-pointer font-extrabold text-emerald-300 hover:text-white text-xs sm:text-sm md:text-base ${putBgClass} ${
                           isPutSelected ? "ring-2 ring-cyan-400 bg-cyan-500/20" : ""
                         }`}
                         title="Click to inspect Put quote"
@@ -796,7 +1001,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.change && (
                       <td
-                        className={`py-1.5 px-2 text-left text-[11px] ${putBgClass} ${
+                        className={`py-2 px-2 text-left text-[11px] sm:text-xs md:text-[13px] ${putBgClass} ${
                           put && put.change >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
@@ -805,56 +1010,91 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.changePercent && (
                       <td
-                        className={`py-1.5 px-2 text-left text-[11px] ${putBgClass} ${
+                        className={`py-2 px-2 text-left text-[11px] sm:text-xs md:text-[13px] ${putBgClass} ${
                           put && put.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
                         {put ? `${put.changePercent >= 0 ? "+" : ""}${put.changePercent.toFixed(2)}%` : "—"}
                       </td>
                     )}
+                    {columnConfig.averagePrice && (
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.averagePrice ? formatIndianCurrency(put.averagePrice, currency) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.spread && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {putSpread !== null ? putSpread.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.bidQty && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.bidQty ? formatIndianQuantity(put.bidQty) : "—"}
+                      </td>
+                    )}
                     {columnConfig.bid && (
-                      <td className={`py-1.5 px-2 text-left ${putBgClass} text-slate-400 text-[11px]`}>
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.bid ? put.bid.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.ask && (
-                      <td className={`py-1.5 px-2 text-left ${putBgClass} text-slate-400 text-[11px]`}>
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.ask ? put.ask.toFixed(2) : "—"}
                       </td>
                     )}
+                    {columnConfig.askQty && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.askQty ? formatIndianQuantity(put.askQty) : "—"}
+                      </td>
+                    )}
                     {columnConfig.delta && (
-                      <td className={`py-1.5 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px]`}>
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.greeks?.delta !== undefined ? put.greeks.delta.toFixed(3) : "—"}
                       </td>
                     )}
+                    {columnConfig.gamma && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.greeks?.gamma !== undefined ? put.greeks.gamma.toFixed(4) : "—"}
+                      </td>
+                    )}
                     {columnConfig.theta && (
-                      <td className={`py-1.5 px-1.5 text-left ${putBgClass} text-rose-300 text-[11px]`}>
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-rose-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.greeks?.theta !== undefined ? put.greeks.theta.toFixed(2) : "—"}
                       </td>
                     )}
+                    {columnConfig.vega && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.greeks?.vega !== undefined ? put.greeks.vega.toFixed(2) : "—"}
+                      </td>
+                    )}
                     {columnConfig.iv && (
-                      <td className={`py-1.5 px-2 text-left ${putBgClass} text-slate-300`}>
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-300 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {put?.iv ? `${put.iv.toFixed(1)}%` : "—"}
                       </td>
                     )}
                     {columnConfig.buildupBadge && (
-                      <td className={`py-1.5 px-1.5 text-center ${putBgClass}`}>
+                      <td className={`py-2 px-1.5 text-center ${putBgClass}`}>
                         {renderBuildupBadge(put?.oiBuildup)}
                       </td>
                     )}
                     {columnConfig.volumeOiRatio && (
-                      <td className={`py-1.5 px-1.5 text-left ${putBgClass} text-slate-300 font-bold`}>
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-slate-300 font-bold text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {put ? `${put.volumeOiRatio.toFixed(1)}x` : "—"}
                       </td>
                     )}
+                    {columnConfig.previousVolume && (
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
+                        {put?.previousVolume !== undefined ? formatIndianQuantity(put.previousVolume) : "—"}
+                      </td>
+                    )}
                     {columnConfig.volume && (
-                      <td className={`py-1.5 px-2 text-left ${putBgClass} text-slate-400`}>
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {put ? formatIndianQuantity(put.volume) : "—"}
                       </td>
                     )}
                     {columnConfig.oiChange && (
                       <td
-                        className={`py-1.5 px-2 text-left ${putBgClass} ${
+                        className={`py-2 px-2 text-left ${putBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
                           put && put.oiChange > 0
                             ? "text-emerald-400"
                             : put && put.oiChange < 0
@@ -865,8 +1105,13 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         {put ? `${put.oiChange > 0 ? "+" : ""}${formatIndianQuantity(put.oiChange)}` : "—"}
                       </td>
                     )}
+                    {columnConfig.previousOi && (
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
+                        {putPrevOi !== null ? formatIndianQuantity(putPrevOi) : "—"}
+                      </td>
+                    )}
                     {columnConfig.oi && (
-                      <td className={`py-1.5 px-2 text-left ${putBgClass} text-slate-200`}>
+                      <td className={`py-2 px-2 text-left ${putBgClass} text-slate-200 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {put ? formatIndianQuantity(put.oi) : "—"}
                       </td>
                     )}
@@ -880,3 +1125,4 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
     </div>
   );
 };
+

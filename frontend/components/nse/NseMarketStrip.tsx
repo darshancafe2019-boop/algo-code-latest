@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React from "react";
 import { TrendingUp, TrendingDown, Activity, Globe, Calendar, RefreshCw } from "lucide-react";
@@ -46,7 +47,7 @@ export function NseMarketStrip() {
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-xs font-sans font-medium">NIFTY 50:</span>
             <span className="font-bold text-white">
-              ₹{nifty?.LastTradedPrice ? nifty.LastTradedPrice.toLocaleString("en-IN") : "24,350.00"}
+              {formatMoney(nifty?.LastTradedPrice, "₹")}
             </span>
             <span
               className={`flex items-center text-xs font-semibold px-1.5 py-0.5 rounded ${
@@ -64,7 +65,7 @@ export function NseMarketStrip() {
           <div className="flex items-center gap-2">
             <span className="text-slate-400 text-xs font-sans font-medium">BANK NIFTY:</span>
             <span className="font-bold text-white">
-              ₹{bankNifty?.LastTradedPrice ? bankNifty.LastTradedPrice.toLocaleString("en-IN") : "52,400.00"}
+              {formatMoney(bankNifty?.LastTradedPrice, "₹")}
             </span>
             <span
               className={`flex items-center text-xs font-semibold px-1.5 py-0.5 rounded ${

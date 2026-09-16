@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Percent,
@@ -56,7 +57,7 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
               </span>
               <span className="text-xs font-mono text-purple-300 font-bold">USED</span>
               <span className="text-xs font-mono text-[#52627A]">
-                (${marginUsed.toLocaleString()} / ${balance.toLocaleString()})
+                ({formatMoney(marginUsed, "$")} / {formatMoney(balance, "$")})
               </span>
             </div>
           </div>
@@ -68,7 +69,7 @@ export function MarginLeveragePanel({ overview }: MarginLeveragePanelProps) {
                 {marginFreePct.toFixed(1)}% FREE
               </span>
               <span className="text-[10px] text-[#7C8CA3] font-mono block">
-                (${marginFreeDollars.toLocaleString()} Available)
+                ({formatMoney(marginFreeDollars, "$")} Available)
               </span>
             </div>
 

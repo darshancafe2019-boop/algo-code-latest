@@ -14,7 +14,7 @@ def _load_env_fallback(file_path: Path):
                 k, v = line.split("=", 1)
                 k = k.strip()
                 v = v.strip().strip("'\"")
-                if k and k not in os.environ:
+                if k:
                     os.environ[k] = v
     except Exception:
         pass
@@ -38,7 +38,7 @@ for _env_file in [
 ]:
     if _env_file.is_file():
         if _has_dotenv:
-            load_dotenv(dotenv_path=_env_file, override=False)
+            load_dotenv(dotenv_path=_env_file, override=True)
         else:
             _load_env_fallback(_env_file)
 
@@ -97,9 +97,14 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database Configuration (PostgreSQL / SQLite)
 DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
-DATABASE_MIGRATION_URL = os.getenv("DATABASE_MIGRATION_URL", DATABASE_URL)
-IS_POSTGRES = DATABASE_PROVIDER == "postgresql" and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"))
+if os.getenv("FORCE_SQLITE", "true").lower() == "true" or DATABASE_PROVIDER != "postgresql":
+    DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
+    os.environ["DATABASE_URL"] = DATABASE_URL
+    os.environ["DATABASE_PROVIDER"] = "sqlite"
+    IS_POSTGRES = False
+else:
+    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
+    IS_POSTGRES = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
 
 
 # Institutional Authentication, 2FA & Password Reset

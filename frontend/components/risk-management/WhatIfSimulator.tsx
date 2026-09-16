@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -162,7 +163,7 @@ export function WhatIfSimulator() {
                   <div>
                     <span className="text-[10px] text-[#52627A] block">Projected Equity</span>
                     <span className="text-sm font-bold text-white block">
-                      ${res.projected_equity.toLocaleString()}
+                      {formatMoney(res.projected_equity, "$")}
                     </span>
                   </div>
                 </div>

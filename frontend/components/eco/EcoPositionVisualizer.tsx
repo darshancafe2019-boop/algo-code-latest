@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React from "react";
 import { Target, Shield } from "lucide-react";
 
@@ -67,7 +68,7 @@ export function EcoPositionVisualizer({
               isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
-            {isProfit ? `+${currency}${pnl?.toLocaleString()}` : `-${currency}${Math.abs(pnl || 0).toLocaleString()}`}
+            {isProfit ? `+${currency}{formatMoney(pnl, "$")}` : `-${currency}{formatMoney(Math.abs(pnl || 0), "$")}`}
           </span>
           <span
             className={`text-[10px] font-bold tabular-nums ${
@@ -115,14 +116,14 @@ export function EcoPositionVisualizer({
               <Shield className="h-2.5 w-2.5" /> SL
             </span>
             <span className="text-[#F7FAFC] font-bold tabular-nums">
-              {currency}{stopLoss?.toLocaleString() || "—"}
+              {formatMoney(stopLoss, currency)}
             </span>
           </div>
 
           <div>
             <span className="text-[#52627A] uppercase">ENTRY</span>
             <span className="text-[#F7FAFC] font-bold tabular-nums">
-              {currency}{entryPrice.toLocaleString()}
+              {formatMoney(entryPrice, currency)}
             </span>
           </div>
 
@@ -133,7 +134,7 @@ export function EcoPositionVisualizer({
                 isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
               }`}
             >
-              {currency}{currentPrice.toLocaleString()}
+              {formatMoney(currentPrice, currency)}
             </span>
           </div>
 
@@ -142,7 +143,7 @@ export function EcoPositionVisualizer({
               <Target className="h-2.5 w-2.5" /> TP
             </span>
             <span className="text-[#F7FAFC] font-bold tabular-nums">
-              {currency}{takeProfit?.toLocaleString() || "—"}
+              {formatMoney(takeProfit, currency)}
             </span>
           </div>
         </div>

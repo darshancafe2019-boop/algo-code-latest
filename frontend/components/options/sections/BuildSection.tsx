@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useOptionsMarketContext } from "@/context/OptionsMarketContext";
 import { StrategyPayoffChart } from "../StrategyPayoffChart";
@@ -407,7 +408,7 @@ export function BuildSection() {
                   </div>
                   <div className="text-right">
                     <span className="text-cyan-300 font-black text-sm">
-                      {selectedUnderlying.currencySymbol}{strategyEvaluation.net_premium.toLocaleString()}
+                      {selectedUnderlying.currencySymbol}{formatNumber(strategyEvaluation.net_premium)}
                     </span>
                     <span className="text-[10px] text-slate-400 block">Estimated Entry Cost</span>
                   </div>
@@ -650,7 +651,7 @@ export function BuildSection() {
             <div className="bg-[#080E1E] border border-slate-800 rounded-2xl p-3 shadow-xl">
               <div className="text-[10px] text-slate-400">Net Premium Flow</div>
               <div className="font-black text-sm text-cyan-300">
-                {selectedUnderlying.currencySymbol}{strategyEvaluation.net_premium.toLocaleString()}
+                {selectedUnderlying.currencySymbol}{formatNumber(strategyEvaluation.net_premium)}
               </div>
               <div className="text-[10px] text-slate-400">{strategyEvaluation.nature}</div>
             </div>
@@ -660,7 +661,7 @@ export function BuildSection() {
               <div className="font-extrabold text-sm text-emerald-400">
                 {strategyEvaluation.max_profit === null
                   ? "Unlimited"
-                  : `${selectedUnderlying.currencySymbol}${strategyEvaluation.max_profit.toLocaleString()}`}
+                  : `${selectedUnderlying.currencySymbol}{formatMoney(strategyEvaluation.max_profit, "$")}`}
               </div>
               <div className="text-[10px] text-slate-400">Defined Cap</div>
             </div>
@@ -670,7 +671,7 @@ export function BuildSection() {
               <div className="font-extrabold text-sm text-rose-400">
                 {strategyEvaluation.max_loss === null
                   ? "Undefined (Tail Risk)"
-                  : `${selectedUnderlying.currencySymbol}${strategyEvaluation.max_loss.toLocaleString()}`}
+                  : `${selectedUnderlying.currencySymbol}{formatMoney(strategyEvaluation.max_loss, "$")}`}
               </div>
               <div className="text-[10px] text-slate-400">Worst Case Scenario</div>
             </div>

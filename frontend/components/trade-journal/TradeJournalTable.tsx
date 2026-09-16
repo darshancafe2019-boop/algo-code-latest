@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   Layers,
@@ -182,9 +183,9 @@ export function TradeJournalTable({
                       )}
                       {visibleCols.entryExit && (
                         <td className="py-3.5 px-3">
-                          <span className="text-[var(--theme-text-primary)] block">${t.entry_price.toLocaleString()}</span>
+                          <span className="text-[var(--theme-text-primary)] block">{formatMoney(t.entry_price, "$")}</span>
                           <span className="text-[10px] text-[var(--theme-accent)] block">
-                            {t.exit_price ? `$${t.exit_price.toLocaleString()}` : "Active"}
+                            {t.exit_price ? `${formatMoney(t.exit_price, "$")}` : "Active"}
                           </span>
                         </td>
                       )}
@@ -293,7 +294,7 @@ export function TradeJournalTable({
                   <div className="grid grid-cols-2 gap-2 text-xs border-y border-[var(--theme-border-subtle)] py-2 text-[var(--theme-text-secondary)]">
                     <div>
                       <span className="text-[10px] text-[var(--theme-text-muted)] block">Entry / Exit</span>
-                      <span>${t.entry_price.toLocaleString()} → {t.exit_price ? `$${t.exit_price.toLocaleString()}` : "Open"}</span>
+                      <span>{formatMoney(t.entry_price, "$")} → {t.exit_price ? `${formatMoney(t.exit_price, "$")}` : "Open"}</span>
                     </div>
                     <div>
                       <span className="text-[10px] text-[var(--theme-text-muted)] block">UTC Execution</span>

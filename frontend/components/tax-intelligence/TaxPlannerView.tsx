@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Calculator, TrendingUp, PiggyBank, ShieldCheck, ArrowRight } from "lucide-react";
 import { TaxCommandCenterSummary } from "@/types/tax";
@@ -12,10 +13,7 @@ interface TaxPlannerViewProps {
 export function TaxPlannerView({ summary, currency }: TaxPlannerViewProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${Math.abs(val).toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(Math.abs(val), "$")}`;
   };
 
   return (

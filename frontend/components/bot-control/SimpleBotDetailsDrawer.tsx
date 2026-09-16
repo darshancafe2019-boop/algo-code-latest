@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -371,7 +372,7 @@ export function SimpleBotDetailsDrawer({
               <div className="p-3.5 rounded-2xl bg-[var(--theme-elevated)]/70 border border-[var(--theme-border-subtle)] space-y-1">
                 <span className="text-[10px] text-[var(--theme-text-muted)] font-sans">Today Net P&L</span>
                 <div className={`text-base font-extrabold ${isPnlPositive ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-                  {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                  {isPnlPositive ? "+" : ""}{formatMoney(Math.abs(pnl), "$")}
                 </div>
                 <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
                   Realized: ${bot.pnl?.realized ? bot.pnl.realized.toFixed(2) : "0.00"}
@@ -390,7 +391,7 @@ export function SimpleBotDetailsDrawer({
                   )}
                 </div>
                 <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">
-                  {pos.has_position ? `@ $${pos.entry_price?.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : "No open risk"}
+                  {pos.has_position ? `@ ${formatMoney(pos.entry_price, "$")}` : "No open risk"}
                 </div>
               </div>
             </div>
@@ -419,7 +420,7 @@ export function SimpleBotDetailsDrawer({
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Mark Price</span>
                   <span className="font-extrabold text-sm text-white">
                     {bot.symbol.includes("NIFTY") || bot.symbol.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "TATAMOTORS"].some(s => bot.symbol.toUpperCase().includes(s)) ? "₹" : "$"}
-                    {(liveQuote?.last_price || pos.entry_price || 2450.0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatNumber(liveQuote.last_price || pos.entry_price || 2450.0, 2)}
                   </span>
                 </div>
                 <div className="text-center border-x border-[var(--theme-border-subtle)]">
@@ -444,7 +445,7 @@ export function SimpleBotDetailsDrawer({
                     <span>Dhan Margin Available:</span>
                   </div>
                   <span className="font-bold text-emerald-400">
-                    ₹{Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 1250000.0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    {formatMoney(Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 1250000.0), "₹")}
                   </span>
                 </div>
               )}
@@ -517,7 +518,7 @@ export function SimpleBotDetailsDrawer({
                   </div>
                   <div className="flex justify-between">
                     <span>Allocated Capital:</span>
-                    <strong className="text-[var(--theme-text-primary)]">${bot.allocated_capital.toLocaleString()}</strong>
+                    <strong className="text-[var(--theme-text-primary)]">{formatMoney(bot.allocated_capital, "$")}</strong>
                   </div>
                   <div className="flex justify-between">
                     <span>Last Heartbeat:</span>

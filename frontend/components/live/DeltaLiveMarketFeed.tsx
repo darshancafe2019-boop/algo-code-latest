@@ -27,7 +27,7 @@ import {
   Sparkles,
   Bot,
 } from "lucide-react";
-import { formatPrice, formatPercent, formatVolume } from "@/lib/formatters";
+import { formatPrice, formatPercent, formatVolume, formatMoney } from "@/lib/formatters";
 import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 export interface DeltaQuoteTick {
@@ -594,9 +594,7 @@ export function DeltaLiveMarketFeed() {
                     : "text-white"
                 }`}
               >
-                ${activeQuote.last_price >= 1000
-                  ? activeQuote.last_price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                  : activeQuote.last_price.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                {formatMoney(activeQuote.last_price, "$", (activeQuote.last_price ?? 0) >= 1000 ? 2 : 4)}
               </div>
               <div className="text-xs font-mono text-slate-400 flex items-center justify-end gap-2">
                 {activeQuote.change_24h !== undefined && (
@@ -633,37 +631,37 @@ export function DeltaLiveMarketFeed() {
             <div className="p-2.5 rounded-xl bg-[#080E20]/70 border border-[#213047]/50">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Mark Price</div>
               <div className="text-sm font-bold text-amber-300 mt-0.5">
-                ${activeQuote.mark_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                {formatMoney(activeQuote.mark_price, "$")}
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-[#080E20]/70 border border-[#213047]/50">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Spot Index</div>
               <div className="text-sm font-bold text-slate-200 mt-0.5">
-                ${activeQuote.spot_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                {formatMoney(activeQuote.spot_price, "$")}
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-[#080E20]/70 border border-[#213047]/50">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">24h High / Low</div>
               <div className="text-xs font-bold text-slate-200 mt-0.5">
-                <span className="text-emerald-400">${activeQuote.high?.toLocaleString("en-US", { maximumFractionDigits: 2 }) || "—"}</span>
+                <span className="text-emerald-400">{formatMoney(activeQuote.high, "$")}</span>
                 {" / "}
-                <span className="text-rose-400">${activeQuote.low?.toLocaleString("en-US", { maximumFractionDigits: 2 }) || "—"}</span>
+                <span className="text-rose-400">{formatMoney(activeQuote.low, "$")}</span>
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-[#080E20]/70 border border-[#213047]/50">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">24h Turnover</div>
               <div className="text-sm font-bold text-cyan-400 mt-0.5">
-                {activeQuote.turnover_usd ? `$${(activeQuote.turnover_usd / 1e6).toFixed(2)}M` : (activeQuote.volume ? `${activeQuote.volume.toLocaleString()} contracts` : "—")}
+                {activeQuote.turnover_usd ? `$${(activeQuote.turnover_usd / 1e6).toFixed(2)}M` : (activeQuote.volume ? `${formatVolume(activeQuote.volume)} contracts` : "—")}
               </div>
             </div>
 
             <div className="p-2.5 rounded-xl bg-[#080E20]/70 border border-[#213047]/50">
               <div className="text-[10px] text-slate-400 uppercase font-semibold">Open Interest</div>
               <div className="text-sm font-bold text-purple-400 mt-0.5">
-                {activeQuote.open_interest ? `${activeQuote.open_interest.toLocaleString()} contracts` : "—"}
+                {activeQuote.open_interest ? `${formatVolume(activeQuote.open_interest)} contracts` : "—"}
               </div>
             </div>
 
@@ -681,12 +679,12 @@ export function DeltaLiveMarketFeed() {
               <div>
                 <span className="text-[10px] text-emerald-400 font-bold uppercase">Best Bid Price</span>
                 <div className="text-lg font-bold text-emerald-300">
-                  ${activeQuote.bid_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                  {formatMoney(activeQuote.bid_price, "$")}
                 </div>
               </div>
               <div className="text-right text-xs text-emerald-400/80">
                 <span>SIZE: </span>
-                <span className="font-bold text-emerald-300">{activeQuote.bid_size?.toLocaleString() || "1,250"}</span>
+                <span className="font-bold text-emerald-300">{formatVolume(activeQuote.bid_size)}</span>
               </div>
             </div>
 
@@ -694,12 +692,12 @@ export function DeltaLiveMarketFeed() {
               <div>
                 <span className="text-[10px] text-rose-400 font-bold uppercase">Best Ask Price</span>
                 <div className="text-lg font-bold text-rose-300">
-                  ${activeQuote.ask_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                  {formatMoney(activeQuote.ask_price, "$")}
                 </div>
               </div>
               <div className="text-right text-xs text-rose-400/80">
                 <span>SIZE: </span>
-                <span className="font-bold text-rose-300">{activeQuote.ask_size?.toLocaleString() || "890"}</span>
+                <span className="font-bold text-rose-300">{formatVolume(activeQuote.ask_size)}</span>
               </div>
             </div>
           </div>
@@ -828,9 +826,7 @@ export function DeltaLiveMarketFeed() {
                               : "text-white"
                           }`}
                         >
-                          ${q.last_price >= 1000
-                            ? q.last_price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-                            : q.last_price.toLocaleString("en-US", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}
+                          {formatMoney(q.last_price, "$", q.last_price >= 1000 ? 2 : 4)}
                         </span>
                       </td>
 
@@ -844,7 +840,7 @@ export function DeltaLiveMarketFeed() {
                                 : "bg-rose-500/15 text-rose-400"
                             }`}
                           >
-                            {q.change_24h >= 0 ? "+" : ""}{q.change_24h.toFixed(2)}%
+                            {formatPercent(q.change_24h)}
                           </span>
                         ) : (
                           <span className="text-slate-500">—</span>
@@ -853,29 +849,29 @@ export function DeltaLiveMarketFeed() {
 
                       {/* 24h High / Low */}
                       <td className="py-3.5 px-4 text-right text-slate-300 text-[11px]">
-                        <span className="text-emerald-400">${q.high?.toLocaleString("en-US", { maximumFractionDigits: 2 }) || "—"}</span>
+                        <span className="text-emerald-400">{formatMoney(q.high, "$")}</span>
                         {" / "}
-                        <span className="text-rose-400">${q.low?.toLocaleString("en-US", { maximumFractionDigits: 2 }) || "—"}</span>
+                        <span className="text-rose-400">{formatMoney(q.low, "$")}</span>
                       </td>
 
                       {/* Best Bid */}
                       <td className="py-3.5 px-3 text-right text-emerald-400 font-semibold">
-                        ${q.bid_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                        {formatMoney(q.bid_price, "$")}
                       </td>
 
                       {/* Best Ask */}
                       <td className="py-3.5 px-3 text-right text-rose-400 font-semibold">
-                        ${q.ask_price?.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "—"}
+                        {formatMoney(q.ask_price, "$")}
                       </td>
 
                       {/* 24h Turnover */}
                       <td className="py-3.5 px-4 text-right text-cyan-300">
-                        {q.turnover_usd ? `$${(q.turnover_usd / 1e6).toFixed(2)}M` : (q.volume ? `${q.volume.toLocaleString()}` : "—")}
+                        {q.turnover_usd ? `$${(q.turnover_usd / 1e6).toFixed(2)}M` : (q.volume ? `${formatVolume(q.volume)} contracts` : "—")}
                       </td>
 
                       {/* Open Interest */}
                       <td className="py-3.5 px-3 text-right text-purple-300">
-                        {q.open_interest ? `${q.open_interest.toLocaleString()}` : "—"}
+                        {q.open_interest ? `${formatVolume(q.open_interest)} contracts` : "—"}
                       </td>
 
                       {/* Action */}

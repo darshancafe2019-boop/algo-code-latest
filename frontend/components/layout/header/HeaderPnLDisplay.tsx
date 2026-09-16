@@ -97,15 +97,15 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-300">
               <span>Gross Capital (Deposits − Withdrawals):</span>
-              <span className="font-bold text-slate-100">{formatMoney(cb?.gross_capital ?? totalEquity, currencySymbol, 2)}</span>
+              <span className="font-bold text-slate-100">{formatMoney(cb.gross_capital ?? totalEquity, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Deposits:</span>
-              <span className="font-mono text-emerald-400">{formatMoney(cb?.deposits ?? totalEquity, currencySymbol, 2)}</span>
+              <span className="font-mono text-emerald-400">{formatMoney(cb.deposits ?? totalEquity, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Withdrawals:</span>
-              <span className="font-mono text-rose-400">{formatMoney(cb?.withdrawals ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-rose-400">{formatMoney(cb.withdrawals ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-200 font-bold pt-1 border-t border-[var(--theme-border-subtle)]">
               <span>Net Equity:</span>
@@ -132,15 +132,15 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Brokerage Fees & Commissions:</span>
-              <span className="font-mono text-rose-300">{formatMoney(cb?.brokerage_fees ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-rose-300">{formatMoney(cb.brokerage_fees ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Taxes (STT / GST / Stamp):</span>
-              <span className="font-mono text-rose-300">{formatMoney(cb?.taxes ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-rose-300">{formatMoney(cb.taxes ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Funding & Overnight Costs:</span>
-              <span className="font-mono text-rose-300">{formatMoney(cb?.funding_costs ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-rose-300">{formatMoney(cb.funding_costs ?? 0, currencySymbol, 2)}</span>
             </div>
           </div>
 
@@ -152,19 +152,19 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Department Trading Budget:</span>
-              <span className="text-slate-100 font-bold">{formatMoney(cb?.department_budget ?? totalEquity, currencySymbol, 2)}</span>
+              <span className="text-slate-100 font-bold">{formatMoney(cb.department_budget ?? totalEquity, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Bot Allocations Total:</span>
-              <span className="font-mono text-slate-200">{formatMoney(cb?.bot_allocations_total ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-slate-200">{formatMoney(cb.bot_allocations_total ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Deployed Capital (Active Bots):</span>
-              <span className="font-mono text-slate-200">{formatMoney(cb?.bot_deployed_capital ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-slate-200">{formatMoney(cb.bot_deployed_capital ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Reserved Risk Capital:</span>
-              <span className="font-mono text-slate-200">{formatMoney(cb?.bot_reserved_capital ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-slate-200">{formatMoney(cb.bot_reserved_capital ?? 0, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-200 font-bold pt-1 border-t border-[var(--theme-border-subtle)]">
               <span>Available Trading Capital:</span>
@@ -172,7 +172,7 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Unallocated Capital:</span>
-              <span className="text-sky-300 font-mono">{formatMoney(cb?.unallocated_capital ?? availableFunds, currencySymbol, 2)}</span>
+              <span className="text-sky-300 font-mono">{formatMoney(cb.unallocated_capital ?? availableFunds, currencySymbol, 2)}</span>
             </div>
           </div>
 
@@ -184,7 +184,7 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Broker Cash / Balance:</span>
-              <span className="text-slate-200 font-bold">{formatMoney(cb?.broker_balance ?? totalEquity, currencySymbol, 2)}</span>
+              <span className="text-slate-200 font-bold">{formatMoney(cb.broker_balance ?? totalEquity, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Margin Utilized:</span>
@@ -192,15 +192,15 @@ export const HeaderPnLDisplay = memo(function HeaderPnLDisplay({
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Available Margin:</span>
-              <span className="text-emerald-400 font-bold">{formatMoney(cb?.available_margin ?? availableFunds, currencySymbol, 2)}</span>
+              <span className="text-emerald-400 font-bold">{formatMoney(cb.available_margin ?? availableFunds, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400 pt-1 border-t border-[var(--theme-border-subtle)]">
               <span>Paper Funds:</span>
-              <span className="font-mono text-cyan-300">{formatMoney(cb?.paper_funds ?? totalEquity, currencySymbol, 2)}</span>
+              <span className="font-mono text-cyan-300">{formatMoney(cb.paper_funds ?? totalEquity, currencySymbol, 2)}</span>
             </div>
             <div className="flex items-center justify-between text-slate-400">
               <span>Live Funds:</span>
-              <span className="font-mono text-amber-300">{formatMoney(cb?.live_funds ?? 0, currencySymbol, 2)}</span>
+              <span className="font-mono text-amber-300">{formatMoney(cb.live_funds ?? 0, currencySymbol, 2)}</span>
             </div>
           </div>
 

@@ -14,7 +14,6 @@ import {
   MarketDataNormalizer,
   marketState,
   subscriptionManager,
-  liveCandleEngine,
   liveOptionChainEngine,
   liveOrderBookEngine,
   marketHealthMonitor,
@@ -192,35 +191,6 @@ function runUnitTests() {
   const subCountAfter = subscriptionManager.getSubscribedCount();
 
   assert(subCountBefore === 1 && subCountMiddle === 1 && subCountAfter === 0, "Subscription Manager Reference Counting");
-
-  // ── TEST 7: Multi-Timeframe Real-time Candle Engine ───────────────────────
-  const cTick1: any = {
-    provider: "dhan",
-    exchange: "NSE_EQ",
-    securityId: "13",
-    symbol: "NIFTY",
-    timestamp: 1700000000000,
-    exchangeTimestamp: 1700000000000,
-    receivedTimestamp: 1700000000000,
-    ltp: 24300.0,
-    volume: 100,
-    freshness: "LIVE",
-    ageMs: 10,
-    isValid: true,
-  };
-  liveCandleEngine.processTick(cTick1);
-
-  const cTick2: any = {
-    ...cTick1,
-    timestamp: 1700000030000,
-    exchangeTimestamp: 1700000030000,
-    ltp: 24350.0,
-    volume: 200,
-  };
-  liveCandleEngine.processTick(cTick2);
-
-  const forming = liveCandleEngine.getFormingCandle("NIFTY", "1m");
-  assert(forming?.open === 24300.0 && forming?.high === 24350.0 && forming?.close === 24350.0 && forming?.volume === 300, "Real-Time Forming Candle Calculations", `O: ${forming?.open}, H: ${forming?.high}, C: ${forming?.close}, V: ${forming?.volume}`);
 
   // ── TEST 8: Option Chain Engine & PCR / Max Pain ──────────────────────────
   const strikes = [

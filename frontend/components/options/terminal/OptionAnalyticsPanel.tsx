@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import {
@@ -365,7 +366,7 @@ export const OptionAnalyticsPanel: React.FC<OptionAnalyticsPanelProps> = ({
               </span>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
-              {snapshot.supportZone?.strike.toLocaleString("en-IN") || "—"}
+              {formatPrice(snapshot.supportZone?.strike)}
             </div>
             <div className="text-xs sm:text-sm text-slate-400 font-semibold">
               Total Put Open Interest: <strong className="text-emerald-300">{formatIndianQuantity(snapshot.supportZone?.oi)}</strong>
@@ -384,7 +385,7 @@ export const OptionAnalyticsPanel: React.FC<OptionAnalyticsPanelProps> = ({
               </span>
             </div>
             <div className="text-2xl sm:text-3xl md:text-4xl font-black text-white">
-              {snapshot.resistanceZone?.strike.toLocaleString("en-IN") || "—"}
+              {formatPrice(snapshot.resistanceZone?.strike)}
             </div>
             <div className="text-xs sm:text-sm text-slate-400 font-semibold">
               Total Call Open Interest: <strong className="text-rose-300">{formatIndianQuantity(snapshot.resistanceZone?.oi)}</strong>

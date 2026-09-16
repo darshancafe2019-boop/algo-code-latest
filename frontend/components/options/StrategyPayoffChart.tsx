@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { PayoffPoint, StrategyEvaluationResult } from "@/types/options-workstation";
 
@@ -92,7 +93,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
         <div className="flex items-center gap-2 text-xs">
           <span className="text-slate-400 font-bold">Payoff Profile:</span>
           <span className="px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-500/30 text-cyan-400 font-extrabold text-[11px]">
-            {underlyingName} @ {currencySymbol}{spotPrice.toLocaleString()}
+            {underlyingName} @ {formatMoney(spotPrice, currencySymbol)}
           </span>
         </div>
 
@@ -102,7 +103,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
             <span className="text-emerald-400 font-bold">
               {maxProfit === "UNLIMITED"
                 ? "UNLIMITED"
-                : `${currencySymbol}${Number(maxProfit).toLocaleString()}`}
+                : `${currencySymbol}{formatMoney(Number(maxProfit), "$")}`}
             </span>
           </div>
 
@@ -111,7 +112,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
             <span className="text-rose-400 font-bold">
               {maxLoss === "UNLIMITED"
                 ? "UNLIMITED"
-                : `${currencySymbol}${Number(maxLoss).toLocaleString()}`}
+                : `${currencySymbol}{formatMoney(Number(maxLoss), "$")}`}
             </span>
           </div>
 
@@ -297,7 +298,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
           >
             <div className="text-slate-400 text-[10px]">At Underlying Price:</div>
             <div className="text-white font-extrabold text-sm mb-1">
-              {currencySymbol}{hoveredPoint.underlying_price.toLocaleString()}
+              {formatMoney(hoveredPoint.underlying_price, currencySymbol)}
             </div>
             <div className="flex items-center gap-2">
               <span className="text-slate-400 text-[10px]">Net P&L:</span>
@@ -307,7 +308,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
                 }`}
               >
                 {hoveredPoint.pnl >= 0 ? "+" : ""}
-                {currencySymbol}{hoveredPoint.pnl.toLocaleString()} ({hoveredPoint.pnl_pct}%)
+                {formatMoney(hoveredPoint.pnl, currencySymbol)} ({hoveredPoint.pnl_pct}%)
               </span>
             </div>
           </div>

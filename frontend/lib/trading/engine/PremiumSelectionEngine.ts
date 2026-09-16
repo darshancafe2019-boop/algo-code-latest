@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 /**
  * Client-Side Intelligent Premium Selection Engine
  * ================================================
@@ -113,7 +114,7 @@ export class PremiumSelectionClientEngine {
 
       const explanation = `Strike ${row.strike} ${optionType} @ ${execPrice.toFixed(2)} (${action} via ${
         isBuy ? "Ask" : "Bid"
-      }), Delta: ${quote.delta.toFixed(2)}, Spread: ${spread.toFixed(2)} (${(spreadPct * 100).toFixed(1)}%), OI: ${quote.oi.toLocaleString()}`;
+      }), Delta: ${quote.delta.toFixed(2)}, Spread: ${spread.toFixed(2)} (${(spreadPct * 100).toFixed(1)}%), OI: {formatMoney(quote.oi, "$")}`;
 
       matches.push({
         strike: row.strike,

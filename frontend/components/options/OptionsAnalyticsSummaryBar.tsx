@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Activity, ShieldAlert, Target, Zap, TrendingUp, TrendingDown, Layers } from "lucide-react";
 import { PCRMetrics } from "@/types/option-chain";
@@ -37,10 +38,10 @@ export function OptionsAnalyticsSummaryBar({
           <Target className="w-3 h-3 text-cyan-400" />
         </div>
         <div className="text-sm font-bold text-white tracking-tight">
-          {currency}{atmStrike > 0 ? atmStrike.toLocaleString() : spotPrice.toLocaleString()}
+          {formatMoney(atmStrike > 0 ? atmStrike : spotPrice, currency)}
         </div>
         <div className="text-[10px] text-cyan-400">
-          Spot: {currency}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+          Spot: {formatMoney(spotPrice, currency)}
         </div>
       </div>
 
@@ -65,7 +66,7 @@ export function OptionsAnalyticsSummaryBar({
           <Zap className="w-3 h-3 text-amber-400" />
         </div>
         <div className="text-sm font-bold text-amber-400 tracking-tight">
-          {currency}{maxPain > 0 ? maxPain.toLocaleString() : (atmStrike || spotPrice).toLocaleString()}
+          {formatMoney(maxPain > 0 ? maxPain : (atmStrike || spotPrice), currency)}
         </div>
         <div className="text-[10px] text-slate-400">
           Option Seller Min Loss
@@ -93,7 +94,7 @@ export function OptionsAnalyticsSummaryBar({
           <TrendingDown className="w-3 h-3 text-rose-400" />
         </div>
         <div className="text-sm font-bold text-rose-400 tracking-tight">
-          {currency}{(callResistanceStrike || atmStrike * 1.02).toLocaleString()}
+          {formatMoney(callResistanceStrike || atmStrike * 1.02, currency)}
         </div>
         <div className="text-[10px] text-slate-400">
           Max Call Concentration
@@ -107,7 +108,7 @@ export function OptionsAnalyticsSummaryBar({
           <TrendingUp className="w-3 h-3 text-emerald-400" />
         </div>
         <div className="text-sm font-bold text-emerald-400 tracking-tight">
-          {currency}{(putSupportStrike || atmStrike * 0.98).toLocaleString()}
+          {formatMoney(putSupportStrike || atmStrike * 0.98, currency)}
         </div>
         <div className="text-[10px] text-slate-400">
           Max Put Concentration

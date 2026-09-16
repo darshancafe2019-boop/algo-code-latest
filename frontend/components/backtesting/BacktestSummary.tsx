@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { CheckCircle2, ShieldCheck, Zap, Scale, Clock, Award, DollarSign } from "lucide-react";
 import { BacktestResult, BacktestRequest } from "@/types/backtest";
@@ -43,19 +44,19 @@ export function BacktestSummary({ metrics, config }: BacktestSummaryProps) {
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Initial Starting Capital:</span>
             <span className="font-mono font-bold text-slate-200">
-              ${initial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatMoney(initial, "$")}
             </span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Final Simulated Equity:</span>
             <span className="font-mono font-bold text-white">
-              ${final.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatMoney(final, "$")}
             </span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Net Realized P/L:</span>
             <span className={`font-mono font-bold ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
-              {isProfit ? "+" : ""}${metrics.total_net_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({metrics.return_pct.toFixed(2)}%)
+              {isProfit ? "+" : ""}{formatMoney(metrics.total_net_profit, "$")} ({metrics.return_pct.toFixed(2)}%)
             </span>
           </div>
           <div className="flex justify-between items-center text-xs">

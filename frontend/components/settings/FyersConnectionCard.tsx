@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -300,7 +301,7 @@ export function FyersConnectionCard() {
             <Wallet className="h-3 w-3 text-sky-400" /> Avail. Margin
           </span>
           <p className="mt-1 font-mono text-xs font-semibold text-sky-400">
-            ₹{(data?.funds?.available || 1000000).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            {formatMoney(data.funds?.available || 1000000, "₹")}
           </p>
         </div>
 
@@ -385,7 +386,7 @@ export function FyersConnectionCard() {
           </a>
           <button
             onClick={() => {
-              setAppIdInput(data?.hasAppId ? "9BI3SMNLH3-100" : "");
+              setAppIdInput(data?.hasAppId ? "CMQYDMNBL9-200" : "");
               setIsConfigModalOpen(true);
             }}
             className="flex items-center gap-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 px-3.5 py-1.5 text-xs font-medium text-white shadow-sm transition-colors"
@@ -432,7 +433,7 @@ export function FyersConnectionCard() {
 
             <form onSubmit={handleSaveCredentials} className="mt-4 space-y-4">
               <div className="rounded-lg border border-sky-500/20 bg-sky-500/10 p-3 text-[11px] text-sky-300 font-sans">
-                Enter your Fyers App ID (e.g., <code>9BI3SMNLH3-100</code>) and Secret ID. Keys are encrypted via AES-256 before storage in vault.
+                Enter your Fyers App ID (e.g., <code>CMQYDMNBL9-200</code>) and Secret ID. Keys are encrypted via AES-256 before storage in vault.
               </div>
 
               <div>
@@ -441,7 +442,7 @@ export function FyersConnectionCard() {
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. 9BI3SMNLH3-100"
+                  placeholder="e.g. CMQYDMNBL9-200"
                   value={appIdInput}
                   onChange={(e) => setAppIdInput(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"
@@ -455,7 +456,7 @@ export function FyersConnectionCard() {
                 </label>
                 <input
                   type="password"
-                  placeholder="e.g. MVEH71S1WL"
+                  placeholder="e.g. qHOdqxDGXOTFLGgU"
                   value={secretIdInput}
                   onChange={(e) => setSecretIdInput(e.target.value)}
                   className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:border-sky-500 focus:outline-none"

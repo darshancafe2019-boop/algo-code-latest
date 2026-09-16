@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dhanAuth } from "@/lib/brokers/dhan/auth";
-import { dhanLiveFeed } from "@/lib/market-data/dhan-feed";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,13 +23,6 @@ export async function GET(req: NextRequest) {
       console.warn("[DhanCallback] Profile verification notice:", err.message);
       return null;
     });
-
-    // 3. Connect Live Dhan Market Feed with the freshly acquired token
-    try {
-      dhanLiveFeed.connect();
-    } catch (wsErr) {
-      console.warn("[DhanCallback] Dhan live feed connection scheduled:", wsErr);
-    }
 
     // 4. Clean Redirect (ZERO token leakage in URL bar)
     const successUrl = new URL("/settings", req.url);

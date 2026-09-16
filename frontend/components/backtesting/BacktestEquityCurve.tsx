@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { TrendingUp, ShieldAlert, Award, ArrowUpRight, ArrowDownRight, Layers } from "lucide-react";
 import { BacktestResult, BacktestRequest } from "@/types/backtest";
@@ -74,8 +75,8 @@ export function BacktestEquityCurve({ metrics, config }: BacktestEquityCurveProp
         </div>
 
         <div className="flex items-center gap-4 text-xs font-mono">
-          <span>Initial: <strong className="text-slate-200">${initial.toLocaleString()}</strong></span>
-          <span>Final: <strong className={final >= initial ? "text-emerald-400" : "text-red-400"}>${final.toLocaleString()}</strong></span>
+          <span>Initial: <strong className="text-slate-200">{formatMoney(initial, "$")}</strong></span>
+          <span>Final: <strong className={final >= initial ? "text-emerald-400" : "text-red-400"}>{formatMoney(final, "$")}</strong></span>
           <span>Return: <strong className={returnPct >= 0 ? "text-emerald-400" : "text-red-400"}>{returnPct >= 0 ? "+" : ""}{returnPct.toFixed(2)}%</strong></span>
           <span>Max DD: <strong className="text-red-400">{maxDD.toFixed(2)}%</strong></span>
         </div>
@@ -111,7 +112,7 @@ export function BacktestEquityCurve({ metrics, config }: BacktestEquityCurveProp
                   </td>
                   <td className="py-2.5 px-3 text-slate-400 font-mono text-[11px]">{m.date}</td>
                   <td className="py-2.5 px-3 text-right font-mono font-bold text-white">
-                    ${m.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatMoney(m.equity, "$")}
                   </td>
                   <td className={`py-2.5 px-3 text-right font-mono font-bold ${isPos ? "text-emerald-400" : "text-red-400"}`}>
                     {isPos ? "+" : ""}${m.pnl.toFixed(2)}

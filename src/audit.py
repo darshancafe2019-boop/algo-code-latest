@@ -68,7 +68,7 @@ def _audit_writer_worker():
                             with conn.transaction():
                                 with conn.cursor() as cur:
                                     cur.executemany(pg_sql, clean_items)
-                    else:
+                    elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
                         import psycopg
                         conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
                         try:

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Sparkles, Clock, TrendingUp, TrendingDown, DollarSign, Activity } from "lucide-react";
 import { FundingHeatmapItem } from "../types/futures";
@@ -66,7 +67,7 @@ export function FundingRateHeatmap({ data, isLoading }: FundingRateHeatmapProps)
               <div className="mt-3 space-y-1.5 font-mono text-xs">
                 <div className="flex justify-between text-slate-400">
                   <span>Mark Price</span>
-                  <span className="text-white font-bold">${item.markPrice.toLocaleString()}</span>
+                  <span className="text-white font-bold">{formatMoney(item.markPrice, "$")}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>8h Rate</span>

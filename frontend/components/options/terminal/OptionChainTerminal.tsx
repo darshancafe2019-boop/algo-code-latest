@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -292,28 +293,28 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     if (filterConfig.minOI > 0) {
       chips.push({
         id: "oi_min",
-        label: `OI ≥ ${filterConfig.minOI.toLocaleString()}`,
+        label: `OI ≥ {formatMoney(filterConfig.minOI, "$")}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, minOI: 0 })),
       });
     }
     if (filterConfig.maxOI !== undefined && filterConfig.maxOI > 0) {
       chips.push({
         id: "oi_max",
-        label: `OI ≤ ${filterConfig.maxOI.toLocaleString()}`,
+        label: `OI ≤ {formatMoney(filterConfig.maxOI, "$")}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, maxOI: undefined })),
       });
     }
     if (filterConfig.minVolume > 0) {
       chips.push({
         id: "vol_min",
-        label: `Vol ≥ ${filterConfig.minVolume.toLocaleString()}`,
+        label: `Vol ≥ {formatMoney(filterConfig.minVolume, "$")}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, minVolume: 0 })),
       });
     }
     if (filterConfig.maxVolume !== undefined && filterConfig.maxVolume > 0) {
       chips.push({
         id: "vol_max",
-        label: `Vol ≤ ${filterConfig.maxVolume.toLocaleString()}`,
+        label: `Vol ≤ {formatMoney(filterConfig.maxVolume, "$")}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, maxVolume: undefined })),
       });
     }

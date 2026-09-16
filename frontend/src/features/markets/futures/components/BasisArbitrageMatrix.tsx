@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { CanonicalFuturesContract } from "../types/futures";
 import { Zap, Activity, ArrowRight, ShieldCheck } from "lucide-react";
@@ -55,11 +56,11 @@ export function BasisArbitrageMatrix({ contracts }: BasisArbitrageMatrixProps) {
               <div className="space-y-1.5 text-slate-400">
                 <div className="flex justify-between">
                   <span>Spot Reference</span>
-                  <span className="text-slate-200 font-bold">${b.spot_price.toLocaleString()}</span>
+                  <span className="text-slate-200 font-bold">{formatMoney(b.spot_price, "$")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Futures Price</span>
-                  <span className="text-white font-bold">${b.futures_price.toLocaleString()}</span>
+                  <span className="text-white font-bold">{formatMoney(b.futures_price, "$")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Spread (Basis)</span>

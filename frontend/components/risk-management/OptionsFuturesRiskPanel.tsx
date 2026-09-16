@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Layers,
@@ -199,10 +200,10 @@ export function OptionsFuturesRiskPanel() {
                     <td className="py-3.5 px-3 font-bold text-[#22D3EE]">{opt.delta.toFixed(2)}</td>
                     <td className="py-3.5 px-3 text-red-400">${opt.theta.toFixed(1)}/d</td>
                     <td className="py-3.5 px-3 text-purple-300">${opt.vega.toFixed(1)}</td>
-                    <td className="py-3.5 px-3 text-white">${opt.margin.toLocaleString()}</td>
-                    <td className="py-3.5 px-3 text-red-400 font-bold">${opt.max_loss.toLocaleString()}</td>
+                    <td className="py-3.5 px-3 text-white">{formatMoney(opt.margin, "$")}</td>
+                    <td className="py-3.5 px-3 text-red-400 font-bold">{formatMoney(opt.max_loss, "$")}</td>
                     <td className="py-3.5 px-4 text-right font-bold text-emerald-400">
-                      ${opt.breakeven.toLocaleString()}
+                      {formatMoney(opt.breakeven, "$")}
                     </td>
                   </tr>
                 ))}
@@ -275,8 +276,8 @@ export function OptionsFuturesRiskPanel() {
                       <span className="text-[10px] text-[#52627A] block">{fut.expiry}</span>
                     </td>
                     <td className="py-3.5 px-3">
-                      <span className="text-white block">{fut.quantity} BTC (${fut.notional.toLocaleString()})</span>
-                      <span className="text-[10px] text-[#52627A] block">Mark: ${fut.current_price.toLocaleString()}</span>
+                      <span className="text-white block">{fut.quantity} BTC ({formatMoney(fut.notional, "$")})</span>
+                      <span className="text-[10px] text-[#52627A] block">Mark: {formatMoney(fut.current_price, "$")}</span>
                     </td>
                     <td className="py-3.5 px-3">
                       <span className="text-cyan-300 font-bold block">{fut.leverage}x Leverage</span>
@@ -292,7 +293,7 @@ export function OptionsFuturesRiskPanel() {
                     </td>
                     <td className="py-3.5 px-4 text-right">
                       <span className="text-red-400 font-bold block">${fut.max_loss.toFixed(2)}</span>
-                      <span className="text-[10px] text-[#52627A] block">SL: ${fut.stop_loss.toLocaleString()}</span>
+                      <span className="text-[10px] text-[#52627A] block">SL: {formatMoney(fut.stop_loss, "$")}</span>
                     </td>
                   </tr>
                 ))}

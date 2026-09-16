@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
   ArrowUpDown,
@@ -930,7 +931,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         <div className="flex items-center justify-center gap-1.5">
                           {isATM && <span className="text-xs sm:text-sm font-bold text-cyan-400">←</span>}
                           <span className={`text-sm sm:text-base md:text-lg 2xl:text-xl font-black ${isATM ? "text-cyan-300" : "text-white"}`}>
-                            {row.strike.toLocaleString("en-IN")}
+                            {formatNumber(row.strike)}
                           </span>
                           {isATM && (
                             <span className="px-1.5 py-0.5 rounded text-[9px] sm:text-[10px] md:text-xs font-black bg-cyan-500 text-slate-950">

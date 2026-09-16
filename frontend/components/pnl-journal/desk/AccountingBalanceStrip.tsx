@@ -3,6 +3,7 @@
 import React from "react";
 import { Wallet, ShieldCheck, PieChart, Coins, AlertCircle, RefreshCw } from "lucide-react";
 import { AccountingBalance } from "@/types/pnl-journal";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 interface AccountingBalanceStripProps {
   balances: AccountingBalance[];
@@ -20,10 +21,6 @@ export const AccountingBalanceStrip: React.FC<AccountingBalanceStripProps> = ({
   const totalUnrealized = balances.reduce((acc, b) => acc + b.unrealizedPnl, 0);
 
   const marginUtilization = totalBalance > 0 ? (totalUsedMargin / totalBalance) * 100 : 0;
-
-  const formatNumber = (num: number) => {
-    return num.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 });
-  };
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-3.5 shadow-lg backdrop-blur-md">

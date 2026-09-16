@@ -101,32 +101,6 @@ class GatewayClient:
 
         return True, "", age_sec
 
-    def get_history(
-        self,
-        symbol: str,
-        timeframe: str = "1d",
-        from_dt: Optional[datetime] = None,
-        to_dt: Optional[datetime] = None,
-    ) -> List[Dict[str, Any]]:
-        """Return historical OHLCV candles."""
-        params: Dict[str, str] = {"symbol": symbol, "tf": timeframe}
-        if from_dt:
-            params["from"] = from_dt.isoformat()
-        if to_dt:
-            params["to"] = to_dt.isoformat()
-        try:
-            resp = requests.get(
-                f"{self._base_url}/history",
-                params=params,
-                headers=self._headers,
-                timeout=max(self._timeout, 10.0),
-            )
-            if resp.status_code == 200:
-                return resp.json().get("candles", [])
-        except Exception as exc:
-            logger.warning("Gateway history error for %s: %s", symbol, exc)
-        return []
-
     def get_provider_health(self) -> List[Dict[str, Any]]:
         """Return provider health matrix."""
         try:

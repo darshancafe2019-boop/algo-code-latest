@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useRef, useEffect } from "react";
 import { Eye, EyeOff, Settings, X, Plus } from "lucide-react";
@@ -165,7 +166,7 @@ function SubPaneCanvasItem({
     } else if (pane.type === "volume") {
       const vol = (result.latest as any).volume;
       const sma = (result.latest as any).volumeSMA;
-      latestReadout = `Vol: ${vol ? vol.toLocaleString() : "—"} SMA: ${sma ? sma.toLocaleString() : "—"}`;
+      latestReadout = `Vol: ${formatVolume(vol)} SMA: ${formatNumber(sma, 2)}`;
     } else if (pane.type === "adx") {
       const adx = (result.latest as any).adx;
       const pdi = (result.latest as any).plusDI;
@@ -173,7 +174,7 @@ function SubPaneCanvasItem({
       latestReadout = `ADX: ${adx?.toFixed(1) || "—"} +DI: ${pdi?.toFixed(1) || "—"} -DI: ${mdi?.toFixed(1) || "—"}`;
     } else if (pane.type === "cvd") {
       const cvd = (result.latest as any).cvd;
-      latestReadout = `CVD: ${cvd ? cvd.toLocaleString() : "—"}`;
+      latestReadout = `CVD: ${formatVolume(cvd)}`;
     }
   }
 

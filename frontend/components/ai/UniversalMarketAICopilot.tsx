@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useRef } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import {
@@ -391,7 +392,7 @@ export function UniversalMarketAICopilot() {
                   </div>
                   <div>
                     <div className="text-base font-bold text-white font-mono">
-                      {currentSymbol} • ${data?.signal.currentPrice.toLocaleString()}
+                      {currentSymbol} • {formatMoney(data.signal.currentPrice, "$")}
                     </div>
                     <div className="text-[11px] text-slate-400 font-sans mt-0.5">
                       Model Confluence Score: <strong className="text-purple-400">{data?.signal.confidence}% Confidence</strong>
@@ -445,7 +446,7 @@ export function UniversalMarketAICopilot() {
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-sans mt-0.5">
-                    Underlying Price: <strong>${data?.options.underlyingPrice.toLocaleString()}</strong> • Implied Volatility:{" "}
+                    Underlying Price: <strong>{formatMoney(data.options.underlyingPrice, "$")}</strong> • Implied Volatility:{" "}
                     <strong className="text-cyan-400">{data?.options.impliedVolatilityPct}% (IV Rank: {data?.options.ivRank})</strong>
                   </p>
                 </div>
@@ -555,7 +556,7 @@ export function UniversalMarketAICopilot() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 font-mono text-xs">
                   <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
                     <span className="text-[10px] text-slate-500 block">Allocated Capital</span>
-                    <span className="text-white font-bold">${data?.botBlueprint.allocatedCapital.toLocaleString()}</span>
+                    <span className="text-white font-bold">{formatMoney(data.botBlueprint.allocatedCapital, "$")}</span>
                   </div>
                   <div className="p-2.5 bg-slate-950 rounded-lg border border-slate-800">
                     <span className="text-[10px] text-slate-500 block">Risk Per Trade</span>

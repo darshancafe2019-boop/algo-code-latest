@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   PieChart,
@@ -90,7 +91,7 @@ export function PositionsRiskMatrix({
             <div className="text-right text-xs">
               <span className="text-[10px] text-[#52627A] block uppercase font-medium">Total Portfolio Notional</span>
               <span className="font-bold text-[#F7FAFC] tabular-nums">
-                ${symbolStats.grandTotalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatMoney(symbolStats.grandTotalNotional, "$")}
               </span>
             </div>
           </div>
@@ -121,7 +122,7 @@ export function PositionsRiskMatrix({
                       <div>
                         <span className="text-[10px] text-[#52627A] block">Total Notional</span>
                         <span className="font-semibold text-[#F7FAFC] tabular-nums">
-                          ${stat.totalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          {formatMoney(stat.totalNotional, "$")}
                         </span>
                       </div>
                       <div>

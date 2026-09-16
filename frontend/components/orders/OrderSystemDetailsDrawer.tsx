@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { X, ShieldCheck, Cpu, Activity, Zap, CheckCircle2, ShieldAlert } from "lucide-react";
 import { useGlobalData } from "@/context/GlobalDataContext";
@@ -25,7 +26,7 @@ export function OrderSystemDetailsDrawer({
     { id: 1, name: "Global Kill Switch", status: "PASS", desc: "Emergency shutdown inactive on server." },
     { id: 2, name: "Live Market Feed Freshness", status: "PASS", desc: "Real-time tick age < 100ms." },
     { id: 3, name: "Broker Link Connectivity", status: "PASS", desc: "Direct REST/WebSocket adapter armed." },
-    { id: 4, name: "Available Margin & Capital", status: "PASS", desc: `Available: $${(portfolioSnapshot?.availableCapital || 50000).toLocaleString()}.` },
+    { id: 4, name: "Available Margin & Capital", status: "PASS", desc: `Available: ${formatMoney(portfolioSnapshot.availableCapital || 50000, "$")}.` },
     { id: 5, name: "Daily Loss Limit Guard", status: "PASS", desc: "Daily loss under -$5,000 threshold." },
     { id: 6, name: "Max Exposure & Position Size", status: "PASS", desc: "Order size within asset bounds." },
     { id: 7, name: "Leverage Multiplier Cap", status: "PASS", desc: "Instrument leverage within allowed tier." },

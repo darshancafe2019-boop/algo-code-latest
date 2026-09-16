@@ -2,7 +2,37 @@
  * Centralized Live Market Data Engine - TypeScript Definitions
  */
 
-export type BrokerProvider = "dhan" | "upstox" | "delta" | "binance" | "angelone" | "fyers";
+export type CanonicalProviderId = "dhan" | "upstox" | "delta" | "twelvedata" | "binance";
+export type BrokerProvider = CanonicalProviderId | "angelone" | "fyers";
+
+export interface NormalizedTick {
+  provider: CanonicalProviderId;
+  symbol: string;
+  instrumentId: string;
+  exchange: string;
+  assetClass: string;
+
+  ltp: number | null;
+  bid: number | null;
+  ask: number | null;
+
+  open: number | null;
+  high: number | null;
+  low: number | null;
+
+  previousClose: number | null;
+
+  volume: number | null;
+  openInterest: number | null;
+
+  lastTradeTime: number | null;
+  receivedAt: number;
+
+  connectionState: "CONNECTED" | "RECONNECTING" | "DISCONNECTED";
+  marketSession: "OPEN" | "PRE_OPEN" | "CLOSING" | "CLOSED" | "24X7";
+  priceState: "LIVE_TRADE" | "LAST_TRADED" | "STALE" | "DELAYED" | "CACHED";
+  isLive: boolean;
+}
 
 export type ExchangeSegment =
   | "IDX_I"

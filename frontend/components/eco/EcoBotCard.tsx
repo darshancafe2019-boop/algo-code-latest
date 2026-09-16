@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Play, Pause, Edit3, Eye } from "lucide-react";
 import { EcoButton } from "./EcoButton";
@@ -93,14 +94,14 @@ export function EcoBotCard({
               isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
-            {isProfit ? `+${currency}${pnl.toLocaleString()}` : `-${currency}${Math.abs(pnl).toLocaleString()}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})
+            {isProfit ? `+${currency}{formatMoney(pnl, "$")}` : `-${currency}{formatMoney(Math.abs(pnl), "$")}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})
           </span>
         </div>
 
         <div className="p-2 bg-[#07101A] border border-[#122033] rounded-lg">
           <span className="text-[9px] text-[#52627A] uppercase block">Capital / Used</span>
           <span className="text-xs font-bold text-[#F7FAFC] tabular-nums">
-            {currency}{capitalUsed.toLocaleString()} <span className="text-[#52627A] font-normal">/ {currency}{capitalTotal.toLocaleString()}</span>
+            {formatMoney(capitalUsed, currency)} <span className="text-[#52627A] font-normal">/ {formatMoney(capitalTotal, currency)}</span>
           </span>
         </div>
 

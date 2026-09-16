@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { X, ShieldCheck, Send, AlertTriangle, Lock } from "lucide-react";
 import { OrderRiskPreview, ExecutionMode } from "@/types/order-execution";
@@ -77,7 +78,7 @@ export function OrderConfirmationDrawer({
 
           <div className="flex justify-between items-center">
             <span className="text-[#7C8CA3]">Estimated Entry:</span>
-            <span className="text-[#F7FAFC] font-mono tabular-nums font-semibold">${(Number(preview.entry_price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            <span className="text-[#F7FAFC] font-mono tabular-nums font-semibold">{formatMoney(Number(preview.entry_price), "$")}</span>
           </div>
 
           <div className="flex justify-between items-center">

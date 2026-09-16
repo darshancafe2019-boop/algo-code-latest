@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Activity,
@@ -309,8 +310,8 @@ export function StrategyTestingDrawer({
                                   {tr.side}
                                 </span>
                               </td>
-                              <td className="p-2 text-[#F8FAFC]">${tr.entry_price.toLocaleString()}</td>
-                              <td className="p-2 text-[#F8FAFC]">${tr.exit_price.toLocaleString()}</td>
+                              <td className="p-2 text-[#F8FAFC]">{formatMoney(tr.entry_price, "$")}</td>
+                              <td className="p-2 text-[#F8FAFC]">{formatMoney(tr.exit_price, "$")}</td>
                               <td className="p-2">
                                 <span className={tr.return_pct >= 0 ? "text-[#00E89A] font-bold" : "text-[#FF3B5C] font-bold"}>
                                   {tr.return_pct >= 0 ? `+${tr.return_pct}%` : `${tr.return_pct}%`}

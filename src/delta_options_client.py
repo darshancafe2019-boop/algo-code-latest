@@ -276,14 +276,11 @@ class DeltaOptionsClient:
     ) -> List[Dict[str, Any]]:
         """
         Discovers all products from official /v2/products endpoint by exhausting all pagination pages.
-        Filters for option contracts (call_options, put_options), live and upcoming states, and current/future settlements.
+        Supports all contract types (perpetual_futures, futures, call_options, put_options, spot, etc.).
         """
-        if contract_types is None:
-            contract_types = ["call_options", "put_options"]
         if states is None:
             states = ["live", "upcoming"]
 
-        contract_types_param = ",".join(contract_types) if contract_types else "call_options,put_options"
         states_param = ",".join(states) if states else "live,upcoming"
 
         all_raw_products: List[Dict[str, Any]] = []
@@ -295,10 +292,11 @@ class DeltaOptionsClient:
         while page < max_pages:
             page += 1
             params: Dict[str, Any] = {
-                "contract_types": contract_types_param,
                 "states": states_param,
                 "page_size": 100,
             }
+            if contract_types:
+                params["contract_types"] = ",".join(contract_types)
             if after_cursor:
                 params["after"] = after_cursor
 
@@ -340,7 +338,7 @@ class DeltaOptionsClient:
             if states and state not in states:
                 continue
 
-            # Strict future filter: Remove past or expired dates
+            # Strict future filter: Remove past or expired dates for contracts with settlement_time
             if settle_time:
                 try:
                     clean_ts = settle_time.replace("Z", "+00:00")
@@ -354,7 +352,7 @@ class DeltaOptionsClient:
 
             discovered.append(p)
 
-        logger.info(f"Delta product discovery completed: fetched {len(all_raw_products)} raw products across {page} pages, {len(discovered)} active/upcoming option contracts.")
+        logger.info(f"Delta product discovery completed: fetched {len(all_raw_products)} raw products across {page} pages, {len(discovered)} active contracts.")
         return discovered
 
     def get_tickers(
@@ -364,13 +362,12 @@ class DeltaOptionsClient:
         expiry_date: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """
-        Fetches live option tickers from /v2/tickers with optional filters.
+        Fetches live tickers from /v2/tickers with optional filters.
+        When contract_types is omitted/None, fetches all contract types (perpetuals, futures, options).
         """
         params: Dict[str, Any] = {}
         if contract_types:
             params["contract_types"] = ",".join(contract_types)
-        else:
-            params["contract_types"] = "call_options,put_options"
 
         if underlying_asset_symbols:
             params["underlying_asset_symbols"] = ",".join(underlying_asset_symbols)
@@ -381,6 +378,15 @@ class DeltaOptionsClient:
         res = self._request("/v2/tickers", params=params, method="GET", use_cache=False, weight=1.0)
         result = res.get("result", [])
         return result if isinstance(result, list) else []
+
+    def get_ticker(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetches live ticker snapshot for a single symbol (/v2/tickers/{symbol})."""
+        try:
+            res = self._request(f"/v2/tickers/{symbol}", method="GET", use_cache=False, weight=1.0)
+            return res.get("result")
+        except Exception as e:
+            logger.debug(f"Failed to fetch Delta ticker for {symbol}: {e}")
+            return None
 
     def get_option_chain_for_underlying_and_expiry(
         self,

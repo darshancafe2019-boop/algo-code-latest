@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Shield, CheckCircle2, AlertTriangle, AlertOctagon, TrendingUp, DollarSign, PieChart } from "lucide-react";
 
@@ -51,7 +52,7 @@ export const RiskStatusPanel: React.FC<RiskStatusPanelProps> = ({
         <div className="bg-slate-900/50 border border-slate-800/80 rounded-lg p-3">
           <span className="text-[10px] font-mono text-slate-400 block mb-1">TOTAL CAPITAL</span>
           <span className="text-sm font-bold font-mono text-white">
-            ₹{capital.toLocaleString()}
+            {formatMoney(capital, "₹")}
           </span>
         </div>
 
@@ -59,7 +60,7 @@ export const RiskStatusPanel: React.FC<RiskStatusPanelProps> = ({
         <div className="bg-slate-900/50 border border-slate-800/80 rounded-lg p-3">
           <span className="text-[10px] font-mono text-slate-400 block mb-1">AVAILABLE MARGIN</span>
           <span className="text-sm font-bold font-mono text-emerald-400">
-            ₹{availableMargin.toLocaleString()}
+            {formatMoney(availableMargin, "₹")}
           </span>
         </div>
 
@@ -71,7 +72,7 @@ export const RiskStatusPanel: React.FC<RiskStatusPanelProps> = ({
               dailyPnl >= 0 ? "text-emerald-400" : "text-rose-400"
             }`}
           >
-            ₹{dailyPnl >= 0 ? `+${dailyPnl.toLocaleString()}` : dailyPnl.toLocaleString()}
+            {dailyPnl !== null && dailyPnl !== undefined ? (dailyPnl >= 0 ? `+${formatMoney(dailyPnl, "₹")}` : formatMoney(dailyPnl, "₹")) : "—"}
           </span>
         </div>
 
@@ -79,7 +80,7 @@ export const RiskStatusPanel: React.FC<RiskStatusPanelProps> = ({
         <div className="bg-slate-900/50 border border-slate-800/80 rounded-lg p-3">
           <span className="text-[10px] font-mono text-slate-400 block mb-1">DAILY LOSS LIMIT</span>
           <span className="text-sm font-bold font-mono text-slate-300">
-            ₹{dailyLossLimit.toLocaleString()}
+            {formatMoney(dailyLossLimit, "₹")}
           </span>
         </div>
       </div>

@@ -4,14 +4,15 @@ import React, { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
 import { DhanLiveMarketFeed } from "@/components/live/DhanLiveMarketFeed";
+import { UpstoxLiveMarketFeed } from "@/components/live/UpstoxLiveMarketFeed";
 import { DeltaLiveMarketFeed } from "@/components/live/DeltaLiveMarketFeed";
-import { Radio, Coins, TrendingUp } from "lucide-react";
+import { Radio, Coins, TrendingUp, Zap } from "lucide-react";
 
 function LiveMarketDataContent() {
   const searchParams = useSearchParams();
   const initialProvider = (searchParams?.get("provider") || "dhan").toLowerCase();
-  const [activeProvider, setActiveProvider] = useState<"dhan" | "delta">(
-    initialProvider === "delta" ? "delta" : "dhan"
+  const [activeProvider, setActiveProvider] = useState<"dhan" | "upstox" | "delta">(
+    initialProvider === "upstox" ? "upstox" : initialProvider === "delta" ? "delta" : "dhan"
   );
 
   return (
@@ -30,6 +31,23 @@ function LiveMarketDataContent() {
           <span className="text-sm">🇮🇳</span>
           <span>DHAN HQ (NSE / BSE)</span>
           <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-cyan-300">EQUITY</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveProvider("upstox")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+            activeProvider === "upstox"
+              ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/40 border border-purple-400/40"
+              : "text-slate-400 hover:text-slate-200 hover:bg-[#142036]"
+          }`}
+        >
+          <Zap className="h-3.5 w-3.5 text-purple-300 fill-purple-300" />
+          <span>UPSTOX V3</span>
+          <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-purple-300 flex items-center gap-1">
+            <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+            LIVE FEED
+          </span>
         </button>
 
         <button
@@ -53,6 +71,8 @@ function LiveMarketDataContent() {
       {/* Live Feed Components */}
       {activeProvider === "dhan" ? (
         <DhanLiveMarketFeed />
+      ) : activeProvider === "upstox" ? (
+        <UpstoxLiveMarketFeed />
       ) : (
         <DeltaLiveMarketFeed />
       )}

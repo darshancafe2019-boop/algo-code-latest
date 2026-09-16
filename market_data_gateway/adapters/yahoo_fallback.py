@@ -110,18 +110,6 @@ class YahooFallbackAdapter(BaseProviderAdapter):
                 result[s] = self._quote_cache[s]
         return result
 
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        """Fetch historical OHLCV from yfinance."""
-        return await asyncio.get_event_loop().run_in_executor(
-            None, self._fetch_history_sync, symbol, timeframe, from_dt, to_dt
-        )
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         return []
 
@@ -196,41 +184,3 @@ class YahooFallbackAdapter(BaseProviderAdapter):
             logger.error("Yahoo batch fetch error: %s", exc)
 
         return result
-
-    def _fetch_history_sync(
-        self, symbol: str, timeframe: str, from_dt: datetime, to_dt: datetime
-    ) -> List[OHLCVCandle]:
-        try:
-            import yfinance as yf
-        except ImportError:
-            return []
-
-        interval_map = {
-            "1m": "1m", "5m": "5m", "15m": "15m", "30m": "30m",
-            "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1wk", "1M": "1mo",
-        }
-        yahoo_sym = YAHOO_SYMBOL_MAP.get(symbol, symbol)
-        interval = interval_map.get(timeframe, "1d")
-        candles: List[OHLCVCandle] = []
-        try:
-            df = yf.download(
-                yahoo_sym,
-                start=from_dt.strftime("%Y-%m-%d"),
-                end=to_dt.strftime("%Y-%m-%d"),
-                interval=interval,
-                progress=False,
-                auto_adjust=True,
-            )
-            for idx, row in df.iterrows():
-                ts = idx.isoformat() if hasattr(idx, "isoformat") else str(idx)
-                candles.append(OHLCVCandle(
-                    symbol=symbol, exchange="YAHOO", provider="yahoo_fallback",
-                    timeframe=timeframe, timestamp=ts,
-                    open=float(row["Open"]), high=float(row["High"]),
-                    low=float(row["Low"]), close=float(row["Close"]),
-                    volume=float(row.get("Volume", 0)),
-                    is_closed=True,
-                ))
-        except Exception as exc:
-            logger.error("Yahoo history fetch error for %s: %s", symbol, exc)
-        return candles

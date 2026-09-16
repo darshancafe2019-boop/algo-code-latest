@@ -8,7 +8,6 @@ import { InstrumentResolver } from "../lib/market-data/instrument-master";
 import { MarketDataValidator } from "../lib/market-data/validator";
 import { MarketFreshnessEngine } from "../lib/market-data/freshness";
 import { marketState } from "../lib/market-data/market-state";
-import { candleEngine } from "../lib/market-data/candle-engine";
 import { optionChainEngine } from "../lib/market-data/option-chain-engine";
 import { orderBookEngine } from "../lib/market-data/orderbook-engine";
 import { marketHealthMonitor } from "../lib/market-data/health";
@@ -171,12 +170,6 @@ async function runDhanMasterTestSuite() {
 
   const cachedQuote = marketState.getQuote("NIFTY");
   assert(Boolean(cachedQuote && cachedQuote.last_price === 24375.5), "Cached Normalized Quote Retrieved", `LTP: ${cachedQuote?.last_price}`);
-
-  // ── TEST 6: Candle Engine Ingestion ───────────────────────────────────────
-  console.log("\n[PHASE 6: REAL-TIME CANDLE ENGINE]");
-  candleEngine.ingestTick(validTick);
-  const forming = candleEngine.getFormingCandle("NIFTY", "5m");
-  assert(Boolean(forming && forming.close === 24375.5), "5m Forming Candle Synchronized", `Close: ${forming?.close}, High: ${forming?.high}`);
 
   // ── TEST 7: Indicators Connected to Normalized Live Data ──────────────────
   console.log("\n[PHASE 7: INDICATOR ENGINE INTEGRATION]");

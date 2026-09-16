@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React from "react";
 import { useOptionsMarketContext } from "@/context/OptionsMarketContext";
 import {
@@ -105,7 +106,7 @@ export function OptionsMarketHeader() {
               <span className="text-slate-400 text-[11px] font-bold">Spot:</span>
             </div>
             <span className="text-white font-extrabold text-sm tracking-wide">
-              {selectedUnderlying.currencySymbol}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {selectedUnderlying.currencySymbol}{formatNumber(spotPrice, 2)}
             </span>
             <span className="text-[10px] text-slate-500 flex items-center gap-0.5">
               <Clock className="w-3 h-3" />

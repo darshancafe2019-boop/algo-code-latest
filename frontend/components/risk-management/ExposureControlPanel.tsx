@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Layers,
@@ -53,25 +54,25 @@ export function ExposureControlPanel({ overview, heatmap = [] }: ExposureControl
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-xs font-mono">
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Gross Exposure</span>
-          <span className="text-base font-bold text-white">${grossExp.toLocaleString()}</span>
+          <span className="text-base font-bold text-white">{formatMoney(grossExp, "$")}</span>
           <span className="text-[10px] text-cyan-300 block">{((grossExp / balance) * 100).toFixed(1)}% of Capital</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Net Directional</span>
-          <span className="text-base font-bold text-[#22D3EE]">${netExp.toLocaleString()}</span>
+          <span className="text-base font-bold text-[#22D3EE]">{formatMoney(netExp, "$")}</span>
           <span className="text-[10px] text-[#22D3EE] block">Net Long Bias</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Long Exposure</span>
-          <span className="text-base font-bold text-emerald-400">${longExp.toLocaleString()}</span>
+          <span className="text-base font-bold text-emerald-400">{formatMoney(longExp, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">100% of Open Notional</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Short Exposure</span>
-          <span className="text-base font-bold text-slate-400">${shortExp.toLocaleString()}</span>
+          <span className="text-base font-bold text-slate-400">{formatMoney(shortExp, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">0% Short</span>
         </div>
 
@@ -103,7 +104,7 @@ export function ExposureControlPanel({ overview, heatmap = [] }: ExposureControl
               </div>
 
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-[#52627A]">${item.exposure.toLocaleString()}</span>
+                <span className="text-[#52627A]">{formatMoney(item.exposure, "$")}</span>
                 <span className="text-cyan-300 font-bold">{item.pct}% / {maxConcentrationLimit}% Cap</span>
               </div>
 

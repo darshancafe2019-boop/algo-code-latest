@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { OrderSide, OrderType } from "@/types/order-execution";
@@ -93,7 +94,7 @@ export function OrderTypeSelector({
           <label className="text-[10px] text-[#7C8CA3] uppercase flex items-center justify-between">
             <span>Limit Price</span>
             <span className="text-[#22D3EE] cursor-pointer hover:underline font-mono" onClick={() => onChangeLimitPrice(currentPrice.toString())}>
-              Use LTP (${currentPrice.toLocaleString()})
+              Use LTP ({formatMoney(currentPrice, "$")})
             </span>
           </label>
           <input

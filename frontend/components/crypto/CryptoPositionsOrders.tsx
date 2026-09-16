@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -144,9 +145,9 @@ export function CryptoPositionsOrders() {
                           </span>
                         </td>
                         <td className="py-2.5 px-3 text-right text-slate-200">{p.quantity}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-200">${p.entry_price.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-blue-400 font-bold">${p.mark_price.toLocaleString()}</td>
-                        <td className="py-2.5 px-3 text-right text-slate-300">${p.margin.toLocaleString()}</td>
+                        <td className="py-2.5 px-3 text-right text-slate-200">{formatMoney(p.entry_price, "$")}</td>
+                        <td className="py-2.5 px-3 text-right text-blue-400 font-bold">{formatMoney(p.mark_price, "$")}</td>
+                        <td className="py-2.5 px-3 text-right text-slate-300">{formatMoney(p.margin, "$")}</td>
                         <td className="py-2.5 px-3 text-right font-bold">
                           <span className={isProfit ? "text-emerald-400" : "text-rose-400"}>
                             {isProfit ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}
@@ -204,7 +205,7 @@ export function CryptoPositionsOrders() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right text-slate-200">{ord.quantity}</td>
-                      <td className="py-2.5 px-3 text-right text-white font-bold">${ord.price.toLocaleString()}</td>
+                      <td className="py-2.5 px-3 text-right text-white font-bold">{formatMoney(ord.price, "$")}</td>
                       <td className="py-2.5 px-3 text-center">
                         <span className="px-2 py-0.5 rounded bg-blue-500/10 text-blue-300 text-[10px]">
                           {ord.execution_mode}

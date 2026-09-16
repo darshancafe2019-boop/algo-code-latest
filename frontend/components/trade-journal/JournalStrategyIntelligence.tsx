@@ -9,7 +9,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { StrategyStat } from "@/types/trade-journal";
-import { formatPnL } from "@/lib/formatters";
+import { formatPnL, formatMoney } from "@/lib/formatters";
 
 interface JournalStrategyIntelligenceProps {
   strategies: StrategyStat[];
@@ -66,10 +66,10 @@ export function JournalStrategyIntelligence({
                   <td className="py-3 px-3 tabular-nums">{s.profit_factor.toFixed(2)}</td>
                   <td className="py-3 px-3 tabular-nums">${s.expectancy_usd.toFixed(2)}</td>
                   <td className="py-3 px-3 tabular-nums font-bold text-[var(--theme-profit)]">
-                    +${s.trending_pnl.toLocaleString()}
+                    +{formatMoney(s.trending_pnl, "$")}
                   </td>
                   <td className="py-3 px-3 tabular-nums font-bold text-[var(--theme-warning)]">
-                    ${s.ranging_pnl.toLocaleString()}
+                    {formatMoney(s.ranging_pnl, "$")}
                   </td>
                   <td className="py-3 px-3 text-right font-bold tabular-nums">
                     <span className={isProfit ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}>

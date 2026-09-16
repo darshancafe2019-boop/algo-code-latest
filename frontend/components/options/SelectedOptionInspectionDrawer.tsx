@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { X, Shield, Activity, Radio, AlertTriangle } from "lucide-react";
 import { OptionContractQuote } from "@/types/option-chain";
@@ -65,7 +66,7 @@ export function SelectedOptionInspectionDrawer({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h2 className="text-base font-bold text-white tracking-tight">
-                  {underlying} {currency}{strike.toLocaleString()} {isCall ? "CALL (CE)" : "PUT (PE)"}
+                  {underlying} {formatMoney(strike, currency)} {isCall ? "CALL (CE)" : "PUT (PE)"}
                 </h2>
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
                   SOURCE: {providerName}

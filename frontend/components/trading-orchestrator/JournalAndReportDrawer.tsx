@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { BookOpen, FileText, Calendar, TrendingUp, CheckCircle, ShieldAlert, Award, Clock } from "lucide-react";
 
@@ -89,7 +90,7 @@ export const JournalAndReportDrawer: React.FC<JournalAndReportDrawerProps> = ({
                   dailyReport.net_pnl >= 0 ? "text-emerald-400" : "text-rose-400"
                 }`}
               >
-                ₹{dailyReport.net_pnl.toLocaleString()}
+                {formatMoney(dailyReport.net_pnl, "₹")}
               </span>
             </div>
 

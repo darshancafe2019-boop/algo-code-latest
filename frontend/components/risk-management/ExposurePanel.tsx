@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Layers, Globe, Activity } from "lucide-react";
 import { RiskHeatmapItem } from "@/types/risk";
@@ -46,7 +47,7 @@ export function ExposurePanel({
                 <div className="flex justify-between text-xs font-mono">
                   <span className="text-slate-300 font-semibold">{assetClass}</span>
                   <span className="text-slate-400">
-                    ${val.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({pct.toFixed(1)}%)
+                    {formatMoney(val, "$")} ({pct.toFixed(1)}%)
                   </span>
                 </div>
                 <div className="h-2 w-full bg-[#0E1524] rounded-full overflow-hidden border border-[#1A2A3F]">
@@ -93,7 +94,7 @@ export function ExposurePanel({
                     <td className="py-2 px-3 font-bold text-white">{item.entity}</td>
                     <td className="py-2 px-3 text-slate-400">{item.type}</td>
                     <td className="py-2 px-3 text-slate-200">
-                      ${item.exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatMoney(item.exposure, "$")}
                     </td>
                     <td className="py-2 px-3 text-cyan-400">{item.exposure_pct.toFixed(1)}%</td>
                     <td className="py-2 px-3">

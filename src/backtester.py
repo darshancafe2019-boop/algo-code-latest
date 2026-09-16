@@ -523,6 +523,59 @@ def save_backtest_run_details(metrics: Dict[str, Any], symbol: str, timeframe: s
         logger.error(f"Failed to log backtest metrics to SQLite: {e}")
 
 
+def generate_synthetic_candles(
+    symbol: str = "BTC/USDT",
+    n_bars: int = 150,
+    start_date: str = "2024-01-01"
+) -> pd.DataFrame:
+    """Generate realistic, deterministic OHLCV candles for backtest simulation."""
+    import numpy as np
+    from datetime import timedelta
+
+    seed_val = abs(hash(f"{symbol}_{start_date}")) % (2**31)
+    rng = np.random.default_rng(seed_val)
+
+    sym_upper = symbol.upper()
+    if "BTC" in sym_upper:
+        base_price = 52000.0
+    elif "ETH" in sym_upper:
+        base_price = 3100.0
+    elif "NIFTY" in sym_upper:
+        base_price = 22500.0
+    elif "BANKNIFTY" in sym_upper:
+        base_price = 48000.0
+    else:
+        base_price = 1000.0
+
+    try:
+        cur_dt = datetime.fromisoformat(start_date.replace("Z", "+00:00"))
+    except Exception:
+        cur_dt = datetime(2024, 1, 1, 9, 15)
+
+    rows = []
+    price = base_price
+    for _ in range(n_bars):
+        ret = rng.normal(0.0008, 0.012)
+        close_p = max(1.0, price * (1.0 + ret))
+        open_p = price
+        high_p = max(open_p, close_p) * (1.0 + float(rng.uniform(0.001, 0.006)))
+        low_p = min(open_p, close_p) * (1.0 - float(rng.uniform(0.001, 0.006)))
+        vol = float(rng.uniform(100.0, 5000.0))
+
+        rows.append({
+            "timestamp": cur_dt.isoformat(),
+            "open": round(open_p, 2),
+            "high": round(high_p, 2),
+            "low": round(low_p, 2),
+            "close": round(close_p, 2),
+            "volume": round(vol, 2)
+        })
+        price = close_p
+        cur_dt += timedelta(minutes=15)
+
+    return pd.DataFrame(rows)
+
+
 def run_backtest(
     symbol: str = "BTC/USDT",
     timeframe: str = "15m",
@@ -530,13 +583,14 @@ def run_backtest(
     end_date: str = "2024-06-01",
     initial_cash: float = 10000.0,
     allow_shorts: bool = True,
-    config_dict: Optional[Dict[str, Any]] = None
+    config_dict: Optional[Dict[str, Any]] = None,
+    df: Optional[pd.DataFrame] = None
 ) -> Dict[str, Any]:
     """Execute advanced on-demand backtest and return structured metrics payload."""
     try:
         from src.backtester_v2 import AdvancedBacktestEngine
-        
-        cfg = config_dict or {}
+
+        cfg = dict(config_dict or {})
         cfg["symbol"] = symbol
         cfg["timeframe"] = timeframe
         cfg["start_date"] = start_date
@@ -544,64 +598,31 @@ def run_backtest(
         cfg["initial_capital"] = initial_cash
         cfg["allow_shorts"] = allow_shorts
 
-        # 1. Fetch candles from cache or provider
-        rows = db.safe_query(
-            "SELECT timestamp, open, high, low, close, volume FROM candles_cache WHERE symbol = ? ORDER BY timestamp ASC LIMIT 500",
-            (symbol,)
-        )
-        if not rows or len(rows) < 30:
-            rows = db.safe_query("SELECT timestamp, open, high, low, close, volume FROM candles_cache ORDER BY timestamp ASC LIMIT 500")
-
-        if rows and len(rows) >= 30:
-            df = pd.DataFrame(rows)
-            for col in ["open", "high", "low", "close", "volume"]:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0.0)
-        else:
-            # Generate deterministic synthetic verification history if cache empty
-            t_now = int(datetime.now(timezone.utc).timestamp() * 1000)
-            n_bars = 120
-            p_base = 64000.0 if "BTC" in symbol else 2500.0
-            data_list = []
-            for j in range(n_bars):
-                p_close = p_base + (j * 12.5) + math.sin(j / 5.0) * 150.0
-                data_list.append({
-                    "timestamp": datetime.fromtimestamp((t_now - (n_bars - j) * 900000) / 1000, tz=timezone.utc).isoformat(),
-                    "open": p_close - 10.0,
-                    "high": p_close + 25.0,
-                    "low": p_close - 30.0,
-                    "close": p_close,
-                    "volume": 1500.0 + (j * 10.0)
-                })
-            df = pd.DataFrame(data_list)
+        if df is None or len(df) < 30:
+            df = generate_synthetic_candles(symbol=symbol, n_bars=150, start_date=start_date)
 
         engine = AdvancedBacktestEngine(cfg)
-        res = engine.run(df)
+        result = engine.run(df)
 
-        metrics = res.get("metrics", {})
-        return {
-            "backtest_id": res.get("backtest_id"),
-            "total_net_profit": metrics.get("net_profit", 0.0),
-            "return_pct": metrics.get("return_pct", 0.0),
-            "total_trades": metrics.get("total_trades", 0),
-            "win_rate_pct": metrics.get("win_rate_pct", 0.0),
-            "max_drawdown_pct": metrics.get("max_drawdown_pct", 0.0),
-            "sharpe_ratio": metrics.get("sharpe_ratio", 0.0),
-            "trades": res.get("trades", []),
-            "equity_curve": res.get("equity_curve", []),
-            "monthly_performance": res.get("monthly_performance", []),
-            "full_result": res
-        }
+        if "total_net_profit" not in result:
+            result["total_net_profit"] = result.get("net_profit", 0.0)
+
+        return result
     except Exception as exc:
         logger.error("Run backtest error: %s", exc)
         return {
-            "total_net_profit": 1250.50,
-            "return_pct": 12.51,
-            "total_trades": 18,
-            "win_rate_pct": 66.67,
-            "max_drawdown_pct": 4.12,
-            "sharpe_ratio": 1.95,
-            "trades": []
+            "status": "error",
+            "message": str(exc),
+            "total_net_profit": 0.0,
+            "return_pct": 0.0,
+            "total_trades": 0,
+            "win_rate_pct": 0.0,
+            "max_drawdown_pct": 0.0,
+            "sharpe_ratio": 0.0,
+            "trades": [],
+            "equity_curve": [],
+            "monthly_performance": []
         }
+
 
 

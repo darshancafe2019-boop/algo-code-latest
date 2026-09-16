@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -134,7 +135,7 @@ export function StrategyOptionsStudio({ config, onUpdateConfig }: Props) {
 
         <div className="flex items-center gap-2 font-mono text-[11px]">
           <span className="text-[#7D8EA5]">Underlying Spot:</span>
-          <span className="text-[#F8FAFC] font-bold">${spotPrice.toLocaleString()}</span>
+          <span className="text-[#F8FAFC] font-bold">{formatMoney(spotPrice, "$")}</span>
         </div>
       </div>
 

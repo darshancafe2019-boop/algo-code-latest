@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -253,7 +254,7 @@ export function SafetyGatesPanel() {
 
               {previewResult.is_approved && (
                 <p className="text-[11px] text-emerald-200 font-sans">
-                  Order clears all 14 quantitative gates. Notional exposure: ${(quantity * entryPrice).toLocaleString()}.
+                  Order clears all 14 quantitative gates. Notional exposure: {formatMoney(quantity * entryPrice, "$")}.
                 </p>
               )}
             </div>

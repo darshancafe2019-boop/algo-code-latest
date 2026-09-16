@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   StrategyEvaluationResult,
@@ -312,14 +313,14 @@ export function StrategyBuilderTab({
                       evaluation.nature === "NET DEBIT" ? "text-amber-400" : "text-emerald-400"
                     }`}
                   >
-                    {evaluation.nature}: {currencySymbol}{evaluation.net_premium.toLocaleString()}
+                    {evaluation.nature}: {formatMoney(evaluation.net_premium, currencySymbol)}
                   </div>
                 </div>
 
                 <div className="p-2 rounded-xl bg-slate-950 border border-slate-800">
                   <div className="text-[10px] text-slate-400">Req. Margin</div>
                   <div className="font-black text-sm text-cyan-400">
-                    {currencySymbol}{evaluation.required_margin.toLocaleString()}
+                    {formatMoney(evaluation.required_margin, currencySymbol)}
                   </div>
                 </div>
               </div>

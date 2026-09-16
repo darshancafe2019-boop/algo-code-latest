@@ -1,3 +1,4 @@
+import { formatNumber } from "@/lib/formatters";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
@@ -133,8 +134,8 @@ export function OptionsCommandHeader({
     { id: "UPSTOX", label: "Upstox Options", department: "Department 2: NSE F&O Derivatives", badge: "UPSTOX v3", color: "border-teal-500/50 bg-teal-950/40 text-teal-300", healthStatus: getProviderStatus("upstox") },
     { id: "DELTA_INDIA", label: "Delta Crypto Options", department: "Department 3: Crypto Derivatives", badge: "DELTA INDIA", color: "border-amber-500/50 bg-amber-950/40 text-amber-300", healthStatus: getProviderStatus("delta") },
     { id: "BINANCE", label: "Binance Options", department: "Department 4: European Options", badge: "BINANCE E-OPT", color: "border-yellow-500/50 bg-yellow-950/40 text-yellow-300", healthStatus: getProviderStatus("binance") },
-    { id: "PAPER_SIMULATOR", label: "Paper Simulator", department: "Department 5: Simulation Engine", badge: "BLACK-SCHOLES", color: "border-purple-500/50 bg-purple-950/40 text-purple-300" },
   ];
+
 
   const currentObj = underlyingsList.find((u) => u.id === underlying) || underlyingsList[0];
   const isPositive = spotChange24h >= 0;
@@ -211,7 +212,7 @@ export function OptionsCommandHeader({
           <div>
             <div className="text-[10px] text-slate-400 uppercase">Underlying Spot</div>
             <div className="text-base font-bold text-white tracking-tight flex items-center gap-1.5">
-              <span>{currentObj.currency}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>{currentObj.currency}{formatNumber(spotPrice, 2)}</span>
               <span className={`text-xs font-semibold flex items-center ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {isPositive ? "+" : ""}{spotChange24h}%

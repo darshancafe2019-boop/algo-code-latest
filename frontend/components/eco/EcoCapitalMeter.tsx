@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Wallet } from "lucide-react";
 
@@ -40,21 +41,21 @@ export function EcoCapitalMeter({
           <div>
             <span className="text-[9px] text-[#52627A] uppercase block">Total Capital</span>
             <span className="text-xs font-bold text-[#F7FAFC] tabular-nums">
-              {currency}{totalCapital.toLocaleString()}
+              {formatMoney(totalCapital, currency)}
             </span>
           </div>
 
           <div>
             <span className="text-[9px] text-[#52627A] uppercase block">Allocated / Used</span>
             <span className="text-xs font-bold text-[#F59E0B] tabular-nums">
-              {currency}{usedCapital.toLocaleString()}
+              {formatMoney(usedCapital, currency)}
             </span>
           </div>
 
           <div>
             <span className="text-[9px] text-[#52627A] uppercase block">Available Cash</span>
             <span className="text-xs font-bold text-[#00E890] tabular-nums">
-              {currency}{availableCapital.toLocaleString()}
+              {formatMoney(availableCapital, currency)}
             </span>
           </div>
         </div>

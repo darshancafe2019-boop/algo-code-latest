@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney, formatPrice } from "@/lib/formatters";
 import React, { useMemo } from "react";
 import { OptionLegGreekData, NseOptionStrikeRow } from "@/types/nse";
 import { Check, ChevronDown, Eye, SlidersHorizontal } from "lucide-react";
@@ -23,12 +24,7 @@ function formatNumberShort(num: number | undefined | null): string {
   if (num >= 10_000_000) return `${(num / 10_000_000).toFixed(2)}Cr`;
   if (num >= 100_000) return `${(num / 100_000).toFixed(1)}L`;
   if (num >= 1_000) return `${(num / 1_000).toFixed(0)}K`;
-  return num.toLocaleString();
-}
-
-function formatPrice(val: number | undefined | null, symbol: string = "₹"): string {
-  if (val === undefined || val === null || isNaN(val)) return "—";
-  return `${symbol}${val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatNumber(num);
 }
 
 function formatGreek(val: number | undefined | null, decimals: number = 2): string {
@@ -246,7 +242,7 @@ export function SimpleOptionChainTable({
                     {/* STRIKE (CENTER) */}
                     <td className="py-2 px-4 text-center font-extrabold text-white bg-slate-950/80 border-x border-slate-800">
                       <div className="flex items-center justify-center gap-1.5">
-                        <span>{row.strike.toLocaleString()}</span>
+                        <span>{formatNumber(row.strike)}</span>
                         {isATM && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500 text-slate-950 font-black tracking-tighter">
                             ATM

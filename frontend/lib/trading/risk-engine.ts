@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 /**
  * Universal Server-Side Pre-Trade Risk Engine & Kill-Switch
  */
@@ -79,7 +80,7 @@ export class UniversalRiskEngine {
         return {
           passed: false,
           code: "MAX_ORDER_VALUE_EXCEEDED",
-          blockedReason: `Estimated order value ₹${notional.toLocaleString()} exceeds hard risk limit of ₹${this.limits.maxOrderValue.toLocaleString()}.`,
+          blockedReason: `Estimated order value ₹{formatMoney(notional, "$")} exceeds hard risk limit of ₹{formatMoney(this.limits.maxOrderValue, "$")}.`,
         };
       }
     }

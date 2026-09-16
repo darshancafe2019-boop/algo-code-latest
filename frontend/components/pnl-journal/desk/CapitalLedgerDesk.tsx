@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Coins,
@@ -45,10 +46,7 @@ export const CapitalLedgerDesk: React.FC<CapitalLedgerDeskProps> = ({
   };
 
   const formatMoney = (val: number) => {
-    return `${currencySymbol}${val.toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
-      minimumFractionDigits: 2,
-    })}`;
+    return `${currencySymbol}{formatMoney(val, "$")}`;
   };
 
   return (

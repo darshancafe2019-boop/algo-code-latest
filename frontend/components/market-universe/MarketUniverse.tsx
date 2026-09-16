@@ -292,18 +292,51 @@ export function MarketUniverse() {
     filters.status !== "ALL",
   ].filter(Boolean).length;
 
+  const healthyProviders = useMemo(() => {
+    const active = new Set<string>();
+    
+    // Check providerHealth returned from backend/gateway
+    if (providerHealth && providerHealth.length > 0) {
+      providerHealth.forEach((p) => {
+        const status = (p.status || "").toUpperCase();
+        const isOk = ["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED"].includes(status);
+        if (isOk) {
+          const id = (p.provider_id || "").toLowerCase();
+          if (id.includes("dhan")) active.add("DHAN");
+          else if (id.includes("upstox")) active.add("UPSTOX");
+          else if (id.includes("delta")) active.add("DELTA");
+          else if (id.includes("binance")) active.add("BINANCE");
+        }
+      });
+    }
+
+    // Also check active quotes
+    quotes.forEach((q) => {
+      if (q && !q.is_stale && (q.age_seconds ?? 0) < 60) {
+        const p = (q.provider || "").toLowerCase();
+        if (p.includes("dhan")) active.add("DHAN");
+        else if (p.includes("upstox")) active.add("UPSTOX");
+        else if (p.includes("delta")) active.add("DELTA");
+        else if (p.includes("binance")) active.add("BINANCE");
+      }
+    });
+
+    return active;
+  }, [providerHealth, quotes]);
+
+  const providerCount = healthyProviders.size;
+
   const liveCount = useMemo(() => {
     let count = 0;
     rawInstruments.forEach((inst) => {
-      const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol;
-      if (sym) {
-        const q = getQuote(sym);
-        if (
-          q &&
-          !q.is_stale &&
-          (q.age_seconds ?? 0) < 10 &&
-          (q.provider === "dhan" || q.provider === "dhan_ws" || q.provider === "delta_options" || q.provider === "delta_options_ws")
-        ) {
+      const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol || "";
+      const isCrypto = (inst.asset_class || "").toUpperCase() === "CRYPTO" || ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE"].some((c) => sym.toUpperCase().includes(c));
+      const isMarketOpen = isCrypto || inst.market_status !== "CLOSED";
+
+      if (sym && isMarketOpen) {
+        const q = getQuote(sym) || (inst.symbol ? getQuote(inst.symbol) : null) || (inst.provider_symbol ? getQuote(inst.provider_symbol) : null);
+        if (q && !q.last_price && q.last_price !== 0) return;
+        if (q && !q.is_stale && (q.age_seconds ?? 0) < 30) {
           count++;
         }
       }
@@ -311,22 +344,22 @@ export function MarketUniverse() {
     return count;
   }, [rawInstruments, quotes, getQuote]);
 
-  const providerCount = useMemo(() => {
-    const activeProviders = new Set<string>();
-    quotes.forEach((q) => {
-      if (q && !q.is_stale && (q.age_seconds ?? 0) < 10) {
-        if (q.provider === "dhan" || q.provider === "dhan_ws") activeProviders.add("DHAN_WS");
-        if (q.provider === "delta_options" || q.provider === "delta_options_ws") activeProviders.add("DELTA_OPTIONS_WS");
-      }
-    });
-    return activeProviders.size;
-  }, [quotes]);
+  const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "MARKETS CLOSED" | "RECONNECTING" | "STALE" | "OFFLINE" => {
+    if (connectionStatus === "RECONNECTING" || connectionStatus === "CONNECTING") return "RECONNECTING";
+    if (providerCount === 0 && connectionStatus === "DISCONNECTED") return "OFFLINE";
+    if (liveCount > 0) return "LIVE";
+    if (providerCount > 0) {
+      if (connectionStatus === "STALE") return "STALE";
+      return "MARKETS CLOSED";
+    }
+    return "STALE";
+  }, [connectionStatus, providerCount, liveCount]);
 
   const averageFeedLatencyMs = useMemo(() => {
     let total = 0;
     let count = 0;
     quotes.forEach((q) => {
-      if (q && (q.provider.includes("dhan") || q.provider.includes("delta"))) {
+      if (q && (q.provider.includes("dhan") || q.provider.includes("delta") || q.provider.includes("upstox") || q.provider.includes("binance"))) {
         if (q.feed_latency_ms != null && q.feed_latency_ms >= 0) {
           total += q.feed_latency_ms;
           count++;
@@ -358,6 +391,7 @@ export function MarketUniverse() {
           providerCount={providerCount}
           lastUpdateMs={averageFeedLatencyMs}
           isLiveFeed={liveCount > 0 && connectionStatus === "LIVE"}
+          feedStatus={feedStatus}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           activeCategory={activeCategory}

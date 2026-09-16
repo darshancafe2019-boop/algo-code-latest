@@ -23,7 +23,7 @@ import {
   Play,
   Bot,
 } from "lucide-react";
-import { formatPrice, formatPercent, formatVolume } from "@/lib/formatters";
+import { formatPrice, formatPercent, formatVolume, formatMoney } from "@/lib/formatters";
 import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 
 interface DhanQuoteTick {
@@ -539,7 +539,7 @@ export function DhanLiveMarketFeed() {
                     : "text-white"
                 }`}
               >
-                ₹{activeQuote.last_price.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatMoney(activeQuote.last_price, "₹")}
               </div>
               <div className="text-xs font-mono text-slate-400 flex items-center justify-end gap-2">
                 <span>EVENT TIME: {activeQuote.event_time ? new Date(activeQuote.event_time).toLocaleTimeString() : "—"}</span>

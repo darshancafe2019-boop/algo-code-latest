@@ -14,7 +14,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
-import { formatGreek, formatPrice } from "@/lib/formatters/numbers";
+import { formatGreek, formatPrice, formatMoney } from "@/lib/formatters";
 
 export function OptionsPositionsView() {
   const [modeFilter, setModeFilter] = useState<"ALL" | "PAPER" | "SHADOW" | "LIVE">("ALL");
@@ -93,7 +93,7 @@ export function OptionsPositionsView() {
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">TOTAL UNREALIZED P&L</span>
           <div className={`text-xl font-bold mt-1 ${totalPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-            ₹{totalPnl.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            {formatMoney(totalPnl, "₹")}
           </div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">{totalPnl >= 0 ? "+ Profit" : "- Loss"}</span>
         </div>
@@ -101,7 +101,7 @@ export function OptionsPositionsView() {
         <div className="p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80">
           <span className="text-[10px] text-slate-400 uppercase block">MARGIN ALLOCATION</span>
           <div className="text-xl font-bold text-amber-300 mt-1">
-            ₹{totalMargin.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            {formatMoney(totalMargin, "₹")}
           </div>
           <span className="text-[10px] text-slate-400 mt-0.5 block">Portfolio collateral</span>
         </div>

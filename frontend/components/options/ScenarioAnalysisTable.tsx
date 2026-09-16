@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { OptionLeg, StrategyEvaluationResult } from "@/types/options-workstation";
 
@@ -48,7 +49,7 @@ export function ScenarioAnalysisTable(props: ScenarioAnalysisTableProps) {
           Price Shift Scenario Matrix (At Expiry)
         </h4>
         <span className="text-slate-400 text-[11px]">
-          Spot: {currencySymbol}{spot.toLocaleString()}
+          Spot: {formatMoney(spot, currencySymbol)}
         </span>
       </div>
 
@@ -83,7 +84,7 @@ export function ScenarioAnalysisTable(props: ScenarioAnalysisTableProps) {
                   {isSpot && <span className="ml-1 text-cyan-400 font-extrabold">(Spot)</span>}
                 </td>
                 <td className="py-2 px-3 text-white font-bold">
-                  {currencySymbol}{simPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatMoney(simPrice, currencySymbol)}
                 </td>
                 <td
                   className={`py-2 px-3 font-extrabold ${
@@ -91,7 +92,7 @@ export function ScenarioAnalysisTable(props: ScenarioAnalysisTableProps) {
                   }`}
                 >
                   {pnl >= 0 ? "+" : ""}
-                  {currencySymbol}{pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatMoney(pnl, currencySymbol)}
                 </td>
                 <td
                   className={`py-2 px-3 font-bold ${

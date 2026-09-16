@@ -21,7 +21,7 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
-import { formatPrice, formatPercent, formatNumber } from "@/lib/formatters";
+import { formatPrice, formatPercent, formatNumber, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 export type RightPanelTabType = "watchlist" | "trade" | "positions" | "orders";
 
@@ -351,7 +351,7 @@ export function TerminalRightPanel({
                         </div>
                       </td>
                       <td className="py-2 px-2 text-right font-bold text-[#F7FAFC] font-mono tabular-nums">
-                        {item.price > 0 ? (item.price >= 1000 ? item.price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.price.toFixed(2)) : "—"}
+                        {formatPrice(item.price)}
                       </td>
                       <td
                         className={`py-2 px-2.5 text-right font-bold font-mono tabular-nums ${

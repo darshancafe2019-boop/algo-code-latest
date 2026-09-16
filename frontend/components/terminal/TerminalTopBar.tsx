@@ -17,7 +17,7 @@ import {
   Zap,
 } from "lucide-react";
 import { STANDARD_INDICATOR_PRESETS } from "@/lib/indicators/presets";
-import { formatPrice, formatPercent } from "@/lib/formatters";
+import { formatPrice, formatPercent, formatNumber, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 export interface TerminalTopBarProps {
   symbol: string;
@@ -175,7 +175,7 @@ export function TerminalTopBar({
               isBullish ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
-            {price > 0 ? (price >= 1000 ? price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : price.toFixed(2)) : "—"}
+            {formatPrice(price)}
           </span>
 
           {/* Change Pill */}
@@ -196,13 +196,13 @@ export function TerminalTopBar({
           {high24h && (
             <div>
               <span className="text-[#52627A]">H: </span>
-              <span className="text-[#F7FAFC]">{high24h.toLocaleString()}</span>
+              <span className="text-[#F7FAFC]">{formatNumber(high24h)}</span>
             </div>
           )}
           {low24h && (
             <div>
               <span className="text-[#52627A]">L: </span>
-              <span className="text-[#F7FAFC]">{low24h.toLocaleString()}</span>
+              <span className="text-[#F7FAFC]">{formatNumber(low24h)}</span>
             </div>
           )}
           {volume24h && (

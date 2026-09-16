@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -260,7 +261,7 @@ export function BotDetailDrawer({
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
                 <span className="text-[10px] text-[#52627A] font-bold uppercase block">Allocated Capital</span>
                 <span className="text-base font-bold font-mono text-[#F7FAFC]">
-                  ${bot.allocated_capital?.toLocaleString() || "10,000"}
+                  {formatMoney(bot.allocated_capital, "$")}
                 </span>
               </div>
 
@@ -508,7 +509,7 @@ export function BotDetailDrawer({
                         </td>
                         <td className="py-2 px-3 text-slate-300">{ord.type || "MARKET"}</td>
                         <td className="py-2 px-3 text-white font-bold">{ord.qty}</td>
-                        <td className="py-2 px-3 text-cyan-300">${ord.price?.toLocaleString()}</td>
+                        <td className="py-2 px-3 text-cyan-300">{formatMoney(ord.price, "$")}</td>
                         <td className="py-2 px-3">
                           <span
                             className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
@@ -571,19 +572,19 @@ export function BotDetailDrawer({
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-[#7C8CA3]">
                     <div>
                       <span className="text-[#52627A]">Entry Price:</span>
-                      <p className="text-white font-bold">${pos.entry_price?.toLocaleString()}</p>
+                      <p className="text-white font-bold">{formatMoney(pos.entry_price, "$")}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Current Price:</span>
-                      <p className="text-cyan-300 font-bold">${pos.current_price?.toLocaleString()}</p>
+                      <p className="text-cyan-300 font-bold">{formatMoney(pos.current_price, "$")}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Stop Loss:</span>
-                      <p className="text-red-400 font-bold">${pos.stop_loss?.toLocaleString() || "63,200"}</p>
+                      <p className="text-red-400 font-bold">{formatMoney(pos.stop_loss, "$")}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Take Profit:</span>
-                      <p className="text-[#22D3EE] font-bold">${pos.take_profit?.toLocaleString() || "67,500"}</p>
+                      <p className="text-[#22D3EE] font-bold">{formatMoney(pos.take_profit, "$")}</p>
                     </div>
                   </div>
                 </div>
@@ -689,7 +690,7 @@ export function BotDetailDrawer({
                     </div>
 
                     <div className="flex items-center justify-between text-[10px] text-[#52627A] pt-1 border-t border-[#122033]">
-                      <span>Price: ${d.price?.toLocaleString() || "65,420"}</span>
+                      <span>Price: {formatMoney(d.price, "$")}</span>
                       <span className="text-[#22D3EE]">Risk: PASSED</span>
                     </div>
                   </div>

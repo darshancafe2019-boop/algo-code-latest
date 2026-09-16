@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   ShieldCheck,
@@ -188,10 +189,10 @@ export function UnifiedRiskTopBar({
             <DollarSign className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
           </div>
           <div className="mt-1 text-base sm:text-lg font-bold text-[var(--theme-text-primary)]">
-            ${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatMoney(capital.availableCash, "$")}
           </div>
           <div className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">
-            of ${capital.accountEquity.toLocaleString()} Total Equity
+            of {formatMoney(capital.accountEquity, "$")} Total Equity
           </div>
         </div>
 
@@ -205,7 +206,7 @@ export function UnifiedRiskTopBar({
             <Layers className="h-3.5 w-3.5 text-cyan-400" />
           </div>
           <div className="mt-1 text-base sm:text-lg font-bold text-cyan-300">
-            ${exposure.grossExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatMoney(exposure.grossExposure, "$")}
           </div>
           <div className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">
             Effective Leverage: <span className="font-bold text-[var(--theme-text-secondary)]">{exposure.effectiveLeverage.toFixed(2)}x</span>
@@ -259,7 +260,7 @@ export function UnifiedRiskTopBar({
             {margin.marginUtilizationPct.toFixed(1)}% <span className="text-xs font-normal text-[var(--theme-text-muted)]">/ {margin.maxMarginLimitPct.toFixed(0)}% Cap</span>
           </div>
           <div className="text-[10px] text-[var(--theme-text-muted)] mt-0.5">
-            ${margin.marginUsed.toLocaleString()} Locked Collateral
+            {formatMoney(margin.marginUsed, "$")} Locked Collateral
           </div>
         </div>
       </div>

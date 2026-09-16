@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 /**
  * useMarketGateway
  * ================
@@ -64,7 +65,7 @@ export function useMarketGateway(
   const formattedPrice = useMemo(() => {
     if (!quote) return "—";
     const p = quote.last_price;
-    if (p >= 10000) return p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (p >= 10000) return formatNumber(p, 2);
     if (p >= 1) return p.toFixed(2);
     if (p >= 0.01) return p.toFixed(4);
     return p.toFixed(8);

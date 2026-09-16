@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -366,7 +367,7 @@ export function FuturesDetailsDrawer({
           <div>
             <span className="text-[8px] text-slate-500 block uppercase">LTP</span>
             <strong className="text-white truncate block">
-              {contract.last_price != null ? `${currency}${contract.last_price.toLocaleString()}` : "—"}
+              {contract.last_price != null ? `${currency}{formatMoney(contract.last_price, "$")}` : "—"}
             </strong>
           </div>
           <div>
@@ -624,19 +625,19 @@ export function FuturesDetailsDrawer({
                 <div>
                   <span className="text-slate-500 block text-[9px]">Required Initial Margin</span>
                   <strong className="text-white">
-                    {currency}{requiredInitialMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatMoney(requiredInitialMargin, currency)}
                   </strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[9px]">Available Capital</span>
                   <strong className="text-emerald-400">
-                    {currency}{(brokerAccount.available_margin || 0).toLocaleString()}
+                    {formatMoney(brokerAccount.available_margin, currency)}
                   </strong>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[9px]">Est. Liquidation Price</span>
                   <strong className="text-amber-400">
-                    {liqResult?.liquidationPrice ? `${currency}${liqResult.liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "—"}
+                    {liqResult?.liquidationPrice ? `${currency}{formatMoney(liqResult.liquidationPrice, "$")}` : "—"}
                   </strong>
                 </div>
                 <div>
@@ -753,7 +754,7 @@ export function FuturesDetailsDrawer({
                     className="w-full flex justify-between items-center px-2 py-0.5 rounded bg-rose-500/5 hover:bg-rose-500/20 text-[11px] border border-rose-500/10 transition text-left group"
                   >
                     <span className="font-bold text-rose-400 group-hover:underline">
-                      {level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatNumber(level.price, 2)}
                     </span>
                     <span className="text-slate-300">{level.quantity.toFixed(3)}</span>
                     <span className="text-slate-500 text-[9px]">{(level.total || level.quantity).toFixed(3)}</span>
@@ -767,7 +768,7 @@ export function FuturesDetailsDrawer({
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-400 text-[10px]">LTP:</span>
                 <span className="text-white text-xs">
-                  {currency}{(contract.last_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatMoney(contract.last_price, currency)}
                 </span>
               </div>
               <div className="flex items-center gap-1.5 text-[9px]">
@@ -798,7 +799,7 @@ export function FuturesDetailsDrawer({
                     className="w-full flex justify-between items-center px-2 py-0.5 rounded bg-emerald-500/5 hover:bg-emerald-500/20 text-[11px] border border-emerald-500/10 transition text-left group"
                   >
                     <span className="font-bold text-emerald-400 group-hover:underline">
-                      {level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatNumber(level.price, 2)}
                     </span>
                     <span className="text-slate-300">{level.quantity.toFixed(3)}</span>
                     <span className="text-slate-500 text-[9px]">{(level.total || level.quantity).toFixed(3)}</span>
@@ -824,11 +825,11 @@ export function FuturesDetailsDrawer({
               </div>
               <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Mark Price:</span>
-                <span className="text-white font-bold">{currency}{(contract.mark_price || contract.last_price || 0).toLocaleString()}</span>
+                <span className="text-white font-bold">{formatMoney(contract.mark_price || contract.last_price, currency)}</span>
               </div>
               <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Index Price:</span>
-                <span className="text-slate-300">{currency}{(contract.index_price || contract.last_price || 0).toLocaleString()}</span>
+                <span className="text-slate-300">{formatMoney(contract.index_price || contract.last_price, currency)}</span>
               </div>
               <div className="flex justify-between items-center text-[11px]">
                 <span className="text-slate-400">Basis:</span>

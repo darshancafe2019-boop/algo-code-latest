@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -124,7 +125,7 @@ export function TopMoversBoard({ onSelectInstrument }: TopMoversBoardProps) {
                 <div className="flex items-center justify-between text-[11px] text-slate-400">
                   <span>
                     {currSymbol}
-                    {inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
+                    {formatPrice(inst.last_price)}
                   </span>
                   <span className="text-[10px] text-slate-500">
                     Vol: {currSymbol}{(inst.volume_24h || 0) > 1e6 ? `${((inst.volume_24h || 0) / 1e6).toFixed(1)}M` : `${((inst.volume_24h || 0) / 1e3).toFixed(0)}k`}

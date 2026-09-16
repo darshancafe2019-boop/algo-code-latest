@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useRef } from "react";
 import {
   BrainCircuit,
@@ -385,7 +386,7 @@ export function MarketAnalystDrawer({
                         key={idx}
                         className="px-2 py-0.5 rounded bg-emerald-950/40 text-emerald-300 border border-emerald-500/30 text-xs font-mono"
                       >
-                        ${lvl.toLocaleString()}
+                        {formatMoney(lvl, "$")}
                       </span>
                     ))}
                   </div>
@@ -405,7 +406,7 @@ export function MarketAnalystDrawer({
                         key={idx}
                         className="px-2 py-0.5 rounded bg-rose-950/40 text-rose-300 border border-rose-500/30 text-xs font-mono"
                       >
-                        ${lvl.toLocaleString()}
+                        {formatMoney(lvl, "$")}
                       </span>
                     ))}
                   </div>

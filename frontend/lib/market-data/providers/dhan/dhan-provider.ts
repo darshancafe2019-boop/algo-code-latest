@@ -53,11 +53,6 @@ export class DhanProvider implements MarketDataProvider {
     return marketState.getQuote(symbol) || null;
   }
 
-  public async getCandles(symbol: string, timeframe: CandleTimeframe, limit: number = 100): Promise<OHLCVCandle[]> {
-    const candles = marketState.getCandles(symbol, timeframe);
-    return candles.slice(-limit);
-  }
-
   public async getOrderBook(symbol: string): Promise<MarketDepth | null> {
     return marketState.getDepth(symbol) || null;
   }

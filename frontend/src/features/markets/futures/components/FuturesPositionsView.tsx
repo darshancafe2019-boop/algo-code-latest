@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -103,7 +104,7 @@ export function FuturesPositionsView() {
 
         <div className="p-4 bg-[#0E1524] border border-[#1E293B] rounded-2xl shadow-xl">
           <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Margin In Use</span>
-          <span className="text-xl font-bold text-cyan-300 mt-1 block">${totalMargin.toLocaleString()}</span>
+          <span className="text-xl font-bold text-cyan-300 mt-1 block">{formatMoney(totalMargin, "$")}</span>
           <div className="mt-2 text-[10px] text-slate-500">Isolated & Cross Allocation</div>
         </div>
 
@@ -174,8 +175,8 @@ export function FuturesPositionsView() {
                         </div>
                       </td>
                       <td className="py-3.5 px-3 text-right font-bold text-white">{pos.quantity}</td>
-                      <td className="py-3.5 px-3 text-right text-slate-400">${(pos.entry_price || 0).toLocaleString()}</td>
-                      <td className="py-3.5 px-3 text-right font-bold text-white">${(pos.mark_price || pos.entry_price || 0).toLocaleString()}</td>
+                      <td className="py-3.5 px-3 text-right text-slate-400">{formatMoney(pos.entry_price, "$")}</td>
+                      <td className="py-3.5 px-3 text-right font-bold text-white">{formatMoney(pos.mark_price || pos.entry_price, "$")}</td>
                       <td className="py-3.5 px-3 text-right">
                         <span className={`font-bold ${isProfit ? "text-emerald-400" : "text-red-400"}`}>
                           {isProfit ? `+$${(pos.unrealized_pnl || 0).toFixed(2)}` : `-$${Math.abs(pos.unrealized_pnl || 0).toFixed(2)}`}
@@ -185,11 +186,11 @@ export function FuturesPositionsView() {
                         </span>
                       </td>
                       <td className="py-3.5 px-3 text-right">
-                        <div className="text-slate-200 font-bold">${(pos.margin_usd || 0).toLocaleString()}</div>
+                        <div className="text-slate-200 font-bold">{formatMoney(pos.margin_usd, "$")}</div>
                         <div className="text-[9px] text-slate-500">{pos.margin_mode || "ISOLATED"}</div>
                       </td>
                       <td className="py-3.5 px-3 text-right text-red-400 font-bold">
-                        {pos.liquidation_price ? `$${pos.liquidation_price.toLocaleString()}` : "—"}
+                        {pos.liquidation_price ? `${formatMoney(pos.liquidation_price, "$")}` : "—"}
                       </td>
                       <td className="py-3.5 px-3 text-center">
                         <button

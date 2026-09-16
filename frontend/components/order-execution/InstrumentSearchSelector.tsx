@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Search, ChevronDown, Check, TrendingUp, TrendingDown, Layers, Coins } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
@@ -103,7 +104,7 @@ export function InstrumentSearchSelector({
                     </div>
                     <div className="text-right">
                       <div className="text-xs font-semibold text-[#F7FAFC] font-mono tabular-nums">
-                        {item.symbol.includes("NIFTY") || item.symbol.includes(".NS") ? "₹" : "$"}{item.price.toLocaleString()}
+                        {item.symbol.includes("NIFTY") || item.symbol.includes(".NS") ? "₹" : "$"}{formatNumber(item.price)}
                       </div>
                       <div className="text-[9px] px-1.5 py-0.2 rounded bg-[#101B2D] text-[#7C8CA3]">
                         {item.assetClass}
@@ -121,7 +122,7 @@ export function InstrumentSearchSelector({
           <div>
             <div className="text-[10px] text-[#7C8CA3] uppercase">Last Traded Price</div>
             <div className="text-base font-bold text-[#F7FAFC] tracking-tight flex items-center gap-1.5 font-mono tabular-nums">
-              <span>{currencySymbol}{(Number(currentPrice) || 64500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span>{formatMoney(Number(currentPrice) || 64500, currencySymbol)}</span>
               <span className={`text-xs font-semibold flex items-center ${isPositive ? "text-[#00E890]" : "text-[#FF3B5C]"}`}>
                 {isPositive ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {isPositive ? "+" : ""}{(Number(priceChange24h) || 0).toFixed(2)}%

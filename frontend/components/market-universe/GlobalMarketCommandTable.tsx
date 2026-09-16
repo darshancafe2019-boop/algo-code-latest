@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   Star,
@@ -235,7 +236,7 @@ export function GlobalMarketCommandTable({
                       {visibleCols.price && (
                         <td className="py-3 px-3 text-right font-bold text-slate-100">
                           {hasPrice ? (
-                            <span>{currSymbol}{inst.last_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>
+                            <span>{formatMoney(inst.last_price, currSymbol)}</span>
                           ) : (
                             <span className="text-slate-500 font-normal" title="Provider quote unavailable">—</span>
                           )}
@@ -263,7 +264,7 @@ export function GlobalMarketCommandTable({
                               {currSymbol}
                               {inst.volume_24h > 1e6
                                 ? `${(inst.volume_24h / 1e6).toFixed(2)}M`
-                                : inst.volume_24h.toLocaleString()}
+                                : formatVolume(inst.volume_24h)}
                             </span>
                           ) : (
                             "—"

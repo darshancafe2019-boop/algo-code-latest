@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useMemo } from "react";
 import {
   ShieldAlert,
@@ -228,7 +229,7 @@ export function TradeAnalysisRiskReward({
         <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
           <span className="text-slate-500 block">Total Premium Value</span>
           <strong className="text-white text-xs block truncate mt-0.5">
-            ₹{calculation.totalEstimatedPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatMoney(calculation.totalEstimatedPremium, "₹")}
           </strong>
         </div>
 
@@ -242,14 +243,14 @@ export function TradeAnalysisRiskReward({
         <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
           <span className="text-slate-500 block">Max Planned Loss</span>
           <strong className="text-rose-400 text-xs block truncate mt-0.5">
-            -₹{calculation.totalCapitalAtRisk.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            -{formatMoney(calculation.totalCapitalAtRisk, "₹")}
           </strong>
         </div>
 
         <div className="p-2.5 rounded-xl bg-[#06101B] border border-[#12304A]">
           <span className="text-slate-500 block">Potential Reward</span>
           <strong className="text-emerald-400 text-xs block truncate mt-0.5">
-            +₹{calculation.totalPotentialProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            +{formatMoney(calculation.totalPotentialProfit, "₹")}
           </strong>
         </div>
       </div>

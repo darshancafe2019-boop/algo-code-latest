@@ -11,6 +11,7 @@ export {
   safeNumber,
   normalizeZero,
   getDynamicDecimals,
+  formatNumber,
   formatDecimal,
   formatPercent,
   formatCurrency,
@@ -18,14 +19,17 @@ export {
   formatMoney,
   formatInteger,
   formatQuantity,
+  formatVolume,
+  formatCompactMoney,
+  formatExactNumber,
   formatPnL,
   formatRatio,
   safeArray,
   safeMap,
+  logInvalidNumericField,
 } from "./formatters/financial";
 
 export {
-  formatNumber,
   formatGreek,
   normalizeOptionGreeks,
   normalizeOptionQuote,
@@ -51,51 +55,3 @@ export function isNumeric(value: unknown): value is number {
   return false;
 }
 
-export function formatExactNumber(
-  value: unknown,
-  fallback: string = "—"
-): string {
-  const { toFiniteNumber } = require("./formatters/financial");
-  const num = toFiniteNumber(value);
-  if (num === null) return fallback;
-  return num.toLocaleString(undefined, { maximumFractionDigits: 8 });
-}
-
-export function formatVolume(
-  value: unknown,
-  currency: string = "",
-  fallback: string = "—"
-): string {
-  const { toFiniteNumber, normalizeZero } = require("./formatters/financial");
-  const num = toFiniteNumber(value);
-  if (num === null) return fallback;
-  const cleanNum = normalizeZero(num);
-  if (cleanNum === 0) return `${currency}0`;
-  const abs = Math.abs(cleanNum);
-  const sign = cleanNum < 0 ? "-" : "";
-
-  if (abs >= 1_000_000_000) {
-    const val = abs / 1_000_000_000;
-    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}B`;
-  }
-  if (abs >= 1_000_000) {
-    const val = abs / 1_000_000;
-    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}M`;
-  }
-  if (abs >= 1_000) {
-    const val = abs / 1_000;
-    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}K`;
-  }
-  return `${sign}${currency}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
-}
-
-export function formatCompactMoney(
-  value: unknown,
-  currency: string = "$",
-  fallback: string = "—"
-): string {
-  return formatVolume(value, currency, fallback);
-}

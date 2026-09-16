@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Search, Zap, Flame, Activity, TrendingUp, TrendingDown, ArrowUpRight } from "lucide-react";
 import { OptionStrikeRow } from "@/types/option-chain";
@@ -105,7 +106,7 @@ export function OptionsScannerView({
             {sorted.map((item, idx) => (
               <tr key={`${item.strike}-${item.type}-${idx}`} className="hover:bg-[#141E33]">
                 <td className="p-2.5 font-bold text-white">
-                  {currency}{item.strike.toLocaleString()}
+                  {formatMoney(item.strike, currency)}
                 </td>
                 <td className="p-2.5">
                   <span
@@ -123,7 +124,7 @@ export function OptionsScannerView({
                   {((item.quote.open_interest || 0) / 1000).toFixed(1)}k
                 </td>
                 <td className="p-2.5 text-right text-slate-400">
-                  {(item.quote.volume || 0).toLocaleString()}
+                  {formatNumber(item.quote.volume)}
                 </td>
                 <td className="p-2.5 text-right text-purple-400 font-bold">
                   {item.quote.iv ? `${item.quote.iv.toFixed(1)}%` : "N/A"}

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   FlaskConical,
@@ -143,7 +144,7 @@ export function StrategyPaperTestPanel({ strategy }: StrategyPaperTestPanelProps
                       </span>
                     </td>
                     <td className="py-2 px-3 text-cyan-400 font-bold">{sig.confidence}%</td>
-                    <td className="py-2 px-3 text-white font-bold">${sig.price?.toLocaleString()}</td>
+                    <td className="py-2 px-3 text-white font-bold">{formatMoney(sig.price, "$")}</td>
                     <td className="py-2 px-3 text-slate-300 text-[11px]">{sig.reason}</td>
                   </tr>
                 ))}

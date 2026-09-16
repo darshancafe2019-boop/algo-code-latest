@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -1443,7 +1444,7 @@ export function StrategyBotCreationWorkspace() {
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-white">{underlying} OPTION CHAIN</span>
                   <span className="font-mono text-xs text-[#22D3EE] px-2 py-0.5 rounded bg-[#0A2A47] border border-[#22D3EE]/30">
-                    SPOT: ₹{spotPrice.toLocaleString()}
+                    SPOT: {formatMoney(spotPrice, "₹")}
                   </span>
                   <span className="font-mono text-xs text-[#10B981] px-2 py-0.5 rounded bg-[#10B981]/10">
                     ATM: {atmStrike}
@@ -1771,7 +1772,7 @@ export function StrategyBotCreationWorkspace() {
                     className="w-full bg-[#0B1929] border border-[#12304A] rounded-xl px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-[#22D3EE]"
                   />
                   <span className="text-[11px] text-[#7D8EA5]">
-                    Available Margin Cushion: ₹{(capital - riskMetrics.requiredMargin).toLocaleString()}
+                    Available Margin Cushion: {formatMoney(capital - riskMetrics.requiredMargin, "₹")}
                   </span>
                 </div>
 
@@ -1812,28 +1813,28 @@ export function StrategyBotCreationWorkspace() {
                     }`}
                   >
                     {riskMetrics.netDebitCredit < 0 ? "Debit" : "Credit"}: ₹
-                    {Math.abs(riskMetrics.netDebitCredit).toLocaleString()}
+                    {formatNumber(Math.abs(riskMetrics.netDebitCredit))}
                   </span>
                 </div>
 
                 <div className="bg-[#07111F] border border-[#12304A] rounded-xl p-3.5">
                   <span className="text-[#7D8EA5] text-[11px] block">Estimated Margin</span>
                   <span className="text-sm font-bold text-white block mt-1">
-                    ₹{riskMetrics.requiredMargin.toLocaleString()}
+                    {formatMoney(riskMetrics.requiredMargin, "₹")}
                   </span>
                 </div>
 
                 <div className="bg-[#07111F] border border-[#12304A] rounded-xl p-3.5">
                   <span className="text-[#7D8EA5] text-[11px] block">Maximum Loss</span>
                   <span className="text-sm font-bold text-[#F43F5E] block mt-1">
-                    ₹{riskMetrics.maxLoss.toLocaleString()}
+                    {formatMoney(riskMetrics.maxLoss, "₹")}
                   </span>
                 </div>
 
                 <div className="bg-[#07111F] border border-[#12304A] rounded-xl p-3.5">
                   <span className="text-[#7D8EA5] text-[11px] block">Maximum Profit</span>
                   <span className="text-sm font-bold text-[#10B981] block mt-1">
-                    ₹{riskMetrics.maxProfit.toLocaleString()}
+                    {formatMoney(riskMetrics.maxProfit, "₹")}
                   </span>
                 </div>
               </div>
@@ -2003,15 +2004,15 @@ export function StrategyBotCreationWorkspace() {
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[#12304A]">
                   <div>
                     <span className="text-[#7D8EA5] text-[10px] block">Required Margin</span>
-                    <span className="font-bold text-white">₹{riskMetrics.requiredMargin.toLocaleString()}</span>
+                    <span className="font-bold text-white">{formatMoney(riskMetrics.requiredMargin, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-[#7D8EA5] text-[10px] block">Max Profit</span>
-                    <span className="font-bold text-[#10B981]">₹{riskMetrics.maxProfit.toLocaleString()}</span>
+                    <span className="font-bold text-[#10B981]">{formatMoney(riskMetrics.maxProfit, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-[#7D8EA5] text-[10px] block">Max Loss</span>
-                    <span className="font-bold text-[#F43F5E]">₹{riskMetrics.maxLoss.toLocaleString()}</span>
+                    <span className="font-bold text-[#F43F5E]">{formatMoney(riskMetrics.maxLoss, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-[#7D8EA5] text-[10px] block">Risk Check</span>
@@ -2116,10 +2117,10 @@ export function StrategyBotCreationWorkspace() {
             </div>
             <p className="text-xs text-[#B7C6D8] leading-relaxed">
               You are about to activate <strong>{botName}</strong> in <strong>LIVE TRADING</strong> mode on Dhan HQ.
-              Real market orders with an estimated margin of <strong>₹{riskMetrics.requiredMargin.toLocaleString()}</strong> will be transmitted to the exchange.
+              Real market orders with an estimated margin of <strong>{formatMoney(riskMetrics.requiredMargin, "₹")}</strong> will be transmitted to the exchange.
             </p>
             <div className="bg-[#07111F] border border-[#12304A] rounded-xl p-3 text-[11px] font-mono text-[#7D8EA5] space-y-1">
-              <div>• Max Loss Ceiling: ₹{riskMetrics.maxLoss.toLocaleString()}</div>
+              <div>• Max Loss Ceiling: {formatMoney(riskMetrics.maxLoss, "₹")}</div>
               <div>• Underlying: {underlying} ({strategyLegs.length} legs)</div>
               <div>• Broker: Dhan Multi-Broker (Connected)</div>
             </div>

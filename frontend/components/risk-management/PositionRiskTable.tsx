@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Layers,
@@ -146,25 +147,25 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
 
                     {/* Entry / Current */}
                     <td className="py-3.5 px-3">
-                      <span className="text-white block">${pos.entry_price.toLocaleString()}</span>
+                      <span className="text-white block">{formatMoney(pos.entry_price, "$")}</span>
                       <span className="text-[10px] text-cyan-300 block">
-                        ${pos.current_price?.toLocaleString() || pos.entry_price.toLocaleString()}
+                        {formatMoney(pos.current_price ?? pos.entry_price, "$")}
                       </span>
                     </td>
 
                     {/* Exposure / Margin */}
                     <td className="py-3.5 px-3">
-                      <span className="text-white block">${pos.position_value.toLocaleString()}</span>
+                      <span className="text-white block">{formatMoney(pos.position_value, "$")}</span>
                       <span className="text-[10px] text-[#52627A] block">
-                        Margin: ${pos.margin_used.toLocaleString()} ({pos.leverage}x)
+                        Margin: {formatMoney(pos.margin_used, "$")} ({pos.leverage}x)
                       </span>
                     </td>
 
                     {/* SL / TP */}
                     <td className="py-3.5 px-3">
-                      <span className="text-red-400 block">SL: ${pos.stop_loss.toLocaleString()}</span>
+                      <span className="text-red-400 block">SL: {formatMoney(pos.stop_loss, "$")}</span>
                       <span className="text-[#22D3EE] text-[10px] block">
-                        TP: ${pos.take_profit ? pos.take_profit.toLocaleString() : "Auto Trailing"}
+                        TP: {pos.take_profit ? formatMoney(pos.take_profit, "$") : "Auto Trailing"}
                       </span>
                     </td>
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useOptionsMarketContext } from "@/context/OptionsMarketContext";
 import { OptionChainTab } from "../tabs/OptionChainTab";
@@ -76,7 +77,7 @@ export function AnalyzeSection() {
         </div>
 
         <div className="text-[11px] text-slate-400 px-2">
-          Analyzing: <b className="text-white">{selectedUnderlying.name}</b> ({selectedUnderlying.currencySymbol}{spotPrice.toLocaleString()})
+          Analyzing: <b className="text-white">{selectedUnderlying.name}</b> ({selectedUnderlying.currencySymbol}{formatNumber(spotPrice)})
         </div>
       </div>
 

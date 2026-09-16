@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { X, Shield, Target, Sliders, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -126,13 +127,13 @@ export function ModifyProtectionModal({
             <div>
               <span className="text-[10px] text-[#52627A] block uppercase font-medium">Entry Basis</span>
               <span className="font-semibold text-[#F7FAFC] tabular-nums">
-                ${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatMoney(entryP, "$")}
               </span>
             </div>
             <div className="text-right">
               <span className="text-[10px] text-[#52627A] block uppercase font-medium">Current Mark</span>
               <span className="font-semibold text-[#19C5FF] tabular-nums">
-                ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                {formatMoney(currP, "$")}
               </span>
             </div>
           </div>

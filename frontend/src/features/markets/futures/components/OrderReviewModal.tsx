@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   X,
@@ -169,7 +170,7 @@ export function OrderReviewModal({
             <div>
               <span className="text-[9px] text-slate-500 uppercase block">Mark / Index</span>
               <strong className="text-slate-200 block">
-                {contract.mark_price != null ? `${currSymbol}${contract.mark_price.toLocaleString()}` : "—"}
+                {contract.mark_price != null ? `${currSymbol}{formatMoney(contract.mark_price, "$")}` : "—"}
               </strong>
             </div>
           </div>
@@ -273,11 +274,11 @@ export function OrderReviewModal({
           <div className="p-3.5 bg-[#080C14] rounded-xl border border-slate-800 space-y-2 text-[11px]">
             <div className="flex justify-between">
               <span className="text-slate-400">Estimated Notional:</span>
-              <span className="text-white font-bold">{currSymbol}{estimatedNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-white font-bold">{formatMoney(estimatedNotional, currSymbol)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Required Margin:</span>
-              <span className="text-cyan-300 font-bold">{currSymbol}{requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-cyan-300 font-bold">{formatMoney(requiredMargin, currSymbol)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Estimated Fee (Taker):</span>
@@ -286,7 +287,7 @@ export function OrderReviewModal({
             {liqPrice && (
               <div className="flex justify-between pt-1 border-t border-slate-800/80">
                 <span className="text-red-400">Est. Liquidation Price:</span>
-                <span className="text-red-400 font-bold">{currSymbol}{liqPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="text-red-400 font-bold">{formatMoney(liqPrice, currSymbol)}</span>
               </div>
             )}
           </div>

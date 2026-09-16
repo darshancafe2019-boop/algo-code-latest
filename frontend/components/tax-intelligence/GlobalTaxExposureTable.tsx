@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Globe, ArrowUpRight, ShieldCheck, AlertCircle } from "lucide-react";
 import { GlobalTaxExposureItem, TaxConfidenceLevel } from "@/types/tax";
@@ -15,10 +16,7 @@ export function GlobalTaxExposureTable({
 }: GlobalTaxExposureTableProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${val.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(val, "$")}`;
   };
 
   const getConfidenceBadge = (confidence: TaxConfidenceLevel) => {

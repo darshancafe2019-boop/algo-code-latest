@@ -5,11 +5,9 @@
 
 import { MarketDataNormalizer } from "./normalizer";
 import {
-  CandleTimeframe,
   MarketDepth,
   MarketTick,
   NormalizedQuote,
-  OHLCVCandle,
   OptionChainSnapshot,
 } from "./types";
 
@@ -19,7 +17,6 @@ export class CentralMarketState {
   private ticks: Map<string, MarketTick> = new Map();
   private quotes: Map<string, NormalizedQuote> = new Map();
   private depths: Map<string, MarketDepth> = new Map();
-  private candles: Map<string, OHLCVCandle[]> = new Map();
   private optionChains: Map<string, OptionChainSnapshot> = new Map();
 
   private symbolListeners: Map<string, Set<(tick: MarketTick) => void>> = new Map();
@@ -110,17 +107,6 @@ export class CentralMarketState {
     this.depths.set(symbol.toUpperCase(), depth);
   }
 
-  public getCandles(symbol: string, timeframe: CandleTimeframe, limit?: number): OHLCVCandle[] {
-    const key = `${symbol.toUpperCase()}:${timeframe}`;
-    const list = this.candles.get(key) || [];
-    return limit ? list.slice(-limit) : list;
-  }
-
-  public setCandles(symbol: string, timeframe: CandleTimeframe, candleList: OHLCVCandle[]): void {
-    const key = `${symbol.toUpperCase()}:${timeframe}`;
-    this.candles.set(key, candleList);
-  }
-
   public getOptionChain(underlying: string): OptionChainSnapshot | undefined {
     return this.optionChains.get(underlying.toUpperCase());
   }
@@ -192,7 +178,6 @@ export class CentralMarketState {
     this.ticks.clear();
     this.quotes.clear();
     this.depths.clear();
-    this.candles.clear();
     this.optionChains.clear();
   }
 }

@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 export type BotStatus =
   | "RUNNING"
   | "PAUSED"
@@ -513,9 +514,9 @@ export function calculateRiskRewardRatio(stopLossPct: number, takeProfitPct: num
 export function formatCurrency(amount: number, currency: string = "INR"): string {
   const symbol = currency === "INR" || currency === "₹" ? "₹" : currency === "USDT" ? "USDT " : "$";
   if (currency === "INR" || currency === "₹") {
-    return `${symbol}${amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${symbol}{formatMoney(amount, "$")}`;
   }
-  return `${symbol}${amount.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${symbol}{formatMoney(amount, "$")}`;
 }
 
 export interface ValidationEvidenceItem {

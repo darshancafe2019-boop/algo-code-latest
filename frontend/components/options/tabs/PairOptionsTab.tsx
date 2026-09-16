@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import {
   PairAnalysisResult,
@@ -179,7 +180,7 @@ export function PairOptionsTab({
                 <div className="p-2.5 rounded-xl bg-slate-950 border border-slate-800">
                   <div className="text-[10px] text-slate-400">Direct Underlying Capital</div>
                   <div className="font-extrabold text-sm text-slate-200">
-                    {currencySymbol}{result.capital_required_direct.toLocaleString()}
+                    {formatMoney(result.capital_required_direct, currencySymbol)}
                   </div>
                   <div className="text-[10px] text-rose-400 font-bold">Undefined Tail Risk</div>
                 </div>
@@ -187,7 +188,7 @@ export function PairOptionsTab({
                 <div className="p-2.5 rounded-xl bg-slate-950 border border-cyan-500/30">
                   <div className="text-[10px] text-cyan-400">Option Structure Capital</div>
                   <div className="font-extrabold text-sm text-cyan-300">
-                    {currencySymbol}{result.capital_required_options.toLocaleString()}
+                    {formatMoney(result.capital_required_options, currencySymbol)}
                   </div>
                   <div className="text-[10px] text-emerald-400 font-bold">
                     {result.capital_savings_pct >= 0
@@ -313,7 +314,7 @@ export function PairOptionsTab({
                       }`}
                     >
                       {row.pnl_direct_underlying >= 0 ? "+" : ""}
-                      {currencySymbol}{row.pnl_direct_underlying.toLocaleString()}
+                      {formatMoney(row.pnl_direct_underlying, currencySymbol)}
                     </td>
                     <td
                       className={`py-2.5 px-3 text-right font-extrabold ${
@@ -321,7 +322,7 @@ export function PairOptionsTab({
                       }`}
                     >
                       {row.pnl_option_structure >= 0 ? "+" : ""}
-                      {currencySymbol}{row.pnl_option_structure.toLocaleString()}
+                      {formatMoney(row.pnl_option_structure, currencySymbol)}
                     </td>
                     <td
                       className={`py-2.5 px-3 text-right font-extrabold ${
@@ -329,7 +330,7 @@ export function PairOptionsTab({
                       }`}
                     >
                       {row.relative_benefit >= 0 ? "+" : ""}
-                      {currencySymbol}{row.relative_benefit.toLocaleString()}
+                      {formatMoney(row.relative_benefit, currencySymbol)}
                     </td>
                   </tr>
                 ))}

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Sparkles,
@@ -136,15 +137,15 @@ export const AiDecisionPanel: React.FC<AiDecisionPanelProps> = ({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-2 bg-slate-950/60 p-2 rounded-lg border border-slate-800/80 text-xs font-mono">
                   <div>
                     <span className="text-slate-400 text-[10px] block">ENTRY</span>
-                    <span className="text-white font-bold">₹{dec.entry_price.toLocaleString()}</span>
+                    <span className="text-white font-bold">{formatMoney(dec.entry_price, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">STOP LOSS</span>
-                    <span className="text-rose-400 font-bold">₹{dec.stop_loss.toLocaleString()}</span>
+                    <span className="text-rose-400 font-bold">{formatMoney(dec.stop_loss, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">TARGET (TP)</span>
-                    <span className="text-emerald-400 font-bold">₹{dec.take_profit.toLocaleString()}</span>
+                    <span className="text-emerald-400 font-bold">{formatMoney(dec.take_profit, "₹")}</span>
                   </div>
                   <div>
                     <span className="text-slate-400 text-[10px] block">QUANTITY</span>

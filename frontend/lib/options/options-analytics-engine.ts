@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 /**
  * Production-Grade Options Analytics Engine
  * Quantitative calculations for Greeks, PCR, Max Pain, OI Buildups, Flow Sentiment, and IST Session Status.
@@ -461,5 +462,5 @@ export function formatIndianQuantity(val: number | null | undefined): string {
     return `${sign}${(absVal / 1000).toFixed(1)} K`;
   }
 
-  return `${sign}${Math.round(absVal).toLocaleString("en-IN")}`;
+  return `${sign}{formatMoney(Math.round(absVal), "$")}`;
 }

@@ -240,9 +240,6 @@ class TwelveDataWSAdapter(BaseProviderAdapter):
 
         return res
 
-    async def get_history(self, symbol: str, timeframe: str, from_dt: datetime, to_dt: datetime) -> List[OHLCVCandle]:
-        return []
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         return []
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { ShieldAlert, AlertTriangle, ShieldCheck, Activity, Target } from "lucide-react";
 import { PnlSummary, PositionRecord } from "@/types/pnl-journal";
@@ -16,9 +17,7 @@ export const RiskDeskView: React.FC<RiskDeskViewProps> = ({
   currencySymbol = "₹",
 }) => {
   const formatMoney = (val: number) => {
-    return `${currencySymbol}${Math.abs(val).toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
-    })}`;
+    return `${currencySymbol}{formatMoney(Math.abs(val), "$")}`;
   };
 
   // 95% 1-Day Value at Risk estimate based on average loss & expectancy

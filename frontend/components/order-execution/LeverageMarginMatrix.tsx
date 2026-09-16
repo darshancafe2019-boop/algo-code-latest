@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Gauge } from "lucide-react";
 
@@ -74,7 +75,7 @@ export function LeverageMarginMatrix({
         <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5">
           <div className="text-[10px] text-[#7C8CA3] uppercase">Required Margin</div>
           <div className="text-sm font-bold text-[#F7FAFC] mt-0.5 font-mono tabular-nums">
-            ${requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatMoney(requiredMargin, "$")}
           </div>
           <div className={`text-[10px] mt-0.5 font-mono ${isHighMargin ? "text-[#F59E0B]" : "text-[#00E890]"}`}>
             {(Number(marginUtilizationPct) || 0).toFixed(1)}% of Capital
@@ -84,10 +85,10 @@ export function LeverageMarginMatrix({
         <div className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2.5">
           <div className="text-[10px] text-[#7C8CA3] uppercase">Available Capital</div>
           <div className="text-sm font-bold text-[#00E890] mt-0.5 font-mono tabular-nums">
-            ${availableMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatMoney(availableMargin, "$")}
           </div>
           <div className="text-[10px] text-[#7C8CA3] mt-0.5 font-mono tabular-nums">
-            Remaining: ${(Math.max(0, availableMargin - requiredMargin)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Remaining: {formatMoney(Math.max(0, availableMargin - requiredMargin), "$")}
           </div>
         </div>
       </div>
@@ -96,7 +97,7 @@ export function LeverageMarginMatrix({
       {leverage > 1 && liquidationPrice && (
         <div className="flex items-center justify-between text-xs bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 rounded-lg p-2 text-[#FF3B5C]">
           <span className="text-[#7C8CA3]">Estimated Liquidation:</span>
-          <span className="font-semibold font-mono tabular-nums">${liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span className="font-semibold font-mono tabular-nums">{formatMoney(liquidationPrice, "$")}</span>
         </div>
       )}
     </div>

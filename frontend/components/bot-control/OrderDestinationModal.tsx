@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   X,
@@ -141,7 +142,7 @@ export function OrderDestinationModal({
                 Order Confirmed & Filled by Destination!
               </div>
               <div className="text-[11px] text-[var(--theme-text-secondary)]">
-                Order ID: <code>{orderResult.order_id || "TEST_ORD_CONFIRMED"}</code> • Fill Price: {currencySymbol}{orderResult.price?.toLocaleString()}
+                Order ID: <code>{orderResult.order_id || "TEST_ORD_CONFIRMED"}</code> • Fill Price: {formatMoney(orderResult.price, currencySymbol)}
               </div>
               <button
                 onClick={onClose}
@@ -220,12 +221,12 @@ export function OrderDestinationModal({
 
                 <div className="flex items-center justify-between p-3">
                   <span className="text-[var(--theme-text-muted)] font-sans">Estimated Price:</span>
-                  <span className="font-bold text-[var(--theme-text-primary)]">{currencySymbol}{estPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(estPrice, currencySymbol)}</span>
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-[var(--theme-elevated)]/80">
                   <span className="text-[var(--theme-text-muted)] font-sans font-semibold">Estimated Margin Required:</span>
-                  <span className="font-extrabold text-sm text-[var(--theme-accent)]">{currencySymbol}{estMargin.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  <span className="font-extrabold text-sm text-[var(--theme-accent)]">{formatMoney(estMargin, currencySymbol)}</span>
                 </div>
               </div>
 

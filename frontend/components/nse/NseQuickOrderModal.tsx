@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { X, ShieldCheck, Zap, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useNseTradeExecution } from "@/hooks/useNseData";
@@ -247,7 +248,7 @@ export function NseQuickOrderModal({
           {/* Capital Requirement Estimate */}
           <div className="p-3 bg-cyan-950/20 border border-cyan-500/20 rounded-xl flex items-center justify-between text-xs">
             <span className="text-slate-400 font-sans">Estimated Turnover / Margin:</span>
-            <span className="font-bold text-cyan-300">₹{estimatedCapital.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+            <span className="font-bold text-cyan-300">{formatMoney(estimatedCapital, "₹")}</span>
           </div>
 
           {/* Feedback message */}

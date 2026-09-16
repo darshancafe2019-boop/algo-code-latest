@@ -50,9 +50,6 @@ class NotConfiguredAdapter(BaseProviderAdapter):
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
         return {}
 
-    async def get_history(self, symbol, timeframe, from_dt, to_dt) -> List[OHLCVCandle]:
-        return []
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         return []
 

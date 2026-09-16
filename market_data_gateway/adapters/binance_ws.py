@@ -137,47 +137,6 @@ class BinanceWSAdapter(BaseProviderAdapter):
 
         return result
 
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        """Fetch OHLCV candles via Binance REST klines endpoint."""
-        import aiohttp
-
-        interval_map = {
-            "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m",
-            "30m": "30m", "1h": "1h", "4h": "4h", "1d": "1d", "1w": "1w",
-        }
-        interval = interval_map.get(timeframe, "1h")
-        raw_sym = _canonical_to_binance(symbol).upper()
-        start_ms = int(from_dt.timestamp() * 1000)
-        end_ms = int(to_dt.timestamp() * 1000)
-
-        candles: List[OHLCVCandle] = []
-        url = f"{BINANCE_REST_BASE}/klines"
-        params = {"symbol": raw_sym, "interval": interval, "startTime": start_ms, "endTime": end_ms, "limit": 1000}
-
-        try:
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
-                async with session.get(url, params=params) as resp:
-                    data = await resp.json()
-                    for row in data:
-                        ts = datetime.fromtimestamp(row[0] / 1000, tz=timezone.utc).isoformat()
-                        candles.append(OHLCVCandle(
-                            symbol=symbol, exchange="BINANCE", provider="binance_ws",
-                            timeframe=timeframe, timestamp=ts,
-                            open=float(row[1]), high=float(row[2]), low=float(row[3]),
-                            close=float(row[4]), volume=float(row[5]),
-                            is_closed=True,
-                        ))
-        except Exception as exc:
-            logger.error("Binance history fetch error for %s: %s", symbol, exc)
-
-        return candles
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         """Return a subset of popular crypto instruments traded on Binance."""
         # The canonical registry provides the full catalog; this is just validation

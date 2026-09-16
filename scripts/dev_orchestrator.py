@@ -36,11 +36,16 @@ RUNTIME_STATE_FILE = ROOT_DIR / "quantos_runtime_state.json"
 try:
     from dotenv import load_dotenv
     if (ROOT_DIR / ".env").exists():
-        load_dotenv(ROOT_DIR / ".env")
+        load_dotenv(ROOT_DIR / ".env", override=True)
     if (FRONTEND_DIR / ".env.local").exists():
-        load_dotenv(FRONTEND_DIR / ".env.local")
+        load_dotenv(FRONTEND_DIR / ".env.local", override=True)
 except Exception:
     pass
+
+if os.getenv("DATABASE_PROVIDER", "sqlite").lower() != "postgresql":
+    db_sqlite_path = (ROOT_DIR / "data" / "trading_bot.db").as_posix()
+    os.environ["DATABASE_URL"] = f"sqlite:///{db_sqlite_path}"
+    os.environ["DATABASE_PROVIDER"] = "sqlite"
 
 if hasattr(sys.stdout, "reconfigure"):
     try:
@@ -507,22 +512,11 @@ class ServiceSupervisor:
         next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
         next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
         
-        # Clean stale .next compilation cache before launching dev server to prevent 500 chunk mismatch errors
-        next_cache = FRONTEND_DIR / ".next"
-        if next_cache.exists():
-            try:
-                import shutil
-                shutil.rmtree(next_cache, ignore_errors=True)
-            except Exception:
-                pass
-
         # Use direct node execution of Next.js binary for deterministic cross-platform execution
         if next_dist.exists():
             frontend_cmd = ["node", str(next_dist), "dev", "-p", str(FRONTEND_PORT)]
         elif next_cmd_bin.exists():
             frontend_cmd = [str(next_cmd_bin), "dev", "-p", str(FRONTEND_PORT)]
-        elif sys.platform == "win32":
-            frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
         else:
             frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
 

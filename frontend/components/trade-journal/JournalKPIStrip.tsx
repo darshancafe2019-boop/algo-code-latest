@@ -17,7 +17,7 @@ import {
   BarChart2,
 } from "lucide-react";
 import { JournalKPISummary } from "@/types/trade-journal";
-import { formatNumber, formatPrice, formatPercent, formatPnL } from "@/lib/formatters";
+import { formatNumber, formatPrice, formatPercent, formatPnL, formatMoney } from "@/lib/formatters";
 
 interface JournalKPIStripProps {
   kpis?: JournalKPISummary | null;
@@ -179,7 +179,7 @@ export function JournalKPIStrip({ kpis, currency = "$" }: JournalKPIStripProps) 
           <div className="space-y-0.5">
             <span className="text-[10px] text-[var(--theme-text-muted)] block uppercase">Gross Gain / Loss</span>
             <div className="font-bold text-[var(--theme-text-primary)]">
-              <span className="text-[var(--theme-profit)]">+${s.gross_profit.toLocaleString()}</span> / <span className="text-[var(--theme-loss)]">-${s.gross_loss.toLocaleString()}</span>
+              <span className="text-[var(--theme-profit)]">+{formatMoney(s.gross_profit, "$")}</span> / <span className="text-[var(--theme-loss)]">-{formatMoney(s.gross_loss, "$")}</span>
             </div>
           </div>
 

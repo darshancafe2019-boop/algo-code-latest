@@ -1,0 +1,2907 @@
+[
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\app\\api\\ai\\copilot\\query\\route.ts",
+    "line": 146,
+    "code": "? `Based on quantitative multi-timeframe analysis for ${rawSymbol} in the ${marketType} universe: Current price is $${livePrice.toLocaleString()}, displaying a ${direction} bias with ${confluenceScore}% model confidence. Risk management mandates a stop at $${signalData.stopLoss.toFixed(2)} and initial take profit at $${signalData.takeProfit.toFixed(2)}.`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\ai\\UniversalMarketAICopilot.tsx",
+    "line": 394,
+    "code": "{currentSymbol} • ${data?.signal.currentPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\ai\\UniversalMarketAICopilot.tsx",
+    "line": 448,
+    "code": "Underlying Price: <strong>${data?.options.underlyingPrice.toLocaleString()}</strong> • Implied Volatility:{\" \"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\ai\\UniversalMarketAICopilot.tsx",
+    "line": 558,
+    "code": "<span className=\"text-white font-bold\">${data?.botBlueprint.allocatedCapital.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\alerts\\AlertCard.tsx",
+    "line": 72,
+    "code": "formattedTime = d.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\analyst\\MarketAnalystDrawer.tsx",
+    "line": 388,
+    "code": "${lvl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\analyst\\MarketAnalystDrawer.tsx",
+    "line": 408,
+    "code": "${lvl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\analytics\\MultiBotLeaderboard.tsx",
+    "line": 171,
+    "code": "<div className=\"text-[10px] text-slate-400\">{bot.timeframe} • Capital: ${bot.allocated_capital.toLocaleString()}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestEquityCurve.tsx",
+    "line": 77,
+    "code": "<span>Initial: <strong className=\"text-slate-200\">${initial.toLocaleString()}</strong></span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestEquityCurve.tsx",
+    "line": 78,
+    "code": "<span>Final: <strong className={final >= initial ? \"text-emerald-400\" : \"text-red-400\"}>${final.toLocaleString()}</strong></span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestEquityCurve.tsx",
+    "line": 114,
+    "code": "${m.equity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestMetrics.tsx",
+    "line": 28,
+    "code": "{isProfit ? \"+\" : \"\"}${metrics.total_net_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestMetrics.tsx",
+    "line": 31,
+    "code": "Final Equity: ${finalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestProfiles.tsx",
+    "line": 100,
+    "code": "<Shield className=\"h-3 w-3 text-emerald-400\" /> ${p.recommended_cash.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestSummary.tsx",
+    "line": 46,
+    "code": "${initial.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestSummary.tsx",
+    "line": 52,
+    "code": "${final.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestSummary.tsx",
+    "line": 58,
+    "code": "{isProfit ? \"+\" : \"\"}${metrics.total_net_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ({metrics.return_pct.toFixed(2)}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestTradeTable.tsx",
+    "line": 106,
+    "code": "${(t.entry_price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\backtesting\\BacktestTradeTable.tsx",
+    "line": 109,
+    "code": "${(t.exit_price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotCardGrid.tsx",
+    "line": 217,
+    "code": "{pos.direction} {pos.size} @ ${pos.entry_price ? pos.entry_price.toLocaleString(\"en-US\", { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotCardGrid.tsx",
+    "line": 231,
+    "code": "{isPnlPositive ? \"+\" : \"\"}${Math.abs(pnl).toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 263,
+    "code": "${bot.allocated_capital?.toLocaleString() || \"10,000\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 511,
+    "code": "<td className=\"py-2 px-3 text-cyan-300\">${ord.price?.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 574,
+    "code": "<p className=\"text-white font-bold\">${pos.entry_price?.toLocaleString()}</p>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 578,
+    "code": "<p className=\"text-cyan-300 font-bold\">${pos.current_price?.toLocaleString()}</p>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 582,
+    "code": "<p className=\"text-red-400 font-bold\">${pos.stop_loss?.toLocaleString() || \"63,200\"}</p>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 586,
+    "code": "<p className=\"text-[#22D3EE] font-bold\">${pos.take_profit?.toLocaleString() || \"67,500\"}</p>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotDetailDrawer.tsx",
+    "line": 692,
+    "code": "<span>Price: ${d.price?.toLocaleString() || \"65,420\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotInstancesTable.tsx",
+    "line": 281,
+    "code": "${(bot.allocated_capital || 10000.0).toLocaleString(undefined, { minimumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotInstancesTable.tsx",
+    "line": 419,
+    "code": "<span className=\"font-bold text-[var(--theme-text-primary)]\">${(bot.allocated_capital || 10000).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotOverviewMetrics.tsx",
+    "line": 79,
+    "code": "${allocatedCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotOverviewMetrics.tsx",
+    "line": 95,
+    "code": "${availableCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotOverviewMetrics.tsx",
+    "line": 99,
+    "code": "Equity: ${totalCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotOverviewMetrics.tsx",
+    "line": 164,
+    "code": "${currentExposure.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\BotStrategyMatrix.tsx",
+    "line": 179,
+    "code": "${grp.totalExposure.toLocaleString(\"en-US\", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\CreateBotWizardModal.tsx",
+    "line": 1281,
+    "code": "{currency === \"INR\" ? `₹${ltp.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : `$${ltp.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\CreateBotWizardModal.tsx",
+    "line": 2190,
+    "code": "evidence: `Allocated ${allocatedCapital.toLocaleString()} (${allocationPct}% of ${totalCapital.toLocaleString()}). Max trade risk: ${formatCurrency(calculateRiskAmount(allocatedCapital, riskPerTradePct), currency)}.`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\MarketContextStrip.tsx",
+    "line": 89,
+    "code": "{currencySymbol}{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\OrderDestinationModal.tsx",
+    "line": 144,
+    "code": "Order ID: <code>{orderResult.order_id || \"TEST_ORD_CONFIRMED\"}</code> • Fill Price: {currencySymbol}{orderResult.price?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\OrderDestinationModal.tsx",
+    "line": 223,
+    "code": "<span className=\"font-bold text-[var(--theme-text-primary)]\">{currencySymbol}{estPrice.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\OrderDestinationModal.tsx",
+    "line": 228,
+    "code": "<span className=\"font-extrabold text-sm text-[var(--theme-accent)]\">{currencySymbol}{estMargin.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotDetailsDrawer.tsx",
+    "line": 374,
+    "code": "{isPnlPositive ? \"+\" : \"\"}${Math.abs(pnl).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotDetailsDrawer.tsx",
+    "line": 393,
+    "code": "{pos.has_position ? `@ $${pos.entry_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}` : \"No open risk\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotDetailsDrawer.tsx",
+    "line": 422,
+    "code": "{(liveQuote?.last_price || pos.entry_price || 2450.0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotDetailsDrawer.tsx",
+    "line": 447,
+    "code": "₹{Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 1250000.0).toLocaleString(undefined, { maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotDetailsDrawer.tsx",
+    "line": 520,
+    "code": "<strong className=\"text-[var(--theme-text-primary)]\">${bot.allocated_capital.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotTable.tsx",
+    "line": 427,
+    "code": "@ ${pos.entry_price ? pos.entry_price.toLocaleString(\"en-US\", { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleBotTable.tsx",
+    "line": 442,
+    "code": "{isPnlPositive ? \"+\" : \"\"}${Math.abs(pnl).toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\SimpleFleetSummaryHeader.tsx",
+    "line": 176,
+    "code": "<span className=\"text-[#22D3EE] font-semibold\">${metrics.current_exposure.toLocaleString(\"en-US\", { maximumFractionDigits: 0 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-control\\StrategyDiagnosisBanner.tsx",
+    "line": 51,
+    "code": "<span className=\"font-bold text-white\">${price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 908,
+    "code": "{currency === \"INR\" ? \"₹\" : \"$\"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 944,
+    "code": "{currency === \"INR\" ? \"₹\" : \"$\"}{stopLossPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1014,
+    "code": "<span className=\"text-[10px] text-[#52627A]\">Available: {currency} {totalCapital.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1218,
+    "code": "{currency === \"INR\" ? \"₹\" : \"$\"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1224,
+    "code": "<span className=\"text-emerald-400 font-bold\">{currency} {allocatedCapital.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1230,
+    "code": "{currency} {maxRiskAmount.toLocaleString()} ({riskPerTradePct}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1511,
+    "code": "<span className=\"text-emerald-400 font-bold\">{currency} {remainingCapital.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\bot-instance\\CreateBotWizard.tsx",
+    "line": 1747,
+    "code": "<div className=\"flex justify-between\"><span className=\"text-[#7C8CA3]\">Allocated:</span><span className=\"text-emerald-400 font-bold\">{currency} {allocatedCapital.toLocaleString()}</span></div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoFuturesTab.tsx",
+    "line": 144,
+    "code": "${c.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoFuturesTab.tsx",
+    "line": 149,
+    "code": "${c.mark_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 455,
+    "code": "{spotPrice > 0 ? `$${spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 463,
+    "code": "{atmStrike > 0 ? `$${atmStrike.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 662,
+    "code": "{c?.openInterest !== null && c?.openInterest !== undefined ? c.openInterest.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 665,
+    "code": "{c?.volume !== null && c?.volume !== undefined ? c.volume.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 714,
+    "code": "${row.strike.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 744,
+    "code": "{p?.volume !== null && p?.volume !== undefined ? p.volume.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionChainTerminal.tsx",
+    "line": 747,
+    "code": "{p?.openInterest !== null && p?.openInterest !== undefined ? p.openInterest.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionsTab.tsx",
+    "line": 68,
+    "code": "Spot: <strong className=\"text-white\">${chainData.spot_price?.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionsTab.tsx",
+    "line": 72,
+    "code": "Max Pain: <strong className=\"text-purple-300\">${chainData.max_pain.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionsTab.tsx",
+    "line": 150,
+    "code": "{call?.open_interest ? call.open_interest.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionsTab.tsx",
+    "line": 174,
+    "code": "<span>${s.strike.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOptionsTab.tsx",
+    "line": 203,
+    "code": "{put?.open_interest ? put.open_interest.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOverviewTab.tsx",
+    "line": 130,
+    "code": "${m.spot_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoOverviewTab.tsx",
+    "line": 136,
+    "code": "${m.futures_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoPositionsBar.tsx",
+    "line": 79,
+    "code": "MARGIN USED: <strong className=\"text-cyan-300\">${totalMarginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoPositionsOrders.tsx",
+    "line": 147,
+    "code": "<td className=\"py-2.5 px-3 text-right text-slate-200\">${p.entry_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoPositionsOrders.tsx",
+    "line": 148,
+    "code": "<td className=\"py-2.5 px-3 text-right text-blue-400 font-bold\">${p.mark_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoPositionsOrders.tsx",
+    "line": 149,
+    "code": "<td className=\"py-2.5 px-3 text-right text-slate-300\">${p.margin.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoPositionsOrders.tsx",
+    "line": 207,
+    "code": "<td className=\"py-2.5 px-3 text-right text-white font-bold\">${ord.price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoQuickTradeDrawer.tsx",
+    "line": 259,
+    "code": "<span className=\"text-white font-bold\">${notional.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoStrategyBuilderDrawer.tsx",
+    "line": 93,
+    "code": "Strike: ${spotPrice.toLocaleString()} (ATM)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoStrategyBuilderDrawer.tsx",
+    "line": 106,
+    "code": "Strike: ${(spotPrice + 1000).toLocaleString()} (OTM)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\CryptoStrategyBuilderDrawer.tsx",
+    "line": 137,
+    "code": "${(spotPrice + 530).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractDetailDrawer.tsx",
+    "line": 94,
+    "code": "${(Number(contract.last_price) || 0).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractDetailDrawer.tsx",
+    "line": 100,
+    "code": "${(Number(contract.mark_price) || 0).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractDetailDrawer.tsx",
+    "line": 106,
+    "code": "${(Number(contract.index_price) || 0).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractDetailDrawer.tsx",
+    "line": 119,
+    "code": "${(contract.high_24h || 0).toLocaleString()} / ${(contract.low_24h || 0).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractDetailDrawer.tsx",
+    "line": 165,
+    "code": "{(contract.open_interest || 0).toLocaleString()} {contract.underlying}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractMasterTable.tsx",
+    "line": 440,
+    "code": "${(Number(c.last_price) || 0).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesContractMasterTable.tsx",
+    "line": 480,
+    "code": "${(Number(c.mark_price) || 0).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesIntelligenceHub.tsx",
+    "line": 164,
+    "code": "${termStructure?.spot_price.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesIntelligenceHub.tsx",
+    "line": 178,
+    "code": "${pt.price.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesIntelligenceHub.tsx",
+    "line": 279,
+    "code": "{oiAnalytics?.current_oi.toLocaleString()} {underlying}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 493,
+    "code": "{effectiveQuantity} {underlyingSymbol} ≈ ${notionalValue.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 495,
+    "code": "<span>Margin: ${initialMargin.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 598,
+    "code": "≈ ${stopLossPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 622,
+    "code": "≈ ${takeProfitPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 638,
+    "code": "Est. liquidation is ${estLiquidation.toLocaleString()}, but configured stop is ${stopLossPrice.toLocaleString()}. Position may liquidate before stop triggers."
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 750,
+    "code": "<span className=\"text-slate-200 font-semibold\">${notionalValue.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 754,
+    "code": "<span className=\"text-blue-400 font-bold\">${initialMargin.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesOrderTicket.tsx",
+    "line": 758,
+    "code": "<span className=\"text-amber-400 font-semibold\">${estLiquidation.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\FuturesTerminalHeader.tsx",
+    "line": 90,
+    "code": "${lastPrice.toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\OptionStrategyBuilder.tsx",
+    "line": 215,
+    "code": "<td className=\"py-2.5 px-3 text-right text-amber-300 font-bold\">${leg.strike.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\OptionStrategyBuilder.tsx",
+    "line": 273,
+    "code": "${evalData?.net_premium?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\OptionStrategyBuilder.tsx",
+    "line": 281,
+    "code": "? `+$${evalData.max_profit.toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\crypto\\OptionStrategyBuilder.tsx",
+    "line": 290,
+    "code": "? `-$${evalData.max_loss.toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoBotCard.tsx",
+    "line": 96,
+    "code": "{isProfit ? `+${currency}${pnl.toLocaleString()}` : `-${currency}${Math.abs(pnl).toLocaleString()}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoBotCard.tsx",
+    "line": 103,
+    "code": "{currency}{capitalUsed.toLocaleString()} <span className=\"text-[#52627A] font-normal\">/ {currency}{capitalTotal.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoCapitalMeter.tsx",
+    "line": 43,
+    "code": "{currency}{totalCapital.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoCapitalMeter.tsx",
+    "line": 50,
+    "code": "{currency}{usedCapital.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoCapitalMeter.tsx",
+    "line": 57,
+    "code": "{currency}{availableCapital.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoPositionVisualizer.tsx",
+    "line": 70,
+    "code": "{isProfit ? `+${currency}${pnl?.toLocaleString()}` : `-${currency}${Math.abs(pnl || 0).toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoPositionVisualizer.tsx",
+    "line": 118,
+    "code": "{currency}{stopLoss?.toLocaleString() || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoPositionVisualizer.tsx",
+    "line": 125,
+    "code": "{currency}{entryPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoPositionVisualizer.tsx",
+    "line": 136,
+    "code": "{currency}{currentPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\eco\\EcoPositionVisualizer.tsx",
+    "line": 145,
+    "code": "{currency}{takeProfit?.toLocaleString() || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\layout\\BottomActivityDock.tsx",
+    "line": 176,
+    "code": "${Number(t.price || t.entry_price || 0).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\layout\\header\\LiveTickerItem.tsx",
+    "line": 118,
+    "code": "formattedP = `${currencySymbol}${currentPrice.toLocaleString(\"en-US\", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\layout\\header\\LiveTickerItem.tsx",
+    "line": 120,
+    "code": "formattedP = `${currencySymbol}${currentPrice.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\layout\\header\\LiveTickerItem.tsx",
+    "line": 122,
+    "code": "formattedP = `₹${currentPrice.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 598,
+    "code": "? activeQuote.last_price.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 599,
+    "code": ": activeQuote.last_price.toLocaleString(\"en-US\", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 636,
+    "code": "${activeQuote.mark_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 643,
+    "code": "${activeQuote.spot_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 650,
+    "code": "<span className=\"text-emerald-400\">${activeQuote.high?.toLocaleString(\"en-US\", { maximumFractionDigits: 2 }) || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 652,
+    "code": "<span className=\"text-rose-400\">${activeQuote.low?.toLocaleString(\"en-US\", { maximumFractionDigits: 2 }) || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 659,
+    "code": "{activeQuote.turnover_usd ? `$${(activeQuote.turnover_usd / 1e6).toFixed(2)}M` : (activeQuote.volume ? `${activeQuote.volume.toLocaleString()} contracts` : \"—\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 666,
+    "code": "{activeQuote.open_interest ? `${activeQuote.open_interest.toLocaleString()} contracts` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 684,
+    "code": "${activeQuote.bid_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 689,
+    "code": "<span className=\"font-bold text-emerald-300\">{activeQuote.bid_size?.toLocaleString() || \"1,250\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 697,
+    "code": "${activeQuote.ask_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 702,
+    "code": "<span className=\"font-bold text-rose-300\">{activeQuote.ask_size?.toLocaleString() || \"890\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 832,
+    "code": "? q.last_price.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 833,
+    "code": ": q.last_price.toLocaleString(\"en-US\", { minimumFractionDigits: 4, maximumFractionDigits: 4 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 856,
+    "code": "<span className=\"text-emerald-400\">${q.high?.toLocaleString(\"en-US\", { maximumFractionDigits: 2 }) || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 858,
+    "code": "<span className=\"text-rose-400\">${q.low?.toLocaleString(\"en-US\", { maximumFractionDigits: 2 }) || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 863,
+    "code": "${q.bid_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 868,
+    "code": "${q.ask_price?.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 873,
+    "code": "{q.turnover_usd ? `$${(q.turnover_usd / 1e6).toFixed(2)}M` : (q.volume ? `${q.volume.toLocaleString()}` : \"—\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DeltaLiveMarketFeed.tsx",
+    "line": 878,
+    "code": "{q.open_interest ? `${q.open_interest.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\DhanLiveMarketFeed.tsx",
+    "line": 542,
+    "code": "₹{activeQuote.last_price.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\UpstoxLiveMarketFeed.tsx",
+    "line": 596,
+    "code": "₹{activeQuote.last_price.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\live\\UpstoxLiveMarketFeed.tsx",
+    "line": 750,
+    "code": "₹{q.last_price.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\ContextualActionBar.tsx",
+    "line": 77,
+    "code": "{instrument.last_price ? instrument.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\FuturesChainModal.tsx",
+    "line": 54,
+    "code": "Spot: ₹{spotPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\FuturesChainModal.tsx",
+    "line": 141,
+    "code": "₹{c.last_price?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\FuturesCommandCenter.tsx",
+    "line": 165,
+    "code": "${c.last_price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\FuturesCommandCenter.tsx",
+    "line": 177,
+    "code": "{c.open_interest?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\FuturesCommandCenter.tsx",
+    "line": 180,
+    "code": "{c.volume_24h?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\GlobalMarketCommandTable.tsx",
+    "line": 238,
+    "code": "<span>{currSymbol}{inst.last_price?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\GlobalMarketCommandTable.tsx",
+    "line": 266,
+    "code": ": inst.volume_24h.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\GlobalMarketHeatmap.tsx",
+    "line": 114,
+    "code": "{inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentDetailDrawer.tsx",
+    "line": 129,
+    "code": "{instrument.last_price ? `${currSymbol}${instrument.last_price.toLocaleString()}` : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentDetailDrawer.tsx",
+    "line": 148,
+    "code": "<span className=\"text-cyan-300 font-bold\">{instrument.volume_24h ? instrument.volume_24h.toLocaleString() : \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentDetailDrawer.tsx",
+    "line": 152,
+    "code": "<span className=\"text-purple-300 font-bold\">{instrument.open_interest ? instrument.open_interest.toLocaleString() : \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentInspector.tsx",
+    "line": 378,
+    "code": "{high24h ? `${currSymbol}${high24h.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentInspector.tsx",
+    "line": 384,
+    "code": "{low24h ? `${currSymbol}${low24h.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\InstrumentInspector.tsx",
+    "line": 410,
+    "code": "<span className=\"text-white font-bold\">{instrument.strike?.toLocaleString() || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\MarketAnalysisModal.tsx",
+    "line": 115,
+    "code": "{instrument.last_price?.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\MarketScannerPanel.tsx",
+    "line": 117,
+    "code": "{inst.last_price ? `${currSymbol}${inst.last_price.toLocaleString()}` : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\MarketScannerWorkbench.tsx",
+    "line": 205,
+    "code": "{inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\MarketTable.tsx",
+    "line": 138,
+    "code": "{inst.last_price !== undefined ? inst.last_price.toLocaleString() : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\OptionChainModal.tsx",
+    "line": 60,
+    "code": "Spot: ₹{spotPrice > 0 ? spotPrice.toLocaleString() : \"...\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\OptionChainModal.tsx",
+    "line": 237,
+    "code": "{s.strike.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\OptionsCommandCenter.tsx",
+    "line": 93,
+    "code": "{symbol} Spot: ${spot.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\OptionsCommandCenter.tsx",
+    "line": 163,
+    "code": "{call?.open_interest ? call.open_interest.toLocaleString() : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\OptionsCommandCenter.tsx",
+    "line": 198,
+    "code": "{put?.open_interest ? put.open_interest.toLocaleString() : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\SimpleMarketTable.tsx",
+    "line": 709,
+    "code": "<td className=\"px-4 text-right font-mono font-bold text-[15px] text-white\">{instrument.strike?.toLocaleString() || \"—\"}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\TerminalInspector.tsx",
+    "line": 85,
+    "code": "? val.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\TopMoversBoard.tsx",
+    "line": 127,
+    "code": "{inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\market-universe\\VirtualizedMarketTable.tsx",
+    "line": 108,
+    "code": "? val.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\Navbar.tsx",
+    "line": 277,
+    "code": "{currencySymbol}{currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseAlgoBotPanel.tsx",
+    "line": 166,
+    "code": "<span className=\"text-white font-bold\">₹{signal?.spot_price ? signal.spot_price.toLocaleString(\"en-IN\") : \"--\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseAlgoBotPanel.tsx",
+    "line": 176,
+    "code": "<span className=\"text-amber-300 font-bold\">₹{signal?.max_pain ? signal.max_pain.toLocaleString(\"en-IN\") : \"--\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseComprehensiveIntelligence.tsx",
+    "line": 229,
+    "code": "<td className=\"py-2.5 px-3 text-slate-400\">{item.finalQuantity ? item.finalQuantity.toLocaleString(\"en-IN\") : \"15,400\"}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseComprehensiveIntelligence.tsx",
+    "line": 257,
+    "code": "<td className=\"py-2.5 px-3 text-emerald-400 font-bold\">+{item.buyQty.toLocaleString(\"en-IN\")}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseMarketStrip.tsx",
+    "line": 49,
+    "code": "₹{nifty?.LastTradedPrice ? nifty.LastTradedPrice.toLocaleString(\"en-IN\") : \"24,350.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseMarketStrip.tsx",
+    "line": 67,
+    "code": "₹{bankNifty?.LastTradedPrice ? bankNifty.LastTradedPrice.toLocaleString(\"en-IN\") : \"52,400.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseOptionChainTerminal.tsx",
+    "line": 135,
+    "code": "<div className=\"text-lg font-bold text-white mt-1\">₹{spotPrice.toLocaleString(\"en-IN\")}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseOptionChainTerminal.tsx",
+    "line": 152,
+    "code": "<div className=\"text-lg font-bold text-amber-300 mt-1\">₹{maxPain.toLocaleString(\"en-IN\")}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseOptionChainTerminal.tsx",
+    "line": 266,
+    "code": "{strike.toLocaleString(\"en-IN\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\nse\\NseQuickOrderModal.tsx",
+    "line": 250,
+    "code": "<span className=\"font-bold text-cyan-300\">₹{estimatedCapital.toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\ImpliedVolatilitySkewView.tsx",
+    "line": 73,
+    "code": "{currency}{s.strike.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\MultiLegStrategyBuilder.tsx",
+    "line": 198,
+    "code": "<td className=\"p-2.5 font-bold text-white\">{currency}{leg.strike.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OpenInterestHeatmapView.tsx",
+    "line": 104,
+    "code": "{currency}{r.strike.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAdvancedDrawers.tsx",
+    "line": 324,
+    "code": "<div className=\"text-[10px] text-slate-400\">Vol: {opt.volume?.toLocaleString() || \"—\"}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAdvancedDrawers.tsx",
+    "line": 328,
+    "code": "<div className=\"text-[10px] text-slate-400\">OI: {opt.open_interest?.toLocaleString() || \"—\"}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAnalyticsSummaryBar.tsx",
+    "line": 40,
+    "code": "{currency}{atmStrike > 0 ? atmStrike.toLocaleString() : spotPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAnalyticsSummaryBar.tsx",
+    "line": 43,
+    "code": "Spot: {currency}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAnalyticsSummaryBar.tsx",
+    "line": 68,
+    "code": "{currency}{maxPain > 0 ? maxPain.toLocaleString() : (atmStrike || spotPrice).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAnalyticsSummaryBar.tsx",
+    "line": 96,
+    "code": "{currency}{(callResistanceStrike || atmStrike * 1.02).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsAnalyticsSummaryBar.tsx",
+    "line": 110,
+    "code": "{currency}{(putSupportStrike || atmStrike * 0.98).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCommandHeader.tsx",
+    "line": 214,
+    "code": "<span>{currentObj.currency}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCompactMetricsBar.tsx",
+    "line": 52,
+    "code": "? `${currency}${Math.round(atmStrike).toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCompactMetricsBar.tsx",
+    "line": 54,
+    "code": "? `${currency}${Math.round(spotPrice).toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCompactMetricsBar.tsx",
+    "line": 111,
+    "code": "? `${currency}${Math.round(maxPain).toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCompactMetricsBar.tsx",
+    "line": 133,
+    "code": "? `${currency}${Math.round(callResistanceStrike).toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsCompactMetricsBar.tsx",
+    "line": 145,
+    "code": "? `${currency}${Math.round(putSupportStrike).toLocaleString()}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsContractSelectorModal.tsx",
+    "line": 445,
+    "code": "Spot Reference: <strong className=\"text-white font-mono\">{currentSpot.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsContractSelectorModal.tsx",
+    "line": 463,
+    "code": "<span className=\"font-extrabold text-xs\">{s.strike.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsContractSelectorModal.tsx",
+    "line": 519,
+    "code": "<span>Strike: <strong className=\"text-slate-200\">{resolvedContract.strike.toLocaleString()}</strong></span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsGatewayControlBar.tsx",
+    "line": 238,
+    "code": "? spotPrice.toLocaleString(undefined, {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsMarketHeader.tsx",
+    "line": 108,
+    "code": "{selectedUnderlying.currencySymbol}{spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsPositionsOrdersDock.tsx",
+    "line": 138,
+    "code": "{pos.quantity.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsPositionsOrdersDock.tsx",
+    "line": 201,
+    "code": "{ord.requested_quantity.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsScannerView.tsx",
+    "line": 108,
+    "code": "{currency}{item.strike.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\OptionsScannerView.tsx",
+    "line": 126,
+    "code": "{(item.quote.volume || 0).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\ScenarioAnalysisTable.tsx",
+    "line": 51,
+    "code": "Spot: {currencySymbol}{spot.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\ScenarioAnalysisTable.tsx",
+    "line": 86,
+    "code": "{currencySymbol}{simPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\ScenarioAnalysisTable.tsx",
+    "line": 94,
+    "code": "{currencySymbol}{pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\sections\\AnalyzeSection.tsx",
+    "line": 79,
+    "code": "Analyzing: <b className=\"text-white\">{selectedUnderlying.name}</b> ({selectedUnderlying.currencySymbol}{spotPrice.toLocaleString()})"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\sections\\BuildSection.tsx",
+    "line": 410,
+    "code": "{selectedUnderlying.currencySymbol}{strategyEvaluation.net_premium.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\sections\\BuildSection.tsx",
+    "line": 653,
+    "code": "{selectedUnderlying.currencySymbol}{strategyEvaluation.net_premium.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\sections\\BuildSection.tsx",
+    "line": 663,
+    "code": ": `${selectedUnderlying.currencySymbol}${strategyEvaluation.max_profit.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\sections\\BuildSection.tsx",
+    "line": 673,
+    "code": ": `${selectedUnderlying.currencySymbol}${strategyEvaluation.max_loss.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SelectedOptionInspectionDrawer.tsx",
+    "line": 68,
+    "code": "{underlying} {currency}{strike.toLocaleString()} {isCall ? \"CALL (CE)\" : \"PUT (PE)\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleLiveOptionChainTable.tsx",
+    "line": 32,
+    "code": "return val.toLocaleString();"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleLiveOptionChainTable.tsx",
+    "line": 37,
+    "code": "return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleLiveOptionChainTable.tsx",
+    "line": 153,
+    "code": "Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}${spotPrice.toLocaleString()}` : \"underlying\"}..."
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleLiveOptionChainTable.tsx",
+    "line": 360,
+    "code": "<span>{row.strike.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionChainTable.tsx",
+    "line": 26,
+    "code": "return num.toLocaleString();"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionChainTable.tsx",
+    "line": 31,
+    "code": "return `${symbol}${val.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionChainTable.tsx",
+    "line": 249,
+    "code": "<span>{row.strike.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionOrderTicket.tsx",
+    "line": 301,
+    "code": "{underlying} {strike ? strike.toLocaleString() : \"—\"} {optionType}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionOrderTicket.tsx",
+    "line": 403,
+    "code": "{totalQuantity.toLocaleString()} Units"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\SimpleOptionOrderTicket.tsx",
+    "line": 462,
+    "code": "{totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrategyPayoffChart.tsx",
+    "line": 95,
+    "code": "{underlyingName} @ {currencySymbol}{spotPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrategyPayoffChart.tsx",
+    "line": 105,
+    "code": ": `${currencySymbol}${Number(maxProfit).toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrategyPayoffChart.tsx",
+    "line": 114,
+    "code": ": `${currencySymbol}${Number(maxLoss).toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrategyPayoffChart.tsx",
+    "line": 300,
+    "code": "{currencySymbol}{hoveredPoint.underlying_price.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrategyPayoffChart.tsx",
+    "line": 310,
+    "code": "{currencySymbol}{hoveredPoint.pnl.toLocaleString()} ({hoveredPoint.pnl_pct}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrikeCenteredOptionLadderTable.tsx",
+    "line": 252,
+    "code": "{ceOI > 0 ? (ceOI >= 1000 ? `${(ceOI / 1000).toFixed(1)}k` : ceOI.toLocaleString()) : renderValueOrDash(null)}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrikeCenteredOptionLadderTable.tsx",
+    "line": 255,
+    "code": "{ceVol > 0 ? ceVol.toLocaleString() : renderValueOrDash(null)}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrikeCenteredOptionLadderTable.tsx",
+    "line": 344,
+    "code": "<span>{currency}{row.strike.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrikeCenteredOptionLadderTable.tsx",
+    "line": 428,
+    "code": "{peVol > 0 ? peVol.toLocaleString() : renderValueOrDash(null)}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\StrikeCenteredOptionLadderTable.tsx",
+    "line": 431,
+    "code": "{peOI > 0 ? (peOI >= 1000 ? `${(peOI / 1000).toFixed(1)}k` : peOI.toLocaleString()) : renderValueOrDash(null)}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\ActiveStrategiesTab.tsx",
+    "line": 139,
+    "code": "{currencySymbol}{strat.unrealized_pnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\BacktestingTab.tsx",
+    "line": 147,
+    "code": "{currencySymbol}{backtestResult.net_pnl.toLocaleString()} ({backtestResult.total_return_pct}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\BacktestingTab.tsx",
+    "line": 166,
+    "code": "{currencySymbol}{backtestResult.max_drawdown_dollars.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\OrdersPositionsTab.tsx",
+    "line": 118,
+    "code": "{currencySymbol}{(p.unrealized_pnl || 0).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PairOptionsTab.tsx",
+    "line": 182,
+    "code": "{currencySymbol}{result.capital_required_direct.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PairOptionsTab.tsx",
+    "line": 190,
+    "code": "{currencySymbol}{result.capital_required_options.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PairOptionsTab.tsx",
+    "line": 316,
+    "code": "{currencySymbol}{row.pnl_direct_underlying.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PairOptionsTab.tsx",
+    "line": 324,
+    "code": "{currencySymbol}{row.pnl_option_structure.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PairOptionsTab.tsx",
+    "line": 332,
+    "code": "{currencySymbol}{row.relative_benefit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\PremiumSelectorTab.tsx",
+    "line": 261,
+    "code": "<td className=\"py-2.5 px-3 text-right text-slate-300\">{c.oi.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\RiskMonitorTab.tsx",
+    "line": 78,
+    "code": "{currencySymbol}{(riskSummary?.available_margin || 1000000).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\RiskMonitorTab.tsx",
+    "line": 94,
+    "code": "{currencySymbol}{(riskSummary?.daily_loss_limit || 50000).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\StrategyBuilderTab.tsx",
+    "line": 315,
+    "code": "{evaluation.nature}: {currencySymbol}{evaluation.net_premium.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\tabs\\StrategyBuilderTab.tsx",
+    "line": 322,
+    "code": "{currencySymbol}{evaluation.required_margin.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionAnalyticsPanel.tsx",
+    "line": 368,
+    "code": "{snapshot.supportZone?.strike.toLocaleString(\"en-IN\") || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionAnalyticsPanel.tsx",
+    "line": 387,
+    "code": "{snapshot.resistanceZone?.strike.toLocaleString(\"en-IN\") || \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionChainTable.tsx",
+    "line": 933,
+    "code": "{row.strike.toLocaleString(\"en-IN\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionChainTerminal.tsx",
+    "line": 295,
+    "code": "label: `OI ≥ ${filterConfig.minOI.toLocaleString()}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionChainTerminal.tsx",
+    "line": 302,
+    "code": "label: `OI ≤ ${filterConfig.maxOI.toLocaleString()}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionChainTerminal.tsx",
+    "line": 309,
+    "code": "label: `Vol ≥ ${filterConfig.minVolume.toLocaleString()}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionChainTerminal.tsx",
+    "line": 316,
+    "code": "label: `Vol ≤ ${filterConfig.maxVolume.toLocaleString()}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionFlowTable.tsx",
+    "line": 197,
+    "code": "{trade.strike.toLocaleString(\"en-IN\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionMarketSummaryCards.tsx",
+    "line": 107,
+    "code": "{snapshot.maxPain !== null ? snapshot.maxPain.toLocaleString(\"en-IN\") : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionMarketSummaryCards.tsx",
+    "line": 126,
+    "code": "{snapshot.atmStrike.toLocaleString(\"en-IN\")}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 293,
+    "code": "<span className=\"text-slate-300 font-semibold z-10\">{b ? b.quantity.toLocaleString() : \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 308,
+    "code": "<span className=\"text-slate-300 font-semibold z-10\">{a ? a.quantity.toLocaleString() : \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 320,
+    "code": "Total Bids: {depthData?.totalBidQty?.toLocaleString() || 0}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 326,
+    "code": "Total Asks: {depthData?.totalAskQty?.toLocaleString() || 0}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 343,
+    "code": "<span className=\"text-slate-200 font-bold\">{contract.volume?.toLocaleString() || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionOrderBook.tsx",
+    "line": 347,
+    "code": "<span className=\"text-slate-200 font-bold\">{contract.oi?.toLocaleString() || \"—\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionQuickOrderTicket.tsx",
+    "line": 547,
+    "code": "<span className=\"text-white font-extrabold\">{totalQuantity.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\options\\terminal\\OptionQuickOrderTicket.tsx",
+    "line": 562,
+    "code": "{curSymbol}{availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\InstrumentSearchSelector.tsx",
+    "line": 106,
+    "code": "{item.symbol.includes(\"NIFTY\") || item.symbol.includes(\".NS\") ? \"₹\" : \"$\"}{item.price.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\InstrumentSearchSelector.tsx",
+    "line": 124,
+    "code": "<span>{currencySymbol}{(Number(currentPrice) || 64500).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\LeverageMarginMatrix.tsx",
+    "line": 77,
+    "code": "${requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\LeverageMarginMatrix.tsx",
+    "line": 87,
+    "code": "${availableMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\LeverageMarginMatrix.tsx",
+    "line": 90,
+    "code": "Remaining: ${(Math.max(0, availableMargin - requiredMargin)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\LeverageMarginMatrix.tsx",
+    "line": 99,
+    "code": "<span className=\"font-semibold font-mono tabular-nums\">${liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\OrderConfirmationDrawer.tsx",
+    "line": 80,
+    "code": "<span className=\"text-[#F7FAFC] font-mono tabular-nums font-semibold\">${(Number(preview.entry_price) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\OrderExecutionCenter.tsx",
+    "line": 366,
+    "code": "PREVIEW & EXECUTE {orderSide} {parsedQty} {selectedSymbol} (${parsedPrice.toLocaleString()})"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\OrderExecutionCenter.tsx",
+    "line": 426,
+    "code": "${Number(ord.entry_price || ord.price || currentPrice).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\OrderTypeSelector.tsx",
+    "line": 96,
+    "code": "Use LTP (${currentPrice.toLocaleString()})"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\order-execution\\QuantitySizingCalculator.tsx",
+    "line": 74,
+    "code": "Notional: ${notionalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 189,
+    "code": "reason: `Insufficient margin (Required: $${requiredMargin.toLocaleString()}, Available: $${availableCapital.toLocaleString()})`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 259,
+    "code": "message: data.message || `${tradingMode} ${targetSide} order for ${effectiveQty} ${selectedSymbol} FILLED @ $${fillPrice.toLocaleString()}!`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 335,
+    "code": "<div className=\"font-semibold text-[#22D3EE] font-mono tabular-nums\">${inst.price.toLocaleString()}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 352,
+    "code": "{currencySymbol}{marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 359,
+    "code": "{currencySymbol}{(marketPrice * 0.9998).toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 469,
+    "code": "≈ ${calculatedNotional.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 500,
+    "code": "Required Margin: <strong className=\"text-[#F7FAFC] font-mono tabular-nums\">${requiredMargin.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 529,
+    "code": "<span className=\"text-[10px] text-[#FF3B5C] font-semibold font-mono tabular-nums\">${stopLossPrice.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 559,
+    "code": "<span className=\"text-[10px] text-[#00E890] font-semibold font-mono tabular-nums\">${takeProfitPrice.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\NewOrderTicket.tsx",
+    "line": 691,
+    "code": "<span className=\"text-[#F7FAFC] font-semibold font-mono tabular-nums\">${lastExecutedOrder.executionPrice.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderReviewConfirmationModal.tsx",
+    "line": 119,
+    "code": "<span className=\"text-[#22D3EE] font-mono tabular-nums font-semibold\">${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderReviewConfirmationModal.tsx",
+    "line": 125,
+    "code": "${notionalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderReviewConfirmationModal.tsx",
+    "line": 132,
+    "code": "${requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderReviewConfirmationModal.tsx",
+    "line": 141,
+    "code": "{stopLossPrice ? `$${stopLossPrice.toLocaleString()}` : \"None\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderReviewConfirmationModal.tsx",
+    "line": 148,
+    "code": "{takeProfitPrice ? `$${takeProfitPrice.toLocaleString()}` : \"None\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrdersLedgerDock.tsx",
+    "line": 200,
+    "code": "${ord.price ? ord.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : \"MARKET\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\orders\\OrderSystemDetailsDrawer.tsx",
+    "line": 28,
+    "code": "{ id: 4, name: \"Available Margin & Capital\", status: \"PASS\", desc: `Available: $${(portfolioSnapshot?.availableCapital || 50000).toLocaleString()}.` },"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\AccountingBalanceStrip.tsx",
+    "line": 25,
+    "code": "return num.toLocaleString(\"en-IN\", { maximumFractionDigits: 2, minimumFractionDigits: 2 });"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\BrokerReconciliationDesk.tsx",
+    "line": 37,
+    "code": "return `${currencySymbol}${val.toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\CapitalLedgerDesk.tsx",
+    "line": 48,
+    "code": "return `${currencySymbol}${val.toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\InteractiveEquityDrawdownChart.tsx",
+    "line": 95,
+    "code": "return `${val < 0 ? \"-\" : \"\"}${currencySymbol}${Math.abs(val).toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\PnlCalendarHeatmap.tsx",
+    "line": 32,
+    "code": "const monthName = currentMonthDate.toLocaleString(\"default\", { month: \"long\" });"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\RiskDeskView.tsx",
+    "line": 19,
+    "code": "return `${currencySymbol}${Math.abs(val).toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\TaxIntelligenceDesk.tsx",
+    "line": 89,
+    "code": "return `${val < 0 ? \"-\" : \"\"}${currencySymbol}${Math.abs(val).toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\pnl-journal\\desk\\TaxIntelligenceDesk.tsx",
+    "line": 217,
+    "code": "{currencySymbol}{taxData.section44abTurnover.toLocaleString(\"en-IN\", { maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\ModifyProtectionModal.tsx",
+    "line": 129,
+    "code": "${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\ModifyProtectionModal.tsx",
+    "line": 135,
+    "code": "${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionDetailDrawer.tsx",
+    "line": 157,
+    "code": "${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionDetailDrawer.tsx",
+    "line": 163,
+    "code": "${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionDetailDrawer.tsx",
+    "line": 226,
+    "code": "${notional.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionDetailDrawer.tsx",
+    "line": 292,
+    "code": "${slP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionDetailDrawer.tsx",
+    "line": 309,
+    "code": "${tpP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 128,
+    "code": "title={`Stop Loss: $${slP.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 135,
+    "code": "title={`Entry: $${entryP.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 146,
+    "code": "title={`Current Mark: $${currP.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 152,
+    "code": "title={`Take Profit: $${tpP.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 163,
+    "code": "${slP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 170,
+    "code": "${entryP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 181,
+    "code": "${currP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCardGrid.tsx",
+    "line": 190,
+    "code": "${tpP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCompactTable.tsx",
+    "line": 133,
+    "code": "{currencySymbol}{currP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCompactTable.tsx",
+    "line": 136,
+    "code": "Entry: {currencySymbol}{entryP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCompactTable.tsx",
+    "line": 144,
+    "code": "{currencySymbol}{notional.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCompactTable.tsx",
+    "line": 156,
+    "code": "<span>{currencySymbol}{slP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsCompactTable.tsx",
+    "line": 166,
+    "code": "{currencySymbol}{tpP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsKpiStrip.tsx",
+    "line": 110,
+    "code": "{unPnl === null ? \"—\" : `${isUnPnlPos ? \"+\" : \"-\"}₹${Math.abs(unPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsKpiStrip.tsx",
+    "line": 142,
+    "code": "{relPnl === null ? \"—\" : `${isRelPnlPos ? \"+\" : \"-\"}₹${Math.abs(relPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsKpiStrip.tsx",
+    "line": 186,
+    "code": "₹{marginUsed.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsKpiStrip.tsx",
+    "line": 225,
+    "code": "<span>VaR 95%: ₹{portfolioVar.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsKpiStrip.tsx",
+    "line": 246,
+    "code": "/ ₹{dailyLossLimit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 82,
+    "code": "Live Mark: ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 97,
+    "code": "${tp3.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 113,
+    "code": "${tp2.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 129,
+    "code": "${tpP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 147,
+    "code": "${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 166,
+    "code": "${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 178,
+    "code": "${trailingSl.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 196,
+    "code": "${slP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsPriceLadderMatrix.tsx",
+    "line": 211,
+    "code": "${liqP.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsRiskMatrix.tsx",
+    "line": 93,
+    "code": "${symbolStats.grandTotalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\positions\\PositionsRiskMatrix.tsx",
+    "line": 124,
+    "code": "${stat.totalNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 89,
+    "code": "<span className=\"text-base font-bold text-white\">${totalCap.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 95,
+    "code": "<span className=\"text-base font-bold text-[#22D3EE]\">${availCap.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 101,
+    "code": "<span className=\"text-base font-bold text-cyan-300\">${usedCap.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 107,
+    "code": "<span className=\"text-base font-bold text-purple-300\">${reserveCap.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 113,
+    "code": "<span className=\"text-base font-bold text-emerald-400\">${marginAvail.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 164,
+    "code": "<span className=\"text-[10px] text-[#52627A]\">Allocated: ${item.allocated.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\CapitalControlCenter.tsx",
+    "line": 171,
+    "code": "<span className=\"font-bold text-cyan-300\">${item.used.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposureControlPanel.tsx",
+    "line": 56,
+    "code": "<span className=\"text-base font-bold text-white\">${grossExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposureControlPanel.tsx",
+    "line": 62,
+    "code": "<span className=\"text-base font-bold text-[#22D3EE]\">${netExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposureControlPanel.tsx",
+    "line": 68,
+    "code": "<span className=\"text-base font-bold text-emerald-400\">${longExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposureControlPanel.tsx",
+    "line": 74,
+    "code": "<span className=\"text-base font-bold text-slate-400\">${shortExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposureControlPanel.tsx",
+    "line": 106,
+    "code": "<span className=\"text-[#52627A]\">${item.exposure.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposurePanel.tsx",
+    "line": 49,
+    "code": "${val.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({pct.toFixed(1)}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\ExposurePanel.tsx",
+    "line": 96,
+    "code": "${item.exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\MarginLeveragePanel.tsx",
+    "line": 59,
+    "code": "(${marginUsed.toLocaleString()} / ${balance.toLocaleString()})"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\MarginLeveragePanel.tsx",
+    "line": 71,
+    "code": "(${marginFreeDollars.toLocaleString()} Available)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 202,
+    "code": "<td className=\"py-3.5 px-3 text-white\">${opt.margin.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 203,
+    "code": "<td className=\"py-3.5 px-3 text-red-400 font-bold\">${opt.max_loss.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 205,
+    "code": "${opt.breakeven.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 278,
+    "code": "<span className=\"text-white block\">{fut.quantity} BTC (${fut.notional.toLocaleString()})</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 279,
+    "code": "<span className=\"text-[10px] text-[#52627A] block\">Mark: ${fut.current_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\OptionsFuturesRiskPanel.tsx",
+    "line": 295,
+    "code": "<span className=\"text-[10px] text-[#52627A] block\">SL: ${fut.stop_loss.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 149,
+    "code": "<span className=\"text-white block\">${pos.entry_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 151,
+    "code": "${pos.current_price?.toLocaleString() || pos.entry_price.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 157,
+    "code": "<span className=\"text-white block\">${pos.position_value.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 159,
+    "code": "Margin: ${pos.margin_used.toLocaleString()} ({pos.leverage}x)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 165,
+    "code": "<span className=\"text-red-400 block\">SL: ${pos.stop_loss.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionRiskTable.tsx",
+    "line": 167,
+    "code": "TP: ${pos.take_profit ? pos.take_profit.toLocaleString() : \"Auto Trailing\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionSizeCalculator.tsx",
+    "line": 257,
+    "code": "${result.notional_value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionSizeCalculator.tsx",
+    "line": 264,
+    "code": "${result.margin_required?.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\PositionSizingEngine.tsx",
+    "line": 198,
+    "code": "<span className=\"text-sm font-bold text-white\">${calcResult.notional_value.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskDecisionTable.tsx",
+    "line": 241,
+    "code": "${d.requested_risk_usd ? d.requested_risk_usd.toLocaleString() : \"50.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 243,
+    "code": "${decision.requested_notional ? decision.requested_notional.toLocaleString() : \"4,500.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 249,
+    "code": "${decision.max_passing_exposure ? decision.max_passing_exposure.toLocaleString() : \"800.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 370,
+    "code": "${decision.portfolio_before?.portfolio_exposure?.toLocaleString() || \"32,000.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 376,
+    "code": "${decision.portfolio_before?.symbol_exposure?.toLocaleString() || \"3,200.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 388,
+    "code": "${decision.portfolio_before?.capital_used?.toLocaleString() || \"3,200.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 403,
+    "code": "${decision.portfolio_after?.portfolio_exposure?.toLocaleString() || \"36,500.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 409,
+    "code": "${decision.portfolio_after?.symbol_exposure?.toLocaleString() || \"7,700.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 421,
+    "code": "${decision.portfolio_after?.capital_used?.toLocaleString() || \"7,700.00\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 436,
+    "code": "<span className=\"font-bold text-purple-300\">+${decision.risk_delta?.capital_used_diff?.toLocaleString() || \"4,500.00\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 440,
+    "code": "<span className=\"font-bold text-purple-300\">+${decision.risk_delta?.symbol_exposure_diff?.toLocaleString() || \"4,500.00\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskForensicDrawer.tsx",
+    "line": 482,
+    "code": "<span className=\"text-slate-200\">${decision.requested_notional?.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskMetrics.tsx",
+    "line": 70,
+    "code": "<span className=\"font-mono font-bold text-slate-100\">${overview.gross_exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskMetrics.tsx",
+    "line": 75,
+    "code": "<span className=\"font-mono font-bold text-cyan-400\">${overview.net_exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskMetrics.tsx",
+    "line": 80,
+    "code": "<span className=\"font-mono font-bold text-emerald-400\">${overview.account_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 77,
+    "code": "Total Account Equity: <span className=\"font-bold text-[var(--theme-text-primary)]\">${capital.accountEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 87,
+    "code": "title={`Used Margin: $${capital.marginUsed.toLocaleString()} (${usedPct.toFixed(1)}%)`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 92,
+    "code": "title={`Available Cash: $${capital.availableCash.toLocaleString()} (${availPct.toFixed(1)}%)`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 99,
+    "code": "<span>Used Collateral: <strong className=\"text-[var(--theme-text-primary)]\">${capital.marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({usedPct.toFixed(1)}%)</strong></span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 103,
+    "code": "<span>Available Cash: <strong className=\"text-[var(--theme-text-primary)]\">${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({availPct.toFixed(1)}%)</strong></span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 121,
+    "code": "<span className=\"font-bold text-[var(--theme-text-primary)]\">${capital.accountEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 125,
+    "code": "<span className=\"font-bold text-[var(--theme-profit)]\">${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 129,
+    "code": "<span className=\"font-bold text-purple-300\">${capital.allocatedCapital.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 144,
+    "code": "<span className=\"font-bold text-cyan-300\">${exposure.grossExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 148,
+    "code": "<span className=\"font-bold text-[var(--theme-text-primary)]\">${exposure.netExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 167,
+    "code": "<span className=\"font-bold text-purple-300\">${margin.marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 171,
+    "code": "<span className=\"font-bold text-[var(--theme-profit)]\">${margin.availableMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionCapitalExposure.tsx",
+    "line": 206,
+    "code": "<span>${item.val.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({item.pct.toFixed(1)}%)</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskSectionOverview.tsx",
+    "line": 183,
+    "code": "${maxOrderSize > 0 ? maxOrderSize.toLocaleString(undefined, { maximumFractionDigits: 0 }) : \"0\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskTelemetryDashboard.tsx",
+    "line": 43,
+    "code": "current: `$${grossExp.toLocaleString()}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\RiskTelemetryDashboard.tsx",
+    "line": 44,
+    "code": "limit: `$${balance.toLocaleString()} (100%)`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\SafetyGatesPanel.tsx",
+    "line": 256,
+    "code": "Order clears all 14 quantitative gates. Notional exposure: ${(quantity * entryPrice).toLocaleString()}."
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 104,
+    "code": "<span className=\"text-sm font-bold text-white\">${availCap.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 105,
+    "code": "<span className=\"text-[10px] text-[#22D3EE] block\">of ${totalCap.toLocaleString()} Total</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 111,
+    "code": "<span className=\"text-sm font-bold text-cyan-300\">${grossExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 159,
+    "code": "<span className=\"text-white font-bold\">${(totalCap * 0.25).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 164,
+    "code": "<span className=\"text-cyan-300 font-bold\">${grossExp.toLocaleString()} ({((grossExp / totalCap) * 100).toFixed(0)}%)</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\TopGlobalRiskBar.tsx",
+    "line": 174,
+    "code": "<span className=\"text-emerald-400 font-bold\">${overview.net_exposure?.toLocaleString() || grossExp.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\UnifiedRiskTopBar.tsx",
+    "line": 191,
+    "code": "${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\UnifiedRiskTopBar.tsx",
+    "line": 194,
+    "code": "of ${capital.accountEquity.toLocaleString()} Total Equity"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\UnifiedRiskTopBar.tsx",
+    "line": 208,
+    "code": "${exposure.grossExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\UnifiedRiskTopBar.tsx",
+    "line": 262,
+    "code": "${margin.marginUsed.toLocaleString()} Locked Collateral"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\risk-management\\WhatIfSimulator.tsx",
+    "line": 165,
+    "code": "${res.projected_equity.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\settings\\DeltaConnectionCard.tsx",
+    "line": 307,
+    "code": "{b.currency_symbol || \"\"}{Number(b.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\settings\\DhanConnectionCard.tsx",
+    "line": 296,
+    "code": "₹{(data?.funds?.available || 0).toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\settings\\DhanConnectionCard.tsx",
+    "line": 305,
+    "code": "₹{(data?.funds?.collateral || 0).toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\settings\\FyersConnectionCard.tsx",
+    "line": 303,
+    "code": "₹{(data?.funds?.available || 1000000).toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\shell\\OrderReviewModal.tsx",
+    "line": 105,
+    "code": "{order.orderType === \"MARKET\" ? \"MARKET (LTP)\" : `₹${order.price?.toLocaleString()}`}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\shell\\OrderReviewModal.tsx",
+    "line": 111,
+    "code": "<span className=\"text-[#F4F7FA] tabular-nums\">₹{order.estimatedMargin.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\shell\\OrderReviewModal.tsx",
+    "line": 117,
+    "code": "<span className=\"text-[#F4F7FA] tabular-nums\">₹{order.estimatedFee.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBacktestPanel.tsx",
+    "line": 174,
+    "code": "+${backtestData.total_net_profit?.toLocaleString() || \"0\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1446,
+    "code": "SPOT: ₹{spotPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1774,
+    "code": "Available Margin Cushion: ₹{(capital - riskMetrics.requiredMargin).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1815,
+    "code": "{Math.abs(riskMetrics.netDebitCredit).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1822,
+    "code": "₹{riskMetrics.requiredMargin.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1829,
+    "code": "₹{riskMetrics.maxLoss.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 1836,
+    "code": "₹{riskMetrics.maxProfit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 2006,
+    "code": "<span className=\"font-bold text-white\">₹{riskMetrics.requiredMargin.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 2010,
+    "code": "<span className=\"font-bold text-[#10B981]\">₹{riskMetrics.maxProfit.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 2014,
+    "code": "<span className=\"font-bold text-[#F43F5E]\">₹{riskMetrics.maxLoss.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 2119,
+    "code": "Real market orders with an estimated margin of <strong>₹{riskMetrics.requiredMargin.toLocaleString()}</strong> will be transmitted to the exchange."
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyBotCreationWorkspace.tsx",
+    "line": 2122,
+    "code": "<div>• Max Loss Ceiling: ₹{riskMetrics.maxLoss.toLocaleString()}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 157,
+    "code": "${metrics.total_net_profit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 187,
+    "code": "-${metrics.max_drawdown_usd.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 229,
+    "code": "${metrics.ending_equity.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 262,
+    "code": "<td className=\"p-2.5 text-[#F8FAFC]\">${t.entry_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 264,
+    "code": "<td className=\"p-2.5 text-[#F8FAFC]\">${t.exit_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 290,
+    "code": "Final: ${metrics.ending_equity.toLocaleString()} (+{metrics.return_pct}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyFullReportModal.tsx",
+    "line": 298,
+    "code": "<span className=\"text-xs font-bold text-[#F8FAFC]\">${pt.equity.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyOptionsStudio.tsx",
+    "line": 137,
+    "code": "<span className=\"text-[#F8FAFC] font-bold\">${spotPrice.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyPaperTestPanel.tsx",
+    "line": 146,
+    "code": "<td className=\"py-2 px-3 text-white font-bold\">${sig.price?.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyReadinessPanel.tsx",
+    "line": 92,
+    "code": "message: hasCapital ? `$${strategy.risk.capital.toLocaleString()} allocated` : \"Capital cannot be 0\","
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyRuleCanvas.tsx",
+    "line": 595,
+    "code": "<span className=\"text-[#F8FAFC] font-bold\">${capital.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyRuleCanvas.tsx",
+    "line": 600,
+    "code": "${estimatedCalculations.allocatedCapital.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyRuleCanvas.tsx",
+    "line": 606,
+    "code": "${estimatedCalculations.estimatedMargin.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyRuleCanvas.tsx",
+    "line": 612,
+    "code": "${estimatedCalculations.estimatedExposure.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyTestingDrawer.tsx",
+    "line": 312,
+    "code": "<td className=\"p-2 text-[#F8FAFC]\">${tr.entry_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\strategy\\StrategyTestingDrawer.tsx",
+    "line": 313,
+    "code": "<td className=\"p-2 text-[#F8FAFC]\">${tr.exit_price.toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\GlobalTaxExposureTable.tsx",
+    "line": 18,
+    "code": "return `${prefix}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxAlertsView.tsx",
+    "line": 23,
+    "code": "return `${prefix}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxCalendarView.tsx",
+    "line": 15,
+    "code": "return `${prefix}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxCommandCenter.tsx",
+    "line": 38,
+    "code": "return `${prefix}${Math.abs(val).toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxIntelligenceTab.tsx",
+    "line": 353,
+    "code": "{seg.realized_pnl !== null ? `₹${Math.round(seg.realized_pnl).toLocaleString()}` : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxIntelligenceTab.tsx",
+    "line": 359,
+    "code": "{seg.estimated_tax !== null ? `₹${Math.round(seg.estimated_tax).toLocaleString()}` : \"N/A\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxIntelligenceTab.tsx",
+    "line": 412,
+    "code": "Taxable: ₹{item.taxable_amount.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxIntelligenceTab.tsx",
+    "line": 415,
+    "code": "Est. Tax: ₹{item.estimated_tax.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxLotsView.tsx",
+    "line": 17,
+    "code": "return `${prefix}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxPlannerView.tsx",
+    "line": 15,
+    "code": "return `${prefix}${Math.abs(val).toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxPositionsView.tsx",
+    "line": 27,
+    "code": "return `${prefix}${Math.abs(val).toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxTransactionsView.tsx",
+    "line": 24,
+    "code": "return `${prefix}${Math.abs(val).toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\tax-intelligence\\TaxWhatIfSimulator.tsx",
+    "line": 22,
+    "code": "return `${prefix}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\QuickTradePanel.tsx",
+    "line": 337,
+    "code": "<span className=\"text-slate-100 font-bold\">${(estimate?.required_margin || 0).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalChart.tsx",
+    "line": 510,
+    "code": "<span className=\"text-[#F7FAFC]\">{activeBar.volume.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalOrderPanel.tsx",
+    "line": 238,
+    "code": "<span className=\"font-mono text-slate-200\">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalOrderPanel.tsx",
+    "line": 292,
+    "code": "<strong className=\"text-slate-200\">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalPositionsPanel.tsx",
+    "line": 240,
+    "code": "<td className=\"py-2.5 text-slate-300\">${pos.entry_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalPositionsPanel.tsx",
+    "line": 241,
+    "code": "<td className=\"py-2.5 text-slate-300\">${pos.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalPositionsPanel.tsx",
+    "line": 242,
+    "code": "<td className=\"py-2.5 text-rose-400\">${pos.stop_loss.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalPositionsPanel.tsx",
+    "line": 243,
+    "code": "<td className=\"py-2.5 text-emerald-400\">${pos.take_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalRightPanel.tsx",
+    "line": 354,
+    "code": "{item.price > 0 ? (item.price >= 1000 ? item.price.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.price.toFixed(2)) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalSubPanes.tsx",
+    "line": 168,
+    "code": "latestReadout = `Vol: ${vol ? vol.toLocaleString() : \"—\"} SMA: ${sma ? sma.toLocaleString() : \"—\"}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalSubPanes.tsx",
+    "line": 176,
+    "code": "latestReadout = `CVD: ${cvd ? cvd.toLocaleString() : \"—\"}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalTopBar.tsx",
+    "line": 178,
+    "code": "{price > 0 ? (price >= 1000 ? price.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : price.toFixed(2)) : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalTopBar.tsx",
+    "line": 199,
+    "code": "<span className=\"text-[#F7FAFC]\">{high24h.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalTopBar.tsx",
+    "line": 205,
+    "code": "<span className=\"text-[#F7FAFC]\">{low24h.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\terminal\\TerminalWatchlist.tsx",
+    "line": 150,
+    "code": "{inst.last_price ? `${currSymbol}${inst.last_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisOrderExecutor.tsx",
+    "line": 225,
+    "code": "₹{orderPreview.estimatedValue.toLocaleString(\"en-IN\", { maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisOrderExecutor.tsx",
+    "line": 236,
+    "code": "₹{totalMaxRisk.toLocaleString(\"en-IN\", { maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisOrderExecutor.tsx",
+    "line": 242,
+    "code": "₹{totalPotentialProfit.toLocaleString(\"en-IN\", { maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisRiskReward.tsx",
+    "line": 231,
+    "code": "₹{calculation.totalEstimatedPremium.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisRiskReward.tsx",
+    "line": 245,
+    "code": "-₹{calculation.totalCapitalAtRisk.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisRiskReward.tsx",
+    "line": 252,
+    "code": "+₹{calculation.totalPotentialProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisUnderlyingFuturesPanel.tsx",
+    "line": 79,
+    "code": "₹{underlyingData.spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisUnderlyingFuturesPanel.tsx",
+    "line": 93,
+    "code": "<strong className=\"text-slate-200\">₹{underlyingData.dayHigh.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisUnderlyingFuturesPanel.tsx",
+    "line": 97,
+    "code": "<strong className=\"text-slate-200\">₹{underlyingData.dayLow.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisUnderlyingFuturesPanel.tsx",
+    "line": 101,
+    "code": "<strong className=\"text-amber-300\">₹{(underlyingData.vwap || underlyingData.spotPrice).toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-analysis\\TradeAnalysisUnderlyingFuturesPanel.tsx",
+    "line": 125,
+    "code": "₹{futuresData.ltp.toLocaleString(undefined, { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\JournalKPIStrip.tsx",
+    "line": 182,
+    "code": "<span className=\"text-[var(--theme-profit)]\">+${s.gross_profit.toLocaleString()}</span> / <span className=\"text-[var(--theme-loss)]\">-${s.gross_loss.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\JournalStrategyIntelligence.tsx",
+    "line": 69,
+    "code": "+${s.trending_pnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\JournalStrategyIntelligence.tsx",
+    "line": 72,
+    "code": "${s.ranging_pnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeDetailDrawer.tsx",
+    "line": 257,
+    "code": "<span className=\"text-white font-bold\">${Number(trade.entry_price || 0).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeDetailDrawer.tsx",
+    "line": 261,
+    "code": "<span className=\"text-white font-bold\">${trade.exit_price ? Number(trade.exit_price).toLocaleString() : \"Active\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeDetailDrawer.tsx",
+    "line": 269,
+    "code": "<span className=\"text-red-400 font-bold\">${trade.stop_loss ? Number(trade.stop_loss).toLocaleString() : \"None\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeDetailDrawer.tsx",
+    "line": 273,
+    "code": "<span className=\"text-[#22D3EE] font-bold\">${trade.take_profit ? Number(trade.take_profit).toLocaleString() : \"Trailing\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeJournalSummaryCards.tsx",
+    "line": 85,
+    "code": "{isNetProfit ? \"+\" : \"\"}${metrics.net_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeJournalTable.tsx",
+    "line": 185,
+    "code": "<span className=\"text-[var(--theme-text-primary)] block\">${t.entry_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeJournalTable.tsx",
+    "line": 187,
+    "code": "{t.exit_price ? `$${t.exit_price.toLocaleString()}` : \"Active\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trade-journal\\TradeJournalTable.tsx",
+    "line": 296,
+    "code": "<span>${t.entry_price.toLocaleString()} → {t.exit_price ? `$${t.exit_price.toLocaleString()}` : \"Open\"}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\AiDecisionPanel.tsx",
+    "line": 139,
+    "code": "<span className=\"text-white font-bold\">₹{dec.entry_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\AiDecisionPanel.tsx",
+    "line": 143,
+    "code": "<span className=\"text-rose-400 font-bold\">₹{dec.stop_loss.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\AiDecisionPanel.tsx",
+    "line": 147,
+    "code": "<span className=\"text-emerald-400 font-bold\">₹{dec.take_profit.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\CurrentPositionPanel.tsx",
+    "line": 82,
+    "code": "{isProfit ? \"+\" : \"\"}₹{position.pnl.toLocaleString()} ({position.pnlPercent}%)"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\JournalAndReportDrawer.tsx",
+    "line": 92,
+    "code": "₹{dailyReport.net_pnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\PerformanceSummaryCard.tsx",
+    "line": 44,
+    "code": "{isProfit ? \"+\" : \"\"}₹{performance.todayPnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\RiskStatusPanel.tsx",
+    "line": 54,
+    "code": "₹{capital.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\RiskStatusPanel.tsx",
+    "line": 62,
+    "code": "₹{availableMargin.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\RiskStatusPanel.tsx",
+    "line": 74,
+    "code": "₹{dailyPnl >= 0 ? `+${dailyPnl.toLocaleString()}` : dailyPnl.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\RiskStatusPanel.tsx",
+    "line": 82,
+    "code": "₹{dailyLossLimit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\TradeDecisionCard.tsx",
+    "line": 110,
+    "code": "₹{decision.entryPrice.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\TradeDecisionCard.tsx",
+    "line": 118,
+    "code": "₹{decision.stopLoss.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\components\\trading-orchestrator\\TradeDecisionCard.tsx",
+    "line": 126,
+    "code": "₹{decision.takeProfit.toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\hooks\\useMarketGateway.ts",
+    "line": 67,
+    "code": "if (p >= 10000) return p.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 });"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\financial.ts",
+    "line": 154,
+    "code": "const formatted = Math.abs(cleanNum).toLocaleString(locale, {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\financial.ts",
+    "line": 176,
+    "code": "const formatted = Math.abs(cleanNum).toLocaleString(locale, {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\financial.ts",
+    "line": 208,
+    "code": "return Math.round(num).toLocaleString(locale);"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\financial.ts",
+    "line": 240,
+    "code": "return `${sign}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 4 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\financial.ts",
+    "line": 278,
+    "code": "formatted: `${sign}${currency}${absNum.toLocaleString(locale, {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\numbers.ts",
+    "line": 69,
+    "code": "return num.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\numbers.ts",
+    "line": 86,
+    "code": "return Math.round(num).toLocaleString(\"en-US\");"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters\\numbers.ts",
+    "line": 103,
+    "code": "const formatted = num.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters.ts",
+    "line": 61,
+    "code": "return num.toLocaleString(undefined, { maximumFractionDigits: 8 });"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\formatters.ts",
+    "line": 92,
+    "code": "return `${sign}${currency}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\indicators\\options\\oi.ts",
+    "line": 32,
+    "code": "reason: `Fresh Build-Up: Open Interest expanded by +${oiChg.toLocaleString()} contracts`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\indicators\\options\\oi.ts",
+    "line": 39,
+    "code": "reason: `Long Unwinding / Short Covering: Open Interest dropped by ${oiChg.toLocaleString()} contracts`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\options\\options-analytics-engine.ts",
+    "line": 464,
+    "code": "return `${sign}${Math.round(absVal).toLocaleString(\"en-IN\")}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\risk\\tradingPermission.ts",
+    "line": 102,
+    "code": "currentValue: `$${availCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\risk\\tradingPermission.ts",
+    "line": 150,
+    "code": "currentValue: `$${grossExp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\risk\\tradingPermission.ts",
+    "line": 151,
+    "code": "limitValue: `$${maxExposureCap.toLocaleString(undefined, { maximumFractionDigits: 0 })} max`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\taxEngineService.ts",
+    "line": 475,
+    "code": "message: `Position currently has ₹${Math.round(longRunningPos.unrealized_pnl).toLocaleString()} unrealized gains. Review holding threshold to transition from STCG (${rules.rates.equity_stcg}%) to LTCG (${rules.rates.equity_ltcg}%).`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\trading\\engine\\PremiumSelectionEngine.ts",
+    "line": 116,
+    "code": "}), Delta: ${quote.delta.toFixed(2)}, Spread: ${spread.toFixed(2)} (${(spreadPct * 100).toFixed(1)}%), OI: ${quote.oi.toLocaleString()}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\lib\\trading\\risk-engine.ts",
+    "line": 82,
+    "code": "blockedReason: `Estimated order value ₹${notional.toLocaleString()} exceeds hard risk limit of ₹${this.limits.maxOrderValue.toLocaleString()}.`,"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\BasisArbitrageMatrix.tsx",
+    "line": 58,
+    "code": "<span className=\"text-slate-200 font-bold\">${b.spot_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\BasisArbitrageMatrix.tsx",
+    "line": 62,
+    "code": "<span className=\"text-white font-bold\">${b.futures_price.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FundingRateHeatmap.tsx",
+    "line": 69,
+    "code": "<span className=\"text-white font-bold\">${item.markPrice.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 369,
+    "code": "{contract.last_price != null ? `${currency}${contract.last_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 627,
+    "code": "{currency}{requiredInitialMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 633,
+    "code": "{currency}{(brokerAccount.available_margin || 0).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 639,
+    "code": "{liqResult?.liquidationPrice ? `${currency}${liqResult.liquidationPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 756,
+    "code": "{level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 770,
+    "code": "{currency}{(contract.last_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 801,
+    "code": "{level.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 827,
+    "code": "<span className=\"text-white font-bold\">{currency}{(contract.mark_price || contract.last_price || 0).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesDetailsDrawer.tsx",
+    "line": 831,
+    "code": "<span className=\"text-slate-300\">{currency}{(contract.index_price || contract.last_price || 0).toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesMarketSummaryBar.tsx",
+    "line": 24,
+    "code": ": `$${totalVolumeUsd.toLocaleString()}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesMarketSummaryBar.tsx",
+    "line": 31,
+    "code": ": `$${totalOpenInterestUsd.toLocaleString()}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesOrdersView.tsx",
+    "line": 183,
+    "code": "{ord.price != null ? `$${ord.price.toLocaleString()}` : \"MARKET\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesOrdersView.tsx",
+    "line": 186,
+    "code": "{ord.average_fill_price != null ? `$${ord.average_fill_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesPositionsView.tsx",
+    "line": 106,
+    "code": "<span className=\"text-xl font-bold text-cyan-300 mt-1 block\">${totalMargin.toLocaleString()}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesPositionsView.tsx",
+    "line": 177,
+    "code": "<td className=\"py-3.5 px-3 text-right text-slate-400\">${(pos.entry_price || 0).toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesPositionsView.tsx",
+    "line": 178,
+    "code": "<td className=\"py-3.5 px-3 text-right font-bold text-white\">${(pos.mark_price || pos.entry_price || 0).toLocaleString()}</td>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesPositionsView.tsx",
+    "line": 188,
+    "code": "<div className=\"text-slate-200 font-bold\">${(pos.margin_usd || 0).toLocaleString()}</div>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesPositionsView.tsx",
+    "line": 192,
+    "code": "{pos.liquidation_price ? `$${pos.liquidation_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesSavedView.tsx",
+    "line": 70,
+    "code": "{isConnected && c.mark_price != null ? `${currSymbol}${c.mark_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesStrategiesView.tsx",
+    "line": 215,
+    "code": "<strong className=\"text-white text-sm block\">${estNotional.toLocaleString()}</strong>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesTable.tsx",
+    "line": 247,
+    "code": "? `${currSymbol}${c.mark_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\FuturesTable.tsx",
+    "line": 254,
+    "code": "? `${currSymbol}${c.index_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\OrderReviewModal.tsx",
+    "line": 172,
+    "code": "{contract.mark_price != null ? `${currSymbol}${contract.mark_price.toLocaleString()}` : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\OrderReviewModal.tsx",
+    "line": 276,
+    "code": "<span className=\"text-white font-bold\">{currSymbol}{estimatedNotional.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\OrderReviewModal.tsx",
+    "line": 280,
+    "code": "<span className=\"text-cyan-300 font-bold\">{currSymbol}{requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\OrderReviewModal.tsx",
+    "line": 289,
+    "code": "<span className=\"text-red-400 font-bold\">{currSymbol}{liqPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\SimpleFuturesTable.tsx",
+    "line": 38,
+    "code": "return `${currency}${val.toLocaleString(undefined, {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\futures\\components\\SimpleFuturesTable.tsx",
+    "line": 53,
+    "code": "return `${currency}${val.toLocaleString()}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsFlowView.tsx",
+    "line": 161,
+    "code": "{snapshot.resistanceZone?.strike ? snapshot.resistanceZone.strike.toLocaleString(\"en-IN\") : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsFlowView.tsx",
+    "line": 171,
+    "code": "{snapshot.supportZone?.strike ? snapshot.supportZone.strike.toLocaleString(\"en-IN\") : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsFlowView.tsx",
+    "line": 181,
+    "code": "{snapshot.maxPain !== null && snapshot.maxPain !== undefined ? snapshot.maxPain.toLocaleString(\"en-IN\") : \"—\"}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsPositionsView.tsx",
+    "line": 96,
+    "code": "₹{totalPnl.toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsPositionsView.tsx",
+    "line": 104,
+    "code": "₹{totalMargin.toLocaleString(\"en-IN\", { minimumFractionDigits: 2 })}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OptionsTradingView.tsx",
+    "line": 383,
+    "code": "{underlying === \"BTC\" ? \"$\" : \"₹\"}{(limitPrice * lots * (underlying.includes(\"NIFTY\") ? 50 : 1)).toLocaleString()}"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OrderReviewModal.tsx",
+    "line": 156,
+    "code": "<span className=\"font-bold text-slate-100\">₹{notional.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\options\\components\\OrderReviewModal.tsx",
+    "line": 160,
+    "code": "<span className=\"font-bold text-amber-400\">₹{estimatedMargin.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\components\\StocksHeader.tsx",
+    "line": 52,
+    "code": "<span className=\"text-white font-bold font-mono\">{totalCount.toLocaleString()} Stocks</span>"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\components\\StocksTable.tsx",
+    "line": 189,
+    "code": "<span className=\"text-cyan-400 font-bold\">{total.toLocaleString()}</span> stocks"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\components\\StockTechnicals.tsx",
+    "line": 22,
+    "code": "return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\utils\\formatting.ts",
+    "line": 22,
+    "code": "return `${symbol}${val.toLocaleString(\"en-IN\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\utils\\formatting.ts",
+    "line": 28,
+    "code": "return `${symbol}${val.toLocaleString(\"en-US\", {"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\utils\\formatting.ts",
+    "line": 62,
+    "code": "return val.toLocaleString();"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\utils\\formatting.ts",
+    "line": 79,
+    "code": "return `${sym}${val.toLocaleString(\"en-IN\")}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\src\\features\\markets\\stocks\\utils\\formatting.ts",
+    "line": 91,
+    "code": "return `${sym}${val.toLocaleString()}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\types\\bot-control.ts",
+    "line": 516,
+    "code": "return `${symbol}${amount.toLocaleString(\"en-IN\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  },
+  {
+    "file": "H:\\New folder\\algo-code-main\\frontend\\types\\bot-control.ts",
+    "line": 518,
+    "code": "return `${symbol}${amount.toLocaleString(\"en-US\", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;"
+  }
+]

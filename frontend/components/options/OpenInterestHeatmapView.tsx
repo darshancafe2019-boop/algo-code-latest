@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Flame, Layers, BarChart3, Activity } from "lucide-react";
 import { OptionStrikeRow } from "@/types/option-chain";
@@ -101,7 +102,7 @@ export function OpenInterestHeatmapView({
                     : "bg-[#141E33] text-white border border-slate-700"
                 }`}
               >
-                {currency}{r.strike.toLocaleString()}
+                {formatMoney(r.strike, currency)}
               </div>
 
               {/* Put Bar (Right) */}

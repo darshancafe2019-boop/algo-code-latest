@@ -6,6 +6,7 @@ import {
   globalMarketStore,
   globalUpstoxWs,
   UpstoxHealthReport,
+  UpstoxConnectionState,
 } from "@/lib/upstox";
 
 export const dynamic = "force-dynamic";
@@ -28,20 +29,31 @@ export async function GET(req: NextRequest) {
     const latestTs = Math.max(lastMsgTs, lastUpdateTs);
     const ageMs = Date.now() - latestTs;
 
+    const healthSummary = globalMarketStore.getHealthSummary();
+
+    const wsState = globalUpstoxWs.getState();
+    const connState: UpstoxConnectionState = wsState === "STALE" ? "ERROR" : wsState;
+
     const report: UpstoxHealthReport = {
       provider: "UPSTOX",
       configured: Boolean(creds.apiKey || creds.analyticsToken),
       authenticated: tokenResolution.isValid,
       tokenType: tokenResolution.tokenType,
       restApi: tokenResolution.isValid ? "healthy" : "unauthenticated",
-      websocket: globalUpstoxWs.getState(),
+      websocket: wsState,
+      connectionState: connState,
       marketStatus: isOpen ? "OPEN" : "CLOSED",
+      marketPhase: healthSummary.marketPhase,
       subscriptions: globalUpstoxWs.getSubscriptionsCount(),
       lastTickAt: latestTs > 0 ? new Date(latestTs).toISOString() : null,
       stale: isOpen && ageMs > 30000,
       paperMode: creds.paperMode,
       tradingEnabled: creds.tradingEnabled,
       timestamp: new Date().toISOString(),
+      liveTradeCount: healthSummary.liveTradeCount,
+      closingAuctionCount: healthSummary.closingAuctionCount,
+      lastTradedCount: healthSummary.lastTradedCount,
+      staleCount: healthSummary.staleCount,
     };
 
     return NextResponse.json({

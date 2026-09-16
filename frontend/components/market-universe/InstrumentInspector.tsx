@@ -30,16 +30,10 @@ import {
   Maximize2,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
-import {
-  formatPrice,
-  formatPercent,
-  formatVolume,
-  formatQuantity,
-  formatExactNumber,
-  formatNumber,
-} from "@/lib/formatters";
+import { formatPrice, formatPercent, formatVolume, formatQuantity, formatExactNumber, formatNumber, formatMoney } from "@/lib/formatters";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
+import { getMarketRowStatus, normalizeProvider } from "@/lib/market-data/row-status";
 
 interface InstrumentInspectorProps {
   instrument: MarketInstrument | null;
@@ -62,7 +56,7 @@ export function InstrumentInspector({
 }: InstrumentInspectorProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { getQuote, connectionStatus } = useMarketGatewayContext();
+  const { getQuote, connectionStatus, providerHealth } = useMarketGatewayContext();
   const [activeTab, setActiveTab] = useState<InspectorTab>("OVERVIEW");
 
   // Chart state
@@ -128,6 +122,21 @@ export function InstrumentInspector({
     };
   }, [price, changePct, high24h, low24h]);
 
+  // Real Data Quality & Provider Status
+  const healthyProvidersSet = useMemo(() => {
+    const set = new Set<string>();
+    if (providerHealth && providerHealth.length > 0) {
+      providerHealth.forEach((p) => {
+        const s = (p.status || "").toUpperCase();
+        if (["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED"].includes(s)) {
+          const norm = normalizeProvider(p.provider_id);
+          if (norm) set.add(norm.toUpperCase());
+        }
+      });
+    }
+    return set;
+  }, [providerHealth]);
+
   if (!instrument) return null;
 
   const name = instrument.company_name || instrument.name || sym;
@@ -155,27 +164,30 @@ export function InstrumentInspector({
     sym.endsWith("_PERP") ||
     sym.endsWith("-PERP");
 
-  // Real Data Quality Status
-  const dataAgeSec = liveQuote?.age_seconds ?? 999;
-  const isMarketClosed = instrument.market_status === "CLOSED";
-  const isStaleFeed = liveQuote != null && (liveQuote.is_stale || dataAgeSec >= 10);
-  const isLiveFeed = liveQuote != null && !isStaleFeed && !isMarketClosed;
+  const rowStatus = getMarketRowStatus({
+    instrument,
+    rawQuote: liveQuote,
+    healthyProviders: healthyProvidersSet,
+    connectionStatus,
+  });
 
-  const statusLabel = isMarketClosed
-    ? "MARKET CLOSED"
-    : isLiveFeed
-    ? "LIVE"
-    : isStaleFeed
-    ? "STALE FEED"
-    : "NO LIVE PROVIDER";
+  const statusLabel = rowStatus.label;
+  const statusColor =
+    rowStatus.state === "closed"
+      ? "bg-slate-800 text-slate-400 border-slate-700"
+      : rowStatus.state === "live"
+      ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+      : rowStatus.state === "stale"
+      ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
+      : rowStatus.state === "reconnecting"
+      ? "bg-amber-500/10 text-amber-400 border-amber-500/30 animate-pulse"
+      : rowStatus.state === "connected"
+      ? "bg-blue-500/10 text-blue-400 border-blue-500/30"
+      : "bg-slate-800/80 text-slate-400 border-slate-700/80";
 
-  const statusColor = isMarketClosed
-    ? "bg-slate-800 text-slate-400 border-slate-700"
-    : isLiveFeed
-    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-    : isStaleFeed
-    ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-    : "bg-slate-800/80 text-slate-400 border-slate-700/80";
+  const dataAgeSec = liveQuote?.age_seconds ?? 0;
+  const isLiveFeed = rowStatus.isLive;
+  const isStaleFeed = rowStatus.isStale;
 
   const handlePlaceOrder = async () => {
     setIsPlacingOrder(true);
@@ -356,13 +368,13 @@ export function InstrumentInspector({
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h High</span>
                 <span className="text-slate-200 font-bold">
-                  {high24h ? `${currSymbol}${high24h.toLocaleString()}` : "—"}
+                  {high24h ? `${currSymbol}{formatMoney(high24h, "$")}` : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h Low</span>
                 <span className="text-slate-200 font-bold">
-                  {low24h ? `${currSymbol}${low24h.toLocaleString()}` : "—"}
+                  {low24h ? `${currSymbol}{formatMoney(low24h, "$")}` : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
@@ -388,7 +400,7 @@ export function InstrumentInspector({
                 <div className="grid grid-cols-3 gap-2 text-[11px]">
                   <div>
                     <span className="text-[10px] text-slate-500 block">Strike</span>
-                    <span className="text-white font-bold">{instrument.strike?.toLocaleString() || "—"}</span>
+                    <span className="text-white font-bold">{formatPrice(instrument.strike)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">Type</span>

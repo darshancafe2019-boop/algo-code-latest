@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -74,7 +75,7 @@ export function RiskSectionCapitalExposure({
             </h3>
           </div>
           <div className="text-xs font-mono text-[var(--theme-text-muted)]">
-            Total Account Equity: <span className="font-bold text-[var(--theme-text-primary)]">${capital.accountEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            Total Account Equity: <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(capital.accountEquity, "$")}</span>
           </div>
         </div>
 
@@ -84,23 +85,23 @@ export function RiskSectionCapitalExposure({
             <div
               style={{ width: `${Math.min(100, usedPct)}%` }}
               className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full transition-all"
-              title={`Used Margin: $${capital.marginUsed.toLocaleString()} (${usedPct.toFixed(1)}%)`}
+              title={`Used Margin: ${formatMoney(capital.marginUsed, "$")} (${usedPct.toFixed(1)}%)`}
             />
             <div
               style={{ width: `${Math.max(0, availPct)}%` }}
               className="bg-gradient-to-r from-emerald-600 to-teal-500 h-full transition-all"
-              title={`Available Cash: $${capital.availableCash.toLocaleString()} (${availPct.toFixed(1)}%)`}
+              title={`Available Cash: ${formatMoney(capital.availableCash, "$")} (${availPct.toFixed(1)}%)`}
             />
           </div>
 
           <div className="flex flex-wrap items-center justify-between text-xs font-mono text-[var(--theme-text-secondary)] pt-1">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-purple-500" />
-              <span>Used Collateral: <strong className="text-[var(--theme-text-primary)]">${capital.marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({usedPct.toFixed(1)}%)</strong></span>
+              <span>Used Collateral: <strong className="text-[var(--theme-text-primary)]">{formatMoney(capital.marginUsed, "$")} ({usedPct.toFixed(1)}%)</strong></span>
             </div>
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-sm bg-emerald-500" />
-              <span>Available Cash: <strong className="text-[var(--theme-text-primary)]">${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2 })} ({availPct.toFixed(1)}%)</strong></span>
+              <span>Available Cash: <strong className="text-[var(--theme-text-primary)]">{formatMoney(capital.availableCash, "$")} ({availPct.toFixed(1)}%)</strong></span>
             </div>
           </div>
         </div>
@@ -118,15 +119,15 @@ export function RiskSectionCapitalExposure({
           <div className="space-y-2.5 pt-1">
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Total Equity:</span>
-              <span className="font-bold text-[var(--theme-text-primary)]">${capital.accountEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(capital.accountEquity, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Available Cash:</span>
-              <span className="font-bold text-[var(--theme-profit)]">${capital.availableCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold text-[var(--theme-profit)]">{formatMoney(capital.availableCash, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Allocated Margin:</span>
-              <span className="font-bold text-purple-300">${capital.allocatedCapital.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold text-purple-300">{formatMoney(capital.allocatedCapital, "$")}</span>
             </div>
           </div>
         </div>
@@ -141,11 +142,11 @@ export function RiskSectionCapitalExposure({
           <div className="space-y-2.5 pt-1">
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Gross Exposure:</span>
-              <span className="font-bold text-cyan-300">${exposure.grossExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              <span className="font-bold text-cyan-300">{formatMoney(exposure.grossExposure, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Net Exposure:</span>
-              <span className="font-bold text-[var(--theme-text-primary)]">${exposure.netExposure.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+              <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(exposure.netExposure, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Effective Leverage:</span>
@@ -164,11 +165,11 @@ export function RiskSectionCapitalExposure({
           <div className="space-y-2.5 pt-1">
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Margin Used:</span>
-              <span className="font-bold text-purple-300">${margin.marginUsed.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-purple-300">{formatMoney(margin.marginUsed, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Margin Available:</span>
-              <span className="font-bold text-[var(--theme-profit)]">${margin.availableMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+              <span className="font-bold text-[var(--theme-profit)]">{formatMoney(margin.availableMargin, "$")}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-[var(--theme-text-secondary)]">Utilization Rate:</span>
@@ -203,7 +204,7 @@ export function RiskSectionCapitalExposure({
             <div key={item.symbol} className="space-y-1.5">
               <div className="flex justify-between text-[var(--theme-text-secondary)]">
                 <span className="font-bold text-[var(--theme-text-primary)]">{item.symbol}</span>
-                <span>${item.val.toLocaleString(undefined, { maximumFractionDigits: 0 })} ({item.pct.toFixed(1)}%)</span>
+                <span>{formatMoney(item.val, "$")} ({item.pct.toFixed(1)}%)</span>
               </div>
               <div className="h-2 w-full bg-[var(--theme-elevated)] rounded-full overflow-hidden">
                 <div

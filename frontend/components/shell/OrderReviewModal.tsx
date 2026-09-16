@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, CheckCircle2, Shield, X, ArrowRight } from "lucide-react";
@@ -102,19 +103,19 @@ export function OrderReviewModal({
             <div>
               <span className="text-[#52627A] block text-[10px]">PRICE:</span>
               <span className="text-[#F4F7FA] font-bold tabular-nums">
-                {order.orderType === "MARKET" ? "MARKET (LTP)" : `₹${order.price?.toLocaleString()}`}
+                {order.orderType === "MARKET" ? "MARKET (LTP)" : `₹{formatMoney(order.price, "$")}`}
               </span>
             </div>
             {order.estimatedMargin !== undefined && (
               <div>
                 <span className="text-[#52627A] block text-[10px]">EST. MARGIN:</span>
-                <span className="text-[#F4F7FA] tabular-nums">₹{order.estimatedMargin.toLocaleString()}</span>
+                <span className="text-[#F4F7FA] tabular-nums">{formatMoney(order.estimatedMargin, "₹")}</span>
               </div>
             )}
             {order.estimatedFee !== undefined && (
               <div>
                 <span className="text-[#52627A] block text-[10px]">EST. FEES:</span>
-                <span className="text-[#F4F7FA] tabular-nums">₹{order.estimatedFee.toLocaleString()}</span>
+                <span className="text-[#F4F7FA] tabular-nums">{formatMoney(order.estimatedFee, "₹")}</span>
               </div>
             )}
             <div className="col-span-2 pt-1 border-t border-[#213047]/60 flex items-center justify-between text-[10px]">

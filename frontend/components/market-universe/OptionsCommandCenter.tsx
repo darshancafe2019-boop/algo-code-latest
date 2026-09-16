@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -90,7 +91,7 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
                 Options Command Center
               </h3>
               <span className="text-[10px] px-2 py-0.5 rounded bg-[#07101A] text-cyan-300 font-mono font-bold border border-[#122033]">
-                {symbol} Spot: ${spot.toLocaleString()}
+                {symbol} Spot: {formatMoney(spot, "$")}
               </span>
             </div>
             <p className="text-[11px] text-[#7C8CA3]">
@@ -160,7 +161,7 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
                   >
                     {/* CALLS */}
                     <td className="py-3 px-3 text-right text-[#7C8CA3]">
-                      {call?.open_interest ? call.open_interest.toLocaleString() : "N/A"}
+                      {formatVolume(call?.open_interest)}
                     </td>
                     <td className="py-3 px-3 text-right text-purple-300">
                       {call?.implied_volatility ? `${call.implied_volatility.toFixed(1)}%` : "N/A"}
@@ -195,7 +196,7 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
                       {put?.implied_volatility ? `${put.implied_volatility.toFixed(1)}%` : "N/A"}
                     </td>
                     <td className="py-3 px-3 text-left text-[#7C8CA3]">
-                      {put?.open_interest ? put.open_interest.toLocaleString() : "N/A"}
+                      {formatVolume(put?.open_interest)}
                     </td>
                   </tr>
                 );

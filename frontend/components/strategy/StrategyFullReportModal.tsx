@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   X,
@@ -154,7 +155,7 @@ export function StrategyFullReportModal({
                     +{metrics.return_pct}%
                   </span>
                   <span className="text-[10px] text-[#7D8EA5] block mt-0.5">
-                    ${metrics.total_net_profit.toLocaleString()}
+                    {formatMoney(metrics.total_net_profit, "$")}
                   </span>
                 </div>
 
@@ -184,7 +185,7 @@ export function StrategyFullReportModal({
                     -{metrics.max_drawdown_pct}%
                   </span>
                   <span className="text-[10px] text-[#7D8EA5] block mt-0.5">
-                    -${metrics.max_drawdown_usd.toLocaleString()}
+                    -{formatMoney(metrics.max_drawdown_usd, "$")}
                   </span>
                 </div>
 
@@ -226,7 +227,7 @@ export function StrategyFullReportModal({
                 <div>
                   <span className="text-[#7D8EA5] text-[10px] block">Ending Equity</span>
                   <span className="text-sm font-bold text-[#00E89A]">
-                    ${metrics.ending_equity.toLocaleString()}
+                    {formatMoney(metrics.ending_equity, "$")}
                   </span>
                 </div>
               </div>
@@ -259,9 +260,9 @@ export function StrategyFullReportModal({
                         </span>
                       </td>
                       <td className="p-2.5 text-[#7D8EA5]">{t.entry_time}</td>
-                      <td className="p-2.5 text-[#F8FAFC]">${t.entry_price.toLocaleString()}</td>
+                      <td className="p-2.5 text-[#F8FAFC]">{formatMoney(t.entry_price, "$")}</td>
                       <td className="p-2.5 text-[#7D8EA5]">{t.exit_time}</td>
-                      <td className="p-2.5 text-[#F8FAFC]">${t.exit_price.toLocaleString()}</td>
+                      <td className="p-2.5 text-[#F8FAFC]">{formatMoney(t.exit_price, "$")}</td>
                       <td className="p-2.5">
                         <span className={t.net_pnl >= 0 ? "text-[#00E89A] font-bold" : "text-[#FF3B5C] font-bold"}>
                           {t.net_pnl >= 0 ? `+$${t.net_pnl.toFixed(2)}` : `-$${Math.abs(t.net_pnl).toFixed(2)}`}
@@ -287,7 +288,7 @@ export function StrategyFullReportModal({
                   Simulated Equity Growth Curve
                 </span>
                 <span className="text-[10px] text-[#00E89A] font-bold">
-                  Final: ${metrics.ending_equity.toLocaleString()} (+{metrics.return_pct}%)
+                  Final: {formatMoney(metrics.ending_equity, "$")} (+{metrics.return_pct}%)
                 </span>
               </div>
 
@@ -295,7 +296,7 @@ export function StrategyFullReportModal({
                 {equityCurve.map((pt, i) => (
                   <div key={i} className="p-2 rounded bg-[#0A1422] border border-[#12304A]">
                     <span className="text-[10px] text-[#7D8EA5] block">{pt.time}</span>
-                    <span className="text-xs font-bold text-[#F8FAFC]">${pt.equity.toLocaleString()}</span>
+                    <span className="text-xs font-bold text-[#F8FAFC]">{formatMoney(pt.equity, "$")}</span>
                     <span className="text-[10px] text-[#FF3B5C] block mt-0.5">
                       DD: -{pt.drawdown_pct}%
                     </span>

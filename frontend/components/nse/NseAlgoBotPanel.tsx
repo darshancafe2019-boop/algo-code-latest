@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import {
@@ -163,7 +164,7 @@ export function NseAlgoBotPanel() {
             <div className="space-y-2 text-xs border-t border-slate-800 pt-3">
               <div className="flex justify-between">
                 <span className="text-slate-400">Underlying Spot:</span>
-                <span className="text-white font-bold">₹{signal?.spot_price ? signal.spot_price.toLocaleString("en-IN") : "--"}</span>
+                <span className="text-white font-bold">{formatMoney(signal?.spot_price, "₹")}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Put-Call Ratio (PCR):</span>
@@ -173,7 +174,7 @@ export function NseAlgoBotPanel() {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Max Pain Target:</span>
-                <span className="text-amber-300 font-bold">₹{signal?.max_pain ? signal.max_pain.toLocaleString("en-IN") : "--"}</span>
+                <span className="text-amber-300 font-bold">{formatMoney(signal?.max_pain, "₹")}</span>
               </div>
             </div>
 

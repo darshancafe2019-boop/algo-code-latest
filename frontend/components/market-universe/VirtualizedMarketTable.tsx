@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState, useMemo, useRef, useEffect, memo } from "react";
 import {
@@ -105,7 +106,7 @@ const MarketTableRow = memo(function MarketTableRow({
     if (val === null || val === undefined) return "—";
     if (val === 0) return "—";
     return val >= 1000
-      ? val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ? formatPrice(val)
       : val.toFixed(2);
   };
 

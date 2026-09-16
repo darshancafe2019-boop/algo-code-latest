@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -442,7 +443,7 @@ export function OptionsContractSelectorModal({
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-slate-400 font-bold uppercase">5. Select Strike Price</span>
               <span className="text-[11px] text-slate-300">
-                Spot Reference: <strong className="text-white font-mono">{currentSpot.toLocaleString()}</strong>
+                Spot Reference: <strong className="text-white font-mono">{formatNumber(currentSpot)}</strong>
               </span>
             </div>
 
@@ -460,7 +461,7 @@ export function OptionsContractSelectorModal({
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-extrabold text-xs">{s.strike.toLocaleString()}</span>
+                      <span className="font-extrabold text-xs">{formatNumber(s.strike)}</span>
                       {s.isAtm ? (
                         <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
                           ATM
@@ -516,7 +517,7 @@ export function OptionsContractSelectorModal({
             <div className="flex flex-wrap items-center gap-4 pt-1 text-[11px] text-slate-400 border-t border-slate-800/80">
               <span>Underlying: <strong className="text-slate-200">{resolvedContract.underlying}</strong></span>
               <span>Expiry: <strong className="text-slate-200">{resolvedContract.expiry}</strong></span>
-              <span>Strike: <strong className="text-slate-200">{resolvedContract.strike.toLocaleString()}</strong></span>
+              <span>Strike: <strong className="text-slate-200">{formatNumber(resolvedContract.strike)}</strong></span>
               <span>Side: <strong className={selectedSide === "CALL" ? "text-emerald-400" : "text-rose-400"}>{selectedSide}</strong></span>
             </div>
           </div>

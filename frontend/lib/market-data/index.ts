@@ -16,7 +16,6 @@ export * from "./market-state";
 export * from "./subscription-manager";
 export * from "./websocket-manager";
 export * from "./dhan-feed";
-export * from "./candle-engine";
 export * from "./option-chain-engine";
 export * from "./orderbook-engine";
 export * from "./metrics";
@@ -190,30 +189,6 @@ export function useMarketHealth() {
 export const useMarketQuote = useLiveQuote;
 export const useOptionChain = useLiveOptionChain;
 export const useProviderHealth = useMarketHealth;
-
-/**
- * Hook to retrieve normalized candles for a symbol.
- */
-export function useMarketCandles(symbol: string | null | undefined, timeframe: CandleTimeframe = "15m", limit: number = 100) {
-  const sym = symbol ? symbol.toUpperCase() : null;
-  const [candles, setCandles] = useState<OHLCVCandle[]>(() =>
-    sym ? marketState.getCandles(sym, timeframe).slice(-limit) : []
-  );
-
-  useEffect(() => {
-    if (!sym) {
-      setCandles([]);
-      return;
-    }
-    setCandles(marketState.getCandles(sym, timeframe).slice(-limit));
-    const unsub = marketState.subscribeSymbol(sym, () => {
-      setCandles(marketState.getCandles(sym, timeframe).slice(-limit));
-    });
-    return () => unsub();
-  }, [sym, timeframe, limit]);
-
-  return candles;
-}
 
 /**
  * Hook to resolve canonical instrument details.

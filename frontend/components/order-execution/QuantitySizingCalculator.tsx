@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Calculator } from "lucide-react";
 import { QuantityMode } from "@/types/order-execution";
@@ -71,7 +72,7 @@ export function QuantitySizingCalculator({
         <div className="flex items-center justify-between text-[11px] text-[#7C8CA3]">
           <span>Order Size ({quantityMode})</span>
           <span className="text-[#22D3EE] font-semibold font-mono tabular-nums">
-            Notional: ${notionalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Notional: {formatMoney(notionalValue, "$")}
           </span>
         </div>
         <div className="relative">

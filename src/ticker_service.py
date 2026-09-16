@@ -444,21 +444,6 @@ class ResilientTickerService:
         }
 
     def _query_db_last_candle(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Queries SQLite candles_cache for the most recent candle for the symbol."""
-        try:
-            conn = sqlite3.connect(str(config.DB_PATH), timeout=3.0)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            cursor.execute(
-                "SELECT open, high, low, close, volume FROM candles_cache WHERE symbol = ? ORDER BY id DESC LIMIT 1",
-                (symbol,)
-            )
-            row = cursor.fetchone()
-            conn.close()
-            if row:
-                return dict(row)
-        except Exception as ex:
-            logger.debug("[TickerService] DB fallback query error: %s", ex)
         return None
 
     def record_external_tick(self, symbol: str, data: Dict[str, Any]):

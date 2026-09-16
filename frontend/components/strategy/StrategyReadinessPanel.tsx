@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useMemo } from "react";
 import {
   ShieldCheck,
@@ -89,7 +90,7 @@ export function StrategyReadinessPanel({ strategy }: StrategyReadinessPanelProps
       category: "Risk",
       label: "Capital Allocation",
       status: hasCapital ? "PASSED" : "FAILED",
-      message: hasCapital ? `$${strategy.risk.capital.toLocaleString()} allocated` : "Capital cannot be 0",
+      message: hasCapital ? `${formatMoney(strategy.risk.capital, "$")} allocated` : "Capital cannot be 0",
       critical: true,
     });
 

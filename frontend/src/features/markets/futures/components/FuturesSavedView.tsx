@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Star, Bookmark, Trash2, ArrowUpRight, Zap, TrendingUp } from "lucide-react";
 import { useFuturesStore } from "../state/futures-store";
@@ -67,7 +68,7 @@ export function FuturesSavedView({ contracts }: FuturesSavedViewProps) {
                     <div>
                       <span className="text-[9px] text-slate-500 uppercase block">Mark Price</span>
                       <span className="font-bold text-white text-sm">
-                        {isConnected && c.mark_price != null ? `${currSymbol}${c.mark_price.toLocaleString()}` : "—"}
+                        {isConnected && c.mark_price != null ? `${currSymbol}{formatMoney(c.mark_price, "$")}` : "—"}
                       </span>
                     </div>
                     <div>

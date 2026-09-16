@@ -225,7 +225,7 @@ def reject_decision(decision_id: str):
 @orchestrator_bp.route("/risk", methods=["GET"])
 def get_risk_telemetry():
     limits = get_universal_risk_limits()
-    raw_positions = db.safe_query("SELECT * FROM positions WHERE is_closed = 0") or []
+    raw_positions = db.safe_query("SELECT * FROM positions WHERE status = 'OPEN'") or []
     positions_list = [dict(p) for p in raw_positions]
 
     return jsonify({

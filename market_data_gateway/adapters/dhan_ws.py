@@ -109,10 +109,12 @@ class DhanWSAdapter(BaseProviderAdapter):
         self._rest_block_until: float = 0.0
         self._rest_min_interval_sec: float = 1.10
 
-        # Pre-populate security ID lookup from registry
+        # Pre-populate security ID lookup from registry (prioritize canonical trading symbols)
         for sym, meta in OFFICIAL_DHAN_KEYS.items():
             sec_id = str(meta["security_id"])
-            self._sec_id_to_symbol[sec_id] = sym
+            canonical = meta.get("trading_symbol") or sym
+            if sec_id not in self._sec_id_to_symbol or (" " not in sym and sym == canonical):
+                self._sec_id_to_symbol[sec_id] = canonical
 
         # Register for dynamic credential hot-reload events
         global_dhan_credential_manager.register_callback(self._on_credential_update)
@@ -732,67 +734,6 @@ class DhanWSAdapter(BaseProviderAdapter):
                     result[sym] = self._quote_cache[sym]
 
         return result
-
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        meta = global_dhan_service.resolve_symbol(symbol)
-        if not meta or not global_dhan_service.is_authenticated:
-            return []
-
-        sec_id = str(meta["security_id"])
-        seg = meta.get("exchange_segment", "NSE_EQ")
-        from_str = from_dt.strftime("%Y-%m-%d")
-        to_str = to_dt.strftime("%Y-%m-%d")
-
-        loop = asyncio.get_event_loop()
-        resp = await loop.run_in_executor(
-            None,
-            lambda: global_dhan_service.get_historical_charts(
-                security_id=sec_id,
-                exchange_segment=seg,
-                from_date=from_str,
-                to_date=to_str,
-            ),
-        )
-
-        candles: List[OHLCVCandle] = []
-        if not resp or not isinstance(resp, dict) or "data" not in resp:
-            return candles
-
-        chart_data = resp.get("data", {})
-        timestamps = chart_data.get("timestamp", [])
-        opens = chart_data.get("open", [])
-        highs = chart_data.get("high", [])
-        lows = chart_data.get("low", [])
-        closes = chart_data.get("close", [])
-        volumes = chart_data.get("volume", [])
-
-        for i in range(len(timestamps)):
-            try:
-                dt_iso = datetime.fromtimestamp(timestamps[i], tz=timezone.utc).isoformat()
-                candles.append(
-                    OHLCVCandle(
-                        symbol=symbol,
-                        exchange="NSE",
-                        provider="dhan_ws",
-                        timeframe=timeframe,
-                        timestamp=dt_iso,
-                        open=float(opens[i]),
-                        high=float(highs[i]),
-                        low=float(lows[i]),
-                        close=float(closes[i]),
-                        volume=float(volumes[i]) if i < len(volumes) else 0.0,
-                    )
-                )
-            except Exception:
-                continue
-
-        return candles
 
     async def get_instruments(self) -> List[CanonicalInstrument]:
         instruments: List[CanonicalInstrument] = []

@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import {
@@ -238,7 +239,7 @@ export function RiskDecisionTable({
                         {d.requested_risk_pct ? `${d.requested_risk_pct.toFixed(2)}%` : "0.50%"}
                       </span>
                       <span className="text-[10px] text-slate-500 block">
-                        ${d.requested_risk_usd ? d.requested_risk_usd.toLocaleString() : "50.00"}
+                        {formatMoney(d.requested_risk_usd, "$")}
                       </span>
                     </td>
 

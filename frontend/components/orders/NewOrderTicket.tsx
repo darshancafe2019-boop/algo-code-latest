@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Zap,
@@ -186,7 +187,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
     if (!isMarginOK) {
       return {
         passed: false,
-        reason: `Insufficient margin (Required: $${requiredMargin.toLocaleString()}, Available: $${availableCapital.toLocaleString()})`,
+        reason: `Insufficient margin (Required: ${formatMoney(requiredMargin, "$")}, Available: ${formatMoney(availableCapital, "$")})`,
       };
     }
     return { passed: true, reason: "14 / 14 Pre-Order Safety Checks Passed" };
@@ -256,7 +257,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
       setOrderFeedback({
         status: "success",
-        message: data.message || `${tradingMode} ${targetSide} order for ${effectiveQty} ${selectedSymbol} FILLED @ $${fillPrice.toLocaleString()}!`,
+        message: data.message || `${tradingMode} ${targetSide} order for ${effectiveQty} ${selectedSymbol} FILLED @ ${formatMoney(fillPrice, "$")}!`,
       });
 
       setIsReviewModalOpen(false);
@@ -332,7 +333,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                       <div className="text-[10px] text-[#7C8CA3]">{inst.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-[#22D3EE] font-mono tabular-nums">${inst.price.toLocaleString()}</div>
+                      <div className="font-semibold text-[#22D3EE] font-mono tabular-nums">{formatMoney(inst.price, "$")}</div>
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#101B2D] text-[#7C8CA3]">
                         {inst.assetClass}
                       </span>
@@ -349,14 +350,14 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           <div>
             <div className="text-[10px] text-[#7C8CA3] uppercase">Last Traded Price</div>
             <div className="text-base font-bold text-[#F7FAFC] font-mono tabular-nums">
-              {currencySymbol}{marketPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(marketPrice, currencySymbol)}
             </div>
           </div>
 
           <div className="hidden sm:block">
             <div className="text-[10px] text-[#7C8CA3] uppercase">Mark Price</div>
             <div className="text-sm font-medium text-[#7C8CA3] font-mono tabular-nums">
-              {currencySymbol}{(marketPrice * 0.9998).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(marketPrice * 0.9998, currencySymbol)}
             </div>
           </div>
         </div>
@@ -466,7 +467,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           <div className="px-3 py-2 bg-[#07101A] border border-[#1A2A3F] rounded-lg flex items-center justify-between text-xs">
             <span className="text-[#7C8CA3]">Notional Value:</span>
             <span className="text-[#22D3EE] font-bold font-mono tabular-nums">
-              ≈ ${calculatedNotional.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ≈ {formatMoney(calculatedNotional, "$")}
             </span>
           </div>
         </div>
@@ -497,7 +498,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
         <div className="flex items-center justify-between">
           <label className="text-[11px] text-[#7C8CA3]">Leverage & Margin</label>
           <span className="text-[10px] text-[#7C8CA3]">
-            Required Margin: <strong className="text-[#F7FAFC] font-mono tabular-nums">${requiredMargin.toLocaleString()}</strong>
+            Required Margin: <strong className="text-[#F7FAFC] font-mono tabular-nums">{formatMoney(requiredMargin, "$")}</strong>
           </span>
         </div>
 
@@ -526,7 +527,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           <div className="bg-[#07101A] p-3 rounded-lg border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] text-[#7C8CA3]">Stop Loss</label>
-              <span className="text-[10px] text-[#FF3B5C] font-semibold font-mono tabular-nums">${stopLossPrice.toLocaleString()}</span>
+              <span className="text-[10px] text-[#FF3B5C] font-semibold font-mono tabular-nums">{formatMoney(stopLossPrice, "$")}</span>
             </div>
             <div className="relative">
               <input
@@ -556,7 +557,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
           <div className="bg-[#07101A] p-3 rounded-lg border border-[#1A2A3F]">
             <div className="flex items-center justify-between mb-1">
               <label className="text-[11px] text-[#7C8CA3]">Take Profit</label>
-              <span className="text-[10px] text-[#00E890] font-semibold font-mono tabular-nums">${takeProfitPrice.toLocaleString()}</span>
+              <span className="text-[10px] text-[#00E890] font-semibold font-mono tabular-nums">{formatMoney(takeProfitPrice, "$")}</span>
             </div>
             <div className="relative">
               <input
@@ -688,7 +689,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
             </div>
             <div>
               <span className="text-[#52627A] block">Fill Price</span>
-              <span className="text-[#F7FAFC] font-semibold font-mono tabular-nums">${lastExecutedOrder.executionPrice.toLocaleString()}</span>
+              <span className="text-[#F7FAFC] font-semibold font-mono tabular-nums">{formatMoney(lastExecutedOrder.executionPrice, "$")}</span>
             </div>
             <div>
               <span className="text-[#52627A] block">Timestamp</span>

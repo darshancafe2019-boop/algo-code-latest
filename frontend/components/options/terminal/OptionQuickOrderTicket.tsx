@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
@@ -544,7 +545,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
           <div>
             <div className="text-[10px] uppercase text-slate-400 font-bold mb-1">Quantity</div>
             <div className="h-8 flex items-center justify-between px-2.5 rounded-lg bg-slate-900 border border-slate-800">
-              <span className="text-white font-extrabold">{totalQuantity.toLocaleString()}</span>
+              <span className="text-white font-extrabold">{formatNumber(totalQuantity)}</span>
               <span className="text-[10px] text-slate-500">(@ {lotSize}/lot)</span>
             </div>
           </div>
@@ -559,7 +560,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
           <div className="flex items-center justify-between text-slate-400">
             <span>Available Funds:</span>
             <span className={isFundsSufficient ? "text-emerald-400 font-bold" : "text-rose-400 font-bold"}>
-              {curSymbol}{availableFunds.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {curSymbol}{formatNumber(availableFunds, 2)}
             </span>
           </div>
         </div>

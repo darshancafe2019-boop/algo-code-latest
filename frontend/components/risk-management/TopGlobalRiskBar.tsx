@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Shield,
@@ -101,14 +102,14 @@ export function TopGlobalRiskBar({ overview, onOpenEmergencyModal }: TopGlobalRi
           {/* Capital */}
           <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033] space-y-0.5">
             <span className="text-[10px] text-[#52627A] uppercase font-bold block">Available Capital</span>
-            <span className="text-sm font-bold text-white">${availCap.toLocaleString()}</span>
-            <span className="text-[10px] text-[#22D3EE] block">of ${totalCap.toLocaleString()} Total</span>
+            <span className="text-sm font-bold text-white">{formatMoney(availCap, "$")}</span>
+            <span className="text-[10px] text-[#22D3EE] block">of {formatMoney(totalCap, "$")} Total</span>
           </div>
 
           {/* Exposure */}
           <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033] space-y-0.5">
             <span className="text-[10px] text-[#52627A] uppercase font-bold block">Gross Exposure</span>
-            <span className="text-sm font-bold text-cyan-300">${grossExp.toLocaleString()}</span>
+            <span className="text-sm font-bold text-cyan-300">{formatMoney(grossExp, "$")}</span>
             <span className="text-[10px] text-[#7C8CA3] block">{((grossExp / totalCap) * 100).toFixed(1)}% Utilization</span>
           </div>
 
@@ -156,12 +157,12 @@ export function TopGlobalRiskBar({ overview, onOpenEmergencyModal }: TopGlobalRi
 
         <div className="p-2 rounded-lg bg-[#07101A] border border-[#122033]">
           <span className="text-[#52627A] block text-[9px] uppercase font-bold">2. Max Order Size?</span>
-          <span className="text-white font-bold">${(totalCap * 0.25).toLocaleString()}</span>
+          <span className="text-white font-bold">{formatMoney(totalCap * 0.25, "$")}</span>
         </div>
 
         <div className="p-2 rounded-lg bg-[#07101A] border border-[#122033]">
           <span className="text-[#52627A] block text-[9px] uppercase font-bold">3. Capital In Use?</span>
-          <span className="text-cyan-300 font-bold">${grossExp.toLocaleString()} ({((grossExp / totalCap) * 100).toFixed(0)}%)</span>
+          <span className="text-cyan-300 font-bold">{formatMoney(grossExp, "$")} ({((grossExp / totalCap) * 100).toFixed(0)}%)</span>
         </div>
 
         <div className="p-2 rounded-lg bg-[#07101A] border border-[#122033]">
@@ -171,7 +172,7 @@ export function TopGlobalRiskBar({ overview, onOpenEmergencyModal }: TopGlobalRi
 
         <div className="p-2 rounded-lg bg-[#07101A] border border-[#122033]">
           <span className="text-[#52627A] block text-[9px] uppercase font-bold">5. Net Exposure?</span>
-          <span className="text-emerald-400 font-bold">${overview.net_exposure?.toLocaleString() || grossExp.toLocaleString()}</span>
+          <span className="text-emerald-400 font-bold">{formatMoney(overview.net_exposure ?? grossExp, "$")}</span>
         </div>
 
         <div className="p-2 rounded-lg bg-[#07101A] border border-[#122033]">

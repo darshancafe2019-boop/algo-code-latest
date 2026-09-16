@@ -342,7 +342,7 @@ export function ContextInspector({
             <div>
               <span className="text-[10px] text-slate-500 block">MARGIN REQ</span>
               <span className="text-slate-300 font-semibold">
-                {formatMoney(entity.riskProfile?.marginRequirement || 0)}
+                {formatMoney(entity.riskProfile.marginRequirement || 0)}
               </span>
             </div>
           </div>

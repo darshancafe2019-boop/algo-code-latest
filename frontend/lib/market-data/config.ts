@@ -23,6 +23,11 @@ export interface MarketDataConfig {
     wsUrl: string;
     restUrl: string;
   };
+  twelvedata: {
+    apiKey: string;
+    restUrl: string;
+    wsUrl: string;
+  };
   redis: {
     url: string;
     keyPrefix: string;
@@ -47,14 +52,19 @@ export const marketDataConfig: MarketDataConfig = {
   upstox: {
     apiKey: process.env.UPSTOX_API_KEY || "",
     accessToken: process.env.UPSTOX_ACCESS_TOKEN || "",
-    feedUrl: process.env.UPSTOX_FEED_URL || "wss://api.upstox.com/v2/feed/market-data-feed",
-    restUrl: process.env.UPSTOX_BASE_URL || "https://api.upstox.com/v2",
+    feedUrl: process.env.UPSTOX_FEED_URL || "wss://api.upstox.com/v3/feed/market-data-feed",
+    restUrl: process.env.UPSTOX_BASE_URL || "https://api.upstox.com/v3",
   },
   delta: {
     apiKey: process.env.DELTA_API_KEY || "",
     apiSecret: process.env.DELTA_API_SECRET || "",
-    wsUrl: process.env.DELTA_WS_URL || "wss://socket.india.delta.exchange",
+    wsUrl: process.env.DELTA_WS_URL || "wss://public-socket.india.delta.exchange",
     restUrl: process.env.DELTA_BASE_URL || "https://api.india.delta.exchange",
+  },
+  twelvedata: {
+    apiKey: process.env.TWELVE_DATA_API_KEY || "",
+    restUrl: process.env.TWELVE_DATA_REST_URL || "https://api.twelvedata.com",
+    wsUrl: process.env.TWELVE_DATA_WS_URL || "wss://ws.twelvedata.com/v1/quotes/price",
   },
   redis: {
     url: process.env.REDIS_URL || process.env.REDIS_CACHE_URL || "redis://127.0.0.1:6379",
@@ -68,6 +78,7 @@ export const marketDataConfig: MarketDataConfig = {
   },
   isServer: typeof window === "undefined",
 };
+
 
 export const DHAN_CONFIG = {
   getCredentials: () => {

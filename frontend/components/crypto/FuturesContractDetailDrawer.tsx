@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   X,
@@ -91,19 +92,19 @@ export function FuturesContractDetailDrawer({ isOpen, onClose, contract }: Props
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Last Price</span>
             <span className="text-sm font-bold text-white">
-              ${(Number(contract.last_price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatMoney(Number(contract.last_price), "$")}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Mark Price</span>
             <span className="text-slate-200 font-semibold">
-              ${(Number(contract.mark_price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatMoney(Number(contract.mark_price), "$")}
             </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-slate-400">Index Price</span>
             <span className="text-slate-200 font-semibold">
-              ${(Number(contract.index_price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatMoney(Number(contract.index_price), "$")}
             </span>
           </div>
           <div className="flex items-center justify-between pt-1 border-t border-slate-800/80">
@@ -116,7 +117,7 @@ export function FuturesContractDetailDrawer({ isOpen, onClose, contract }: Props
           <div className="flex items-center justify-between">
             <span className="text-slate-400">24H High / Low</span>
             <span className="text-slate-300 text-[11px]">
-              ${(contract.high_24h || 0).toLocaleString()} / ${(contract.low_24h || 0).toLocaleString()}
+              {formatMoney(contract.high_24h, "$")} / {formatMoney(contract.low_24h, "$")}
             </span>
           </div>
         </div>
@@ -162,7 +163,7 @@ export function FuturesContractDetailDrawer({ isOpen, onClose, contract }: Props
             <div className="flex items-center justify-between">
               <span className="text-slate-400">Open Interest (Base)</span>
               <span className="text-slate-300">
-                {(contract.open_interest || 0).toLocaleString()} {contract.underlying}
+                {formatNumber(contract.open_interest)} {contract.underlying}
               </span>
             </div>
             <div className="flex items-center justify-between">

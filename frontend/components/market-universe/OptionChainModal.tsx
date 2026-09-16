@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { OptionChainData, OptionStrike } from "@/types/market-universe";
@@ -57,7 +58,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
                   {selectedUnderlying}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-mono font-bold">
-                  Spot: ₹{spotPrice > 0 ? spotPrice.toLocaleString() : "..."}
+                  Spot: {formatMoney(spotPrice, "₹")}
                 </span>
               </div>
               <p className="text-[11px] text-slate-400">
@@ -234,7 +235,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
 
                       {/* Strike Price (Center) */}
                       <td className={`py-2 px-3 text-center bg-[#0F141F] font-bold ${isAtm ? "text-cyan-300 ring-1 ring-cyan-500/40" : "text-white"}`}>
-                        {s.strike.toLocaleString()}
+                        {formatNumber(s.strike)}
                         {isAtm && <span className="ml-1 text-[9px] text-cyan-400 uppercase tracking-tighter">(ATM)</span>}
                       </td>
 

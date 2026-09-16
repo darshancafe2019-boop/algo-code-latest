@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Compass, Plus, Trash2, ShieldCheck, Zap, Send, ArrowRight } from "lucide-react";
 import { StrategyLeg, MultiLegPayoff } from "@/types/option-chain";
@@ -195,7 +196,7 @@ export function MultiLegStrategyBuilder({
                     </span>
                   </td>
                   <td className="p-2.5 font-bold text-white">{leg.option_type}</td>
-                  <td className="p-2.5 font-bold text-white">{currency}{leg.strike.toLocaleString()}</td>
+                  <td className="p-2.5 font-bold text-white">{formatMoney(leg.strike, currency)}</td>
                   <td className="p-2.5 text-slate-400">{leg.expiry || selectedExpiry}</td>
                   <td className="p-2.5">{leg.lots} Lot ({leg.quantity} Qty)</td>
                   <td className="p-2.5 text-right font-bold text-white">{currency}{leg.premium.toFixed(2)}</td>

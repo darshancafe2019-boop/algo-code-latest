@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React from "react";
 import { Layers, Activity, Server, Clock, RefreshCw } from "lucide-react";
 
@@ -49,7 +50,7 @@ export const StocksHeader: React.FC<StocksHeaderProps> = ({
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <div className="text-[11px]">
               <span className="text-slate-500 block text-[9px] uppercase font-mono">Discovered</span>
-              <span className="text-white font-bold font-mono">{totalCount.toLocaleString()} Stocks</span>
+              <span className="text-white font-bold font-mono">{formatNumber(totalCount)} Stocks</span>
             </div>
           </div>
 

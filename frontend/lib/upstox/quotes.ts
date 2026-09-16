@@ -9,6 +9,7 @@ import { upstoxFetch } from "./client";
 import { NormalizedLtp, NormalizedQuote } from "./types";
 import { resolveInstrumentKey, PRIMARY_UPSTOX_INSTRUMENTS } from "./instruments";
 import { UpstoxValidationError } from "./errors";
+import { getIndianMarketPhase } from "./market-status";
 
 /**
  * Fetches normalized Last Traded Price (LTP) for a specific instrument.
@@ -120,6 +121,9 @@ export async function getFullQuotes(
     }));
 
     const instMeta = PRIMARY_UPSTOX_INSTRUMENTS.find((i) => i.instrumentKey === key);
+    const marketPhase = getIndianMarketPhase();
+    const isOpen = marketPhase === "NORMAL_OPEN";
+    const priceState = isOpen ? "LIVE_TRADE" : "LAST_TRADED";
 
     normalized[key] = {
       provider: "UPSTOX",
@@ -153,8 +157,12 @@ export async function getFullQuotes(
       exchangeTimestamp: new Date(lastTradeTs).toISOString(),
       receivedAt: nowIso,
       ageMs,
-      stale: ageMs > 30000,
-      status: ageMs > 30000 ? "STALE" : "LIVE",
+      stale: isOpen && ageMs > 30000,
+      status: !isOpen ? "MARKET_CLOSED" : ageMs > 30000 ? "STALE" : "LIVE",
+      connectionState: "CONNECTED",
+      marketPhase,
+      priceState,
+      isTradable: isOpen,
     };
   }
 

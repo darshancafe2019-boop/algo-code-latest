@@ -29,6 +29,7 @@ interface SimpleMarketsHeaderProps {
   providerCount?: number;
   lastUpdateMs?: number;
   isLiveFeed: boolean;
+  feedStatus?: "LIVE" | "PARTIAL" | "MARKETS CLOSED" | "RECONNECTING" | "STALE" | "OFFLINE";
   searchQuery: string;
   onSearchChange: (q: string) => void;
   activeCategory: string;
@@ -67,6 +68,7 @@ export function SimpleMarketsHeader({
   providerCount = 0,
   lastUpdateMs = 0,
   isLiveFeed = false,
+  feedStatus,
   searchQuery,
   onSearchChange,
   activeCategory,
@@ -85,6 +87,8 @@ export function SimpleMarketsHeader({
   const [isMoreOpen, setIsMoreOpen] = useState(false);
   const moreRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const effectiveStatus = feedStatus || (isLiveFeed ? "LIVE" : "STALE");
 
   // Keyboard shortcut: '/' or Ctrl/Cmd+K to focus search
   useEffect(() => {
@@ -123,20 +127,37 @@ export function SimpleMarketsHeader({
             </h1>
 
             {/* Calculated Data Health Badge */}
-            <div
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all ${
-                isLiveFeed
-                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]"
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-400"
-              }`}
-            >
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-                }`}
-              />
-              <span>{isLiveFeed ? "LIVE FEED" : "STALE / RECONNECTING"}</span>
-            </div>
+            {effectiveStatus === "LIVE" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span>● LIVE</span>
+              </div>
+            ) : effectiveStatus === "PARTIAL" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-cyan-500/10 border-cyan-500/30 text-cyan-400">
+                <span className="w-2 h-2 rounded-full bg-cyan-400" />
+                <span>● PARTIAL</span>
+              </div>
+            ) : effectiveStatus === "MARKETS CLOSED" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-slate-800 border-slate-700 text-slate-300">
+                <span className="w-2 h-2 rounded-full bg-slate-400" />
+                <span>● MARKETS CLOSED</span>
+              </div>
+            ) : effectiveStatus === "RECONNECTING" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>● RECONNECTING</span>
+              </div>
+            ) : effectiveStatus === "OFFLINE" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-rose-500/10 border-rose-500/30 text-rose-400">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                <span>● OFFLINE</span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-400">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>● STALE</span>
+              </div>
+            )}
           </div>
 
           {/* Telemetry Summary Sub-Row with Enhanced Contrast & Readability */}

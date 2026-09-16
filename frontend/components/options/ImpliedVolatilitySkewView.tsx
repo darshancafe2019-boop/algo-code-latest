@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { LineChart, Activity, Layers, Sparkles } from "lucide-react";
 import { OptionStrikeRow } from "@/types/option-chain";
@@ -70,7 +71,7 @@ export function ImpliedVolatilitySkewView({
                   }`}
                 >
                   <td className="p-2.5 font-bold text-white">
-                    {currency}{s.strike.toLocaleString()}
+                    {formatMoney(s.strike, currency)}
                   </td>
                   <td className="p-2.5 text-center">
                     <span

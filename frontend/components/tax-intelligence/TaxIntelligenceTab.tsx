@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   LayoutDashboard,
@@ -350,13 +351,13 @@ export function TaxIntelligenceTab() {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Realized P&L:</span>
                           <span className={seg.realized_pnl !== null ? (seg.realized_pnl >= 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold") : "text-slate-500"}>
-                            {seg.realized_pnl !== null ? `₹${Math.round(seg.realized_pnl).toLocaleString()}` : "N/A"}
+                            {seg.realized_pnl !== null ? `₹{formatMoney(Math.round(seg.realized_pnl), "$")}` : "N/A"}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Est. Tax:</span>
                           <span className="text-amber-400 font-semibold">
-                            {seg.estimated_tax !== null ? `₹${Math.round(seg.estimated_tax).toLocaleString()}` : "N/A"}
+                            {seg.estimated_tax !== null ? `₹{formatMoney(Math.round(seg.estimated_tax), "$")}` : "N/A"}
                           </span>
                         </div>
                         <div className="flex justify-between">
@@ -409,10 +410,10 @@ export function TaxIntelligenceTab() {
 
                       <div className="text-right">
                         <div className="text-slate-200 font-semibold">
-                          Taxable: ₹{item.taxable_amount.toLocaleString()}
+                          Taxable: {formatMoney(item.taxable_amount, "₹")}
                         </div>
                         <div className="text-[11px] text-amber-400 font-bold">
-                          Est. Tax: ₹{item.estimated_tax.toLocaleString()}
+                          Est. Tax: {formatMoney(item.estimated_tax, "₹")}
                         </div>
                       </div>
                     </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { CheckCircle2, ShieldCheck, X, Zap, AlertTriangle } from "lucide-react";
 
@@ -116,20 +117,20 @@ export function OrderReviewConfirmationModal({
 
           <div className="flex items-center justify-between">
             <span className="text-[#7C8CA3]">Estimated Price:</span>
-            <span className="text-[#22D3EE] font-mono tabular-nums font-semibold">${price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="text-[#22D3EE] font-mono tabular-nums font-semibold">{formatMoney(price, "$")}</span>
           </div>
 
           <div className="flex items-center justify-between pt-2 border-t border-[#1A2A3F]">
             <span className="text-[#7C8CA3]">Expected Notional:</span>
             <span className="text-[#F7FAFC] font-mono tabular-nums font-bold text-sm">
-              ${notionalValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(notionalValue, "$")}
             </span>
           </div>
 
           <div className="flex items-center justify-between">
             <span className="text-[#7C8CA3]">Required Margin ({leverage}x):</span>
             <span className="text-[#F7FAFC] font-mono tabular-nums font-medium">
-              ${requiredMargin.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(requiredMargin, "$")}
             </span>
           </div>
 
@@ -138,14 +139,14 @@ export function OrderReviewConfirmationModal({
               <div>
                 <span className="text-[#7C8CA3] block">Stop Loss:</span>
                 <span className="text-[#FF3B5C] font-semibold font-mono tabular-nums">
-                  {stopLossPrice ? `$${stopLossPrice.toLocaleString()}` : "None"}
+                  {stopLossPrice ? `${formatMoney(stopLossPrice, "$")}` : "None"}
                 </span>
                 {riskUsd ? <span className="text-[#52627A] block text-[10px] font-mono">Risk: -${riskUsd.toFixed(2)}</span> : null}
               </div>
               <div className="text-right">
                 <span className="text-[#7C8CA3] block">Take Profit:</span>
                 <span className="text-[#00E890] font-semibold font-mono tabular-nums">
-                  {takeProfitPrice ? `$${takeProfitPrice.toLocaleString()}` : "None"}
+                  {takeProfitPrice ? `${formatMoney(takeProfitPrice, "$")}` : "None"}
                 </span>
                 {rewardUsd ? <span className="text-[#52627A] block text-[10px] font-mono">Target: +${rewardUsd.toFixed(2)}</span> : null}
               </div>

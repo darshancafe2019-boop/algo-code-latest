@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   ArrowUpRight,
@@ -130,10 +131,10 @@ const PositionTableRow = React.memo(function PositionTableRow({
       {/* 5. Entry / Current Mark Price */}
       <td className="py-3 px-2.5 text-right tabular-nums">
         <div className="font-bold text-xs text-[#F7FAFC]">
-          {currencySymbol}{currP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {formatMoney(currP, currencySymbol)}
         </div>
         <div className="text-[11px] text-[#52627A]">
-          Entry: {currencySymbol}{entryP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          Entry: {formatMoney(entryP, currencySymbol)}
         </div>
       </td>
 
@@ -141,7 +142,7 @@ const PositionTableRow = React.memo(function PositionTableRow({
       <td className="py-3 px-2.5 text-right tabular-nums">
         <div className="text-[#F7FAFC] font-semibold text-xs">{qty}</div>
         <div className="text-[11px] text-[#52627A]">
-          {currencySymbol}{notional.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          {formatMoney(notional, currencySymbol)}
         </div>
       </td>
 
@@ -153,7 +154,7 @@ const PositionTableRow = React.memo(function PositionTableRow({
               BE
             </span>
           )}
-          <span>{currencySymbol}{slP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          <span>{formatMoney(slP, currencySymbol)}</span>
         </div>
         <div className="text-[11px] text-[#FF3B5C] opacity-80">
           -{pos.sl_distance_pct?.toFixed(2) || "2.00"}%
@@ -163,7 +164,7 @@ const PositionTableRow = React.memo(function PositionTableRow({
       {/* 8. Take Profit */}
       <td className="py-3 px-2.5 text-right tabular-nums">
         <div className="text-[#00E890] font-semibold text-xs">
-          {currencySymbol}{tpP.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {formatMoney(tpP, currencySymbol)}
         </div>
         <div className="text-[11px] text-[#00E890] opacity-80">
           +{pos.tp_distance_pct?.toFixed(2) || "4.00"}%

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Calendar as CalendarIcon, Clock, AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
 import { TaxDeadlineItem } from "@/types/tax";
@@ -12,10 +13,7 @@ interface TaxCalendarViewProps {
 export function TaxCalendarView({ deadlines, currency }: TaxCalendarViewProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${val.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(val, "$")}`;
   };
 
   const getStatusBadge = (status: string, days: number) => {

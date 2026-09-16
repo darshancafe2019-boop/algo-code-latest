@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -158,7 +159,7 @@ export function OptionsFlowView() {
           <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
             <span className="text-[10px] text-slate-400 uppercase block">HIGHEST CALL OI (RESISTANCE)</span>
             <div className="text-lg font-bold text-rose-400 mt-0.5">
-              {snapshot.resistanceZone?.strike ? snapshot.resistanceZone.strike.toLocaleString("en-IN") : "—"}
+              {formatPrice(snapshot.resistanceZone?.strike)}
             </div>
             <span className="text-[10px] text-slate-400 mt-0.5 block">
               Call OI: {formatIndianQuantity(snapshot.resistanceZone?.oi)}
@@ -168,7 +169,7 @@ export function OptionsFlowView() {
           <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
             <span className="text-[10px] text-slate-400 uppercase block">HIGHEST PUT OI (SUPPORT)</span>
             <div className="text-lg font-bold text-emerald-400 mt-0.5">
-              {snapshot.supportZone?.strike ? snapshot.supportZone.strike.toLocaleString("en-IN") : "—"}
+              {formatPrice(snapshot.supportZone?.strike)}
             </div>
             <span className="text-[10px] text-slate-400 mt-0.5 block">
               Put OI: {formatIndianQuantity(snapshot.supportZone?.oi)}
@@ -178,7 +179,7 @@ export function OptionsFlowView() {
           <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90">
             <span className="text-[10px] text-slate-400 uppercase block">MAX PAIN ANCHOR</span>
             <div className="text-lg font-bold text-cyan-400 mt-0.5">
-              {snapshot.maxPain !== null && snapshot.maxPain !== undefined ? snapshot.maxPain.toLocaleString("en-IN") : "—"}
+              {formatPrice(snapshot.maxPain)}
             </div>
             <span className="text-[10px] text-slate-400 mt-0.5 block">
               Spot: {formatIndianCurrency(snapshot.spotPrice, currency)}

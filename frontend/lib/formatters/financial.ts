@@ -87,6 +87,31 @@ export function getDynamicDecimals(num: number, explicitDecimals?: number): numb
 }
 
 /**
+ * Formats a generic decimal or whole number with commas and precision.
+ * e.g. formatNumber(1250.5) -> "1,250.5"
+ *      formatNumber(1250.5, 2) -> "1,250.50"
+ *      formatNumber(null) -> "—"
+ */
+export function formatNumber(
+  value: unknown,
+  decimals?: number,
+  fallback: string = "—"
+): string {
+  const num = toFiniteNumber(value);
+  if (num === null) return fallback;
+  const cleanNum = normalizeZero(num);
+  if (decimals !== undefined && decimals !== null) {
+    return cleanNum.toLocaleString("en-US", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  }
+  return cleanNum.toLocaleString("en-US", {
+    maximumFractionDigits: 8,
+  });
+}
+
+/**
  * Formats a generic decimal number.
  * e.g. formatDecimal(12.3456, 2) -> "12.35"
  *      formatDecimal(null) -> "—"
@@ -332,3 +357,73 @@ export function safeMap<T, R>(
   }
   return result;
 }
+
+
+/**
+ * Formats asset volume with currency and compact unit suffixes (K, M, B).
+ */
+export function formatVolume(
+  value: unknown,
+  currency: string = "",
+  fallback: string = "—"
+): string {
+  const num = toFiniteNumber(value);
+  if (num === null) return fallback;
+  const cleanNum = normalizeZero(num);
+  if (cleanNum === 0) return `${currency}0`;
+  const abs = Math.abs(cleanNum);
+  const sign = cleanNum < 0 ? "-" : "";
+
+  if (abs >= 1_000_000_000) {
+    const val = abs / 1_000_000_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}B`;
+  }
+  if (abs >= 1_000_000) {
+    const val = abs / 1_000_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}M`;
+  }
+  if (abs >= 1_000) {
+    const val = abs / 1_000;
+    const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
+    return `${sign}${currency}${formatted}K`;
+  }
+  return `${sign}${currency}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * Formats compact money (e.g. $1.5M, ₹250K). Alias for formatVolume with default currency.
+ */
+export function formatCompactMoney(
+  value: unknown,
+  currency: string = "$",
+  fallback: string = "—"
+): string {
+  return formatVolume(value, currency, fallback);
+}
+
+/**
+ * Formats an exact number preserving up to 8 fractional digits.
+ */
+export function formatExactNumber(
+  value: unknown,
+  fallback: string = "—"
+): string {
+  const num = toFiniteNumber(value);
+  if (num === null) return fallback;
+  return num.toLocaleString(undefined, { maximumFractionDigits: 8 });
+}
+
+/**
+ * Safely logs development-only warnings when an invalid financial value is provided.
+ * Redacts sensitive tokens, keys, passwords, and authorization data.
+ */
+export function logInvalidNumericField(component: string, fieldName: string, value: unknown): void {
+  if (typeof process !== "undefined" && process.env?.NODE_ENV !== "production") {
+    const isSensitive = /token|secret|password|key|auth|bearer|cookie|session/i.test(fieldName);
+    if (isSensitive) return;
+    console.warn(`[Quant.OS Numeric Diagnostic] [${component}] Invalid numeric value for field "${fieldName}":`, value);
+  }
+}
+

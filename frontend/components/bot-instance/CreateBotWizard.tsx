@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import * as React from "react";
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -905,7 +906,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
             <span className="text-[#52627A] block text-[10px]">Live Benchmark (LTP)</span>
             <span className="text-white font-black text-sm">
-              {currency === "INR" ? "₹" : "$"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
             </span>
           </div>
 
@@ -941,7 +942,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
             <span className="text-[#52627A] block text-[10px]">Stop Loss Level</span>
             <span className="text-rose-400 font-bold">
-              {currency === "INR" ? "₹" : "$"}{stopLossPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {currency === "INR" ? "₹" : "$"}{formatNumber(stopLossPrice, 2)}
             </span>
           </div>
         </div>
@@ -1011,7 +1012,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     onChange={(e) => setAllocatedCapital(Math.max(1, Number(e.target.value)))}
                     className="w-full bg-[#07101A] border border-[#1A2A3F] rounded-xl px-3 py-2 text-xs text-white font-mono font-bold focus:outline-none focus:border-cyan-400"
                   />
-                  <span className="text-[10px] text-[#52627A]">Available: {currency} {totalCapital.toLocaleString()}</span>
+                  <span className="text-[10px] text-[#52627A]">Available: {currency} {formatNumber(totalCapital)}</span>
                 </div>
 
                 <div className="space-y-1.5">
@@ -1215,19 +1216,19 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Benchmark Price:</span>
                   <span className="text-cyan-300 font-bold">
-                    {currency === "INR" ? "₹" : "$"}{effectivePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
                   </span>
                 </div>
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Allocated Capital:</span>
-                  <span className="text-emerald-400 font-bold">{currency} {allocatedCapital.toLocaleString()}</span>
+                  <span className="text-emerald-400 font-bold">{currency} {formatNumber(allocatedCapital)}</span>
                 </div>
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Max Trade Risk:</span>
                   <span className="text-rose-400 font-bold">
-                    {currency} {maxRiskAmount.toLocaleString()} ({riskPerTradePct}%)
+                    {currency} {formatNumber(maxRiskAmount)} ({riskPerTradePct}%)
                   </span>
                 </div>
 
@@ -1508,7 +1509,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[#7C8CA3]">Remaining Unallocated:</span>
-                      <span className="text-emerald-400 font-bold">{currency} {remainingCapital.toLocaleString()}</span>
+                      <span className="text-emerald-400 font-bold">{currency} {formatNumber(remainingCapital)}</span>
                     </div>
                   </div>
                 </div>
@@ -1744,7 +1745,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                     </h3>
                     <div className="flex justify-between"><span className="text-[#7C8CA3]">Name:</span><span className="text-white font-bold">{name}</span></div>
                     <div className="flex justify-between"><span className="text-[#7C8CA3]">Symbol:</span><span className="text-white font-bold">{symbol}</span></div>
-                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Allocated:</span><span className="text-emerald-400 font-bold">{currency} {allocatedCapital.toLocaleString()}</span></div>
+                    <div className="flex justify-between"><span className="text-[#7C8CA3]">Allocated:</span><span className="text-emerald-400 font-bold">{currency} {formatNumber(allocatedCapital)}</span></div>
                     <div className="flex justify-between"><span className="text-[#7C8CA3]">Stop Loss:</span><span className="text-rose-400 font-bold">{stopLossPct}%</span></div>
                     <div className="flex justify-between"><span className="text-[#7C8CA3]">Take Profit:</span><span className="text-emerald-400 font-bold">{takeProfitPct}%</span></div>
                   </div>

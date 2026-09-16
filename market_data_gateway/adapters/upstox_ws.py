@@ -473,56 +473,6 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     result[s] = self._quote_cache[sym_mapped.upper()]
         return result
 
-    async def get_history(self, symbol: str, timeframe: str, start_time: str, end_time: Optional[str] = None) -> List[OHLCVCandle]:
-        """Fetches historical candles with safe dataframe handling."""
-        df = global_upstox_service.fetch_historical_candles(symbol, timeframe, limit=300)
-        candles: List[OHLCVCandle] = []
-
-        if df is None:
-            return candles
-
-        if hasattr(df, "iterrows"):
-            for _, row in df.iterrows():
-                ts = str(row.get("timestamp", ""))
-                try:
-                    ts_iso = datetime.fromisoformat(ts.replace("Z", "+00:00")).isoformat()
-                except Exception:
-                    ts_iso = ts
-
-                candles.append(
-                    OHLCVCandle(
-                        symbol=symbol,
-                        exchange="NSE",
-                        provider="upstox_ws",
-                        timeframe=timeframe,
-                        timestamp=ts_iso,
-                        open=float(row.get("open", 0.0)),
-                        high=float(row.get("high", 0.0)),
-                        low=float(row.get("low", 0.0)),
-                        close=float(row.get("close", 0.0)),
-                        volume=float(row.get("volume", 0.0)),
-                        is_closed=True,
-                    )
-                )
-        elif isinstance(df, list):
-            for row in df:
-                candles.append(
-                    OHLCVCandle(
-                        symbol=symbol,
-                        exchange="NSE",
-                        provider="upstox_ws",
-                        timeframe=timeframe,
-                        timestamp=str(row.get("timestamp", "")),
-                        open=float(row.get("open", 0.0)),
-                        high=float(row.get("high", 0.0)),
-                        low=float(row.get("low", 0.0)),
-                        close=float(row.get("close", 0.0)),
-                        volume=float(row.get("volume", 0.0)),
-                        is_closed=True,
-                    )
-                )
-        return candles
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         instruments = []
         for sym, meta in OFFICIAL_UPSTOX_KEYS.items():

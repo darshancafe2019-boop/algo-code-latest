@@ -19,11 +19,8 @@ RESULT_FILE = DATA_DIR / "backtest_comparison.json"
 
 
 def load_data(timeframe: str) -> pd.DataFrame:
-    path = DATA_DIR / f"btc_historical_{timeframe}.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"Historical data not found: {path}")
-    df = pd.read_csv(path)
-    return df
+    print("Historical candle dataset loading is disabled (subsystem removed).")
+    return pd.DataFrame()
 
 
 def compare_strategies(primary_df: pd.DataFrame, rsi_df: pd.DataFrame, daily_df: pd.DataFrame) -> Dict[str, Any]:

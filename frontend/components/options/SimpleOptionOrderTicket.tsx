@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   CheckCircle2,
@@ -298,7 +299,7 @@ export function SimpleOptionOrderTicket({
           <div>
             <div className="text-sm font-extrabold text-white flex items-center gap-2">
               <span>
-                {underlying} {strike ? strike.toLocaleString() : "—"} {optionType}
+                {underlying} {formatPrice(strike)} {optionType}
               </span>
               <span
                 className={`text-[9px] px-1.5 py-0.2 rounded font-bold ${
@@ -400,7 +401,7 @@ export function SimpleOptionOrderTicket({
               Quantity ({lotSize} / lot)
             </label>
             <div className="px-2.5 py-1.5 bg-slate-900/60 border border-slate-800 rounded-lg text-white font-bold text-xs text-center">
-              {totalQuantity.toLocaleString()} Units
+              {formatNumber(totalQuantity)} Units
             </div>
           </div>
         </div>
@@ -459,7 +460,7 @@ export function SimpleOptionOrderTicket({
           <span>Required Premium:</span>
           <span className="text-white font-bold">
             {currencySymbol}
-            {totalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatNumber(totalCost, 2)}
           </span>
         </div>
         <div className="flex items-center justify-between text-slate-400">

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   TrendingUp,
@@ -107,7 +108,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
                   : "text-[#FF3B5C]"
               )}
             >
-              {unPnl === null ? "—" : `${isUnPnlPos ? "+" : "-"}₹${Math.abs(unPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {unPnl === null ? "—" : `${isUnPnlPos ? "+" : "-"}₹{formatMoney(Math.abs(unPnl), "$")}`}
             </div>
             <div className="text-xs text-[#52627A] flex items-center gap-1 mt-1">
               {unPnl !== null && (
@@ -139,7 +140,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
                   : "text-[#FF3B5C]"
               )}
             >
-              {relPnl === null ? "—" : `${isRelPnlPos ? "+" : "-"}₹${Math.abs(relPnl).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+              {relPnl === null ? "—" : `${isRelPnlPos ? "+" : "-"}₹{formatMoney(Math.abs(relPnl), "$")}`}
             </div>
             <div className="text-xs text-[#52627A] mt-1">
               <span>Cumulative Booked</span>
@@ -183,7 +184,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
           </div>
           <div className="mt-2">
             <div className="text-xl sm:text-2xl font-bold tabular-nums text-[#F7FAFC]">
-              ₹{marginUsed.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {formatMoney(marginUsed, "₹")}
             </div>
             {/* Progress bar */}
             <div className="w-full bg-[#0D1727] h-1.5 rounded-full mt-2 overflow-hidden border border-[#1A2A3F]">
@@ -222,7 +223,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
               {riskUtil.toFixed(2)}%
             </div>
             <div className="text-[11px] tabular-nums text-[#52627A] mt-1 flex justify-between">
-              <span>VaR 95%: ₹{portfolioVar.toLocaleString()}</span>
+              <span>VaR 95%: {formatMoney(portfolioVar, "₹")}</span>
               <span className="text-[10px]">Cap: 5.0%</span>
             </div>
           </div>
@@ -243,7 +244,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
             >
               ₹{dailyLoss.toFixed(0)}{" "}
               <span className="text-xs font-normal text-[#52627A]">
-                / ₹{dailyLossLimit.toLocaleString()}
+                / {formatMoney(dailyLossLimit, "₹")}
               </span>
             </div>
             <div className="text-[11px] text-[#00E890] flex items-center gap-1 mt-1">

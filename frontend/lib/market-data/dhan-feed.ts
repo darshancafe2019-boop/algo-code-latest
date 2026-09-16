@@ -18,8 +18,10 @@ export class DhanLiveFeed {
   private state: ConnectionState = "DISCONNECTED";
 
   private constructor() {
-    this.initSockets();
-    this.bindSubscriptionTransport();
+    if (typeof window !== "undefined") {
+      this.initSockets();
+      this.bindSubscriptionTransport();
+    }
   }
 
   public static getInstance(): DhanLiveFeed {

@@ -46,11 +46,6 @@ def main():
     
     print("\n--- LAST 20 ROWS OF DATA ---")
     print(df_indicators[['timestamp', 'close', 'ema_9', 'ema_20', 'ema_50', 'ema_200', 'macd_line', 'poc', 'val', 'vah']].tail(20).to_string(index=False))
-    
-    # Save historical data inside the data directory
-    output_file = project_dir / "data" / "btc_historical_1h.csv"
-    df_indicators.to_csv(output_file, index=False)
-    print(f"\nSaved raw data with indicators to {output_file}")
 
 if __name__ == "__main__":
     main()

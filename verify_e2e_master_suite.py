@@ -57,7 +57,6 @@ from src.market_data.data_quality import DataQualityEngine
 from src.market_data.stream_engine import CentralizedStreamManager, global_stream_manager
 from src.market_data.options_engine import UniversalOptionsEngine
 from src.crypto_option_strategy import OptionStrategyEngine, OptionLeg
-from src.candle_engine import CandleEngine, parse_timeframe
 from src.indicators import generate_indicators, calculate_emas, calculate_rsi, calculate_macd, calculate_bollinger_bands, calculate_atr
 from src.strategy import Strategy
 from src.universal_risk_engine import evaluate_trade_precheck, calculate_universal_position_size, get_kill_switch_state

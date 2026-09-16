@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Info, CheckCircle2, AlertTriangle, Layers, Wallet, Scale } from "lucide-react";
 import { RiskOverviewState } from "@/types/risk";
@@ -67,17 +68,17 @@ export function RiskMetrics({ overview }: RiskMetricsProps) {
         <div className="space-y-2.5 pt-1 text-xs">
           <div className="flex justify-between items-center p-2 rounded-lg bg-[#0E1524] border border-[#1A2A3F]">
             <span className="text-slate-400">Gross Notional Exposure:</span>
-            <span className="font-mono font-bold text-slate-100">${overview.gross_exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="font-mono font-bold text-slate-100">{formatMoney(overview.gross_exposure, "$")}</span>
           </div>
 
           <div className="flex justify-between items-center p-2 rounded-lg bg-[#0E1524] border border-[#1A2A3F]">
             <span className="text-slate-400">Net Directional Exposure:</span>
-            <span className="font-mono font-bold text-cyan-400">${overview.net_exposure.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="font-mono font-bold text-cyan-400">{formatMoney(overview.net_exposure, "$")}</span>
           </div>
 
           <div className="flex justify-between items-center p-2 rounded-lg bg-[#0E1524] border border-[#1A2A3F]">
             <span className="text-slate-400">Total Account Balance:</span>
-            <span className="font-mono font-bold text-emerald-400">${overview.account_balance.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+            <span className="font-mono font-bold text-emerald-400">{formatMoney(overview.account_balance, "$")}</span>
           </div>
 
           <div className="flex justify-between items-center p-2 rounded-lg bg-[#0E1524] border border-[#1A2A3F]">

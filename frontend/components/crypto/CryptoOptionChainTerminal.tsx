@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -452,7 +453,7 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
         <div className="bg-[#0B1220] border border-slate-800 rounded-xl p-3 shadow-md">
           <span className="text-[10px] text-slate-400 uppercase font-mono block">Spot Price</span>
           <span className="text-base font-bold font-mono text-white">
-            {spotPrice > 0 ? `$${spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "—"}
+            {spotPrice > 0 ? `${formatMoney(spotPrice, "$")}` : "—"}
           </span>
           <span className="text-[10px] text-emerald-400 font-mono block">Delta Index Price</span>
         </div>
@@ -460,7 +461,7 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
         <div className="bg-[#0B1220] border border-slate-800 rounded-xl p-3 shadow-md">
           <span className="text-[10px] text-slate-400 uppercase font-mono block">ATM Strike</span>
           <span className="text-base font-bold font-mono text-amber-300">
-            {atmStrike > 0 ? `$${atmStrike.toLocaleString()}` : "—"}
+            {atmStrike > 0 ? `${formatMoney(atmStrike, "$")}` : "—"}
           </span>
           <span className="text-[10px] text-slate-400 font-mono block">Center Node</span>
         </div>
@@ -659,10 +660,10 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
                           {viewMode === "standard" ? (
                             <>
                               <td className="py-2 px-2.5 text-right text-slate-300">
-                                {c?.openInterest !== null && c?.openInterest !== undefined ? c.openInterest.toLocaleString() : "—"}
+                                {formatVolume(c?.openInterest)}
                               </td>
                               <td className="py-2 px-2.5 text-right text-slate-400">
-                                {c?.volume !== null && c?.volume !== undefined ? c.volume.toLocaleString() : "—"}
+                                {formatVolume(c?.volume)}
                               </td>
                               <td className="py-2 px-2.5 text-right text-purple-300">
                                 {c?.iv !== null && c?.iv !== undefined ? `${c.iv.toFixed(1)}%` : "—"}
@@ -711,7 +712,7 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
                           isAtm ? "text-amber-300 bg-amber-500/20" : "text-white bg-[#0e1626]"
                         }`}
                       >
-                        ${row.strike.toLocaleString()}
+                        {formatMoney(row.strike, "$")}
                       </td>
                       <td
                         className={`py-2 px-2 text-center text-[10px] font-sans border-r border-slate-800 ${
@@ -741,10 +742,10 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
                                 {p?.iv !== null && p?.iv !== undefined ? `${p.iv.toFixed(1)}%` : "—"}
                               </td>
                               <td className="py-2 px-2.5 text-left text-slate-400">
-                                {p?.volume !== null && p?.volume !== undefined ? p.volume.toLocaleString() : "—"}
+                                {formatVolume(p?.volume)}
                               </td>
                               <td className="py-2 px-2.5 text-left text-slate-300">
-                                {p?.openInterest !== null && p?.openInterest !== undefined ? p.openInterest.toLocaleString() : "—"}
+                                {formatVolume(p?.openInterest)}
                               </td>
                             </>
                           ) : (

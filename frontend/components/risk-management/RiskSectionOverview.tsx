@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -180,7 +181,7 @@ export function RiskSectionOverview({
             <div className="p-3.5 rounded-xl bg-[var(--theme-elevated)] border border-[var(--theme-border-subtle)] space-y-1">
               <span className="text-[10px] uppercase font-bold text-[var(--theme-text-muted)] block">Max New Order</span>
               <div className="text-lg font-bold text-[var(--theme-text-primary)]">
-                ${maxOrderSize > 0 ? maxOrderSize.toLocaleString(undefined, { maximumFractionDigits: 0 }) : "0"}
+                {formatMoney(maxOrderSize, "$", 0)}
               </div>
               <span className="text-[10px] text-[var(--theme-text-muted)] block truncate">
                 {canTrade ? "Based on Collateral" : "Margin Restricted"}

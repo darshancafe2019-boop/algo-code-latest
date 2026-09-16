@@ -335,16 +335,6 @@ class FyersWSAdapter(BaseProviderAdapter):
                     result[s] = self._quote_cache[f_sym]
         return result
 
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        """Fetches historical candles via FYERS REST API."""
-        return []
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         instruments = []
         try:

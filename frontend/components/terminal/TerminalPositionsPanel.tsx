@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Layers, CheckCircle, RefreshCw, XCircle, ArrowUpRight, ArrowDownRight, Edit3, ShieldAlert, History, Activity } from "lucide-react";
@@ -237,10 +238,10 @@ export function TerminalPositionsPanel() {
                           </span>
                         </td>
                         <td className="py-2.5 text-slate-200">{pos.quantity}</td>
-                        <td className="py-2.5 text-slate-300">${pos.entry_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2.5 text-slate-300">${pos.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2.5 text-rose-400">${pos.stop_loss.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2.5 text-emerald-400">${pos.take_profit.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                        <td className="py-2.5 text-slate-300">{formatMoney(pos.entry_price, "$")}</td>
+                        <td className="py-2.5 text-slate-300">{formatMoney(pos.current_price, "$")}</td>
+                        <td className="py-2.5 text-rose-400">{formatMoney(pos.stop_loss, "$")}</td>
+                        <td className="py-2.5 text-emerald-400">{formatMoney(pos.take_profit, "$")}</td>
                         <td className="py-2.5">
                           <div className={`flex items-center gap-1 font-bold ${isPos ? "text-emerald-400" : "text-rose-400"}`}>
                             {isPos ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}

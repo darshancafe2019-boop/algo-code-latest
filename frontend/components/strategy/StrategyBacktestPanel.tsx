@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import {
@@ -171,7 +172,7 @@ export function StrategyBacktestPanel({ strategy }: StrategyBacktestPanelProps) 
             <div className="p-2.5 bg-[#121927] border border-[#1A2A3F] rounded-xl">
               <span className="text-[10px] text-slate-400 uppercase font-bold block">Net Profit</span>
               <span className="text-sm font-bold font-mono text-emerald-400">
-                +${backtestData.total_net_profit?.toLocaleString() || "0"}
+                +{formatMoney(backtestData.total_net_profit, "$")}
               </span>
             </div>
 

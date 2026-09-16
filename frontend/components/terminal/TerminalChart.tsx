@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { CandleData, IndicatorResult } from "@/lib/indicators/types";
 import { DrawingToolType } from "./TerminalLeftToolbar";
-import { formatPrice, formatPercent } from "@/lib/formatters";
+import { formatPrice, formatPercent, formatNumber } from "@/lib/formatters";
 
 export interface ChartDrawingItem {
   id: string;
@@ -507,7 +507,7 @@ export function TerminalChart({
           {activeBar.volume && (
             <>
               <span className="text-[#52627A] ml-2">Vol:</span>
-              <span className="text-[#F7FAFC]">{activeBar.volume.toLocaleString()}</span>
+              <span className="text-[#F7FAFC]">{formatNumber(activeBar.volume)}</span>
             </>
           )}
         </div>

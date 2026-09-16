@@ -13,7 +13,7 @@ import {
   TrendingUp,
   Scale,
 } from "lucide-react";
-import { formatCurrency, formatDecimal } from "@/lib/formatters";
+import { formatCurrency, formatDecimal, formatMoney } from "@/lib/formatters";
 
 export interface OptionOrderIntentRequest {
   canonical_id: string;
@@ -153,11 +153,11 @@ export function OrderReviewModal({
             </div>
             <div className="flex justify-between py-1.5 border-b border-slate-800">
               <span className="text-slate-400">Total Premium / Notional</span>
-              <span className="font-bold text-slate-100">₹{notional.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold text-slate-100">{formatMoney(notional, "₹")}</span>
             </div>
             <div className="flex justify-between py-1.5 border-b border-slate-800">
               <span className="text-slate-400">Estimated Required Margin</span>
-              <span className="font-bold text-amber-400">₹{estimatedMargin.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-bold text-amber-400">{formatMoney(estimatedMargin, "₹")}</span>
             </div>
             {order.delta !== undefined && (
               <div className="flex justify-between py-1.5 border-b border-slate-800">

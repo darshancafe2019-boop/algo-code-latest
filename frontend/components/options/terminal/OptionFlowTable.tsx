@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
   Activity,
@@ -194,7 +195,7 @@ export const OptionFlowTable: React.FC<OptionFlowTableProps> = ({
 
                     {/* Strike */}
                     <td className="py-1.5 px-3 text-right font-bold text-slate-100">
-                      {trade.strike.toLocaleString("en-IN")}
+                      {formatNumber(trade.strike)}
                     </td>
 
                     {/* Moneyness */}

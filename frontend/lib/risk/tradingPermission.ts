@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 /**
  * Quant.OS Authoritative Trading Permission & Risk Evaluation Engine
  * =================================================================
@@ -99,7 +100,7 @@ export function evaluateAllRiskGates(
       name: "Available Capital",
       category: "ACCOUNT",
       status: availCash <= 0 ? "BLOCK" : availCash < equity * 0.1 ? "WARN" : "PASS",
-      currentValue: `$${availCash.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      currentValue: `${formatMoney(availCash, "$")}`,
       limitValue: `> $${(equity * 0.05).toFixed(0)} min reserve`,
       description: availCash <= 0 ? "Zero available cash for new collateral." : "Sufficient unallocated cash reserve.",
       isCritical: true,
@@ -147,8 +148,8 @@ export function evaluateAllRiskGates(
       name: "Portfolio Exposure",
       category: "POSITION",
       status: grossExp > maxExposureCap ? "BLOCK" : grossExp > maxExposureCap * 0.85 ? "WARN" : "PASS",
-      currentValue: `$${grossExp.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-      limitValue: `$${maxExposureCap.toLocaleString(undefined, { maximumFractionDigits: 0 })} max`,
+      currentValue: `${formatMoney(grossExp, "$")}`,
+      limitValue: `${formatMoney(maxExposureCap, "$")} max`,
       description: "Total gross leveraged notional of all open positions.",
       isCritical: true,
       suggestedAction: grossExp > maxExposureCap ? { label: "Review Leverage", actionType: "NAVIGATE_POSITIONS" } : undefined,

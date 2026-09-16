@@ -1,3 +1,4 @@
+import { formatMoney } from "@/lib/formatters";
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
@@ -143,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     // 5. Synthesize AI Chat Answer
     const chatAnswer = prompt
-      ? `Based on quantitative multi-timeframe analysis for ${rawSymbol} in the ${marketType} universe: Current price is $${livePrice.toLocaleString()}, displaying a ${direction} bias with ${confluenceScore}% model confidence. Risk management mandates a stop at $${signalData.stopLoss.toFixed(2)} and initial take profit at $${signalData.takeProfit.toFixed(2)}.`
+      ? `Based on quantitative multi-timeframe analysis for ${rawSymbol} in the ${marketType} universe: Current price is ${formatMoney(livePrice, "$")}, displaying a ${direction} bias with ${confluenceScore}% model confidence. Risk management mandates a stop at $${signalData.stopLoss.toFixed(2)} and initial take profit at $${signalData.takeProfit.toFixed(2)}.`
       : `AI Copilot is armed for ${rawSymbol}. Select an AI Tool option above to generate signals, structure option Greeks, or deploy a tuned quantitative bot.`;
 
     return NextResponse.json(

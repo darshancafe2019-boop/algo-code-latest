@@ -342,9 +342,9 @@ async def run_live_websocket_test(
                                 results["ticks_sample"].append(tick_summary)
 
                                 print(f"  [TICK #{results['ticks_decoded']:02d}] {sym:<12} ({ik})")
-                                print(f"    LTP:                 ₹{ltp:,.2f}")
+                                print(f"    LTP:                 INR {ltp:,.2f}")
                                 print(f"    LTT:                 {ltt} (Age: {age_ms:.1f}ms)")
-                                print(f"    PREV_CLOSE:          ₹{cp:,.2f}")
+                                print(f"    PREV_CLOSE:          INR {cp:,.2f}")
                                 print(f"    FRESHNESS:           {freshness.value}")
                                 print(f"    TIMESTAMP_UTC:       {datetime.now(timezone.utc).isoformat()}")
 
@@ -385,6 +385,7 @@ def print_diagnostic_summary(
 
     has_token = config_data.get("has_token", False)
     is_open = config_data.get("is_open", False)
+    market_phase = "NORMAL_OPEN" if is_open else "CLOSED"
 
     print(f"  1. CONFIGURATION:      {'PASS' if has_token else 'FAIL (UPSTOX_ACCESS_TOKEN missing)'}")
     print(f"  2. REST AUTH:          {'PASS' if auth_state not in (UpstoxAuthState.TOKEN_MISSING, UpstoxAuthState.TOKEN_INVALID, UpstoxAuthState.FAILED) else 'FAIL'}")
@@ -395,20 +396,46 @@ def print_diagnostic_summary(
         sub_ok = ws_results.get("subscription_sent", False)
         bytes_rec = ws_results.get("bytes_received", 0)
         ticks = ws_results.get("ticks_decoded", 0)
-        freshness = ws_results.get("freshness_status", FreshnessStatus.INVALID)
+        sample = ws_results.get("ticks_sample", [])
+
+        # Calculate per-instrument state breakdown
+        live_trade_cnt = 0
+        closing_auction_cnt = 0
+        last_traded_cnt = 0
+        stale_cnt = 0
+
+        for t in sample:
+            fr = t.get("freshness")
+            if is_open and fr in ("LIVE", "RECENT"):
+                live_trade_cnt += 1
+            elif fr == "STALE" and is_open:
+                stale_cnt += 1
+            else:
+                last_traded_cnt += 1
+
+        if not is_open and sample:
+            last_traded_cnt = len(sample)
+            live_trade_cnt = 0
 
         print(f"  4. WEBSOCKET CONNECT:  {'PASS' if ws_ok else 'FAIL'}")
         print(f"  5. BINARY SUB REQUEST: {'PASS' if sub_ok else 'FAIL'}")
         print(f"  6. BINARY DATA RX:     {'PASS' if bytes_rec > 0 else ('MARKET_CLOSED_STANDBY' if not is_open else 'NO_DATA')}")
         print(f"  7. PROTOBUF DECODING:  {'PASS' if ticks > 0 else ('MARKET_CLOSED_STANDBY' if not is_open else 'NO_TICKS')}")
-        print(f"  8. DATA FRESHNESS:     {freshness.value if ticks > 0 else ('MARKET_CLOSED_SESSION' if not is_open else 'NO_TICKS')}")
-        print(f"  9. TOTAL BYTES RX:     {bytes_rec} bytes")
-        print(f" 10. TOTAL TICKS:        {ticks}")
+        print(f"  8. TOTAL BYTES RX:     {bytes_rec} bytes")
+        print(f"  9. TOTAL TICKS:        {ticks}")
 
-        if ticks > 0:
-            verdict = "PASS — LIVE STREAMING VERIFIED (Real Market Ticks Decoded)"
-        elif not is_open and ws_ok and sub_ok:
-            verdict = "PASS — CONNECTIVITY VERIFIED (Market is Closed, Ready for Market Open)"
+        print("\n  INSTRUMENT FRESHNESS BREAKDOWN:")
+        print(f"    - LIVE TRADE:        {live_trade_cnt}")
+        print(f"    - CLOSING/INDICATIVE:{closing_auction_cnt}")
+        print(f"    - LAST TRADED:       {last_traded_cnt}")
+        print(f"    - STALE:             {stale_cnt}")
+        print(f"    - WEBSOCKET HEALTH:  {'PASS' if ws_ok else 'FAIL'}")
+        print(f"    - MARKET PHASE:      {market_phase}")
+
+        if is_open and live_trade_cnt > 0:
+            verdict = "PASS — LIVE STREAMING ACTIVE (Real Market Ticks Decoded)"
+        elif ws_ok and sub_ok:
+            verdict = f"PASS — STREAM CONNECTIVITY VERIFIED (Market Session: {market_phase})"
         elif not has_token:
             verdict = "PREREQUISITE REQUIRED — Set UPSTOX_ACCESS_TOKEN in .env"
         else:

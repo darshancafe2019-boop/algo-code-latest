@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney, formatPrice } from "@/lib/formatters";
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { OptionStrikeRow, OptionContractQuote } from "@/types/option-chain";
@@ -29,12 +30,7 @@ function formatVolumeOrOI(val: number | undefined | null): string {
   if (val >= 10_000_000) return `${(val / 10_000_000).toFixed(2)}Cr`;
   if (val >= 100_000) return `${(val / 100_000).toFixed(1)}L`;
   if (val >= 1_000) return `${(val / 1_000).toFixed(0)}K`;
-  return val.toLocaleString();
-}
-
-function formatPrice(val: number | undefined | null, symbol: string = "₹"): string {
-  if (val === undefined || val === null || isNaN(val) || val <= 0) return "—";
-  return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return formatNumber(val);
 }
 
 function formatGreek(val: number | undefined | null, decimals: number = 2): string {
@@ -150,7 +146,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
       <div className="bg-[#0A1020] border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs space-y-2">
         <div className="text-sm font-bold text-white">CONNECTING TO {sourceName.toUpperCase()} OPTION FEED...</div>
         <p className="text-slate-500">
-          Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}${spotPrice.toLocaleString()}` : "underlying"}...
+          Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}{formatMoney(spotPrice, "$")}` : "underlying"}...
         </p>
       </div>
     );
@@ -357,7 +353,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
                           ATM
                         </span>
                       )}
-                      <span>{row.strike.toLocaleString()}</span>
+                      <span>{formatNumber(row.strike)}</span>
                     </div>
                   </td>
 

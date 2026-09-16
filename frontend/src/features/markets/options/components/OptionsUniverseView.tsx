@@ -174,15 +174,15 @@ export function OptionsUniverseView({
     retry: 1,
   });
 
-  const spotPrice = data?.spot_price || (underlying.includes("NIFTY") ? 22500.0 : 78000.0);
+  const spotPrice = data?.spot_price || (data as any)?.spot || 0;
   const rawCurrentExpiry = data?.selected_expiry || (data as any)?.expiry || selectedExpiry || "";
   const currentExpiry = typeof rawCurrentExpiry === "string" ? rawCurrentExpiry : (rawCurrentExpiry?.expiry_date || rawCurrentExpiry?.settlement_time || "");
-  const expiriesList = data?.available_expiries || [];
-  const strikesList = data?.strikes || [];
+  const expiriesList = data?.available_expiries || (data as any)?.availableExpiries || [];
+  const strikesList = data?.strikes || (data as any)?.rows || [];
 
   const currencySymbol = isCrypto ? "$" : "₹";
   const stepSize = spotPrice > 40000 ? 500 : spotPrice > 15000 ? 100 : 50;
-  const atmStrike = data?.atm_strike || (Math.round(spotPrice / stepSize) * stepSize);
+  const atmStrike = data?.atm_strike || (data as any)?.atmStrike || (spotPrice > 0 ? Math.round(spotPrice / stepSize) * stepSize : 0);
 
   // Execution Mutation
   const singleOptionMutation = useMutation({

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
   Scale,
@@ -85,11 +86,6 @@ export const TaxIntelligenceDesk: React.FC<TaxIntelligenceDeskProps> = ({
     };
   }, [trades, assumedTaxSlab]);
 
-  const formatMoney = (val: number) => {
-    return `${val < 0 ? "-" : ""}${currencySymbol}${Math.abs(val).toLocaleString("en-IN", {
-      maximumFractionDigits: 2,
-    })}`;
-  };
 
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 shadow-lg backdrop-blur-md flex flex-col gap-4">
@@ -214,7 +210,7 @@ export const TaxIntelligenceDesk: React.FC<TaxIntelligenceDeskProps> = ({
             </span>
           </div>
           <div className="text-base font-bold text-cyan-300">
-            {currencySymbol}{taxData.section44abTurnover.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+            {formatMoney(taxData.section44abTurnover, currencySymbol)}
           </div>
           <p className="text-[11px] text-slate-400 font-sans">
             Calculated as sum of absolute profits & losses across all derivative contracts.

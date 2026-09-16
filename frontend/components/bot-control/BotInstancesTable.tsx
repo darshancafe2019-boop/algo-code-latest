@@ -19,7 +19,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BotInstanceExtended, BotStatus } from "@/types/bot-control";
-import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric } from "@/lib/formatters";
+import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric, formatMoney } from "@/lib/formatters";
 
 interface BotInstancesTableProps {
   bots: BotInstanceExtended[];
@@ -278,7 +278,7 @@ export function BotInstancesTable({
                     {bot.risk?.risk_per_trade_pct ?? 1.5}%
                   </td>
                   <td className="p-3 text-right font-mono font-bold text-[var(--theme-text-primary)]">
-                    ${(bot.allocated_capital || 10000.0).toLocaleString(undefined, { minimumFractionDigits: 0 })}
+                    {formatMoney(bot.allocated_capital || 10000.0, "$")}
                   </td>
                   <td className="p-3 text-right font-mono font-bold">
                     <span className={isPosPnl ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}>
@@ -416,7 +416,7 @@ export function BotInstancesTable({
                 </div>
                 <div>
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Capital</span>
-                  <span className="font-bold text-[var(--theme-text-primary)]">${(bot.allocated_capital || 10000).toLocaleString()}</span>
+                  <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(bot.allocated_capital || 10000, "$")}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Today P&L</span>

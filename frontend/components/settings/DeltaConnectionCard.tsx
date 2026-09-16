@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -304,7 +305,7 @@ export function DeltaConnectionCard() {
               <div key={b.asset || `balance-${idx}`} className="flex items-center gap-1.5">
                 <span className="text-slate-400">{b.asset}:</span>
                 <span className="font-bold text-emerald-400">
-                  {b.currency_symbol || ""}{Number(b.balance || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {b.currency_symbol || ""}{formatNumber(Number(b.balance || 0), 2)}
                 </span>
                 {b.mode && (
                   <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">

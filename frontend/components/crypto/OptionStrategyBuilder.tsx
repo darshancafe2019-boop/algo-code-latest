@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -212,7 +213,7 @@ export function OptionStrategyBuilder() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3 text-white font-semibold">{leg.option_type}</td>
-                    <td className="py-2.5 px-3 text-right text-amber-300 font-bold">${leg.strike.toLocaleString()}</td>
+                    <td className="py-2.5 px-3 text-right text-amber-300 font-bold">{formatMoney(leg.strike, "$")}</td>
                     <td className="py-2.5 px-3 text-right text-slate-200">${leg.premium.toFixed(2)}</td>
                     <td className="py-2.5 px-3 text-right text-slate-300">{leg.quantity}</td>
                   </tr>
@@ -270,7 +271,7 @@ export function OptionStrategyBuilder() {
               <div className="flex justify-between text-slate-300">
                 <span className="text-slate-400">Net Premium Flow:</span>
                 <span className="font-mono font-bold text-white">
-                  ${evalData?.net_premium?.toLocaleString()}
+                  {formatMoney(evalData.net_premium, "$")}
                 </span>
               </div>
 
@@ -278,7 +279,7 @@ export function OptionStrategyBuilder() {
                 <span className="text-slate-400">Max Profit:</span>
                 <span className="font-mono font-bold text-emerald-400">
                   {typeof evalData?.max_profit === "number"
-                    ? `+$${evalData.max_profit.toLocaleString()}`
+                    ? `+${formatMoney(evalData.max_profit, "$")}`
                     : evalData?.max_profit}
                 </span>
               </div>
@@ -287,7 +288,7 @@ export function OptionStrategyBuilder() {
                 <span className="text-slate-400">Max Loss:</span>
                 <span className="font-mono font-bold text-rose-400">
                   {typeof evalData?.max_loss === "number"
-                    ? `-$${evalData.max_loss.toLocaleString()}`
+                    ? `-${formatMoney(evalData.max_loss, "$")}`
                     : evalData?.max_loss}
                 </span>
               </div>

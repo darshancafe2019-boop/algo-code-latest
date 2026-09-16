@@ -222,13 +222,6 @@ class TestNotConfiguredStub(unittest.IsolatedAsyncioTestCase):
         result = await stub.get_snapshot(["AAPL"])
         self.assertEqual(result, {})
 
-    async def test_history_returns_empty(self):
-        stub = NotConfiguredAdapter("databento", "Databento", [], "")
-        from_dt = datetime.now(timezone.utc) - timedelta(days=7)
-        to_dt = datetime.now(timezone.utc)
-        result = await stub.get_history("ES", "1d", from_dt, to_dt)
-        self.assertEqual(result, [])
-
 
 # ─── GatewayClient tests ─────────────────────────────────────────────────────
 

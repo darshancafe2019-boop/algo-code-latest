@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -195,7 +196,7 @@ export function PositionSizingEngine() {
 
                   <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">
                     <span className="text-[10px] text-[#52627A] block">Notional Exposure</span>
-                    <span className="text-sm font-bold text-white">${calcResult.notional_value.toLocaleString()}</span>
+                    <span className="text-sm font-bold text-white">{formatMoney(calcResult.notional_value, "$")}</span>
                   </div>
 
                   <div className="p-2.5 rounded-xl bg-[#07101A] border border-[#122033]">

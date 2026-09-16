@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   TrendingUp,
@@ -82,7 +83,7 @@ export function TradeJournalSummaryCards({ summary }: TradeJournalSummaryCardsPr
               isNetProfit ? "text-[#22D3EE]" : "text-red-400"
             }`}
           >
-            {isNetProfit ? "+" : ""}${metrics.net_pnl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {isNetProfit ? "+" : ""}{formatMoney(metrics.net_pnl, "$")}
           </span>
           <span className="text-[10px] text-[#52627A] block">
             Gross: +${metrics.gross_profit.toFixed(0)} / -${metrics.gross_loss.toFixed(0)}

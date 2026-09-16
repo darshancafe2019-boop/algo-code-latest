@@ -106,19 +106,6 @@ class GlobalDataEngine:
             if norm_sym in self._quote_cache:
                 return self._quote_cache[norm_sym]["price"]
 
-        # Try resolving from candle cache in DB
-        try:
-            row = db.safe_query_one(
-                "SELECT close FROM candles_cache WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1",
-                (norm_sym,),
-            )
-            if row and float(row.get("close") or 0.0) > 0:
-                price = float(row["close"])
-                self.update_live_quote(norm_sym, price, 0.0, "db_candle_cache")
-                return price
-        except Exception as e:
-            logger.debug("Error fetching price for %s: %s", norm_sym, e)
-
         # Baseline crypto asset fallbacks
         if "BTC" in norm_sym:
             return 65420.0

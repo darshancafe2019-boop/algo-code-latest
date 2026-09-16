@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { Search, Star, ArrowUpRight, ArrowDownRight, RefreshCw, Zap } from "lucide-react";
 import { useActiveBot } from "@/context/ActiveBotContext";
@@ -147,7 +148,7 @@ export function TerminalWatchlist() {
 
                 <div className="text-right font-mono shrink-0">
                   <div className="text-xs font-bold text-[var(--theme-text-primary)]">
-                    {inst.last_price ? `${currSymbol}${inst.last_price.toLocaleString()}` : "—"}
+                    {inst.last_price ? `${currSymbol}{formatMoney(inst.last_price, "$")}` : "—"}
                   </div>
                   <div
                     className={`text-[10px] font-bold flex items-center justify-end gap-0.5 ${

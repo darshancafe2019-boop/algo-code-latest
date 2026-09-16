@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Layers, Search, Filter } from "lucide-react";
 import { TaxLotItem } from "@/types/tax";
@@ -14,10 +15,7 @@ export function TaxLotsView({ lots, currency }: TaxLotsViewProps) {
 
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${val.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(val, "$")}`;
   };
 
   const filtered = lots.filter(

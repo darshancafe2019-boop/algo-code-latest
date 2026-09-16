@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -293,7 +294,7 @@ export function DhanConnectionCard() {
             <Wallet className="h-3 w-3 text-emerald-400" /> Avail. Margin
           </span>
           <p className="mt-1 font-mono text-xs font-semibold text-emerald-400">
-            ₹{(data?.funds?.available || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            {formatMoney(data.funds?.available, "₹")}
           </p>
         </div>
 
@@ -302,7 +303,7 @@ export function DhanConnectionCard() {
             <Layers className="h-3 w-3 text-emerald-400" /> Collateral
           </span>
           <p className="mt-1 font-mono text-xs font-semibold text-foreground">
-            ₹{(data?.funds?.collateral || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+            {formatMoney(data.funds?.collateral, "₹")}
           </p>
         </div>
 

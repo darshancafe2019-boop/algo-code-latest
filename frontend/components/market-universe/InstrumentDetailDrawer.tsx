@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   X,
@@ -126,7 +127,7 @@ export function InstrumentDetailDrawer({
                   <span className="text-[#52627A] text-[10px] uppercase font-bold">Last Traded Price</span>
                   <div className="text-right">
                     <span className="text-xl font-bold text-white block">
-                      {instrument.last_price ? `${currSymbol}${instrument.last_price.toLocaleString()}` : "N/A"}
+                      {instrument.last_price ? `${currSymbol}{formatMoney(instrument.last_price, "$")}` : "N/A"}
                     </span>
                     <span className={`text-xs font-bold ${isPositive ? "text-[#22D3EE]" : "text-red-400"}`}>
                       {isPositive ? "+" : ""}{(instrument.change_24h || 0).toFixed(2)}%
@@ -145,11 +146,11 @@ export function InstrumentDetailDrawer({
                   </div>
                   <div>
                     <span className="text-[#52627A] block">24H Volume</span>
-                    <span className="text-cyan-300 font-bold">{instrument.volume_24h ? instrument.volume_24h.toLocaleString() : "—"}</span>
+                    <span className="text-cyan-300 font-bold">{formatVolume(instrument.volume_24h)}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Open Interest</span>
-                    <span className="text-purple-300 font-bold">{instrument.open_interest ? instrument.open_interest.toLocaleString() : "—"}</span>
+                    <span className="text-purple-300 font-bold">{formatVolume(instrument.open_interest)}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Data Source</span>

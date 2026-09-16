@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { ActiveStrategyInstance } from "@/types/options-workstation";
 import {
@@ -136,7 +137,7 @@ export function ActiveStrategiesTab({ currencySymbol = "₹" }: ActiveStrategies
                       }`}
                     >
                       {strat.unrealized_pnl >= 0 ? "+" : ""}
-                      {currencySymbol}{strat.unrealized_pnl.toLocaleString()}
+                      {formatMoney(strat.unrealized_pnl, currencySymbol)}
                     </div>
                   </div>
 

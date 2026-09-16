@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -161,7 +162,7 @@ export function FuturesIntelligenceHub({ underlying }: Props) {
                 <div className="text-right text-[11px]">
                   <span className="text-slate-400 block">Spot Reference:</span>
                   <span className="text-white font-bold">
-                    ${termStructure?.spot_price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    {formatMoney(termStructure.spot_price, "$")}
                   </span>
                 </div>
               </div>
@@ -175,7 +176,7 @@ export function FuturesIntelligenceHub({ underlying }: Props) {
                   >
                     <span className="text-[10px] text-blue-400 font-bold block">{pt.label}</span>
                     <span className="text-sm font-bold text-white block mt-0.5">
-                      ${pt.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      {formatMoney(pt.price, "$")}
                     </span>
                     <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1 pt-1 border-t border-slate-800/60">
                       <span>Basis:</span>
@@ -276,7 +277,7 @@ export function FuturesIntelligenceHub({ underlying }: Props) {
                     ${((oiAnalytics?.open_interest_usd || 0) / 1_000_000).toFixed(2)}M
                   </span>
                   <span className="text-[10px] text-slate-500">
-                    {oiAnalytics?.current_oi.toLocaleString()} {underlying}
+                    {formatNumber(oiAnalytics.current_oi)} {underlying}
                   </span>
                 </div>
 

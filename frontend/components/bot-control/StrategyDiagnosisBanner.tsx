@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Cpu, ShieldCheck, AlertCircle } from "lucide-react";
@@ -48,7 +49,7 @@ export function StrategyDiagnosisBanner() {
 
         <div className="bg-[#0B0F17] px-3 py-1.5 rounded-lg border border-[#1A2333]">
           <span className="text-slate-400">Market Price: </span>
-          <span className="font-bold text-white">${price.toLocaleString()}</span>
+          <span className="font-bold text-white">{formatMoney(price, "$")}</span>
         </div>
       </div>
     </div>

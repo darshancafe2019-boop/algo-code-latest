@@ -62,13 +62,13 @@ export function QuantitativeWinLossExpectancyPanel({
           <div className="bg-[#141E33] border border-slate-800 rounded-xl p-2.5">
             <div className="text-[10px] text-slate-400 uppercase">Win Rate</div>
             <div className="text-sm font-bold text-emerald-400 mt-0.5">{formatPercent(winRate, 1)}</div>
-            <div className="text-[9px] text-slate-400">{formatNumber(metrics?.winning_trades, 0, "17")} Wins</div>
+            <div className="text-[9px] text-slate-400">{formatNumber(metrics.winning_trades, 0, "17")} Wins</div>
           </div>
 
           <div className="bg-[#141E33] border border-slate-800 rounded-xl p-2.5">
             <div className="text-[10px] text-slate-400 uppercase">Loss Rate</div>
             <div className="text-sm font-bold text-red-400 mt-0.5">{formatPercent(lossRate, 1)}</div>
-            <div className="text-[9px] text-slate-400">{formatNumber(metrics?.losing_trades, 0, "7")} Losses</div>
+            <div className="text-[9px] text-slate-400">{formatNumber(metrics.losing_trades, 0, "7")} Losses</div>
           </div>
 
           <div className="bg-[#141E33] border border-slate-800 rounded-xl p-2.5">

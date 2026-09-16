@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Send, Zap, CheckCircle2, AlertTriangle, ShieldCheck, Lock } from "lucide-react";
@@ -363,7 +364,7 @@ export function OrderExecutionCenter({
       >
         <Send className="w-4 h-4" />
         <span>
-          PREVIEW & EXECUTE {orderSide} {parsedQty} {selectedSymbol} (${parsedPrice.toLocaleString()})
+          PREVIEW & EXECUTE {orderSide} {parsedQty} {selectedSymbol} ({formatMoney(parsedPrice, "$")})
         </span>
       </button>
 
@@ -423,7 +424,7 @@ export function OrderExecutionCenter({
                         </span>
                       </td>
                       <td className="py-2.5 px-3 font-mono tabular-nums font-semibold text-[#F7FAFC]">
-                        ${Number(ord.entry_price || ord.price || currentPrice).toLocaleString()}
+                        {formatMoney(Number(ord.entry_price || ord.price || currentPrice), "$")}
                       </td>
                       <td className="py-2.5 px-3 font-mono tabular-nums text-[#F7FAFC]">
                         {ord.quantity || ord.position_size || "0.05"}

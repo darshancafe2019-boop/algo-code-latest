@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -380,7 +381,7 @@ export function OptionsTradingView() {
               <div>
                 <label className="text-slate-400 block mb-1 font-bold">Est. Total Premium</label>
                 <div className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-cyan-400 font-bold">
-                  {underlying === "BTC" ? "$" : "₹"}{(limitPrice * lots * (underlying.includes("NIFTY") ? 50 : 1)).toLocaleString()}
+                  {underlying === "BTC" ? "$" : "₹"}{formatNumber(limitPrice * lots * (underlying.includes("NIFTY") ? 50 : 1))}
                 </div>
               </div>
             </div>

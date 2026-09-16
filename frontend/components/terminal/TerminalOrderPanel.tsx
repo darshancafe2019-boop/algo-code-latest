@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { ShieldCheck, ShieldAlert, Zap, AlertTriangle, CheckCircle, RefreshCw, Send } from "lucide-react";
@@ -235,7 +236,7 @@ export function TerminalOrderPanel() {
       <div className="space-y-1">
         <label className="text-[11px] font-medium text-slate-400 flex justify-between">
           <span>Quantity ({activeSymbol.split("/")[0] || "BTC"})</span>
-          <span className="font-mono text-slate-200">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+          <span className="font-mono text-slate-200">{formatMoney(notionalValue, "$")}</span>
         </label>
         <input
           type="number"
@@ -289,7 +290,7 @@ export function TerminalOrderPanel() {
       <div className="bg-[var(--theme-elevated)]/70 border border-[var(--theme-border)] rounded-xl p-2.5 space-y-1.5 text-[11px] font-mono">
         <div className="flex justify-between text-slate-400">
           <span>Notional Value:</span>
-          <strong className="text-slate-200">${notionalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}</strong>
+          <strong className="text-slate-200">{formatMoney(notionalValue, "$")}</strong>
         </div>
         <div className="flex justify-between text-slate-400">
           <span>Risk Amount ($):</span>

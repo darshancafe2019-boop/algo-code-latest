@@ -1,4 +1,5 @@
 import copy
+import os
 import json
 import logging
 import random
@@ -123,7 +124,7 @@ def _record_pg_success():
 def get_db_pool():
     """Returns the single central PostgreSQL ConnectionPool or None if disabled/circuit-broken."""
     global _pg_pool, _pg_circuit_broken_until
-    if time.time() < _pg_circuit_broken_until:
+    if os.getenv("FORCE_SQLITE", "false").lower() == "true" or not getattr(config, "IS_POSTGRES", False) or time.time() < _pg_circuit_broken_until:
         return None
 
     if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
@@ -178,8 +179,10 @@ def get_pg_connection():
     pool = get_db_pool()
     if pool is not None:
         return pool.getconn(timeout=5.0)
-    import psycopg
-    return psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+    if getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
+        import psycopg
+        return psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+    raise RuntimeError("PostgreSQL disabled/unavailable")
 
 
 def get_connection() -> sqlite3.Connection:
@@ -252,7 +255,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
-        else:
+        elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
             try:
                 import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
@@ -320,7 +323,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
-        else:
+        elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
             try:
                 import psycopg
                 from psycopg.rows import dict_row
@@ -335,6 +338,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 finally:
                     conn.close()
             except Exception as e:
+                _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL query failed: %s", e)
 
     conn = None
@@ -1097,23 +1101,6 @@ def init_db(force: bool = False) -> None:
                         created_at TEXT NOT NULL DEFAULT (datetime('now')),
                         updated_at TEXT NOT NULL DEFAULT (datetime('now')),
                         owner_id TEXT DEFAULT 'primary_trader'
-                    )
-                    """
-                )
-
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS candles_cache (
-                        id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        symbol TEXT NOT NULL,
-                        timeframe TEXT NOT NULL,
-                        timestamp INTEGER NOT NULL,
-                        open REAL NOT NULL,
-                        high REAL NOT NULL,
-                        low REAL NOT NULL,
-                        close REAL NOT NULL,
-                        volume REAL NOT NULL,
-                        UNIQUE(symbol, timeframe, timestamp)
                     )
                     """
                 )
@@ -8920,8 +8907,18 @@ def get_instruments_master(
         LIMIT ? OFFSET ?
     """
     query_params = tuple(params + [limit, offset])
-    rows = safe_query(query_sql, query_params)
+    now_utc = datetime.now(timezone.utc)
+    ist_date = now_utc + timedelta(hours=5, minutes=30)
+    ist_weekday = ist_date.weekday()
+    ist_mins = ist_date.hour * 60 + ist_date.minute
+    nse_is_open = (ist_weekday < 5) and (555 <= ist_mins <= 930)
 
+    est_date = now_utc - timedelta(hours=5)
+    est_weekday = est_date.weekday()
+    est_mins = est_date.hour * 60 + est_date.minute
+    us_is_open = (est_weekday < 5) and (570 <= est_mins <= 960)
+
+    rows = safe_query(query_sql, query_params)
     enriched_rows = []
     for r in rows:
         d = dict(r)
@@ -8931,6 +8928,38 @@ def get_instruments_master(
         d["paper_enabled"] = bool(d.get("paper_enabled", 1))
         d["strategy_enabled"] = bool(d.get("strategy_enabled", 1))
         d["live_enabled"] = bool(d.get("live_enabled", 0))
+
+        ex = str(d.get("exchange", "")).upper()
+        ac = str(d.get("asset_class", "")).upper()
+        sym = str(d.get("canonical_symbol") or d.get("symbol") or "").upper()
+
+        # Dynamic Provider & Session resolution
+        if ex in ["DELTA", "BINANCE", "BYBIT"] or ac in ["CRYPTO", "CRYPTOCURRENCY"] or any(c in sym for c in ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE"]):
+            d["provider"] = "binance" if ex == "BINANCE" else "delta"
+            d["market_status"] = "OPEN"
+            d["marketSession"] = "24X7"
+            d["priceState"] = "LIVE_TRADE"
+        elif ex in ["NSE", "BSE", "NFO", "MCX"] or "INDIAN" in ac or "STOCK" in ac or "EQUITY" in ac or sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]:
+            d["provider"] = "upstox"
+            d["market_status"] = "OPEN" if nse_is_open else "CLOSED"
+            d["marketSession"] = "OPEN" if nse_is_open else "CLOSED"
+            d["priceState"] = "LIVE_TRADE" if nse_is_open else "LAST_TRADED"
+        elif ex in ["NASDAQ", "NYSE"] or "GLOBAL" in ac or "US" in ac:
+            d["provider"] = "twelve_data"
+            d["market_status"] = "OPEN" if us_is_open else "CLOSED"
+            d["marketSession"] = "OPEN" if us_is_open else "CLOSED"
+            d["priceState"] = "LIVE_TRADE" if us_is_open else "LAST_TRADED"
+        elif ex in ["FOREX", "OANDA", "FX"] or "FOREX" in ac or "FX" in ac or "COMMODIT" in ac:
+            d["provider"] = "twelve_data"
+            d["market_status"] = "OPEN"
+            d["marketSession"] = "24X7"
+            d["priceState"] = "LIVE_TRADE"
+        else:
+            d["provider"] = d.get("provider") or "upstox"
+            d["market_status"] = d.get("market_status") or "CLOSED"
+            d["marketSession"] = d.get("market_status") or "CLOSED"
+            d["priceState"] = "LAST_TRADED"
+
         enriched_rows.append(d)
 
     return {

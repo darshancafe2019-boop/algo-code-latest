@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/apiClient";
@@ -334,7 +335,7 @@ export const QuickTradePanel: React.FC<QuickTradePanelProps> = ({
       <div className="p-3 bg-[var(--theme-elevated)]/70 border border-[var(--theme-border)] rounded-xl space-y-1.5 text-xs font-mono">
         <div className="flex items-center justify-between text-slate-400">
           <span>Required Margin:</span>
-          <span className="text-slate-100 font-bold">${(estimate?.required_margin || 0).toLocaleString()}</span>
+          <span className="text-slate-100 font-bold">{formatMoney(estimate.required_margin, "$")}</span>
         </div>
         <div className="flex items-center justify-between text-slate-400">
           <span>Max Risk (SL):</span>

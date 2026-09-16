@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Bell,
@@ -20,10 +21,7 @@ interface TaxAlertsViewProps {
 export function TaxAlertsView({ alerts, currency }: TaxAlertsViewProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${val.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(val, "$")}`;
   };
 
   const getSeverityIcon = (severity: string, type: string) => {

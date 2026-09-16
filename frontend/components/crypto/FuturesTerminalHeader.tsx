@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Zap,
@@ -87,7 +88,7 @@ export function FuturesTerminalHeader({
           <div>
             <span className="text-[9px] text-slate-400 block uppercase">Price</span>
             <span className="text-xs font-bold text-white tracking-wide">
-              ${lastPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              {formatMoney(lastPrice, "$")}
             </span>
           </div>
 

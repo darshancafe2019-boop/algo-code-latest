@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Layers,
@@ -132,7 +133,7 @@ export function NseOptionChainTerminal() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 font-mono">
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Underlying Spot Price</div>
-          <div className="text-lg font-bold text-white mt-1">₹{spotPrice.toLocaleString("en-IN")}</div>
+          <div className="text-lg font-bold text-white mt-1">{formatMoney(spotPrice, "₹")}</div>
         </div>
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
@@ -149,7 +150,7 @@ export function NseOptionChainTerminal() {
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Max Pain Strike</div>
-          <div className="text-lg font-bold text-amber-300 mt-1">₹{maxPain.toLocaleString("en-IN")}</div>
+          <div className="text-lg font-bold text-amber-300 mt-1">{formatMoney(maxPain, "₹")}</div>
         </div>
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
@@ -263,7 +264,7 @@ export function NseOptionChainTerminal() {
                   <td className="py-2 px-4 text-center bg-slate-950 border-x border-slate-800">
                     <div className="flex items-center justify-center gap-1.5">
                       <span className={`font-bold ${isAtm ? "text-cyan-300 scale-110" : "text-white"}`}>
-                        {strike.toLocaleString("en-IN")}
+                        {formatNumber(strike)}
                       </span>
                       {isAtm && (
                         <span className="px-1 py-0.2 rounded bg-cyan-500/20 text-cyan-300 text-[9px] font-bold">

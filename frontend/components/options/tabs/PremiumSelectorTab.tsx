@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Sliders, Filter, Lock, CheckCircle, Search, ArrowRight, Shield } from "lucide-react";
 
@@ -258,7 +259,7 @@ export function PremiumSelectorTab({
                 </td>
                 <td className="py-2.5 px-3 text-right text-slate-200">{c.delta.toFixed(2)}</td>
                 <td className="py-2.5 px-3 text-right text-slate-400">{c.iv.toFixed(1)}%</td>
-                <td className="py-2.5 px-3 text-right text-slate-300">{c.oi.toLocaleString()}</td>
+                <td className="py-2.5 px-3 text-right text-slate-300">{formatNumber(c.oi)}</td>
                 <td className="py-2.5 px-3 text-center">
                   <button
                     onClick={() => onSelectContract?.(c)}

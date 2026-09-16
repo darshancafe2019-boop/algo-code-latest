@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -180,10 +181,10 @@ export function FuturesOrdersView() {
                       <td className="py-3 px-3 text-slate-300">{ord.order_type}</td>
                       <td className="py-3 px-3 text-right font-bold text-white">{ord.quantity}</td>
                       <td className="py-3 px-3 text-right text-slate-200">
-                        {ord.price != null ? `$${ord.price.toLocaleString()}` : "MARKET"}
+                        {ord.price != null ? `${formatMoney(ord.price, "$")}` : "MARKET"}
                       </td>
                       <td className="py-3 px-3 text-right text-slate-300">
-                        {ord.average_fill_price != null ? `$${ord.average_fill_price.toLocaleString()}` : "—"}
+                        {ord.average_fill_price != null ? `${formatMoney(ord.average_fill_price, "$")}` : "—"}
                       </td>
                       <td className="py-3 px-3">
                         <span

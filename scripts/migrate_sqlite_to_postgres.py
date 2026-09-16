@@ -115,11 +115,9 @@ DEPENDENCY_ORDER = [
     "pairs_discovery_cache",
     "provider_health_status",
     "risk_rule_violations",
-    "candles_cache",
     "indicator_configs",
     "indicator_config_history",
-    "indicator_profile_versions",
-    "historical_data_registry"
+    "indicator_profile_versions"
 ]
 
 

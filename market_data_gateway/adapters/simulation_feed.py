@@ -117,9 +117,6 @@ class SimulationFeedAdapter(BaseProviderAdapter):
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
         return {s: self._quote_cache[s] for s in symbols if s in self._quote_cache}
 
-    async def get_history(self, symbol: str, timeframe: str, from_dt: datetime, to_dt: datetime) -> List[OHLCVCandle]:
-        return []
-
     async def get_instruments(self) -> List[CanonicalInstrument]:
         return []
 

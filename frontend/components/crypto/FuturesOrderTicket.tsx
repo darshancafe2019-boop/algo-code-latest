@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   TrendingUp,
@@ -490,9 +491,9 @@ export function FuturesOrderTicket({
         {/* Dynamic Conversion Display */}
         <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1">
           <span>
-            {effectiveQuantity} {underlyingSymbol} ≈ ${notionalValue.toLocaleString()}
+            {effectiveQuantity} {underlyingSymbol} ≈ {formatMoney(notionalValue, "$")}
           </span>
-          <span>Margin: ${initialMargin.toLocaleString()}</span>
+          <span>Margin: {formatMoney(initialMargin, "$")}</span>
         </div>
 
         {/* Quick Position Size Buttons (25%, 50%, 75%, MAX) */}
@@ -595,7 +596,7 @@ export function FuturesOrderTicket({
             <span className="absolute right-2 top-1.5 text-[9px] text-slate-500">%</span>
           </div>
           <span className="text-[9px] text-slate-400 mt-1 block truncate">
-            ≈ ${stopLossPrice.toLocaleString()}
+            ≈ {formatMoney(stopLossPrice, "$")}
           </span>
           <span className="text-[9px] text-rose-400 block">
             Risk: -${plannedRiskUSD.toFixed(1)}
@@ -619,7 +620,7 @@ export function FuturesOrderTicket({
             <span className="absolute right-2 top-1.5 text-[9px] text-slate-500">%</span>
           </div>
           <span className="text-[9px] text-slate-400 mt-1 block truncate">
-            ≈ ${takeProfitPrice.toLocaleString()}
+            ≈ {formatMoney(takeProfitPrice, "$")}
           </span>
           <span className="text-[9px] text-emerald-400 block">
             Reward: +${plannedRewardUSD.toFixed(1)}
@@ -635,7 +636,7 @@ export function FuturesOrderTicket({
             <span>WARNING: Stop Beyond Liquidation</span>
           </div>
           <p>
-            Est. liquidation is ${estLiquidation.toLocaleString()}, but configured stop is ${stopLossPrice.toLocaleString()}. Position may liquidate before stop triggers.
+            Est. liquidation is {formatMoney(estLiquidation, "$")}, but configured stop is {formatMoney(stopLossPrice, "$")}. Position may liquidate before stop triggers.
           </p>
         </div>
       )}
@@ -747,15 +748,15 @@ export function FuturesOrderTicket({
       <div className="bg-[#131B2A] p-2.5 rounded-lg border border-slate-800 space-y-1 mb-3 text-[11px]">
         <div className="flex items-center justify-between text-slate-400">
           <span>Notional</span>
-          <span className="text-slate-200 font-semibold">${notionalValue.toLocaleString()}</span>
+          <span className="text-slate-200 font-semibold">{formatMoney(notionalValue, "$")}</span>
         </div>
         <div className="flex items-center justify-between text-slate-400">
           <span>Margin ({leverage}x)</span>
-          <span className="text-blue-400 font-bold">${initialMargin.toLocaleString()}</span>
+          <span className="text-blue-400 font-bold">{formatMoney(initialMargin, "$")}</span>
         </div>
         <div className="flex items-center justify-between text-slate-400">
           <span>Est. Liquidation</span>
-          <span className="text-amber-400 font-semibold">${estLiquidation.toLocaleString()}</span>
+          <span className="text-amber-400 font-semibold">{formatMoney(estLiquidation, "$")}</span>
         </div>
         <div className="flex items-center justify-between text-slate-400 pt-1 border-t border-slate-800">
           <span>Max Risk</span>

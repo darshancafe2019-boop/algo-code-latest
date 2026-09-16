@@ -40,10 +40,12 @@ export function ProviderDropdownPanel({ isOpen, onClose }: ProviderDropdownPanel
     queryKey: ["providersCatalog"],
     queryFn: async () => {
       const res = await fetch("/api/providers");
-      if (!res.ok) throw new Error("Failed fetching providers");
+      if (!res.ok) return null;
       return await res.json();
     },
-    refetchInterval: 5000,
+    staleTime: 5000,
+    refetchInterval: 8000,
+    refetchOnWindowFocus: false,
   });
 
   const selectRoleMutation = useMutation({

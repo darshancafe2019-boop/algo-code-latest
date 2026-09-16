@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Activity,
@@ -40,8 +41,8 @@ export function RiskTelemetryDashboard({ overview }: RiskTelemetryDashboardProps
     {
       id: "exposure",
       label: "Max Gross Exposure",
-      current: `$${grossExp.toLocaleString()}`,
-      limit: `$${balance.toLocaleString()} (100%)`,
+      current: `${formatMoney(grossExp, "$")}`,
+      limit: `${formatMoney(balance, "$")} (100%)`,
       utilization: (grossExp / balance) * 100,
       status: (grossExp / balance) > 0.8 ? "WARNING" : "SAFE",
       icon: Layers,

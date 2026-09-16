@@ -71,17 +71,10 @@ To verify all calculations are working correctly on your machine, run:
    python -m pytest btc-bot/tests/
    ```
 
-### 2. Fetch Market Data & Verify Indicators
-To download historical market data (Binance Mainnet public endpoints) and print indicator samples, execute:
+### 2. Verify Live Indicators & Real-Time Market Feed
+To verify live indicators and live market data pipeline, execute:
    ```bash
-   # Generates btc_historical_1h.csv under btc-bot/data/
-   python btc-bot/scripts/verify_indicators.py
-   ```
-
-### 3. Run Historical & Walk-Forward Backtests
-To simulate performance metrics (trades count, win rate, Sharpe ratio, profit factor, max drawdown) and verify walk-forward in-sample vs out-of-sample data splits, execute:
-   ```bash
-   python btc-bot/scripts/run_backtests.py
+   python scripts/verify_indicators.py
    ```
    *Note: Results will automatically log into the `backtest_runs` table in SQLite and `data/backtest_runs.csv`.*
 

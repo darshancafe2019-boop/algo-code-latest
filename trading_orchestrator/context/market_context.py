@@ -229,7 +229,7 @@ def build_comprehensive_market_context(
     )
 
     # Query Active Positions & Orders from database
-    raw_positions = db.safe_query("SELECT * FROM positions WHERE is_closed = 0") or []
+    raw_positions = db.safe_query("SELECT * FROM positions WHERE status = 'OPEN'") or []
     positions_list = [dict(p) for p in raw_positions]
 
     raw_orders = db.safe_query("SELECT * FROM trades_log WHERE status IN ('PENDING', 'SUBMITTED', 'OPEN')") or []

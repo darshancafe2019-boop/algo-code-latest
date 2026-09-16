@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useEffect, useState, useRef } from "react";
 import {
   Activity,
@@ -274,7 +275,7 @@ export function Navbar({
                     : "text-white"
               }`}
             >
-              {currencySymbol}{currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatMoney(currentPrice, currencySymbol)}
             </span>
           </div>
 

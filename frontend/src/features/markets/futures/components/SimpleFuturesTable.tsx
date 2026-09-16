@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatPrice, formatVolume } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { CanonicalFuturesContract } from "../types/futures";
@@ -33,25 +34,6 @@ interface SimpleFuturesTableProps {
 type SortField = "symbol" | "price" | "bid" | "ask" | "change" | "oi" | "funding" | "volume" | "expiry";
 type SortOrder = "asc" | "desc";
 
-function formatPrice(val: number | null | undefined, currency: string = "$"): string {
-  if (val === null || val === undefined || isNaN(val)) return "—";
-  return `${currency}${val.toLocaleString(undefined, {
-    minimumFractionDigits: val >= 100 ? 2 : (val >= 1 ? 3 : 4),
-    maximumFractionDigits: val >= 100 ? 2 : (val >= 1 ? 3 : 4),
-  })}`;
-}
-
-function formatVolume(val: number | null | undefined, currency: string = "$"): string {
-  if (val === null || val === undefined || isNaN(val) || val === 0) return "—";
-  if (currency === "₹") {
-    if (val >= 10_000_000) return `₹${(val / 10_000_000).toFixed(2)}Cr`;
-    if (val >= 100_000) return `₹${(val / 100_000).toFixed(1)}L`;
-  }
-  if (val >= 1e9) return `${currency}${(val / 1e9).toFixed(2)}B`;
-  if (val >= 1e6) return `${currency}${(val / 1e6).toFixed(1)}M`;
-  if (val >= 1e3) return `${currency}${(val / 1e3).toFixed(0)}K`;
-  return `${currency}${val.toLocaleString()}`;
-}
 
 export function SimpleFuturesTable({
   contracts,

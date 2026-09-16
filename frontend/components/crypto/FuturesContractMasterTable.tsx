@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
   Search,
@@ -437,7 +438,7 @@ export function FuturesContractMasterTable({
 
                     {/* 3. Price */}
                     <td className="py-2.5 px-3 text-right font-bold text-white font-mono">
-                      ${(Number(c.last_price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      {formatMoney(Number(c.last_price), "$")}
                     </td>
 
                     {/* 4. 24H */}
@@ -477,7 +478,7 @@ export function FuturesContractMasterTable({
                     {isAdvancedView && (
                       <>
                         <td className="py-2.5 px-3 text-right text-slate-300 font-mono text-[11px]">
-                          ${(Number(c.mark_price) || 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          {formatMoney(Number(c.mark_price), "$")}
                         </td>
                         <td className="py-2.5 px-3 text-right font-mono text-[11px]">
                           <span className={isPositiveBasis ? "text-emerald-400" : "text-rose-400"}>

@@ -13,6 +13,11 @@ export type UpstoxFeedStatus = "LIVE" | "DELAYED" | "STALE" | "MARKET_CLOSED" | 
 export type UpstoxWsState = "DISCONNECTED" | "CONNECTING" | "CONNECTED" | "RECONNECTING" | "STALE" | "ERROR";
 export type UpstoxCandleInterval = "1m" | "5m" | "15m" | "30m" | "1h" | "1d";
 
+// ─── Independent Core State Classifications ──────────────────────────────────
+export type UpstoxConnectionState = "CONNECTED" | "CONNECTING" | "RECONNECTING" | "DISCONNECTED" | "ERROR";
+export type UpstoxMarketPhase = "PRE_OPEN" | "NORMAL_OPEN" | "CLOSING_AUCTION" | "CLOSING_SESSION" | "CLOSED";
+export type UpstoxPriceState = "LIVE_TRADE" | "LAST_TRADED" | "INDICATIVE" | "STALE" | "NO_DATA";
+
 export interface UpstoxCredentials {
   apiKey: string;
   apiSecret: string;
@@ -41,6 +46,9 @@ export interface NormalizedLtp {
   source: "LIVE" | "SNAPSHOT" | "CACHED";
   change?: number;
   changePct?: number;
+  indicativePrice?: number | null;
+  marketPhase?: UpstoxMarketPhase;
+  priceState?: UpstoxPriceState;
 }
 
 export interface NormalizedMarketDepthLevel {
@@ -61,7 +69,7 @@ export interface NormalizedOptionGreeks {
 }
 
 export interface NormalizedQuote {
-  provider: "UPSTOX";
+  provider: "UPSTOX" | "DHAN";
   instrumentKey: string;
   symbol: string;
   exchange: string;
@@ -69,11 +77,13 @@ export interface NormalizedQuote {
   ltp: number;
   ltq: number;
   lastTradeTime: string;
+  previousLtt?: number | null;
   previousClose: number;
   open: number;
   high: number;
   low: number;
   close: number;
+  indicativePrice?: number | null;
   volume: number;
   oi: number;
   iv: number | null;
@@ -89,6 +99,26 @@ export interface NormalizedQuote {
   ageMs: number;
   stale: boolean;
   status: UpstoxFeedStatus;
+  connectionState: UpstoxConnectionState;
+  marketPhase: UpstoxMarketPhase;
+  priceState: UpstoxPriceState;
+  isTradable: boolean;
+}
+
+export interface NormalizedMarketTick {
+  provider: "upstox" | "dhan";
+  instrumentKey: string;
+  symbol: string;
+  ltp: number | null;
+  previousClose: number | null;
+  lastTradeTime: number | null;
+  receivedAt: number;
+  indicativePrice?: number | null;
+  connectionState: UpstoxConnectionState;
+  marketPhase: UpstoxMarketPhase;
+  priceState: UpstoxPriceState;
+  isTradable: boolean;
+  ageMs: number | null;
 }
 
 export interface UpstoxInstrument {
@@ -159,6 +189,7 @@ export interface NormalizedOptionChainResponse {
 export interface UpstoxExchangeStatus {
   exchange: string;
   status: "OPEN" | "CLOSED" | "PRE_OPEN" | "POST_CLOSE";
+  phase: UpstoxMarketPhase;
   marketHours: string;
   isOpen: boolean;
   lastChecked: string;
@@ -171,11 +202,18 @@ export interface UpstoxHealthReport {
   tokenType: "ANALYTICS" | "OAUTH" | "NONE";
   restApi: "healthy" | "error" | "unauthenticated";
   websocket: UpstoxWsState;
+  connectionState: UpstoxConnectionState;
   marketStatus: "OPEN" | "CLOSED";
+  marketPhase: UpstoxMarketPhase;
   subscriptions: number;
   lastTickAt: string | null;
   stale: boolean;
   paperMode: boolean;
   tradingEnabled: boolean;
   timestamp: string;
+  // Truthful per-instrument breakdown
+  liveTradeCount: number;
+  closingAuctionCount: number;
+  lastTradedCount: number;
+  staleCount: number;
 }

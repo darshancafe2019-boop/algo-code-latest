@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 import React from "react";
 import {
   TrendingUp,
@@ -104,7 +105,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <Target className="w-3.5 h-3.5 text-cyan-400" />
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-cyan-300 mt-1">
-          {snapshot.maxPain !== null ? snapshot.maxPain.toLocaleString("en-IN") : "N/A"}
+          {formatPrice(snapshot.maxPain)}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Spot Diff</span>
@@ -123,7 +124,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <span className="text-purple-400 text-[10px] sm:text-xs font-bold">IV {snapshot.atmIV || "14.5"}%</span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-purple-300 mt-1">
-          {snapshot.atmStrike.toLocaleString("en-IN")}
+          {formatNumber(snapshot.atmStrike)}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Total OI</span>

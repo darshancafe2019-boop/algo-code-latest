@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   X,
@@ -154,13 +155,13 @@ export function PositionDetailDrawer({
               <div>
                 <span className="text-[10px] text-[#52627A] block">LIVE MARK</span>
                 <span className="font-bold text-sm text-[#F7FAFC] tabular-nums">
-                  ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(currP, "$")}
                 </span>
               </div>
               <div>
                 <span className="text-[10px] text-[#52627A] block">ENTRY BASIS</span>
                 <span className="text-xs text-[#7C8CA3] tabular-nums">
-                  ${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(entryP, "$")}
                 </span>
               </div>
               <div>
@@ -223,7 +224,7 @@ export function PositionDetailDrawer({
               <div className="p-3 bg-[#0D1727] border border-[#1A2A3F] rounded-lg">
                 <span className="text-[10px] text-[#52627A] uppercase block">Notional Value</span>
                 <span className="font-semibold text-[#F7FAFC] tabular-nums">
-                  ${notional.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(notional, "$")}
                 </span>
               </div>
               <div className="p-3 bg-[#0D1727] border border-[#1A2A3F] rounded-lg">
@@ -289,7 +290,7 @@ export function PositionDetailDrawer({
                   </span>
                 </div>
                 <div className="text-base font-bold text-[#FF3B5C] tabular-nums">
-                  ${slP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(slP, "$")}
                 </div>
                 <div className="text-[10px] text-[#52627A]">
                   Distance: ${position.sl_distance_price?.toFixed(2) || "—"}
@@ -306,7 +307,7 @@ export function PositionDetailDrawer({
                   </span>
                 </div>
                 <div className="text-base font-bold text-[#00E890] tabular-nums">
-                  ${tpP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(tpP, "$")}
                 </div>
                 <div className="text-[10px] text-[#52627A]">
                   Distance: ${position.tp_distance_price?.toFixed(2) || "—"}

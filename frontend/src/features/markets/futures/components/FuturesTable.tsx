@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   TrendingUp,
@@ -244,14 +245,14 @@ export function FuturesTable({ contracts, isLoading }: FuturesTableProps) {
                     {/* 5. Mark Price (Null Safe) */}
                     <td className="py-3.5 px-3 text-right font-bold text-white">
                       {isConnected && c.mark_price != null
-                        ? `${currSymbol}${c.mark_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        ? `${currSymbol}{formatMoney(c.mark_price, "$")}`
                         : "—"}
                     </td>
 
                     {/* 6. Index Price (Null Safe) */}
                     <td className="py-3.5 px-3 text-right text-slate-400">
                       {isConnected && c.index_price != null
-                        ? `${currSymbol}${c.index_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        ? `${currSymbol}{formatMoney(c.index_price, "$")}`
                         : "—"}
                     </td>
 

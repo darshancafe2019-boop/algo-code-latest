@@ -1,3 +1,5 @@
+import { formatMoney, formatVolume as canonicalFormatVolume } from "@/lib/formatters";
+
 /**
  * Stock Formatting Utilities
  * ==========================
@@ -17,18 +19,7 @@ export function formatStockCurrency(
   }
 
   const symbol = currency.toUpperCase() === "INR" ? "₹" : "$";
-
-  if (currency.toUpperCase() === "INR") {
-    return `${symbol}${val.toLocaleString("en-IN", {
-      minimumFractionDigits: decimals,
-      maximumFractionDigits: decimals,
-    })}`;
-  }
-
-  return `${symbol}${val.toLocaleString("en-US", {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  })}`;
+  return formatMoney(val, symbol, decimals);
 }
 
 export function formatStockPercent(
@@ -59,7 +50,7 @@ export function formatStockVolume(val: number | null | undefined): string {
   if (val >= 1000) {
     return `${(val / 1000).toFixed(1)}k`;
   }
-  return val.toLocaleString();
+  return canonicalFormatVolume(val);
 }
 
 export function formatStockMarketCap(
@@ -76,7 +67,7 @@ export function formatStockMarketCap(
     if (val >= 10000000) {
       return `${sym}${(val / 10000000).toFixed(2)} Cr`;
     }
-    return `${sym}${val.toLocaleString("en-IN")}`;
+    return formatMoney(val, sym);
   }
 
   if (val >= 1000000000000) {
@@ -88,7 +79,7 @@ export function formatStockMarketCap(
   if (val >= 1000000) {
     return `${sym}${(val / 1000000).toFixed(2)}M`;
   }
-  return `${sym}${val.toLocaleString()}`;
+  return formatMoney(val, sym);
 }
 
 export function formatRelativeVolume(val: number | null | undefined): string {
@@ -97,3 +88,4 @@ export function formatRelativeVolume(val: number | null | undefined): string {
   }
   return `${val.toFixed(2)}x`;
 }
+

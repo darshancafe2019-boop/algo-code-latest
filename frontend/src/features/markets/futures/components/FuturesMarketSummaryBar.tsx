@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Activity, DollarSign, Flame, Layers } from "lucide-react";
 
@@ -21,14 +22,14 @@ export function FuturesMarketSummaryBar({
       ? `$${(totalVolumeUsd / 1e9).toFixed(2)}B`
       : totalVolumeUsd >= 1e6
       ? `$${(totalVolumeUsd / 1e6).toFixed(2)}M`
-      : `$${totalVolumeUsd.toLocaleString()}`;
+      : `${formatMoney(totalVolumeUsd, "$")}`;
 
   const oiFormatted =
     totalOpenInterestUsd >= 1e9
       ? `$${(totalOpenInterestUsd / 1e9).toFixed(2)}B`
       : totalOpenInterestUsd >= 1e6
       ? `$${(totalOpenInterestUsd / 1e6).toFixed(2)}M`
-      : `$${totalOpenInterestUsd.toLocaleString()}`;
+      : `${formatMoney(totalOpenInterestUsd, "$")}`;
 
   const fundingVal =
     typeof avgFundingRateApr === "number"

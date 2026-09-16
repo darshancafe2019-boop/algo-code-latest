@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatMoney } from "@/lib/formatters";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -162,7 +163,7 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
                   </td>
                   <td className="py-3 px-3 text-cyan-300">{c.exchange}</td>
                   <td className="py-3 px-3 text-right font-bold text-white">
-                    ${c.last_price?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(c.last_price, "$")}
                   </td>
                   <td className="py-3 px-3 text-right font-bold text-[#22D3EE]">
                     +${c.basis?.toFixed(2)}
@@ -174,10 +175,10 @@ export function FuturesCommandCenter({ underlyingSymbol }: FuturesCommandCenterP
                     {c.funding_rate !== undefined ? `${(c.funding_rate * 100).toFixed(4)}%` : "N/A"}
                   </td>
                   <td className="py-3 px-3 text-right text-cyan-300">
-                    {c.open_interest?.toLocaleString()}
+                    {formatNumber(c.open_interest)}
                   </td>
                   <td className="py-3 px-3 text-right text-[#7C8CA3]">
-                    {c.volume_24h?.toLocaleString()}
+                    {formatNumber(c.volume_24h)}
                   </td>
                 </tr>
               ))}

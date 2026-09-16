@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React from "react";
 import { ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { StockQuoteRow } from "../types/stocks";
@@ -186,7 +187,7 @@ export const StocksTable: React.FC<StocksTableProps> = ({
             <div>
               Showing <span className="text-white font-bold">{Math.min(total, (page - 1) * pageSize + 1)}</span> to{" "}
               <span className="text-white font-bold">{Math.min(total, page * pageSize)}</span> of{" "}
-              <span className="text-cyan-400 font-bold">{total.toLocaleString()}</span> stocks
+              <span className="text-cyan-400 font-bold">{formatNumber(total)}</span> stocks
             </div>
 
             <div className="flex items-center gap-1.5">

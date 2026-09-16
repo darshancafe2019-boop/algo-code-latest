@@ -13,14 +13,9 @@ import {
   Layers,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
-import {
-  formatPrice,
-  formatPercent,
-  formatVolume,
-  formatQuantity,
-  formatNumber,
-} from "@/lib/formatters";
+import { formatPrice, formatPercent, formatVolume, formatQuantity, formatNumber, formatMoney } from "@/lib/formatters";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
+import { getMarketRowStatus, normalizeProvider } from "@/lib/market-data/row-status";
 
 interface SimpleMarketTableProps {
   instruments: MarketInstrument[];
@@ -487,20 +482,56 @@ const MemoizedMarketRow = memo(function MarketRow({
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
-  // Real-time live quote lookup
-  const rawQuote = getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null);
+  // Comprehensive multi-key real-time live quote lookup
+  const lookupKeys = [
+    sym,
+    sym.toUpperCase(),
+    instrument.canonical_symbol,
+    instrument.canonical_symbol?.toUpperCase(),
+    instrument.symbol,
+    instrument.symbol?.toUpperCase(),
+    instrument.provider_symbol,
+    instrument.provider_symbol?.toUpperCase(),
+    sym.replace("/", ""),
+    instrument.canonical_symbol ? instrument.canonical_symbol.replace("/", "") : null,
+    instrument.id,
+  ].filter(Boolean) as string[];
 
-  // Strict check: Markets page live quotes must originate from DHAN_WS or DELTA_OPTIONS_WS
-  const isAllowedProviderQuote = rawQuote && (
-    rawQuote.provider === "dhan" ||
-    rawQuote.provider === "dhan_ws" ||
-    rawQuote.provider === "delta_options" ||
-    rawQuote.provider === "delta_options_ws"
-  );
+  let rawQuote: any = null;
+  for (const k of lookupKeys) {
+    const q = getQuote(k);
+    if (q) {
+      rawQuote = q;
+      break;
+    }
+  }
 
-  const liveQuote = isAllowedProviderQuote ? rawQuote : null;
+  // Derive active healthy providers from gateway
+  const { providerHealth } = useMarketGatewayContext();
+  const healthyProvidersSet = React.useMemo(() => {
+    const set = new Set<string>();
+    if (providerHealth && providerHealth.length > 0) {
+      providerHealth.forEach((p) => {
+        const s = (p.status || "").toUpperCase();
+        if (["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED"].includes(s)) {
+          const norm = normalizeProvider(p.provider_id);
+          if (norm) set.add(norm.toUpperCase());
+        }
+      });
+    }
+    return set;
+  }, [providerHealth]);
+
+  const rowStatus = getMarketRowStatus({
+    instrument,
+    rawQuote,
+    healthyProviders: healthyProvidersSet,
+    connectionStatus,
+  });
+
+  const liveQuote = rawQuote;
   const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
-  const price = hasLivePrice ? liveQuote!.last_price : instrument.last_price;
+  const price = hasLivePrice ? liveQuote.last_price : instrument.last_price;
   const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument.change_pct_24h ?? instrument.change_24h ?? 0);
   const isPositive = changePct >= 0;
   const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
@@ -512,39 +543,49 @@ const MemoizedMarketRow = memo(function MarketRow({
   const low24h = liveQuote?.low ?? instrument.low_24h;
   const openPrice = liveQuote?.open ?? (instrument as any).open;
 
-  // Data Health status calculation
   const dataAgeSec = liveQuote?.age_seconds ?? 999;
-  const isMarketClosed = instrument.market_status === "CLOSED";
-  const isStaleFeed = liveQuote != null && (liveQuote.is_stale || dataAgeSec >= 10);
-  const isLiveFeed = liveQuote != null && !isStaleFeed && !isMarketClosed;
+  const isStaleFeed = rowStatus.isStale;
+  const isLiveFeed = rowStatus.isLive;
 
-  const statusBadge = isMarketClosed ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-slate-800/90 text-slate-300 border border-slate-700">
-      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
-      MARKET CLOSED
-    </span>
-  ) : isLiveFeed ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
-      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-      LIVE
-    </span>
-  ) : isStaleFeed ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">
-      <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
-      STALE
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700/80">
-      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
-      NO LIVE PROVIDER
-    </span>
-  );
+  // Truthful provider status badge
+  const statusBadge =
+    rowStatus.state === "closed" ? (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-slate-800/90 text-slate-300 border border-slate-700 whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+        {rowStatus.label}
+      </span>
+    ) : rowStatus.state === "live" ? (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)] whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+        {rowStatus.label}
+      </span>
+    ) : rowStatus.state === "stale" ? (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+        {rowStatus.label}
+      </span>
+    ) : rowStatus.state === "reconnecting" ? (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40 animate-pulse whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
+        {rowStatus.label}
+      </span>
+    ) : rowStatus.state === "connected" ? (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-blue-500/15 text-blue-300 border border-blue-500/40 whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-blue-400 shrink-0" />
+        {rowStatus.label}
+      </span>
+    ) : (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700/80 whitespace-nowrap">
+        <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+        NO LIVE PROVIDER
+      </span>
+    );
 
   // Trend determination based on calculated change
   const trend =
-    changePct > 1.0
+    changePct > 0.05
       ? { label: "↑ Bullish", color: "text-emerald-400" }
-      : changePct < -1.0
+      : changePct < -0.05
       ? { label: "↓ Bearish", color: "text-rose-400" }
       : { label: "→ Neutral", color: "text-slate-400" };
 
@@ -659,7 +700,7 @@ const MemoizedMarketRow = memo(function MarketRow({
         <>
           <td className="px-4 py-3 font-bold text-[15px] text-cyan-300">{sym.split(" ")[0] || sym.split("-")[0] || sym}</td>
           <td className="px-4 text-[13px] text-slate-300">{instrument.expiry || "Weekly"}</td>
-          <td className="px-4 text-right font-mono font-bold text-[15px] text-white">{instrument.strike?.toLocaleString() || "—"}</td>
+          <td className="px-4 text-right font-mono font-bold text-[15px] text-white">{formatPrice(instrument.strike)}</td>
           <td className="px-4 text-center">
             <span
               className={`px-2 py-0.5 rounded text-[11px] font-black ${

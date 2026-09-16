@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Calculator, Play, ArrowRight, ShieldCheck, AlertCircle, RefreshCw } from "lucide-react";
 import { PositionSizeResult, WhatIfResult } from "@/types/risk";
@@ -254,14 +255,14 @@ export function PositionSizeCalculator({ accountBalance }: PositionSizeCalculato
               <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Notional Value ($)</span>
                 <span className="text-base font-bold text-white">
-                  ${result.notional_value?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(result.notional_value, "$")}
                 </span>
               </div>
 
               <div className="p-3 bg-[#0E1524] rounded-xl border border-[#1A2A3F]">
                 <span className="text-slate-400 text-[10px] block">Margin Required ($)</span>
                 <span className="text-base font-bold text-cyan-400">
-                  ${result.margin_required?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(result.margin_required, "$")}
                 </span>
               </div>
             </div>

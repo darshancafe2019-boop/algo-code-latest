@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Code,
@@ -212,7 +213,7 @@ export function FuturesStrategiesView({ contracts }: FuturesStrategiesViewProps)
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-[#080C14] rounded-xl border border-[#1E293B]">
           <div>
             <span className="text-[9px] text-slate-500 uppercase block">Total Net Notional</span>
-            <strong className="text-white text-sm block">${estNotional.toLocaleString()}</strong>
+            <strong className="text-white text-sm block">{formatMoney(estNotional, "$")}</strong>
           </div>
           <div>
             <span className="text-[9px] text-slate-500 uppercase block">Annualized Yield / APR</span>

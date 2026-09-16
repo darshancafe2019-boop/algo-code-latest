@@ -115,6 +115,10 @@ const DhanLiveMarketFeed = dynamic(
   () => import("@/components/live/DhanLiveMarketFeed").then((m) => m.DhanLiveMarketFeed),
   { ssr: false, loading: () => null }
 );
+const UpstoxLiveMarketFeed = dynamic(
+  () => import("@/components/live/UpstoxLiveMarketFeed").then((m) => m.UpstoxLiveMarketFeed),
+  { ssr: false, loading: () => null }
+);
 const DeltaLiveMarketFeed = dynamic(
   () => import("@/components/live/DeltaLiveMarketFeed").then((m) => m.DeltaLiveMarketFeed),
   { ssr: false, loading: () => null }
@@ -127,7 +131,7 @@ const TradingOrchestratorView = dynamic(
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
-  const [liveProvider, setLiveProvider] = useState<"dhan" | "delta">("dhan");
+  const [liveProvider, setLiveProvider] = useState<"dhan" | "upstox" | "delta">("dhan");
 
   // Idle-time chunk preloading: warms up heavy tab bundles during browser idle periods
   useEffect(() => {
@@ -148,6 +152,7 @@ function MainApp() {
       import("@/src/features/markets/futures");
       import("@/components/tax-intelligence/TaxIntelligenceTab");
       import("@/components/live/DhanLiveMarketFeed");
+      import("@/components/live/UpstoxLiveMarketFeed");
       import("@/components/live/DeltaLiveMarketFeed");
     };
 
@@ -169,6 +174,13 @@ function MainApp() {
         {(activeTab === "home" || activeTab === "dashboard") && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
+          </ErrorBoundary>
+        )}
+
+        {/* 0.1 AI-Assisted Trading Orchestrator */}
+        {(activeTab === "orchestrator" || activeTab === "trading-orchestrator") && (
+          <ErrorBoundary title="Trading Orchestrator Failed">
+            <TradingOrchestratorView />
           </ErrorBoundary>
         )}
 
@@ -194,6 +206,23 @@ function MainApp() {
 
                 <button
                   type="button"
+                  onClick={() => setLiveProvider("upstox")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
+                    liveProvider === "upstox"
+                      ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/40 border border-purple-400/40"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-[#142036]"
+                  }`}
+                >
+                  <span className="text-purple-300 font-bold">⚡</span>
+                  <span>UPSTOX V3</span>
+                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-purple-300 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                    LIVE FEED
+                  </span>
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setLiveProvider("delta")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
                     liveProvider === "delta"
@@ -210,7 +239,13 @@ function MainApp() {
                 </button>
               </div>
 
-              {liveProvider === "dhan" ? <DhanLiveMarketFeed /> : <DeltaLiveMarketFeed />}
+              {liveProvider === "dhan" ? (
+                <DhanLiveMarketFeed />
+              ) : liveProvider === "upstox" ? (
+                <UpstoxLiveMarketFeed />
+              ) : (
+                <DeltaLiveMarketFeed />
+              )}
             </div>
           </ErrorBoundary>
         )}

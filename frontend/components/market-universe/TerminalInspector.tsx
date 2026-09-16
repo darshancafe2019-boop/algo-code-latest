@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState, useMemo } from "react";
 import {
@@ -82,7 +83,7 @@ export function TerminalInspector({
   const formatPrice = (val: number | null) => {
     if (val === null || val === undefined || val === 0) return "—";
     return val >= 1000
-      ? val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      ? formatPrice(val)
       : val.toFixed(2);
   };
 

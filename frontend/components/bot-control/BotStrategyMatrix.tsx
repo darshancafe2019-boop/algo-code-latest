@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useMemo } from "react";
 import {
   PieChart,
@@ -176,7 +177,7 @@ export function BotStrategyMatrix({
                 <div>
                   <div className="text-[10px] text-[var(--theme-text-muted)] font-sans">Exposure</div>
                   <div className="font-bold text-[var(--theme-text-primary)] mt-0.5">
-                    ${grp.totalExposure.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {formatMoney(grp.totalExposure, "$")}
                   </div>
                 </div>
 

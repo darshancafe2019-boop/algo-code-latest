@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { WorkstationRiskSummary } from "@/types/options-workstation";
 import { Shield, AlertTriangle, CheckCircle, Flame, Lock, Power, RefreshCw } from "lucide-react";
@@ -75,7 +76,7 @@ export function RiskMonitorTab({ currencySymbol = "₹" }: RiskMonitorTabProps) 
         <div className="bg-[#080E1E] border border-slate-800 rounded-2xl p-3 shadow-xl space-y-1">
           <div className="text-[10px] text-slate-400">Available Margin</div>
           <div className="font-extrabold text-base text-cyan-300">
-            {currencySymbol}{(riskSummary?.available_margin || 1000000).toLocaleString()}
+            {formatMoney(riskSummary.available_margin || 1000000, currencySymbol)}
           </div>
           <div className="text-[10px] text-emerald-400 font-bold">100% Coverage</div>
         </div>
@@ -91,7 +92,7 @@ export function RiskMonitorTab({ currencySymbol = "₹" }: RiskMonitorTabProps) 
         <div className="bg-[#080E1E] border border-slate-800 rounded-2xl p-3 shadow-xl space-y-1">
           <div className="text-[10px] text-slate-400">Daily Loss Limit</div>
           <div className="font-extrabold text-base text-rose-400">
-            {currencySymbol}{(riskSummary?.daily_loss_limit || 50000).toLocaleString()}
+            {formatMoney(riskSummary.daily_loss_limit || 50000, currencySymbol)}
           </div>
           <div className="text-[10px] text-slate-400">Current Loss: {currencySymbol}0.00</div>
         </div>

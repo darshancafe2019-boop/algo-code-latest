@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React from "react";
 import { OptionStrikeRow, Moneyness, OptionContractQuote } from "@/types/option-chain";
 import { TrendingUp, TrendingDown, Target, Zap, Plus, Shield, Radio, Activity, HelpCircle } from "lucide-react";
@@ -249,10 +250,10 @@ export const StrikeCenteredOptionLadderTable = React.memo(function StrikeCentere
                 >
                   {/* CE Columns */}
                   <td className={`p-2 text-right text-slate-300 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {ceOI > 0 ? (ceOI >= 1000 ? `${(ceOI / 1000).toFixed(1)}k` : ceOI.toLocaleString()) : renderValueOrDash(null)}
+                    {formatVolume(ceOI)}
                   </td>
                   <td className={`p-2 text-right text-slate-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
-                    {ceVol > 0 ? ceVol.toLocaleString() : renderValueOrDash(null)}
+                    {formatVolume(ceVol)}
                   </td>
                   <td className={`p-2 text-right text-slate-400 ${ceITM ? "bg-rose-950/20" : ""}`}>
                     {ceIV > 0 ? (
@@ -341,7 +342,7 @@ export const StrikeCenteredOptionLadderTable = React.memo(function StrikeCentere
                   >
                     <div className="flex items-center justify-center gap-1">
                       {isATM && <Target className="w-3 h-3 text-amber-400 inline" />}
-                      <span>{currency}{row.strike.toLocaleString()}</span>
+                      <span>{formatMoney(row.strike, currency)}</span>
                     </div>
                   </td>
 
@@ -425,10 +426,10 @@ export const StrikeCenteredOptionLadderTable = React.memo(function StrikeCentere
                     )}
                   </td>
                   <td className={`p-2 text-left text-slate-400 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {peVol > 0 ? peVol.toLocaleString() : renderValueOrDash(null)}
+                    {formatVolume(peVol)}
                   </td>
                   <td className={`p-2 text-left text-slate-300 ${peITM ? "bg-emerald-950/20" : ""}`}>
-                    {peOI > 0 ? (peOI >= 1000 ? `${(peOI / 1000).toFixed(1)}k` : peOI.toLocaleString()) : renderValueOrDash(null)}
+                    {formatVolume(peOI)}
                   </td>
                 </tr>
               );

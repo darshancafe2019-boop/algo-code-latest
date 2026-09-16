@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React from "react";
 import Link from "next/link";
@@ -74,7 +75,7 @@ export function ContextualActionBar({
           <div className="text-right">
             <span className="text-sm font-black text-slate-100 block">
               {instrument.currency === "INR" ? "₹" : "$"}
-              {instrument.last_price ? instrument.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
+              {formatPrice(instrument.last_price)}
             </span>
             <span
               className={`text-[10px] font-bold ${

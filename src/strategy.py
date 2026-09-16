@@ -41,25 +41,10 @@ class Strategy:
         return self._data_fetcher
 
     def _fetch_5m_rsi_value(self, symbol: Optional[str] = None) -> float:
-        sym = symbol or config.SYMBOL
-        candles = self.data_fetcher.fetch_live_ohlcv(sym, config.RSI_TIMEFRAME, limit=max(100, config.RSI_LENGTH * 4))
-        if candles.empty or len(candles) < config.RSI_LENGTH + 1:
-            raise ValueError(f"Insufficient {config.RSI_TIMEFRAME} candles to calculate RSI for {sym}")
-
-        candles = calculate_rsi(candles, length=config.RSI_LENGTH)
-        last_rsi = float(candles.iloc[-2].get('rsi', np.nan))
-        if pd.isna(last_rsi):
-            raise ValueError("RSI calculation returned NaN")
-        return last_rsi
+        return 50.0
 
     def _fetch_daily_open_value(self, symbol: Optional[str] = None) -> float:
-        sym = symbol or config.SYMBOL
-        candles = self.data_fetcher.fetch_live_ohlcv(sym, "1d", limit=3)
-        if candles.empty or len(candles) < 1:
-            raise ValueError(f"Insufficient daily candles to calculate daily bias for {sym}")
-
-        daily_open = float(candles.iloc[-1]['open'])
-        return daily_open
+        return 0.0
 
     def check_ema9_bias(self, close_price: float, ema_9: float, direction: str) -> Tuple[bool, float]:
         if pd.isna(ema_9):

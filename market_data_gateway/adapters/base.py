@@ -129,6 +129,9 @@ class NormalizedQuote:
         if d.get("provider") == "dhan_ws":
             d["raw_provider"] = "dhan_ws"
             d["provider"] = "dhan"
+        elif d.get("provider") in ("delta_options_ws", "delta_ws"):
+            d["raw_provider"] = d.get("provider")
+            d["provider"] = "delta"
         
         # Compatibility fields for table rendering
         if d.get("bid") is not None and "bid_price" not in d:
@@ -249,9 +252,22 @@ class BaseProviderAdapter(ABC):
         self._subscribed_symbols: Set[str] = set()
         self._logger = logging.getLogger(f"MDGateway.{provider_id}")
         self._on_quote_callback: Optional[Callable[[NormalizedQuote], None]] = None
+        self._quote_callbacks: List[Callable[[NormalizedQuote], None]] = []
 
     def set_quote_callback(self, callback: Callable[[NormalizedQuote], None]) -> None:
         self._on_quote_callback = callback
+        if callback not in self._quote_callbacks:
+            self._quote_callbacks.append(callback)
+
+    def add_quote_callback(self, callback: Callable[[NormalizedQuote], None]) -> None:
+        if callback not in self._quote_callbacks:
+            self._quote_callbacks.append(callback)
+
+    def remove_quote_callback(self, callback: Callable[[NormalizedQuote], None]) -> None:
+        if callback in self._quote_callbacks:
+            self._quote_callbacks.remove(callback)
+        if self._on_quote_callback == callback:
+            self._on_quote_callback = None
 
     def _emit(self, quote: NormalizedQuote) -> None:
         self._last_tick_time = time.monotonic()
@@ -261,6 +277,12 @@ class BaseProviderAdapter(ABC):
                 self._on_quote_callback(quote)
             except Exception as exc:
                 self._logger.error("Quote callback error: %s", exc)
+        for cb in list(self._quote_callbacks):
+            if cb is not self._on_quote_callback:
+                try:
+                    cb(quote)
+                except Exception as exc:
+                    self._logger.error("Additional quote callback error: %s", exc)
 
     # ── Abstract methods ──────────────────────────────────────────────────────
 
@@ -278,15 +300,6 @@ class BaseProviderAdapter(ABC):
 
     @abstractmethod
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]: ...
-
-    @abstractmethod
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]: ...
 
     @abstractmethod
     async def get_instruments(self) -> List[CanonicalInstrument]: ...

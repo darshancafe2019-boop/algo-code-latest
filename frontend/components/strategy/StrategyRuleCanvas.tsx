@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
   Layers,
@@ -592,24 +593,24 @@ export function StrategyRuleCanvas({
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1 font-mono text-[11px]">
             <div className="p-2 rounded bg-[#07111F] border border-[#12304A]">
               <span className="text-[#7D8EA5] text-[10px] block">Available Capital</span>
-              <span className="text-[#F8FAFC] font-bold">${capital.toLocaleString()}</span>
+              <span className="text-[#F8FAFC] font-bold">{formatMoney(capital, "$")}</span>
             </div>
             <div className="p-2 rounded bg-[#07111F] border border-[#12304A]">
               <span className="text-[#7D8EA5] text-[10px] block">Allocated Capital</span>
               <span className="text-[#22D3EE] font-bold">
-                ${estimatedCalculations.allocatedCapital.toLocaleString()}
+                {formatMoney(estimatedCalculations.allocatedCapital, "$")}
               </span>
             </div>
             <div className="p-2 rounded bg-[#07111F] border border-[#12304A]">
               <span className="text-[#7D8EA5] text-[10px] block">Est. Margin</span>
               <span className="text-[#00E89A] font-bold">
-                ${estimatedCalculations.estimatedMargin.toLocaleString()}
+                {formatMoney(estimatedCalculations.estimatedMargin, "$")}
               </span>
             </div>
             <div className="p-2 rounded bg-[#07111F] border border-[#12304A]">
               <span className="text-[#7D8EA5] text-[10px] block">Est. Exposure</span>
               <span className="text-[#F59E0B] font-bold">
-                ${estimatedCalculations.estimatedExposure.toLocaleString()}
+                {formatMoney(estimatedCalculations.estimatedExposure, "$")}
               </span>
             </div>
             <div className="p-2 rounded bg-[#07111F] border border-[#12304A]">

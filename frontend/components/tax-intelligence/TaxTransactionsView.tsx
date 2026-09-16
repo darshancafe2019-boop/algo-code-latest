@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Search, FileSpreadsheet, ShieldAlert, Layers } from "lucide-react";
 import { NormalizedTaxTransaction } from "@/lib/taxEngineService";
@@ -21,10 +22,7 @@ export function TaxTransactionsView({
   const formatCurrency = (val: number | null | undefined, placeholder = "N/A") => {
     if (val === null || val === undefined) return placeholder;
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${Math.abs(val).toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(Math.abs(val), "$")}`;
   };
 
   const filtered = (transactions || []).filter((t: any) => {

@@ -15,12 +15,8 @@ from src import config
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def main():
-    data_file = project_dir / "data" / "btc_historical_1h.csv"
-    if not data_file.exists():
-        print(f"Historical data file not found at {data_file}. Please run verify_indicators.py first.")
-        return
-        
-    print(f"Loading historical data from {data_file}...")
+    print("Historical candle dataset backtesting is disabled (historical candle subsystem removed).")
+    return
     df = pd.read_csv(data_file)
     
     print(f"Loaded {len(df)} candles.")

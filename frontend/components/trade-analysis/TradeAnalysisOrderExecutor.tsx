@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Send,
@@ -222,7 +223,7 @@ export function TradeAnalysisOrderExecutor({
         <div>
           <span className="text-[10px] text-[#5A738E] block uppercase">Est. Value</span>
           <span className="font-bold text-[#F8FAFC] mt-0.5 block tabular-nums">
-            ₹{orderPreview.estimatedValue.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+            {formatMoney(orderPreview.estimatedValue, "₹")}
           </span>
         </div>
       </div>
@@ -233,13 +234,13 @@ export function TradeAnalysisOrderExecutor({
           <div>
             <span className="text-[#5A738E]">Max Risk: </span>
             <span className="font-bold text-rose-400">
-              ₹{totalMaxRisk.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              {formatMoney(totalMaxRisk, "₹")}
             </span>
           </div>
           <div>
             <span className="text-[#5A738E]">Target Profit: </span>
             <span className="font-bold text-emerald-400">
-              ₹{totalPotentialProfit.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+              {formatMoney(totalPotentialProfit, "₹")}
             </span>
           </div>
         </div>

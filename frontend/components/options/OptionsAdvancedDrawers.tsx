@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import {
@@ -321,11 +322,11 @@ export function OptionsAdvancedDrawers({
                     >
                       <div>
                         <div className="font-bold text-white">{opt.symbol || opt.contract_name || `NIFTY Contract ${idx}`}</div>
-                        <div className="text-[10px] text-slate-400">Vol: {opt.volume?.toLocaleString() || "—"}</div>
+                        <div className="text-[10px] text-slate-400">Vol: {formatVolume(opt.volume)}</div>
                       </div>
                       <div className="text-right">
                         <div className="font-bold text-cyan-400">₹{opt.ltp || opt.last_price || "—"}</div>
-                        <div className="text-[10px] text-slate-400">OI: {opt.open_interest?.toLocaleString() || "—"}</div>
+                        <div className="text-[10px] text-slate-400">OI: {formatVolume(opt.open_interest)}</div>
                       </div>
                     </div>
                   ))}

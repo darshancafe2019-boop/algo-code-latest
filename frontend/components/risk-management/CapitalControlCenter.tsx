@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   DollarSign,
@@ -86,31 +87,31 @@ export function CapitalControlCenter({ overview }: CapitalControlCenterProps) {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs font-mono">
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Total Capital</span>
-          <span className="text-base font-bold text-white">${totalCap.toLocaleString()}</span>
+          <span className="text-base font-bold text-white">{formatMoney(totalCap, "$")}</span>
           <span className="text-[10px] text-[#7C8CA3] block">Account Equity</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Available Capital</span>
-          <span className="text-base font-bold text-[#22D3EE]">${availCap.toLocaleString()}</span>
+          <span className="text-base font-bold text-[#22D3EE]">{formatMoney(availCap, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">{((availCap / totalCap) * 100).toFixed(0)}% Free Cash</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Used Capital</span>
-          <span className="text-base font-bold text-cyan-300">${usedCap.toLocaleString()}</span>
+          <span className="text-base font-bold text-cyan-300">{formatMoney(usedCap, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">Active In Trade</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Reserved Capital</span>
-          <span className="text-base font-bold text-purple-300">${reserveCap.toLocaleString()}</span>
+          <span className="text-base font-bold text-purple-300">{formatMoney(reserveCap, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">Safety Buffer</span>
         </div>
 
         <div className="p-3 rounded-2xl bg-[#0A1422] border border-[#122033]">
           <span className="text-[10px] text-[#52627A] uppercase font-bold block">Margin Available</span>
-          <span className="text-base font-bold text-emerald-400">${marginAvail.toLocaleString()}</span>
+          <span className="text-base font-bold text-emerald-400">{formatMoney(marginAvail, "$")}</span>
           <span className="text-[10px] text-[#52627A] block">For New Orders</span>
         </div>
 
@@ -161,14 +162,14 @@ export function CapitalControlCenter({ overview }: CapitalControlCenterProps) {
                 </div>
                 <div>
                   <span className="font-bold text-white block">{item.name}</span>
-                  <span className="text-[10px] text-[#52627A]">Allocated: ${item.allocated.toLocaleString()}</span>
+                  <span className="text-[10px] text-[#52627A]">Allocated: {formatMoney(item.allocated, "$")}</span>
                 </div>
               </div>
 
               <div className="flex items-center gap-4 text-right">
                 <div>
                   <span className="text-[10px] text-[#52627A] block">Active Used</span>
-                  <span className="font-bold text-cyan-300">${item.used.toLocaleString()}</span>
+                  <span className="font-bold text-cyan-300">{formatMoney(item.used, "$")}</span>
                 </div>
                 <div className="w-24 bg-[#0A130F] h-2 rounded-full overflow-hidden border border-[#122033] hidden sm:block">
                   <div

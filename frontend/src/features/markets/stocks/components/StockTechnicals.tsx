@@ -2,6 +2,7 @@
 
 import React from "react";
 import { StockTechnicals as IStockTechnicals } from "../types/stocks";
+import { formatNumber } from "@/lib/formatters";
 
 interface StockTechnicalsProps {
   technicals?: IStockTechnicals;
@@ -17,10 +18,7 @@ export const StockTechnicals: React.FC<StockTechnicalsProps> = ({ technicals, la
     );
   }
 
-  const formatNum = (val: number | null | undefined) => {
-    if (val === null || val === undefined || isNaN(val)) return "—";
-    return val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  };
+  const formatNum = (val: number | null | undefined) => formatNumber(val, 2);
 
   return (
     <div className="space-y-4 font-mono text-xs">

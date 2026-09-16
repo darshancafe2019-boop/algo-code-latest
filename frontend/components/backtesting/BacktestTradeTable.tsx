@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { ListFilter, Search, ArrowUpRight, ArrowDownRight, CheckCircle2, XCircle } from "lucide-react";
 import { BacktestTrade } from "@/types/backtest";
@@ -103,10 +104,10 @@ export function BacktestTradeTable({ trades = [] }: BacktestTradeTableProps) {
                       </span>
                     </td>
                     <td className="py-2.5 font-mono text-slate-300">
-                      ${(t.entry_price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatMoney(t.entry_price, "$")}
                     </td>
                     <td className="py-2.5 font-mono text-slate-300">
-                      ${(t.exit_price ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      {formatMoney(t.exit_price, "$")}
                     </td>
                     <td className="py-2.5 font-mono text-slate-400">{t.quantity ?? 0.15}</td>
                     <td className={`py-2.5 font-mono font-bold text-right ${isWin ? "text-emerald-400" : "text-red-400"}`}>

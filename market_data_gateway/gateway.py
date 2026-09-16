@@ -5,7 +5,6 @@ Always-running asyncio aiohttp server (port 5051 by default).
 Exposes:
   GET  /health           — provider status matrix
   GET  /snapshot         — latest quotes for ?symbols=...
-  GET  /history          — OHLCV candles for ?symbol=&tf=&from=&to=
   GET  /search           — instrument search ?q=&limit=20
   WS   /ws               — authenticated real-time quote stream
 
@@ -40,7 +39,6 @@ from market_data_gateway.adapters.alpaca_iex_ws import AlpacaIEXWSAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
-from market_data_gateway.candle_store import global_candle_store
 from market_data_gateway.cache.market_cache import global_market_cache
 from market_data_gateway.core.feed_manager import global_feed_manager
 from market_data_gateway.core.subscription_manager import global_subscription_manager
@@ -216,9 +214,6 @@ class MarketDataGateway:
 
     async def startup(self) -> None:
         """Connect all adapters and initialize storage."""
-        await global_candle_store.initialize()
-        logger.info("Candle store backend: %s", global_candle_store.get_backend())
-
         # Start Dhan background credential watcher
         global_dhan_credential_manager.start_background_watcher(interval_sec=300)
 
@@ -389,7 +384,6 @@ class MarketDataGateway:
         return web.json_response({
             "status": "OK",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "candle_backend": global_candle_store.get_backend(),
             "providers": healths,
             "dhan_credentials": global_dhan_credential_manager.get_status(),
             "failover_transitions": self.failover.get_transitions(limit=10),
@@ -598,40 +592,6 @@ class MarketDataGateway:
             "message": f"No live provider tick found for {sym}."
         }, status=200)
 
-    async def handle_history(self, request: web.Request) -> web.Response:
-        symbol = request.rel_url.query.get("symbol", "").upper()
-        timeframe = request.rel_url.query.get("tf", "1d")
-        from_str = request.rel_url.query.get("from", "")
-        to_str = request.rel_url.query.get("to", "")
-
-        if not symbol:
-            return web.json_response({"error": "symbol parameter required"}, status=400)
-
-        now = datetime.now(timezone.utc)
-        try:
-            from_dt = datetime.fromisoformat(from_str.replace("Z", "+00:00")) if from_str else now - timedelta(days=30)
-            to_dt = datetime.fromisoformat(to_str.replace("Z", "+00:00")) if to_str else now
-        except ValueError as e:
-            return web.json_response({"error": f"Invalid date format: {e}"}, status=400)
-
-        # Check candle store first
-        candles = await global_candle_store.get_candles(symbol, timeframe, from_dt, to_dt)
-        if not candles:
-            adapter = self.failover.get_best_provider(symbol)
-            if adapter:
-                candles = await adapter.get_history(symbol, timeframe, from_dt, to_dt)
-                if candles:
-                    await global_candle_store.store_candles(candles)
-
-        return web.json_response({
-            "symbol": symbol,
-            "timeframe": timeframe,
-            "from": from_dt.isoformat(),
-            "to": to_dt.isoformat(),
-            "count": len(candles),
-            "candles": [c.to_dict() for c in candles],
-        })
-
     async def handle_search(self, request: web.Request) -> web.Response:
         query = request.rel_url.query.get("q", "").upper().strip()
         limit = min(int(request.rel_url.query.get("limit", "20")), 50)
@@ -819,7 +779,6 @@ def create_app() -> tuple:
     app.router.add_get("/snapshot", gateway.handle_snapshot)
     app.router.add_get("/ltp", gateway.handle_ltp)
     app.router.add_get("/api/market-data/ltp", gateway.handle_ltp)
-    app.router.add_get("/history", gateway.handle_history)
     app.router.add_get("/search", gateway.handle_search)
     app.router.add_get("/ws", gateway.handle_ws)
     app.router.add_post("/subscriptions", gateway.handle_subscribe_api)

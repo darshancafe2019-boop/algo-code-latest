@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   Play,
@@ -214,7 +215,7 @@ export function BotCardGrid({
                       pos.direction === "LONG" ? "text-[#00E89A]" : "text-[#FF3B5C]"
                     }`}
                   >
-                    {pos.direction} {pos.size} @ ${pos.entry_price ? pos.entry_price.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}
+                    {pos.direction} {pos.size} @ {formatMoney(pos.entry_price, "$")}
                   </span>
                 ) : (
                   <span className="text-[#7D8EA5] font-sans text-[11px]">FLAT</span>
@@ -228,7 +229,7 @@ export function BotCardGrid({
                     isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
                   }`}
                 >
-                  {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {isPnlPositive ? "+" : ""}{formatMoney(Math.abs(pnl), "$")}
                 </span>
               </div>
             </div>

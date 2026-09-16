@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import Link from "next/link";
 import { useGlobalData } from "@/context/GlobalDataContext";
@@ -135,7 +136,7 @@ export function OptionsPositionsOrdersDock() {
                         </span>
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-300">
-                        {pos.quantity.toLocaleString()}
+                        {formatNumber(pos.quantity)}
                       </td>
                       <td className="py-2.5 px-3 text-right font-mono text-slate-300">
                         ₹{pos.entry_price.toFixed(2)}
@@ -198,7 +199,7 @@ export function OptionsPositionsOrdersDock() {
                     </span>
                   </td>
                   <td className="py-2 px-3 text-right font-mono text-slate-300">
-                    {ord.requested_quantity.toLocaleString()}
+                    {formatNumber(ord.requested_quantity)}
                   </td>
                   <td className="py-2 px-3 text-right font-mono text-slate-300">
                     {ord.price ? `₹${ord.price.toFixed(2)}` : "MARKET"}

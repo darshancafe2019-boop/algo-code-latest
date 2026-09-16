@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -254,11 +255,11 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-[#122033] text-[11px]">
                   <div>
                     <span className="text-[#52627A] block">Entry Price</span>
-                    <span className="text-white font-bold">${Number(trade.entry_price || 0).toLocaleString()}</span>
+                    <span className="text-white font-bold">{formatMoney(Number(trade.entry_price || 0), "$")}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Exit Price</span>
-                    <span className="text-white font-bold">${trade.exit_price ? Number(trade.exit_price).toLocaleString() : "Active"}</span>
+                    <span className="text-white font-bold">{trade.exit_price ? formatMoney(trade.exit_price, "$") : "Active"}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Position Size</span>
@@ -266,11 +267,11 @@ export function TradeDetailDrawer({ trade, isOpen, onClose }: TradeDetailDrawerP
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Stop Loss</span>
-                    <span className="text-red-400 font-bold">${trade.stop_loss ? Number(trade.stop_loss).toLocaleString() : "None"}</span>
+                    <span className="text-red-400 font-bold">{trade.stop_loss ? formatMoney(trade.stop_loss, "$") : "None"}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Take Profit</span>
-                    <span className="text-[#22D3EE] font-bold">${trade.take_profit ? Number(trade.take_profit).toLocaleString() : "Trailing"}</span>
+                    <span className="text-[#22D3EE] font-bold">{trade.take_profit ? formatMoney(trade.take_profit, "$") : "Trailing"}</span>
                   </div>
                   <div>
                     <span className="text-[#52627A] block">Status</span>

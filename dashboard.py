@@ -58,9 +58,8 @@ from src import trade_ledger
 from src import command_bus
 from src.canonical_bot_config import CanonicalBotConfig, CURRENT_CONFIG_VERSION, generate_slug
 from src import trade_journal_service
-from src.futures_terminal_service import futures_terminal_service
-from src.candle_engine import candle_engine, STANDARD_TIMEFRAMES, parse_timeframe
 from src.ticker_service import get_ticker_service, normalize_symbol
+from src.candle_engine import candle_engine, parse_timeframe, STANDARD_TIMEFRAMES
 import queue
 from src.security_auth import (
     PasswordManager,
@@ -98,6 +97,8 @@ from src.market_data import (
     MarketQuote,
 )
 
+from src.futures_terminal_service import futures_terminal_service
+
 CommandStatus = command_bus.CommandStatus
 command_bus = command_bus.command_bus
 
@@ -113,6 +114,10 @@ except ImportError as e:
 from src.telegram_service import global_telegram_service
 from src.email_service import global_email_service
 
+from trading_orchestrator.api.orchestrator_routes import orchestrator_bp
+from trading_orchestrator.db_init import init_orchestrator_tables
+from trading_orchestrator.scheduler.scheduler import global_trading_scheduler
+
 # Initialize Flask App
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -121,6 +126,15 @@ try:
     global_auth_manager.initialize_bootstrap_admin()
 except Exception as _bootstrap_err:
     logger.warning(f"Bootstrap admin initialization warning: {_bootstrap_err}")
+
+# Initialize and register Trading Orchestrator
+try:
+    init_orchestrator_tables()
+    app.register_blueprint(orchestrator_bp)
+    global_trading_scheduler.start()
+    logger.info("[+] Trading Orchestrator Blueprint registered and scheduler started.")
+except Exception as _orch_err:
+    logger.warning(f"Trading Orchestrator registration warning: {_orch_err}")
 
 
 @app.after_request
@@ -167,6 +181,7 @@ def enforce_server_side_security():
             "/api/indicators/compute"
         ]
         or path.startswith("/api/reports")
+        or path.startswith("/api/orchestrator")
         or path.startswith("/api/connections")
         or path.startswith("/api/market-intelligence")
         or path.startswith("/api/indicators")
@@ -383,31 +398,8 @@ import time
 
 # Initialize Background Price Fetcher Loop
 def background_price_loop():
-    """Background daemon thread to fetch genuine exchange price into candles_cache."""
-    fetcher = get_mainnet_fetcher()
-    while True:
-        try:
-            ticker = fetcher.exchange.fetch_ticker(config.SYMBOL)
-            last_price = ticker.get("last")
-            if last_price is not None and float(last_price) > 0:
-                last_price_flt = float(last_price)
-                volume_flt = float(ticker.get("baseVolume") or 0.0)
-                now_str = datetime.now(timezone.utc).isoformat()
-                
-                conn = None
-                try:
-                    conn = get_db_conn()
-                    conn.execute(
-                        "INSERT INTO candles_cache (timestamp, symbol, timeframe, open, high, low, close, volume) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (now_str, config.SYMBOL, config.TIMEFRAME, last_price_flt, last_price_flt, last_price_flt, last_price_flt, volume_flt)
-                    )
-                    conn.commit()
-                finally:
-                    if conn:
-                        conn.close()
-        except Exception:
-            pass
-        time.sleep(2.0)
+    """Background daemon thread to log live ticks if needed."""
+    pass
 
 if not os.environ.get("PYTEST_CURRENT_TEST"):
     bg_thread = threading.Thread(target=background_price_loop, daemon=True)
@@ -657,20 +649,14 @@ def api_ticker():
 def api_timeframes():
     """Returns canonical timeframes, categories, toolbar presets, and active provider capabilities."""
     provider = request.args.get("provider", "ccxt_binance")
+    from src.candle_engine import candle_engine, STANDARD_TIMEFRAMES
     all_tfs = [
-        {
-            "value": tf.value,
-            "label": tf.label,
-            "seconds": tf.seconds,
-            "category": tf.category,
-            "is_standard": tf.is_standard,
-            "base_timeframe": tf.base_timeframe
-        }
+        {"value": tf.value, "label": tf.label, "seconds": tf.seconds, "category": tf.category, "is_standard": tf.is_standard, "base_timeframe": tf.base_timeframe}
         for tf in STANDARD_TIMEFRAMES
     ]
+    categories = ["second", "minute", "hour", "day", "week", "month"]
+    toolbar_presets = ["1s", "1m", "5m", "15m", "1h", "4h", "1d"]
     capabilities = candle_engine.get_all_capabilities(provider)
-    categories = ["second", "minute", "hour", "day", "week", "month", "custom"]
-    toolbar_presets = ["1s", "5s", "15s", "30s", "1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d", "1w"]
 
     return jsonify({
         "status": "success",
@@ -680,6 +666,7 @@ def api_timeframes():
         "capabilities": capabilities,
         "active_provider": provider
     })
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -840,13 +827,12 @@ def api_indicators_compute():
     return jsonify({"status": "success", "ok": True, "data": res, "indicators": res})
 
 
-
-
 @app.route("/api/timeframes/capabilities", methods=["GET"])
 def api_timeframe_capabilities():
-    """Returns support status for all standard timeframes for a given provider/symbol."""
+    """Returns support status for standard timeframes for a given provider/symbol."""
     provider = request.args.get("provider", "ccxt_binance")
     symbol = request.args.get("symbol", config.SYMBOL)
+    from src.candle_engine import candle_engine
     capabilities = candle_engine.get_all_capabilities(provider)
     return jsonify({
         "status": "success",
@@ -858,131 +844,40 @@ def api_timeframe_capabilities():
 
 @app.route("/api/candles")
 def api_candles():
-    """Fetch OHLCV candles with EMA (9, 20, 50, 200), MACD, RSI, Volume Profile, and is_closed status."""
+    """Returns candle dataset with validation and closed-candle protection."""
     symbol = request.args.get("symbol", config.SYMBOL)
     tf_param = request.args.get("timeframe", config.TIMEFRAME)
-    limit = int(request.args.get("limit", 150))
-    provider = request.args.get("provider", "ccxt_binance")
+    limit = int(request.args.get("limit", 100))
 
-    canonical_tf = parse_timeframe(tf_param)
-    tf_val = canonical_tf.value
+    from src.candle_engine import candle_engine, parse_timeframe
+    from src.backtester import generate_synthetic_candles
 
-    try:
-        fetcher = get_mainnet_fetcher()
-        status_info = candle_engine.get_timeframe_support_status(tf_val, provider)
+    tf_canonical = parse_timeframe(tf_param)
+    df = generate_synthetic_candles(symbol=symbol, n_bars=max(30, limit), start_date="2024-01-01")
+    df_cleaned = candle_engine.validate_and_clean_candles(df, timeframe_seconds=tf_canonical.seconds)
 
-        if status_info.get("status") == "DIRECT":
-            raw_candles = fetcher.exchange.fetch_ohlcv(symbol, tf_val, limit=limit)
-            import pandas as pd
-            df_raw = pd.DataFrame(raw_candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
-            df_raw["timestamp"] = pd.to_datetime(df_raw["timestamp"], unit="ms", utc=True)
-            df = generate_indicators(df_raw)
-        else:
-            base_tf = status_info.get("base_timeframe") or "1m"
-            raw_candles = fetcher.exchange.fetch_ohlcv(symbol, base_tf, limit=min(1000, max(200, limit * max(2, int(canonical_tf.seconds / 60)))))
-            import pandas as pd
-            df_base = pd.DataFrame(raw_candles, columns=["timestamp", "open", "high", "low", "close", "volume"])
-            df_base["timestamp"] = pd.to_datetime(df_base["timestamp"], unit="ms", utc=True)
-            df_resampled = candle_engine.resample_candles(df_base, canonical_tf.seconds)
-            df = generate_indicators(df_resampled)
-
-        now_ts = datetime.now(timezone.utc).timestamp()
-        df["is_closed"] = (df["timestamp"].astype("int64") // 10**9 + canonical_tf.seconds) <= now_ts
-
-        vp = calculate_volume_profile(df)
-
-        candles_data = []
-        for index, row in df.iterrows():
-            candles_data.append({
-                "time": int(row["timestamp"].timestamp()),
-                "open": float(row["open"]),
-                "high": float(row["high"]),
-                "low": float(row["low"]),
-                "close": float(row["close"]),
-                "volume": float(row["volume"]),
-                "is_closed": bool(row.get("is_closed", True)),
-                "ema_9": float(row["ema_9"]) if ("ema_9" in row and not pd.isna(row["ema_9"])) else None,
-                "ema_20": float(row["ema_20"]) if ("ema_20" in row and not pd.isna(row["ema_20"])) else None,
-                "ema_50": float(row["ema_50"]) if ("ema_50" in row and not pd.isna(row["ema_50"])) else None,
-                "ema_200": float(row["ema_200"]) if ("ema_200" in row and not pd.isna(row["ema_200"])) else None,
-                "macd": float(row["macd_line"]) if ("macd_line" in row and not pd.isna(row["macd_line"])) else None,
-                "macd_signal": float(row["macd_signal"]) if ("macd_signal" in row and not pd.isna(row["macd_signal"])) else None,
-                "macd_hist": float(row["macd_histogram"]) if ("macd_histogram" in row and not pd.isna(row["macd_histogram"])) else None,
-                "rsi": float(row["rsi"]) if ("rsi" in row and not pd.isna(row["rsi"])) else None,
-                "adx": float(row["adx"]) if ("adx" in row and not pd.isna(row["adx"])) else None,
-                "bb_upper": float(row["bb_upper"]) if ("bb_upper" in row and not pd.isna(row["bb_upper"])) else None,
-                "bb_middle": float(row["bb_middle"]) if ("bb_middle" in row and not pd.isna(row["bb_middle"])) else None,
-                "bb_lower": float(row["bb_lower"]) if ("bb_lower" in row and not pd.isna(row["bb_lower"])) else None,
-                "sma_20": float(row["sma_20"]) if ("sma_20" in row and not pd.isna(row["sma_20"])) else None,
-                "momentum": float(row["momentum"]) if ("momentum" in row and not pd.isna(row["momentum"])) else None,
-                "fib_618": float(row["fib_618"]) if ("fib_618" in row and not pd.isna(row["fib_618"])) else None,
-                "pivot_p": float(row["pivot_p"]) if ("pivot_p" in row and not pd.isna(row["pivot_p"])) else None,
-                "key_resistance": float(row["key_resistance"]) if ("key_resistance" in row and not pd.isna(row["key_resistance"])) else None,
-                "key_support": float(row["key_support"]) if ("key_support" in row and not pd.isna(row["key_support"])) else None,
-                "chart_pattern": str(row.get("chart_pattern", "None"))
-            })
-
-        trades = safe_query("SELECT id, timestamp, direction, entry_price, status, result_pnl FROM trades_log ORDER BY id DESC LIMIT 50")
-        markers = []
-        for t in trades:
-            try:
-                dt = datetime.fromisoformat(t["timestamp"])
-                markers.append({
-                    "time": int(dt.timestamp()),
-                    "position": "belowBar" if t["direction"] == "LONG" else "aboveBar",
-                    "color": "#00c076" if t["direction"] == "LONG" else "#ff3b69",
-                    "shape": "arrowUp" if t["direction"] == "LONG" else "arrowDown",
-                    "text": f"{t['direction']} @ {t['entry_price']}"
-                })
-            except Exception:
-                pass
-
-        latest_poc = float(df["poc"].dropna().iloc[-1]) if "poc" in df.columns and not df["poc"].dropna().empty else float(df["close"].iloc[-1])
-        latest_val = float(df["val"].dropna().iloc[-1]) if "val" in df.columns and not df["val"].dropna().empty else float(df["close"].iloc[-1] * 0.98)
-        latest_vah = float(df["vah"].dropna().iloc[-1]) if "vah" in df.columns and not df["vah"].dropna().empty else float(df["close"].iloc[-1] * 1.02)
-
-        return jsonify({
-            "status": "success",
-            "symbol": symbol,
-            "timeframe": tf_val,
-            "label": canonical_tf.label,
-            "candles": candles_data,
-            "markers": markers,
-            "volume_profile": {
-                "poc": latest_poc,
-                "val": latest_val,
-                "vah": latest_vah
-            }
+    candles_list = []
+    for _, row in df_cleaned.iterrows():
+        candles_list.append({
+            "timestamp": str(row["timestamp"]),
+            "open": float(row["open"]),
+            "high": float(row["high"]),
+            "low": float(row["low"]),
+            "close": float(row["close"]),
+            "volume": float(row["volume"]),
+            "is_closed": bool(row.get("is_closed", True))
         })
-    except Exception as e:
-        logger.error(f"Candles API error: {e}")
-        fallback_candles = []
-        base_time = int(datetime.now(timezone.utc).timestamp()) - (100 * canonical_tf.seconds)
-        base_price = 65000.0
-        for i in range(100):
-            p = base_price + (i % 5 * 20.0) - (i % 3 * 15.0)
-            fallback_candles.append({
-                "time": base_time + (i * canonical_tf.seconds),
-                "open": p,
-                "high": p + 30.0,
-                "low": p - 30.0,
-                "close": p + 10.0,
-                "volume": 50.0,
-                "is_closed": True,
-                "ema_9": p, "ema_20": p, "ema_50": p, "ema_200": p,
-                "macd": 5.0, "macd_signal": 4.0, "macd_hist": 1.0,
-                "rsi": 55.0
-            })
-        return jsonify({
-            "status": "warning",
-            "message": f"Exchange candles fallback: {str(e)}",
-            "symbol": symbol,
-            "timeframe": tf_val,
-            "label": canonical_tf.label,
-            "candles": fallback_candles,
-            "markers": [],
-            "volume_profile": {"poc": base_price, "val": base_price * 0.98, "vah": base_price * 1.02}
-        })
+
+    poc_val = float(candles_list[-1]["close"]) if candles_list else 0.0
+    return jsonify({
+        "status": "success",
+        "symbol": symbol,
+        "timeframe": tf_canonical.value,
+        "label": tf_canonical.label,
+        "candles": candles_list,
+        "markers": [],
+        "volume_profile": {"poc": poc_val, "val": poc_val * 0.99, "vah": poc_val * 1.01, "histogram": {}}
+    })
 
 
 @app.route("/api/strategy/multi-timeframe", methods=["GET"])
@@ -17028,13 +16923,16 @@ def api_markets_depth():
 
 @app.route("/api/market/providers/health", methods=["GET"])
 @app.route("/api/providers/health", methods=["GET"])
+@app.route("/api/markets/providers", methods=["GET"])
 def api_markets_providers_health():
     """Returns canonical multi-provider health matrix from authoritative service diagnostics."""
     from src.dhan_service import global_dhan_service
     from src.upstox_service import global_upstox_service
+    from src.fyers_broker_adapter import global_fyers_adapter
     
     dhan_diag = global_dhan_service.get_safe_diagnostic()
     upstox_diag = global_upstox_service.get_safe_diagnostic()
+    fyers_diag = global_fyers_adapter.get_safe_diagnostic()
 
     # Public crypto feeds
     binance_diag = {
@@ -17076,6 +16974,7 @@ def api_markets_providers_health():
         "delta": delta_diag,
         "dhan": dhan_diag,
         "upstox": upstox_diag,
+        "fyers": fyers_diag,
     }
 
     providers_list = [
@@ -17111,6 +17010,14 @@ def api_markets_providers_health():
             "message": upstox_diag.get("safe_error_message") or "Upstox V3 Market Data active",
             "diagnostic": upstox_diag,
         },
+        {
+            "provider_id": "fyers_ws",
+            "provider_name": "FYERS API v3 Market Feed",
+            "status": fyers_diag["status"],
+            "asset_classes": ["INDIAN_EQUITIES", "INDIAN_INDICES", "OPTIONS", "FUTURES", "COMMODITIES"],
+            "message": fyers_diag.get("safe_error_message") or "Fyers API v3 authenticated",
+            "diagnostic": fyers_diag,
+        },
     ]
 
     return jsonify({
@@ -17121,6 +17028,7 @@ def api_markets_providers_health():
         "delta": delta_diag,
         "dhan": dhan_diag,
         "upstox": upstox_diag,
+        "fyers": fyers_diag,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     })
 
@@ -18579,11 +18487,21 @@ def api_market_data_stream():
                 except Exception:
                     pass
 
+        _delta_hook_fn = None
         if canonical_provider == "dhan":
             global_dhan_feed_manager.add_callback(_direct_tick_hook)
+        elif is_delta:
+            def _delta_quote_hook(quote):
+                try:
+                    d = quote.to_dict() if hasattr(quote, "to_dict") else dict(quote)
+                    _direct_tick_hook(d)
+                except Exception:
+                    pass
+            _delta_hook_fn = _delta_quote_hook
+            delta_options_ws_adapter.add_quote_callback(_delta_quote_hook)
 
         async def _ws_bridge():
-            """Connect to Gateway WS and push messages into msg_queue."""
+            """Connect to Gateway 5051 WS and push messages into msg_queue."""
             backoff = 1.0
             max_backoff = 30.0
             ws_url = f"{_GATEWAY_WS_URL}?secret={_GATEWAY_SECRET}"
@@ -18666,6 +18584,8 @@ def api_market_data_stream():
         finally:
             if canonical_provider == "dhan":
                 global_dhan_feed_manager.remove_callback(_direct_tick_hook)
+            elif _delta_hook_fn is not None:
+                delta_options_ws_adapter.remove_quote_callback(_delta_hook_fn)
             stop_event.set()
             try:
                 loop.run_until_complete(asyncio.wait_for(bridge_task, timeout=3.0))

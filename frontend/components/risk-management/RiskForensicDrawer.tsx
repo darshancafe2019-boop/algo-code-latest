@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatPercent, formatPrice, formatNumber, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import Link from "next/link";
 import {
@@ -240,13 +241,13 @@ export function RiskForensicDrawer({
                     <div className="bg-[#070D14] p-2.5 rounded-xl border border-[#1A2A3F]">
                       <span className="text-[10px] text-slate-500 block">REQUESTED NOTIONAL</span>
                       <span className="text-slate-200 font-bold">
-                        ${decision.requested_notional ? decision.requested_notional.toLocaleString() : "4,500.00"}
+                        {formatMoney(decision.requested_notional, "$")}
                       </span>
                     </div>
                     <div className="bg-[#070D14] p-2.5 rounded-xl border border-cyan-900/80">
                       <span className="text-[10px] text-cyan-400 block font-bold">MAX PASSING NOTIONAL</span>
                       <span className="text-cyan-300 font-extrabold text-sm">
-                        ${decision.max_passing_exposure ? decision.max_passing_exposure.toLocaleString() : "800.00"}
+                        {formatMoney(decision.max_passing_exposure, "$")}
                       </span>
                     </div>
                   </div>
@@ -367,25 +368,25 @@ export function RiskForensicDrawer({
                     <div className="flex justify-between">
                       <span className="text-slate-500">Portfolio Exposure:</span>
                       <span className="text-slate-200 font-bold">
-                        ${decision.portfolio_before?.portfolio_exposure?.toLocaleString() || "32,000.00"}
+                        {formatMoney(decision.portfolio_before?.portfolio_exposure, "$")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Symbol Exposure:</span>
                       <span className="text-slate-200 font-bold">
-                        ${decision.portfolio_before?.symbol_exposure?.toLocaleString() || "3,200.00"}
+                        {formatMoney(decision.portfolio_before?.symbol_exposure, "$")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Margin Utilization:</span>
                       <span className="text-slate-200 font-bold">
-                        {decision.portfolio_before?.margin_used_pct || 22.0}%
+                        {formatPercent(decision.portfolio_before?.margin_used_pct)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Capital Allocated:</span>
                       <span className="text-slate-200 font-bold">
-                        ${decision.portfolio_before?.capital_used?.toLocaleString() || "3,200.00"}
+                        {formatMoney(decision.portfolio_before?.capital_used, "$")}
                       </span>
                     </div>
                   </div>
@@ -400,25 +401,25 @@ export function RiskForensicDrawer({
                     <div className="flex justify-between">
                       <span className="text-slate-500">Portfolio Exposure:</span>
                       <span className="text-cyan-300 font-bold">
-                        ${decision.portfolio_after?.portfolio_exposure?.toLocaleString() || "36,500.00"}
+                        {formatMoney(decision.portfolio_after?.portfolio_exposure, "$")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Symbol Exposure:</span>
                       <span className="text-cyan-300 font-bold">
-                        ${decision.portfolio_after?.symbol_exposure?.toLocaleString() || "7,700.00"}
+                        {formatMoney(decision.portfolio_after?.symbol_exposure, "$")}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Margin Utilization:</span>
                       <span className="text-cyan-300 font-bold">
-                        {decision.portfolio_after?.margin_used_pct || 31.0}%
+                        {formatPercent(decision.portfolio_after?.margin_used_pct)}
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-slate-500">Capital Allocated:</span>
                       <span className="text-cyan-300 font-bold">
-                        ${decision.portfolio_after?.capital_used?.toLocaleString() || "7,700.00"}
+                        {formatMoney(decision.portfolio_after?.capital_used, "$")}
                       </span>
                     </div>
                   </div>
@@ -433,19 +434,19 @@ export function RiskForensicDrawer({
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
                   <div>
                     <span className="text-[10px] text-slate-500 block">CAPITAL USED</span>
-                    <span className="font-bold text-purple-300">+${decision.risk_delta?.capital_used_diff?.toLocaleString() || "4,500.00"}</span>
+                    <span className="font-bold text-purple-300">+{formatMoney(decision.risk_delta?.capital_used_diff, "$")}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">SYMBOL EXPOSURE</span>
-                    <span className="font-bold text-purple-300">+${decision.risk_delta?.symbol_exposure_diff?.toLocaleString() || "4,500.00"}</span>
+                    <span className="font-bold text-purple-300">+{formatMoney(decision.risk_delta?.symbol_exposure_diff, "$")}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">MARGIN IMPACT</span>
-                    <span className="font-bold text-purple-300">+{decision.risk_delta?.margin_diff_pct || 9.0}%</span>
+                    <span className="font-bold text-purple-300">+{formatPercent(decision.risk_delta?.margin_diff_pct)}</span>
                   </div>
                   <div>
                     <span className="text-[10px] text-slate-500 block">DAILY RISK DELTA</span>
-                    <span className="font-bold text-purple-300">+{decision.risk_delta?.daily_risk_diff_pct || 0.90}%</span>
+                    <span className="font-bold text-purple-300">+{formatPercent(decision.risk_delta?.daily_risk_diff_pct)}</span>
                   </div>
                 </div>
               </div>
@@ -479,7 +480,7 @@ export function RiskForensicDrawer({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Requested Notional:</span>
-                  <span className="text-slate-200">${decision.requested_notional?.toLocaleString()}</span>
+                  <span className="text-slate-200">{formatMoney(decision.requested_notional, "$")}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-500">Correlation ID:</span>

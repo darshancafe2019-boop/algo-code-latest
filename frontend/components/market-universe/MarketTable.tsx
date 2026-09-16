@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { MarketInstrument } from "@/types/market-universe";
@@ -135,7 +136,7 @@ export function MarketTable({ instruments, lastUpdatedTimestamp, onRefreshReques
                     <td className="py-3 px-3 text-right">
                       <span className="font-bold text-white text-xs">
                         {inst.currency === "INR" ? "₹" : "$"}
-                        {inst.last_price !== undefined ? inst.last_price.toLocaleString() : "—"}
+                        {formatPrice(inst.last_price)}
                       </span>
                       <span className="text-[10px] text-slate-500 block">
                         {inst.currency || "USD"}

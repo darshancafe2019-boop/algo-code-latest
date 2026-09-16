@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   PieChart,
@@ -226,7 +227,7 @@ export function NseComprehensiveIntelligence() {
                   <td className={`py-2.5 px-3 font-bold ${(item.pChange ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
                     {(item.pChange ?? 0) >= 0 ? "+" : ""}{item.pChange || 0.45}%
                   </td>
-                  <td className="py-2.5 px-3 text-slate-400">{item.finalQuantity ? item.finalQuantity.toLocaleString("en-IN") : "15,400"}</td>
+                  <td className="py-2.5 px-3 text-slate-400">{formatQuantity(item.finalQuantity)}</td>
                 </tr>
               ))}
             </tbody>
@@ -254,7 +255,7 @@ export function NseComprehensiveIntelligence() {
                   <td className="py-2.5 px-3 font-bold text-cyan-300">{item.symbol}</td>
                   <td className="py-2.5 px-3 text-white">{item.acquirer}</td>
                   <td className="py-2.5 px-3 text-slate-400">{item.secType}</td>
-                  <td className="py-2.5 px-3 text-emerald-400 font-bold">+{item.buyQty.toLocaleString("en-IN")}</td>
+                  <td className="py-2.5 px-3 text-emerald-400 font-bold">+{formatNumber(item.buyQty)}</td>
                   <td className="py-2.5 px-3 text-slate-300">{item.mode}</td>
                   <td className="py-2.5 px-3 text-slate-400">{item.date}</td>
                 </tr>

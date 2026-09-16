@@ -15,7 +15,7 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone, timedelta, time as dtime
 
 from src import db
-from trading_orchestrator.scheduler.checkpoints import DEFAULT_CHECKPOINTS, CheckpointConfig, CheckpointType
+from trading_orchestrator.scheduler.checkpoints import DEFAULT_CHECKPOINTS, CheckpointConfig, CheckpointType, normalize_checkpoint_id, _CheckpointsDict
 from trading_orchestrator.workflow.workflow_engine import global_workflow_engine
 
 logger = logging.getLogger("TradingScheduler")
@@ -31,7 +31,7 @@ class TradingScheduler:
         self._is_running = False
         self._thread: Optional[threading.Thread] = None
         self._last_checked_minute: Optional[str] = None
-        self._checkpoints: Dict[str, CheckpointConfig] = {}
+        self._checkpoints: Dict[str, CheckpointConfig] = _CheckpointsDict()
         self._init_checkpoints()
 
     @property
@@ -118,7 +118,7 @@ class TradingScheduler:
         tz_name: Optional[str] = None,
     ) -> Any:
         with self._lock:
-            cp_key = checkpoint_id.value if hasattr(checkpoint_id, "value") else str(checkpoint_id)
+            cp_key = normalize_checkpoint_id(checkpoint_id)
             if cp_key not in self._checkpoints:
                 raise ValueError(f"Unknown checkpoint ID: {cp_key}")
 

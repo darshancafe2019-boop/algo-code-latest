@@ -223,11 +223,10 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
               <option value="UPSTOX">UPSTOX v3</option>
               <option value="DELTA_INDIA">DELTA INDIA</option>
               <option value="BINANCE">BINANCE</option>
-              <option value="PAPER_SIMULATOR">PAPER SIMULATOR</option>
             </select>
           )}
 
-          {/* Data Mode / Environment */}
+          {/* Execution Environment */}
           {onChangeEnvironment && (
             <button
               type="button"
@@ -238,9 +237,10 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
                   : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
               }`}
             >
-              {environment === "LIVE" ? "DATA: LIVE" : "DATA: PAPER"}
+              {environment === "LIVE" ? "EXEC: LIVE" : "EXEC: PAPER"}
             </button>
           )}
+
 
           {/* Connection status badge */}
           {getConnectionBadge()}

@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -111,7 +112,7 @@ export function GlobalMarketHeatmap({ onSelectInstrument }: GlobalMarketHeatmapP
                 <div className="flex items-center justify-between text-[10px] opacity-80">
                   <span>
                     {currSymbol}
-                    {inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
+                    {formatPrice(inst.last_price)}
                   </span>
                   <span className="text-[9px] uppercase">{inst.exchange}</span>
                 </div>

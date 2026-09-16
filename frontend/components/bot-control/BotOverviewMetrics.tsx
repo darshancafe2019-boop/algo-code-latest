@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   DollarSign,
@@ -76,7 +77,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-lg font-bold font-mono text-slate-100">
-              ${allocatedCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {formatMoney(allocatedCapital, "$")}
             </span>
           </div>
           <div className="text-[10px] text-slate-500 font-mono">
@@ -92,11 +93,11 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-lg font-bold font-mono text-emerald-400">
-              ${availableCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {formatMoney(availableCapital, "$")}
             </span>
           </div>
           <div className="text-[10px] text-slate-500 font-mono">
-            Equity: ${totalCapital.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+            Equity: {formatMoney(totalCapital, "$")}
           </div>
         </div>
 
@@ -161,7 +162,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-lg font-bold font-mono text-slate-100">
-              ${currentExposure.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+              {formatMoney(currentExposure, "$")}
             </span>
           </div>
           <div className="text-[10px] text-slate-500 font-mono">

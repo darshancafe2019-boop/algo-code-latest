@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -202,7 +203,7 @@ export function MarketScannerWorkbench({ onSelectInstrument }: MarketScannerWork
                 <div className="flex items-center justify-between text-[11px] text-slate-400">
                   <span>
                     {currSymbol}
-                    {inst.last_price ? inst.last_price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "—"}
+                    {formatPrice(inst.last_price)}
                   </span>
                   <span className="text-[10px] text-cyan-400">
                     Mom: {inst.momentum_score || 50}/100

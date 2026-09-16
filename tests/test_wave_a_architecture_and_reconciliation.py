@@ -285,13 +285,3 @@ class TestWaveACanonicalDatabaseIntegrity:
         ]
         for g in ghost_files:
             assert not g.exists(), f"Ghost database file must NOT exist: {g}"
-
-    def test_02_candle_store_uses_canonical_database(self):
-        """Verify market_data_gateway.candle_store points to data/trading_bot.db."""
-        from market_data_gateway.candle_store import CandleStore
-        cs = CandleStore()
-        # Initialize SQLite fallback
-        cs._sqlite_path = ""
-        import asyncio
-        asyncio.run(cs.initialize())
-        assert "data" in cs._sqlite_path and "trading_bot.db" in cs._sqlite_path

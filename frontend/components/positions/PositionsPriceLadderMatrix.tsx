@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   Shield,
@@ -79,7 +80,7 @@ export function PositionsPriceLadderMatrix({
                   {isProfit ? "+" : ""}${pos.unrealized_pnl.toFixed(2)} ({pos.unrealized_pnl_pct.toFixed(2)}%)
                 </span>
                 <span className="text-xs text-[#52627A]">
-                  Live Mark: ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  Live Mark: {formatMoney(currP, "$")}
                 </span>
               </div>
             </div>
@@ -94,7 +95,7 @@ export function PositionsPriceLadderMatrix({
                 </div>
                 <div className="text-right tabular-nums">
                   <span className="font-semibold text-[#7C8CA3]">
-                    ${tp3.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(tp3, "$")}
                   </span>
                   <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{Math.abs(((tp3 - entryP) / entryP) * 100).toFixed(2)}%
@@ -110,7 +111,7 @@ export function PositionsPriceLadderMatrix({
                 </div>
                 <div className="text-right tabular-nums">
                   <span className="font-semibold text-[#F7FAFC]">
-                    ${tp2.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(tp2, "$")}
                   </span>
                   <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{Math.abs(((tp2 - entryP) / entryP) * 100).toFixed(2)}%
@@ -126,7 +127,7 @@ export function PositionsPriceLadderMatrix({
                 </div>
                 <div className="text-right tabular-nums">
                   <span className="font-bold text-[#00E890]">
-                    ${tpP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(tpP, "$")}
                   </span>
                   <span className="text-xs text-[#00E890] ml-1.5 font-semibold">
                     +{pos.tp_distance_pct?.toFixed(2) || "4.00"}%
@@ -144,7 +145,7 @@ export function PositionsPriceLadderMatrix({
                 </div>
                 <div className="text-right tabular-nums">
                   <span className="text-sm font-bold text-[#F7FAFC]">
-                    ${currP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(currP, "$")}
                   </span>
                   <span
                     className={`text-xs ml-2 font-bold ${
@@ -163,7 +164,7 @@ export function PositionsPriceLadderMatrix({
                   <span className="text-xs font-medium">Entry / Basis</span>
                 </div>
                 <div className="text-right tabular-nums text-[#F7FAFC] font-semibold">
-                  ${entryP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(entryP, "$")}
                 </div>
               </div>
 
@@ -175,7 +176,7 @@ export function PositionsPriceLadderMatrix({
                     <span className="text-xs font-medium">Dynamic Trailing Stop</span>
                   </div>
                   <div className="text-right tabular-nums font-semibold">
-                    ${trailingSl.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(trailingSl, "$")}
                   </div>
                 </div>
               )}
@@ -193,7 +194,7 @@ export function PositionsPriceLadderMatrix({
                 </div>
                 <div className="text-right tabular-nums">
                   <span className="font-bold text-[#FF3B5C]">
-                    ${slP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    {formatMoney(slP, "$")}
                   </span>
                   <span className="text-xs text-[#FF3B5C] ml-1.5 font-semibold">
                     -{pos.sl_distance_pct?.toFixed(2) || "2.00"}%
@@ -208,7 +209,7 @@ export function PositionsPriceLadderMatrix({
                   <span>Estimated Liquidation</span>
                 </div>
                 <span className="font-semibold text-[#F59E0B] tabular-nums">
-                  ${liqP.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  {formatMoney(liqP, "$")}
                 </span>
               </div>
             </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
@@ -424,7 +425,7 @@ export function SimpleBotTable({
                           {pos.direction} {pos.size}
                         </span>
                         <div className="text-[10px] text-[#7D8EA5]">
-                          @ ${pos.entry_price ? pos.entry_price.toLocaleString("en-US", { minimumFractionDigits: 2 }) : "—"}
+                          @ {formatMoney(pos.entry_price, "$")}
                         </div>
                       </div>
                     ) : (
@@ -439,7 +440,7 @@ export function SimpleBotTable({
                         isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
                       }`}
                     >
-                      {isPnlPositive ? "+" : ""}${Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {isPnlPositive ? "+" : ""}{formatMoney(Math.abs(pnl), "$")}
                     </div>
                     <div className="text-[10px] text-[#7D8EA5] font-sans">
                       Cap: ${(bot.allocated_capital / 1000).toFixed(1)}K

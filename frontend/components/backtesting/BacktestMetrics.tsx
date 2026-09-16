@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { TrendingUp, TrendingDown, DollarSign, Percent, BarChart2, ShieldAlert, Award } from "lucide-react";
 import { BacktestResult } from "@/types/backtest";
@@ -25,10 +26,10 @@ export function BacktestMetrics({ metrics, initialCash }: BacktestMetricsProps) 
         </div>
         <div className="mt-2">
           <div className={`text-xl font-bold font-mono ${isProfit ? "text-emerald-400" : "text-red-400"}`} id="bt-metric-profit">
-            {isProfit ? "+" : ""}${metrics.total_net_profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {isProfit ? "+" : ""}{formatMoney(metrics.total_net_profit, "$")}
           </div>
           <div className="text-[10px] text-slate-500 font-mono mt-0.5">
-            Final Equity: ${finalEquity.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Final Equity: {formatMoney(finalEquity, "$")}
           </div>
         </div>
       </div>

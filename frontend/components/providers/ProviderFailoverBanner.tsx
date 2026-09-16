@@ -16,7 +16,9 @@ export function ProviderFailoverBanner() {
       if (!res.ok) return null;
       return await res.json();
     },
-    refetchInterval: 4000,
+    staleTime: 5000,
+    refetchInterval: 8000,
+    refetchOnWindowFocus: false,
   });
 
   const switchRoleMutation = useMutation({
@@ -43,12 +45,12 @@ export function ProviderFailoverBanner() {
   const primaryProvider = catalog.providers?.find((p) => p.id === activeMdId);
   const secondaryProvider = catalog.providers?.find((p) => p.id === secondaryId);
 
-  // If primary provider is in error, stale, auth_expired, or disconnected
+  // If primary provider is genuinely unconfigured, in error, auth_expired, or rate_limited
   const isProblematic =
     primaryProvider &&
-    ["DISCONNECTED", "STALE", "ERROR", "AUTH_EXPIRED", "RATE_LIMITED"].includes(
-      primaryProvider.connectionState || "DISCONNECTED"
-    );
+    ["ERROR", "AUTH_EXPIRED", "RATE_LIMITED"].includes(primaryProvider.connectionState || "") &&
+    !primaryProvider.configured &&
+    !primaryProvider.connected;
 
   if (!isProblematic || !primaryProvider) return null;
 

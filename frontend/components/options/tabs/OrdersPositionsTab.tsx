@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState, useEffect } from "react";
 import { Layers, CheckCircle, Clock, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
 
@@ -115,7 +116,7 @@ export function OrdersPositionsTab({ currencySymbol = "₹" }: OrdersPositionsTa
                     }`}
                   >
                     {(p.unrealized_pnl || 0) >= 0 ? "+" : ""}
-                    {currencySymbol}{(p.unrealized_pnl || 0).toLocaleString()}
+                    {formatMoney(p.unrealized_pnl, currencySymbol)}
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-500/30 text-[10px] font-black">

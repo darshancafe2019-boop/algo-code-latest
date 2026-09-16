@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -290,7 +291,7 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
                       style={{ width: `${bidDepthPct}%` }}
                     />
                     <span className="text-[10px] text-slate-500 z-10">{b?.orders ?? "—"}</span>
-                    <span className="text-slate-300 font-semibold z-10">{b ? b.quantity.toLocaleString() : "—"}</span>
+                    <span className="text-slate-300 font-semibold z-10">{b ? formatQuantity(b.quantity) : "—"}</span>
                     <span className="text-emerald-400 font-extrabold z-10">
                       {b ? b.price.toFixed(2) : "—"}
                     </span>
@@ -305,7 +306,7 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
                     <span className="text-rose-400 font-extrabold z-10">
                       {a ? a.price.toFixed(2) : "—"}
                     </span>
-                    <span className="text-slate-300 font-semibold z-10">{a ? a.quantity.toLocaleString() : "—"}</span>
+                    <span className="text-slate-300 font-semibold z-10">{a ? formatQuantity(a.quantity) : "—"}</span>
                     <span className="text-[10px] text-slate-500 z-10">{a?.orders ?? "—"}</span>
                   </div>
                 </div>
@@ -317,13 +318,13 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
           <div className="bg-[#060A12] border-t border-slate-800 p-2.5 space-y-1.5 text-[10px]">
             <div className="flex items-center justify-between">
               <span className="text-emerald-400 font-bold">
-                Total Bids: {depthData?.totalBidQty?.toLocaleString() || 0}
+                Total Bids: {formatQuantity(depthData?.totalBidQty)}
               </span>
               <span className="text-slate-400 font-bold">
                 Imbalance: {imbalance}% / {100 - imbalance}%
               </span>
               <span className="text-rose-400 font-bold">
-                Total Asks: {depthData?.totalAskQty?.toLocaleString() || 0}
+                Total Asks: {formatQuantity(depthData?.totalAskQty)}
               </span>
             </div>
             {/* Visual Balance Bar */}
@@ -340,11 +341,11 @@ export const OptionOrderBook: React.FC<OptionOrderBookProps> = ({
         <div className="grid grid-cols-3 gap-2 text-[10px] text-slate-400 bg-[#060A12] p-2.5 rounded-xl border border-slate-800/80">
           <div>
             <span className="text-slate-500">Volume:</span>{" "}
-            <span className="text-slate-200 font-bold">{contract.volume?.toLocaleString() || "—"}</span>
+            <span className="text-slate-200 font-bold">{formatVolume(contract.volume)}</span>
           </div>
           <div>
             <span className="text-slate-500">Open Interest:</span>{" "}
-            <span className="text-slate-200 font-bold">{contract.oi?.toLocaleString() || "—"}</span>
+            <span className="text-slate-200 font-bold">{formatVolume(contract.oi)}</span>
           </div>
           <div>
             <span className="text-slate-500">IV / Delta:</span>{" "}

@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useMemo } from "react";
 import { OptionSource, RawExpiryItem, FreshnessStatus } from "@/types/option-chain";
@@ -235,10 +236,7 @@ export function OptionsGatewayControlBar({
             <span className="text-sm font-black text-white tracking-tight">
               {currencySymbol}
               {spotPrice > 0
-                ? spotPrice.toLocaleString(undefined, {
-                    minimumFractionDigits: isCryptoUnderlying ? 2 : 1,
-                    maximumFractionDigits: 2,
-                  })
+                ? formatPrice(spotPrice)
                 : "—"}
             </span>
             <span

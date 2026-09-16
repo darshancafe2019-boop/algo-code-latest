@@ -1,4 +1,5 @@
 "use client";
+import { formatNumber, formatPrice, formatMoney, formatQuantity, formatVolume } from "@/lib/formatters";
 
 import React, { useState, useMemo } from "react";
 import Link from "next/link";
@@ -197,7 +198,7 @@ export function OrdersLedgerDock() {
                       {ord.requested_quantity}
                     </td>
                     <td className="py-2.5 px-3 text-right text-[#F7FAFC] font-mono tabular-nums font-semibold">
-                      ${ord.price ? ord.price.toLocaleString(undefined, { minimumFractionDigits: 2 }) : "MARKET"}
+                      {ord.price ? formatMoney(ord.price, "$") : "MARKET"}
                     </td>
                     <td className="py-2.5 px-3 text-right font-sans">
                       <span

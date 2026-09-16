@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { memo, useRef, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLivePrice } from "@/hooks/useMarketData";
@@ -115,11 +116,11 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     let formattedP = "—";
     if (currentPrice > 0) {
       if (resolvedCurrency === "USD" && currentPrice >= 1000) {
-        formattedP = `${currencySymbol}${currentPrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+        formattedP = `${currencySymbol}{formatMoney(currentPrice, "$")}`;
       } else if (resolvedCurrency === "USD") {
-        formattedP = `${currencySymbol}${currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        formattedP = `${currencySymbol}{formatMoney(currentPrice, "$")}`;
       } else {
-        formattedP = `₹${currentPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        formattedP = `₹{formatMoney(currentPrice, "$")}`;
       }
     }
 

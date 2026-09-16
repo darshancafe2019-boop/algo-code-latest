@@ -418,8 +418,8 @@ export function HomeExecutiveOverview() {
       return {
         ...pos,
         currentPrice: livePrice,
-        pnl: roundDec(livePnl, 2),
-        pnlPct: roundDec(livePnlPct, 2),
+        pnl: livePnl !== null && !isNaN(livePnl) ? Number(livePnl.toFixed(2)) : null,
+        pnlPct: livePnlPct !== null && !isNaN(livePnlPct) ? Number(livePnlPct.toFixed(2)) : null,
         feedStatus: quote?.is_stale ? "STALE" : "LIVE",
       };
     });

@@ -44,15 +44,15 @@ export function PerformanceSummary({ summary }: { summary?: Partial<TradeSummary
     {
       label: "Win Rate",
       value: formatPercent(winRate, 1),
-      sub: `${formatNumber(summary?.winning_count, 0, "0")} W / ${formatNumber(summary?.losing_count, 0, "0")} L`,
+      sub: `${formatNumber(summary.winning_count, 0, "0")} W / ${formatNumber(summary.losing_count, 0, "0")} L`,
       icon: Percent,
       color: "text-cyan-400",
       flash: flashKey === "winrate",
     },
     {
       label: "Total Trades",
-      value: formatNumber(summary?.total_trades, 0, "0"),
-      sub: `${formatNumber(summary?.open_trades, 0, "0")} Open | ${formatNumber(summary?.total_trades, 0, "0")} Closed`,
+      value: formatNumber(summary.total_trades, 0, "0"),
+      sub: `${formatNumber(summary.open_trades, 0, "0")} Open | ${formatNumber(summary.total_trades, 0, "0")} Closed`,
       icon: Hash,
       color: "text-purple-400",
       flash: false,

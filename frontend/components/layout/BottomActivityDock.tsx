@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -173,7 +174,7 @@ export function BottomActivityDock({ isOpen, onToggle }: BottomActivityDockProps
                         </EcoTableCell>
                         <EcoTableCell align="right">{t.amount || t.quantity}</EcoTableCell>
                         <EcoTableCell align="right" className="font-bold text-[var(--theme-text-primary)]">
-                          ${Number(t.price || t.entry_price || 0).toLocaleString()}
+                          {formatMoney(Number(t.price || t.entry_price || 0), "$")}
                         </EcoTableCell>
                         <EcoTableCell align="right">
                           ${(Number(t.price || 0) * Number(t.amount || 1)).toFixed(2)}

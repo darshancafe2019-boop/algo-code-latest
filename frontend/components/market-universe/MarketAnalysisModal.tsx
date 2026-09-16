@@ -1,5 +1,6 @@
 "use client";
 
+import { formatNumber } from "@/lib/formatters";
 import React, { useState } from "react";
 import { MarketInstrument } from "@/types/market-universe";
 import {
@@ -112,7 +113,7 @@ export function MarketAnalysisModal({ instrument, isOpen, onClose, onControlsUpd
               <div className="flex items-baseline gap-3 mt-1">
                 <span className="text-2xl font-black text-white font-mono">
                   {instrument.currency === "INR" ? "₹" : "$"}
-                  {instrument.last_price?.toLocaleString()}
+                  {formatNumber(instrument.last_price)}
                 </span>
                 <span
                   className={`text-sm font-bold flex items-center gap-1 ${

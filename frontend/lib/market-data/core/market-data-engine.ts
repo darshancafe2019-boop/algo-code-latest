@@ -31,7 +31,6 @@ export interface MarketDataProvider {
   subscribe(symbols: string[], reason?: string): Promise<void>;
   unsubscribe(symbols: string[], reason?: string): Promise<void>;
   getQuote(symbol: string): Promise<NormalizedQuote | null>;
-  getCandles(symbol: string, timeframe: CandleTimeframe, limit?: number): Promise<OHLCVCandle[]>;
   getOrderBook(symbol: string): Promise<MarketDepth | null>;
   getHealth(): ProviderHealthEntry;
 }

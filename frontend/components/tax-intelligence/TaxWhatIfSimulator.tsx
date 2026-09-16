@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { Sparkles, Play, ArrowRight, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { WhatIfSimulationResult } from "@/types/tax";
@@ -19,10 +20,7 @@ export function TaxWhatIfSimulator({ currency }: TaxWhatIfSimulatorProps) {
   const formatCurrency = (val: number | undefined | null) => {
     if (val === undefined || val === null) return "—";
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}${val.toLocaleString("en-US", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+    return `${prefix}{formatMoney(val, "$")}`;
   };
 
   const runSimulation = async () => {

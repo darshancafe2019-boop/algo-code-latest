@@ -1,288 +1,284 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React from "react";
+import { useSharedTradingState } from "./useSharedTradingState";
 import { TopCommandBar } from "./TopCommandBar";
-import { DailyWorkflowCards, CheckpointData } from "./DailyWorkflowCards";
-import { LiveSystemStatus, BrokerStatusItem } from "./LiveSystemStatus";
-import { AiDecisionPanel, DecisionRecord } from "./AiDecisionPanel";
-import { RiskStatusPanel } from "./RiskStatusPanel";
-import { ExecutionModePanel } from "./ExecutionModePanel";
-import { JournalAndReportDrawer } from "./JournalAndReportDrawer";
+import { SystemStatusBar } from "./SystemStatusBar";
+import { WorkflowStepper } from "./WorkflowStepper";
+import { TradeDecisionCard } from "./TradeDecisionCard";
+import { AiStatusCard } from "./AiStatusCard";
+import { RiskSummaryCard } from "./RiskSummaryCard";
+import { ExecutionCard } from "./ExecutionCard";
+import { CurrentPositionPanel } from "./CurrentPositionPanel";
+import { MarketContextCard } from "./MarketContextCard";
+import { PerformanceSummaryCard } from "./PerformanceSummaryCard";
+import { QuickAccessBar } from "./QuickAccessBar";
+import { UniversalDetailsDrawer } from "./UniversalDetailsDrawer";
+import { CommandPaletteModal } from "./CommandPaletteModal";
+import { LiveTradingSafetyModal } from "./LiveTradingSafetyModal";
+import { EmergencyKillSwitchModal } from "./EmergencyKillSwitchModal";
+import { AiTradingFrameworkDiagram } from "./AiTradingFrameworkDiagram";
 
 export const TradingOrchestratorView: React.FC = () => {
-  const [statusData, setStatusData] = useState<any>(null);
-  const [checkpoints, setCheckpoints] = useState<CheckpointData[]>([]);
-  const [decisions, setDecisions] = useState<DecisionRecord[]>([]);
-  const [journalEntries, setJournalEntries] = useState<any[]>([]);
-  const [dailyReport, setDailyReport] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const {
+    viewMode,
+    setViewMode,
+    complexityMode,
+    setComplexityMode,
 
-  const fetchStatus = useCallback(async () => {
-    try {
-      const res = await fetch("/api/orchestrator/status");
-      const data = await res.json();
-      if (data.status === "success") {
-        setStatusData(data);
-        if (data.checkpoints) {
-          setCheckpoints(data.checkpoints);
-        }
-      }
-    } catch (err) {
-      console.error("Failed fetching orchestrator status:", err);
-    }
-  }, []);
+    systemStatus,
+    providers,
+    healthyProvidersCount,
+    checkpoints,
+    currentStage,
+    activeDecision,
+    riskRules,
+    riskOverallStatus,
+    activePosition,
+    performanceSummary,
+    marketContext,
+    isLoading,
 
-  const fetchDecisions = useCallback(async () => {
-    try {
-      const res = await fetch("/api/orchestrator/decisions?limit=20");
-      const data = await res.json();
-      if (data.status === "success") {
-        setDecisions(data.decisions || []);
-      }
-    } catch (err) {
-      console.error("Failed fetching decisions:", err);
-    }
-  }, []);
+    drawerOpen,
+    drawerContent,
+    drawerTitle,
+    drawerData,
+    openDrawer,
+    closeDrawer,
 
-  const fetchJournalAndReport = useCallback(async () => {
-    try {
-      const [jRes, rRes] = await Promise.all([
-        fetch("/api/orchestrator/journal?limit=20"),
-        fetch("/api/orchestrator/report"),
-      ]);
-      const jData = await jRes.json();
-      const rData = await rRes.json();
-      if (jData.status === "success") setJournalEntries(jData.journal || []);
-      if (rData.status === "success") setDailyReport(rData.report || null);
-    } catch (err) {
-      console.error("Failed fetching journal/report:", err);
-    }
-  }, []);
+    commandPaletteOpen,
+    setCommandPaletteOpen,
+    killConfirmOpen,
+    setKillConfirmOpen,
+    liveConfirmOpen,
+    setLiveConfirmOpen,
 
-  useEffect(() => {
-    fetchStatus();
-    fetchDecisions();
-    fetchJournalAndReport();
-
-    const interval = setInterval(() => {
-      fetchStatus();
-      fetchDecisions();
-    }, 5000);
-
-    return () => clearInterval(interval);
-  }, [fetchStatus, fetchDecisions, fetchJournalAndReport]);
-
-  // Command handlers
-  const handleStart = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/start", { method: "POST" });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handlePause = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/pause", { method: "POST" });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handleResume = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/resume", { method: "POST" });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handleStop = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/stop", { method: "POST" });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handleKill = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/kill", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "KILL", operator: "Web Operator" }),
-    });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handleResetKill = async () => {
-    setIsLoading(true);
-    await fetch("/api/orchestrator/kill", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "RESET", operator: "Web Operator" }),
-    });
-    await fetchStatus();
-    setIsLoading(false);
-  };
-
-  const handleTriggerCheckpoint = async (checkpointId: string) => {
-    setIsLoading(true);
-    try {
-      await fetch("/api/orchestrator/checkpoints/trigger", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ checkpoint_id: checkpointId }),
-      });
-      await fetchStatus();
-      await fetchDecisions();
-      await fetchJournalAndReport();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleToggleCheckpoint = async (checkpointId: string, enabled: boolean) => {
-    await fetch("/api/orchestrator/checkpoints/configure", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ checkpoint_id: checkpointId, is_enabled: enabled }),
-    });
-    await fetchStatus();
-  };
-
-  const handleUpdateTime = async (checkpointId: string, time: string) => {
-    await fetch("/api/orchestrator/checkpoints/configure", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ checkpoint_id: checkpointId, scheduled_time: time }),
-    });
-    await fetchStatus();
-  };
-
-  const handleApproveDecision = async (decisionId: string) => {
-    setIsLoading(true);
-    try {
-      await fetch(`/api/orchestrator/decisions/${decisionId}/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operator: "Web Operator" }),
-      });
-      await fetchDecisions();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleRejectDecision = async (decisionId: string) => {
-    setIsLoading(true);
-    try {
-      await fetch(`/api/orchestrator/decisions/${decisionId}/reject`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ operator: "Web Operator" }),
-      });
-      await fetchDecisions();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Construct Broker status items
-  const brokers: BrokerStatusItem[] = [
-    {
-      id: "delta",
-      name: "Delta Exchange India",
-      status: "CONNECTED",
-      marketData: "WS LIVE (PORT 5051)",
-      latencyMs: 38,
-      lastTick: "Live",
-    },
-    {
-      id: "upstox",
-      name: "Upstox V3 Feed",
-      status: "CONNECTED",
-      marketData: "Protobuf Live (PORT 5051)",
-      latencyMs: 42,
-      lastTick: "Live",
-    },
-    {
-      id: "dhan",
-      name: "Dhan HQ",
-      status: "AUTH_REQUIRED",
-      marketData: "Binary Ready",
-      latencyMs: 0,
-      lastTick: "Auth Pending",
-    },
-    {
-      id: "fyers",
-      name: "FYERS API v3",
-      status: "NOT_CONFIGURED",
-      marketData: "WS Ready",
-      latencyMs: 0,
-      lastTick: "Config Pending",
-    },
-  ];
+    handleTriggerCheckpoint,
+    handleApproveDecision,
+    handleRejectDecision,
+    handleExecutePaperTrade,
+    handleKillSwitch,
+    handleResetKillSwitch,
+    handleTogglePause,
+    handleArmLiveTrading,
+    fetchState,
+  } = useSharedTradingState();
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-4 py-6 text-slate-100">
-      {/* Top Command Bar */}
+    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 text-slate-100 space-y-4 font-sans select-none">
+      {/* 1. Persistent Top Command Bar */}
       <TopCommandBar
-        status={statusData?.current_state || "IDLE"}
-        isPaused={Boolean(statusData?.is_paused)}
-        isKilled={Boolean(statusData?.is_killed)}
-        tradingMode={statusData?.trading_mode || "PAPER"}
-        liveTradingEnabled={Boolean(statusData?.live_trading_enabled)}
-        onStart={handleStart}
-        onPause={handlePause}
-        onResume={handleResume}
-        onStop={handleStop}
-        onKill={handleKill}
-        onResetKill={handleResetKill}
+        system={systemStatus}
+        viewMode={viewMode}
+        complexityMode={complexityMode}
+        healthyProvidersCount={healthyProvidersCount}
+        totalProvidersCount={providers.length}
+        onSelectViewMode={setViewMode}
+        onToggleComplexity={() =>
+          setComplexityMode((prev) => (prev === "simple" ? "advanced" : "simple"))
+        }
+        onOpenKillModal={() => setKillConfirmOpen(true)}
+        onResetKill={handleResetKillSwitch}
+        onStart={fetchState}
+        onPauseToggle={handleTogglePause}
         isLoading={isLoading}
       />
 
-      {/* 6 Daily Workflow Checkpoint Cards */}
-      <DailyWorkflowCards
-        checkpoints={checkpoints}
-        onTriggerCheckpoint={handleTriggerCheckpoint}
-        onToggleCheckpoint={handleToggleCheckpoint}
-        onUpdateTime={handleUpdateTime}
-        isLoading={isLoading}
-      />
+      {/* 2. MODE: LIVE OPERATIONS (Default!) */}
+      {viewMode === "operations" && (
+        <div className="space-y-4">
+          {/* AREA 1: SYSTEM STATUS STRIP */}
+          <SystemStatusBar
+            system={systemStatus}
+            providers={providers}
+            healthyCount={healthyProvidersCount}
+            riskStatus={riskOverallStatus}
+            onOpenDrawer={openDrawer}
+          />
 
-      {/* Live System & Broker Health */}
-      <LiveSystemStatus brokers={brokers} gatewayStatus="LIVE" />
-
-      {/* Grid: AI Decisions + Risk Status */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <AiDecisionPanel
-            decisions={decisions}
-            onApprove={handleApproveDecision}
-            onReject={handleRejectDecision}
+          {/* AREA 2: TODAY'S WORKFLOW STEPPER */}
+          <WorkflowStepper
+            checkpoints={checkpoints}
+            currentStage={currentStage}
+            onTriggerStage={handleTriggerCheckpoint}
+            onOpenDrawer={openDrawer}
             isLoading={isLoading}
           />
-        </div>
 
-        <div className="space-y-6">
-          <RiskStatusPanel
-            capital={1000000}
-            availableMargin={850000}
-            dailyLossLimit={statusData?.risk_summary?.daily_loss_limit || 25000}
-            dailyPnl={0}
-            openPositionsCount={0}
-            killSwitchActive={Boolean(statusData?.is_killed)}
+          {/* AREA 3 & 4: 2-COLUMN OPERATIONAL CORE (DECISION + AI vs RISK + EXECUTION) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Left Column: Decision + AI */}
+            <div className="space-y-4 flex flex-col">
+              <TradeDecisionCard
+                decision={activeDecision}
+                onApprove={handleApproveDecision}
+                onReject={handleRejectDecision}
+                onOpenDrawer={openDrawer}
+                isLoading={isLoading}
+              />
+
+              <AiStatusCard
+                decision={activeDecision}
+                onOpenDrawer={openDrawer}
+                onReanalyze={fetchState}
+                isLoading={isLoading}
+              />
+            </div>
+
+            {/* Right Column: Risk + Execution */}
+            <div className="space-y-4 flex flex-col">
+              <RiskSummaryCard
+                rules={riskRules}
+                overallStatus={riskOverallStatus}
+                onOpenDrawer={openDrawer}
+              />
+
+              <ExecutionCard
+                tradingMode={systemStatus.tradingMode}
+                liveTradingEnabled={systemStatus.liveTradingEnabled}
+                onExecutePaper={handleExecutePaperTrade}
+                onOpenLiveModal={() => setLiveConfirmOpen(true)}
+                onOpenDrawer={openDrawer}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
+
+          {/* Current Position Panel */}
+          <CurrentPositionPanel position={activePosition} onOpenDrawer={openDrawer} />
+
+          {/* ADVANCED ON DEMAND SECTIONS */}
+          {complexityMode === "advanced" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              <MarketContextCard context={marketContext} onOpenDrawer={openDrawer} />
+              <PerformanceSummaryCard
+                performance={performanceSummary}
+                onOpenDrawer={openDrawer}
+              />
+            </div>
+          )}
+
+          {/* AREA 5: QUICK ACCESS BAR */}
+          <QuickAccessBar onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
+        </div>
+      )}
+
+      {/* 3. MODE: AI FRAMEWORK DIAGRAM */}
+      {viewMode === "diagram" && (
+        <AiTradingFrameworkDiagram
+          onTriggerCheckpoint={handleTriggerCheckpoint}
+          onKillSwitch={() => setKillConfirmOpen(true)}
+          isKilled={systemStatus.isKilled}
+          tradingMode={systemStatus.tradingMode}
+          liveTradingEnabled={systemStatus.liveTradingEnabled}
+          activeCheckpointId={currentStage?.id}
+          latestDecision={activeDecision}
+        />
+      )}
+
+      {/* 4. MODE: COMBINED WORKSPACE (Advanced 3-Column Layout) */}
+      {viewMode === "combined" && (
+        <div className="space-y-4">
+          <SystemStatusBar
+            system={systemStatus}
+            providers={providers}
+            healthyCount={healthyProvidersCount}
+            riskStatus={riskOverallStatus}
+            onOpenDrawer={openDrawer}
           />
 
-          <ExecutionModePanel
-            tradingMode={statusData?.trading_mode || "PAPER"}
-            isLiveArmed={Boolean(statusData?.live_trading_enabled)}
-          />
-        </div>
-      </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* Left: Schedule & Stages */}
+            <div className="space-y-4">
+              <WorkflowStepper
+                checkpoints={checkpoints}
+                currentStage={currentStage}
+                onTriggerStage={handleTriggerCheckpoint}
+                onOpenDrawer={openDrawer}
+                isLoading={isLoading}
+              />
+              <MarketContextCard context={marketContext} onOpenDrawer={openDrawer} />
+            </div>
 
-      {/* EOD Report & Checkpoint Journal */}
-      <JournalAndReportDrawer
-        journalEntries={journalEntries}
-        dailyReport={dailyReport}
+            {/* Center: Decision & AI */}
+            <div className="space-y-4">
+              <TradeDecisionCard
+                decision={activeDecision}
+                onApprove={handleApproveDecision}
+                onReject={handleRejectDecision}
+                onOpenDrawer={openDrawer}
+                isLoading={isLoading}
+              />
+              <AiStatusCard
+                decision={activeDecision}
+                onOpenDrawer={openDrawer}
+                onReanalyze={fetchState}
+                isLoading={isLoading}
+              />
+            </div>
+
+            {/* Right: Risk & Execution */}
+            <div className="space-y-4">
+              <RiskSummaryCard
+                rules={riskRules}
+                overallStatus={riskOverallStatus}
+                onOpenDrawer={openDrawer}
+              />
+              <ExecutionCard
+                tradingMode={systemStatus.tradingMode}
+                liveTradingEnabled={systemStatus.liveTradingEnabled}
+                onExecutePaper={handleExecutePaperTrade}
+                onOpenLiveModal={() => setLiveConfirmOpen(true)}
+                onOpenDrawer={openDrawer}
+                isLoading={isLoading}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CurrentPositionPanel position={activePosition} onOpenDrawer={openDrawer} />
+            <PerformanceSummaryCard
+              performance={performanceSummary}
+              onOpenDrawer={openDrawer}
+            />
+          </div>
+
+          <QuickAccessBar onOpenCommandPalette={() => setCommandPaletteOpen(true)} />
+        </div>
+      )}
+
+      {/* 5. UNIVERSAL DETAILS DRAWER */}
+      <UniversalDetailsDrawer
+        isOpen={drawerOpen}
+        contentType={drawerContent}
+        title={drawerTitle}
+        data={drawerData}
+        onClose={closeDrawer}
+        onTriggerCheckpoint={handleTriggerCheckpoint}
+      />
+
+      {/* 6. COMMAND PALETTE MODAL (CTRL+K) */}
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        onOpenDrawer={openDrawer}
+        onEmergencyStop={() => setKillConfirmOpen(true)}
+      />
+
+      {/* 7. LIVE TRADING SAFETY MODAL */}
+      <LiveTradingSafetyModal
+        isOpen={liveConfirmOpen}
+        onClose={() => setLiveConfirmOpen(false)}
+        onConfirmLive={handleArmLiveTrading}
+      />
+
+      {/* 8. EMERGENCY KILL SWITCH MODAL */}
+      <EmergencyKillSwitchModal
+        isOpen={killConfirmOpen}
+        isKilled={systemStatus.isKilled}
+        onClose={() => setKillConfirmOpen(false)}
+        onConfirmKill={handleKillSwitch}
+        onResetKill={handleResetKillSwitch}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FuturesContract } from "@/types/market-universe";
@@ -51,7 +52,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
                 </span>
                 {spotPrice > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 text-[11px] font-mono font-bold">
-                    Spot: ₹{spotPrice.toLocaleString()}
+                    Spot: {formatMoney(spotPrice, "₹")}
                   </span>
                 )}
               </div>
@@ -138,7 +139,7 @@ export function FuturesChainModal({ underlying, isOpen, onClose, onSelectContrac
                         <h4 className="text-sm font-bold text-white font-mono">{c.display_symbol}</h4>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-xl font-black text-white font-mono">
-                            ₹{c.last_price?.toLocaleString()}
+                            {formatMoney(c.last_price, "₹")}
                           </span>
                           <span
                             className={`text-xs font-bold ${

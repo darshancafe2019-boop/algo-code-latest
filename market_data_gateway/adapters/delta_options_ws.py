@@ -58,8 +58,153 @@ DELTA_PUBLIC_WS_DEFAULT = DeltaRegionAdapter.get_ws_url("INDIA")
 DELTA_PUBLIC_WS_FALLBACK = DeltaRegionAdapter.get_ws_fallback_url("INDIA")
 MAX_BACKOFF_SEC = 30.0
 
+DELTA_CANONICAL_SYMBOL_MAP: Dict[str, str] = {
+    # BTC
+    "BTC": "BTCUSD",
+    "BTC/USDT": "BTCUSD",
+    "BTCUSDT": "BTCUSD",
+    "BTC/USD": "BTCUSD",
+    "BTCUSD": "BTCUSD",
+    "BINANCE:BTC/USDT:SPOT": "BTCUSD",
+    "BINANCE:BTC/USDT:PERP": "BTCUSD",
+    "DELTA:BTCUSD:PERP": "BTCUSD",
+    "DELTA:BTCUSD": "BTCUSD",
 
-# â”€â”€â”€ Strongly Typed Delta Models â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ETH
+    "ETH": "ETHUSD",
+    "ETH/USDT": "ETHUSD",
+    "ETHUSDT": "ETHUSD",
+    "ETH/USD": "ETHUSD",
+    "ETHUSD": "ETHUSD",
+    "BINANCE:ETH/USDT:SPOT": "ETHUSD",
+    "BINANCE:ETH/USDT:PERP": "ETHUSD",
+    "DELTA:ETHUSD:PERP": "ETHUSD",
+    "DELTA:ETHUSD": "ETHUSD",
+
+    # SOL
+    "SOL": "SOLUSD",
+    "SOL/USDT": "SOLUSD",
+    "SOLUSDT": "SOLUSD",
+    "SOL/USD": "SOLUSD",
+    "SOLUSD": "SOLUSD",
+    "BINANCE:SOL/USDT:SPOT": "SOLUSD",
+    "BINANCE:SOL/USDT:PERP": "SOLUSD",
+    "DELTA:SOLUSD:PERP": "SOLUSD",
+    "DELTA:SOLUSD": "SOLUSD",
+
+    # XRP
+    "XRP": "XRPUSD",
+    "XRP/USDT": "XRPUSD",
+    "XRPUSDT": "XRPUSD",
+    "XRP/USD": "XRPUSD",
+    "XRPUSD": "XRPUSD",
+    "BINANCE:XRP/USDT:SPOT": "XRPUSD",
+    "BINANCE:XRP/USDT:PERP": "XRPUSD",
+    "DELTA:XRPUSD:PERP": "XRPUSD",
+    "DELTA:XRPUSD": "XRPUSD",
+
+    # DOGE
+    "DOGE": "DOGEUSD",
+    "DOGE/USDT": "DOGEUSD",
+    "DOGEUSDT": "DOGEUSD",
+    "DOGE/USD": "DOGEUSD",
+    "DOGEUSD": "DOGEUSD",
+    "BINANCE:DOGE/USDT:SPOT": "DOGEUSD",
+    "BINANCE:DOGE/USDT:PERP": "DOGEUSD",
+    "DELTA:DOGEUSD:PERP": "DOGEUSD",
+    "DELTA:DOGEUSD": "DOGEUSD",
+
+    # PEPE
+    "PEPE": "1000PEPEUSD",
+    "PEPE/USDT": "1000PEPEUSD",
+    "PEPEUSDT": "1000PEPEUSD",
+    "1000PEPE": "1000PEPEUSD",
+    "1000PEPE/USDT": "1000PEPEUSD",
+    "1000PEPEUSDT": "1000PEPEUSD",
+    "1000PEPEUSD": "1000PEPEUSD",
+    "BINANCE:PEPE/USDT:SPOT": "1000PEPEUSD",
+    "BINANCE:1000PEPE/USDT:PERP": "1000PEPEUSD",
+    "DELTA:1000PEPEUSD:PERP": "1000PEPEUSD",
+    "DELTA:1000PEPEUSD": "1000PEPEUSD",
+
+    # SHIB
+    "SHIB": "1000SHIBUSD",
+    "SHIB/USDT": "1000SHIBUSD",
+    "SHIBUSDT": "1000SHIBUSD",
+    "1000SHIB": "1000SHIBUSD",
+    "1000SHIB/USDT": "1000SHIBUSD",
+    "1000SHIBUSDT": "1000SHIBUSD",
+    "1000SHIBUSD": "1000SHIBUSD",
+    "BINANCE:SHIB/USDT:SPOT": "1000SHIBUSD",
+    "BINANCE:1000SHIB/USDT:PERP": "1000SHIBUSD",
+    "DELTA:1000SHIBUSD:PERP": "1000SHIBUSD",
+    "DELTA:1000SHIBUSD": "1000SHIBUSD",
+
+    # BNB
+    "BNB": "BNBUSD",
+    "BNB/USDT": "BNBUSD",
+    "BNBUSDT": "BNBUSD",
+    "BNBUSD": "BNBUSD",
+    "BINANCE:BNB/USDT:SPOT": "BNBUSD",
+    "BINANCE:BNB/USDT:PERP": "BNBUSD",
+    "DELTA:BNBUSD:PERP": "BNBUSD",
+    "DELTA:BNBUSD": "BNBUSD",
+
+    # INR PAIRS
+    "BTC_INR": "BTC_INR",
+    "ETH_INR": "ETH_INR",
+    "BTC/INR": "BTC_INR",
+    "ETH/INR": "ETH_INR",
+}
+
+
+def to_delta_symbol(symbol: str) -> str:
+    """Translates any canonical/UI symbol (e.g. BTC/USDT, BINANCE:BTC/USDT:SPOT) to Delta symbol (BTCUSD)."""
+    s = str(symbol or "").strip().upper()
+    if s in DELTA_CANONICAL_SYMBOL_MAP:
+        return DELTA_CANONICAL_SYMBOL_MAP[s]
+    if s.startswith("DELTA:"):
+        parts = s.split(":")
+        if len(parts) >= 2:
+            return parts[1]
+    if s.endswith("/USDT"):
+        base = s[:-5]
+        return DELTA_CANONICAL_SYMBOL_MAP.get(base, f"{base}USD")
+    if s.endswith("USDT"):
+        base = s[:-4]
+        return DELTA_CANONICAL_SYMBOL_MAP.get(base, f"{base}USD")
+    if s.endswith("/USD"):
+        base = s[:-4]
+        return DELTA_CANONICAL_SYMBOL_MAP.get(base, f"{base}USD")
+    return s
+
+
+def get_symbol_aliases(delta_symbol: str) -> List[str]:
+    """Returns all common aliases for a Delta symbol to populate the central quote caches."""
+    ds = str(delta_symbol or "").strip().upper()
+    aliases = [ds, f"delta:{ds.lower()}", f"DELTA:{ds}"]
+    for k, v in DELTA_CANONICAL_SYMBOL_MAP.items():
+        if v == ds and k not in aliases:
+            aliases.append(k)
+    if ds.endswith("USD") and len(ds) > 3:
+        base = ds[:-3]
+        if base.startswith("1000"):
+            short_base = base[4:]
+            for alias in (base, short_base, f"{short_base}/USDT", f"{short_base}USDT", f"{base}/USDT", f"{base}USDT"):
+                if alias not in aliases:
+                    aliases.append(alias)
+        else:
+            for alias in (base, f"{base}/USDT", f"{base}USDT", f"{base}/USD"):
+                if alias not in aliases:
+                    aliases.append(alias)
+    elif "_" in ds:
+        slash = ds.replace("_", "/")
+        if slash not in aliases:
+            aliases.append(slash)
+    return aliases
+
+
+# ── Strongly Typed Delta Models ──────────────────────────────────────────────
 
 @dataclass
 class DeltaTicker:
@@ -159,7 +304,7 @@ class DeltaCandle:
         return asdict(self)
 
 
-# â”€â”€â”€ Delta Subscription Manager â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+# ── Delta Subscription Manager ──────────────────────────────────────────────
 
 class DeltaSubscriptionManager:
     """Manages active channel subscriptions with reference counting and ensures clean targeted dispatch."""
@@ -178,12 +323,12 @@ class DeltaSubscriptionManager:
         self._ref_counts: Dict[str, int] = {}
 
     def add_ticker(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         self.ticker_symbols.add(s)
         self._ref_counts[f"ticker:{s}"] = self._ref_counts.get(f"ticker:{s}", 0) + 1
 
     def remove_ticker(self, symbol: str) -> bool:
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         k = f"ticker:{s}"
         if k in self._ref_counts:
             self._ref_counts[k] -= 1
@@ -194,7 +339,7 @@ class DeltaSubscriptionManager:
         return False
 
     def add_orderbook(self, symbol: str, level: str = "l1"):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if level == "l1":
             self.ob_l1_symbols.add(s)
         elif level == "updates":
@@ -204,7 +349,7 @@ class DeltaSubscriptionManager:
         self._ref_counts[f"ob_{level}:{s}"] = self._ref_counts.get(f"ob_{level}:{s}", 0) + 1
 
     def remove_orderbook(self, symbol: str, level: str = "l1") -> bool:
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         k = f"ob_{level}:{s}"
         if k in self._ref_counts:
             self._ref_counts[k] -= 1
@@ -220,12 +365,12 @@ class DeltaSubscriptionManager:
         return False
 
     def add_trades(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         self.trades_symbols.add(s)
         self._ref_counts[f"trades:{s}"] = self._ref_counts.get(f"trades:{s}", 0) + 1
 
     def remove_trades(self, symbol: str) -> bool:
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         k = f"trades:{s}"
         if k in self._ref_counts:
             self._ref_counts[k] -= 1
@@ -236,18 +381,47 @@ class DeltaSubscriptionManager:
         return False
 
     def add_mark_price(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         self.mark_price_symbols.add(s)
         self._ref_counts[f"mark:{s}"] = self._ref_counts.get(f"mark:{s}", 0) + 1
 
     def remove_mark_price(self, symbol: str) -> bool:
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         k = f"mark:{s}"
         if k in self._ref_counts:
             self._ref_counts[k] -= 1
             if self._ref_counts[k] <= 0:
                 del self._ref_counts[k]
                 self.mark_price_symbols.discard(s)
+                return True
+        return False
+
+    def add_spot_price(self, symbol: str):
+        s = to_delta_symbol(symbol)
+        self.spot_price_symbols.add(s)
+
+    def add_funding(self, symbol: str):
+        s = to_delta_symbol(symbol)
+        self.funding_symbols.add(s)
+
+    def add_candles(self, symbol: str, resolution: str = "1m"):
+        s = to_delta_symbol(symbol)
+        res_list = self.candle_subscriptions.setdefault(resolution, set())
+        res_list.add(s)
+
+    def add_chain(self, chain_symbol: str):
+        s = chain_symbol.upper().strip()
+        self.chain_symbols.add(s)
+        self._ref_counts[f"chain:{s}"] = self._ref_counts.get(f"chain:{s}", 0) + 1
+
+    def remove_chain(self, chain_symbol: str) -> bool:
+        s = chain_symbol.upper().strip()
+        k = f"chain:{s}"
+        if k in self._ref_counts:
+            self._ref_counts[k] -= 1
+            if self._ref_counts[k] <= 0:
+                del self._ref_counts[k]
+                self.chain_symbols.discard(s)
                 return True
         return False
 
@@ -370,16 +544,23 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         # Product Catalogue Mapping (product_id -> symbol)
         self._product_id_to_symbol: Dict[int, str] = {
             27: "BTCUSD",
-            131: "ETHUSD",
+            3136: "ETHUSD",
             139: "SOLUSD",
             140: "XRPUSD",
             141: "BNBUSD",
             142: "DOGEUSD",
+            143: "1000PEPEUSD",
+            144: "1000SHIBUSD",
         }
 
-        # Seed default majors
-        for sym in ("BTC", "ETH", "SOL", "XRP", "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD"):
+        # Seed default crypto majors and INR pairs
+        for sym in (
+            "BTC", "ETH", "SOL", "XRP", "DOGE", "PEPE", "SHIB", "BNB",
+            "BTCUSD", "ETHUSD", "SOLUSD", "XRPUSD", "DOGEUSD", "1000PEPEUSD", "1000SHIBUSD",
+            "BTC_INR", "ETH_INR"
+        ):
             self.sub_mgr.add_ticker(sym)
+            self.sub_mgr.add_orderbook(sym, level="l1")
             self.sub_mgr.add_orderbook(sym, level="l2")
             self.sub_mgr.add_trades(sym)
             self.sub_mgr.add_mark_price(sym)
@@ -390,6 +571,8 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         """Starts the WebSocket adapter event loop in a dedicated background daemon thread."""
         if self._running or (hasattr(self, "_bg_thread") and self._bg_thread and self._bg_thread.is_alive()):
             return
+
+        import threading
 
         def _runner():
             loop = asyncio.new_event_loop()
@@ -424,7 +607,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             except Exception:
                 pass
 
-    # â”€â”€â”€ Lifecycle & Connection â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Lifecycle & Connection ──────────────────────────────────────────────
 
     async def connect(self) -> None:
         if not WS_AVAILABLE:
@@ -544,26 +727,34 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             except Exception:
                 pass
 
-    # â”€â”€â”€ Subscription Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Subscription Management ──────────────────────────────────────────────
 
     async def subscribe(self, symbols: List[str]) -> None:
         for s in symbols:
-            self.sub_mgr.add_ticker(s)
+            delta_sym = to_delta_symbol(s)
+            self.sub_mgr.add_ticker(delta_sym)
+            self.sub_mgr.add_orderbook(delta_sym, level="l1")
+            self.sub_mgr.add_trades(delta_sym)
+            self.sub_mgr.add_mark_price(delta_sym)
+            self.sub_mgr.add_funding(delta_sym)
             self._subscribed_symbols.add(s.upper().strip())
+            self._subscribed_symbols.add(delta_sym)
         if self._is_ws_open():
             await self._send_all_subscriptions()
 
     async def unsubscribe(self, symbols: List[str]) -> None:
         for s in symbols:
+            delta_sym = to_delta_symbol(s)
             s_up = s.upper().strip()
-            self.sub_mgr.ticker_symbols.discard(s_up)
+            self.sub_mgr.ticker_symbols.discard(delta_sym)
             self._subscribed_symbols.discard(s_up)
+            self._subscribed_symbols.discard(delta_sym)
         if self._is_ws_open():
             unsub_msg = {
                 "type": "unsubscribe",
                 "payload": {
                     "channels": [
-                        {"name": "ticker", "symbols": symbols}
+                        {"name": "ticker", "symbols": [to_delta_symbol(s) for s in symbols]}
                     ]
                 }
             }
@@ -606,7 +797,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         self.subscribe_orderbook(symbol, level="l1")
 
     def unsubscribe_l1(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if self.sub_mgr.remove_orderbook(s, level="l1"):
             if self._is_ws_open():
                 self._schedule_coro(self._safe_send({
@@ -615,15 +806,16 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 }))
 
     def subscribe_ticker(self, symbol: str):
-        self.sub_mgr.add_ticker(symbol)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_ticker(delta_sym)
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "ticker", "symbols": [symbol]}]}
+                "payload": {"channels": [{"name": "ticker", "symbols": [delta_sym]}]}
             }))
 
     def unsubscribe_ticker(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if self.sub_mgr.remove_ticker(s):
             if self._is_ws_open():
                 self._schedule_coro(self._safe_send({
@@ -632,16 +824,17 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 }))
 
     def subscribe_orderbook(self, symbol: str, level: str = "l2"):
-        self.sub_mgr.add_orderbook(symbol, level=level)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_orderbook(delta_sym, level=level)
         ch_name = "ob_l1" if level == "l1" else ("ob_updates" if level == "updates" else "ob_l2")
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": ch_name, "symbols": [symbol]}]}
+                "payload": {"channels": [{"name": ch_name, "symbols": [delta_sym]}]}
             }))
 
     def unsubscribe_orderbook(self, symbol: str, level: str = "l2"):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if self.sub_mgr.remove_orderbook(s, level=level):
             ch_name = "ob_l1" if level == "l1" else ("ob_updates" if level == "updates" else "ob_l2")
             if self._is_ws_open():
@@ -651,15 +844,16 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 }))
 
     def subscribe_trades(self, symbol: str):
-        self.sub_mgr.add_trades(symbol)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_trades(delta_sym)
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "trades", "symbols": [symbol]}]}
+                "payload": {"channels": [{"name": "trades", "symbols": [delta_sym]}]}
             }))
 
     def unsubscribe_trades(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if self.sub_mgr.remove_trades(s):
             if self._is_ws_open():
                 self._schedule_coro(self._safe_send({
@@ -668,15 +862,16 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 }))
 
     def subscribe_mark_price(self, symbol: str):
-        self.sub_mgr.add_mark_price(symbol)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_mark_price(delta_sym)
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "mark_price", "symbols": [symbol]}]}
+                "payload": {"channels": [{"name": "mark_price", "symbols": [delta_sym]}]}
             }))
 
     def unsubscribe_mark_price(self, symbol: str):
-        s = symbol.upper().strip()
+        s = to_delta_symbol(symbol)
         if self.sub_mgr.remove_mark_price(s):
             if self._is_ws_open():
                 self._schedule_coro(self._safe_send({
@@ -685,19 +880,21 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 }))
 
     def subscribe_candles(self, symbol: str, resolution: str = "1m"):
-        self.sub_mgr.add_candles(symbol, resolution)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_candles(delta_sym, resolution)
         if self._is_ws_open():
             self._schedule_coro(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "candlesticks", "symbols": [symbol], "resolution": resolution}]}
+                "payload": {"channels": [{"name": "candlesticks", "symbols": [delta_sym], "resolution": resolution}]}
             }))
 
     def subscribe_funding(self, symbol: str):
-        self.sub_mgr.add_funding(symbol)
+        delta_sym = to_delta_symbol(symbol)
+        self.sub_mgr.add_funding(delta_sym)
         if self._is_ws_open():
             asyncio.create_task(self._safe_send({
                 "type": "subscribe",
-                "payload": {"channels": [{"name": "funding_rate", "symbols": [symbol]}]}
+                "payload": {"channels": [{"name": "funding_rate", "symbols": [delta_sym]}]}
             }))
 
     async def _safe_send(self, payload: Dict[str, Any]) -> None:
@@ -714,7 +911,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             ch_count = len(payload["payload"]["channels"])
             self._logger.info(f"Dispatched Delta WS subscriptions across {ch_count} active channels.")
 
-    # â”€â”€â”€ Message Handling & Normalization â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Message Handling & Normalization ────────────────────────────────────────
 
     def _handle_message(self, data: Dict[str, Any]) -> None:
         msg_type = data.get("type")
@@ -738,7 +935,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
         # 2. Ticker & Option Chain batch updates
         if msg_type in ("ticker", "v2/ticker"):
-            chain_symbol = data.get("sy")
+            chain_symbol = data.get("sy") or data.get("symbol")
             spot_px = float(data.get("sp")) if data.get("sp") is not None else None
             batch_items = data.get("d", [])
 
@@ -766,32 +963,109 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
         # 6. Mark Price
         if msg_type == "mark_price":
-            sym = data.get("symbol") or data.get("s")
-            mp = data.get("price") or data.get("mark_price") or data.get("m")
+            sym = data.get("sy") or data.get("symbol") or data.get("s")
+            mp = data.get("p") or data.get("price") or data.get("mark_price") or data.get("m")
             if sym and mp is not None:
-                self._mark_price_cache[sym] = float(mp)
+                val = float(mp)
+                self._mark_price_cache[sym] = val
+                if sym in self._canonical_quote_cache:
+                    q = self._canonical_quote_cache[sym]
+                    q.mark_price = val
+                    if not q.last_price or q.last_price <= 0:
+                        q.last_price = val
+                    q.received_timestamp = datetime.now(timezone.utc).isoformat()
+                    self._emit_quote_with_aliases(q)
             return
 
         # 7. Spot Price
         if msg_type in ("spot_price", "spot_30mtwap_price"):
-            sym = data.get("symbol") or data.get("s")
-            sp = data.get("price") or data.get("spot_price") or data.get("p")
+            sym = data.get("sy") or data.get("symbol") or data.get("s")
+            sp = data.get("p") or data.get("price") or data.get("spot_price")
             if sym and sp is not None:
-                self._spot_price_cache[sym] = float(sp)
+                val = float(sp)
+                self._spot_price_cache[sym] = val
+                if sym in self._canonical_quote_cache:
+                    q = self._canonical_quote_cache[sym]
+                    q.spot_price = val
+                    self._emit_quote_with_aliases(q)
             return
 
         # 8. Funding Rate
         if msg_type == "funding_rate":
-            sym = data.get("symbol") or data.get("s")
-            fr = data.get("funding_rate") or data.get("rate")
+            sym = data.get("sy") or data.get("symbol") or data.get("s")
+            fr = data.get("rate") or data.get("funding_rate") or data.get("fr")
             if sym and fr is not None:
-                self._funding_rate_cache[sym] = float(fr)
+                val = float(fr)
+                self._funding_rate_cache[sym] = val
+                if sym in self._canonical_quote_cache:
+                    q = self._canonical_quote_cache[sym]
+                    q.funding_rate = val
+                    self._emit_quote_with_aliases(q)
             return
 
         # 9. Candlesticks
         if msg_type == "candlesticks":
             self._handle_candlestick_message(data)
             return
+
+    def _emit_quote_with_aliases(self, norm_quote: NormalizedQuote) -> None:
+        """Emits quote and updates canonical quote cache for symbol and all known aliases."""
+        symbol = norm_quote.symbol
+        self._canonical_quote_cache[symbol] = norm_quote
+        self._emit(norm_quote)
+
+        aliases = get_symbol_aliases(symbol)
+        for alias in aliases:
+            if alias != symbol:
+                alias_q = NormalizedQuote(
+                    symbol=alias,
+                    exchange="DELTA",
+                    provider="delta_options_ws",
+                    last_price=norm_quote.last_price,
+                    bid=norm_quote.bid,
+                    ask=norm_quote.ask,
+                    spread=norm_quote.spread,
+                    volume=norm_quote.volume,
+                    turnover=norm_quote.turnover,
+                    high=norm_quote.high,
+                    low=norm_quote.low,
+                    open=norm_quote.open,
+                    close=norm_quote.close,
+                    change_pct=norm_quote.change_pct,
+                    vwap=norm_quote.vwap,
+                    market=norm_quote.market,
+                    instrument_type=norm_quote.instrument_type,
+                    base_asset=norm_quote.base_asset,
+                    quote_asset=norm_quote.quote_asset,
+                    underlying=norm_quote.underlying,
+                    expiry=norm_quote.expiry,
+                    spot_price=norm_quote.spot_price,
+                    future_price=norm_quote.future_price,
+                    mark_price=norm_quote.mark_price,
+                    index_price=norm_quote.index_price,
+                    basis=norm_quote.basis,
+                    basis_pct=norm_quote.basis_pct,
+                    oi=norm_quote.oi,
+                    oi_change=norm_quote.oi_change,
+                    funding_rate=norm_quote.funding_rate,
+                    next_funding_time=norm_quote.next_funding_time,
+                    lot_size=norm_quote.lot_size,
+                    strike=norm_quote.strike,
+                    option_type=norm_quote.option_type,
+                    moneyness=norm_quote.moneyness,
+                    iv=norm_quote.iv,
+                    greeks=norm_quote.greeks,
+                    event_timestamp=norm_quote.event_timestamp,
+                    received_timestamp=norm_quote.received_timestamp,
+                    feed_latency_ms=norm_quote.feed_latency_ms,
+                    data_mode=norm_quote.data_mode,
+                    status=norm_quote.status,
+                    is_stale=norm_quote.is_stale,
+                    calculation_source=norm_quote.calculation_source,
+                    depth=norm_quote.depth,
+                )
+                self._canonical_quote_cache[alias] = alias_q
+                self._emit(alias_q)
 
     def _normalize_and_emit_ticker(
         self,
@@ -803,7 +1077,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             raw_pid = item.get("i") or item.get("product_id")
             pid_int = int(raw_pid) if raw_pid is not None else None
 
-            symbol = item.get("s") or item.get("symbol")
+            symbol = item.get("sy") or item.get("s") or item.get("symbol")
             if not symbol and pid_int:
                 symbol = self._product_id_to_symbol.get(pid_int)
 
@@ -921,7 +1195,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             delta_ticker = DeltaTicker(
                 symbol=symbol,
                 product_id=pid_int,
-                last_price=mark_price or close_px,
+                last_price=mark_price or close_px or best_bid or best_ask,
                 mark_price=mark_price,
                 spot_price=spot_price,
                 best_bid=best_bid,
@@ -967,8 +1241,10 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 exchange="DELTA",
                 provider="delta_options_ws",
                 last_price=float(delta_ticker.last_price or 0.0),
-                bid=float(delta_ticker.best_bid or 0.0),
-                ask=float(delta_ticker.best_ask or 0.0),
+                bid=delta_ticker.best_bid,
+                ask=delta_ticker.best_ask,
+                mark_price=delta_ticker.mark_price,
+                spot_price=delta_ticker.spot_price,
                 volume=float(delta_ticker.volume_24h or 0.0),
                 high=delta_ticker.high_price,
                 low=delta_ticker.low_price,
@@ -983,77 +1259,65 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 is_stale=False,
             )
 
-            self._canonical_quote_cache[symbol] = norm_quote
-            self._emit(norm_quote)
-
-            # Also alias standard pairs (BTCUSD -> BTC) for simple multi-asset routing
-            if symbol.endswith("USD") and len(symbol) in (6, 7):
-                base_sym = symbol[:-3]
-                if base_sym in ("BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"):
-                    alias_quote = NormalizedQuote(
-                        symbol=base_sym,
-                        exchange="DELTA",
-                        provider="delta_options_ws",
-                        last_price=norm_quote.last_price,
-                        bid=norm_quote.bid,
-                        ask=norm_quote.ask,
-                        volume=norm_quote.volume,
-                        high=norm_quote.high,
-                        low=norm_quote.low,
-                        open=norm_quote.open,
-                        close=norm_quote.close,
-                        change_pct=norm_quote.change_pct,
-                        oi=norm_quote.oi,
-                        funding_rate=norm_quote.funding_rate,
-                        event_timestamp=exchange_ts,
-                        received_timestamp=now_iso,
-                        data_mode="REAL_TIME",
-                        is_stale=False,
-                    )
-                    self._canonical_quote_cache[base_sym] = alias_quote
-                    self._raw_quote_cache[base_sym] = raw_dict
-                    self._emit(alias_quote)
+            self._emit_quote_with_aliases(norm_quote)
 
         except Exception as e:
             self._logger.debug(f"Error normalizing Delta ticker: {e}")
 
-    # â”€â”€â”€ Orderbook & Trade Management â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Orderbook & Trade Management ────────────────────────────────────────
 
     def _handle_orderbook_message(self, data: Dict[str, Any]) -> None:
         try:
-            symbol = data.get("symbol") or data.get("s")
+            symbol = data.get("sy") or data.get("symbol") or data.get("s")
             if not symbol:
                 return
 
-            raw_bids = data.get("bids") or data.get("b") or []
-            raw_asks = data.get("asks") or data.get("a") or []
-
+            best_bid = None
+            best_ask = None
+            bid_size = None
+            ask_size = None
             bids_list: List[Dict[str, float]] = []
-            total_bid_vol = 0.0
-            for b in raw_bids[:15]:
-                p = float(b[0] if isinstance(b, list) else b.get("price", 0))
-                s = float(b[1] if isinstance(b, list) else b.get("size", 0))
-                if p > 0 and s > 0:
-                    bids_list.append({"price": p, "size": s})
-                    total_bid_vol += s
-
             asks_list: List[Dict[str, float]] = []
-            total_ask_vol = 0.0
-            for a in raw_asks[:15]:
-                p = float(a[0] if isinstance(a, list) else a.get("price", 0))
-                s = float(a[1] if isinstance(a, list) else a.get("size", 0))
-                if p > 0 and s > 0:
-                    asks_list.append({"price": p, "size": s})
-                    total_ask_vol += s
 
-            best_bid = bids_list[0]["price"] if bids_list else None
-            bid_size = bids_list[0]["size"] if bids_list else None
-            best_ask = asks_list[0]["price"] if asks_list else None
-            ask_size = asks_list[0]["size"] if asks_list else None
+            # Check L1 compact fields (bp, bs, ap, as)
+            if "bp" in data or "ap" in data:
+                raw_bp = data.get("bp")
+                raw_bs = data.get("bs")
+                raw_ap = data.get("ap")
+                raw_as = data.get("as")
+                if raw_bp is not None and float(raw_bp) > 0:
+                    best_bid = float(raw_bp)
+                    bid_size = float(raw_bs) if raw_bs is not None else None
+                    bids_list.append({"price": best_bid, "size": bid_size or 0.0})
+                if raw_ap is not None and float(raw_ap) > 0:
+                    best_ask = float(raw_ap)
+                    ask_size = float(raw_as) if raw_as is not None else None
+                    asks_list.append({"price": best_ask, "size": ask_size or 0.0})
+            else:
+                raw_bids = data.get("bids") or data.get("b") or []
+                raw_asks = data.get("asks") or data.get("a") or []
 
-            spread = round(best_ask - best_bid, 2) if best_bid and best_ask else None
-            mid = round((best_bid + best_ask) / 2.0, 2) if best_bid and best_ask else None
+                for b in raw_bids[:15]:
+                    p = float(b[0] if isinstance(b, list) else b.get("price", 0))
+                    s = float(b[1] if isinstance(b, list) else b.get("size", 0))
+                    if p > 0 and s > 0:
+                        bids_list.append({"price": p, "size": s})
 
+                for a in raw_asks[:15]:
+                    p = float(a[0] if isinstance(a, list) else a.get("price", 0))
+                    s = float(a[1] if isinstance(a, list) else a.get("size", 0))
+                    if p > 0 and s > 0:
+                        asks_list.append({"price": p, "size": s})
+
+                best_bid = bids_list[0]["price"] if bids_list else None
+                bid_size = bids_list[0]["size"] if bids_list else None
+                best_ask = asks_list[0]["price"] if asks_list else None
+                ask_size = asks_list[0]["size"] if asks_list else None
+
+            spread = round(best_ask - best_bid, 4) if best_bid and best_ask else None
+            mid = round((best_bid + best_ask) / 2.0, 4) if best_bid and best_ask else None
+            total_bid_vol = sum(b["size"] for b in bids_list)
+            total_ask_vol = sum(a["size"] for a in asks_list)
             total_vol = total_bid_vol + total_ask_vol
             imbalance = round((total_bid_vol - total_ask_vol) / total_vol, 4) if total_vol > 0 else 0.0
 
@@ -1074,11 +1338,38 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 total_bid_volume=round(total_bid_vol, 2),
                 total_ask_volume=round(total_ask_vol, 2),
                 sequence_no=int(seq) if seq is not None else None,
-                timestamp=str(data.get("timestamp", now_iso)),
+                timestamp=str(data.get("timestamp") or data.get("ts") or now_iso),
                 received_at=now_iso,
             )
-
             self._orderbook_cache[symbol] = ob
+
+            # Patch canonical quote and re-emit across aliases
+            if symbol in self._canonical_quote_cache:
+                q = self._canonical_quote_cache[symbol]
+                if best_bid is not None:
+                    q.bid = best_bid
+                if best_ask is not None:
+                    q.ask = best_ask
+                if spread is not None:
+                    q.spread = spread
+                q.received_timestamp = now_iso
+                self._emit_quote_with_aliases(q)
+            elif best_bid is not None or best_ask is not None:
+                px = mid or best_bid or best_ask or 0.0
+                norm_quote = NormalizedQuote(
+                    symbol=symbol,
+                    exchange="DELTA",
+                    provider="delta_options_ws",
+                    last_price=float(px),
+                    bid=best_bid,
+                    ask=best_ask,
+                    spread=spread,
+                    event_timestamp=now_iso,
+                    received_timestamp=now_iso,
+                    data_mode="REAL_TIME",
+                    is_stale=False,
+                )
+                self._emit_quote_with_aliases(norm_quote)
 
         except Exception as e:
             self._logger.debug(f"Error parsing Delta orderbook: {e}")
@@ -1086,7 +1377,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
     def _handle_orderbook_updates(self, data: Dict[str, Any]) -> None:
         """Applies incremental depth delta updates to existing orderbook state."""
         try:
-            symbol = data.get("symbol") or data.get("s")
+            symbol = data.get("sy") or data.get("symbol") or data.get("s")
             if not symbol or symbol not in self._orderbook_cache:
                 return
 
@@ -1094,11 +1385,9 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             delta_bids = data.get("bids", [])
             delta_asks = data.get("asks", [])
 
-            # Map existing bids/asks by price
             bids_map = {b["price"]: b["size"] for b in existing_ob.bids}
             asks_map = {a["price"]: a["size"] for a in existing_ob.asks}
 
-            # Apply bid updates (size == 0 means remove level)
             for item in delta_bids:
                 p = float(item[0] if isinstance(item, list) else item.get("price", 0))
                 s = float(item[1] if isinstance(item, list) else item.get("size", 0))
@@ -1107,7 +1396,6 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 else:
                     bids_map[p] = s
 
-            # Apply ask updates
             for item in delta_asks:
                 p = float(item[0] if isinstance(item, list) else item.get("price", 0))
                 s = float(item[1] if isinstance(item, list) else item.get("size", 0))
@@ -1116,7 +1404,6 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 else:
                     asks_map[p] = s
 
-            # Re-sort descending for bids, ascending for asks
             sorted_bids = sorted([{"price": k, "size": v} for k, v in bids_map.items()], key=lambda x: x["price"], reverse=True)[:15]
             sorted_asks = sorted([{"price": k, "size": v} for k, v in asks_map.items()], key=lambda x: x["price"])[:15]
 
@@ -1126,8 +1413,8 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             existing_ob.bid_size = sorted_bids[0]["size"] if sorted_bids else None
             existing_ob.best_ask = sorted_asks[0]["price"] if sorted_asks else None
             existing_ob.ask_size = sorted_asks[0]["size"] if sorted_asks else None
-            existing_ob.spread = round(existing_ob.best_ask - existing_ob.best_bid, 2) if existing_ob.best_bid and existing_ob.best_ask else None
-            existing_ob.mid_price = round((existing_ob.best_bid + existing_ob.best_ask) / 2.0, 2) if existing_ob.best_bid and existing_ob.best_ask else None
+            existing_ob.spread = round(existing_ob.best_ask - existing_ob.best_bid, 4) if existing_ob.best_bid and existing_ob.best_ask else None
+            existing_ob.mid_price = round((existing_ob.best_bid + existing_ob.best_ask) / 2.0, 4) if existing_ob.best_bid and existing_ob.best_ask else None
 
             tot_b = sum(b["size"] for b in sorted_bids)
             tot_a = sum(a["size"] for a in sorted_asks)
@@ -1141,16 +1428,19 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
     def _handle_trades_message(self, data: Dict[str, Any]) -> None:
         try:
-            symbol = data.get("symbol") or data.get("s")
-            raw_trades = data.get("trades") or data.get("d") or [data]
-            if not symbol and isinstance(raw_trades, list) and raw_trades:
-                symbol = raw_trades[0].get("symbol") or raw_trades[0].get("s")
+            symbol = data.get("sy") or data.get("symbol") or data.get("s")
+            raw_trades = data.get("trades") or data.get("d")
+            if not raw_trades and ("p" in data or "price" in data):
+                raw_trades = [data]
+            elif isinstance(raw_trades, list) and raw_trades and not symbol:
+                symbol = raw_trades[0].get("sy") or raw_trades[0].get("symbol") or raw_trades[0].get("s")
 
-            if not symbol:
+            if not symbol or not raw_trades:
                 return
 
             tape = self._recent_trades.setdefault(symbol, [])
             now_iso = datetime.now(timezone.utc).isoformat()
+            latest_price = None
 
             for t in (raw_trades if isinstance(raw_trades, list) else [raw_trades]):
                 px = float(t.get("price") or t.get("p") or 0.0)
@@ -1158,7 +1448,8 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 if px <= 0 or sz <= 0:
                     continue
 
-                role = str(t.get("seller_role") or t.get("buyer_role") or t.get("side") or "buy").lower()
+                latest_price = px
+                role = str(t.get("seller_role") or t.get("buyer_role") or t.get("role") or t.get("r") or t.get("side") or "buy").lower()
                 trade_ts = str(t.get("timestamp") or t.get("t") or now_iso)
                 is_large = (px * sz) >= 50_000.0  # > $50k notional
 
@@ -1176,12 +1467,31 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 if len(tape) > 100:
                     tape.pop(0)
 
+            if latest_price is not None:
+                if symbol in self._canonical_quote_cache:
+                    q = self._canonical_quote_cache[symbol]
+                    q.last_price = latest_price
+                    q.received_timestamp = now_iso
+                    self._emit_quote_with_aliases(q)
+                else:
+                    norm_quote = NormalizedQuote(
+                        symbol=symbol,
+                        exchange="DELTA",
+                        provider="delta_options_ws",
+                        last_price=latest_price,
+                        event_timestamp=now_iso,
+                        received_timestamp=now_iso,
+                        data_mode="REAL_TIME",
+                        is_stale=False,
+                    )
+                    self._emit_quote_with_aliases(norm_quote)
+
         except Exception as e:
             self._logger.debug(f"Error parsing Delta trades message: {e}")
 
     def _handle_candlestick_message(self, data: Dict[str, Any]) -> None:
         try:
-            symbol = data.get("symbol") or data.get("s")
+            symbol = data.get("sy") or data.get("symbol") or data.get("s")
             res = str(data.get("resolution") or data.get("r") or "1m")
             if not symbol:
                 return
@@ -1206,40 +1516,71 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
         except Exception as e:
             self._logger.debug(f"Error parsing Delta candlestick: {e}")
 
-    # â”€â”€â”€ Public Queries & Snapshots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    # ── Public Queries & Snapshots ──────────────────────────────────────────
 
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
         res: Dict[str, NormalizedQuote] = {}
-        missing: List[str] = []
-        for s in symbols:
-            s_up = s.upper().strip()
-            if s_up in self._canonical_quote_cache:
-                res[s_up] = self._canonical_quote_cache[s_up]
-            else:
-                missing.append(s_up)
+        missing_delta_syms: Set[str] = set()
+        symbol_map_req: Dict[str, str] = {}
 
-        if missing:
+        for s in symbols:
+            s_clean = s.strip()
+            delta_sym = to_delta_symbol(s_clean)
+            symbol_map_req[s_clean] = delta_sym
+
+            if s_clean in self._canonical_quote_cache:
+                res[s_clean] = self._canonical_quote_cache[s_clean]
+            elif delta_sym in self._canonical_quote_cache:
+                res[s_clean] = self._canonical_quote_cache[delta_sym]
+            else:
+                missing_delta_syms.add(delta_sym)
+
+        if missing_delta_syms:
             try:
                 tickers = await asyncio.to_thread(global_delta_client.get_tickers)
+                now_iso = datetime.now(timezone.utc).isoformat()
                 for t in tickers:
                     sym = t.get("symbol")
-                    if sym and sym in missing:
+                    if sym:
+                        quotes_dict = t.get("quotes") or {}
+                        bb = float(quotes_dict.get("best_bid") or 0.0) if quotes_dict.get("best_bid") else None
+                        ba = float(quotes_dict.get("best_ask") or 0.0) if quotes_dict.get("best_ask") else None
+                        raw_lp = t.get("mark_price") or t.get("close") or bb or ba or 0.0
+                        lp = float(raw_lp) if raw_lp is not None else 0.0
+
                         norm = NormalizedQuote(
                             symbol=sym,
                             exchange="DELTA",
                             provider="delta_options_ws",
-                            last_price=float(t.get("mark_price", 0.0)),
-                            bid=float(t.get("quotes", {}).get("best_bid", 0.0)),
-                            ask=float(t.get("quotes", {}).get("best_ask", 0.0)),
-                            volume=float(t.get("volume", 0.0)),
-                            oi=float(t.get("oi", 0.0)),
-                            change_pct=float(t.get("mark_change_24h", 0.0)),
+                            last_price=lp,
+                            bid=bb,
+                            ask=ba,
+                            mark_price=float(t.get("mark_price", 0.0)) if t.get("mark_price") else None,
+                            spot_price=float(t.get("spot_price", 0.0)) if t.get("spot_price") else None,
+                            volume=float(t.get("volume", 0.0)) if t.get("volume") else 0.0,
+                            turnover=float(t.get("turnover_usd", 0.0)) if t.get("turnover_usd") else None,
+                            high=float(t.get("high", 0.0)) if t.get("high") else None,
+                            low=float(t.get("low", 0.0)) if t.get("low") else None,
+                            open=float(t.get("open", 0.0)) if t.get("open") else None,
+                            close=float(t.get("close", 0.0)) if t.get("close") else None,
+                            oi=float(t.get("oi", 0.0)) if t.get("oi") else None,
+                            funding_rate=float(t.get("funding_rate", 0.0)) if t.get("funding_rate") else None,
+                            change_pct=float(t.get("mark_change_24h", 0.0)) if t.get("mark_change_24h") else None,
+                            event_timestamp=str(t.get("timestamp") or now_iso),
+                            received_timestamp=now_iso,
                             data_mode="REAL_TIME",
+                            is_stale=False,
                         )
-                        self._canonical_quote_cache[sym] = norm
-                        res[sym] = norm
+                        self._emit_quote_with_aliases(norm)
+
+                for s_clean, delta_sym in symbol_map_req.items():
+                    if s_clean not in res:
+                        if s_clean in self._canonical_quote_cache:
+                            res[s_clean] = self._canonical_quote_cache[s_clean]
+                        elif delta_sym in self._canonical_quote_cache:
+                            res[s_clean] = self._canonical_quote_cache[delta_sym]
             except Exception as e:
-                self._logger.warning(f"Error in REST snapshot fallback: {e}")
+                self._logger.warning(f"Error in Delta REST snapshot fallback: {e}")
 
         return res
 
@@ -1263,18 +1604,6 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
     def get_funding_rate(self, symbol: str) -> Optional[float]:
         return self._funding_rate_cache.get(symbol.upper().strip())
-
-    def get_candles(self, symbol: str, resolution: str = "1m") -> List[DeltaCandle]:
-        return list(self._candles_cache.get(symbol.upper().strip(), {}).get(resolution, []))
-
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        return []
 
     async def get_instruments(self) -> List[CanonicalInstrument]:
         try:
@@ -1658,87 +1987,6 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             "latencyMs": 12.0,
             "latency_ms": 12.0,
         }
-
-    async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
-        result: Dict[str, NormalizedQuote] = {}
-        now_iso = datetime.now(timezone.utc).isoformat()
-        for s in symbols:
-            s_clean = s.upper().strip()
-            aliases = [s_clean]
-            if s_clean in ("BTC", "BTCUSD", "BTC/USDT", "BTCUSDT"):
-                aliases.extend(["BTC", "BTCUSD", "BTC/USDT", "BTCUSDT"])
-
-            matched_q: Optional[NormalizedQuote] = None
-            for a in aliases:
-                if a in self._canonical_quote_cache:
-                    matched_q = self._canonical_quote_cache[a]
-                    break
-
-            if not matched_q:
-                try:
-                    raw_tickers = await asyncio.to_thread(
-                        global_delta_client.get_tickers,
-                        underlying_asset_symbols=["BTC"] if "BTC" in s_clean else None,
-                    )
-                    if isinstance(raw_tickers, list):
-                        for t in raw_tickers:
-                            t_sym = str(t.get("symbol") or "")
-                            if t_sym in ("BTCUSD", "BTCUSDT") or t_sym == s_clean:
-                                lp = float(t.get("close_price") or t.get("mark_price") or t.get("spot_price") or 0.0)
-                                if lp > 0:
-                                    q = NormalizedQuote(
-                                        symbol=s_clean,
-                                        exchange="DELTA",
-                                        provider="delta_options_ws",
-                                        last_price=lp,
-                                        bid=float((t.get("quotes") or {}).get("best_bid") or lp),
-                                        ask=float((t.get("quotes") or {}).get("best_ask") or lp),
-                                        volume=float(t.get("volume") or 0.0),
-                                        open=float(t.get("open_price")) if t.get("open_price") else None,
-                                        high=float(t.get("high_price")) if t.get("high_price") else None,
-                                        low=float(t.get("low_price")) if t.get("low_price") else None,
-                                        close=float(t.get("close_price")) if t.get("close_price") else None,
-                                        change_pct=float(t.get("change_24h")) if t.get("change_24h") else None,
-                                        event_timestamp=now_iso,
-                                        received_timestamp=now_iso,
-                                        data_mode="REAL_TIME",
-                                        is_stale=False,
-                                    )
-                                    self._canonical_quote_cache[s_clean] = q
-                                    matched_q = q
-                                    break
-                except Exception as ex:
-                    self._logger.debug("Delta REST snapshot error for %s: %s", s_clean, ex)
-
-            if matched_q:
-                result[s] = matched_q
-
-        return result
-
-    async def get_history(
-        self,
-        symbol: str,
-        timeframe: str,
-        from_dt: datetime,
-        to_dt: datetime,
-    ) -> List[OHLCVCandle]:
-        return []
-
-    async def get_instruments(self) -> List[CanonicalInstrument]:
-        return []
-
-    async def health_check(self) -> ProviderHealth:
-        return ProviderHealth(
-            provider_id=self.provider_id,
-            provider_name=self.provider_name,
-            status=self.get_status(),
-            asset_classes=["CRYPTO", "OPTIONS", "PERPETUALS"],
-            subscribed_symbols=len(self._subscribed_symbols),
-            latency_ms=12.0,
-            error_count=self._error_count,
-            last_tick_time=datetime.now(timezone.utc).isoformat() if self._last_tick_time else None,
-            message="Operational",
-        )
 
 
 # Singleton adapter instance

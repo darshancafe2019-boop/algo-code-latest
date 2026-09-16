@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -86,7 +87,7 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
 
           <div className="flex items-center gap-2 font-mono">
             <span className="text-sm font-bold text-white">
-              {currencySymbol}{price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatMoney(price, currencySymbol)}
             </span>
             <span
               className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${

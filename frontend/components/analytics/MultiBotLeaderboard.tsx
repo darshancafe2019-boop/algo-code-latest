@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { BotLeaderboardRow } from "@/types/analytics";
 import { Trophy, ArrowUpDown, ArrowUp, ArrowDown, Play, Pause, Square, RefreshCw, AlertCircle } from "lucide-react";
-import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric } from "@/lib/formatters";
+import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric, formatMoney } from "@/lib/formatters";
 
 interface Props {
   bots: BotLeaderboardRow[];
@@ -168,7 +168,7 @@ export function MultiBotLeaderboard({ bots }: Props) {
 
                     <td className="p-3 font-mono text-slate-300">
                       <div><strong className="text-cyan-400">{bot.symbol}</strong> • {bot.strategy}</div>
-                      <div className="text-[10px] text-slate-400">{bot.timeframe} • Capital: ${bot.allocated_capital.toLocaleString()}</div>
+                      <div className="text-[10px] text-slate-400">{bot.timeframe} • Capital: {formatMoney(bot.allocated_capital, "$")}</div>
                     </td>
 
                     <td className="p-3 text-right font-mono font-bold">

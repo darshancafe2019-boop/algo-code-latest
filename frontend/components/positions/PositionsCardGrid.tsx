@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import {
   ArrowUpRight,
@@ -125,14 +126,14 @@ const PositionCardItem = React.memo(function PositionCardItem({
           {/* Stop Loss Level Marker */}
           <div
             className="absolute top-1/2 -translate-y-1/2 left-0 w-3 h-3 bg-[#FF3B5C] rounded-full ring-2 ring-[#0A1422] shadow-sm"
-            title={`Stop Loss: $${slP.toLocaleString()}`}
+            title={`Stop Loss: ${formatMoney(slP, "$")}`}
           />
 
           {/* Entry Price Marker */}
           <div
             className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-[#52627A] rounded-full ring-2 ring-[#0A1422] shadow-sm"
             style={{ left: `${entryPct}%` }}
-            title={`Entry: $${entryP.toLocaleString()}`}
+            title={`Entry: ${formatMoney(entryP, "$")}`}
           />
 
           {/* Current Price Pulsing Indicator */}
@@ -143,13 +144,13 @@ const PositionCardItem = React.memo(function PositionCardItem({
                 : "bg-[#FF3B5C] shadow-lg shadow-[#FF3B5C]/40"
             }`}
             style={{ left: `calc(${currentPct}% - 7px)` }}
-            title={`Current Mark: $${currP.toLocaleString()}`}
+            title={`Current Mark: ${formatMoney(currP, "$")}`}
           />
 
           {/* Take Profit Target Marker */}
           <div
             className="absolute top-1/2 -translate-y-1/2 right-0 w-3 h-3 bg-[#00E890] rounded-full ring-2 ring-[#0A1422] shadow-sm"
-            title={`Take Profit: $${tpP.toLocaleString()}`}
+            title={`Take Profit: ${formatMoney(tpP, "$")}`}
           />
         </div>
 
@@ -160,14 +161,14 @@ const PositionCardItem = React.memo(function PositionCardItem({
               <Shield className="h-3 w-3" /> SL
             </span>
             <span className="text-[#F7FAFC] font-semibold block tabular-nums">
-              ${slP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              {formatMoney(slP, "$")}
             </span>
           </div>
 
           <div>
             <span className="text-[#52627A] uppercase font-medium">Entry</span>
             <span className="text-[#F7FAFC] font-semibold block tabular-nums">
-              ${entryP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              {formatMoney(entryP, "$")}
             </span>
           </div>
 
@@ -178,7 +179,7 @@ const PositionCardItem = React.memo(function PositionCardItem({
                 isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
               }`}
             >
-              ${currP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              {formatMoney(currP, "$")}
             </span>
           </div>
 
@@ -187,7 +188,7 @@ const PositionCardItem = React.memo(function PositionCardItem({
               <Target className="h-3 w-3" /> TP
             </span>
             <span className="text-[#F7FAFC] font-semibold block tabular-nums">
-              ${tpP.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
+              {formatMoney(tpP, "$")}
             </span>
           </div>
         </div>

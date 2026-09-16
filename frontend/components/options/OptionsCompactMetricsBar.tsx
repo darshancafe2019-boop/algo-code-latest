@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { PCRMetrics } from "@/types/option-chain";
 
@@ -49,9 +50,9 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">ATM:</span>
           <span className="font-bold text-cyan-300">
             {atmStrike !== null && atmStrike !== undefined && atmStrike > 0
-              ? `${currency}${Math.round(atmStrike).toLocaleString()}`
+              ? `${currency}{formatMoney(Math.round(atmStrike), "$")}`
               : spotPrice > 0
-              ? `${currency}${Math.round(spotPrice).toLocaleString()}`
+              ? `${currency}{formatMoney(Math.round(spotPrice), "$")}`
               : "—"}
           </span>
           <span
@@ -108,7 +109,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Max Pain:</span>
           <span className="font-bold text-amber-300">
             {maxPain !== null && maxPain !== undefined && maxPain > 0
-              ? `${currency}${Math.round(maxPain).toLocaleString()}`
+              ? `${currency}{formatMoney(Math.round(maxPain), "$")}`
               : "—"}
           </span>
         </div>
@@ -130,7 +131,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Call Wall:</span>
           <span className="font-semibold text-rose-400">
             {callResistanceStrike !== null && callResistanceStrike !== undefined && callResistanceStrike > 0
-              ? `${currency}${Math.round(callResistanceStrike).toLocaleString()}`
+              ? `${currency}{formatMoney(Math.round(callResistanceStrike), "$")}`
               : "—"}
           </span>
         </div>
@@ -142,7 +143,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Put Wall:</span>
           <span className="font-semibold text-emerald-400">
             {putSupportStrike !== null && putSupportStrike !== undefined && putSupportStrike > 0
-              ? `${currency}${Math.round(putSupportStrike).toLocaleString()}`
+              ? `${currency}{formatMoney(Math.round(putSupportStrike), "$")}`
               : "—"}
           </span>
         </div>

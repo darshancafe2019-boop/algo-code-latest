@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React from "react";
 import { Sparkles, Play, Activity, Clock, Shield } from "lucide-react";
 import { BacktestRequest } from "@/types/backtest";
@@ -97,7 +98,7 @@ export function BacktestProfiles({ onSelectPreset, isLoading }: BacktestProfiles
                   <Clock className="h-3 w-3 text-purple-400" /> {p.timeframe}
                 </span>
                 <span className="flex items-center gap-1 font-mono">
-                  <Shield className="h-3 w-3 text-emerald-400" /> ${p.recommended_cash.toLocaleString()}
+                  <Shield className="h-3 w-3 text-emerald-400" /> {formatMoney(p.recommended_cash, "$")}
                 </span>
               </div>
             </div>

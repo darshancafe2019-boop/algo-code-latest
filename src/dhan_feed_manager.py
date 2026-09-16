@@ -119,12 +119,15 @@ class DhanFeedManager:
         self._callbacks: List[Callable[[Dict[str, Any]], None]] = []
         self._lock = asyncio.Lock()
 
-        # Pre-seed symbol mapping from registry
+        # Pre-seed symbol mapping from registry (prioritize canonical trading symbols)
         for sym, meta in OFFICIAL_DHAN_KEYS.items():
             sec_id = str(meta["security_id"])
             seg = meta.get("exchange_segment", "NSE_EQ")
-            self._sec_id_to_symbol[f"{seg}:{sec_id}"] = sym
-            self._sec_id_to_symbol[sec_id] = sym
+            canonical = meta.get("trading_symbol") or sym
+            if f"{seg}:{sec_id}" not in self._sec_id_to_symbol or (" " not in sym and sym == canonical):
+                self._sec_id_to_symbol[f"{seg}:{sec_id}"] = canonical
+            if sec_id not in self._sec_id_to_symbol or (" " not in sym and sym == canonical):
+                self._sec_id_to_symbol[sec_id] = canonical
 
         global_dhan_credential_manager.register_callback(self._on_credential_update)
 

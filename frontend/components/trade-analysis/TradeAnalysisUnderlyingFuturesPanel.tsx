@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   TrendingUp,
@@ -76,7 +77,7 @@ export function TradeAnalysisUnderlyingFuturesPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-base font-bold text-white tracking-tight">
-              ₹{underlyingData.spotPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(underlyingData.spotPrice, "₹")}
             </span>
             <span
               className={`text-[11px] font-bold flex items-center gap-0.5 ${
@@ -90,15 +91,15 @@ export function TradeAnalysisUnderlyingFuturesPanel({
           <div className="grid grid-cols-3 gap-1 pt-1.5 border-t border-[#12304A] text-[9px] text-slate-400">
             <div>
               <span className="block text-slate-500">Day High</span>
-              <strong className="text-slate-200">₹{underlyingData.dayHigh.toLocaleString()}</strong>
+              <strong className="text-slate-200">{formatMoney(underlyingData.dayHigh, "₹")}</strong>
             </div>
             <div>
               <span className="block text-slate-500">Day Low</span>
-              <strong className="text-slate-200">₹{underlyingData.dayLow.toLocaleString()}</strong>
+              <strong className="text-slate-200">{formatMoney(underlyingData.dayLow, "₹")}</strong>
             </div>
             <div>
               <span className="block text-slate-500">VWAP</span>
-              <strong className="text-amber-300">₹{(underlyingData.vwap || underlyingData.spotPrice).toLocaleString()}</strong>
+              <strong className="text-amber-300">{formatMoney(underlyingData.vwap || underlyingData.spotPrice, "₹")}</strong>
             </div>
           </div>
         </div>
@@ -122,7 +123,7 @@ export function TradeAnalysisUnderlyingFuturesPanel({
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-base font-bold text-white tracking-tight">
-              ₹{futuresData.ltp.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {formatMoney(futuresData.ltp, "₹")}
             </span>
             <span className="text-[11px] font-bold text-cyan-300">
               Basis: {futuresData.basis >= 0 ? "+" : ""}

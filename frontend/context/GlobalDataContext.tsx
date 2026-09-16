@@ -142,7 +142,16 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       key: `stream_portfolio_${tradingMode}`,
       onMessage: (parsed) => {
         if (parsed?.type === "PORTFOLIO_SNAPSHOT" && parsed?.data) {
-          setLiveSseSnapshot(parsed.data as PortfolioSnapshot);
+          setLiveSseSnapshot((prev) => {
+            if (!prev) return parsed.data as PortfolioSnapshot;
+            return {
+              ...prev,
+              ...parsed.data,
+              capitalBreakdown: parsed.data.capitalBreakdown
+                ? { ...(prev.capitalBreakdown || {}), ...parsed.data.capitalBreakdown }
+                : prev.capitalBreakdown,
+            };
+          });
         }
       },
     });

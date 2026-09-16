@@ -1,5 +1,6 @@
 "use client";
 
+import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { PairsBacktestResult } from "@/types/pairs-trading";
 import { Activity, Play, CheckCircle, TrendingUp, AlertTriangle, RefreshCw } from "lucide-react";
@@ -144,7 +145,7 @@ export function BacktestingTab({ currencySymbol = "₹" }: BacktestingTabProps) 
                 }`}
               >
                 {backtestResult.net_pnl >= 0 ? "+" : ""}
-                {currencySymbol}{backtestResult.net_pnl.toLocaleString()} ({backtestResult.total_return_pct}%)
+                {formatMoney(backtestResult.net_pnl, currencySymbol)} ({backtestResult.total_return_pct}%)
               </div>
               <div className="text-[10px] text-slate-400">CAGR: {backtestResult.cagr_pct}%</div>
             </div>
@@ -163,7 +164,7 @@ export function BacktestingTab({ currencySymbol = "₹" }: BacktestingTabProps) 
                 -{backtestResult.max_drawdown_pct}%
               </div>
               <div className="text-[10px] text-slate-400">
-                {currencySymbol}{backtestResult.max_drawdown_dollars.toLocaleString()}
+                {formatMoney(backtestResult.max_drawdown_dollars, currencySymbol)}
               </div>
             </div>
 

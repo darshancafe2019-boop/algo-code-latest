@@ -68,7 +68,7 @@ export function SimpleFuturesTable({
     e.stopPropagation();
     const isIndian = c.exchange === "NSE" || c.currency === "INR";
     const isPerp = c.contract_type === "PERPETUAL" || !c.expiry_date;
-    const provider = c.market_data_provider || c.provider || (isIndian ? "DHAN" : "DELTA");
+    const provider = c.market_data_provider || c.provider || (isIndian ? "UPSTOX" : "DELTA");
 
     dispatchBotCreation(router, {
       symbol: c.symbol,

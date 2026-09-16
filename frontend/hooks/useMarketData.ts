@@ -248,10 +248,10 @@ export function useOptionChain(underlying: string | null | undefined, expiry?: s
 }
 
 /**
- * Hook: useOrderBook
- * Market depth (Level 2) order book.
+ * Hook: useMarketDepth
+ * Canonical Level-2 market depth (5-deep or 30-deep bids/asks).
  */
-export function useOrderBook(symbol: string | null | undefined) {
+export function useMarketDepth(symbol: string | null | undefined) {
   const sym = symbol ? symbol.toUpperCase() : null;
   return useQuery<MarketDepth | null>({
     queryKey: ["marketOrderBook", sym],
@@ -265,6 +265,75 @@ export function useOrderBook(symbol: string | null | undefined) {
     enabled: Boolean(sym),
     refetchInterval: 5000,
     staleTime: 2000,
+  });
+}
+
+export const useOrderBook = useMarketDepth;
+
+/**
+ * Hook: useOptionGreeks
+ * Specialized hook for option contract implied volatility and Greeks (Delta, Gamma, Theta, Vega, Rho).
+ */
+export function useOptionGreeks(contractSymbol: string | null | undefined) {
+  const sym = contractSymbol ? contractSymbol.toUpperCase() : null;
+  return useQuery<{
+    symbol: string;
+    iv: number | null;
+    delta: number | null;
+    gamma: number | null;
+    theta: number | null;
+    vega: number | null;
+    rho: number | null;
+    spotPrice: number | null;
+    strikePrice: number | null;
+  } | null>({
+    queryKey: ["optionGreeks", sym],
+    queryFn: async () => {
+      if (!sym) return null;
+      const res = await fetch(`/api/market-data/quote?symbol=${encodeURIComponent(sym)}`);
+      if (!res.ok) return null;
+      const json = await res.json();
+      const q = json.quote || {};
+      return {
+        symbol: sym,
+        iv: q.iv ?? null,
+        delta: q.delta ?? null,
+        gamma: q.gamma ?? null,
+        theta: q.theta ?? null,
+        vega: q.vega ?? null,
+        rho: q.rho ?? null,
+        spotPrice: q.spot_price ?? null,
+        strikePrice: q.strike_price ?? null,
+      };
+    },
+    enabled: Boolean(sym),
+    refetchInterval: 5000,
+    staleTime: 3000,
+  });
+}
+
+/**
+ * Hook: useFeedStatus
+ * Real-time connection health, latency, and data modes for Dhan, Delta, FYERS, Upstox, and Simulation feeds.
+ */
+export function useFeedStatus() {
+  return useQuery<{
+    status: string;
+    dhan: { status: string; subscriptions: number; lastTick?: string; dataMode?: string };
+    delta: { status: string; subscriptions: number; lastTick?: string; dataMode?: string };
+    fyers: { status: string; subscriptions: number; lastTick?: string; dataMode?: string };
+    upstox: { status: string; subscriptions: number; lastTick?: string; dataMode?: string };
+    simulation?: { status: string; subscriptions: number; lastTick?: string; dataMode?: string };
+    metrics?: Record<string, any>;
+  }>({
+    queryKey: ["feedStatusMatrix"],
+    queryFn: async () => {
+      const res = await fetch("/api/market-data/health");
+      if (!res.ok) throw new Error("Failed to fetch feed status");
+      return await res.json();
+    },
+    refetchInterval: 5000,
+    staleTime: 3000,
   });
 }
 

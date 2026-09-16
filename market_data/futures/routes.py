@@ -613,7 +613,7 @@ def submit_futures_order_intent():
     if mode == "LIVE":
         return jsonify({
             "status": "ERROR",
-            "code": "LIVE_TRADING_LOCKED",
+            "code": "LIVE_TRADING_DISABLED",
             "message": "Real-money LIVE trading is currently locked by server safety gate (LIVE_TRADING_ENABLED=false). Execute in PAPER mode.",
         }), 403
 
@@ -762,4 +762,20 @@ def get_live_readiness():
     return jsonify({
         "status": "SUCCESS",
         "readiness": readiness,
+    }), 200
+
+
+@futures_bp.route("/api/futures/calculate-liquidation", methods=["POST"])
+def calculate_futures_liquidation_endpoint():
+    """Calculates futures liquidation price and metrics."""
+    body = request.get_json(silent=True) or {}
+    side = (body.get("side") or "LONG").upper()
+    entry_price = float(body.get("entryPrice") or body.get("entry_price") or 0.0)
+    leverage = int(body.get("leverage") or 10)
+
+    service = FuturesMarketService.get_instance()
+    calc = service.calculate_liquidation(side, entry_price, leverage)
+    return jsonify({
+        "status": "SUCCESS",
+        "result": calc,
     }), 200

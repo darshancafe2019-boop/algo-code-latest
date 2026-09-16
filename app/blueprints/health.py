@@ -36,7 +36,9 @@ def get_liveness():
     """Liveness probe: verifies process is active and event loop is responsive."""
     return jsonify({
         "success": True,
-        "status": "LIVE",
+        "status": "ok",
+        "service": "alpha-algo-backend",
+        "backend": True,
         "pid": os.getpid(),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
@@ -102,7 +104,9 @@ def get_readiness():
     mode = getattr(config, "TRADING_MODE", "PAPER")
 
     return jsonify({
-        "status": overall_status,
+        "status": "ok" if overall_status == "HEALTHY" else "degraded",
+        "overall_status": overall_status,
+        "backend": True,
         "mode": mode,
         "services": {
             "backend": {

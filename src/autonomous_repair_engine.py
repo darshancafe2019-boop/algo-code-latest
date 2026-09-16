@@ -277,8 +277,16 @@ class AutonomousRepairEngine:
         """
         start_time = time.perf_counter()
         try:
-            db.safe_execute("PRAGMA optimize")
-            db.safe_execute("PRAGMA wal_checkpoint(PASSIVE)")
+            conn = db.get_connection()
+            try:
+                conn.isolation_level = None
+                conn.execute("PRAGMA optimize")
+                conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+            finally:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
             mttr_ms = round((time.perf_counter() - start_time) * 1000, 2)
 
             self._record_healing_event("DATABASE_OPTIMIZED", "SQLITE_PRIMARY", "WAL_CHECKPOINT", "SUCCESS", mttr_ms)

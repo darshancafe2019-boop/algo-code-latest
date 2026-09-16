@@ -284,7 +284,7 @@ export function FuturesDetailsDrawer({
     if (!contract) return;
     const isIndian = contract.exchange === "NSE" || contract.currency === "INR";
     const isPerp = contract.contract_type === "PERPETUAL" || !contract.expiry_date;
-    const provider = contract.market_data_provider || contract.provider || (isIndian ? "DHAN" : "DELTA");
+    const provider = contract.market_data_provider || contract.provider || (isIndian ? "UPSTOX" : "DELTA");
 
     dispatchBotCreation(router, {
       symbol: contract.symbol,

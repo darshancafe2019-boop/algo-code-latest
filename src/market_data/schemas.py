@@ -123,8 +123,8 @@ class OptionQuote:
     # Mandatory 8-Tier Hierarchy & Metadata
     customerId: str = "cust_default"
     departmentId: str = "dept_quant_trading"
-    brokerId: str = "dhan"
-    brokerAccountId: str = "ba_dhan_primary"
+    brokerId: str = "upstox"
+    brokerAccountId: str = "ba_upstox_primary"
     brokerAccountAlias: str = "Primary Account"
     environment: str = "PAPER"  # "PAPER" or "LIVE"
     assetClass: str = "INDIAN_INDICES"
@@ -198,8 +198,8 @@ class OptionChainSnapshot:
     resistance_zones: List[float] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     status: str = "LIVE"
-    provider: str = "DHAN"
-    brokerAccountId: str = "ba_dhan_primary"
+    provider: str = "UPSTOX"
+    brokerAccountId: str = "ba_upstox_primary"
     brokerAccountAlias: str = "Primary Account"
     environment: str = "PAPER"
     dataFeed: str = "REST"

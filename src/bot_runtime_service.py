@@ -136,33 +136,37 @@ class BotRuntimeService:
         Calculates authoritative fleet metrics and bot snapshots with strict mathematical invariants.
         """
         conn = db.get_connection()
-        c = conn.cursor()
-
-        # 1. Fetch all active non-deleted bots
-        c.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC")
-        raw_bots = [dict(r) for r in c.fetchall()]
-
-        # 2. Pre-fetch closed trades for exact bot_id P&L attribution
-        c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED')")
-        closed_trades = [dict(r) for r in c.fetchall()]
-
-        # 3. Pre-fetch open positions
-        open_positions = []
         try:
-            c.execute("SELECT * FROM positions WHERE status = 'OPEN'")
-            open_positions = [dict(r) for r in c.fetchall()]
-        except Exception:
+            c = conn.cursor()
+
+            # 1. Fetch all active non-deleted bots
+            c.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC")
+            raw_bots = [dict(r) for r in c.fetchall()]
+
+            # 2. Pre-fetch closed trades for exact bot_id P&L attribution
+            c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED')")
+            closed_trades = [dict(r) for r in c.fetchall()]
+
+            # 3. Pre-fetch open positions
             open_positions = []
+            try:
+                c.execute("SELECT * FROM positions WHERE status = 'OPEN'")
+                open_positions = [dict(r) for r in c.fetchall()]
+            except Exception:
+                open_positions = []
 
-        # 4. Pre-fetch active open trades
-        open_trades = []
-        try:
-            c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL')")
-            open_trades = [dict(r) for r in c.fetchall()]
-        except Exception:
+            # 4. Pre-fetch active open trades
             open_trades = []
-
-        conn.close()
+            try:
+                c.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL')")
+                open_trades = [dict(r) for r in c.fetchall()]
+            except Exception:
+                open_trades = []
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
         # Map closed trades by bot_id with robust timezone handling
         now_dt = datetime.now(timezone.utc)

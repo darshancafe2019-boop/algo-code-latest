@@ -310,6 +310,9 @@ class UniversalOptionsEngine:
         strike_count: int = 20,
         step_size: Optional[float] = None,
         base_iv: float = 0.18,
+        provider: str = "PAPER_SIMULATOR",
+        broker_account_id: str = "ba_paper_sim",
+        broker_account_alias: str = "Paper Sim Primary",
     ) -> OptionChainSnapshot:
         """
         Generates an authoritative, clearly labeled Paper Simulator option chain.
@@ -398,7 +401,7 @@ class UniversalOptionsEngine:
                 optionType="CE",
                 symbol=f"{und} {selected_expiry} {int(k)} CE",
                 exchange=exchange_name,
-                provider="PAPER_SIMULATOR",
+                provider=provider,
                 lastPrice=g_ce["theoretical_price"],
                 bid=round(max(0.05, g_ce["theoretical_price"] * 0.98), 2),
                 ask=round(g_ce["theoretical_price"] * 1.02, 2),
@@ -420,9 +423,9 @@ class UniversalOptionsEngine:
                 time_value=g_ce["time_value"],
                 customerId="cust_default",
                 departmentId="dept_quant_trading",
-                brokerId="paper_simulator",
-                brokerAccountId="ba_paper_sim",
-                brokerAccountAlias="Paper Sim Primary",
+                brokerId=provider.lower(),
+                brokerAccountId=broker_account_id,
+                brokerAccountAlias=broker_account_alias,
                 environment="PAPER",
                 assetClass="SIMULATED_DERIVATIVES",
                 segment="OPTIONS",
@@ -450,7 +453,7 @@ class UniversalOptionsEngine:
                 optionType="PE",
                 symbol=f"{und} {selected_expiry} {int(k)} PE",
                 exchange=exchange_name,
-                provider="PAPER_SIMULATOR",
+                provider=provider,
                 lastPrice=g_pe["theoretical_price"],
                 bid=round(max(0.05, g_pe["theoretical_price"] * 0.98), 2),
                 ask=round(g_pe["theoretical_price"] * 1.02, 2),
@@ -472,9 +475,9 @@ class UniversalOptionsEngine:
                 time_value=g_pe["time_value"],
                 customerId="cust_default",
                 departmentId="dept_quant_trading",
-                brokerId="paper_simulator",
-                brokerAccountId="ba_paper_sim",
-                brokerAccountAlias="Paper Sim Primary",
+                brokerId=provider.lower(),
+                brokerAccountId=broker_account_id,
+                brokerAccountAlias=broker_account_alias,
                 environment="PAPER",
                 assetClass="SIMULATED_DERIVATIVES",
                 segment="OPTIONS",
@@ -532,9 +535,9 @@ class UniversalOptionsEngine:
             resistance_zones=resistance_zones,
             timestamp=now_iso,
             status="LIVE",
-            provider="PAPER_SIMULATOR",
-            brokerAccountId="ba_paper_sim",
-            brokerAccountAlias="Paper Sim Primary",
+            provider=provider,
+            brokerAccountId=broker_account_id,
+            brokerAccountAlias=broker_account_alias,
             environment="PAPER",
             dataFeed="REST",
             exchange=exchange_name,
@@ -598,16 +601,15 @@ class UniversalOptionsEngine:
             )
 
         if environment == "PAPER":
-            paper_snap = self.generate_paper_option_chain(
+            return self.generate_paper_option_chain(
                 underlying=und,
                 spot_price=spot_price,
                 expiry=expiry,
                 strike_count=strike_count,
+                provider="DHAN",
+                broker_account_id="ba_dhan_paper",
+                broker_account_alias="Dhan Paper",
             )
-            paper_snap.provider = "DHAN"
-            paper_snap.brokerAccountId = "ba_dhan_paper"
-            paper_snap.brokerAccountAlias = "Dhan Paper"
-            return paper_snap
 
         # In LIVE mode without valid provider data, strictly return NO_DATA (never invent fake options)
         now_iso = datetime.now(timezone.utc).isoformat()
@@ -685,16 +687,15 @@ class UniversalOptionsEngine:
             )
 
         if environment == "PAPER":
-            paper_snap = self.generate_paper_option_chain(
+            return self.generate_paper_option_chain(
                 underlying=und,
                 spot_price=spot_price,
                 expiry=expiry,
                 strike_count=strike_count,
+                provider="UPSTOX",
+                broker_account_id="ba_upstox_paper",
+                broker_account_alias="Upstox Paper",
             )
-            paper_snap.provider = "UPSTOX"
-            paper_snap.brokerAccountId = "ba_upstox_paper"
-            paper_snap.brokerAccountAlias = "Upstox Paper"
-            return paper_snap
 
         now_iso = datetime.now(timezone.utc).isoformat()
         return OptionChainSnapshot(
@@ -1109,7 +1110,7 @@ class UniversalOptionsEngine:
     def get_option_chain(
         self,
         underlying: str,
-        provider: str = "DHAN",
+        provider: str = "UPSTOX",
         spot_price: float = 0.0,
         expiry: Optional[str] = None,
         strike_count: int = 20,
@@ -1124,10 +1125,10 @@ class UniversalOptionsEngine:
             if cached_quote and cached_quote.ltp:
                 spot_price = float(cached_quote.ltp)
 
-        if prov == "DHAN":
-            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
-        elif prov == "UPSTOX":
+        if prov == "UPSTOX":
             return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+        elif prov == "DHAN":
+            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
         elif prov in ["DELTA", "DELTA_INDIA"]:
             return self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
         elif prov in ["BINANCE", "BINANCE_OPTIONS", "EOPTIONS"]:
@@ -1135,7 +1136,7 @@ class UniversalOptionsEngine:
         elif prov in ["PAPER", "PAPER_SIMULATOR", "SIM"]:
             return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
         else:
-            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
 
     def get_multi_source_option_chain(
         self,

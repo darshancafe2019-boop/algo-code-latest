@@ -102,6 +102,21 @@ class MarketDataCache:
         self._misses += 1
         return None
 
+    def get(self, key: str, default: Any = None) -> Any:
+        """Compatibility getter: returns cached quote or generic memory entry."""
+        q = self.get_quote(key)
+        if q is not None:
+            return q
+        with self._lock:
+            entry = self._memory_store.get(key)
+            if entry:
+                exp, val = entry
+                if time.time() <= exp:
+                    return val
+                else:
+                    del self._memory_store[key]
+        return default
+
     def set_option_chain(self, underlying: str, expiry: str, chain_data: Dict[str, Any], ttl_sec: int = 60) -> None:
         """Caches an option chain snapshot."""
         key = f"option_chain:{underlying.upper()}:{expiry}"

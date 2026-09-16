@@ -105,7 +105,7 @@ class VolumeStarConfig:
     # --- Execution & Environment ---
     execution_behavior: str = "NEXT_BAR_MARKET" # "NEXT_BAR_MARKET", "LIMIT_AT_CONFIRM_CLOSE", "LIMIT_AT_LVN_RECLAIM"
     execution_mode: str = "PAPER"               # "PAPER", "SHADOW", "LIVE", "BACKTEST"
-    market_data_provider: str = "DHAN"          # "DHAN", "UPSTOX", "DELTA", "BINANCE", "NSE"
+    market_data_provider: str = "UPSTOX"          # "UPSTOX", "DHAN", "DELTA", "BINANCE", "NSE"
     execution_broker: str = "PAPER"
     account_id: str = "PRIMARY"
 
@@ -826,7 +826,7 @@ class VolumeStarEvaluator:
         self,
         df: pd.DataFrame,
         symbol: str = "NIFTY",
-        provider: str = "DHAN",
+        provider: str = "UPSTOX",
         current_position: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
@@ -1167,7 +1167,7 @@ class VolumeStarBacktester:
         self,
         df: pd.DataFrame,
         symbol: str = "NIFTY",
-        provider: str = "DHAN",
+        provider: str = "UPSTOX",
         initial_capital: float = 10000.0,
         fees_pct: float = 0.0005,
         slippage_pct: float = 0.0002

@@ -26,8 +26,8 @@ import { OrderReviewModal, OptionOrderIntentRequest } from "./OrderReviewModal";
 export function OptionsTradingView() {
   const queryClient = useQueryClient();
 
-  const [marketDataProvider, setMarketDataProvider] = useState<string>("DHAN");
-  const [executionBroker, setExecutionBroker] = useState<string>("DHAN");
+  const [marketDataProvider, setMarketDataProvider] = useState<string>("UPSTOX");
+  const [executionBroker, setExecutionBroker] = useState<string>("UPSTOX");
   const [tradingMode, setTradingMode] = useState<"PAPER" | "SHADOW" | "LIVE">("PAPER");
   const [selectedAccount, setSelectedAccount] = useState<string>("PRIMARY_MAIN");
   const [underlying, setUnderlying] = useState<string>("NIFTY");

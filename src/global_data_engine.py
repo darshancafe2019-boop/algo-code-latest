@@ -1398,12 +1398,13 @@ class GlobalDataEngine:
         target_tz = _resolve_timezone(tz_name)
         now_utc = datetime.now(timezone.utc)
 
-        all_trades = []
-        events = []
-        signals = []
+        all_trades: List[Dict[str, Any]] = []
+        matching_trades: List[Dict[str, Any]] = []
+        events: List[Dict[str, Any]] = []
+        signals: List[Dict[str, Any]] = []
 
         try:
-            conn = _get_db()
+            conn = db.get_db_connection()
             cursor = conn.cursor()
 
             # Fetch Trades on this date
@@ -1424,7 +1425,6 @@ class GlobalDataEngine:
             cursor.execute(query, tuple(params))
             all_trades = [dict(r) for r in cursor.fetchall()]
 
-            matching_trades = []
             for t in all_trades:
                 ts_str = t.get("exit_timestamp") or t.get("timestamp") or t.get("created_at") or ""
                 try:

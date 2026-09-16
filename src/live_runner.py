@@ -75,10 +75,15 @@ class LiveRunner:
 
         # Load bot instance config from DB
         conn = db.get_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM bot_instances WHERE id = ?", (self.bot_id,))
-        row = c.fetchone()
-        conn.close()
+        try:
+            c = conn.cursor()
+            c.execute("SELECT * FROM bot_instances WHERE id = ?", (self.bot_id,))
+            row = c.fetchone()
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
         if row:
             b = dict(row)
             self.symbol = b.get("symbol") or config.SYMBOL
@@ -152,24 +157,30 @@ class LiveRunner:
             exc = ValueError(self.preflight_error)
             self.error_ledger.record_incident(exc, bot_id=self.bot_id, symbol=self.symbol, stack_trace="")
             db.log_bot_activity(self.bot_id, "ERROR", f"PRE-FLIGHT BLOCKED: {self.preflight_error}", {"error": self.preflight_error})
+            conn = None
             try:
                 conn = db.get_connection()
                 c = conn.cursor()
                 c.execute("UPDATE bot_instances SET status = 'CONFIG_ERROR' WHERE id = ?", (self.bot_id,))
                 conn.commit()
-                conn.close()
             except Exception:
                 pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
             return
 
         # Reload latest bot instance config dynamically from DB
         if getattr(self, "bot_id", None):
+            conn = None
             try:
                 conn = db.get_connection()
                 c = conn.cursor()
                 c.execute("SELECT config_json, allocated_capital, timeframe, symbol FROM bot_instances WHERE id = ?", (self.bot_id,))
                 row = c.fetchone()
-                conn.close()
                 if row and row["config_json"]:
                     cfg = json.loads(row["config_json"])
                     if isinstance(cfg, str):
@@ -180,6 +191,12 @@ class LiveRunner:
                         self.allocated_capital = float(row["allocated_capital"])
             except Exception as exc:
                 logger.warning("[%s] Failed to dynamically reload config from DB: %s", self.bot_id, exc)
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
         logger.info("[%s] Starting signal check cycle for %s (%s)...", self.bot_id, self.symbol, self.timeframe)
         db.log_bot_activity(self.bot_id, "EVALUATION_START", f"Starting {self.timeframe} candle evaluation cycle for {self.symbol}", {"symbol": self.symbol, "timeframe": self.timeframe})
@@ -295,25 +312,30 @@ class LiveRunner:
                         # Fully Autonomous Exit Execution
                         now_iso = datetime.now(timezone.utc).isoformat()
                         conn = db.get_connection()
-                        c = conn.cursor()
-                        c.execute("""
-                            UPDATE trades_log SET
-                                exit_price = ?,
-                                exit_timestamp = ?,
-                                result_pnl = ?,
-                                net_pnl = ?,
-                                realized_pnl = ?,
-                                status = 'CLOSED',
-                                exit_reason = ?,
-                                remarks = ?
-                            WHERE id = ?
-                        """, (exit_price, now_iso, exit_pnl, exit_pnl, exit_pnl, exit_reason, f"Autonomous exit on {exit_reason}", trade_id))
                         try:
-                            c.execute("DELETE FROM positions WHERE bot_id = ? OR id = ?", (self.bot_id, trade_id))
-                        except Exception:
-                            pass
-                        conn.commit()
-                        conn.close()
+                            c = conn.cursor()
+                            c.execute("""
+                                UPDATE trades_log SET
+                                    exit_price = ?,
+                                    exit_timestamp = ?,
+                                    result_pnl = ?,
+                                    net_pnl = ?,
+                                    realized_pnl = ?,
+                                    status = 'CLOSED',
+                                    exit_reason = ?,
+                                    remarks = ?
+                                WHERE id = ?
+                            """, (exit_price, now_iso, exit_pnl, exit_pnl, exit_pnl, exit_reason, f"Autonomous exit on {exit_reason}", trade_id))
+                            try:
+                                c.execute("DELETE FROM positions WHERE bot_id = ? OR id = ?", (self.bot_id, trade_id))
+                            except Exception:
+                                pass
+                            conn.commit()
+                        finally:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
 
                         db.log_bot_activity(
                             self.bot_id,
@@ -460,18 +482,23 @@ class LiveRunner:
                             exec_price = close_price
 
                         conn = db.get_connection()
-                        c = conn.cursor()
-                        c.execute(
-                            """INSERT INTO trades_log 
-                               (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
-                               VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🤖 Auto Algo', ?)""",
-                            (now_iso, self.symbol, signal, exec_price, sl_price, tp_price, size,
-                             json.dumps({"order_id": order_id, "auto_executed": True, "confluence_pct": conf_pct}),
-                             self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
-                        )
-                        trade_id = c.lastrowid
-                        conn.commit()
-                        conn.close()
+                        try:
+                            c = conn.cursor()
+                            c.execute(
+                                """INSERT INTO trades_log 
+                                   (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
+                                   VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🤖 Auto Algo', ?)""",
+                                (now_iso, self.symbol, signal, exec_price, sl_price, tp_price, size,
+                                 json.dumps({"order_id": order_id, "auto_executed": True, "confluence_pct": conf_pct}),
+                                 self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
+                            )
+                            trade_id = c.lastrowid
+                            conn.commit()
+                        finally:
+                            try:
+                                conn.close()
+                            except Exception:
+                                pass
 
                         db.log_bot_activity(
                             self.bot_id,
@@ -573,15 +600,21 @@ class LiveRunner:
                 logger.warning("[%s] Marked bot as non-retryable configuration error to prevent infinite error storm.", self.bot_id)
 
             db.log_bot_activity(self.bot_id, "ERROR", f"RUNNER ERROR: {exc}", {"error": str(exc), "incident_id": incident.get("id")})
+            conn = None
             try:
                 conn = db.get_connection()
                 c = conn.cursor()
                 bot_status_str = "CONFIG_ERROR" if not incident.get("is_retryable", 0) else "ERROR"
                 c.execute("UPDATE bot_instances SET status = ? WHERE id = ?", (bot_status_str, self.bot_id))
                 conn.commit()
-                conn.close()
             except Exception:
                 pass
+            finally:
+                if conn is not None:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
             try:
                 self.telegram.send_message(f"🚨 <b>SYSTEM INCIDENT</b> #{incident.get('id')}: {error_msg}")
             except Exception as tg_err:
@@ -603,22 +636,27 @@ class LiveRunner:
                     next_iso = next_dt.isoformat()
 
                     conn = db.get_connection()
-                    c = conn.cursor()
-                    c.execute("""
-                        UPDATE bot_instances SET
-                            last_heartbeat = ?,
-                            last_scan_at = ?,
-                            next_scan_at = ?,
-                            scan_count = COALESCE(scan_count, 0) + 1,
-                            current_signal = ?,
-                            signal_confidence = ?,
-                            required_confidence = 75.0,
-                            open_position_count = ?,
-                            status = CASE WHEN status IN ('ERROR', 'STOPPED', 'PAUSED') THEN status ELSE 'RUNNING' END
-                        WHERE id = ?
-                    """, (now_iso, now_iso, next_iso, context.signal, getattr(context, 'confidence', 0.0), 1 if context.open_trade else 0, self.bot_id))
-                    conn.commit()
-                    conn.close()
+                    try:
+                        c = conn.cursor()
+                        c.execute("""
+                            UPDATE bot_instances SET
+                                last_heartbeat = ?,
+                                last_scan_at = ?,
+                                next_scan_at = ?,
+                                scan_count = COALESCE(scan_count, 0) + 1,
+                                current_signal = ?,
+                                signal_confidence = ?,
+                                required_confidence = 75.0,
+                                open_position_count = ?,
+                                status = CASE WHEN status IN ('ERROR', 'STOPPED', 'PAUSED') THEN status ELSE 'RUNNING' END
+                            WHERE id = ?
+                        """, (now_iso, now_iso, next_iso, context.signal, getattr(context, 'confidence', 0.0), 1 if context.open_trade else 0, self.bot_id))
+                        conn.commit()
+                    finally:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
                 except Exception as reg_err:
                     logger.warning("[%s] Failed to update bot_instances registry stats: %s", self.bot_id, reg_err)
 
@@ -690,6 +728,7 @@ def get_active_trade(bot_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """
     Helper to fetch the current active open trade from SQLite.
     """
+    conn = None
     try:
         conn = db.get_connection()
         cursor = conn.cursor()
@@ -701,11 +740,16 @@ def get_active_trade(bot_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         else:
             cursor.execute("SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING') ORDER BY id DESC LIMIT 1")
         row = cursor.fetchone()
-        conn.close()
         return dict(row) if row else None
     except Exception as e:
         logger.error(f"Error fetching active trade from DB: {e}")
         return None
+    finally:
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 def parse_timeframe_to_minutes(tf_str: str) -> int:
     if not tf_str:

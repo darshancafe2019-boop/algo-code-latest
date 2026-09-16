@@ -291,8 +291,15 @@ class UpstoxWSAdapter(BaseProviderAdapter):
 
             try:
                 logger.info("Connecting to authorized Upstox V3 WebSocket URI...")
+                import ssl
+                try:
+                    import certifi
+                    ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+                except Exception:
+                    ssl_ctx = ssl.create_default_context()
                 async with websockets.connect(
                     ws_url,
+                    ssl=ssl_ctx,
                     ping_interval=20,
                     ping_timeout=10,
                     close_timeout=5,
@@ -412,6 +419,11 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     is_stale=False,
                 )
                 self._quote_cache[sym] = q
+                self._quote_cache[sym.upper()] = q
+                self._quote_cache[f"NSE:{sym}"] = q
+                self._quote_cache[ik] = q
+                self._quote_cache[ik.upper()] = q
+                self._quote_cache[ik.replace("|", ":")] = q
                 self._emit(q)
 
         except Exception as exc:
@@ -427,11 +439,19 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             pass
 
     def _key_to_symbol(self, ik: str) -> str:
+        ik_clean = ik.strip().upper()
         for sym, meta in OFFICIAL_UPSTOX_KEYS.items():
-            if meta["instrument_key"] == ik or meta["instrument_key"].replace("|", ":") == ik:
+            if (
+                meta["instrument_key"].upper() == ik_clean
+                or meta["instrument_key"].replace("|", ":").upper() == ik_clean
+                or sym.upper() == ik_clean
+                or meta["name"].upper() == ik_clean
+            ):
                 return sym
         if "|" in ik:
             return ik.split("|")[-1]
+        if ":" in ik:
+            return ik.split(":")[-1]
         return ik
 
     # ─── Data Access Methods ─────────────────────────────────────────────────
@@ -439,9 +459,18 @@ class UpstoxWSAdapter(BaseProviderAdapter):
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
         result = {}
         for s in symbols:
-            clean = s.strip().upper()
+            clean = s.strip()
+            clean_u = clean.upper()
             if clean in self._quote_cache:
-                result[clean] = self._quote_cache[clean]
+                result[s] = self._quote_cache[clean]
+            elif clean_u in self._quote_cache:
+                result[s] = self._quote_cache[clean_u]
+            else:
+                sym_mapped = self._key_to_symbol(clean)
+                if sym_mapped in self._quote_cache:
+                    result[s] = self._quote_cache[sym_mapped]
+                elif sym_mapped.upper() in self._quote_cache:
+                    result[s] = self._quote_cache[sym_mapped.upper()]
         return result
 
     async def get_history(self, symbol: str, timeframe: str, start_time: str, end_time: Optional[str] = None) -> List[OHLCVCandle]:

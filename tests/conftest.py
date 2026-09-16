@@ -101,5 +101,33 @@ class AuthenticatedPytestClient(FlaskClient):
         return super().open(*args, **kwargs)
 
 
+@pytest.fixture(autouse=True)
+def reset_test_environment():
+    """Ensure clean risk, kill switch, and configuration state before and after each test."""
+    from src import config
+    if config.KILL_SWITCH_FILE.exists():
+        try:
+            config.KILL_SWITCH_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+    setattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
+    setattr(config, "GLOBAL_KILL_SWITCH", False)
+    setattr(config, "POSITION_MISMATCH_LOCKED", False)
+    setattr(config, "TRADING_MODE", "PAPER")
+
+    yield
+
+    if config.KILL_SWITCH_FILE.exists():
+        try:
+            config.KILL_SWITCH_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+    setattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
+    setattr(config, "GLOBAL_KILL_SWITCH", False)
+    setattr(config, "POSITION_MISMATCH_LOCKED", False)
+    setattr(config, "TRADING_MODE", "PAPER")
+
+
 # Register test client class with Flask app for pytest execution
 app.test_client_class = AuthenticatedPytestClient
+

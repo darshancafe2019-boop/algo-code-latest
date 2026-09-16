@@ -212,7 +212,7 @@ function MainApp() {
         )}
 
         {/* 1. Markets Discovery & Analysis */}
-        {(activeTab === "markets" || activeTab === "market-universe") && (
+        {(activeTab === "markets" || activeTab === "market-universe" || activeTab === "universe") && (
           <ErrorBoundary title="Market Discovery Failed">
             <MarketUniverse />
           </ErrorBoundary>

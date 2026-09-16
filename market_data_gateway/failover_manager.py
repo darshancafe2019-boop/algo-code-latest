@@ -15,19 +15,52 @@ from market_data_gateway.adapters.base import BaseProviderAdapter, NormalizedQuo
 
 logger = logging.getLogger("MDGateway.Failover")
 
+import os
+
 # Provider priority chains per asset class
 # Primary -> Fallback -> Last-resort
+def get_failover_chain(asset_class: str) -> List[str]:
+    pref = os.environ.get("INDIA_BROKER", "UPSTOX").upper()
+    sim_enabled = os.environ.get("FEED_MODE", "").upper() == "SIMULATION"
+    
+    if pref == "FYERS":
+        indian_chain = ["fyers_ws", "upstox_ws", "dhan_ws", "angelone", "yahoo_fallback"]
+    elif pref == "DHAN":
+        indian_chain = ["dhan_ws", "upstox_ws", "fyers_ws", "angelone", "yahoo_fallback"]
+    else:
+        indian_chain = ["upstox_ws", "fyers_ws", "dhan_ws", "angelone", "yahoo_fallback"]
+        
+    if sim_enabled:
+        indian_chain = ["sim_feed"] + indian_chain
+        crypto_chain = ["sim_feed", "binance_ws", "delta_options_ws", "yahoo_fallback"]
+    else:
+        crypto_chain = ["binance_ws", "delta_options_ws", "yahoo_fallback"]
+
+    chains = {
+        "CRYPTO": crypto_chain,
+        "CRYPTO_OPTIONS": ["delta_options_ws", "binance_ws"],
+        "INDIAN_EQUITIES": indian_chain,
+        "INDIAN_INDICES": indian_chain,
+        "GLOBAL_EQUITIES": ["twelve_data", "polygon", "yahoo_fallback"],
+        "GLOBAL_INDICES": ["twelve_data", "yahoo_fallback"],
+        "FOREX": ["twelve_data", "yahoo_fallback"],
+        "COMMODITIES": ["dhan_ws", "upstox_ws", "fyers_ws", "twelve_data", "yahoo_fallback"],
+        "FUTURES": ["binance_ws", "delta_options_ws", "upstox_ws", "dhan_ws", "fyers_ws", "databento", "yahoo_fallback"],
+        "OPTIONS": ["delta_options_ws", "upstox_ws", "dhan_ws", "fyers_ws", "angelone", "twelve_data"],
+    }
+    return chains.get(asset_class, ["yahoo_fallback"])
+
 FAILOVER_CHAINS: Dict[str, List[str]] = {
     "CRYPTO": ["binance_ws", "delta_options_ws", "yahoo_fallback"],
     "CRYPTO_OPTIONS": ["delta_options_ws", "binance_ws"],
-    "INDIAN_EQUITIES": ["dhan_ws", "upstox_ws", "angelone", "yahoo_fallback"],
-    "INDIAN_INDICES": ["dhan_ws", "upstox_ws", "angelone", "yahoo_fallback"],
+    "INDIAN_EQUITIES": ["upstox_ws", "fyers_ws", "dhan_ws", "angelone", "yahoo_fallback"],
+    "INDIAN_INDICES": ["upstox_ws", "fyers_ws", "dhan_ws", "angelone", "yahoo_fallback"],
     "GLOBAL_EQUITIES": ["twelve_data", "polygon", "yahoo_fallback"],
     "GLOBAL_INDICES": ["twelve_data", "yahoo_fallback"],
     "FOREX": ["twelve_data", "yahoo_fallback"],
-    "COMMODITIES": ["dhan_ws", "twelve_data", "yahoo_fallback"],
-    "FUTURES": ["binance_ws", "delta_options_ws", "dhan_ws", "upstox_ws", "databento", "yahoo_fallback"],
-    "OPTIONS": ["delta_options_ws", "dhan_ws", "upstox_ws", "angelone", "twelve_data"],
+    "COMMODITIES": ["dhan_ws", "upstox_ws", "fyers_ws", "twelve_data", "yahoo_fallback"],
+    "FUTURES": ["binance_ws", "delta_options_ws", "upstox_ws", "dhan_ws", "fyers_ws", "databento", "yahoo_fallback"],
+    "OPTIONS": ["delta_options_ws", "upstox_ws", "dhan_ws", "fyers_ws", "angelone", "twelve_data"],
 }
 
 # Asset class assignment per symbol prefix/pattern (simplified)

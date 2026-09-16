@@ -30,6 +30,8 @@ from market_data_gateway.adapters.base import NormalizedQuote, ProviderHealth
 from market_data_gateway.adapters.binance_ws import BinanceWSAdapter
 from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
 from market_data_gateway.adapters.dhan_ws import DhanWSAdapter
+from market_data_gateway.adapters.fyers_ws import FyersWSAdapter
+from market_data_gateway.adapters.simulation_feed import SimulationFeedAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
@@ -37,6 +39,10 @@ from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapte
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
 from market_data_gateway.candle_store import global_candle_store
+from market_data_gateway.cache.market_cache import global_market_cache
+from market_data_gateway.core.feed_manager import global_feed_manager
+from market_data_gateway.core.subscription_manager import global_subscription_manager
+from market_data_gateway.models.feed_status import FeedState
 from src.dhan_credential_manager import global_dhan_credential_manager
 
 logging.basicConfig(
@@ -70,6 +76,8 @@ class MarketDataGateway:
                 "delta_options_ws": DeltaOptionsWSAdapter(),
                 "dhan_ws": DhanWSAdapter(),
                 "upstox_ws": UpstoxWSAdapter(),
+                "fyers_ws": FyersWSAdapter(),
+                "sim_feed": SimulationFeedAdapter(),
                 "angelone": AngelOneAdapter(),
                 "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
                 # Stub adapters for providers that need credentials
@@ -95,6 +103,11 @@ class MarketDataGateway:
                 ),
             }
 
+        # Register adapters in FeedManager and SubscriptionManager
+        for name, adapter in self.adapters.items():
+            global_feed_manager.register_adapter(name, adapter)
+            global_subscription_manager.register_adapter(name, adapter)
+
         self.failover = FailoverManager(self.adapters)
         # Quote cache: symbol -> NormalizedQuote (latest from any active provider)
         self._quote_cache: Dict[str, NormalizedQuote] = {}
@@ -105,6 +118,8 @@ class MarketDataGateway:
         def _on_quote(quote: NormalizedQuote) -> None:
             """Called by any adapter when a new quote arrives."""
             self._quote_cache[quote.symbol] = quote
+            # Update canonical cache as well
+            global_market_cache.put_normalized_quote(quote)
             asyncio.ensure_future(self._broadcast_quote(quote))
 
         # Bridge DhanFeedManager singleton ticks directly into gateway quote cache
@@ -134,6 +149,7 @@ class MarketDataGateway:
                     data_mode="REAL_TIME",
                 )
                 self._quote_cache[sym] = quote
+                global_market_cache.put_normalized_quote(quote)
                 asyncio.ensure_future(self._broadcast_quote(quote))
 
             global_dhan_feed_manager.add_callback(_on_dhan_tick)
@@ -226,6 +242,88 @@ class MarketDataGateway:
 
     # ─── HTTP handlers ────────────────────────────────────────────────────────
 
+    async def handle_market_data_health(self, request: web.Request) -> web.Response:
+        report = global_feed_manager.get_health_report()
+        dhan_stat = self.adapters.get("dhan_ws")
+        delta_stat = self.adapters.get("delta_options_ws")
+        fyers_stat = self.adapters.get("fyers_ws")
+        upstox_stat = self.adapters.get("upstox_ws")
+        sim_stat = self.adapters.get("sim_feed")
+
+        def _fmt_provider(ad):
+            if not ad:
+                return {"status": "not_configured", "subscriptions": 0, "lastTick": None}
+            st = ad.get_status().lower()
+            return {
+                "status": "connected" if st in ("connected", "live", "ok") else st,
+                "subscriptions": len(ad.get_subscribed_symbols()),
+                "lastTick": datetime.now(timezone.utc).isoformat() if st in ("connected", "live", "ok") else None,
+                "dataMode": getattr(ad, "data_mode", "REAL_TIME"),
+            }
+
+        return web.json_response({
+            "status": "OK",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "providers": report,
+            "dhan": _fmt_provider(dhan_stat),
+            "delta": _fmt_provider(delta_stat),
+            "fyers": _fmt_provider(fyers_stat),
+            "upstox": _fmt_provider(upstox_stat),
+            "simulation": _fmt_provider(sim_stat),
+            "metrics": global_feed_manager.get_metrics(),
+        })
+
+    async def handle_metrics(self, request: web.Request) -> web.Response:
+        return web.json_response({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "metrics": global_feed_manager.get_metrics(),
+            "cache": global_market_cache.get_stats(),
+            "subscriptions": global_subscription_manager.get_status(),
+        })
+
+    async def handle_feed_control(self, request: web.Request) -> web.Response:
+        """Control individual provider feeds securely."""
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON payload"}, status=400)
+            
+        action = body.get("action", "").lower()
+        provider = body.get("provider", "").lower()
+        symbols = body.get("symbols", [])
+        
+        adapter_key = provider if provider.endswith("_ws") else f"{provider}_ws"
+        if provider in ("delta", "delta_options"):
+            adapter_key = "delta_options_ws"
+        elif provider in ("sim", "simulation"):
+            adapter_key = "sim_feed"
+            
+        adapter = self.adapters.get(adapter_key)
+        if not adapter:
+            return web.json_response({"error": f"Provider '{provider}' not found"}, status=404)
+            
+        if action == "connect":
+            await adapter.connect()
+        elif action == "disconnect":
+            await adapter.disconnect()
+        elif action == "reconnect":
+            await adapter.disconnect()
+            await adapter.connect()
+        elif action == "subscribe" and symbols:
+            await adapter.subscribe(symbols)
+        elif action == "unsubscribe" and symbols:
+            await adapter.unsubscribe(symbols)
+        else:
+            return web.json_response({"error": f"Unknown or invalid action '{action}'"}, status=400)
+            
+        return web.json_response({
+            "status": "OK",
+            "provider": provider,
+            "action": action,
+            "provider_status": adapter.get_status(),
+            "subscriptions": list(adapter.get_subscribed_symbols()),
+        })
+
     async def handle_health(self, request: web.Request) -> web.Response:
         healths = []
         for adapter in self.adapters.values():
@@ -246,6 +344,7 @@ class MarketDataGateway:
             "dhan_credentials": global_dhan_credential_manager.get_status(),
             "failover_transitions": self.failover.get_transitions(limit=10),
             "subscriptions": self.subscription_registry.dump(),
+            "feed_manager_health": global_feed_manager.get_health_report(),
         })
 
     async def handle_snapshot(self, request: web.Request) -> web.Response:
@@ -657,6 +756,10 @@ def create_app() -> tuple:
     app.router.add_get("/search", gateway.handle_search)
     app.router.add_get("/ws", gateway.handle_ws)
     app.router.add_post("/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_get("/api/market-data/health", gateway.handle_market_data_health)
+    app.router.add_get("/api/market-data/status", gateway.handle_market_data_health)
+    app.router.add_get("/metrics", gateway.handle_metrics)
+    app.router.add_post("/api/market-data/feed/control", gateway.handle_feed_control)
     app.router.add_get("/api/options/chain", gateway.handle_options_chain)
     app.router.add_get("/api/options/delta/chain", gateway.handle_options_chain)
     app.router.add_get("/options/chain", gateway.handle_options_chain)

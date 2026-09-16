@@ -61,7 +61,7 @@ interface OptionsUniverseViewProps {
 const STORAGE_SAVED_CHAINS = "quantos_saved_option_chains";
 
 export function OptionsUniverseView({
-  initialSource = "DHAN",
+  initialSource = "UPSTOX",
   initialUnderlying,
   isSourceLocked = false,
   initialTab = "CHAIN",

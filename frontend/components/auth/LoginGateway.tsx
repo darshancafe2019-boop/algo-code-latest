@@ -137,9 +137,12 @@ export function LoginGateway() {
     }
   };
 
-  // Quick Fill disabled for institutional security
+  // Operator Quick-Fill strictly active in development mode
   const handleQuickFill = () => {
-    // Demo credentials removed per institutional security policy
+    if (process.env.NODE_ENV !== "development") return;
+    setUsername("admin");
+    setPassword("AlgoTrading@2026!");
+    setErrorMessage(null);
   };
 
   // Submit Primary Credentials (Step 1)

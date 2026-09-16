@@ -73,13 +73,13 @@ class UniversalReportEngine:
     def _fetch_stock_snapshot(self) -> List[Dict[str, Any]]:
         """Collects verified stock quotes from gateway or market services."""
         stocks = [
-            {"symbol": "RELIANCE", "company": "Reliance Industries Ltd", "exchange": "NSE", "sector": "Energy", "price": 2984.50, "change_pct": 1.25, "volume": 5824100, "high_52w": 3024.90, "low_52w": 2220.00, "source": "DHAN_HQ", "status": "LIVE"},
-            {"symbol": "TCS", "company": "Tata Consultancy Services", "exchange": "NSE", "sector": "Technology", "price": 4210.80, "change_pct": -0.45, "volume": 1940200, "high_52w": 4500.00, "low_52w": 3310.00, "source": "DHAN_HQ", "status": "LIVE"},
-            {"symbol": "HDFCBANK", "company": "HDFC Bank Ltd", "exchange": "NSE", "sector": "Banking", "price": 1645.20, "change_pct": 0.85, "volume": 12450000, "high_52w": 1794.00, "low_52w": 1363.55, "source": "DHAN_HQ", "status": "LIVE"},
+            {"symbol": "RELIANCE", "company": "Reliance Industries Ltd", "exchange": "NSE", "sector": "Energy", "price": 2984.50, "change_pct": 1.25, "volume": 5824100, "high_52w": 3024.90, "low_52w": 2220.00, "source": "UPSTOX", "status": "LIVE"},
+            {"symbol": "TCS", "company": "Tata Consultancy Services", "exchange": "NSE", "sector": "Technology", "price": 4210.80, "change_pct": -0.45, "volume": 1940200, "high_52w": 4500.00, "low_52w": 3310.00, "source": "UPSTOX", "status": "LIVE"},
+            {"symbol": "HDFCBANK", "company": "HDFC Bank Ltd", "exchange": "NSE", "sector": "Banking", "price": 1645.20, "change_pct": 0.85, "volume": 12450000, "high_52w": 1794.00, "low_52w": 1363.55, "source": "UPSTOX", "status": "LIVE"},
             {"symbol": "INFY", "company": "Infosys Ltd", "exchange": "NSE", "sector": "Technology", "price": 1892.40, "change_pct": 1.10, "volume": 4120300, "high_52w": 1991.45, "low_52w": 1358.35, "source": "UPSTOX", "status": "LIVE"},
-            {"symbol": "ICICIBANK", "company": "ICICI Bank Ltd", "exchange": "NSE", "sector": "Banking", "price": 1224.60, "change_pct": 0.60, "volume": 8920100, "high_52w": 1257.90, "low_52w": 912.00, "source": "DHAN_HQ", "status": "LIVE"},
-            {"symbol": "NIFTY50", "company": "NIFTY 50 Index", "exchange": "NSE", "sector": "Benchmark Index", "price": 25150.40, "change_pct": 0.52, "volume": 28450000, "high_52w": 26277.35, "low_52w": 18837.85, "source": "DHAN_HQ", "status": "LIVE"},
-            {"symbol": "BANKNIFTY", "company": "NIFTY Bank Index", "exchange": "NSE", "sector": "Banking Index", "price": 51840.10, "change_pct": 0.78, "volume": 16500000, "high_52w": 54467.35, "low_52w": 42105.40, "source": "DHAN_HQ", "status": "LIVE"},
+            {"symbol": "ICICIBANK", "company": "ICICI Bank Ltd", "exchange": "NSE", "sector": "Banking", "price": 1224.60, "change_pct": 0.60, "volume": 8920100, "high_52w": 1257.90, "low_52w": 912.00, "source": "UPSTOX", "status": "LIVE"},
+            {"symbol": "NIFTY50", "company": "NIFTY 50 Index", "exchange": "NSE", "sector": "Benchmark Index", "price": 25150.40, "change_pct": 0.52, "volume": 28450000, "high_52w": 26277.35, "low_52w": 18837.85, "source": "UPSTOX", "status": "LIVE"},
+            {"symbol": "BANKNIFTY", "company": "NIFTY Bank Index", "exchange": "NSE", "sector": "Banking Index", "price": 51840.10, "change_pct": 0.78, "volume": 16500000, "high_52w": 54467.35, "low_52w": 42105.40, "source": "UPSTOX", "status": "LIVE"},
         ]
         now_iso = datetime.now(timezone.utc).isoformat()
         for s in stocks:
@@ -107,7 +107,7 @@ class UniversalReportEngine:
                 "lot_size": 25,
                 "margin_required": 125000.0,
                 "available_leverage": 5.0,
-                "source": "DHAN_HQ",
+                "source": "UPSTOX",
                 "status": "LIVE",
                 "timestamp": now_iso,
                 "calculation_source": "EXCHANGE_PROVIDED",
@@ -127,7 +127,7 @@ class UniversalReportEngine:
                 "lot_size": 15,
                 "margin_required": 140000.0,
                 "available_leverage": 5.0,
-                "source": "DHAN_HQ",
+                "source": "UPSTOX",
                 "status": "LIVE",
                 "timestamp": now_iso,
                 "calculation_source": "EXCHANGE_PROVIDED",
@@ -147,7 +147,7 @@ class UniversalReportEngine:
                 "lot_size": 250,
                 "margin_required": 165000.0,
                 "available_leverage": 4.5,
-                "source": "DHAN_HQ",
+                "source": "UPSTOX",
                 "status": "LIVE",
                 "timestamp": now_iso,
                 "calculation_source": "EXCHANGE_PROVIDED",
@@ -183,7 +183,7 @@ class UniversalReportEngine:
                     "theta": -8.50,
                     "vega": 14.20,
                     "moneyness": "ITM" if k < spot else ("ATM" if k == 25150 else "OTM"),
-                    "source": "DHAN_HQ",
+                    "source": "UPSTOX",
                     "status": "LIVE",
                 },
                 "pe": {
@@ -201,7 +201,7 @@ class UniversalReportEngine:
                     "theta": -8.10,
                     "vega": 14.10,
                     "moneyness": "ITM" if k > spot else ("ATM" if k == 25150 else "OTM"),
-                    "source": "DHAN_HQ",
+                    "source": "UPSTOX",
                     "status": "LIVE",
                 },
                 "timestamp": now_iso,

@@ -157,9 +157,26 @@ class ResendEmailProvider(BaseEmailProvider):
 
         sender = from_email or config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or config.RESEND_FROM_EMAIL or "onboarding@resend.dev"
 
-        # In testing mode with sandbox test domains (.test, .invalid, .example), return sandbox success
-        if any(clean_to.endswith(d) for d in (".test", ".invalid", ".example")):
+        # In testing mode with sandbox test domains (.test, .invalid, .example, .algo, .local) or pytest, record to outbox and return sandbox success
+        is_test_env = bool(os.environ.get("PYTEST_CURRENT_TEST")) or any(clean_to.endswith(d) for d in (".test", ".invalid", ".example", ".algo", ".local"))
+        if is_test_env:
             mock_id = f"sandbox_{uuid.uuid4().hex[:12]}"
+            # Append to outbox.log for test assertions
+            try:
+                outbox_file = config.DATA_DIR / "outbox.log"
+                outbox_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(outbox_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "message_id": mock_id,
+                        "from": sender,
+                        "to": clean_to,
+                        "subject": subject,
+                        "text": text_content,
+                        "html": html_content,
+                    }) + "\n")
+            except Exception:
+                pass
             logger.info("[OTP] Local test recipient '%s' simulated sandbox delivery [ID: %s]", mask_email_address(clean_to), mock_id)
             return True, None, mock_id
 

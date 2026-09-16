@@ -23,7 +23,7 @@ import {
 
 export function OptionsGreeksView() {
   const [underlying, setUnderlying] = useState("NIFTY");
-  const [source, setSource] = useState("DHAN");
+  const [source, setSource] = useState("UPSTOX");
   const [strikeRange, setStrikeRange] = useState(15);
 
   const { data, isLoading, isFetching, refetch } = useQuery<OptionChainData>({

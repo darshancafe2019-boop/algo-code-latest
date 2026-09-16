@@ -77,9 +77,13 @@ class UpstoxBrokerAdapter(BrokerAdapter):
             status=ProviderStatus.LIVE if global_upstox_service.is_authenticated else ProviderStatus.PAPER_ONLY,
         )
 
+    @property
+    def is_authenticated(self) -> bool:
+        return global_upstox_service.is_authenticated
+
     def get_capability(self) -> BrokerCapability:
         self._capability.last_heartbeat_utc = datetime.now(timezone.utc).isoformat()
-        self._capability.status = ProviderStatus.LIVE if global_upstox_service.is_authenticated else ProviderStatus.PAPER_ONLY
+        self._capability.status = ProviderStatus.LIVE if self.is_authenticated else ProviderStatus.PAPER_ONLY
         return self._capability
 
     def get_account_summary(self) -> Dict[str, Any]:
@@ -384,3 +388,4 @@ class UpstoxBrokerAdapter(BrokerAdapter):
 
 # Global Singleton Instance
 global_upstox_broker_adapter = UpstoxBrokerAdapter()
+upstox_broker_adapter = global_upstox_broker_adapter

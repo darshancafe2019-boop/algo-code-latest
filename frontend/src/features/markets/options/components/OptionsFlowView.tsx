@@ -18,7 +18,7 @@ import { formatIndianCurrency, formatIndianQuantity } from "@/lib/options/option
 
 export function OptionsFlowView() {
   const [underlying, setUnderlying] = useState("NIFTY");
-  const [source, setSource] = useState("DHAN");
+  const [source, setSource] = useState("UPSTOX");
   const [subView, setSubView] = useState<"FLOW" | "ANALYTICS">("FLOW");
 
   const { data: snapshotData, isLoading, isFetching, refetch } = useQuery<{ success: boolean; data: OptionTerminalSnapshot }>({

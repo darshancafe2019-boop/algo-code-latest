@@ -267,7 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      if (res.ok && data.status === "success") {
+      if (res.ok && (data.status === "success" || data.success === true)) {
         setUser(data.user);
         setSession(data.session || null);
         setIsAuthenticated(true);
@@ -286,33 +286,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      // Record failed attempt
-      const newAttempts = failedAttempts + 1;
-      setFailedAttempts(newAttempts);
-      try {
-        sessionStorage.setItem(FAILED_ATTEMPTS_KEY, newAttempts.toString());
-      } catch {}
-
-      if (newAttempts >= MAX_FAILED_ATTEMPTS) {
-        const until = Date.now() + LOCKOUT_DURATION_MS;
-        setLockoutUntil(until);
+      // Record failed attempt strictly on genuine credential rejection (401)
+      if (res.status === 401) {
+        const newAttempts = failedAttempts + 1;
+        setFailedAttempts(newAttempts);
         try {
-          sessionStorage.setItem(LOCKOUT_UNTIL_KEY, until.toString());
+          sessionStorage.setItem(FAILED_ATTEMPTS_KEY, newAttempts.toString());
         } catch {}
+
+        if (newAttempts >= MAX_FAILED_ATTEMPTS) {
+          const until = Date.now() + LOCKOUT_DURATION_MS;
+          setLockoutUntil(until);
+          try {
+            sessionStorage.setItem(LOCKOUT_UNTIL_KEY, until.toString());
+          } catch {}
+          return {
+            success: false,
+            error: `Maximum failed attempts reached (${MAX_FAILED_ATTEMPTS}/${MAX_FAILED_ATTEMPTS}). Terminal locked for 30s.`,
+          };
+        }
+
         return {
           success: false,
-          error: `Maximum failed attempts exceeded (${MAX_FAILED_ATTEMPTS}/${MAX_FAILED_ATTEMPTS}). Terminal locked for 30s.`,
+          error: data.message || "Invalid credentials or authentication failed.",
         };
       }
 
+      // Handle other specific HTTP error statuses without penalizing the failed attempt counter
+      if (res.status === 403) {
+        return {
+          success: false,
+          error: data.message || "Account is inactive or access is forbidden.",
+        };
+      }
+
+      if (res.status === 423) {
+        return {
+          success: false,
+          error: data.message || "Account is locked. Please contact your administrator.",
+        };
+      }
+
+      const serverMsg = data.error?.message || data.message || (res.status >= 500 ? "Authentication service temporarily unavailable." : "Authentication failed.");
       return {
         success: false,
-        error: data.message || "Invalid credentials or authentication failed.",
+        error: serverMsg,
       };
     } catch (err: any) {
       return {
         success: false,
-        error: err?.message || "Failed to reach authentication server.",
+        error: err?.message || "Connection error: Unable to reach authentication server.",
       };
     }
   };

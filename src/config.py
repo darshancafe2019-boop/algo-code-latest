@@ -58,7 +58,7 @@ UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
 ENABLE_INDIA_MARKET = os.getenv("ENABLE_INDIA_MARKET", "true").lower() == "true"
 ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
 ENABLE_BINANCE = os.getenv("ENABLE_BINANCE", "true").lower() == "true"
-INDIA_BROKER = os.getenv("INDIA_BROKER", "DHAN")
+INDIA_BROKER = os.getenv("INDIA_BROKER", "UPSTOX")
 FYERS_APP_ID = os.getenv("FYERS_APP_ID", "")
 FYERS_CLIENT_ID = os.getenv("FYERS_CLIENT_ID", FYERS_APP_ID)
 FYERS_SECRET_ID = os.getenv("FYERS_SECRET_ID", os.getenv("FYERS_SECRET_KEY", ""))
@@ -99,7 +99,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
 DATABASE_MIGRATION_URL = os.getenv("DATABASE_MIGRATION_URL", DATABASE_URL)
-IS_POSTGRES = DATABASE_PROVIDER == "postgresql" or DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
+IS_POSTGRES = DATABASE_PROVIDER == "postgresql" and (DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://"))
 
 
 # Institutional Authentication, 2FA & Password Reset

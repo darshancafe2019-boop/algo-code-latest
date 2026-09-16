@@ -828,7 +828,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 if symbol.endswith("USD"):
                     self._spot_price_cache[symbol[:-3]] = spot_price
 
-            # Quotes: [best_ask, ask_size, best_bid, bid_size, impact_mid]
+            # Quotes: [best_bid, bid_size, best_ask, ask_size, impact_mid]
             quotes_raw = item.get("q") or item.get("quotes") or []
             best_bid: Optional[float] = None
             best_ask: Optional[float] = None
@@ -836,10 +836,10 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             ask_size: Optional[float] = None
 
             if isinstance(quotes_raw, list) and len(quotes_raw) >= 4:
-                best_ask = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
-                ask_size = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
-                best_bid = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
-                bid_size = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
+                best_bid = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
+                bid_size = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
+                best_ask = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
+                ask_size = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
             elif isinstance(quotes_raw, dict):
                 bb = quotes_raw.get("best_bid")
                 ba = quotes_raw.get("best_ask")
@@ -871,15 +871,15 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 vega = float(greeks_raw["vega"]) if greeks_raw.get("vega") is not None else None
                 rho = float(greeks_raw["rho"]) if greeks_raw.get("rho") is not None else None
 
-            # IV: [ask_iv, bid_iv, mark_iv]
+            # IV: [mark_iv, bid_iv, ask_iv]
             qiv_raw = item.get("qiv") or []
             mark_iv: Optional[float] = None
             bid_iv: Optional[float] = None
             ask_iv: Optional[float] = None
             if isinstance(qiv_raw, list) and len(qiv_raw) >= 3:
-                ask_iv = float(qiv_raw[0]) if qiv_raw[0] is not None and float(qiv_raw[0]) > 0 else None
+                mark_iv = float(qiv_raw[0]) if qiv_raw[0] is not None and float(qiv_raw[0]) > 0 else None
                 bid_iv = float(qiv_raw[1]) if qiv_raw[1] is not None and float(qiv_raw[1]) > 0 else None
-                mark_iv = float(qiv_raw[2]) if qiv_raw[2] is not None and float(qiv_raw[2]) > 0 else None
+                ask_iv = float(qiv_raw[2]) if qiv_raw[2] is not None and float(qiv_raw[2]) > 0 else None
 
             # Open Interest: [oi_contracts, oi_change]
             oi_raw = item.get("oi") or []

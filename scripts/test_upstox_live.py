@@ -187,8 +187,15 @@ class UpstoxV3FeedClient:
 
     async def connect(self):
         self.auth_state = UpstoxAuthState.WS_CONNECTING
+        import ssl
+        try:
+            import certifi
+            ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ssl_ctx = ssl.create_default_context()
         self.ws = await websockets.connect(
             self.ws_url,
+            ssl=ssl_ctx,
             ping_interval=20,
             ping_timeout=10,
             close_timeout=5,

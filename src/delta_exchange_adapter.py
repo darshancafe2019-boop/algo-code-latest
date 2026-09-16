@@ -59,6 +59,10 @@ class DeltaExchangeAdapter:
         self.secrets_mgr = SecretsManager()
         self._load_credentials_from_vault()
 
+    @property
+    def is_authenticated(self) -> bool:
+        return bool(self.api_key and self.api_secret)
+
     def _load_credentials_from_vault(self):
         """Loads encrypted API keys from SQLite broker_credentials if available and not already passed."""
         if self.api_key and self.api_secret:
@@ -333,3 +337,4 @@ class DeltaExchangeAdapter:
 
 global_delta_adapter = DeltaExchangeAdapter()
 global_delta_exchange_adapter = global_delta_adapter
+delta_exchange_adapter = global_delta_adapter

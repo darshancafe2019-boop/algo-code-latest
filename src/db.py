@@ -101,14 +101,34 @@ def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: flo
 
 _pg_pool = None
 _pg_pool_lock = threading.Lock()
+_pg_circuit_broken_until = 0.0
+_pg_consecutive_failures = 0
+
+
+def _trip_pg_circuit_breaker(duration_sec: float = 60.0, reason: str = ""):
+    """Trips the PostgreSQL circuit breaker so fallback to SQLite is instant without pool timeouts."""
+    global _pg_circuit_broken_until, _pg_consecutive_failures
+    _pg_consecutive_failures += 1
+    if _pg_consecutive_failures >= 2:
+        _pg_circuit_broken_until = time.time() + duration_sec
+        logger.warning("PG_CIRCUIT_BREAKER_TRIPPED: Bypassing PostgreSQL for %0.0fs (Reason: %s)", duration_sec, reason)
+
+
+def _record_pg_success():
+    """Resets PostgreSQL failure counter on successful operation."""
+    global _pg_consecutive_failures
+    _pg_consecutive_failures = 0
 
 
 def get_db_pool():
-    """Returns the single central PostgreSQL ConnectionPool."""
-    global _pg_pool
+    """Returns the single central PostgreSQL ConnectionPool or None if disabled/circuit-broken."""
+    global _pg_pool, _pg_circuit_broken_until
+    if time.time() < _pg_circuit_broken_until:
+        return None
+
     if _pg_pool is None and getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None):
         with _pg_pool_lock:
-            if _pg_pool is None:
+            if _pg_pool is None and time.time() >= _pg_circuit_broken_until:
                 try:
                     from psycopg_pool import ConnectionPool
                     _pg_pool = ConnectionPool(
@@ -121,6 +141,7 @@ def get_db_pool():
                     logger.info("Initialized central PostgreSQL ConnectionPool (min=1, max=10)")
                 except Exception as e:
                     logger.exception("Failed to initialize PostgreSQL ConnectionPool: %s", e)
+                    _trip_pg_circuit_breaker(60.0, str(e))
                     _pg_pool = None
     return _pg_pool
 
@@ -222,7 +243,9 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                         with conn.cursor() as cur:
                             cur.execute(pg_sql, params)
                 pg_ok = True
+                _record_pg_success()
             except Exception as e:
+                _trip_pg_circuit_breaker(60.0, str(e))
                 duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                 pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
                 logger.exception(
@@ -239,9 +262,11 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                         with conn.cursor() as cur:
                             cur.execute(pg_sql, params)
                     pg_ok = True
+                    _record_pg_success()
                 finally:
                     conn.close()
             except Exception as e:
+                _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL execute failed: %s", e)
 
     # Maintain SQLite database in sync
@@ -285,8 +310,10 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                     if duration_ms > 250.0:
                         logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+                    _record_pg_success()
                     return res
             except Exception as e:
+                _trip_pg_circuit_breaker(60.0, str(e))
                 duration_ms = round((time.perf_counter() - t0) * 1000, 2)
                 pg_code = getattr(e, "pgcode", getattr(getattr(e, "diag", None), "sqlstate", "UNKNOWN"))
                 logger.exception(
@@ -8425,212 +8452,233 @@ def bulk_upsert_instruments(instruments_list: List[Dict[str, Any]]) -> Tuple[int
     updated = 0
     now_utc = datetime.now(timezone.utc).isoformat()
 
+    def _sf(val: Any, default: float = 0.0) -> float:
+        if val is None:
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    def _si(val: Any, default: int = 0) -> int:
+        if val is None:
+            return default
+        try:
+            return int(val)
+        except (ValueError, TypeError):
+            return default
+
     conn = get_connection()
-    cursor = conn.cursor()
+    try:
+        cursor = conn.cursor()
 
-    for inst in instruments_list:
-        inst_id = inst.get("instrument_id")
-        if not inst_id:
-            continue
+        for inst in instruments_list:
+            inst_id = inst.get("instrument_id")
+            if not inst_id:
+                continue
 
-        cursor.execute("SELECT instrument_id FROM instruments WHERE instrument_id = ?", (inst_id,))
-        exists = cursor.fetchone()
+            cursor.execute("SELECT instrument_id FROM instruments WHERE instrument_id = ?", (inst_id,))
+            exists = cursor.fetchone()
 
-        broker_mappings = inst.get("broker_symbol_mappings")
-        if isinstance(broker_mappings, dict):
-            broker_mappings_str = json.dumps(broker_mappings)
-        elif isinstance(broker_mappings, str):
-            broker_mappings_str = broker_mappings
-        else:
-            broker_mappings_str = "{}"
+            broker_mappings = inst.get("broker_symbol_mappings")
+            if isinstance(broker_mappings, dict):
+                broker_mappings_str = json.dumps(broker_mappings)
+            elif isinstance(broker_mappings, str):
+                broker_mappings_str = broker_mappings
+            else:
+                broker_mappings_str = "{}"
 
-        if exists:
-            cursor.execute(
-                """
-                UPDATE instruments SET
-                    provider_symbol = ?,
-                    canonical_symbol = ?,
-                    display_symbol = ?,
-                    company_name = ?,
-                    exchange = ?,
-                    mic = ?,
-                    country = ?,
-                    currency = ?,
-                    asset_class = ?,
-                    instrument_type = ?,
-                    underlying_id = ?,
-                    underlying_symbol = ?,
-                    series = ?,
-                    isin = ?,
-                    lot_size = ?,
-                    tick_size = ?,
-                    contract_size = ?,
-                    price_multiplier = ?,
-                    expiry = ?,
-                    option_type = ?,
-                    strike = ?,
-                    segment = ?,
-                    market_status = ?,
-                    tradability = ?,
-                    data_status = ?,
-                    data_source = ?,
-                    broker_symbol_mappings = ?,
-                    contract_status = ?,
-                    paper_enabled = ?,
-                    live_enabled = ?,
-                    strategy_enabled = ?,
-                    last_price = ?,
-                    change_24h = ?,
-                    volume_24h = ?,
-                    open_interest = ?,
-                    oi_change = ?,
-                    implied_volatility = ?,
-                    delta = ?,
-                    gamma = ?,
-                    theta = ?,
-                    vega = ?,
-                    volatility_score = ?,
-                    volatility_category = ?,
-                    momentum_score = ?,
-                    directional_bias = ?,
-                    is_swing_candidate = ?,
-                    is_scalping_candidate = ?,
-                    is_hedge_candidate = ?,
-                    updated_at = ?
-                WHERE instrument_id = ?
-                """,
-                (
-                    inst.get("provider_symbol") or inst.get("symbol", ""),
-                    inst.get("canonical_symbol") or inst.get("symbol", ""),
-                    inst.get("display_symbol") or inst.get("display_name", ""),
-                    inst.get("company_name", ""),
-                    inst.get("exchange", "GLOBAL"),
-                    inst.get("mic", ""),
-                    inst.get("country", "GLOBAL"),
-                    inst.get("currency") or inst.get("quote_currency", "USD"),
-                    inst.get("asset_class", "INDIAN_STOCKS"),
-                    inst.get("instrument_type", "EQUITY"),
-                    inst.get("underlying_id", ""),
-                    inst.get("underlying_symbol", ""),
-                    inst.get("series", "EQ"),
-                    inst.get("isin", ""),
-                    float(inst.get("lot_size", 1.0)),
-                    float(inst.get("tick_size", 0.05)),
-                    float(inst.get("contract_size", 1.0)),
-                    float(inst.get("price_multiplier", 1.0)),
-                    inst.get("expiry", ""),
-                    inst.get("option_type", "NONE"),
-                    float(inst.get("strike", 0.0)),
-                    inst.get("segment", "CASH"),
-                    inst.get("market_status", "OPEN"),
-                    inst.get("tradability", "TRADABLE"),
-                    inst.get("data_status", "LIVE"),
-                    inst.get("data_source", "SYSTEM"),
-                    broker_mappings_str,
-                    inst.get("contract_status", "ACTIVE"),
-                    int(inst.get("paper_enabled", 1)),
-                    int(inst.get("live_enabled", 0)),
-                    int(inst.get("strategy_enabled", 1)),
-                    float(inst.get("last_price", 0.0)),
-                    float(inst.get("change_24h", inst.get("change_pct", 0.0))),
-                    float(inst.get("volume_24h", inst.get("volume", 0.0))),
-                    float(inst.get("open_interest", 0.0)),
-                    float(inst.get("oi_change", 0.0)),
-                    float(inst.get("implied_volatility", 0.0)),
-                    float(inst.get("delta", 0.0)),
-                    float(inst.get("gamma", 0.0)),
-                    float(inst.get("theta", 0.0)),
-                    float(inst.get("vega", 0.0)),
-                    float(inst.get("volatility_score", 50.0)),
-                    inst.get("volatility_category", "Medium"),
-                    float(inst.get("momentum_score", 50.0)),
-                    inst.get("directional_bias", "NEUTRAL"),
-                    int(inst.get("is_swing_candidate", 0)),
-                    int(inst.get("is_scalping_candidate", 0)),
-                    int(inst.get("is_hedge_candidate", 0)),
-                    now_utc,
-                    inst_id
+            if exists:
+                cursor.execute(
+                    """
+                    UPDATE instruments SET
+                        provider_symbol = ?,
+                        canonical_symbol = ?,
+                        display_symbol = ?,
+                        company_name = ?,
+                        exchange = ?,
+                        mic = ?,
+                        country = ?,
+                        currency = ?,
+                        asset_class = ?,
+                        instrument_type = ?,
+                        underlying_id = ?,
+                        underlying_symbol = ?,
+                        series = ?,
+                        isin = ?,
+                        lot_size = ?,
+                        tick_size = ?,
+                        contract_size = ?,
+                        price_multiplier = ?,
+                        expiry = ?,
+                        option_type = ?,
+                        strike = ?,
+                        segment = ?,
+                        market_status = ?,
+                        tradability = ?,
+                        data_status = ?,
+                        data_source = ?,
+                        broker_symbol_mappings = ?,
+                        contract_status = ?,
+                        paper_enabled = ?,
+                        live_enabled = ?,
+                        strategy_enabled = ?,
+                        last_price = ?,
+                        change_24h = ?,
+                        volume_24h = ?,
+                        open_interest = ?,
+                        oi_change = ?,
+                        implied_volatility = ?,
+                        delta = ?,
+                        gamma = ?,
+                        theta = ?,
+                        vega = ?,
+                        volatility_score = ?,
+                        volatility_category = ?,
+                        momentum_score = ?,
+                        directional_bias = ?,
+                        is_swing_candidate = ?,
+                        is_scalping_candidate = ?,
+                        is_hedge_candidate = ?,
+                        updated_at = ?
+                    WHERE instrument_id = ?
+                    """,
+                    (
+                        inst.get("provider_symbol") or inst.get("symbol", ""),
+                        inst.get("canonical_symbol") or inst.get("symbol", ""),
+                        inst.get("display_symbol") or inst.get("display_name", ""),
+                        inst.get("company_name", ""),
+                        inst.get("exchange", "GLOBAL"),
+                        inst.get("mic", ""),
+                        inst.get("country", "GLOBAL"),
+                        inst.get("currency") or inst.get("quote_currency", "USD"),
+                        inst.get("asset_class", "INDIAN_STOCKS"),
+                        inst.get("instrument_type", "EQUITY"),
+                        inst.get("underlying_id", ""),
+                        inst.get("underlying_symbol", ""),
+                        inst.get("series", "EQ"),
+                        inst.get("isin", ""),
+                        _sf(inst.get("lot_size"), 1.0),
+                        _sf(inst.get("tick_size"), 0.05),
+                        _sf(inst.get("contract_size"), 1.0),
+                        _sf(inst.get("price_multiplier"), 1.0),
+                        inst.get("expiry", ""),
+                        inst.get("option_type", "NONE"),
+                        _sf(inst.get("strike"), 0.0),
+                        inst.get("segment", "EQUITY"),
+                        inst.get("market_status", "OPEN"),
+                        inst.get("tradability", "TRADABLE"),
+                        inst.get("data_status", "LIVE"),
+                        inst.get("data_source", "System Core"),
+                        broker_mappings_str,
+                        inst.get("contract_status", "ACTIVE"),
+                        _si(inst.get("paper_enabled"), 1),
+                        _si(inst.get("live_enabled"), 0),
+                        _si(inst.get("strategy_enabled"), 1),
+                        _sf(inst.get("last_price"), 0.0),
+                        _sf(inst.get("change_24h") if inst.get("change_24h") is not None else inst.get("change_pct"), 0.0),
+                        _sf(inst.get("volume_24h") if inst.get("volume_24h") is not None else inst.get("volume"), 0.0),
+                        _sf(inst.get("open_interest"), 0.0),
+                        _sf(inst.get("oi_change"), 0.0),
+                        _sf(inst.get("implied_volatility"), 0.0),
+                        _sf(inst.get("delta"), 0.0),
+                        _sf(inst.get("gamma"), 0.0),
+                        _sf(inst.get("theta"), 0.0),
+                        _sf(inst.get("vega"), 0.0),
+                        _sf(inst.get("volatility_score"), 50.0),
+                        inst.get("volatility_category", "Medium"),
+                        _sf(inst.get("momentum_score"), 50.0),
+                        inst.get("directional_bias", "NEUTRAL"),
+                        _si(inst.get("is_swing_candidate"), 0),
+                        _si(inst.get("is_scalping_candidate"), 0),
+                        _si(inst.get("is_hedge_candidate"), 0),
+                        now_utc,
+                        inst_id
+                    )
                 )
-            )
-            updated += 1
-        else:
-            cursor.execute(
-                """
-                INSERT INTO instruments (
-                    instrument_id, provider_symbol, canonical_symbol, display_symbol, company_name,
-                    exchange, mic, country, currency, asset_class, instrument_type, underlying_id,
-                    underlying_symbol, series, isin, lot_size, tick_size, contract_size, price_multiplier,
-                    expiry, option_type, strike, segment, market_status, tradability, data_status,
-                    data_source, broker_symbol_mappings, contract_status, paper_enabled, live_enabled,
-                    strategy_enabled, last_price, change_24h, volume_24h, open_interest, oi_change,
-                    implied_volatility, delta, gamma, theta, vega, volatility_score, volatility_category,
-                    momentum_score, directional_bias, is_swing_candidate, is_scalping_candidate,
-                    is_hedge_candidate, created_at, updated_at, active_from, active_to
-                ) VALUES (
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-                    ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                updated += 1
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO instruments (
+                        instrument_id, provider_symbol, canonical_symbol, display_symbol, company_name,
+                        exchange, mic, country, currency, asset_class, instrument_type, underlying_id,
+                        underlying_symbol, series, isin, lot_size, tick_size, contract_size, price_multiplier,
+                        expiry, option_type, strike, segment, market_status, tradability, data_status,
+                        data_source, broker_symbol_mappings, contract_status, paper_enabled, live_enabled,
+                        strategy_enabled, last_price, change_24h, volume_24h, open_interest, oi_change,
+                        implied_volatility, delta, gamma, theta, vega, volatility_score, volatility_category,
+                        momentum_score, directional_bias, is_swing_candidate, is_scalping_candidate,
+                        is_hedge_candidate, created_at, updated_at, active_from, active_to
+                    ) VALUES (
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+                    )
+                    """,
+                    (
+                        inst_id,
+                        inst.get("provider_symbol") or inst.get("symbol", ""),
+                        inst.get("canonical_symbol") or inst.get("symbol", ""),
+                        inst.get("display_symbol") or inst.get("display_name", ""),
+                        inst.get("company_name", ""),
+                        inst.get("exchange", "GLOBAL"),
+                        inst.get("mic", ""),
+                        inst.get("country", "GLOBAL"),
+                        inst.get("currency") or inst.get("quote_currency", "USD"),
+                        inst.get("asset_class", "INDIAN_STOCKS"),
+                        inst.get("instrument_type", "EQUITY"),
+                        inst.get("underlying_id", ""),
+                        inst.get("underlying_symbol", ""),
+                        inst.get("series", "EQ"),
+                        inst.get("isin", ""),
+                        _sf(inst.get("lot_size"), 1.0),
+                        _sf(inst.get("tick_size"), 0.05),
+                        _sf(inst.get("contract_size"), 1.0),
+                        _sf(inst.get("price_multiplier"), 1.0),
+                        inst.get("expiry", ""),
+                        inst.get("option_type", "NONE"),
+                        _sf(inst.get("strike"), 0.0),
+                        inst.get("segment", "EQUITY"),
+                        inst.get("market_status", "OPEN"),
+                        inst.get("tradability", "TRADABLE"),
+                        inst.get("data_status", "LIVE"),
+                        inst.get("data_source", "System Core"),
+                        broker_mappings_str,
+                        inst.get("contract_status", "ACTIVE"),
+                        _si(inst.get("paper_enabled"), 1),
+                        _si(inst.get("live_enabled"), 0),
+                        _si(inst.get("strategy_enabled"), 1),
+                        _sf(inst.get("last_price"), 0.0),
+                        _sf(inst.get("change_24h") if inst.get("change_24h") is not None else inst.get("change_pct"), 0.0),
+                        _sf(inst.get("volume_24h") if inst.get("volume_24h") is not None else inst.get("volume"), 0.0),
+                        _sf(inst.get("open_interest"), 0.0),
+                        _sf(inst.get("oi_change"), 0.0),
+                        _sf(inst.get("implied_volatility"), 0.0),
+                        _sf(inst.get("delta"), 0.0),
+                        _sf(inst.get("gamma"), 0.0),
+                        _sf(inst.get("theta"), 0.0),
+                        _sf(inst.get("vega"), 0.0),
+                        _sf(inst.get("volatility_score"), 50.0),
+                        inst.get("volatility_category", "Medium"),
+                        _sf(inst.get("momentum_score"), 50.0),
+                        inst.get("directional_bias", "NEUTRAL"),
+                        _si(inst.get("is_swing_candidate"), 0),
+                        _si(inst.get("is_scalping_candidate"), 0),
+                        _si(inst.get("is_hedge_candidate"), 0),
+                        now_utc,
+                        now_utc,
+                        inst.get("active_from", now_utc),
+                        inst.get("active_to", "")
+                    )
                 )
-                """,
-                (
-                    inst_id,
-                    inst.get("provider_symbol") or inst.get("symbol", ""),
-                    inst.get("canonical_symbol") or inst.get("symbol", ""),
-                    inst.get("display_symbol") or inst.get("display_name", ""),
-                    inst.get("company_name", ""),
-                    inst.get("exchange", "GLOBAL"),
-                    inst.get("mic", ""),
-                    inst.get("country", "GLOBAL"),
-                    inst.get("currency") or inst.get("quote_currency", "USD"),
-                    inst.get("asset_class", "INDIAN_STOCKS"),
-                    inst.get("instrument_type", "EQUITY"),
-                    inst.get("underlying_id", ""),
-                    inst.get("underlying_symbol", ""),
-                    inst.get("series", "EQ"),
-                    inst.get("isin", ""),
-                    float(inst.get("lot_size", 1.0)),
-                    float(inst.get("tick_size", 0.05)),
-                    float(inst.get("contract_size", 1.0)),
-                    float(inst.get("price_multiplier", 1.0)),
-                    inst.get("expiry", ""),
-                    inst.get("option_type", "NONE"),
-                    float(inst.get("strike", 0.0)),
-                    inst.get("segment", "CASH"),
-                    inst.get("market_status", "OPEN"),
-                    inst.get("tradability", "TRADABLE"),
-                    inst.get("data_status", "LIVE"),
-                    inst.get("data_source", "SYSTEM"),
-                    broker_mappings_str,
-                    inst.get("contract_status", "ACTIVE"),
-                    int(inst.get("paper_enabled", 1)),
-                    int(inst.get("live_enabled", 0)),
-                    int(inst.get("strategy_enabled", 1)),
-                    float(inst.get("last_price", 0.0)),
-                    float(inst.get("change_24h", inst.get("change_pct", 0.0))),
-                    float(inst.get("volume_24h", inst.get("volume", 0.0))),
-                    float(inst.get("open_interest", 0.0)),
-                    float(inst.get("oi_change", 0.0)),
-                    float(inst.get("implied_volatility", 0.0)),
-                    float(inst.get("delta", 0.0)),
-                    float(inst.get("gamma", 0.0)),
-                    float(inst.get("theta", 0.0)),
-                    float(inst.get("vega", 0.0)),
-                    float(inst.get("volatility_score", 50.0)),
-                    inst.get("volatility_category", "Medium"),
-                    float(inst.get("momentum_score", 50.0)),
-                    inst.get("directional_bias", "NEUTRAL"),
-                    int(inst.get("is_swing_candidate", 0)),
-                    int(inst.get("is_scalping_candidate", 0)),
-                    int(inst.get("is_hedge_candidate", 0)),
-                    now_utc,
-                    now_utc,
-                    inst.get("active_from", now_utc),
-                    inst.get("active_to", "")
-                )
-            )
-            inserted += 1
+                inserted += 1
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
     return inserted, updated
 
 

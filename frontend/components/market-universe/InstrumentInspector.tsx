@@ -79,9 +79,18 @@ export function InstrumentInspector({
   const [tradeFeedback, setTradeFeedback] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
   const sym = instrument?.canonical_symbol || instrument?.provider_symbol || instrument?.symbol || "UNKNOWN";
-  const liveQuote = instrument ? (getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null)) : null;
+  const rawQuote = instrument ? (getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null)) : null;
 
-  const price = (liveQuote?.last_price != null && liveQuote.last_price > 0) ? liveQuote.last_price : (instrument?.last_price ?? 0);
+  const isAllowedProviderQuote = rawQuote && (
+    rawQuote.provider === "dhan" ||
+    rawQuote.provider === "dhan_ws" ||
+    rawQuote.provider === "delta_options" ||
+    rawQuote.provider === "delta_options_ws"
+  );
+
+  const liveQuote = isAllowedProviderQuote ? rawQuote : null;
+  const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
+  const price = hasLivePrice ? liveQuote!.last_price : (instrument?.last_price ?? 0);
   const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument?.change_pct_24h ?? instrument?.change_24h ?? 0);
   const high24h = liveQuote?.high ?? instrument?.high_24h;
   const low24h = liveQuote?.low ?? instrument?.low_24h;
@@ -147,31 +156,26 @@ export function InstrumentInspector({
     sym.endsWith("-PERP");
 
   // Real Data Quality Status
-  const dataAgeMs = liveQuote?.age_seconds != null ? Math.round(liveQuote.age_seconds * 1000) : (instrument.data_age_ms ?? 120);
+  const dataAgeSec = liveQuote?.age_seconds ?? 999;
   const isMarketClosed = instrument.market_status === "CLOSED";
-  const isDisconnected = connectionStatus === "DISCONNECTED";
-  const isStale = (liveQuote?.is_stale || dataAgeMs >= 10000) && !isMarketClosed && !isDisconnected;
-  const isLiveFeed = (connectionStatus === "LIVE" || liveQuote?.data_mode === "REAL_TIME" || (dataAgeMs < 10000 && !isMarketClosed)) && !isStale && !isDisconnected;
+  const isStaleFeed = liveQuote != null && (liveQuote.is_stale || dataAgeSec >= 10);
+  const isLiveFeed = liveQuote != null && !isStaleFeed && !isMarketClosed;
 
   const statusLabel = isMarketClosed
     ? "MARKET CLOSED"
-    : isDisconnected
-    ? "DISCONNECTED"
     : isLiveFeed
     ? "LIVE"
-    : isStale
+    : isStaleFeed
     ? "STALE FEED"
-    : (instrument.data_status || "ACTIVE");
+    : "NO LIVE PROVIDER";
 
   const statusColor = isMarketClosed
     ? "bg-slate-800 text-slate-400 border-slate-700"
-    : isDisconnected
-    ? "bg-rose-500/10 text-rose-400 border-rose-500/30"
     : isLiveFeed
     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
-    : isStale
+    : isStaleFeed
     ? "bg-amber-500/10 text-amber-400 border-amber-500/30"
-    : "bg-cyan-500/10 text-cyan-400 border-cyan-500/30";
+    : "bg-slate-800/80 text-slate-400 border-slate-700/80";
 
   const handlePlaceOrder = async () => {
     setIsPlacingOrder(true);
@@ -290,7 +294,7 @@ export function InstrumentInspector({
             <div className="text-[10px] text-slate-500 font-mono flex items-center justify-end gap-1">
               <span>{instrument.data_source || "FEED"}</span>
               <span>•</span>
-              <span>{dataAgeMs}ms</span>
+              <span>{Math.round(dataAgeSec * 1000)}ms</span>
             </div>
           </div>
         </div>

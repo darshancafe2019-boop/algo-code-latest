@@ -64,9 +64,9 @@ export const MARKET_CATEGORIES = [
 export function SimpleMarketsHeader({
   totalInstruments,
   liveCount,
-  providerCount = 3,
-  lastUpdateMs = 120,
-  isLiveFeed = true,
+  providerCount = 0,
+  lastUpdateMs = 0,
+  isLiveFeed = false,
   searchQuery,
   onSearchChange,
   activeCategory,

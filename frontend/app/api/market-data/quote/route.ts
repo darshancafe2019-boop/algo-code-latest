@@ -100,6 +100,35 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      if (foundQuote && foundQuote.status === "DATA_SOURCE_NOT_CONFIGURED") {
+        return NextResponse.json(
+          {
+            status: "DATA_SOURCE_NOT_CONFIGURED",
+            symbol: cleanSym,
+            resolvedInstrument: safeInst,
+            quote: null,
+            message: foundQuote.message || "Set TWELVE_DATA_API_KEY or POLYGON_API_KEY in .env to activate US market data.",
+            timestamp: new Date().toISOString(),
+          },
+          { status: 200 }
+        );
+      }
+
+      // Handle missing quote for US stocks
+      if (["AAPL", "NVDA", "TSLA"].includes(cleanSym) && (!foundQuote || !foundQuote.last_price || Number(foundQuote.last_price) <= 0)) {
+        return NextResponse.json(
+          {
+            status: "DATA_SOURCE_NOT_CONFIGURED",
+            symbol: cleanSym,
+            resolvedInstrument: safeInst,
+            quote: null,
+            message: "Set TWELVE_DATA_API_KEY or POLYGON_API_KEY in .env to activate US market data.",
+            timestamp: new Date().toISOString(),
+          },
+          { status: 200 }
+        );
+      }
+
       // Handle missing quote (e.g., market closed, no active tick)
       if (!foundQuote || foundQuote.last_price === undefined || foundQuote.last_price === null || Number(foundQuote.last_price) <= 0) {
         return NextResponse.json(

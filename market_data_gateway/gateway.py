@@ -35,6 +35,8 @@ from market_data_gateway.adapters.simulation_feed import SimulationFeedAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
+from market_data_gateway.adapters.twelve_data_ws import TwelveDataWSAdapter
+from market_data_gateway.adapters.alpaca_iex_ws import AlpacaIEXWSAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
 from market_data_gateway.subscription_registry import SubscriptionRegistry
 from market_data_gateway.failover_manager import FailoverManager
@@ -71,7 +73,15 @@ class MarketDataGateway:
             }
         else:
             # Initialize adapters
+            alpaca_key = os.environ.get("ALPACA_API_KEY", "").strip()
+            alpaca_secret = os.environ.get("ALPACA_API_SECRET", "").strip()
+            twelve_data_key = os.environ.get("TWELVE_DATA_API_KEY", "").strip()
             self.adapters = {
+                "alpaca_iex": AlpacaIEXWSAdapter(api_key=alpaca_key, api_secret=alpaca_secret) if (alpaca_key and alpaca_secret) else NotConfiguredAdapter(
+                    "alpaca_iex", "Alpaca IEX (Real-Time)",
+                    ["GLOBAL_EQUITIES"],
+                    "Set ALPACA_API_KEY and ALPACA_API_SECRET in .env to activate",
+                ),
                 "binance_ws": BinanceWSAdapter(),
                 "delta_options_ws": DeltaOptionsWSAdapter(),
                 "dhan_ws": DhanWSAdapter(),
@@ -121,7 +131,7 @@ class MarketDataGateway:
                     ["GLOBAL_EQUITIES", "OPTIONS", "FUTURES", "FOREX"],
                     "Set IBKR_PORT and IBKR_CLIENT_ID in .env to activate",
                 ),
-                "twelve_data": NotConfiguredAdapter(
+                "twelve_data": TwelveDataWSAdapter(api_key=twelve_data_key) if twelve_data_key else NotConfiguredAdapter(
                     "twelve_data", "Twelve Data",
                     ["GLOBAL_EQUITIES", "FOREX", "INDICES"],
                     "Set TWELVE_DATA_API_KEY in .env to activate",
@@ -519,6 +529,14 @@ class MarketDataGateway:
                 cand = self.adapters.get(pid)
                 if cand:
                     cand_status = cand.get_status()
+                    if cand_status == "NOT_CONFIGURED":
+                        return web.json_response({
+                            "ok": False,
+                            "code": "DATA_SOURCE_NOT_CONFIGURED",
+                            "symbol": sym,
+                            "source": cand.provider_id.upper(),
+                            "message": f"Market data source {cand.provider_id} for {sym} is not configured."
+                        }, status=200)
                     if cand_status in ("AUTH_REQUIRED", "AUTH_ERROR", "AUTH_FAILED"):
                         return web.json_response({
                             "ok": False,
@@ -538,11 +556,11 @@ class MarketDataGateway:
 
             return web.json_response({
                 "ok": False,
-                "code": "SOURCE_NOT_CONFIGURED",
+                "code": "NO_LIVE_PROVIDER",
                 "symbol": sym,
-                "source": "UNKNOWN",
-                "message": f"No configured market data adapter for {sym}."
-            }, status=404)
+                "source": "NO_LIVE_PROVIDER",
+                "message": f"No live provider tick available for {sym}."
+            }, status=200)
 
         status = adapter.get_status()
         if status in ("AUTH_REQUIRED", "AUTH_ERROR", "AUTH_FAILED"):
@@ -554,7 +572,16 @@ class MarketDataGateway:
                 "message": f"Provider {adapter.provider_id} requires authentication.",
             }, status=401)
 
-        if status in ("DISCONNECTED", "ERROR", "NOT_CONFIGURED"):
+        if status == "NOT_CONFIGURED":
+            return web.json_response({
+                "ok": False,
+                "code": "NO_LIVE_PROVIDER",
+                "symbol": sym,
+                "source": "NO_LIVE_PROVIDER",
+                "message": f"Market data source for {sym} is not configured."
+            }, status=200)
+
+        if status in ("DISCONNECTED", "ERROR"):
             return web.json_response({
                 "ok": False,
                 "code": "SOURCE_DISCONNECTED",
@@ -565,11 +592,11 @@ class MarketDataGateway:
 
         return web.json_response({
             "ok": False,
-            "code": "INSTRUMENT_NOT_FOUND",
+            "code": "NO_LIVE_PROVIDER",
             "symbol": sym,
-            "source": adapter.provider_id.upper(),
-            "message": f"No quote found for {sym}."
-        }, status=404)
+            "source": "NO_LIVE_PROVIDER",
+            "message": f"No live provider tick found for {sym}."
+        }, status=200)
 
     async def handle_history(self, request: web.Request) -> web.Response:
         symbol = request.rel_url.query.get("symbol", "").upper()

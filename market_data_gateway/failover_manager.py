@@ -69,11 +69,14 @@ ASSET_CLASS_HINTS: Dict[str, str] = {
     "FINNIFTY": "INDIAN_INDICES", "SENSEX": "INDIAN_INDICES",
     "SPX": "GLOBAL_INDICES", "NDX": "GLOBAL_INDICES", "DJI": "GLOBAL_INDICES",
     "FTSE100": "GLOBAL_INDICES", "DAX": "GLOBAL_INDICES", "NIKKEI225": "GLOBAL_INDICES",
-    "BTC/USDT": "CRYPTO", "ETH/USDT": "CRYPTO", "BNB/USDT": "CRYPTO", "SOL/USDT": "CRYPTO",
+    "BTC": "CRYPTO", "BTC/USDT": "CRYPTO", "ETH/USDT": "CRYPTO", "BNB/USDT": "CRYPTO", "SOL/USDT": "CRYPTO",
     "BTCUSDT": "CRYPTO", "ETHUSDT": "CRYPTO", "SOLUSDT": "CRYPTO",
     "BTCUSD": "CRYPTO", "ETHUSD": "CRYPTO", "SOLUSD": "CRYPTO", "XRPUSD": "CRYPTO",
     "EUR/USD": "FOREX", "GBP/USD": "FOREX", "USD/JPY": "FOREX",
     "GOLD": "COMMODITIES", "SILVER": "COMMODITIES", "CRUDE_OIL": "COMMODITIES",
+    "SBIN": "INDIAN_EQUITIES", "SBI": "INDIAN_EQUITIES",
+    "HDFCBANK": "INDIAN_EQUITIES", "HDFC BANK": "INDIAN_EQUITIES",
+    "AAPL": "GLOBAL_EQUITIES", "NVDA": "GLOBAL_EQUITIES", "TSLA": "GLOBAL_EQUITIES",
 }
 
 
@@ -134,7 +137,7 @@ class FailoverManager:
             if adapter is None:
                 continue
             status = adapter.get_status()
-            if status in ("LIVE", "DELAYED", "STALE", "CONNECTED", "MARKET_CLOSED"):
+            if status in ("LIVE", "DELAYED", "STALE", "CONNECTED", "CONNECTING", "REAUTHENTICATING", "MARKET_CLOSED"):
                 # Record transition if provider changed
                 prev = self._active_provider.get(symbol)
                 if prev and prev != provider_id:

@@ -3,40 +3,105 @@
 import React, { memo } from "react";
 import { LiveTickerItem } from "./LiveTickerItem";
 
+export interface TickerInstrumentConfig {
+  symbol: string;
+  displayName?: string;
+  currency?: "INR" | "USD";
+  source?: "DHAN" | "DELTA" | "US";
+  exchangeSegment?: "IDX_I" | "NSE_EQ" | "MCX_COMM" | "DELTA_PERP";
+  securityId?: string;
+}
+
 export interface LiveTickerStripProps {
-  instruments?: Array<{
-    symbol: string;
-    displayName?: string;
-    currency?: "INR" | "USD";
-  }>;
+  instruments?: TickerInstrumentConfig[];
   onSelectInstrument?: (symbol: string) => void;
 }
 
-const DEFAULT_INSTRUMENTS = [
-  { symbol: "NIFTY", displayName: "NIFTY", currency: "INR" as const },
-  { symbol: "BANKNIFTY", displayName: "BANKNIFTY", currency: "INR" as const },
-  { symbol: "BTC", displayName: "BTC", currency: "USD" as const },
+export const DEFAULT_TICKER_INSTRUMENTS: TickerInstrumentConfig[] = [
+  {
+    symbol: "NIFTY",
+    displayName: "NIFTY",
+    currency: "INR",
+    source: "DHAN",
+    exchangeSegment: "IDX_I",
+    securityId: "13",
+  },
+  {
+    symbol: "BANKNIFTY",
+    displayName: "BANKNIFTY",
+    currency: "INR",
+    source: "DHAN",
+    exchangeSegment: "IDX_I",
+    securityId: "25",
+  },
+  {
+    symbol: "GOLD",
+    displayName: "GOLD",
+    currency: "INR",
+    source: "DHAN",
+    exchangeSegment: "MCX_COMM",
+  },
+  {
+    symbol: "SBIN",
+    displayName: "SBI",
+    currency: "INR",
+    source: "DHAN",
+    exchangeSegment: "NSE_EQ",
+    securityId: "3045",
+  },
+  {
+    symbol: "HDFCBANK",
+    displayName: "HDFC BANK",
+    currency: "INR",
+    source: "DHAN",
+    exchangeSegment: "NSE_EQ",
+    securityId: "1333",
+  },
+  {
+    symbol: "BTC",
+    displayName: "BTC",
+    currency: "USD",
+    source: "DELTA",
+  },
+  {
+    symbol: "AAPL",
+    displayName: "APPLE",
+    currency: "USD",
+    source: "US",
+  },
+  {
+    symbol: "NVDA",
+    displayName: "NVIDIA",
+    currency: "USD",
+    source: "US",
+  },
+  {
+    symbol: "TSLA",
+    displayName: "TESLA",
+    currency: "USD",
+    source: "US",
+  },
 ];
 
 export const LiveTickerStrip = memo(function LiveTickerStrip({
-  instruments = DEFAULT_INSTRUMENTS,
+  instruments = DEFAULT_TICKER_INSTRUMENTS,
   onSelectInstrument,
 }: LiveTickerStripProps) {
+  const activeList = instruments && instruments.length > 0 ? instruments : DEFAULT_TICKER_INSTRUMENTS;
+
   return (
-    <div
-      className="flex items-center gap-2 overflow-x-auto scrollbar-none whitespace-nowrap py-0.5"
-      style={{ whiteSpace: "nowrap" }}
-    >
-      {instruments.map((inst, index) => (
-        <React.Fragment key={inst.symbol}>
-          {index > 0 && <div className="h-5 w-[1px] bg-[#12304A] shrink-0" />}
-          <LiveTickerItem
-            symbol={inst.symbol}
-            displayName={inst.displayName}
-            currency={inst.currency}
-            onSelect={onSelectInstrument}
-          />
-        </React.Fragment>
+    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar scroll-smooth py-0.5 max-w-full">
+      {activeList.map((inst) => (
+        <LiveTickerItem
+          key={inst.symbol}
+          symbol={inst.symbol}
+          displayName={inst.displayName}
+          currency={inst.currency}
+          source={inst.source}
+          exchangeSegment={inst.exchangeSegment}
+          securityId={inst.securityId}
+          onSelect={onSelectInstrument}
+        />
       ))}
     </div>
   );

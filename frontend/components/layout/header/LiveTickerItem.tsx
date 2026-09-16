@@ -4,12 +4,15 @@ import React, { memo, useRef, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLivePrice } from "@/hooks/useMarketData";
 import { cn } from "@/lib/utils";
-import { Radio, AlertTriangle } from "lucide-react";
+import { Radio, AlertTriangle, ShieldAlert } from "lucide-react";
 
 export interface LiveTickerItemProps {
   symbol: string;
   displayName?: string;
   currency?: "INR" | "USD";
+  source?: "DHAN" | "DELTA" | "US";
+  exchangeSegment?: string;
+  securityId?: string;
   onSelect?: (symbol: string) => void;
 }
 
@@ -17,6 +20,9 @@ export const LiveTickerItem = memo(function LiveTickerItem({
   symbol,
   displayName,
   currency,
+  source,
+  exchangeSegment,
+  securityId,
   onSelect,
 }: LiveTickerItemProps) {
   const router = useRouter();
@@ -24,7 +30,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
   const label = displayName || (cleanSym === "BTC/USDT" || cleanSym === "BTCUSDT" ? "BTC" : cleanSym);
 
   // Auto-detect currency if not provided
-  const resolvedCurrency = currency || (cleanSym.includes("BTC") || cleanSym.includes("ETH") || cleanSym.includes("USDT") ? "USD" : "INR");
+  const resolvedCurrency = currency || (cleanSym.includes("BTC") || cleanSym.includes("ETH") || cleanSym.includes("USDT") || ["AAPL", "NVDA", "TSLA"].includes(cleanSym) ? "USD" : "INR");
   const currencySymbol = resolvedCurrency === "USD" ? "$" : "";
 
   // Subscribe to live price stream for this single instrument
@@ -48,6 +54,24 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     prevPriceRef.current = price;
   }, [price]);
 
+  // Check unconfigured state returned explicitly from backend
+  const isUnconfigured = useMemo(() => {
+    if (!quote) return false;
+
+    const status = String(
+      (quote as any)?.status ||
+      (quote as any)?.code ||
+      (quote as any)?.freshness_status ||
+      ""
+    ).toUpperCase();
+
+    return (
+      status === "DATA_SOURCE_NOT_CONFIGURED" ||
+      status === "SOURCE_NOT_CONFIGURED" ||
+      status === "NOT_CONFIGURED"
+    );
+  }, [quote]);
+
   // Derived metrics from authoritative quote
   const {
     formattedPrice,
@@ -59,6 +83,19 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     ageText,
     latencyMs,
   } = useMemo(() => {
+    if (isUnconfigured) {
+      return {
+        formattedPrice: "—",
+        changePercent: null,
+        changeDirection: "neutral" as const,
+        freshnessStatus: "CONFIG REQUIRED",
+        isStale: false,
+        sourceProvider: source || "US PROVIDER",
+        ageText: "Not Configured",
+        latencyMs: 0,
+      };
+    }
+
     if (!quote && price === null) {
       return {
         formattedPrice: "—",
@@ -66,21 +103,23 @@ export const LiveTickerItem = memo(function LiveTickerItem({
         changeDirection: "neutral" as const,
         freshnessStatus: "CONNECTING",
         isStale: false,
-        sourceProvider: "STREAM",
+        sourceProvider: source || "STREAM",
         ageText: "Connecting",
         latencyMs: 0,
       };
     }
 
     const currentPrice = price ?? quote?.last_price ?? 0;
-    
+
     // Format price with appropriate decimals
     let formattedP = "—";
     if (currentPrice > 0) {
-      if (resolvedCurrency === "USD" && currentPrice > 1000) {
+      if (resolvedCurrency === "USD" && currentPrice >= 1000) {
         formattedP = `${currencySymbol}${currentPrice.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+      } else if (resolvedCurrency === "USD") {
+        formattedP = `${currencySymbol}${currentPrice.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       } else {
-        formattedP = `${currencySymbol}${currentPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+        formattedP = `₹${currentPrice.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       }
     }
 
@@ -98,7 +137,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     const eventTime = quote?.event_timestamp || quote?.received_timestamp;
     const tickTime = eventTime ? new Date(eventTime).getTime() : now;
     const ageMs = Math.max(0, now - tickTime);
-    
+
     let ageStr = `${ageMs}ms ago`;
     if (ageMs > 60000) {
       ageStr = `${Math.floor(ageMs / 60000)}m ago`;
@@ -108,7 +147,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
 
     const stale = quote?.is_stale || quote?.freshness_status === "STALE" || ageMs > 25000;
     const status = stale ? "STALE" : quote?.freshness_status || "LIVE";
-    const provider = (quote?.provider || "GATEWAY").toUpperCase();
+    const provider = (quote?.provider || source || "GATEWAY").toUpperCase();
     const latency = quote?.feed_latency_ms || 14;
 
     return {
@@ -121,7 +160,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
       ageText: ageStr,
       latencyMs: latency,
     };
-  }, [price, quote, resolvedCurrency, currencySymbol]);
+  }, [price, quote, resolvedCurrency, currencySymbol, isUnconfigured, source]);
 
   const handleClick = () => {
     if (onSelect) {
@@ -161,11 +200,21 @@ export const LiveTickerItem = memo(function LiveTickerItem({
           {formattedPrice}
         </span>
 
-        {/* Change Percent / Stale Indicator */}
-        {isStale ? (
+        {/* Change Percent / Stale / Unconfigured / Connecting Indicator */}
+        {isUnconfigured ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-0.5">
+            <ShieldAlert className="h-2.5 w-2.5 text-[#F59E0B]" />
+            <span>CONFIG REQ</span>
+          </span>
+        ) : isStale ? (
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-0.5">
             <AlertTriangle className="h-2.5 w-2.5" />
             <span>STALE</span>
+          </span>
+        ) : freshnessStatus === "CONNECTING" || (!quote && price === null) ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#3B82F6]/15 text-[#3B82F6] border border-[#3B82F6]/30 flex items-center gap-0.5">
+            <Radio className="h-2.5 w-2.5 text-[#3B82F6]" />
+            <span>CONNECTING</span>
           </span>
         ) : changePercent !== null ? (
           <span
@@ -188,15 +237,17 @@ export const LiveTickerItem = memo(function LiveTickerItem({
 
       {/* ── Hover Tooltip (Rich Metadata Popover) ────────────────────── */}
       {isHovered && (
-        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 min-w-[200px] p-2.5 bg-[#07101A] border border-[#1A2A3F] rounded-lg shadow-2xl text-xs font-sans text-[#F7FAFC] pointer-events-none animate-in fade-in zoom-in-95 duration-100">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-50 min-w-[220px] p-2.5 bg-[#07101A] border border-[#1A2A3F] rounded-lg shadow-2xl text-xs font-sans text-[#F7FAFC] pointer-events-none animate-in fade-in zoom-in-95 duration-100">
           <div className="flex items-center justify-between border-b border-[#122033] pb-1.5 mb-1.5">
-            <span className="font-semibold text-xs text-[#F7FAFC]">{label}</span>
+            <span className="font-semibold text-xs text-[#F7FAFC]">{label} ({cleanSym})</span>
             <span
               className={cn(
                 "text-[10px] font-semibold px-1.5 py-0.2 rounded border flex items-center gap-1",
-                isStale
+                isUnconfigured
                   ? "bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30"
-                  : "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
+                  : isStale
+                    ? "bg-[#F59E0B]/15 text-[#F59E0B] border-[#F59E0B]/30"
+                    : "bg-[#00E890]/15 text-[#00E890] border-[#00E890]/30"
               )}
             >
               <Radio className="h-2.5 w-2.5" />
@@ -209,21 +260,42 @@ export const LiveTickerItem = memo(function LiveTickerItem({
               <span className="text-[#52627A]">Source:</span>
               <span className="font-medium text-[#F7FAFC]">{sourceProvider}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[#52627A]">Updated:</span>
-              <span className="font-medium text-[#F7FAFC] tabular-nums">{ageText}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-[#52627A]">Latency:</span>
-              <span className="font-medium text-[#19C5FF] tabular-nums">{latencyMs}ms</span>
-            </div>
-            {quote?.high !== undefined && quote?.low !== undefined && quote.high !== null && quote.low !== null && (
-              <div className="flex justify-between border-t border-[#122033] pt-1 mt-1 text-[10px]">
-                <span className="text-[#52627A]">H/L:</span>
-                <span className="text-[#F7FAFC] tabular-nums font-mono">
-                  {quote.high.toFixed(1)} / {quote.low.toFixed(1)}
-                </span>
+            {exchangeSegment && (
+              <div className="flex justify-between">
+                <span className="text-[#52627A]">Segment:</span>
+                <span className="font-medium text-[#F7FAFC]">{exchangeSegment}</span>
               </div>
+            )}
+            {securityId && (
+              <div className="flex justify-between">
+                <span className="text-[#52627A]">Security ID:</span>
+                <span className="font-medium text-[#F7FAFC] font-mono">{securityId}</span>
+              </div>
+            )}
+            {isUnconfigured ? (
+              <div className="border-t border-[#122033] pt-1.5 mt-1.5 text-[10px] text-[#F59E0B]">
+                <p className="font-semibold">DATA_SOURCE_NOT_CONFIGURED</p>
+                <p className="text-[#7C8CA3] mt-0.5">Set <code className="text-[#19C5FF]">TWELVE_DATA_API_KEY</code> or <code className="text-[#19C5FF]">POLYGON_API_KEY</code> in <code className="text-[#F7FAFC]">.env</code> to activate US stock data.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span className="text-[#52627A]">Updated:</span>
+                  <span className="font-medium text-[#F7FAFC] tabular-nums">{ageText}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#52627A]">Latency:</span>
+                  <span className="font-medium text-[#19C5FF] tabular-nums">{latencyMs}ms</span>
+                </div>
+                {quote?.high !== undefined && quote?.low !== undefined && quote.high !== null && quote.low !== null && (
+                  <div className="flex justify-between border-t border-[#122033] pt-1 mt-1 text-[10px]">
+                    <span className="text-[#52627A]">H/L:</span>
+                    <span className="text-[#F7FAFC] tabular-nums font-mono">
+                      {quote.high.toFixed(1)} / {quote.low.toFixed(1)}
+                    </span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

@@ -1659,6 +1659,87 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             "latency_ms": 12.0,
         }
 
+    async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
+        result: Dict[str, NormalizedQuote] = {}
+        now_iso = datetime.now(timezone.utc).isoformat()
+        for s in symbols:
+            s_clean = s.upper().strip()
+            aliases = [s_clean]
+            if s_clean in ("BTC", "BTCUSD", "BTC/USDT", "BTCUSDT"):
+                aliases.extend(["BTC", "BTCUSD", "BTC/USDT", "BTCUSDT"])
+
+            matched_q: Optional[NormalizedQuote] = None
+            for a in aliases:
+                if a in self._canonical_quote_cache:
+                    matched_q = self._canonical_quote_cache[a]
+                    break
+
+            if not matched_q:
+                try:
+                    raw_tickers = await asyncio.to_thread(
+                        global_delta_client.get_tickers,
+                        underlying_asset_symbols=["BTC"] if "BTC" in s_clean else None,
+                    )
+                    if isinstance(raw_tickers, list):
+                        for t in raw_tickers:
+                            t_sym = str(t.get("symbol") or "")
+                            if t_sym in ("BTCUSD", "BTCUSDT") or t_sym == s_clean:
+                                lp = float(t.get("close_price") or t.get("mark_price") or t.get("spot_price") or 0.0)
+                                if lp > 0:
+                                    q = NormalizedQuote(
+                                        symbol=s_clean,
+                                        exchange="DELTA",
+                                        provider="delta_options_ws",
+                                        last_price=lp,
+                                        bid=float((t.get("quotes") or {}).get("best_bid") or lp),
+                                        ask=float((t.get("quotes") or {}).get("best_ask") or lp),
+                                        volume=float(t.get("volume") or 0.0),
+                                        open=float(t.get("open_price")) if t.get("open_price") else None,
+                                        high=float(t.get("high_price")) if t.get("high_price") else None,
+                                        low=float(t.get("low_price")) if t.get("low_price") else None,
+                                        close=float(t.get("close_price")) if t.get("close_price") else None,
+                                        change_pct=float(t.get("change_24h")) if t.get("change_24h") else None,
+                                        event_timestamp=now_iso,
+                                        received_timestamp=now_iso,
+                                        data_mode="REAL_TIME",
+                                        is_stale=False,
+                                    )
+                                    self._canonical_quote_cache[s_clean] = q
+                                    matched_q = q
+                                    break
+                except Exception as ex:
+                    self._logger.debug("Delta REST snapshot error for %s: %s", s_clean, ex)
+
+            if matched_q:
+                result[s] = matched_q
+
+        return result
+
+    async def get_history(
+        self,
+        symbol: str,
+        timeframe: str,
+        from_dt: datetime,
+        to_dt: datetime,
+    ) -> List[OHLCVCandle]:
+        return []
+
+    async def get_instruments(self) -> List[CanonicalInstrument]:
+        return []
+
+    async def health_check(self) -> ProviderHealth:
+        return ProviderHealth(
+            provider_id=self.provider_id,
+            provider_name=self.provider_name,
+            status=self.get_status(),
+            asset_classes=["CRYPTO", "OPTIONS", "PERPETUALS"],
+            subscribed_symbols=len(self._subscribed_symbols),
+            latency_ms=12.0,
+            error_count=self._error_count,
+            last_tick_time=datetime.now(timezone.utc).isoformat() if self._last_tick_time else None,
+            message="Operational",
+        )
+
 
 # Singleton adapter instance
 delta_options_ws_adapter = DeltaOptionsWSAdapter()

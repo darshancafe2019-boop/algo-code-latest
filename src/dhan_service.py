@@ -10,9 +10,12 @@ Authoritative service providing:
 """
 from __future__ import annotations
 
+import csv
+import io
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.parse
@@ -132,6 +135,17 @@ OFFICIAL_DHAN_KEYS: Dict[str, Dict[str, Any]] = {
         "isin": "INE040A01034",
         "trading_symbol": "HDFCBANK",
     },
+    "HDFC BANK": {
+        "security_id": "1333",
+        "exchange_segment": "NSE_EQ",
+        "name": "HDFC Bank Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE040A01034",
+        "trading_symbol": "HDFCBANK",
+    },
     "ICICIBANK": {
         "security_id": "4963",
         "exchange_segment": "NSE_EQ",
@@ -175,6 +189,27 @@ OFFICIAL_DHAN_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE062A01020",
         "trading_symbol": "SBIN",
+    },
+    "SBI": {
+        "security_id": "3045",
+        "exchange_segment": "NSE_EQ",
+        "name": "State Bank of India",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE062A01020",
+        "trading_symbol": "SBIN",
+    },
+    "GOLD": {
+        "security_id": "483079",
+        "exchange_segment": "MCX_COMM",
+        "name": "MCX Gold Futures",
+        "exchange": "MCX",
+        "asset_class": "COMMODITIES",
+        "lot_size": 1,
+        "tick_size": 1.0,
+        "trading_symbol": "GOLD",
     },
     "BHARTIARTL": {
         "security_id": "10604",
@@ -355,6 +390,14 @@ class DhanService:
         self._auth_status = "INITIAL"
         self._last_auth_check = 0.0
         self._auth_cached_result: Optional[Dict[str, Any]] = None
+
+        # Dynamic Dhan Instrument Master indexes
+        self._master_lock = threading.Lock()
+        self._master_loaded = False
+        self._trading_symbol_index: Dict[str, Dict[str, Any]] = {}
+        self._security_id_index: Dict[str, Dict[str, Any]] = {}
+        self._isin_index: Dict[str, Dict[str, Any]] = {}
+        self._segment_symbol_index: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
         try:
             from src.dhan_credential_manager import global_dhan_credential_manager
@@ -605,16 +648,248 @@ class DhanService:
 
     # ─── Instrument Resolution ────────────────────────────────────────────────
 
+    def _ensure_master_loaded(self, force: bool = False) -> None:
+        """Loads and indexes official Dhan instrument master CSV."""
+        if self._master_loaded and not force:
+            return
+
+        with self._master_lock:
+            if self._master_loaded and not force:
+                return
+
+            local_paths = [
+                os.path.join(os.getcwd(), "data", "dhan", "dhan-master.csv"),
+                os.path.join(os.getcwd(), "data", "api-scrip-master.csv"),
+                os.path.join(os.getcwd(), "data", "dhan_scrip_master.csv"),
+            ]
+
+            master_path = None
+            for p in local_paths:
+                if os.path.exists(p) and os.path.getsize(p) > 1000:
+                    master_path = p
+                    break
+
+            if not master_path or force:
+                try:
+                    url = "https://images.dhan.co/api-data/api-scrip-master.csv"
+                    logger.info("Downloading official Dhan instrument master from %s ...", url)
+                    from src.ssl_util import get_ssl_context
+                    ssl_ctx = get_ssl_context()
+                    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                    with urllib.request.urlopen(req, timeout=15, context=ssl_ctx) as resp:
+                        content_bytes = resp.read()
+                        if content_bytes and len(content_bytes) > 1000:
+                            save_dir = os.path.join(os.getcwd(), "data", "dhan")
+                            os.makedirs(save_dir, exist_ok=True)
+                            target_file = os.path.join(save_dir, "dhan-master.csv")
+                            with open(target_file, "wb") as f_out:
+                                f_out.write(content_bytes)
+                            master_path = target_file
+                            logger.info("Successfully downloaded Dhan master (%d bytes) to %s", len(content_bytes), target_file)
+                except Exception as dl_err:
+                    logger.warning("Failed to download Dhan master CSV: %s. Using cached copy if available.", dl_err)
+
+            if not master_path or not os.path.exists(master_path):
+                logger.warning("Dhan master CSV file not found on disk. Falling back to OFFICIAL_DHAN_KEYS bootstrap dictionary.")
+                self._master_loaded = True
+                return
+
+            try:
+                t0 = time.monotonic()
+                with open(master_path, "r", encoding="utf-8", errors="ignore") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        exch = (row.get("SEM_EXM_EXCH_ID") or row.get("EXCH_ID") or "").strip().upper()
+                        seg = (row.get("SEM_SEGMENT") or row.get("SEGMENT") or "").strip().upper()
+                        sec_id = (row.get("SEM_SMST_SECURITY_ID") or row.get("SECURITY_ID") or "").strip()
+                        t_sym = (row.get("SEM_TRADING_SYMBOL") or "").strip().upper()
+                        u_sym = (row.get("UNDERLYING_SYMBOL") or "").strip().upper()
+                        c_sym = (row.get("SEM_CUSTOM_SYMBOL") or row.get("DISPLAY_NAME") or "").strip().upper()
+                        s_name = (row.get("SM_SYMBOL_NAME") or row.get("SYMBOL_NAME") or "").strip().upper()
+                        series = (row.get("SEM_SERIES") or row.get("SERIES") or "").strip().upper()
+                        isin = (row.get("SEM_ISIN_CODE") or row.get("ISIN") or "").strip().upper()
+                        lot_size_str = (row.get("SEM_LOT_UNITS") or row.get("LOT_SIZE") or "1").strip()
+                        tick_size_str = (row.get("SEM_TICK_SIZE") or row.get("TICK_SIZE") or "0.05").strip()
+
+                        main_symbol = u_sym or t_sym or c_sym
+                        if not sec_id or not main_symbol:
+                            continue
+
+                        try:
+                            lot_size = float(lot_size_str)
+                        except ValueError:
+                            lot_size = 1.0
+
+                        try:
+                            tick_size = float(tick_size_str)
+                        except ValueError:
+                            tick_size = 0.05
+
+                        if exch == "NSE" and seg in ("E", "EQ", "EQUITY"):
+                            exch_seg = "NSE_EQ"
+                            exch_name = "NSE_EQ"
+                            asset_cls = "INDIAN_EQUITIES"
+                        elif exch == "NSE" and seg in ("I", "IDX", "INDEX"):
+                            exch_seg = "IDX_I"
+                            exch_name = "NSE_INDEX"
+                            asset_cls = "INDIAN_INDICES"
+                        elif exch == "NSE" and seg in ("D", "FNO", "FUT", "OPT"):
+                            exch_seg = "NSE_FNO"
+                            exch_name = "NSE_FNO"
+                            asset_cls = "DERIVATIVES"
+                        elif exch == "BSE" and seg in ("E", "EQ", "EQUITY"):
+                            exch_seg = "BSE_EQ"
+                            exch_name = "BSE_EQ"
+                            asset_cls = "INDIAN_EQUITIES"
+                        elif exch == "BSE" and seg in ("D", "FNO"):
+                            exch_seg = "BSE_FNO"
+                            exch_name = "BSE_FNO"
+                            asset_cls = "DERIVATIVES"
+                        elif exch == "MCX":
+                            exch_seg = "MCX_COMM"
+                            exch_name = "MCX"
+                            asset_cls = "COMMODITIES"
+                        else:
+                            exch_seg = f"{exch}_{seg}"
+                            exch_name = exch
+                            asset_cls = "INDIAN_EQUITIES"
+
+                        meta = {
+                            "security_id": sec_id,
+                            "exchange_segment": exch_seg,
+                            "name": c_sym or t_sym or u_sym,
+                            "exchange": exch_name,
+                            "asset_class": asset_cls,
+                            "lot_size": lot_size,
+                            "tick_size": tick_size,
+                            "isin": isin,
+                            "trading_symbol": main_symbol,
+                            "series": series,
+                        }
+
+                        # Index by (exchange_segment, symbol) for all candidate symbols
+                        for sym in (t_sym, u_sym, c_sym, s_name):
+                            if sym:
+                                self._segment_symbol_index[(exch_seg, sym)] = meta
+
+                        # Index by security_id
+                        self._security_id_index[sec_id] = meta
+
+                        # Index by ISIN
+                        if isin and isin != "NA":
+                            self._isin_index[isin] = meta
+
+                        # Index by candidate symbols in _trading_symbol_index (prioritizing NSE_EQ with series EQ)
+                        for sym in (t_sym, u_sym, c_sym, s_name):
+                            if sym:
+                                existing = self._trading_symbol_index.get(sym)
+                                if not existing or (exch_seg == "NSE_EQ" and series == "EQ"):
+                                    self._trading_symbol_index[sym] = meta
+
+                elapsed_ms = round((time.monotonic() - t0) * 1000.0, 1)
+                logger.info(
+                    "Dhan Instrument Master indexed successfully: %d symbols, %d security IDs in %.1fms",
+                    len(self._trading_symbol_index),
+                    len(self._security_id_index),
+                    elapsed_ms,
+                )
+                self._master_loaded = True
+            except Exception as parse_err:
+                logger.error("Error parsing Dhan master CSV: %s", parse_err, exc_info=True)
+                self._master_loaded = True
+
     def resolve_symbol(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Resolves canonical symbol or trading symbol to Dhan security id mapping."""
-        clean_sym = symbol.strip().upper().replace(" ", "")
+        """
+        Dynamically resolves canonical symbol or trading symbol to Dhan security ID mapping.
+        Supports official Dhan instrument master, normalization, and alias mapping.
+        """
+        if not symbol:
+            return None
+
+        self._ensure_master_loaded()
+
+        raw_sym = str(symbol).strip().upper()
+
+        # Strip prefixes like NSE:, BSE:, MCX:, NFO:, CDS:
+        clean_sym = raw_sym
+        for prefix in ("NSE:", "BSE:", "MCX:", "NFO:", "CDS:", "INDEX:"):
+            if clean_sym.startswith(prefix):
+                clean_sym = clean_sym[len(prefix):]
+
+        # Strip suffixes like .NS, .BO, -EQ, :EQ, :IN
+        for suffix in (".NS", ".BO", "-EQ", ":EQ", ":IN"):
+            if clean_sym.endswith(suffix):
+                clean_sym = clean_sym[:-len(suffix)]
+
+        clean_sym = clean_sym.strip()
+
+        # 1. Authoritative Indices Overrides
+        if clean_sym in ("NIFTY", "NIFTY 50", "NIFTY50", "NIFTY 50 INDEX"):
+            return OFFICIAL_DHAN_KEYS["NIFTY"]
+        if clean_sym in ("BANKNIFTY", "NIFTY BANK", "BANK NIFTY", "NIFTYBANK"):
+            return OFFICIAL_DHAN_KEYS["BANKNIFTY"]
+        if clean_sym in ("FINNIFTY", "NIFTY FINANCIAL SERVICES", "NIFTY FIN SERVICE"):
+            return OFFICIAL_DHAN_KEYS["FINNIFTY"]
+        if clean_sym in ("INDIAVIX", "INDIA VIX"):
+            return OFFICIAL_DHAN_KEYS["INDIAVIX"]
+
+        # 2. Commodity Overrides
+        if clean_sym in ("GOLD", "GOLD_SPOT", "MCX:GOLD"):
+            # Check dynamic MCX GOLD in master
+            mcx_meta = self._segment_symbol_index.get(("MCX_COMM", "GOLD")) or self._trading_symbol_index.get("GOLD")
+            if mcx_meta and mcx_meta.get("exchange_segment") == "MCX_COMM":
+                return mcx_meta
+            return OFFICIAL_DHAN_KEYS["GOLD"]
+
+        # 3. Known Equities Rebrand / Restructure Aliases
+        alias_map = {
+            "TATAMOTORS": "TMPV",
+            "TATA MOTORS": "TMPV",
+            "ZOMATO": "ETERNAL",
+            "SBI": "SBIN",
+            "STATE BANK OF INDIA": "SBIN",
+            "HDFC BANK": "HDFCBANK",
+            "ICICI BANK": "ICICIBANK",
+            "AXIS BANK": "AXISBANK",
+            "TATA STEEL": "TATASTEEL",
+            "COAL INDIA": "COALINDIA",
+            "POWER GRID": "POWERGRID",
+            "BHARTI AIRTEL": "BHARTIARTL",
+            "KOTAK BANK": "KOTAKBANK",
+            "L&T": "LT",
+            "LARSEN & TOUBRO": "LT",
+        }
+
+        target_sym = alias_map.get(clean_sym, clean_sym)
+
+        # 4. Lookup in trading symbol index (preferring NSE_EQ)
+        if target_sym in self._trading_symbol_index:
+            return self._trading_symbol_index[target_sym]
+
+        # 5. Lookup in segment symbol index (NSE_EQ -> NSE_FNO -> BSE_EQ -> MCX_COMM)
+        for seg in ("NSE_EQ", "IDX_I", "MCX_COMM", "NSE_FNO", "BSE_EQ", "BSE_FNO"):
+            meta = self._segment_symbol_index.get((seg, target_sym))
+            if meta:
+                return meta
+
+        # 6. Numeric Security ID lookup
+        if clean_sym.isdigit() and clean_sym in self._security_id_index:
+            return self._security_id_index[clean_sym]
+
+        # 7. ISIN lookup
+        if clean_sym in self._isin_index:
+            return self._isin_index[clean_sym]
+
+        # 8. Emergency Bootstrap OFFICIAL_DHAN_KEYS
         if clean_sym in OFFICIAL_DHAN_KEYS:
             return OFFICIAL_DHAN_KEYS[clean_sym]
+
         for key, meta in OFFICIAL_DHAN_KEYS.items():
             if meta.get("trading_symbol", "").upper().replace(" ", "") == clean_sym:
                 return meta
             if meta.get("isin", "").upper() == clean_sym:
                 return meta
+
         return None
 
     def get_security_id(self, symbol: str) -> Optional[str]:

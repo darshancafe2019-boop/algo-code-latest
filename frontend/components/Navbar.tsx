@@ -270,8 +270,8 @@ export function Navbar({
                 currentFlash === "up"
                   ? "text-emerald-300 bg-emerald-950/80 px-1.5 rounded shadow-sm shadow-emerald-500/30"
                   : currentFlash === "down"
-                  ? "text-red-300 bg-red-950/80 px-1.5 rounded shadow-sm shadow-red-500/30"
-                  : "text-white"
+                    ? "text-red-300 bg-red-950/80 px-1.5 rounded shadow-sm shadow-red-500/30"
+                    : "text-white"
               }`}
             >
               {currencySymbol}{currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -290,6 +290,9 @@ export function Navbar({
             </span>
           </div>
 
+          {/* Global Provider Control Plane Selector */}
+          <ProviderHeaderSelector />
+
           <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono border-l border-slate-800 pl-3">
             <span className={`flex items-center gap-1 ${isLiveFeed ? "text-emerald-400" : "text-amber-400"}`}>
               <span className={`h-1.5 w-1.5 rounded-full ${isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
@@ -300,113 +303,108 @@ export function Navbar({
           </div>
         </div>
 
-        {/* Global Provider Control Plane Selector */}
-        <ProviderHeaderSelector />
+      {/* Right Top Action Buttons */}
+      <div className="flex items-center gap-2">
+        {/* AI Bot Copilot & Self-Healing Trigger */}
+        <button
+          onClick={() => setIsBotAssistantOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition shadow-md shadow-cyan-950/40"
+          title="Open AI Bot Copilot & Autonomous Resolver (Ctrl+J / Cmd+J)"
+        >
+          <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
+          <span className="hidden sm:inline">Bot Copilot</span>
+          <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
+            Ctrl+J
+          </kbd>
+        </button>
 
-        {/* Right Top Action Buttons */}
-        <div className="flex items-center gap-2">
-          {/* AI Bot Copilot & Self-Healing Trigger */}
-          <button
-            onClick={() => setIsBotAssistantOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition shadow-md shadow-cyan-950/40"
-            title="Open AI Bot Copilot & Autonomous Resolver (Ctrl+J / Cmd+J)"
-          >
-            <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
-            <span className="hidden sm:inline">Bot Copilot</span>
-            <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-              Ctrl+J
-            </kbd>
-          </button>
+        {/* Market Analyst Copilot Quick Trigger */}
+        <button
+          onClick={() => setIsMarketAnalystOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition shadow-sm"
+          title="Open Read-Only GPT Market Analyst Copilot"
+        >
+          <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
+          <span className="hidden sm:inline">Market Analyst</span>
+          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+            GPT
+          </span>
+        </button>
 
-          {/* Market Analyst Copilot Quick Trigger */}
-          <button
-            onClick={() => setIsMarketAnalystOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition shadow-sm"
-            title="Open Read-Only GPT Market Analyst Copilot"
-          >
-            <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Market Analyst</span>
-            <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
-              GPT
-            </span>
-          </button>
+        {/* Command Palette Quick Trigger */}
+        <button
+          onClick={() => onOpenCommandPalette?.()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition"
+          title="Open Command Palette (Ctrl+K)"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+          <span className="hidden sm:inline">Commands</span>
+          <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+            Ctrl+K
+          </kbd>
+        </button>
 
-          {/* Command Palette Quick Trigger */}
-          <button
-            onClick={() => onOpenCommandPalette?.()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition"
-            title="Open Command Palette (Ctrl+K)"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-            <span className="hidden sm:inline">Commands</span>
-            <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
-              Ctrl+K
-            </kbd>
-          </button>
+        {/* Theme & Appearance Palette Button */}
+        <button
+          onClick={openAppearanceDrawer}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
+          title="Open Theme & Appearance Editor"
+        >
+          <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
+          <span className="hidden lg:inline">{themeConfig.name}</span>
+        </button>
 
-          {/* Theme & Appearance Palette Button */}
-          <button
-            onClick={openAppearanceDrawer}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
-            title="Open Theme & Appearance Editor"
-          >
-            <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
-            <span className="hidden lg:inline">{themeConfig.name}</span>
-          </button>
+        {/* Guided Tutorial Button */}
+        <button
+          onClick={() => onOpenTutorial?.()}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-cyan-300 hover:text-cyan-200 text-xs font-bold transition-colors"
+          title="17-Step In-App Tutorial Walkthrough"
+        >
+          <HelpCircle className="h-3.5 w-3.5 text-cyan-400" />
+          <span className="hidden md:inline">How to Use</span>
+        </button>
 
-          {/* Guided Tutorial Button */}
-          <button
-            onClick={() => onOpenTutorial?.()}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-cyan-300 hover:text-cyan-200 text-xs font-bold transition-colors"
-            title="17-Step In-App Tutorial Walkthrough"
-          >
-            <HelpCircle className="h-3.5 w-3.5 text-cyan-400" />
-            <span className="hidden md:inline">How to Use</span>
-          </button>
-
-          {/* Activate All Bots Button */}
-          <button
-            onClick={() => activateAllMutation.mutate()}
-            disabled={activateAllMutation.isPending}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg transition-all ${
-              activateSuccess
-                ? "bg-emerald-600 text-white shadow-emerald-600/30"
-                : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/25 active:scale-95"
+        {/* Activate All Bots Button */}
+        <button
+          onClick={() => activateAllMutation.mutate()}
+          disabled={activateAllMutation.isPending}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg transition-all ${activateSuccess
+              ? "bg-emerald-600 text-white shadow-emerald-600/30"
+              : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/25 active:scale-95"
             } disabled:opacity-50`}
-          >
-            {activateAllMutation.isPending ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
-            ) : activateSuccess ? (
-              <CheckCircle className="h-3.5 w-3.5 text-white" />
-            ) : (
-              <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" />
-            )}
-            <span className="hidden sm:inline">
-              {activateAllMutation.isPending
-                ? "ACTIVATING..."
-                : activateSuccess
+        >
+          {activateAllMutation.isPending ? (
+            <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
+          ) : activateSuccess ? (
+            <CheckCircle className="h-3.5 w-3.5 text-white" />
+          ) : (
+            <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" />
+          )}
+          <span className="hidden sm:inline">
+            {activateAllMutation.isPending
+              ? "ACTIVATING..."
+              : activateSuccess
                 ? "ALL ACTIVATED!"
                 : "ACTIVATE ALL"}
-            </span>
-          </button>
+          </span>
+        </button>
 
-          {/* Emergency Kill Switch Button */}
-          <button
-            onClick={() => killSwitchMutation.mutate()}
-            disabled={killSwitchMutation.isPending}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all ${
-              killSwitchActive
-                ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30"
-                : "bg-red-600/90 hover:bg-red-600 text-white shadow-red-600/30 active:scale-95"
+        {/* Emergency Kill Switch Button */}
+        <button
+          onClick={() => killSwitchMutation.mutate()}
+          disabled={killSwitchMutation.isPending}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all ${killSwitchActive
+              ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30"
+              : "bg-red-600/90 hover:bg-red-600 text-white shadow-red-600/30 active:scale-95"
             }`}
-            title="Emergency Kill Switch - Stops all bots and locks execution"
-          >
-            <ShieldAlert className="h-3.5 w-3.5" />
-            <span className="hidden md:inline">
-              {killSwitchActive ? "UNLOCK KILL SWITCH" : "KILL SWITCH"}
-            </span>
-          </button>
-        </div>
+          title="Emergency Kill Switch - Stops all bots and locks execution"
+        >
+          <ShieldAlert className="h-3.5 w-3.5" />
+          <span className="hidden md:inline">
+            {killSwitchActive ? "UNLOCK KILL SWITCH" : "KILL SWITCH"}
+          </span>
+        </button>
+      </div>
 
       {/* Navigation Tabs Bar */}
       <nav className="px-4 flex items-center gap-1 overflow-x-auto scrollbar-none py-1 bg-[#0A0E17]">
@@ -419,11 +417,10 @@ export function Navbar({
               id={`nav-tab-${item.id}`}
               data-tab={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                isActive
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${isActive
                   ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-sm font-bold"
                   : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent"
-              }`}
+                }`}
             >
               <Icon className="h-3.5 w-3.5" />
               <span>{item.label}</span>

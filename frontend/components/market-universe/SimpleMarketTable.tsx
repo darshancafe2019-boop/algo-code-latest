@@ -488,16 +488,20 @@ const MemoizedMarketRow = memo(function MarketRow({
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
   // Real-time live quote lookup
-  const liveQuote =
-    getQuote(sym) ||
-    (instrument.symbol ? getQuote(instrument.symbol) : null) ||
-    (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null);
+  const rawQuote = getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null);
 
-  const price = liveQuote?.last_price != null && liveQuote.last_price > 0 ? liveQuote.last_price : instrument.last_price;
-  const changePct =
-    liveQuote?.change_pct != null
-      ? liveQuote.change_pct
-      : instrument.change_pct_24h ?? instrument.change_24h ?? 0;
+  // Strict check: Markets page live quotes must originate from DHAN_WS or DELTA_OPTIONS_WS
+  const isAllowedProviderQuote = rawQuote && (
+    rawQuote.provider === "dhan" ||
+    rawQuote.provider === "dhan_ws" ||
+    rawQuote.provider === "delta_options" ||
+    rawQuote.provider === "delta_options_ws"
+  );
+
+  const liveQuote = isAllowedProviderQuote ? rawQuote : null;
+  const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
+  const price = hasLivePrice ? liveQuote!.last_price : instrument.last_price;
+  const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument.change_pct_24h ?? instrument.change_24h ?? 0);
   const isPositive = changePct >= 0;
   const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
 
@@ -509,40 +513,30 @@ const MemoizedMarketRow = memo(function MarketRow({
   const openPrice = liveQuote?.open ?? (instrument as any).open;
 
   // Data Health status calculation
-  const dataAgeMs =
-    liveQuote?.age_seconds != null ? Math.round(liveQuote.age_seconds * 1000) : instrument.data_age_ms ?? 120;
+  const dataAgeSec = liveQuote?.age_seconds ?? 999;
   const isMarketClosed = instrument.market_status === "CLOSED";
-  const isDisconnected = connectionStatus === "DISCONNECTED";
-  const isStale = (liveQuote?.is_stale || dataAgeMs >= 10000) && !isMarketClosed && !isDisconnected;
-  const isLiveFeed =
-    (connectionStatus === "LIVE" || liveQuote?.data_mode === "REAL_TIME" || (dataAgeMs < 10000 && !isMarketClosed)) &&
-    !isStale &&
-    !isDisconnected;
+  const isStaleFeed = liveQuote != null && (liveQuote.is_stale || dataAgeSec >= 10);
+  const isLiveFeed = liveQuote != null && !isStaleFeed && !isMarketClosed;
 
   const statusBadge = isMarketClosed ? (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-slate-800/90 text-slate-300 border border-slate-700">
       <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
-      CLOSED
-    </span>
-  ) : isDisconnected ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-rose-500/15 text-rose-300 border border-rose-500/40">
-      <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
-      OFFLINE
+      MARKET CLOSED
     </span>
   ) : isLiveFeed ? (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-emerald-500/15 text-emerald-300 border border-emerald-500/40 shadow-[0_0_8px_rgba(16,185,129,0.15)]">
       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
       LIVE
     </span>
-  ) : isStale ? (
+  ) : isStaleFeed ? (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-amber-500/15 text-amber-300 border border-amber-500/40">
       <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0" />
       STALE
     </span>
   ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40">
-      <span className="w-2 h-2 rounded-full bg-cyan-400 shrink-0" />
-      ACTIVE
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700/80">
+      <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
+      NO LIVE PROVIDER
     </span>
   );
 
@@ -638,7 +632,7 @@ const MemoizedMarketRow = memo(function MarketRow({
           <td className="px-4 text-center font-mono text-[12.5px] text-slate-300">
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -655,9 +649,9 @@ const MemoizedMarketRow = memo(function MarketRow({
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
           <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
           <td className="px-4 text-center text-slate-200 font-bold text-[13px]">{instrument.lot_size || 1}</td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -685,9 +679,9 @@ const MemoizedMarketRow = memo(function MarketRow({
             {formatPrice(bid, currSymbol, undefined, "—")} / {formatPrice(ask, currSymbol, undefined, "—")}
           </td>
           <td className="px-4 text-right font-mono font-medium text-[14px] text-slate-200">{formatVolume(volume)}</td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
           <td className="px-4 text-right font-mono font-bold text-[13px] text-amber-400">{instrument.implied_volatility ? `${instrument.implied_volatility.toFixed(1)}%` : "—"}</td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -710,8 +704,8 @@ const MemoizedMarketRow = memo(function MarketRow({
           <td className="px-4 text-right font-mono font-bold text-[13px] text-emerald-400">
             {instrument.funding_rate != null ? `${(instrument.funding_rate * 100).toFixed(4)}%` : "—"}
           </td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-200">{instrument.open_interest ? formatQuantity(instrument.open_interest) : "—"}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -724,9 +718,9 @@ const MemoizedMarketRow = memo(function MarketRow({
           <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, "", 4)}</td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, "", 4)}</td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatPrice(high24h, "", 4)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatPrice(low24h, "", 4)}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -743,10 +737,51 @@ const MemoizedMarketRow = memo(function MarketRow({
           <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}
           </td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(high24h, currSymbol)}</td>
-          <td className="px-4 text-right font-mono text-[13.5px] text-slate-300">{formatPrice(low24h, currSymbol)}</td>
-          <td className="px-4 text-center" title={`Data age: ${dataAgeMs}ms`}>{statusBadge}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatPrice(openPrice, currSymbol)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatPrice(high24h, currSymbol)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatPrice(low24h, currSymbol)}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
+          {optionsCell}
+          {actionCell}
+        </>
+      ) : category === "FUNDS" ? (
+        <>
+          <td className="px-3">
+            <div className="font-bold text-cyan-300">{sym}</div>
+            <div className="text-[10px] text-slate-400">{name}</div>
+          </td>
+          <td className="px-3 text-right font-bold text-white">{formatPrice(price, currSymbol)}</td>
+          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+            {formatPercent(changePct, 2, true)}
+          </td>
+          <td className="px-3 text-center text-slate-300">Equity Index Fund</td>
+          <td className="px-3 text-center text-slate-400">{instrument.data_source || "GLOBAL"}</td>
+          <td className="px-3 text-center">{statusBadge}</td>
+        </>
+      ) : category === "BONDS" ? (
+        <>
+          <td className="px-3 font-bold text-cyan-300">{sym}</td>
+          <td className="px-3 text-right font-bold text-emerald-400">{price ? `${price.toFixed(3)}%` : "4.250%"}</td>
+          <td className="px-3 text-right font-bold text-white">{formatPrice(price, "$")}</td>
+          <td className={`px-3 text-right font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+            {formatPercent(changePct, 2, true)}
+          </td>
+          <td className="px-3 text-center text-slate-300">10 Years</td>
+          <td className="px-3 text-center text-slate-400">{instrument.data_source || "TREASURY"}</td>
+          <td className="px-3 text-center">{statusBadge}</td>
+        </>
+      ) : category === "ECONOMY" ? (
+        <>
+          <td className="px-4 py-3 font-bold text-[15px] text-cyan-300">{sym}</td>
+          <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatNumber(price, 2)}</td>
+          <td className="px-4 text-right font-mono font-medium text-[13.5px] text-slate-300">{formatNumber(high24h, 2)}</td>
+          <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+            {formatPercent(changePct, 2, true)}
+          </td>
+          <td className="px-4 text-center font-medium text-[13.5px] text-slate-300">Monthly</td>
+          <td className="px-4 text-center font-medium text-[13.5px] text-slate-300">{instrument.country || "Global"}</td>
+          <td className="px-4 text-center font-medium text-[13.5px] text-slate-400">{instrument.data_source || "FRED / MOSPI"}</td>
+          <td className="px-4 text-center" title={`Data age: ${Math.round(dataAgeSec * 1000)}ms`}>{statusBadge}</td>
           {optionsCell}
           {actionCell}
         </>
@@ -776,7 +811,7 @@ const MemoizedMarketRow = memo(function MarketRow({
           <td className={`px-4 text-center font-medium text-[14px] ${trend.color}`} title="Trend calculated from EMA alignment & momentum">
             {trend.label}
           </td>
-          <td className="px-4 text-center" title={`Provider: ${instrument.data_source || 'FEED'} • Age: ${dataAgeMs}ms`}>
+          <td className="px-4 text-center" title={`Provider: ${instrument.data_source || 'FEED'} • Age: ${Math.round(dataAgeSec * 1000)}ms`}>
             {statusBadge}
           </td>
           {optionsCell}

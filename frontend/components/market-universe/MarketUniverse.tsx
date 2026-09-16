@@ -39,7 +39,7 @@ export function MarketUniverse() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { subscribe, unsubscribe, connectionStatus, providerHealth } = useMarketGatewayContext();
+  const { quotes, subscribe, unsubscribe, connectionStatus, providerHealth, getQuote } = useMarketGatewayContext();
 
   // Read initial query params from URL if present
   const initialCategory = searchParams.get("asset")?.toUpperCase() || "ALL";
@@ -293,8 +293,48 @@ export function MarketUniverse() {
   ].filter(Boolean).length;
 
   const liveCount = useMemo(() => {
-    return rawInstruments.filter((i) => i.data_status === "LIVE" || (i.data_age_ms ?? 120) < 10000).length;
-  }, [rawInstruments]);
+    let count = 0;
+    rawInstruments.forEach((inst) => {
+      const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol;
+      if (sym) {
+        const q = getQuote(sym);
+        if (
+          q &&
+          !q.is_stale &&
+          (q.age_seconds ?? 0) < 10 &&
+          (q.provider === "dhan" || q.provider === "dhan_ws" || q.provider === "delta_options" || q.provider === "delta_options_ws")
+        ) {
+          count++;
+        }
+      }
+    });
+    return count;
+  }, [rawInstruments, quotes, getQuote]);
+
+  const providerCount = useMemo(() => {
+    const activeProviders = new Set<string>();
+    quotes.forEach((q) => {
+      if (q && !q.is_stale && (q.age_seconds ?? 0) < 10) {
+        if (q.provider === "dhan" || q.provider === "dhan_ws") activeProviders.add("DHAN_WS");
+        if (q.provider === "delta_options" || q.provider === "delta_options_ws") activeProviders.add("DELTA_OPTIONS_WS");
+      }
+    });
+    return activeProviders.size;
+  }, [quotes]);
+
+  const averageFeedLatencyMs = useMemo(() => {
+    let total = 0;
+    let count = 0;
+    quotes.forEach((q) => {
+      if (q && (q.provider.includes("dhan") || q.provider.includes("delta"))) {
+        if (q.feed_latency_ms != null && q.feed_latency_ms >= 0) {
+          total += q.feed_latency_ms;
+          count++;
+        }
+      }
+    });
+    return count > 0 ? Math.round(total / count) : 0;
+  }, [quotes]);
 
   const handleLaunchOptionChainDirect = (underlying: string, exchange?: string, provider?: string) => {
     const params = new URLSearchParams({ underlying });
@@ -313,11 +353,11 @@ export function MarketUniverse() {
       {/* 1. Header: Universal Search, Category Tabs, Telemetry & Filter Controls */}
       <ErrorBoundary title="Markets Header Error">
         <SimpleMarketsHeader
-          totalInstruments={summaryData?.summary?.total_instruments || rawInstruments.length || 229}
-          liveCount={liveCount || 184}
-          providerCount={summaryData?.summary?.providers_connected || 3}
-          lastUpdateMs={summaryData?.summary?.average_feed_latency_ms || 120}
-          isLiveFeed={liveCount > 0}
+          totalInstruments={displayedInstruments.length || rawInstruments.length}
+          liveCount={liveCount}
+          providerCount={providerCount}
+          lastUpdateMs={averageFeedLatencyMs}
+          isLiveFeed={liveCount > 0 && connectionStatus === "LIVE"}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           activeCategory={activeCategory}

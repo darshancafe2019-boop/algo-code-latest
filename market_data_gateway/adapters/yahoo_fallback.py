@@ -58,7 +58,7 @@ class YahooFallbackAdapter(BaseProviderAdapter):
     Never used for automated trading signals — display and reference only.
     """
 
-    def __init__(self, poll_interval_sec: float = 60.0):
+    def __init__(self, poll_interval_sec: float = 3.0):
         super().__init__("yahoo_fallback", "Yahoo Finance (Delayed)")
         self._poll_interval = poll_interval_sec
         self._quote_cache: Dict[str, NormalizedQuote] = {}

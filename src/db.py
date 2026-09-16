@@ -1606,6 +1606,38 @@ def init_db(force: bool = False) -> None:
 
                 cursor.execute(
                     """
+                    CREATE TABLE IF NOT EXISTS provider_control_configs (
+                        provider_id TEXT PRIMARY KEY,
+                        provider_name TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        enabled INTEGER DEFAULT 1,
+                        configured INTEGER DEFAULT 0,
+                        market_data_enabled INTEGER DEFAULT 1,
+                        execution_enabled INTEGER DEFAULT 1,
+                        is_primary INTEGER DEFAULT 0,
+                        is_secondary INTEGER DEFAULT 0,
+                        credentials_masked_json TEXT DEFAULT '{}',
+                        custom_settings_json TEXT DEFAULT '{}',
+                        last_health_check TEXT DEFAULT '',
+                        last_tick TEXT DEFAULT '',
+                        connection_state TEXT DEFAULT 'NOT_CONFIGURED',
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS provider_role_selections (
+                        role_key TEXT PRIMARY KEY,
+                        provider_id TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
                     CREATE TABLE IF NOT EXISTS user_watchlists (
                         id TEXT PRIMARY KEY,
                         name TEXT NOT NULL,
@@ -1996,6 +2028,138 @@ def init_db(force: bool = False) -> None:
                         final_decision TEXT NOT NULL,
                         rejection_reason TEXT DEFAULT '',
                         global_scan_id TEXT DEFAULT ''
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_checkpoints (
+                        checkpoint_id TEXT PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        scheduled_time TEXT NOT NULL,
+                        timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+                        is_enabled INTEGER NOT NULL DEFAULT 1,
+                        last_run TEXT,
+                        next_run TEXT,
+                        last_status TEXT DEFAULT 'IDLE',
+                        last_duration_sec REAL DEFAULT 0.0,
+                        last_result_summary TEXT DEFAULT '',
+                        updated_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_workflow_runs (
+                        run_id TEXT PRIMARY KEY,
+                        checkpoint_id TEXT NOT NULL,
+                        checkpoint_name TEXT NOT NULL,
+                        trigger_type TEXT NOT NULL DEFAULT 'SCHEDULED',
+                        status TEXT NOT NULL DEFAULT 'RUNNING',
+                        state_history_json TEXT NOT NULL DEFAULT '[]',
+                        market_context_json TEXT DEFAULT '{}',
+                        decisions_count INTEGER DEFAULT 0,
+                        orders_count INTEGER DEFAULT 0,
+                        started_at TEXT NOT NULL,
+                        completed_at TEXT,
+                        duration_sec REAL DEFAULT 0.0,
+                        error_message TEXT DEFAULT '',
+                        audit_log_json TEXT DEFAULT '[]'
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_decisions (
+                        decision_id TEXT PRIMARY KEY,
+                        run_id TEXT NOT NULL,
+                        checkpoint_id TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        symbol TEXT NOT NULL,
+                        exchange TEXT NOT NULL,
+                        provider TEXT DEFAULT 'AUTO',
+                        action TEXT NOT NULL,
+                        strategy TEXT NOT NULL,
+                        entry_price REAL NOT NULL,
+                        quantity REAL NOT NULL,
+                        stop_loss REAL DEFAULT 0.0,
+                        take_profit REAL DEFAULT 0.0,
+                        time_in_force TEXT DEFAULT 'DAY',
+                        confidence REAL DEFAULT 0.0,
+                        reason TEXT NOT NULL,
+                        market_regime TEXT DEFAULT 'UNKNOWN',
+                        risk_status TEXT NOT NULL DEFAULT 'PENDING',
+                        risk_score REAL DEFAULT 0.0,
+                        risk_reasons_json TEXT DEFAULT '[]',
+                        approval_status TEXT NOT NULL DEFAULT 'PENDING',
+                        approved_by TEXT DEFAULT '',
+                        approved_at TEXT,
+                        execution_mode TEXT NOT NULL DEFAULT 'PAPER',
+                        order_id TEXT DEFAULT '',
+                        broker_order_id TEXT DEFAULT '',
+                        execution_status TEXT DEFAULT 'NOT_EXECUTED',
+                        execution_details_json TEXT DEFAULT '{}',
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_journal (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        journal_id TEXT UNIQUE NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        checkpoint_id TEXT NOT NULL,
+                        market_regime TEXT DEFAULT 'NORMAL',
+                        market_context_json TEXT NOT NULL DEFAULT '{}',
+                        analysis_summary TEXT NOT NULL DEFAULT '',
+                        candidate_setups_json TEXT DEFAULT '[]',
+                        decisions_json TEXT DEFAULT '[]',
+                        risk_summary_json TEXT DEFAULT '{}',
+                        execution_summary_json TEXT DEFAULT '{}',
+                        positions_snapshot_json TEXT DEFAULT '[]',
+                        outcome_summary TEXT DEFAULT '',
+                        ai_observations TEXT DEFAULT '',
+                        created_at TEXT NOT NULL
+                    )
+                    """
+                )
+
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS orchestrator_daily_reports (
+                        report_id TEXT PRIMARY KEY,
+                        report_date TEXT UNIQUE NOT NULL,
+                        generated_at TEXT NOT NULL,
+                        total_trades INTEGER DEFAULT 0,
+                        winning_trades INTEGER DEFAULT 0,
+                        losing_trades INTEGER DEFAULT 0,
+                        win_rate_pct REAL DEFAULT 0.0,
+                        gross_pnl REAL DEFAULT 0.0,
+                        net_pnl REAL DEFAULT 0.0,
+                        total_fees REAL DEFAULT 0.0,
+                        max_drawdown_pct REAL DEFAULT 0.0,
+                        risk_utilization_pct REAL DEFAULT 0.0,
+                        strategy_performance_json TEXT DEFAULT '{}',
+                        blocked_trades_count INTEGER DEFAULT 0,
+                        execution_errors_count INTEGER DEFAULT 0,
+                        ai_observations TEXT DEFAULT '',
+                        next_session_watchlist_json TEXT DEFAULT '[]',
+                        report_payload_json TEXT NOT NULL DEFAULT '{}'
                     )
                     """
                 )

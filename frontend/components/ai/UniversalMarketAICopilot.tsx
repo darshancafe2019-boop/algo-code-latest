@@ -119,6 +119,32 @@ export function UniversalMarketAICopilot() {
   const [chatHistory, setChatHistory] = useState<Array<{ sender: "user" | "ai"; text: string }>>([]);
   const [deployNotification, setDeployNotification] = useState<string | null>(null);
 
+  // Load persistent chat history on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("quantos_ai_copilot_chat_history");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setChatHistory(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed loading saved copilot chat history:", e);
+    }
+  }, []);
+
+  // Save persistent chat history on update
+  useEffect(() => {
+    if (chatHistory.length > 0) {
+      try {
+        localStorage.setItem("quantos_ai_copilot_chat_history", JSON.stringify(chatHistory));
+      } catch (e) {
+        console.warn("Failed saving copilot chat history:", e);
+      }
+    }
+  }, [chatHistory]);
+
   // Keyboard shortcut listener (Cmd+J / Ctrl+J or Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -243,6 +269,21 @@ export function UniversalMarketAICopilot() {
           </div>
 
           <div className="flex items-center gap-2">
+            {chatHistory.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setChatHistory([]);
+                  try {
+                    localStorage.removeItem("quantos_ai_copilot_chat_history");
+                  } catch (e) {}
+                }}
+                className="text-[10px] text-slate-400 hover:text-rose-400 px-2 py-1 rounded bg-slate-900 border border-slate-700 transition cursor-pointer"
+                title="Clear Chat History"
+              >
+                Clear
+              </button>
+            )}
             <button
               onClick={() =>
                 copilotMutation.mutate({
@@ -252,14 +293,14 @@ export function UniversalMarketAICopilot() {
                 })
               }
               disabled={isLoading}
-              className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition disabled:opacity-50"
+              className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition disabled:opacity-50 cursor-pointer"
               title="Refresh AI Analysis"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-purple-400" : ""}`} />
             </button>
             <button
               onClick={() => setAICopilotOpen(false)}
-              className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition"
+              className="p-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>

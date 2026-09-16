@@ -81,6 +81,46 @@ class MarketDataGateway:
                 "angelone": AngelOneAdapter(),
                 "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
                 # Stub adapters for providers that need credentials
+                "zerodha": NotConfiguredAdapter(
+                    "zerodha", "Zerodha Kite Connect",
+                    ["INDIAN_EQUITIES", "OPTIONS", "FUTURES"],
+                    "Set ZERODHA_API_KEY and ZERODHA_ACCESS_TOKEN in .env to activate",
+                ),
+                "icici_direct": NotConfiguredAdapter(
+                    "icici_direct", "ICICI Direct Breeze",
+                    ["INDIAN_EQUITIES", "OPTIONS"],
+                    "Set ICICI_API_KEY and ICICI_SESSION_TOKEN in .env to activate",
+                ),
+                "five_paisa": NotConfiguredAdapter(
+                    "five_paisa", "5Paisa Open API",
+                    ["INDIAN_EQUITIES", "OPTIONS"],
+                    "Set FIVE_PAISA_APP_NAME and FIVE_PAISA_APP_KEY in .env to activate",
+                ),
+                "bybit": NotConfiguredAdapter(
+                    "bybit", "Bybit V5",
+                    ["CRYPTO_SPOT", "CRYPTO_PERP"],
+                    "Set BYBIT_API_KEY and BYBIT_API_SECRET in .env to activate",
+                ),
+                "okx": NotConfiguredAdapter(
+                    "okx", "OKX V5",
+                    ["CRYPTO_SPOT", "CRYPTO_PERP", "CRYPTO_OPTIONS"],
+                    "Set OKX_API_KEY and OKX_SECRET_KEY in .env to activate",
+                ),
+                "mt5": NotConfiguredAdapter(
+                    "mt5", "MetaTrader 5",
+                    ["FOREX", "CFD", "COMMODITIES"],
+                    "Set MT5_LOGIN, MT5_PASSWORD, and MT5_SERVER in .env to activate",
+                ),
+                "exness": NotConfiguredAdapter(
+                    "exness", "Exness Bridge",
+                    ["FOREX", "METALS", "CRYPTO"],
+                    "Set EXNESS_ACCOUNT_ID and EXNESS_API_KEY in .env to activate",
+                ),
+                "ibkr": NotConfiguredAdapter(
+                    "ibkr", "Interactive Brokers",
+                    ["GLOBAL_EQUITIES", "OPTIONS", "FUTURES", "FOREX"],
+                    "Set IBKR_PORT and IBKR_CLIENT_ID in .env to activate",
+                ),
                 "twelve_data": NotConfiguredAdapter(
                     "twelve_data", "Twelve Data",
                     ["GLOBAL_EQUITIES", "FOREX", "INDICES"],

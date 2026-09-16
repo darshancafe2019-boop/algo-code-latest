@@ -19,6 +19,7 @@ import {
   Search,
 } from "lucide-react";
 import { TopMarketBar } from "@/components/layout/header/TopMarketBar";
+import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
 
 interface GlobalHeaderProps {
   onOpenSearch?: () => void;
@@ -50,7 +51,7 @@ export const GlobalHeader = memo(function GlobalHeader({
   );
 
   return (
-    <header className="h-[70px] bg-[#06101B] border-b border-[#10263A] px-4 flex items-center justify-between gap-4 select-none z-30 font-sans shrink-0 sticky top-0">
+    <header className="h-[70px] bg-[#06101B] border-b border-[#10263A] px-4 flex items-center justify-between gap-3 select-none z-30 font-sans shrink-0 sticky top-0">
       {/* ── LEFT SECTION: LOGO + SUBTITLE ──────────────────────── */}
       <div className="flex items-center gap-3 shrink-0">
         <Link
@@ -72,12 +73,14 @@ export const GlobalHeader = memo(function GlobalHeader({
       </div>
 
       {/* ── CENTER SECTION: COMPACT SEARCH + LIVE MARKET TICKERS ── */}
-      <div className="hidden md:flex items-center justify-center flex-1 max-w-4xl min-w-0 mx-2">
+      <div className="hidden md:flex items-center justify-center flex-1 max-w-3xl min-w-0 mx-2">
         <TopMarketBar onOpenSearch={onOpenSearch} />
       </div>
 
-      {/* ── RIGHT SECTION: PAPER MODE + USER CONTROL ───────────── */}
+      {/* ── RIGHT SECTION: PROVIDER SELECTOR + PAPER MODE + USER CONTROL ───────────── */}
       <div className="flex items-center gap-2.5 shrink-0">
+        {/* Compact Multi-Broker / Provider Header Selector */}
+        <ProviderHeaderSelector />
         {/* Paper Mode Control Button */}
         <div className="h-[40px] px-3.5 flex items-center gap-2 rounded-lg bg-[#168BFF]/15 border border-[#168BFF]/40 text-[#17C5FF] font-sans text-[12px] font-bold shadow-xs">
           <span className="h-2 w-2 rounded-full bg-[#22D3EE] animate-pulse" />

@@ -40,19 +40,52 @@ interface MessageItem {
   timestamp: string;
 }
 
+const DEFAULT_INIT_MESSAGE: MessageItem = {
+  id: "msg-init",
+  sender: "copilot",
+  text: "👋 Hello! I am your Quant.OS Next.js Bot Copilot. I can execute commands across your fleet, diagnose operational anomalies, and autonomously self-heal errors.",
+  timestamp: new Date().toLocaleTimeString(),
+};
+
 export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
-  const [messages, setMessages] = useState<MessageItem[]>([
-    {
-      id: "msg-init",
-      sender: "copilot",
-      text: "👋 Hello! I am your Quant.OS Next.js Bot Copilot. I can execute commands across your fleet, diagnose operational anomalies, and autonomously self-heal errors.",
-      timestamp: new Date().toLocaleTimeString(),
-    },
-  ]);
+  const [messages, setMessages] = useState<MessageItem[]>([DEFAULT_INIT_MESSAGE]);
   const [isProcessing, setIsProcessing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Load persistent message history on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("quantos_bot_copilot_messages");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setMessages(parsed);
+        }
+      }
+    } catch (e) {
+      console.warn("Failed loading saved copilot messages:", e);
+    }
+  }, []);
+
+  // Save persistent message history on change
+  useEffect(() => {
+    if (messages.length > 1 || (messages.length === 1 && messages[0].id !== "msg-init")) {
+      try {
+        localStorage.setItem("quantos_bot_copilot_messages", JSON.stringify(messages));
+      } catch (e) {
+        console.warn("Failed saving copilot messages:", e);
+      }
+    }
+  }, [messages]);
+
+  const handleClearHistory = () => {
+    setMessages([DEFAULT_INIT_MESSAGE]);
+    try {
+      localStorage.removeItem("quantos_bot_copilot_messages");
+    } catch (e) {}
+  };
 
   // Keyboard shortcut listener (Cmd+J / Ctrl+J or Escape)
   useEffect(() => {
@@ -169,12 +202,22 @@ export function BotAssistantModal({ isOpen, onClose }: BotAssistantModalProps) {
           </div>
 
           <div className="flex items-center gap-2">
+            {messages.length > 1 && (
+              <button
+                type="button"
+                onClick={handleClearHistory}
+                className="text-[10px] text-slate-400 hover:text-rose-400 px-2 py-1 rounded bg-[#0B131E] border border-[#1A2A3F] transition cursor-pointer"
+                title="Clear Chat History"
+              >
+                Clear
+              </button>
+            )}
             <span className="text-[10px] font-mono text-slate-500 bg-[#0B131E] px-2 py-1 rounded border border-[#1A2A3F] hidden sm:inline">
               Ctrl+J / Cmd+J
             </span>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition cursor-pointer"
             >
               <X className="h-5 w-5" />
             </button>

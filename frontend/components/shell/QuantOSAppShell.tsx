@@ -14,6 +14,7 @@ import { QuickOrderModal } from "@/components/order-execution/QuickOrderModal";
 import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AuthGuard } from "@/components/auth/AuthGuard";
+import { ProviderFailoverBanner } from "@/components/providers/ProviderFailoverBanner";
 
 export interface DrawerConfig {
   isOpen: boolean;
@@ -258,6 +259,9 @@ export function QuantOSAppShell({
               onOpenDetailDrawer={handleQuickStatusInspect}
             />
           </ErrorBoundary>
+
+          {/* Provider Failover Alert Banner (Automatic fail-safe indicator) */}
+          <ProviderFailoverBanner />
 
           {/* 2. MIDDLE AREA: LEFT NAV + MAIN WORKSPACE */}
           <div className="flex-1 flex overflow-hidden relative">

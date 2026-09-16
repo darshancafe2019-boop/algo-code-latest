@@ -339,6 +339,25 @@ try:
 except Exception as mdbp_err:
     logger.warning(f"Notice: Failed registering market data blueprint: {mdbp_err}")
 
+# Register AI Trading Orchestrator Blueprint
+try:
+    from trading_orchestrator.api.orchestrator_routes import orchestrator_bp
+    from trading_orchestrator.scheduler.scheduler import global_trading_scheduler
+    app.register_blueprint(orchestrator_bp)
+    global_trading_scheduler.start()
+    logger.info("Successfully registered orchestrator_bp and started Trading Scheduler.")
+except Exception as orch_err:
+    logger.warning(f"Notice: Failed registering orchestrator blueprint: {orch_err}")
+
+# Register Provider Control Plane Blueprint
+try:
+    from src.provider_manager.provider_routes import provider_manager_bp
+    app.register_blueprint(provider_manager_bp, url_prefix="/api/providers_v2")
+    logger.info("Successfully registered provider_manager_bp at /api/providers_v2.")
+except Exception as pmbp_err:
+    logger.warning(f"Notice: Failed registering provider manager blueprint: {pmbp_err}")
+
+
 
 # ============================================================================
 # HELPER FUNCTIONS

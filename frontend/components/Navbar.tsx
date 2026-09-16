@@ -36,6 +36,8 @@ import { useTheme } from "@/context/ThemeContext";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
+import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
+import { ProviderFailoverBanner } from "@/components/providers/ProviderFailoverBanner";
 
 interface TickerData {
   symbol: string;
@@ -157,6 +159,7 @@ export function Navbar({
 
   const navItems = [
     { id: "home", label: "🏠 Home", icon: Activity },
+    { id: "orchestrator", label: "🤖 AI Orchestrator", icon: BrainCircuit },
     { id: "markets", label: "🌐 Markets", icon: Globe },
     { id: "command-center", label: "⚡ Command Center", icon: Terminal },
     { id: "crypto-derivatives", label: "🪙 Crypto Hub", icon: Zap },
@@ -195,7 +198,9 @@ export function Navbar({
   const latencyDisplay = (liveQuote?.feedLatencyMs || feedHealth.latencyMs || 42).toFixed(0);
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-[#1A2A3F] bg-[#0B0E17]/95 backdrop-blur px-4 py-2 flex items-center justify-between shadow-md">
+    <>
+      <ProviderFailoverBanner />
+      <header className="sticky top-0 z-40 w-full border-b border-[#1A2A3F] bg-[#0B0E17]/95 backdrop-blur px-4 py-2 flex items-center justify-between shadow-md">
         {/* Left Branding and Nav Links */}
         <div className="flex items-center gap-6">
           <div
@@ -226,6 +231,7 @@ export function Navbar({
           <nav className="hidden lg:flex items-center gap-1">
             {[
               { id: "home", label: "Executive Home", icon: Landmark },
+              { id: "orchestrator", label: "AI Orchestrator", icon: BrainCircuit },
               { id: "terminal", label: "Terminal", icon: Terminal },
               { id: "options", label: "Option Chain", icon: Layers },
               { id: "universe", label: "Market Universe", icon: Globe },
@@ -293,6 +299,9 @@ export function Navbar({
             <span className="text-slate-400">{latencyDisplay}ms</span>
           </div>
         </div>
+
+        {/* Global Provider Control Plane Selector */}
+        <ProviderHeaderSelector />
 
         {/* Right Top Action Buttons */}
         <div className="flex items-center gap-2">
@@ -438,5 +447,7 @@ export function Navbar({
         onClose={() => setIsBotAssistantOpen(false)}
       />
     </header>
+    </>
   );
 }
+

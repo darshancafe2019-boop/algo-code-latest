@@ -1805,7 +1805,26 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 pass
 
         if spot_price <= 0:
-            spot_price = 78000.0 if und == "BTC" else (3500.0 if und == "ETH" else 150.0)
+            try:
+                from market_data_gateway.cache.market_cache import global_market_cache
+                for cand in (f"{und}/USDT", f"{und}USDT", f"{und}USD", und):
+                    q = global_market_cache.get_quote(cand) or global_market_cache.get_quote(f"BINANCE:{cand}")
+                    if q and q.last_price and q.last_price > 0:
+                        spot_price = float(q.last_price)
+                        break
+            except Exception:
+                pass
+
+        if spot_price <= 0:
+            try:
+                import urllib.request
+                import json
+                with urllib.request.urlopen(f"https://api.binance.com/api/v3/ticker/price?symbol={und}USDT", timeout=2.0) as resp:
+                    b_data = json.loads(resp.read().decode())
+                    if "price" in b_data and float(b_data["price"]) > 0:
+                        spot_price = float(b_data["price"])
+            except Exception:
+                pass
 
         # 6. Group contracts by strike into dual-sided ladder
         strikes_map: Dict[float, Dict[str, Any]] = {}

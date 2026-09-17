@@ -15,73 +15,69 @@ import {
 } from "lucide-react";
 import { OptionsRiskItem, FuturesRiskItem } from "@/types/risk";
 
+import { useQuery } from "@tanstack/react-query";
+
 export function OptionsFuturesRiskPanel() {
   const [subSection, setSubSection] = useState<"options" | "strategies" | "futures">("options");
 
-  // Mock Active Options Positions & Greeks
-  const optionsList: OptionsRiskItem[] = [
-    {
-      underlying: "NIFTY",
-      expiry: "24-SEP-2026",
-      strike: 24500,
-      option_type: "CALL",
-      quantity: 50,
-      premium: 165.0,
-      iv: 14.8,
-      delta: 0.54,
-      gamma: 0.0018,
-      theta: -12.4,
-      vega: 24.5,
-      open_interest: 2450000,
-      margin: 8250.0,
-      max_profit: 999999, // Unlimited
-      max_loss: 8250.0,
-      breakeven: 24665.0,
+  // Dynamic query from positions endpoint
+  const { data: positionsData } = useQuery({
+    queryKey: ["riskDerivativesPositions"],
+    queryFn: async () => {
+      const res = await fetch("/api/positions");
+      if (!res.ok) return [];
+      const json = await res.json();
+      return json.positions || json.data || [];
     },
-    {
-      underlying: "BTC",
-      expiry: "27-SEP-2026",
-      strike: 66000,
-      option_type: "PUT",
-      quantity: 1,
-      premium: 1420.0,
-      iv: 48.2,
-      delta: -0.38,
-      gamma: 0.00004,
-      theta: -45.2,
-      vega: 65.8,
-      open_interest: 450,
-      margin: 1420.0,
-      max_profit: 64580.0,
-      max_loss: 1420.0,
-      breakeven: 64580.0,
-    },
-  ];
+    refetchInterval: 8000,
+  });
+
+  const rawPositions: any[] = positionsData || [];
+  const optionsList: OptionsRiskItem[] = rawPositions
+    .filter((p) => (p.asset_class || "").toUpperCase().includes("OPTION") || p.strike || p.option_type)
+    .map((p, idx) => ({
+      underlying: p.underlying || p.symbol?.split(" ")[0] || p.symbol,
+      expiry: p.expiry || "-",
+      strike: p.strike || 0,
+      option_type: (p.option_type || (p.symbol?.includes("PE") ? "PUT" : "CALL")).toUpperCase() as any,
+      quantity: p.quantity || p.size || 1,
+      premium: p.entry_price || p.current_price || p.premium || 0,
+      iv: p.iv || 0,
+      delta: p.delta || 0,
+      gamma: p.gamma || 0,
+      theta: p.theta || 0,
+      vega: p.vega || 0,
+      open_interest: p.open_interest || 0,
+      margin: p.margin_used || p.position_value || 0,
+      max_profit: p.max_profit || 0,
+      max_loss: p.max_loss || p.risk_amount || 0,
+      breakeven: p.breakeven || 0,
+    }));
+
+  const futuresList: FuturesRiskItem[] = rawPositions
+    .filter((p) => (p.asset_class || "").toUpperCase().includes("FUTUR") || (p.asset_class || "").toUpperCase().includes("PERP"))
+    .map((p) => ({
+      contract: p.symbol || "FUT-CONTRACT",
+      expiry: p.expiry || "PERPETUAL",
+      quantity: p.quantity || p.size || 1,
+      entry_price: p.entry_price || 0,
+      current_price: p.current_price || p.mark_price || p.entry_price || 0,
+      notional: p.position_value || (p.quantity * (p.current_price || p.entry_price || 0)),
+      margin: p.margin_used || 0,
+      leverage: p.leverage || 1,
+      funding_rate_pct: p.funding_rate || 0,
+      open_interest: p.open_interest || 0,
+      liquidation_buffer_pct: p.liquidation_buffer_pct || 0,
+      stop_loss: p.stop_loss || 0,
+      max_loss: p.risk_amount || 0,
+    }));
 
   const netGreeks = {
-    net_delta: +0.16,
-    net_gamma: +0.00184,
-    net_theta: -57.60,
-    net_vega: +90.30,
+    net_delta: Number(optionsList.reduce((acc, o) => acc + (o.delta * o.quantity), 0).toFixed(2)),
+    net_gamma: Number(optionsList.reduce((acc, o) => acc + (o.gamma * o.quantity), 0).toFixed(4)),
+    net_theta: Number(optionsList.reduce((acc, o) => acc + (o.theta * o.quantity), 0).toFixed(2)),
+    net_vega: Number(optionsList.reduce((acc, o) => acc + (o.vega * o.quantity), 0).toFixed(2)),
   };
-
-  const futuresList: FuturesRiskItem[] = [
-    {
-      contract: "BTC-PERP (Binance)",
-      expiry: "PERPETUAL",
-      quantity: 0.05,
-      entry_price: 64200.0,
-      current_price: 65420.0,
-      notional: 3271.0,
-      margin: 327.1,
-      leverage: 10.0,
-      funding_rate_pct: 0.01,
-      open_interest: 48200,
-      liquidation_buffer_pct: 88.5,
-      stop_loss: 63200.0,
-      max_loss: 50.0,
-    },
-  ];
 
   return (
     <div className="space-y-4 font-sans select-none">

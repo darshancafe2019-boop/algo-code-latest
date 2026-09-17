@@ -52,20 +52,17 @@ function LiveMarketIndexRow({
   onSelect: (sym: string) => void;
 }) {
   const quote = useSymbolQuote(symbol);
-  const ltp = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (fallback?.ltp ?? 0);
+  const ltp = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (fallback?.ltp && fallback.ltp > 0 ? fallback.ltp : null);
   const prevClose = quote?.previousClose && quote.previousClose > 0 
     ? quote.previousClose 
-    : (fallback?.previousClose ?? (ltp > 0 && fallback?.change ? ltp - fallback.change : ltp));
+    : (fallback?.previousClose && fallback.previousClose > 0 ? fallback.previousClose : null);
   
-  const change = quote?.change !== undefined 
-    ? quote.change 
-    : (prevClose > 0 ? ltp - prevClose : (fallback?.change ?? 0));
+  const change = ltp !== null && prevClose !== null ? ltp - prevClose : (quote?.change !== undefined ? quote.change : null);
+  const changePct = ltp !== null && prevClose !== null && prevClose > 0 
+    ? ((ltp - prevClose) / prevClose) * 100 
+    : (quote?.changePercent !== undefined ? quote.changePercent : null);
     
-  const changePct = quote?.changePercent !== undefined 
-    ? quote.changePercent 
-    : (prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : (fallback?.pct ?? 0));
-    
-  const isUp = changePct >= 0;
+  const isUp = (changePct ?? 0) >= 0;
   const isLive = quote ? (!quote.isStale && quote.status === "LIVE") : (fallback?.status === "LIVE");
   const flash = quote?.flashDirection;
 
@@ -80,9 +77,9 @@ function LiveMarketIndexRow({
           <span
             className={cn(
               "h-1.5 w-1.5 rounded-full transition-colors",
-              isLive ? "bg-[#00E89A] animate-pulse" : "bg-[#F59E0B]"
+              isLive ? "bg-[#00E89A] animate-pulse" : (ltp !== null ? "bg-[#F59E0B]" : "bg-slate-600")
             )}
-            title={isLive ? "Live Real-Time Feed" : "Cached / Stale"}
+            title={isLive ? "Live Real-Time Feed" : (ltp !== null ? "Cached / Stale" : "Unavailable")}
           />
         </div>
       </td>
@@ -94,14 +91,14 @@ function LiveMarketIndexRow({
             flash === "down" && "bg-red-950/80 text-red-300 font-bold"
           )}
         >
-          {formatDecimal(ltp, 2)}
+          {ltp !== null && ltp > 0 ? formatDecimal(ltp, 2) : "—"}
         </span>
       </td>
-      <td className={cn("text-right tabular-nums font-medium", isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-        {isUp ? "+" : ""}{formatDecimal(change, 2)}
+      <td className={cn("text-right tabular-nums font-medium", change !== null ? (isUp ? "text-[#00E89A]" : "text-[#FF3B5C]") : "text-slate-400")}>
+        {change !== null ? `${isUp ? "+" : ""}${formatDecimal(change, 2)}` : "—"}
       </td>
-      <td className={cn("text-right tabular-nums font-semibold", isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-        {formatPercent(changePct, 2, "—", false, true)}
+      <td className={cn("text-right tabular-nums font-semibold", changePct !== null ? (isUp ? "text-[#00E89A]" : "text-[#FF3B5C]") : "text-slate-400")}>
+        {changePct !== null ? formatPercent(changePct, 2, "—", false, true) : "—"}
       </td>
     </tr>
   );
@@ -418,26 +415,13 @@ export function HomeExecutiveOverview() {
   const brokers = rawBrokers.length > 0 ? rawBrokers.map((b: any) => ({
     name: b.name || b.id,
     status: b.auth_status === "HEALTHY" && b.rest_status === "HEALTHY" ? "ONLINE" : (b.auth_status === "AUTH_FAILED" ? "AUTH_FAILED" : (b.configured ? "ONLINE" : "ACTIVE")),
-    latency: b.latency_ms ? `${Math.round(b.latency_ms)}ms` : "42ms",
+    latency: b.latency_ms ? `${Math.round(b.latency_ms)}ms` : "—",
     isLive: b.configured ?? true,
     isPaper: b.id === "PAPER_ENGINE" || b.id === "QUANTOS_PAPER",
-  })) : [
-    { name: "Dhan HQ", status: "ONLINE", latency: "42ms", isLive: true },
-    { name: "Upstox", status: "ONLINE", latency: "55ms", isLive: true },
-    { name: "Delta Exchange", status: "ONLINE", latency: "88ms", isLive: true },
-    { name: "Paper Trading", status: "ACTIVE", latency: "0ms", isLive: true, isPaper: true },
-  ];
+  })) : [];
 
   // ── Real System Health ───────────────────────────────────────────────────
-  const systemHealth = snapshotData?.health?.services || [
-    { service: "Backend", status: "Operational", isOk: true },
-    { service: "Database", status: "Operational", isOk: true },
-    { service: "Gateway", status: "Streaming :5051", isOk: true },
-    { service: "Market Data", status: "Live Feed", isOk: true },
-    { service: "Risk Engine", status: "Operational", isOk: true },
-    { service: "OMS", status: "Operational", isOk: true },
-    { service: "WebSocket", status: "Connected", isOk: true },
-  ];
+  const systemHealth = snapshotData?.health?.services || [];
 
   // ── Real Normalized Positions & Live MTM P&L ─────────────────────────────
   const normalizedPositions = useMemo(() => {

@@ -117,7 +117,62 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "trading_symbol": "FINNIFTY",
         "canonical_symbol": "FINNIFTY",
     },
+    "NIFTY FIN SERVICE": {
+        "instrument_key": "NSE_INDEX|Nifty Fin Service",
+        "name": "NIFTY FINANCIAL SERVICES",
+        "exchange": "NSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 25,
+        "tick_size": 0.05,
+        "isin": "FINNIFTY",
+        "trading_symbol": "FINNIFTY",
+        "canonical_symbol": "FINNIFTY",
+    },
+    "SENSEX": {
+        "instrument_key": "BSE_INDEX|SENSEX",
+        "name": "BSE SENSEX",
+        "exchange": "BSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 10,
+        "tick_size": 0.01,
+        "isin": "SENSEX",
+        "trading_symbol": "SENSEX",
+        "canonical_symbol": "SENSEX",
+    },
+    "BSE SENSEX": {
+        "instrument_key": "BSE_INDEX|SENSEX",
+        "name": "BSE SENSEX",
+        "exchange": "BSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 10,
+        "tick_size": 0.01,
+        "isin": "SENSEX",
+        "trading_symbol": "SENSEX",
+        "canonical_symbol": "SENSEX",
+    },
     "MIDCPNIFTY": {
+        "instrument_key": "NSE_INDEX|NIFTY MID SELECT",
+        "name": "NIFTY MIDCAP SELECT",
+        "exchange": "NSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 50,
+        "tick_size": 0.05,
+        "isin": "MIDCPNIFTY",
+        "trading_symbol": "MIDCPNIFTY",
+        "canonical_symbol": "MIDCPNIFTY",
+    },
+    "NIFTY MID SELECT": {
+        "instrument_key": "NSE_INDEX|NIFTY MID SELECT",
+        "name": "NIFTY MIDCAP SELECT",
+        "exchange": "NSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 50,
+        "tick_size": 0.05,
+        "isin": "MIDCPNIFTY",
+        "trading_symbol": "MIDCPNIFTY",
+        "canonical_symbol": "MIDCPNIFTY",
+    },
+    "NIFTY MIDCAP SELECT": {
         "instrument_key": "NSE_INDEX|NIFTY MID SELECT",
         "name": "NIFTY MIDCAP SELECT",
         "exchange": "NSE_INDEX",
@@ -915,7 +970,28 @@ class UpstoxService:
         # Map symbol to official Upstox instrument key
         und_clean = underlying.upper().strip()
         reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
-        instrument_key = reg_entry.get("instrument_key", f"NSE_INDEX|{und_clean}")
+        instrument_key = reg_entry.get("instrument_key")
+
+        if not instrument_key:
+            # Check known indices
+            if und_clean in ["NIFTY", "NIFTY 50", "NIFTY50"]:
+                instrument_key = "NSE_INDEX|Nifty 50"
+            elif und_clean in ["BANKNIFTY", "NIFTY BANK"]:
+                instrument_key = "NSE_INDEX|Nifty Bank"
+            elif und_clean in ["FINNIFTY", "NIFTY FIN SERVICE"]:
+                instrument_key = "NSE_INDEX|Nifty Fin Service"
+            elif und_clean in ["MIDCPNIFTY", "NIFTY MID SELECT", "NIFTY MIDCAP SELECT"]:
+                instrument_key = "NSE_INDEX|NIFTY MID SELECT"
+            elif und_clean in ["SENSEX", "BSE SENSEX"]:
+                instrument_key = "BSE_INDEX|SENSEX"
+            elif und_clean in ["INDIA VIX", "INDIAVIX"]:
+                instrument_key = "NSE_INDEX|India VIX"
+            else:
+                return {
+                    "status": "error",
+                    "error": "UNRESOLVED_INSTRUMENT",
+                    "message": f"Could not resolve Upstox instrument key for underlying '{underlying}'. Never defaulting to NSE_INDEX."
+                }
 
         params = {"instrument_key": instrument_key}
         if expiry:

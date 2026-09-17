@@ -92,6 +92,34 @@ class StaleDataProtectionEngine:
             "recent_lockouts": self._lockout_events[-5:],
         }
 
+    def is_stale(self, symbol: str, timestamp: Any = None) -> Dict[str, Any]:
+        """Calculates freshness for a symbol given an optional timestamp or internal record."""
+        now = time.time()
+        age_sec = 0.0
+        if timestamp:
+            if hasattr(timestamp, "timestamp"):
+                ts_val = timestamp.timestamp()
+            elif isinstance(timestamp, (int, float)):
+                ts_val = float(timestamp)
+            else:
+                try:
+                    from datetime import datetime
+                    ts_val = datetime.fromisoformat(str(timestamp).replace("Z", "+00:00")).timestamp()
+                except Exception:
+                    ts_val = now
+            age_sec = max(0.0, now - ts_val)
+        else:
+            last_seen = self._feed_last_active.get(symbol.upper())
+            age_sec = (now - last_seen) if last_seen is not None else 0.0
+
+        is_stale_flag = age_sec > self.stale_threshold_sec
+        return {
+            "symbol": symbol,
+            "age_sec": round(age_sec, 2),
+            "is_stale": is_stale_flag,
+            "status": "LIVE" if not is_stale_flag else "STALE"
+        }
+
 
 # Global Singleton Instance
 global_stale_protection = StaleDataProtectionEngine()

@@ -82,7 +82,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     ? "DELTA_INDIA"
     : initialSource;
 
-  // Primary State
+  // Market Data Mode is strictly LIVE; Execution Mode remains PAPER
+  const marketDataMode = "LIVE";
   const [underlying, setUnderlying] = useState<string>(resolvedUnderlying);
   const [source, setSource] = useState<string>(resolvedSource);
   const [environment, setEnvironment] = useState<"LIVE" | "PAPER">("PAPER");
@@ -196,14 +197,17 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
   };
 
-  // 1. Fetch Terminal Snapshot & Option Flow Data
+  // 1. Fetch Terminal Snapshot & Option Flow Data with explicit LIVE market data mode
   const { data: snapshotData, isLoading, isFetching, refetch } = useQuery<{ success: boolean; data: OptionTerminalSnapshot }>({
-    queryKey: ["optionTerminalSnapshot", underlying, source, selectedExpiry, strikeRange],
+    queryKey: ["optionTerminalSnapshot", underlying, source, selectedExpiry, strikeRange, marketDataMode, tradingMode],
     queryFn: async () => {
       const params = new URLSearchParams({
         underlying,
         provider: source,
         strike_count: strikeRange.toString(),
+        market_data_mode: marketDataMode,
+        execution_mode: tradingMode,
+        mode: marketDataMode,
       });
       if (selectedExpiry) params.append("expiry", selectedExpiry);
 
@@ -448,48 +452,21 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         if (!isNaN(to) && row.strike > to) return false;
       }
 
-      // 3. Option Side filter
-      if (filterConfig.side === "CALLS_ONLY" && !call) return false;
-      if (filterConfig.side === "PUTS_ONLY" && !put) return false;
-
-      // 4. Moneyness filter
-      if (filterConfig.moneyness === "ITM_ONLY") {
-        if (filterConfig.side === "CALLS_ONLY") {
-          if (row.moneynessCall !== "ITM") return false;
-        } else if (filterConfig.side === "PUTS_ONLY") {
-          if (row.moneynessPut !== "ITM") return false;
-        } else {
-          if (row.moneynessCall !== "ITM" && row.moneynessPut !== "ITM") return false;
-        }
-      } else if (filterConfig.moneyness === "ATM_ONLY") {
-        if (!row.isATM) return false;
-      } else if (filterConfig.moneyness === "OTM_ONLY") {
-        if (filterConfig.side === "CALLS_ONLY") {
-          if (row.moneynessCall !== "OTM") return false;
-        } else if (filterConfig.side === "PUTS_ONLY") {
-          if (row.moneynessPut !== "OTM") return false;
-        } else {
-          if (row.moneynessCall !== "OTM" && row.moneynessPut !== "OTM") return false;
-        }
+      // 3. Moneyness filter
+      if (filterConfig.moneyness !== "ALL") {
+        const matchCall = call?.moneyness === filterConfig.moneyness;
+        const matchPut = put?.moneyness === filterConfig.moneyness;
+        if (!matchCall && !matchPut) return false;
       }
 
-      // Helper to evaluate price & greeks condition for target side
-      const testContractCondition = (c: typeof call | typeof put) => {
+      // 4. Detailed single contract tester
+      const testContractCondition = (c?: ActionableOptionContract | null) => {
         if (!c) return false;
-
-        // LTP
+        // Price
         if (filterConfig.minLtp !== undefined && c.ltp < filterConfig.minLtp) return false;
         if (filterConfig.maxLtp !== undefined && c.ltp > filterConfig.maxLtp) return false;
-
-        // Change %
         if (filterConfig.minChangePct !== undefined && c.changePercent < filterConfig.minChangePct) return false;
         if (filterConfig.maxChangePct !== undefined && c.changePercent > filterConfig.maxChangePct) return false;
-
-        // Bid / Ask
-        if (filterConfig.minBid !== undefined && c.bid < filterConfig.minBid) return false;
-        if (filterConfig.maxBid !== undefined && c.bid > filterConfig.maxBid) return false;
-        if (filterConfig.minAsk !== undefined && c.ask < filterConfig.minAsk) return false;
-        if (filterConfig.maxAsk !== undefined && c.ask > filterConfig.maxAsk) return false;
 
         // OI
         if (filterConfig.minOI > 0 && c.oi < filterConfig.minOI) return false;
@@ -555,11 +532,23 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
 
 
 
-  // Direct One-Click Execution Handler
+  // Direct One-Click Execution Handler with Provider-Accurate Broker Account Resolution
   const executeOneClickTrade = async (side: "BUY" | "SELL", contract: ActionableOptionContract) => {
     const clientOrderId = `OPT_1CLICK_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const lotSize = contract.lotSize || 1;
     const price = side === "BUY" ? (contract.ask || contract.ltp) : (contract.bid || contract.ltp);
+
+    const brokerUpper = (contract.broker || contract.source || "PAPER").toUpperCase();
+    let brokerAccountId = "ba_paper";
+    if (tradingMode === "LIVE") {
+      if (brokerUpper.includes("DELTA")) {
+        brokerAccountId = "ba_delta_primary";
+      } else if (brokerUpper.includes("UPSTOX")) {
+        brokerAccountId = "ba_upstox_primary";
+      } else if (brokerUpper.includes("DHAN")) {
+        brokerAccountId = "ba_dhan_primary";
+      }
+    }
 
     try {
       const payload = {
@@ -574,7 +563,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         strategy: "OPTION_ONE_CLICK",
         provider: contract.source || contract.broker,
         broker: contract.broker,
-        broker_account_id: contract.broker === "DELTA" ? "ba_delta_primary" : "ba_dhan_primary",
+        broker_account_id: brokerAccountId,
         instrument_id: contract.instrumentId || contract.symbol,
         product_id: contract.productId,
         underlying: contract.underlying,
@@ -607,12 +596,15 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
   };
 
-  // Action Dispatchers -> Direct Bot Creation from Option Chain
+  // Action Dispatchers -> Direct Bot Creation from Option Chain with Canonical ID & Real Timestamps
   const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
     const isAddLeg = searchParams?.get("mode") === "addLeg";
+    const canonicalContractId = contract.contractId || `${contract.broker || contract.source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${contract.optionType}:${contract.instrumentId || contract.securityId || contract.symbol}`;
+
     dispatchBotCreation(router, {
       symbol: contract.symbol,
-      canonicalSymbol: contract.symbol,
+      canonicalSymbol: canonicalContractId,
+      canonicalContractId,
       side: "BUY",
       assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "OPTIONS",
       underlying: contract.underlying,
@@ -636,7 +628,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       iv: contract.iv,
       openInterest: contract.oi,
       volume: contract.volume,
-      timestamp: Date.now(),
+      timestamp: contract.timestamp || Date.now(),
+      uiDispatchTimestamp: Date.now(),
       origin: "OPTIONS",
       mode: isAddLeg ? "addLeg" : "new",
     });
@@ -644,9 +637,12 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
 
   const handleActionSell = useCallback((contract: ActionableOptionContract) => {
     const isAddLeg = searchParams?.get("mode") === "addLeg";
+    const canonicalContractId = contract.contractId || `${contract.broker || contract.source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${contract.optionType}:${contract.instrumentId || contract.securityId || contract.symbol}`;
+
     dispatchBotCreation(router, {
       symbol: contract.symbol,
-      canonicalSymbol: contract.symbol,
+      canonicalSymbol: canonicalContractId,
+      canonicalContractId,
       side: "SELL",
       assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "OPTIONS",
       underlying: contract.underlying,
@@ -670,7 +666,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       iv: contract.iv,
       openInterest: contract.oi,
       volume: contract.volume,
-      timestamp: Date.now(),
+      timestamp: contract.timestamp || Date.now(),
+      uiDispatchTimestamp: Date.now(),
       origin: "OPTIONS",
       mode: isAddLeg ? "addLeg" : "new",
     });
@@ -715,10 +712,10 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
             setSource("DHAN");
           }
         }}
-        spotPrice={snapshot?.spotPrice || 25420.0}
-        spotChange={snapshot?.spotChange || 128.4}
-        spotChangePercent={snapshot?.spotChangePercent || 0.51}
-        marketStatus={snapshot?.marketStatus || "OPEN"}
+        spotPrice={snapshot?.spotPrice || 0}
+        spotChange={snapshot?.spotChange || 0}
+        spotChangePercent={snapshot?.spotChangePercent || 0}
+        marketStatus={snapshot?.marketStatus || "CLOSED"}
         selectedExpiry={snapshot?.selectedExpiry || selectedExpiry}
         onChangeExpiry={(exp) => setSelectedExpiry(exp)}
         availableExpiries={snapshot?.availableExpiries || []}
@@ -727,9 +724,9 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         isSourceLocked={isSourceLocked}
         environment={environment}
         onChangeEnvironment={(env) => setEnvironment(env)}
-        freshnessStatus={snapshot?.freshnessStatus || "LIVE"}
-        dataAgeMs={snapshot?.dataAgeMs || 100}
-        latencyMs={snapshot?.latencyMs || 16}
+        freshnessStatus={snapshot?.freshnessStatus || (isFetching ? "DELAYED" : "OFFLINE")}
+        dataAgeMs={snapshot?.dataAgeMs || 0}
+        latencyMs={snapshot?.latencyMs || 0}
         isFetching={isFetching}
         onRefresh={() => refetch()}
       />
@@ -836,8 +833,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           {/* Actionable Option Chain Table */}
           <OptionChainTable
             strikes={displayedStrikes}
-            spotPrice={snapshot?.spotPrice || 25420.0}
-            atmStrike={snapshot?.atmStrike || 25400}
+            spotPrice={snapshot?.spotPrice || 0}
+            atmStrike={snapshot?.atmStrike || 0}
             currency={currency}
             underlying={underlying}
             selectedExpiry={snapshot?.selectedExpiry || selectedExpiry}
@@ -931,7 +928,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           isOpen={isDrawerOpen}
           onClose={() => setIsDrawerOpen(false)}
           underlying={underlying}
-          spotPrice={snapshot?.spotPrice || 25420.0}
+          spotPrice={snapshot?.spotPrice || 0}
           strike={selectedStrike}
           optionType={selectedOptionType}
           quote={selectedQuote as any}

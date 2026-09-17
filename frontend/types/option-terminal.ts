@@ -166,10 +166,10 @@ export interface OptionTerminalSnapshot {
     totalFlowTurnover: number;
     bullishTurnover: number;
     bearishTurnover: number;
-    bullishPercentage: number;
-    bearishPercentage: number;
-    overallSentiment: FlowSentiment;
-    confidence: number;
+    bullishPercentage: number | null;
+    bearishPercentage: number | null;
+    overallSentiment: FlowSentiment | "UNAVAILABLE" | null;
+    confidence: number | null;
     unusualTradeCount: number;
   };
   strikes: OptionStrikeRowData[];
@@ -186,6 +186,7 @@ export interface ActionableOptionContract {
   broker: "DELTA" | "DHAN" | "UPSTOX" | "PAPER";
   source: string;
   symbol: string;
+  contractId?: string;
   productId?: number | string;
   instrumentId?: string;
   securityId?: string;
@@ -195,6 +196,8 @@ export interface ActionableOptionContract {
   optionType: OptionType;
   side: "BUY" | "SELL";
   ltp: number;
+  change?: number;
+  changePercent?: number;
   bid: number;
   ask: number;
   bidSize?: number;
@@ -206,10 +209,14 @@ export interface ActionableOptionContract {
   gamma?: number;
   theta?: number;
   vega?: number;
+  greeks?: OptionGreeks;
   oi?: number;
+  oiChange?: number;
+  oiBuildup?: string;
   volume?: number;
   dataAgeMs?: number;
-  freshnessStatus?: "LIVE" | "RECENT" | "STALE" | "OFFLINE";
+  freshnessStatus?: "LIVE" | "RECENT" | "STALE" | "OFFLINE" | "DELAYED" | "UNAVAILABLE" | "AUTH_FAILED" | "AUTHENTICATION_FAILED" | "AUTH_REQUIRED";
+  timestamp?: number;
 }
 
 export interface OrderBookLevel {

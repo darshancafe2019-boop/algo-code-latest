@@ -45,9 +45,9 @@ export function NseOptionChainTerminal() {
     strikeCount
   );
 
-  const spotPrice = chainData?.spot_price || 24350.0;
-  const maxPain = chainData?.max_pain_strike || spotPrice;
-  const pcr = chainData?.pcr_oi || 1.0;
+  const spotPrice = chainData?.spot_price || 0;
+  const maxPain = chainData?.max_pain_strike || (spotPrice > 0 ? spotPrice : 0);
+  const pcr = chainData?.pcr_oi != null ? chainData.pcr_oi : null;
   const normalizedExpiries = React.useMemo(() => {
     const availableExpiries = chainData?.available_expiries || [];
     return normalizeExpiriesList(availableExpiries, selectedSymbol);
@@ -57,7 +57,7 @@ export function NseOptionChainTerminal() {
   const handleOpenOrder = (strike: number, type: "CE" | "PE", price: number, side: "BUY" | "SELL") => {
     setOrderStrike(strike);
     setOrderType(type);
-    setOrderPrice(price || 100);
+    setOrderPrice(price || 0);
     setOrderSide(side);
     setOrderModalOpen(true);
   };
@@ -133,31 +133,37 @@ export function NseOptionChainTerminal() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6 font-mono">
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Underlying Spot Price</div>
-          <div className="text-lg font-bold text-white mt-1">{formatMoney(spotPrice, "₹")}</div>
+          <div className="text-lg font-bold text-white mt-1">{spotPrice > 0 ? formatMoney(spotPrice, "₹") : "—"}</div>
         </div>
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Put-Call Ratio (PCR)</div>
           <div className="flex items-center gap-2 mt-1">
-            <span className={`text-lg font-bold ${pcr > 1 ? "text-emerald-400" : "text-rose-400"}`}>
-              {pcr.toFixed(2)}
-            </span>
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
-              {pcr > 1.2 ? "BULLISH" : pcr < 0.8 ? "BEARISH" : "NEUTRAL"}
-            </span>
+            {pcr != null ? (
+              <>
+                <span className={`text-lg font-bold ${pcr > 1 ? "text-emerald-400" : "text-rose-400"}`}>
+                  {pcr.toFixed(2)}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                  {pcr > 1.2 ? "BULLISH" : pcr < 0.8 ? "BEARISH" : "NEUTRAL"}
+                </span>
+              </>
+            ) : (
+              <span className="text-sm font-bold text-slate-500">—</span>
+            )}
           </div>
         </div>
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Max Pain Strike</div>
-          <div className="text-lg font-bold text-amber-300 mt-1">{formatMoney(maxPain, "₹")}</div>
+          <div className="text-lg font-bold text-amber-300 mt-1">{maxPain > 0 ? formatMoney(maxPain, "₹") : "—"}</div>
         </div>
 
         <div className="p-3 bg-slate-900/60 border border-slate-800 rounded-xl">
           <div className="text-xs text-slate-400 font-sans">Total Call / Put OI</div>
           <div className="text-xs font-bold text-slate-300 mt-2 flex justify-between">
-            <span className="text-emerald-400">C: {(chainData?.total_call_oi ? chainData.total_call_oi / 100000 : 12.5).toFixed(1)}L</span>
-            <span className="text-rose-400">P: {(chainData?.total_put_oi ? chainData.total_put_oi / 100000 : 14.2).toFixed(1)}L</span>
+            <span className="text-emerald-400">C: {chainData?.total_call_oi != null ? `${(chainData.total_call_oi / 100000).toFixed(1)}L` : "—"}</span>
+            <span className="text-rose-400">P: {chainData?.total_put_oi != null ? `${(chainData.total_put_oi / 100000).toFixed(1)}L` : "—"}</span>
           </div>
         </div>
       </div>
@@ -198,8 +204,8 @@ export function NseOptionChainTerminal() {
               const ce = row.ce;
               const pe = row.pe;
 
-              const isCeItm = strike < spotPrice;
-              const isPeItm = strike > spotPrice;
+              const isCeItm = spotPrice > 0 ? strike < spotPrice : false;
+              const isPeItm = spotPrice > 0 ? strike > spotPrice : false;
 
               return (
                 <tr
@@ -242,22 +248,22 @@ export function NseOptionChainTerminal() {
 
                   {/* CE IV */}
                   <td className={`py-2 px-2 text-slate-400 ${isCeItm ? "bg-emerald-950/20" : ""}`}>
-                    {ce.iv ? ce.iv.toFixed(1) : "14.2"}%
+                    {ce.iv != null ? `${ce.iv.toFixed(1)}%` : "—"}
                   </td>
 
                   {/* CE Delta */}
                   <td className={`py-2 px-2 text-emerald-400 ${isCeItm ? "bg-emerald-950/20" : ""}`}>
-                    {ce.delta ? ce.delta.toFixed(2) : "0.50"}
+                    {ce.delta != null ? ce.delta.toFixed(2) : "—"}
                   </td>
 
                   {/* CE Theta */}
                   <td className={`py-2 px-2 text-slate-400 ${isCeItm ? "bg-emerald-950/20" : ""}`}>
-                    {ce.theta ? ce.theta.toFixed(1) : "-8.2"}
+                    {ce.theta != null ? ce.theta.toFixed(1) : "—"}
                   </td>
 
                   {/* CE LTP */}
                   <td className={`py-2 px-3 font-bold text-emerald-300 ${isCeItm ? "bg-emerald-950/20" : ""}`}>
-                    ₹{ce.ltp.toFixed(2)}
+                    {ce.ltp != null ? `₹${ce.ltp.toFixed(2)}` : "—"}
                   </td>
 
                   {/* CENTER STRIKE */}
@@ -276,22 +282,22 @@ export function NseOptionChainTerminal() {
 
                   {/* PE LTP */}
                   <td className={`py-2 px-3 font-bold text-rose-300 text-left ${isPeItm ? "bg-rose-950/20" : ""}`}>
-                    ₹{pe.ltp.toFixed(2)}
+                    {pe.ltp != null ? `₹${pe.ltp.toFixed(2)}` : "—"}
                   </td>
 
                   {/* PE Theta */}
                   <td className={`py-2 px-2 text-slate-400 text-left ${isPeItm ? "bg-rose-950/20" : ""}`}>
-                    {pe.theta ? pe.theta.toFixed(1) : "-7.8"}
+                    {pe.theta != null ? pe.theta.toFixed(1) : "—"}
                   </td>
 
                   {/* PE Delta */}
                   <td className={`py-2 px-2 text-rose-400 text-left ${isPeItm ? "bg-rose-950/20" : ""}`}>
-                    {pe.delta ? pe.delta.toFixed(2) : "-0.50"}
+                    {pe.delta != null ? pe.delta.toFixed(2) : "—"}
                   </td>
 
                   {/* PE IV */}
                   <td className={`py-2 px-2 text-slate-400 text-left ${isPeItm ? "bg-rose-950/20" : ""}`}>
-                    {pe.iv ? pe.iv.toFixed(1) : "14.8"}%
+                    {pe.iv != null ? `${pe.iv.toFixed(1)}%` : "—"}
                   </td>
 
                   {/* PE Volume */}

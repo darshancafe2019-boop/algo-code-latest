@@ -61,19 +61,20 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
   const currencySymbol = isIndianAsset ? "₹" : "$";
 
   // Prioritize WebSocket live quote if available
-  const price = Number(liveWsQuote?.last_price || rawTicker.last || rawTicker.price || contextData?.price || (isIndianAsset ? 24500.0 : 65420.0));
-  const changePct = liveWsQuote?.change_pct !== null && liveWsQuote?.change_pct !== undefined
-    ? Number(liveWsQuote.change_pct)
-    : (rawTicker.change_pct !== undefined ? Number(rawTicker.change_pct) : (rawTicker.change_24h_pct !== undefined ? Number(rawTicker.change_24h_pct) : (contextData?.change_24h_pct ?? 1.45)));
-  const isPositive = changePct >= 0;
+  const rawPrice = liveWsQuote?.last_price ?? rawTicker.last ?? rawTicker.price ?? contextData?.price ?? null;
+  const price = typeof rawPrice === "number" && rawPrice > 0 ? rawPrice : null;
+
+  const rawChangePct = liveWsQuote?.change_pct ?? rawTicker.change_pct ?? rawTicker.change_24h_pct ?? contextData?.change_24h_pct ?? null;
+  const changePct = typeof rawChangePct === "number" ? rawChangePct : null;
+  const isPositive = (changePct ?? 0) >= 0;
 
   const regime = contextData?.trend_regime || "TRENDING_BULL";
-  const atr = contextData?.volatility_atr || (price * 0.015);
-  const funding = contextData?.funding_rate_pct !== undefined ? contextData.funding_rate_pct : 0.01;
-  const feedAgeMs = liveWsQuote ? Math.round(liveWsQuote.feed_latency_ms || 18) : (tickerData?.latency_ms || rawTicker.latency_ms || 35);
+  const atr = contextData?.volatility_atr || (price ? price * 0.015 : 0);
+  const funding = contextData?.funding_rate_pct !== undefined ? contextData.funding_rate_pct : null;
+  const feedAgeMs = liveWsQuote ? Math.round(liveWsQuote.feed_latency_ms || 0) : (tickerData?.latency_ms || rawTicker.latency_ms || 0);
   const isStale = Boolean(liveWsQuote?.is_stale || (connectionStatus !== "LIVE" && (tickerData?.is_stale || rawTicker.is_stale)));
-  const provider = liveWsQuote?.provider || rawTicker.provider || (isIndianAsset ? "dhan_ws" : "binance");
-  const dataQuality = isStale ? "RECONNECTING" : feedAgeMs < 500 ? "LIVE" : "DEGRADED";
+  const provider = liveWsQuote?.provider || rawTicker.provider || (isIndianAsset ? "upstox_ws" : "binance");
+  const dataQuality = isStale ? "RECONNECTING" : feedAgeMs < 500 && price ? "LIVE" : "DEGRADED";
 
   return (
     <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-2.5 sm:p-3 shadow-lg select-none font-sans overflow-x-auto">
@@ -81,23 +82,25 @@ export function MarketContextStrip({ symbol, contextData }: MarketContextStripPr
         {/* Left: Active Symbol & Live Mark Price */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <span className={`h-2 w-2 rounded-full ${isStale ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
+            <span className={`h-2 w-2 rounded-full ${isStale || !price ? "bg-amber-400" : "bg-emerald-400"} animate-pulse`} />
             <span className="font-mono font-bold text-sm text-slate-100">{symbol || "BTC/USDT"}</span>
           </div>
 
           <div className="flex items-center gap-2 font-mono">
             <span className="text-sm font-bold text-white">
-              {formatMoney(price, currencySymbol)}
+              {price !== null ? formatMoney(price, currencySymbol) : "—"}
             </span>
-            <span
-              className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                isPositive
-                  ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800"
-                  : "bg-rose-950/80 text-rose-400 border border-rose-800"
-              }`}
-            >
-              {isPositive ? `+${changePct.toFixed(2)}%` : `${changePct.toFixed(2)}%`}
-            </span>
+            {changePct !== null && (
+              <span
+                className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                  isPositive
+                    ? "bg-emerald-950/80 text-emerald-400 border border-emerald-800"
+                    : "bg-rose-950/80 text-rose-400 border border-rose-800"
+                }`}
+              >
+                {isPositive ? `+${changePct.toFixed(2)}%` : `${changePct.toFixed(2)}%`}
+              </span>
+            )}
           </div>
         </div>
 

@@ -14,7 +14,6 @@ import { HeaderTimeframeSelector } from "./header/HeaderTimeframeSelector";
 import { HeaderConnectionStatus } from "./header/HeaderConnectionStatus";
 import { HeaderRiskStatus } from "./header/HeaderRiskStatus";
 import { HeaderGlobalSearch } from "./header/HeaderGlobalSearch";
-import { HeaderAICopilotButton } from "./header/HeaderAICopilotButton";
 import { HeaderOrderButton } from "./header/HeaderOrderButton";
 import { HeaderBotControl } from "./header/HeaderBotControl";
 import { HeaderTradingMode } from "./header/HeaderTradingMode";
@@ -22,9 +21,7 @@ import { HeaderPnLDisplay } from "./header/HeaderPnLDisplay";
 import { HeaderHaltButton } from "./header/HeaderHaltButton";
 import { HeaderUserMenu } from "./header/HeaderUserMenu";
 
-import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 import { QuickMarketSwitcherModal } from "@/components/layout/QuickMarketSwitcherModal";
-import { UniversalMarketAICopilot } from "@/components/ai/UniversalMarketAICopilot";
 
 interface TopCommandBarProps {
   onOpenSearch?: () => void;
@@ -122,10 +119,9 @@ export const TopCommandBar = memo(function TopCommandBar({
           </div>
         </div>
 
-        {/* Center Section: Intelligent Global Search + AI Copilot Trigger */}
+        {/* Center Section: Intelligent Global Search */}
         <div className="hidden md:flex items-center justify-center gap-2 flex-1 max-w-sm mx-2">
           <HeaderGlobalSearch onOpenSearch={onOpenSearch} />
-          <HeaderAICopilotButton />
         </div>
 
         {/* Right Section: Order, Bot, Trading Mode, P&L, Safety Halt, User Controls */}
@@ -142,7 +138,7 @@ export const TopCommandBar = memo(function TopCommandBar({
             statusDataEquity={statusData?.health?.balance}
           />
           <HeaderHaltButton isKillSwitchActive={isKillSwitchActive} />
-          <HeaderUserMenu onOpenMarketAnalyst={() => setIsMarketAnalystOpen(true)} />
+          <HeaderUserMenu />
 
           {/* Mobile Hamburger Menu Toggle */}
           <button
@@ -156,17 +152,8 @@ export const TopCommandBar = memo(function TopCommandBar({
         </div>
       </header>
 
-      {/* Embedded Global Modals & Drawers */}
-      <MarketAnalystDrawer
-        isOpen={isMarketAnalystOpen}
-        onClose={() => setIsMarketAnalystOpen(false)}
-        symbol={activeSymbol || "BTC/USDT"}
-        assetClass="crypto"
-        exchange="binance"
-      />
-
+      {/* Embedded Global Modals */}
       <QuickMarketSwitcherModal />
-      <UniversalMarketAICopilot />
     </>
   );
 });

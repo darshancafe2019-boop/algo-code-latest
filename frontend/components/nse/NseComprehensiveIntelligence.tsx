@@ -223,9 +223,9 @@ export function NseComprehensiveIntelligence() {
               {(preData?.data || []).map((item: any, idx: number) => (
                 <tr key={idx} className="hover:bg-slate-900/40">
                   <td className="py-2.5 px-3 font-bold text-white">{item.symbol}</td>
-                  <td className="py-2.5 px-3 text-cyan-300">₹{item.iep || item.lastPrice || 24350.0}</td>
+                  <td className="py-2.5 px-3 text-cyan-300">{item.iep || item.lastPrice ? `₹${(item.iep || item.lastPrice).toFixed(2)}` : "—"}</td>
                   <td className={`py-2.5 px-3 font-bold ${(item.pChange ?? 0) >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                    {(item.pChange ?? 0) >= 0 ? "+" : ""}{item.pChange || 0.45}%
+                    {item.pChange != null ? `${item.pChange >= 0 ? "+" : ""}${item.pChange.toFixed(2)}%` : "—"}
                   </td>
                   <td className="py-2.5 px-3 text-slate-400">{formatQuantity(item.finalQuantity)}</td>
                 </tr>

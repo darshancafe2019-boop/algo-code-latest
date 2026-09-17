@@ -29,51 +29,22 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
   const [selectedExpiry, setSelectedExpiry] = useState<string>("2026-08-27");
 
   // Fetch Option Chain data (`GET /api/universe/option-chain`)
-  const { data: chainData, isLoading } = useQuery<OptionChainData>({
+  const { data: chainData, isLoading, error } = useQuery<OptionChainData>({
     queryKey: ["optionsCommandChain", symbol, selectedExpiry],
     queryFn: async () => {
       const res = await fetch(`/api/universe/option-chain?underlying=${encodeURIComponent(symbol)}&expiry=${encodeURIComponent(selectedExpiry)}`);
       if (!res.ok) {
-        // High fidelity fallback strike data for demo/offline
-        return {
-          underlying: symbol,
-          spot_price: symbol.includes("NIFTY") ? 24350.0 : 65420.0,
-          selected_expiry: selectedExpiry,
-          available_expiries: ["2026-08-27", "2026-09-03", "2026-09-24", "2026-10-29"],
-          atm_strike: symbol.includes("NIFTY") ? 24350 : 65400,
-          highest_call_oi: symbol.includes("NIFTY") ? 24500 : 66000,
-          highest_put_oi: symbol.includes("NIFTY") ? 24000 : 64000,
-          pcr: 1.15,
-          max_pain: symbol.includes("NIFTY") ? 24300 : 65000,
-          iv_skew: 1.4,
-          strikes: [
-            {
-              strike: symbol.includes("NIFTY") ? 24200 : 64000,
-              call: { instrument_id: "c1", provider_symbol: `${symbol} 24200 CE`, canonical_symbol: `${symbol} 24200 CE`, display_symbol: "24200 CE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 240.5, volume_24h: 180000, open_interest: 450000, delta: 0.72, gamma: 0.0015, theta: -14.2, vega: 18.5, implied_volatility: 14.8, volatility_score: 55, momentum_score: 60 },
-              put: { instrument_id: "p1", provider_symbol: `${symbol} 24200 PE`, canonical_symbol: `${symbol} 24200 PE`, display_symbol: "24200 PE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 68.2, volume_24h: 310000, open_interest: 920000, delta: -0.28, gamma: 0.0015, theta: -12.4, vega: 18.2, implied_volatility: 15.2, volatility_score: 55, momentum_score: 60 },
-            },
-            {
-              strike: symbol.includes("NIFTY") ? 24350 : 65400,
-              call: { instrument_id: "c2", provider_symbol: `${symbol} 24350 CE`, canonical_symbol: `${symbol} 24350 CE`, display_symbol: "24350 CE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 135.0, volume_24h: 420000, open_interest: 780000, delta: 0.51, gamma: 0.0022, theta: -18.6, vega: 22.4, implied_volatility: 15.0, volatility_score: 60, momentum_score: 65 },
-              put: { instrument_id: "p2", provider_symbol: `${symbol} 24350 PE`, canonical_symbol: `${symbol} 24350 PE`, display_symbol: "24350 PE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 132.5, volume_24h: 390000, open_interest: 740000, delta: -0.49, gamma: 0.0022, theta: -18.1, vega: 22.1, implied_volatility: 15.1, volatility_score: 60, momentum_score: 65 },
-            },
-            {
-              strike: symbol.includes("NIFTY") ? 24500 : 66000,
-              call: { instrument_id: "c3", provider_symbol: `${symbol} 24500 CE`, canonical_symbol: `${symbol} 24500 CE`, display_symbol: "24500 CE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 62.4, volume_24h: 510000, open_interest: 1250000, delta: 0.31, gamma: 0.0016, theta: -13.5, vega: 19.2, implied_volatility: 15.4, volatility_score: 50, momentum_score: 55 },
-              put: { instrument_id: "p3", provider_symbol: `${symbol} 24500 PE`, canonical_symbol: `${symbol} 24500 PE`, display_symbol: "24500 PE", company_name: symbol, exchange: "NSE", mic: "XNSE", country: "IN", currency: "INR", asset_class: "Options", instrument_type: "OPT", lot_size: 25, tick_size: 0.05, contract_size: 25, price_multiplier: 1, segment: "NFO", market_status: "OPEN", tradability: "FULL", data_status: "LIVE", data_source: "NSE", contract_status: "ACTIVE", paper_enabled: true, live_enabled: true, strategy_enabled: true, last_price: 245.0, volume_24h: 120000, open_interest: 320000, delta: -0.69, gamma: 0.0016, theta: -14.1, vega: 19.5, implied_volatility: 15.6, volatility_score: 50, momentum_score: 55 },
-            },
-          ],
-        };
+        throw new Error(`Option chain service returned status ${res.status}`);
       }
       return res.json();
     },
     refetchInterval: 6000,
   });
 
-  const spot = chainData?.spot_price || 24350.0;
-  const atmStrike = chainData?.atm_strike || 24350;
+  const spot = chainData?.spot_price ?? 0;
+  const atmStrike = chainData?.atm_strike ?? 0;
   const normalizedExpiries = React.useMemo(() => {
-    const rawExpiries = chainData?.available_expiries || ["2026-08-27", "2026-09-03", "2026-09-24"];
+    const rawExpiries = chainData?.available_expiries || [];
     return normalizeExpiriesList(rawExpiries, symbol);
   }, [chainData?.available_expiries, symbol]);
 
@@ -91,7 +62,7 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
                 Options Command Center
               </h3>
               <span className="text-[10px] px-2 py-0.5 rounded bg-[#07101A] text-cyan-300 font-mono font-bold border border-[#122033]">
-                {symbol} Spot: {formatMoney(spot, "$")}
+                {symbol} Spot: {spot > 0 ? formatMoney(spot, "$") : "—"}
               </span>
             </div>
             <p className="text-[11px] text-[#7C8CA3]">
@@ -103,11 +74,11 @@ export function OptionsCommandCenter({ underlyingSymbol }: OptionsCommandCenterP
         {/* Expiry Selector & PCR Metrics */}
         <div className="flex items-center gap-2 font-mono text-xs">
           <div className="px-3 py-1 bg-[#07101A] border border-[#122033] rounded-xl text-purple-300">
-            <span>PCR: <strong>{chainData?.pcr || 1.15}</strong></span>
+            <span>PCR: <strong>{chainData?.pcr !== undefined && chainData?.pcr !== null ? chainData.pcr.toFixed(2) : "—"}</strong></span>
           </div>
 
           <div className="px-3 py-1 bg-[#07101A] border border-[#122033] rounded-xl text-[#22D3EE]">
-            <span>Max Pain: <strong>{chainData?.max_pain || 24300}</strong></span>
+            <span>Max Pain: <strong>{chainData?.max_pain !== undefined && chainData?.max_pain !== null ? chainData.max_pain : "—"}</strong></span>
           </div>
 
           <select

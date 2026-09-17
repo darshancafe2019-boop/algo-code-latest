@@ -399,7 +399,8 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 q = NormalizedQuote(
                     symbol=sym,
                     exchange="NSE",
-                    provider="upstox_ws",
+                    provider="upstox",
+                    instrument_key=ik,
                     last_price=ltp_val,
                     bid=bid_val,
                     ask=ask_val,
@@ -417,6 +418,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     feed_latency_ms=round(self._last_latency_ms, 1),
                     data_mode="REAL_TIME",
                     is_stale=False,
+                    calculation_source="upstox_websocket",
                 )
                 self._quote_cache[sym] = q
                 self._quote_cache[sym.upper()] = q
@@ -463,6 +465,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
 
     async def get_snapshot(self, symbols: List[str]) -> Dict[str, NormalizedQuote]:
         result = {}
+        missing = []
         for s in symbols:
             clean = s.strip()
             clean_u = clean.upper()
@@ -476,6 +479,42 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                     result[s] = self._quote_cache[sym_mapped]
                 elif sym_mapped.upper() in self._quote_cache:
                     result[s] = self._quote_cache[sym_mapped.upper()]
+                else:
+                    missing.append(s)
+
+        if missing and global_upstox_service.is_authenticated:
+            try:
+                rest_data = await asyncio.to_thread(global_upstox_service.get_ltp, missing)
+                if rest_data.get("status") == "success" and "data" in rest_data:
+                    raw_data = rest_data["data"]
+                    now_iso = datetime.now(timezone.utc).isoformat()
+                    for m in missing:
+                        item = raw_data.get(m) or raw_data.get(m.upper())
+                        if item and isinstance(item, dict):
+                            ltp_val = float(item.get("last_price") or item.get("ltp") or 0.0)
+                            if ltp_val > 0:
+                                ik = item.get("instrument_key") or global_upstox_service.resolve_instrument_key(m) or m
+                                can_sym = global_upstox_service.resolve_canonical_symbol(ik) or m
+                                q = NormalizedQuote(
+                                    symbol=can_sym,
+                                    exchange="NSE",
+                                    provider="upstox",
+                                    instrument_key=ik,
+                                    last_price=ltp_val,
+                                    event_timestamp=now_iso,
+                                    received_timestamp=now_iso,
+                                    data_mode="SNAPSHOT",
+                                    is_stale=False,
+                                    calculation_source="upstox_rest_snapshot",
+                                )
+                                result[m] = q
+                                # Only set in cache if not already populated by live WebSocket
+                                if can_sym not in self._quote_cache:
+                                    self._quote_cache[can_sym] = q
+                                    self._quote_cache[ik] = q
+            except Exception as e:
+                logger.debug("Upstox REST snapshot query note: %s", e)
+
         return result
 
     async def get_instruments(self) -> List[CanonicalInstrument]:

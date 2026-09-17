@@ -31,7 +31,7 @@ interface OptionTerminalHeaderProps {
   isSourceLocked?: boolean;
   environment: "LIVE" | "PAPER";
   onChangeEnvironment?: (env: "LIVE" | "PAPER") => void;
-  freshnessStatus: "LIVE" | "RECENT" | "STALE" | "OFFLINE";
+  freshnessStatus: "LIVE" | "RECENT" | "STALE" | "OFFLINE" | "DELAYED" | "UNAVAILABLE" | "AUTH_FAILED" | "AUTHENTICATION_FAILED" | "AUTH_REQUIRED" | string;
   dataAgeMs: number;
   latencyMs: number;
   isFetching: boolean;
@@ -111,7 +111,15 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          LIVE ({latencyMs}ms)
+          DATA: LIVE {latencyMs > 0 ? `(${latencyMs}ms)` : ""}
+        </span>
+      );
+    }
+    if (freshnessStatus === "DELAYED") {
+      return (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold">
+          <span className="w-2 h-2 rounded-full bg-amber-400" />
+          DATA: DELAYED ({Math.round(dataAgeMs / 1000)}s)
         </span>
       );
     }
@@ -119,14 +127,22 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
-          STALE ({Math.round(dataAgeMs / 1000)}s)
+          DATA: STALE ({Math.round(dataAgeMs / 1000)}s)
+        </span>
+      );
+    }
+    if (freshnessStatus === "AUTHENTICATION_FAILED" || freshnessStatus === "AUTH_FAILED" || freshnessStatus === "AUTH_REQUIRED") {
+      return (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold">
+          <span className="w-2 h-2 rounded-full bg-rose-400" />
+          DATA: AUTH FAILED
         </span>
       );
     }
     return (
-      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold">
-        <span className="w-2 h-2 rounded-full bg-rose-400" />
-        OFFLINE
+      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-xs sm:text-sm font-mono font-bold">
+        <span className="w-2 h-2 rounded-full bg-slate-500" />
+        DATA: UNAVAILABLE
       </span>
     );
   };
@@ -173,20 +189,22 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
           {/* Spot Price and Daily Change */}
           <div className="flex items-baseline gap-2.5 font-mono">
             <span className="text-xl sm:text-2xl md:text-3xl font-black text-white tracking-tight">
-              {formatIndianCurrency(spotPrice, currency)}
+              {spotPrice > 0 ? formatIndianCurrency(spotPrice, currency) : "—"}
             </span>
-            <div
-              className={`flex items-center gap-1 text-xs sm:text-sm md:text-base font-bold px-2 py-0.5 rounded ${
-                isPositive ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
-              }`}
-            >
-              {isPositive ? <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-              <span>
-                {isPositive ? "+" : ""}
-                {spotChange.toFixed(2)} ({isPositive ? "+" : ""}
-                {spotChangePercent.toFixed(2)}%)
-              </span>
-            </div>
+            {spotPrice > 0 && spotChange !== 0 && (
+              <div
+                className={`flex items-center gap-1 text-xs sm:text-sm md:text-base font-bold px-2 py-0.5 rounded ${
+                  isPositive ? "text-emerald-400 bg-emerald-500/10" : "text-rose-400 bg-rose-500/10"
+                }`}
+              >
+                {isPositive ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                <span>
+                  {isPositive ? "+" : ""}
+                  {spotChange.toFixed(2)} ({isPositive ? "+" : ""}
+                  {spotChangePercent.toFixed(2)}%)
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Market Status (IST Clock) */}

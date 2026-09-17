@@ -155,25 +155,53 @@ def get_market_quote():
     # 1. Query Central In-Memory Market Cache
     cached = global_market_cache.get(symbol)
     if cached:
-        stale_info = global_stale_protection.is_stale(symbol, cached.timestamp)
+        if isinstance(cached, dict):
+            c_ltp = cached.get("ltp") or cached.get("last_price") or cached.get("price")
+            c_bid = cached.get("bid")
+            c_ask = cached.get("ask")
+            c_vol = cached.get("volume")
+            c_oi = cached.get("oi") or cached.get("open_interest")
+            c_high = cached.get("high")
+            c_low = cached.get("low")
+            c_open = cached.get("open")
+            c_close = cached.get("close") or cached.get("previous_close")
+            c_ts = cached.get("timestamp") or cached.get("event_timestamp")
+            c_prov = cached.get("provider")
+            c_qual = cached.get("data_quality", "VALIDATED_LIVE")
+        else:
+            c_ltp = getattr(cached, "ltp", getattr(cached, "last_price", getattr(cached, "price", None)))
+            c_bid = getattr(cached, "bid", None)
+            c_ask = getattr(cached, "ask", None)
+            c_vol = getattr(cached, "volume", None)
+            c_oi = getattr(cached, "oi", getattr(cached, "open_interest", None))
+            c_high = getattr(cached, "high", None)
+            c_low = getattr(cached, "low", None)
+            c_open = getattr(cached, "open", None)
+            c_close = getattr(cached, "close", getattr(cached, "previous_close", None))
+            c_ts = getattr(cached, "timestamp", getattr(cached, "event_timestamp", None))
+            c_prov = getattr(cached, "provider", None)
+            c_qual = getattr(cached, "data_quality", "VALIDATED_LIVE")
+
+        stale_info = global_stale_protection.is_stale(symbol, c_ts)
+        ts_str = c_ts.isoformat() if hasattr(c_ts, "isoformat") else (str(c_ts) if c_ts else None)
         return jsonify({
             "status": "success",
             "symbol": symbol,
-            "source": cached.provider or "CENTRAL_CACHE",
+            "source": c_prov or "CENTRAL_CACHE",
             "quote": {
-                "symbol": cached.symbol,
-                "ltp": cached.ltp,
-                "bid": cached.bid,
-                "ask": cached.ask,
-                "volume": cached.volume,
-                "oi": cached.oi,
-                "high": cached.high,
-                "low": cached.low,
-                "open": cached.open,
-                "close": cached.close,
-                "timestamp": cached.timestamp.isoformat() if cached.timestamp else None,
+                "symbol": symbol,
+                "ltp": c_ltp,
+                "bid": c_bid,
+                "ask": c_ask,
+                "volume": c_vol,
+                "oi": c_oi,
+                "high": c_high,
+                "low": c_low,
+                "open": c_open,
+                "close": c_close,
+                "timestamp": ts_str,
                 "is_stale": stale_info.get("is_stale", False),
-                "data_quality": cached.data_quality
+                "data_quality": c_qual
             },
             "providerStatus": "LIVE" if not stale_info.get("is_stale", False) else "STALE",
             "timestamp": datetime.now(timezone.utc).isoformat()

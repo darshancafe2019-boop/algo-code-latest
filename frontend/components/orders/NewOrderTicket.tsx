@@ -27,12 +27,12 @@ import {
 import { OrderReviewConfirmationModal } from "./OrderReviewConfirmationModal";
 
 const POPULAR_INSTRUMENTS = [
-  { symbol: "BTC/USDT", name: "Bitcoin Perpetual", price: 65240.0, assetClass: "Crypto" },
-  { symbol: "ETH/USDT", name: "Ethereum Perpetual", price: 3520.0, assetClass: "Crypto" },
-  { symbol: "SOL/USDT", name: "Solana Perpetual", price: 154.5, assetClass: "Crypto" },
-  { symbol: "NIFTY", name: "NIFTY 50 Index", price: 24350.0, assetClass: "NSE" },
-  { symbol: "BANKNIFTY", name: "Bank NIFTY Index", price: 51200.0, assetClass: "NSE" },
-  { symbol: "RELIANCE", name: "Reliance Industries", price: 2980.0, assetClass: "NSE" },
+  { symbol: "BTC/USDT", name: "Bitcoin Perpetual", assetClass: "Crypto" },
+  { symbol: "ETH/USDT", name: "Ethereum Perpetual", assetClass: "Crypto" },
+  { symbol: "SOL/USDT", name: "Solana Perpetual", assetClass: "Crypto" },
+  { symbol: "NIFTY", name: "NIFTY 50 Index", assetClass: "NSE" },
+  { symbol: "BANKNIFTY", name: "Bank NIFTY Index", assetClass: "NSE" },
+  { symbol: "RELIANCE", name: "Reliance Industries", assetClass: "NSE" },
 ];
 
 interface NewOrderTicketProps {
@@ -44,7 +44,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
 
   // 1. Instrument State
   const [selectedSymbol, setSelectedSymbol] = useState("BTC/USDT");
-  const [marketPrice, setMarketPrice] = useState(65240.0);
+  const [marketPrice, setMarketPrice] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isPriceLoading, setIsPriceLoading] = useState(false);
@@ -52,12 +52,12 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   // 2. Order Parameters State
   const [side, setSide] = useState<"BUY" | "SELL">("BUY");
   const [orderType, setOrderType] = useState<"MARKET" | "LIMIT" | "STOP">("MARKET");
-  const [limitPrice, setLimitPrice] = useState<number>(65240.0);
+  const [limitPrice, setLimitPrice] = useState<number>(0);
 
   // 3. Sizing State
   const [sizeMode, setSizeMode] = useState<"UNITS" | "NOTIONAL" | "RISK">("UNITS");
   const [quantity, setQuantity] = useState<number>(0.05);
-  const [notionalInput, setNotionalInput] = useState<number>(3262.0);
+  const [notionalInput, setNotionalInput] = useState<number>(0);
   const [riskPercentInput, setRiskPercentInput] = useState<number>(1.0);
 
   // 4. Leverage State
@@ -122,10 +122,12 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
   }, [selectedSymbol, orderType]);
 
   // Sync price when instrument changes
-  const handleSelectInstrument = (inst: { symbol: string; price: number }) => {
+  const handleSelectInstrument = (inst: { symbol: string; price?: number }) => {
     setSelectedSymbol(inst.symbol);
-    setMarketPrice(inst.price);
-    setLimitPrice(inst.price);
+    if (inst.price != null && inst.price > 0) {
+      setMarketPrice(inst.price);
+      setLimitPrice(inst.price);
+    }
     setIsSearchOpen(false);
     setSearchQuery("");
   };
@@ -333,7 +335,7 @@ export function NewOrderTicket({ onOpenDetailsDrawer }: NewOrderTicketProps) {
                       <div className="text-[10px] text-[#7C8CA3]">{inst.name}</div>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-[#22D3EE] font-mono tabular-nums">{formatMoney(inst.price, "$")}</div>
+                      <div className="font-semibold text-[#22D3EE] font-mono tabular-nums">{(inst as any).price ? formatMoney((inst as any).price, "$") : "Live"}</div>
                       <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#101B2D] text-[#7C8CA3]">
                         {inst.assetClass}
                       </span>

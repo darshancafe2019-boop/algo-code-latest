@@ -13,7 +13,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ["ws", "bufferutil", "utf-8-validate"],
   },
-  webpack(config, { isServer, dev }) {
+  webpack(config, { isServer }) {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -23,7 +23,6 @@ const nextConfig = {
         crypto: false,
       };
     }
-    config.externals = [...(config.externals || []), "bufferutil", "utf-8-validate"];
     return config;
   },
 };

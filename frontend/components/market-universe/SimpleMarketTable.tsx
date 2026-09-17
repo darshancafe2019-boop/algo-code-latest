@@ -483,8 +483,8 @@ const MemoizedMarketRow = memo(function MarketRow({
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
-  // Reactive subscription to real-time live ticks for this instrument
-  const liveTick = useSymbolQuote(sym);
+  // Reactive subscription to real-time live ticks for this instrument (strictly provider-scoped)
+  const liveTick = useSymbolQuote(sym, instrument.exchange, instrument.provider);
 
   // Derive authoritative raw quote from reactive tick or gateway context cache
   const rawQuote = liveTick ? {
@@ -507,9 +507,9 @@ const MemoizedMarketRow = memo(function MarketRow({
     received_timestamp: liveTick.receivedTimestamp,
     status: liveTick.status,
   } : (
-    getQuote(sym) ||
-    (instrument.canonical_symbol ? getQuote(instrument.canonical_symbol) : null) ||
-    (instrument.symbol ? getQuote(instrument.symbol) : null)
+    getQuote(sym, instrument.exchange, instrument.provider) ||
+    (instrument.canonical_symbol ? getQuote(instrument.canonical_symbol, instrument.exchange, instrument.provider) : null) ||
+    (instrument.symbol ? getQuote(instrument.symbol, instrument.exchange, instrument.provider) : null)
   );
 
   // Derive active healthy providers from gateway
@@ -535,23 +535,34 @@ const MemoizedMarketRow = memo(function MarketRow({
   });
 
   const liveQuote = rawQuote;
+  const isClosedMarket = rowStatus.marketSession === "CLOSED";
   const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
-  const price = hasLivePrice ? liveQuote.last_price : instrument.last_price;
   
-  // Calculate dynamic change and % based on validated previous close
-  const prevClose = (liveQuote as any)?.previous_close || liveQuote?.close || liveQuote?.open || (instrument as any).previous_close || (price && liveQuote?.change_pct ? price / (1 + liveQuote.change_pct / 100) : price);
-  const changePct = liveQuote?.change_pct != null 
-    ? liveQuote.change_pct 
-    : (prevClose && prevClose > 0 && price ? ((price - prevClose) / prevClose) * 100 : (instrument.change_pct_24h ?? instrument.change_24h ?? 0));
-  const isPositive = changePct >= 0;
+  // Strict Real Data Rule: If market is open or 24/7, ONLY genuine live quote is accepted.
+  // Static registry prices are NEVER silently substituted for missing live data on open markets.
+  const price = hasLivePrice 
+    ? liveQuote.last_price 
+    : (isClosedMarket && instrument.last_price != null && instrument.last_price > 0 ? instrument.last_price : null);
+  
+  // Calculate dynamic change and % strictly based on live quote when open, or static last close when market is closed
+  const prevClose = hasLivePrice 
+    ? (liveQuote?.close || liveQuote?.open || (price && liveQuote?.change_pct ? price / (1 + liveQuote.change_pct / 100) : null))
+    : (isClosedMarket ? ((instrument as any).previous_close || (instrument as any).open) : null);
+    
+  const changePct = hasLivePrice && liveQuote?.change_pct != null
+    ? liveQuote.change_pct
+    : (hasLivePrice && prevClose && prevClose > 0 && price ? ((price - prevClose) / prevClose) * 100 : (isClosedMarket ? (instrument.change_pct_24h ?? instrument.change_24h ?? null) : null));
+    
+  const isPositive = (changePct ?? 0) >= 0;
   const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
 
-  const bid = liveQuote?.bid != null && liveQuote.bid > 0 ? liveQuote.bid : instrument.bid;
-  const ask = liveQuote?.ask != null && liveQuote.ask > 0 ? liveQuote.ask : instrument.ask;
-  const volume = liveQuote?.volume != null && liveQuote.volume > 0 ? liveQuote.volume : instrument.volume_24h;
-  const high24h = liveQuote?.high ?? instrument.high_24h;
-  const low24h = liveQuote?.low ?? instrument.low_24h;
-  const openPrice = liveQuote?.open ?? (instrument as any).open;
+  // Bid / Ask / Volume / High / Low / Open: STRICT separation between live feed and static registry
+  const bid = hasLivePrice && liveQuote?.bid != null && liveQuote.bid > 0 ? liveQuote.bid : (isClosedMarket && instrument.bid != null && instrument.bid > 0 ? instrument.bid : null);
+  const ask = hasLivePrice && liveQuote?.ask != null && liveQuote.ask > 0 ? liveQuote.ask : (isClosedMarket && instrument.ask != null && instrument.ask > 0 ? instrument.ask : null);
+  const volume = hasLivePrice && liveQuote?.volume != null && liveQuote.volume > 0 ? liveQuote.volume : (isClosedMarket && instrument.volume_24h != null && instrument.volume_24h > 0 ? instrument.volume_24h : null);
+  const high24h = hasLivePrice && liveQuote?.high != null && liveQuote.high > 0 ? liveQuote.high : (isClosedMarket && instrument.high_24h != null && instrument.high_24h > 0 ? instrument.high_24h : null);
+  const low24h = hasLivePrice && liveQuote?.low != null && liveQuote.low > 0 ? liveQuote.low : (isClosedMarket && instrument.low_24h != null && instrument.low_24h > 0 ? instrument.low_24h : null);
+  const openPrice = hasLivePrice && liveQuote?.open != null && liveQuote.open > 0 ? liveQuote.open : (isClosedMarket && (instrument as any).open != null && (instrument as any).open > 0 ? (instrument as any).open : null);
 
   const dataAgeSec = liveQuote?.age_seconds ?? 999;
   const isStaleFeed = rowStatus.isStale;
@@ -594,7 +605,9 @@ const MemoizedMarketRow = memo(function MarketRow({
 
   // Trend determination based on calculated change
   const trend =
-    changePct > 0.05
+    changePct == null
+      ? { label: "—", color: "text-slate-500" }
+      : changePct > 0.05
       ? { label: "↑ Bullish", color: "text-emerald-400" }
       : changePct < -0.05
       ? { label: "↓ Bearish", color: "text-rose-400" }
@@ -784,7 +797,7 @@ const MemoizedMarketRow = memo(function MarketRow({
           </td>
           <td className="px-4 text-right font-mono font-bold text-[15.5px] text-white tracking-tight">{formatPrice(price, currSymbol)}</td>
           <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
-            {formatPrice(instrument.change_24h ?? 0, currSymbol, undefined, "—")}
+            {formatPrice(hasLivePrice ? (liveQuote as any)?.change : (isClosedMarket ? (instrument.change_24h ?? 0) : null), currSymbol, undefined, "—")}
           </td>
           <td className={`px-4 text-right font-mono font-bold text-[14.5px] ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
             {formatPercent(changePct, 2, true)}

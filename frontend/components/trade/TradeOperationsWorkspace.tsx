@@ -69,29 +69,7 @@ export function TradeOperationsWorkspace() {
   const [commandPayload, setCommandPayload] = useState<string>("{}");
   const [consoleOutput, setConsoleOutput] = useState<
     Array<{ timestamp: string; command: string; status: "STARTED" | "COMPLETED" | "FAILED"; message: string; latency?: string }>
-  >([
-    {
-      timestamp: "18:42:11",
-      command: "REFRESH_MARKET_DATA",
-      status: "COMPLETED",
-      message: "Candles and tick buffers refreshed across 220 instruments",
-      latency: "42ms",
-    },
-    {
-      timestamp: "18:42:12",
-      command: "DHAN_FEED",
-      status: "COMPLETED",
-      message: "Official Dhan v2 market feed authenticated and connected",
-      latency: "12ms",
-    },
-    {
-      timestamp: "18:42:12",
-      command: "TELEGRAM_ALERTS",
-      status: "COMPLETED",
-      message: "Notification worker ACK received (Chat ID: 5657...)",
-      latency: "38ms",
-    },
-  ]);
+  >([]);
   const [isExecuting, setIsExecuting] = useState(false);
 
   // ── 3. Safety Confirmation Modals ──────────────────────────────

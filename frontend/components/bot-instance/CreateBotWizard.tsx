@@ -220,6 +220,54 @@ const QUICK_STRATEGIES = [
   },
 ];
 
+// Central Broker & Account Normalizer
+export function normalizeBroker(rawBroker?: string | null): {
+  folderId: string;
+  accountId: string;
+  provider: string;
+  brokerId: string;
+} {
+  const b = (rawBroker || "").toUpperCase();
+  if (b.includes("DHAN")) {
+    return {
+      folderId: "bf_dhan",
+      accountId: "ba_dhan_primary",
+      provider: "dhan",
+      brokerId: "dhan_india",
+    };
+  }
+  if (b.includes("UPSTOX")) {
+    return {
+      folderId: "bf_upstox",
+      accountId: "ba_upstox_primary",
+      provider: "upstox",
+      brokerId: "upstox",
+    };
+  }
+  if (b.includes("DELTA")) {
+    return {
+      folderId: "bf_delta",
+      accountId: "ba_delta_primary",
+      provider: "delta_exchange",
+      brokerId: "delta_exchange",
+    };
+  }
+  if (b.includes("BINANCE")) {
+    return {
+      folderId: "bf_binance",
+      accountId: "ba_binance_primary",
+      provider: "binance",
+      brokerId: "binance",
+    };
+  }
+  return {
+    folderId: "bf_paper",
+    accountId: "ACC-PRIMARY",
+    provider: "paper_simulator",
+    brokerId: "paper_simulator",
+  };
+}
+
 export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -312,40 +360,61 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const [errorMessage, setErrorMessage] = useState<string>("");
   const [successMessage, setSuccessMessage] = useState<string>("");
 
+  // Active subscription key (prefer canonical contract ID for options & futures)
+  const activeSubKey = activeIntent?.canonicalContractId || searchParams.get("canonicalContractId") || activeIntent?.symbol || symbol;
+
   // WebSocket Live Telemetry Feed
-  const { getQuote, subscribe, unsubscribe, connectionStatus } = useMarketGatewayContext();
+  const { getQuote, quotes, subscribe, unsubscribe, connectionStatus } = useMarketGatewayContext();
 
-  // Subscribe to live market feed for current symbol
+  // Subscribe to live market feed for current symbol and canonical contract
   useEffect(() => {
-    if (!symbol) return;
-    subscribe(symbol, "RUNNING_BOT");
+    if (!activeSubKey) return;
+    subscribe(activeSubKey, "RUNNING_BOT");
+    if (symbol && symbol !== activeSubKey) {
+      subscribe(symbol, "RUNNING_BOT");
+    }
     return () => {
-      unsubscribe(symbol, "RUNNING_BOT");
+      unsubscribe(activeSubKey, "RUNNING_BOT");
+      if (symbol && symbol !== activeSubKey) {
+        unsubscribe(symbol, "RUNNING_BOT");
+      }
     };
-  }, [symbol, subscribe, unsubscribe]);
+  }, [activeSubKey, symbol, subscribe, unsubscribe]);
 
-  const liveWsQuote = getQuote(symbol);
+  const liveWsQuote = getQuote(activeSubKey) || getQuote(symbol) || quotes.get(activeSubKey) || quotes.get(symbol);
 
-  // Load Intent from Store or Session on mount
+  // Load Intent from Store or Session or URL on mount
   const hasIngestedIntent = useRef(false);
   useEffect(() => {
     if (hasIngestedIntent.current) return;
 
     let intent = activeIntentFromStore || loadStoredIntent();
 
-    // Fallback: build from URL params if direct navigation
+    // Fallback: restore from URL params if direct navigation or page refresh
     if (!intent) {
       const urlSymbol = searchParams.get("symbol");
-      const urlSide = searchParams.get("side") as "BUY" | "SELL" | null;
-      const urlOrigin = searchParams.get("origin") as any;
-      if (urlSymbol && urlSide) {
+      const urlSide = (searchParams.get("side") as "BUY" | "SELL") || "BUY";
+      const urlOrigin = (searchParams.get("origin") as any) || "LIVE_FEED";
+      if (urlSymbol) {
         intent = {
           symbol: urlSymbol,
-          canonicalSymbol: urlSymbol,
+          canonicalSymbol: searchParams.get("canonicalSymbol") || urlSymbol,
+          canonicalContractId: searchParams.get("canonicalContractId") || undefined,
           side: urlSide,
-          assetClass: (searchParams.get("assetClass") as any) || "SPOT",
-          broker: searchParams.get("broker") || undefined,
-          origin: urlOrigin || "LIVE_FEED",
+          assetClass: (searchParams.get("assetClass") as any) || (searchParams.get("strike") ? "OPTIONS" : "SPOT"),
+          broker: searchParams.get("broker") || searchParams.get("marketDataSource") || undefined,
+          marketDataSource: searchParams.get("marketDataSource") || undefined,
+          underlying: searchParams.get("underlying") || undefined,
+          expiry: searchParams.get("expiry") || undefined,
+          strike: searchParams.get("strike") ? Number(searchParams.get("strike")) : undefined,
+          optionType: (searchParams.get("optionType") as any) || undefined,
+          exchange: searchParams.get("exchange") || undefined,
+          securityId: searchParams.get("securityId") || undefined,
+          currentPrice: searchParams.get("ltp") ? Number(searchParams.get("ltp")) : undefined,
+          bid: searchParams.get("bid") ? Number(searchParams.get("bid")) : undefined,
+          ask: searchParams.get("ask") ? Number(searchParams.get("ask")) : undefined,
+          lotSize: searchParams.get("lotSize") ? Number(searchParams.get("lotSize")) : undefined,
+          origin: urlOrigin,
           timestamp: Date.now(),
         };
       }
@@ -364,22 +433,32 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
       setName(`${sym} ${sideText} Alpha Bot`);
       setDescription(`Deterministic 1-click ${sideText} bot originating from ${intent.origin || "Market Feed"}.`);
 
-      // Determine Asset Class
-      if (intent.assetClass === "OPTION" || intent.origin === "OPTIONS") {
-        setAssetClass("OPTIONS");
-        setGroupName("NSE Options Bots");
+      // Determine Asset Class with Option Metadata Precedence
+      const isOptionOrigin =
+        intent.assetClass === "OPTION" ||
+        intent.assetClass === "OPTIONS" ||
+        intent.origin === "OPTIONS" ||
+        Boolean(intent.strike) ||
+        Boolean(intent.optionType);
+
+      if (isOptionOrigin) {
+        const isCryptoOpt =
+          intent.assetClass === "CRYPTO_OPTIONS" ||
+          (intent.broker && intent.broker.toUpperCase().includes("DELTA"));
+        setAssetClass(isCryptoOpt ? "CRYPTO_OPTIONS" : "OPTIONS");
+        setGroupName(isCryptoOpt ? "Crypto Options Bots" : "NSE Options Bots");
       } else if (intent.assetClass === "FUTURE" || intent.assetClass === "PERPETUAL" || intent.origin === "FUTURES") {
         setAssetClass("FUTURES");
         setGroupName("Futures Trend Bots");
       } else if (intent.assetClass === "CRYPTO_OPTIONS") {
         setAssetClass("CRYPTO_OPTIONS");
         setGroupName("Crypto Scalping Bots");
-      } else if (intent.assetClass === "COMMODITY") {
+      } else if (intent.assetClass === "COMMODITY" || intent.assetClass === "COMMODITIES") {
         setAssetClass("COMMODITIES");
         setGroupName("Commodity Momentum Bots");
       } else if (sym.includes("NIFTY") || sym.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK"].some((s) => sym.includes(s))) {
         setAssetClass("INDEX");
-        setGroupName("NSE Options Bots");
+        setGroupName("NSE Equities Bots");
       } else if (sym.includes("BTC") || sym.includes("ETH") || sym.includes("SOL") || sym.includes("USDT")) {
         setAssetClass("CRYPTO");
         setGroupName("Crypto Scalping Bots");
@@ -406,7 +485,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
 
       // Options Specifics
       if (intent.optionType) {
-        setOptionSide(intent.optionType === "PUT" ? "PUT" : "CALL");
+        setOptionSide(intent.optionType === "PUT" || intent.optionType === "PE" ? "PUT" : "CALL");
       }
       if (intent.strike) {
         setStrikeOffset(intent.strike);
@@ -420,20 +499,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         setLeverage(Math.min(intent.maxLeverage, 5));
       }
 
-      // Broker Mapping
-      if (intent.broker === "dhan" || intent.broker === "dhan_india") {
-        setBrokerFolderId("bf_dhan");
-        setBrokerAccountId("ba_dhan_primary");
-        setBrokerProvider("dhan");
-      } else if (intent.broker === "upstox") {
-        setBrokerFolderId("bf_upstox");
-        setBrokerAccountId("ba_upstox_primary");
-        setBrokerProvider("upstox");
-      } else if (intent.broker === "delta_india" || intent.broker === "delta_exchange") {
-        setBrokerFolderId("bf_delta");
-        setBrokerAccountId("ba_delta_primary");
-        setBrokerProvider("delta_exchange");
-      }
+      // Broker Mapping using Central Normalizer
+      const brokerNorm = normalizeBroker(intent.broker || intent.marketDataSource);
+      setBrokerFolderId(brokerNorm.folderId);
+      setBrokerAccountId(brokerNorm.accountId);
+      setBrokerProvider(brokerNorm.provider);
 
       // Safe default: strictly PAPER
       setEnvironment("PAPER");
@@ -454,13 +524,43 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
   const estimatedNotional = useMemo(() => allocatedCapital * Math.max(1, leverage), [allocatedCapital, leverage]);
   const requiredMargin = useMemo(() => Math.round((estimatedNotional / Math.max(1, leverage)) * 100) / 100, [estimatedNotional, leverage]);
 
-  // Effective Live Price Benchmark
-  const effectivePrice = Number(
-    liveWsQuote?.last_price ||
-    activeIntent?.currentPrice ||
-    activeIntent?.markPrice ||
-    (currency === "INR" ? 24500.0 : 65000.0)
-  );
+  // Effective Live Price Benchmark (Options use live option premium; Futures use contract price)
+  const isOptionAsset =
+    (assetClass as string) === "OPTIONS" ||
+    (assetClass as string) === "OPTION" ||
+    (assetClass as string) === "CRYPTO_OPTIONS" ||
+    activeIntent?.origin === "OPTIONS" ||
+    Boolean(activeIntent?.strike);
+
+  const rawEffective = isOptionAsset
+    ? (tradeDirection === "BUY"
+        ? (liveWsQuote?.ask && liveWsQuote.ask > 0
+            ? liveWsQuote.ask
+            : (liveWsQuote?.last_price && liveWsQuote.last_price > 0
+                ? liveWsQuote.last_price
+                : (activeIntent?.ask && activeIntent.ask > 0
+                    ? activeIntent.ask
+                    : (activeIntent?.currentPrice && activeIntent.currentPrice > 0
+                        ? activeIntent.currentPrice
+                        : null))))
+        : (liveWsQuote?.bid && liveWsQuote.bid > 0
+            ? liveWsQuote.bid
+            : (liveWsQuote?.last_price && liveWsQuote.last_price > 0
+                ? liveWsQuote.last_price
+                : (activeIntent?.bid && activeIntent.bid > 0
+                    ? activeIntent.bid
+                    : (activeIntent?.currentPrice && activeIntent.currentPrice > 0
+                        ? activeIntent.currentPrice
+                        : null)))))
+    : (liveWsQuote?.last_price && liveWsQuote.last_price > 0
+        ? liveWsQuote.last_price
+        : (activeIntent?.currentPrice && activeIntent.currentPrice > 0
+            ? activeIntent.currentPrice
+            : (activeIntent?.markPrice && activeIntent.markPrice > 0
+                ? activeIntent.markPrice
+                : null)));
+
+  const effectivePrice = typeof rawEffective === "number" && rawEffective > 0 ? rawEffective : 0;
 
   const isPositiveChange = (liveWsQuote?.change_pct ?? 0) >= 0;
 
@@ -805,14 +905,14 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#142233] pb-3">
           
           {/* Left: Origin & Symbol Badges */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => router.push(originUrl)}
               className="px-2.5 py-1.5 rounded-lg bg-[#07101A] hover:bg-[#101B2D] text-[#7C8CA3] hover:text-white border border-[#1A2A3F] font-bold text-[11px] transition flex items-center gap-1.5"
             >
               <ArrowLeft className="h-3.5 w-3.5 text-cyan-400" />
-              <span>Back to {activeIntent?.origin === "OPTIONS" ? "Option Chain" : activeIntent?.origin === "FUTURES" ? "Futures" : "Live Market"}</span>
+              <span>Back to {activeIntent?.origin === "OPTIONS" ? "Options" : activeIntent?.origin === "FUTURES" ? "Futures" : "Live Market"}</span>
             </button>
 
             <div className="h-4 w-[1px] bg-[#1A2A3F] hidden sm:block" />
@@ -821,9 +921,37 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               <span className={`h-2.5 w-2.5 rounded-full ${liveWsQuote?.is_stale ? "bg-amber-400 animate-ping" : "bg-emerald-400 animate-pulse"}`} />
               <span className="font-mono font-black text-sm text-white">{symbol}</span>
               <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-[#142B21] text-cyan-300 border border-[#275841]">
-                {assetClass}
+                {isOptionAsset ? "OPTION" : assetClass}
               </span>
             </div>
+
+            {/* Option-specific Context Chips */}
+            {isOptionAsset && (
+              <div className="hidden md:flex items-center gap-1.5 font-mono text-[10px]">
+                {(activeIntent?.expiry || optionExpiry) && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
+                    Expiry: <strong className="text-white">{activeIntent?.expiry || optionExpiry}</strong>
+                  </span>
+                )}
+                {(activeIntent?.strike || strikeOffset > 0) && (
+                  <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
+                    Strike: <strong className="text-cyan-300">{formatNumber(activeIntent?.strike || strikeOffset)}</strong>
+                  </span>
+                )}
+                <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
+                  Type: <strong className="text-amber-300">{activeIntent?.optionType || (optionSide === "PUT" ? "PUT" : "CALL")}</strong>
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3]">
+                  Provider: <strong className="text-emerald-400">{(activeIntent?.broker || brokerProvider || "UPSTOX").toUpperCase()}</strong>
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-emerald-300 font-bold">
+                  DATA: LIVE
+                </span>
+                <span className="px-1.5 py-0.5 rounded bg-[#07101A] border border-[#1A2A3F] text-cyan-300 font-bold">
+                  EXEC: {environment}
+                </span>
+              </div>
+            )}
 
             {/* BUY / SELL Badge Toggle */}
             <div className="flex items-center rounded-lg bg-[#07101A] p-0.5 border border-[#1A2A3F]">
@@ -902,25 +1030,54 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
         </div>
 
         {/* Live Telemetry Bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-2 text-[11px] font-mono">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-[11px] font-mono">
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
-            <span className="text-[#52627A] block text-[10px]">Live Benchmark (LTP)</span>
-            <span className="text-white font-black text-sm">
-              {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
+            <span className="text-[#52627A] block text-[10px]">
+              {isOptionAsset ? "LIVE OPTION PREMIUM" : "Live Benchmark (LTP)"}
             </span>
+            {effectivePrice > 0 ? (
+              <span className="text-white font-black text-sm">
+                {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
+              </span>
+            ) : (
+              <span className="text-rose-400 font-black text-xs">
+                PREMIUM UNAVAILABLE
+              </span>
+            )}
           </div>
 
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
-            <span className="text-[#52627A] block text-[10px]">Bid / Ask Spread</span>
+            <span className="text-[#52627A] block text-[10px]">Bid / Ask / LTP</span>
+            <div className="space-y-0.5 text-[10px]">
+              <div className="flex justify-between">
+                <span className="text-[#7C8CA3]">Bid:</span>
+                <span className="text-emerald-400 font-bold">
+                  {liveWsQuote?.bid !== undefined && liveWsQuote?.bid !== null ? (currency === "INR" ? "₹" : "$") + formatNumber(liveWsQuote.bid, 2) : (activeIntent?.bid ? (currency === "INR" ? "₹" : "$") + formatNumber(activeIntent.bid, 2) : "-")}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#7C8CA3]">Ask:</span>
+                <span className="text-rose-400 font-bold">
+                  {liveWsQuote?.ask !== undefined && liveWsQuote?.ask !== null ? (currency === "INR" ? "₹" : "$") + formatNumber(liveWsQuote.ask, 2) : (activeIntent?.ask ? (currency === "INR" ? "₹" : "$") + formatNumber(activeIntent.ask, 2) : "-")}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
+            <span className="text-[#52627A] block text-[10px]">
+              {isOptionAsset ? "Underlying Spot" : "Underlying / Market"}
+            </span>
             <span className="text-cyan-300 font-bold truncate block">
-              {liveWsQuote?.bid !== undefined && liveWsQuote?.bid !== null ? `${liveWsQuote.bid} / ${liveWsQuote.ask}` : (activeIntent?.bid ? `${activeIntent.bid} / ${activeIntent.ask}` : "Tight Spread")}
+              {activeIntent?.underlying || symbol.split(" ")[0]}
+              {(liveWsQuote as any)?.underlying_price ? ` (${currency === "INR" ? "₹" : "$"}${formatNumber((liveWsQuote as any).underlying_price, 2)})` : ""}
             </span>
           </div>
 
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
             <span className="text-[#52627A] block text-[10px]">Data Source</span>
             <span className="text-emerald-400 font-bold truncate block">
-              {activeIntent?.broker ? activeIntent.broker.toUpperCase() : "LIVE GATEWAY"}
+              {activeIntent?.broker ? activeIntent.broker.toUpperCase() : "UPSTOX LIVE"}
             </span>
           </div>
 
@@ -933,16 +1090,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           </div>
 
           <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
-            <span className="text-[#52627A] block text-[10px]">Execution Target</span>
-            <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-cyan-400"}`}>
-              {environment === "LIVE" ? "LIVE BROKER" : "PAPER SIMULATOR"}
+            <span className="text-[#52627A] block text-[10px]">
+              {isOptionAsset ? "Lot Size / Execution" : "Execution Target"}
             </span>
-          </div>
-
-          <div className="bg-[#07101A] border border-[#142233] p-2 rounded-xl">
-            <span className="text-[#52627A] block text-[10px]">Stop Loss Level</span>
-            <span className="text-rose-400 font-bold">
-              {currency === "INR" ? "₹" : "$"}{formatNumber(stopLossPrice, 2)}
+            <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-cyan-400"}`}>
+              {isOptionAsset ? `Lot: ${lotSize} • ` : ""}{environment === "LIVE" ? "LIVE" : "PAPER"}
             </span>
           </div>
         </div>
@@ -1195,7 +1347,7 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
               </div>
 
               {/* Bot Identity Summary */}
-              <div className="space-y-2.5 font-mono text-[11px]">
+              <div className="space-y-2 font-mono text-[11px]">
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Bot Name:</span>
                   <span className="text-white font-bold truncate max-w-[170px]">{name}</span>
@@ -1203,7 +1355,12 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Instrument:</span>
-                  <span className="text-white font-bold">{symbol}</span>
+                  <span className="text-white font-bold truncate max-w-[170px]">{symbol}</span>
+                </div>
+
+                <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                  <span className="text-[#7C8CA3]">Asset:</span>
+                  <span className="text-cyan-300 font-bold">{isOptionAsset ? "OPTIONS" : assetClass}</span>
                 </div>
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
@@ -1213,12 +1370,47 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                   </span>
                 </div>
 
-                <div className="flex justify-between border-b border-[#142233] pb-1.5">
-                  <span className="text-[#7C8CA3]">Benchmark Price:</span>
-                  <span className="text-cyan-300 font-bold">
-                    {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
-                  </span>
-                </div>
+                {isOptionAsset && (
+                  <>
+                    <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                      <span className="text-[#7C8CA3]">Underlying:</span>
+                      <span className="text-white font-bold">{activeIntent?.underlying || symbol.split(" ")[0]}</span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                      <span className="text-[#7C8CA3]">Strike / Type:</span>
+                      <span className="text-amber-300 font-bold">
+                        {formatNumber(activeIntent?.strike || strikeOffset)} {activeIntent?.optionType || (optionSide === "PUT" ? "PE (PUT)" : "CE (CALL)")}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                      <span className="text-[#7C8CA3]">Expiry:</span>
+                      <span className="text-slate-200 font-bold">{activeIntent?.expiry || optionExpiry || "-"}</span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                      <span className="text-[#7C8CA3]">Premium (Entry):</span>
+                      <span className="text-cyan-300 font-bold">
+                        {effectivePrice > 0 ? `${currency === "INR" ? "₹" : "$"}${formatNumber(effectivePrice, 2)}` : "PREMIUM UNAVAILABLE"}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                      <span className="text-[#7C8CA3]">Lot Size:</span>
+                      <span className="text-white font-bold">{lotSize} units / lot</span>
+                    </div>
+                  </>
+                )}
+
+                {!isOptionAsset && (
+                  <div className="flex justify-between border-b border-[#142233] pb-1.5">
+                    <span className="text-[#7C8CA3]">Benchmark Price:</span>
+                    <span className="text-cyan-300 font-bold">
+                      {currency === "INR" ? "₹" : "$"}{formatNumber(effectivePrice, 2)}
+                    </span>
+                  </div>
+                )}
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
                   <span className="text-[#7C8CA3]">Allocated Capital:</span>
@@ -1233,14 +1425,14 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
                 </div>
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
-                  <span className="text-[#7C8CA3]">Target R:R Ratio:</span>
-                  <span className="text-cyan-300 font-bold">1 : {riskRewardRatio}</span>
+                  <span className="text-[#7C8CA3]">Provider / Source:</span>
+                  <span className="text-emerald-400 font-bold">{(activeIntent?.broker || brokerProvider || "UPSTOX").toUpperCase()}</span>
                 </div>
 
                 <div className="flex justify-between border-b border-[#142233] pb-1.5">
-                  <span className="text-[#7C8CA3]">Environment:</span>
+                  <span className="text-[#7C8CA3]">Execution:</span>
                   <span className={`font-bold ${environment === "LIVE" ? "text-red-400" : "text-emerald-400"}`}>
-                    {environment} SANDBOX
+                    {environment} ({environment === "LIVE" ? "REAL MONEY" : "PAPER TRADING"})
                   </span>
                 </div>
               </div>

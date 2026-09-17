@@ -46,9 +46,9 @@ export async function getLtp(
   }
 
   const ltp = quoteData.last_price;
-  const prevClose = quoteData.previous_close || ltp;
-  const change = +(ltp - prevClose).toFixed(2);
-  const changePct = prevClose > 0 ? +((change / prevClose) * 100).toFixed(2) : 0;
+  const prevClose = typeof quoteData.previous_close === "number" && quoteData.previous_close > 0 ? quoteData.previous_close : null;
+  const change = prevClose !== null ? +(ltp - prevClose).toFixed(2) : null;
+  const changePct = prevClose !== null && prevClose > 0 ? +(((ltp - prevClose) / prevClose) * 100).toFixed(2) : null;
 
   const instMeta = PRIMARY_UPSTOX_INSTRUMENTS.find((i) => i.instrumentKey === instrumentKey);
   const symbol = instMeta ? (instMeta.tradingSymbol || instMeta.symbol) : instrumentKey.split("|")[1] || instrumentKey;
@@ -96,9 +96,9 @@ export async function getMultipleLtp(
     if (!quoteData || typeof quoteData.last_price !== "number") continue;
 
     const ltp = quoteData.last_price;
-    const prevClose = quoteData.previous_close || ltp;
-    const change = +(ltp - prevClose).toFixed(2);
-    const changePct = prevClose > 0 ? +((change / prevClose) * 100).toFixed(2) : 0;
+    const prevClose = typeof quoteData.previous_close === "number" && quoteData.previous_close > 0 ? quoteData.previous_close : null;
+    const change = prevClose !== null ? +(ltp - prevClose).toFixed(2) : null;
+    const changePct = prevClose !== null && prevClose > 0 ? +(((ltp - prevClose) / prevClose) * 100).toFixed(2) : null;
 
     const instMeta = PRIMARY_UPSTOX_INSTRUMENTS.find((i) => i.instrumentKey === key);
     const symbol = instMeta ? (instMeta.tradingSymbol || instMeta.symbol) : key.split("|")[1] || key;
@@ -160,7 +160,7 @@ export async function getFullQuotes(
     const ohlc = q.ohlc || {};
     const depth = q.depth || {};
     const ltp = typeof q.last_price === "number" ? q.last_price : 0;
-    const prevClose = typeof ohlc.close === "number" ? ohlc.close : ltp;
+    const prevClose = typeof ohlc.close === "number" && ohlc.close > 0 ? ohlc.close : null;
     const lastTradeTs = q.last_trade_time ? Number(q.last_trade_time) : now;
     const ageMs = Math.max(0, now - lastTradeTs);
 
@@ -197,17 +197,17 @@ export async function getFullQuotes(
       ltq: q.volume || 0,
       lastTradeTime: new Date(lastTradeTs).toISOString(),
       previousClose: prevClose,
-      open: typeof ohlc.open === "number" ? ohlc.open : ltp,
-      high: typeof ohlc.high === "number" ? ohlc.high : ltp,
-      low: typeof ohlc.low === "number" ? ohlc.low : ltp,
-      close: typeof ohlc.close === "number" ? ohlc.close : ltp,
-      volume: q.volume || 0,
-      oi: q.oi || 0,
+      open: typeof ohlc.open === "number" && ohlc.open > 0 ? ohlc.open : null,
+      high: typeof ohlc.high === "number" && ohlc.high > 0 ? ohlc.high : null,
+      low: typeof ohlc.low === "number" && ohlc.low > 0 ? ohlc.low : null,
+      close: typeof ohlc.close === "number" && ohlc.close > 0 ? ohlc.close : null,
+      volume: q.volume || null,
+      oi: q.oi || null,
       iv: null,
-      bid: bids[0]?.bidPrice || ltp,
-      bidQty: bids[0]?.bidQty || 0,
-      ask: asks[0]?.askPrice || ltp,
-      askQty: asks[0]?.askQty || 0,
+      bid: bids[0]?.bidPrice || null,
+      bidQty: bids[0]?.bidQty || null,
+      ask: asks[0]?.askPrice || null,
+      askQty: asks[0]?.askQty || null,
       marketDepth: bids.slice(0, 5),
       greeks: {
         delta: null,

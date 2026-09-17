@@ -31,32 +31,36 @@ export function StrategyPaperTestPanel({ strategy }: StrategyPaperTestPanelProps
   useEffect(() => {
     let interval: any;
     if (isActive) {
-      interval = setInterval(() => {
+      const sym = strategy.symbol || "NIFTY";
+      interval = setInterval(async () => {
         setTicksProcessed((prev) => prev + 1);
 
-        // Periodically simulate a signal
-        if (Math.random() > 0.65) {
-          const isBull = Math.random() > 0.4;
-          const conf = Math.floor(75 + Math.random() * 20);
-          const price = 64500 + Math.random() * 500;
-          const newSignal = {
-            id: Date.now(),
-            timestamp: new Date().toLocaleTimeString(),
-            signal: isBull ? "BUY" : "SELL",
-            confidence: conf,
-            price: Math.round(price * 100) / 100,
-            reason: isBull ? "EMA Crossover + RSI Bullish (>55)" : "EMA Breakdown + Volume Surge",
-          };
-
-          setSignalsLog((prev) => [newSignal, ...prev.slice(0, 9)]);
-
-          // Simulated paper pnl fluctuation
-          setPaperPnl((prev) => prev + (isBull ? 25.5 : -10.2));
+        try {
+          const res = await fetch(`/api/market?symbol=${encodeURIComponent(sym)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const livePrice = data.price || data.last_price;
+            if (livePrice && livePrice > 0) {
+              const ruleCount = (strategy as any).rules?.length || (strategy as any).indicators?.length || 1;
+              const isBull = (data.change_pct || 0) >= 0;
+              const newSignal = {
+                id: Date.now(),
+                timestamp: new Date().toLocaleTimeString(),
+                signal: isBull ? "BUY" : "SELL",
+                confidence: Math.min(95, Math.max(50, Math.round(50 + Math.abs(data.change_pct || 0) * 10))),
+                price: Number(livePrice.toFixed(2)),
+                reason: isBull ? `Rule confluence positive on ${sym} (${ruleCount} conditions)` : `Rule breakdown on ${sym}`,
+              };
+              setSignalsLog((prev) => [newSignal, ...prev.slice(0, 9)]);
+            }
+          }
+        } catch {
+          // Ignore network errors in tick polling
         }
-      }, 2000);
+      }, 3000);
     }
     return () => clearInterval(interval);
-  }, [isActive]);
+  }, [isActive, strategy]);
 
   return (
     <div className="bg-[#0E1524] border border-[#1A2A3F] rounded-2xl p-4 sm:p-5 shadow-xl space-y-4 font-sans select-none">

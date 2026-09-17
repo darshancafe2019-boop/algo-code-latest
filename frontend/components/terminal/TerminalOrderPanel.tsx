@@ -45,7 +45,8 @@ export function TerminalOrderPanel() {
         if (res.ok && isMounted) {
           const json = await res.json();
           const raw = json.data || json.ticker || json;
-          const p = parseFloat(raw.price || raw.last || 65420.0);
+          const rawPrice = raw.price || raw.last || raw.last_price;
+          const p = rawPrice ? parseFloat(rawPrice) : 0;
           if (p > 0 && isMounted) {
             setPrice(p);
             if (side === "BUY") {

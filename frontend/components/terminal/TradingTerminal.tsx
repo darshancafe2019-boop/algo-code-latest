@@ -24,16 +24,16 @@ import { CandleData, IndicatorResult } from "@/lib/indicators/types";
 import { STANDARD_INDICATOR_PRESETS } from "@/lib/indicators/presets";
 import { ShieldAlert } from "lucide-react";
 
-// Default Initial Watchlist
+// Default Watchlist Symbols (real prices fetched dynamically from gateway)
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
-  { symbol: "NIFTY", exchange: "NSE", price: 24350.0, change: 125.0, changePct: 0.52, volume: 1250000 },
-  { symbol: "BANKNIFTY", exchange: "NSE", price: 51200.0, change: -80.0, changePct: -0.16, volume: 980000 },
-  { symbol: "FINNIFTY", exchange: "NSE", price: 23150.0, change: 45.0, changePct: 0.19, volume: 450000 },
-  { symbol: "BTC/USDT", exchange: "DELTA", price: 65420.0, change: 350.0, changePct: 0.54, volume: 24500 },
-  { symbol: "ETH/USDT", exchange: "DELTA", price: 3480.5, change: -15.2, changePct: -0.43, volume: 18200 },
-  { symbol: "SOL/USDT", exchange: "DELTA", price: 154.2, change: 4.8, changePct: 3.21, volume: 89000 },
-  { symbol: "RELIANCE", exchange: "NSE", price: 2980.0, change: 18.5, changePct: 0.62, volume: 320000 },
-  { symbol: "HDFCBANK", exchange: "NSE", price: 1650.0, change: -6.0, changePct: -0.36, volume: 410000 },
+  { symbol: "NIFTY", exchange: "NSE", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "BANKNIFTY", exchange: "NSE", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "FINNIFTY", exchange: "NSE", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "BTC/USDT", exchange: "DELTA", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "ETH/USDT", exchange: "DELTA", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "SOL/USDT", exchange: "DELTA", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "RELIANCE", exchange: "NSE", price: 0, change: 0, changePct: 0, volume: 0 },
+  { symbol: "HDFCBANK", exchange: "NSE", price: 0, change: 0, changePct: 0, volume: 0 },
 ];
 
 export function TradingTerminal() {
@@ -79,15 +79,11 @@ export function TradingTerminal() {
     { id: "sp_rsi", type: "rsi", title: "RSI (14)", height: 85, hidden: false },
   ]);
 
-  // Positions & Orders State
-  const [positions, setPositions] = useState<PositionItem[]>([
-    { id: "pos-1", symbol: activeSymbol, side: "LONG", size: 2, entryPrice: 24310.0, markPrice: 24350.0, pnl: 80.0, pnlPct: 1.65 },
-  ]);
-  const [orders, setOrders] = useState<OrderItem[]>([
-    { id: "ord-1", symbol: activeSymbol, side: "BUY", type: "LIMIT", price: 24290.0, quantity: 1, status: "OPEN", timestamp: "10:15 AM" },
-  ]);
+  // Positions & Orders State (Dynamic from real backend or live session)
+  const [positions, setPositions] = useState<PositionItem[]>([]);
+  const [orders, setOrders] = useState<OrderItem[]>([]);
 
-  // 3. Fetch Historical Candlesticks with Real-Time Fallback Generation
+  // 3. Fetch Historical Candlesticks from authoritative backend
   const { data: candlesData } = useQuery<CandleData[]>({
     queryKey: ["terminalCandles", activeSymbol, activeTimeframe],
     queryFn: async () => {
@@ -105,45 +101,14 @@ export function TradingTerminal() {
               high: parseFloat(c.high),
               low: parseFloat(c.low),
               close: parseFloat(c.close),
-              volume: parseFloat(c.volume || 1000),
+              volume: parseFloat(c.volume || 0),
             }));
           }
         }
       } catch (err) {
-        console.warn("Candle fetch error, using synthetic series:", err);
+        console.warn("Candle fetch error:", err);
       }
-
-      // High-fidelity fallback series
-      const generated: CandleData[] = [];
-      const basePrice = activeSymbol.includes("BTC") ? 65000 : activeSymbol.includes("ETH") ? 3400 : 24300;
-      let cur = basePrice;
-      const now = Date.now();
-      const tfMinutes = activeTimeframe.includes("m")
-        ? parseInt(activeTimeframe)
-        : activeTimeframe.includes("h")
-        ? parseInt(activeTimeframe) * 60
-        : 1440;
-      const intervalMs = (tfMinutes || 5) * 60 * 1000;
-
-      for (let i = 120; i >= 0; i--) {
-        const drift = (Math.random() - 0.48) * (basePrice * 0.003);
-        const open = cur;
-        const close = open + drift;
-        const high = Math.max(open, close) + Math.random() * (basePrice * 0.002);
-        const low = Math.min(open, close) - Math.random() * (basePrice * 0.002);
-        const volume = Math.floor(5000 + Math.random() * 25000);
-
-        generated.push({
-          timestamp: now - i * intervalMs,
-          open,
-          high,
-          low,
-          close,
-          volume,
-        });
-        cur = close;
-      }
-      return generated;
+      return [];
     },
     staleTime: 5000,
     refetchInterval: 10000,
@@ -191,13 +156,14 @@ export function TradingTerminal() {
 
   // Strategy Levels (Entry, SL, Target overlay)
   const strategyLevels: StrategyLevel[] = useMemo(() => {
-    const latestClose = activeCandles[activeCandles.length - 1]?.close || 24350;
+    const latestClose = activeCandles[activeCandles.length - 1]?.close || (quote?.last_price ?? 0);
+    if (!latestClose) return [];
     return [
       { id: "sl_1", label: "SL", type: "STOP_LOSS", price: latestClose * 0.992, color: "#EF5350" },
       { id: "entry_1", label: "ENTRY", type: "ENTRY", price: latestClose, color: "#2962FF" },
       { id: "tp_1", label: "TP 1", type: "TARGET", price: latestClose * 1.015, color: "#26A69A" },
     ];
-  }, [activeCandles]);
+  }, [activeCandles, quote]);
 
   // 5. Handlers
   const handleToggleMode = (mode: "PAPER" | "SHADOW" | "LIVE") => {
@@ -298,9 +264,10 @@ export function TradingTerminal() {
     );
   };
 
-  const activePrice = quote?.last_price || activeCandles[activeCandles.length - 1]?.close || 24350.0;
-  const activeChange = quote ? (quote.last_price * (quote.change_pct || 0)) / 100 : 125.0;
-  const activeChangePct = quote?.change_pct !== undefined && quote?.change_pct !== null ? quote.change_pct : 0.52;
+  const activePrice = quote?.last_price || activeCandles[activeCandles.length - 1]?.close || 0;
+  const activeChange = quote ? (quote.last_price * (quote.change_pct || 0)) / 100 : 0;
+  const activeChangePct = quote?.change_pct !== undefined && quote?.change_pct !== null ? quote.change_pct : 0;
+  const latency = quote?.feed_latency_ms ? Math.round(quote.feed_latency_ms) : 0;
 
   return (
     <div className="flex flex-col h-full w-full bg-[#0F1116] text-[#D1D4DC] font-sans select-none overflow-hidden">
@@ -321,8 +288,8 @@ export function TradingTerminal() {
         onSelectPreset={handleSelectPreset}
         executionMode={executionMode}
         onToggleMode={handleToggleMode}
-        dataStatus={isLive ? "LIVE" : isStale ? "STALE" : "LIVE"}
-        latencyMs={14}
+        dataStatus={isLive ? "LIVE" : isStale ? "STALE" : "DISCONNECTED"}
+        latencyMs={latency}
       />
 
       {/* 2. MAIN 3-COLUMN WORKSPACE */}

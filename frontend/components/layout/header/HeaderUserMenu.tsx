@@ -8,12 +8,10 @@ import { apiClient } from "@/lib/apiClient";
 import { useQueryClient } from "@tanstack/react-query";
 
 interface HeaderUserMenuProps {
-  onOpenMarketAnalyst: () => void;
+  onOpenMarketAnalyst?: () => void;
 }
 
-export const HeaderUserMenu = memo(function HeaderUserMenu({
-  onOpenMarketAnalyst,
-}: HeaderUserMenuProps) {
+export const HeaderUserMenu = memo(function HeaderUserMenu({}: HeaderUserMenuProps) {
   const queryClient = useQueryClient();
   const { user, logout, lockTerminal } = useAuth();
   const { openAppearanceDrawer } = useTheme();
@@ -98,18 +96,6 @@ export const HeaderUserMenu = memo(function HeaderUserMenu({
 
           {/* Tools & Views */}
           <div className="flex flex-col gap-0.5 pb-1 border-b border-[var(--theme-border-subtle)]">
-            <button
-              type="button"
-              onClick={() => {
-                onOpenMarketAnalyst();
-                setIsOpen(false);
-              }}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[var(--theme-elevated)] font-medium transition-colors text-left cursor-pointer"
-            >
-              <BrainCircuit className="h-3.5 w-3.5 text-purple-400" />
-              <span>Market Analyst AI</span>
-            </button>
-
             <button
               type="button"
               onClick={() => {

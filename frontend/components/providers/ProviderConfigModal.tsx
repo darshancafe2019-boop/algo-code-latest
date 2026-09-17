@@ -59,7 +59,7 @@ export function ProviderConfigModal({ provider, isOpen, onClose }: ProviderConfi
         setTestResult({
           tested: true,
           success: true,
-          latencyMs: data.latency_ms || 32,
+          latencyMs: data.latency_ms != null ? data.latency_ms : undefined,
           message: data.message || "Connection validated successfully! API handshake OK.",
         });
       } else {

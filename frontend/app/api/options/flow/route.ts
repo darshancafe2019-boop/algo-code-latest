@@ -26,6 +26,8 @@ export async function GET(request: NextRequest) {
     const underlying = (searchParams.get("underlying") || searchParams.get("symbol") || "NIFTY").toUpperCase();
     const provider = (searchParams.get("provider") || searchParams.get("source") || "DHAN").toUpperCase();
     const expiry = searchParams.get("expiry") || "";
+    const marketDataMode = (searchParams.get("market_data_mode") || searchParams.get("mode") || process.env.MARKET_DATA_MODE || "LIVE").toUpperCase();
+    const executionMode = (searchParams.get("execution_mode") || "PAPER").toUpperCase();
 
     const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || provider.includes("DELTA");
 
@@ -50,9 +52,18 @@ export async function GET(request: NextRequest) {
 
     if (!chainData) {
       try {
+        const queryParams = new URLSearchParams({
+          underlying,
+          source: isCrypto ? "DELTA_INDIA" : provider,
+          strike_count: "25",
+          market_data_mode: marketDataMode,
+          execution_mode: executionMode,
+        });
+        if (expiry) queryParams.set("expiry", expiry);
+
         const primaryUrl = isCrypto
-          ? `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=DELTA_INDIA${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`
-          : `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`;
+          ? `${GATEWAY_URL}/api/options/chain?${queryParams.toString()}`
+          : `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`;
 
         const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
         if (upstreamRes.ok) {
@@ -62,8 +73,17 @@ export async function GET(request: NextRequest) {
       } catch {
         // Gateway may be offline, fallback to backend
         try {
+          const queryParams = new URLSearchParams({
+            underlying,
+            source: provider,
+            strike_count: "25",
+            market_data_mode: marketDataMode,
+            execution_mode: executionMode,
+          });
+          if (expiry) queryParams.set("expiry", expiry);
+
           const fallbackRes = await fetch(
-            `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(provider)}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}&strike_count=25`,
+            `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`,
             { cache: "no-store", signal: AbortSignal.timeout(4000) }
           );
           if (fallbackRes.ok) {
@@ -74,34 +94,32 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const defaultSpot = underlying.includes("BANKNIFTY")
-      ? 48500.0
-      : underlying.includes("FINNIFTY")
-      ? 23200.0
-      : underlying.includes("BTC")
-      ? 78500.0
-      : underlying.includes("ETH")
-      ? 2650.0
-      : 25420.0;
-
     const rawSpot = chainData?.spot_price ?? chainData?.spot;
-    const spotPrice = typeof rawSpot === "number" && rawSpot > 0
-      ? rawSpot
-      : defaultSpot;
+    const spotPrice = typeof rawSpot === "number" && rawSpot > 0 ? rawSpot : 0;
 
-    const spotChange = typeof chainData?.spot_change === "number" ? chainData.spot_change : 128.4;
-    const spotChangePct = typeof chainData?.spot_change_24h === "number" ? chainData.spot_change_24h : 0.51;
+    const spotChange = typeof chainData?.spot_change === "number" ? chainData.spot_change : 0;
+    const spotChangePct = typeof chainData?.spot_change_24h === "number" ? chainData.spot_change_24h : 0;
 
-    // Available Expiries
+    // Available Expiries directly from upstream
     const availableExpiriesRaw: string[] = Array.isArray(chainData?.available_expiries) && chainData.available_expiries.length > 0
       ? chainData.available_expiries
-      : (isCrypto ? [] : ["18 Sep 2026", "25 Sep 2026", "01 Oct 2026", "29 Oct 2026"]);
+      : [];
 
     const selectedExpiry = expiry || (typeof chainData?.selected_expiry === "string" ? chainData.selected_expiry : (availableExpiriesRaw[0] || ""));
 
+    // Calculate DTE helper
+    const calculateDaysToExpiry = (expiryStr: string): number => {
+      if (!expiryStr) return 0;
+      const expDate = new Date(expiryStr);
+      if (isNaN(expDate.getTime())) return 0;
+      const now = new Date();
+      const diffTime = expDate.getTime() - now.getTime();
+      return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
+    };
+
     // Parse strikes
     const stepSize = spotPrice > 40000 ? 500 : spotPrice > 15000 ? 100 : spotPrice > 5000 ? 50 : 10;
-    const atmStrike = chainData?.atm_strike || (Math.round(spotPrice / stepSize) * stepSize);
+    const atmStrike = chainData?.atm_strike || (spotPrice > 0 ? Math.round(spotPrice / stepSize) * stepSize : 0);
 
     const strikesList: OptionStrikeRowData[] = [];
     const flowTrades: OptionFlowTrade[] = [];
@@ -123,6 +141,8 @@ export async function GET(request: NextRequest) {
         const ceVol = ce.volume || 0;
         const peVol = pe.volume || 0;
 
+        const dteYears = Math.max(1, calculateDaysToExpiry(selectedExpiry)) / 365;
+
         const callQuote = {
           symbol: `${underlying} ${strike} CE`,
           underlying,
@@ -135,20 +155,20 @@ export async function GET(request: NextRequest) {
           ltp: ceLtp,
           change: ce.change || 0,
           changePercent: ce.changePercent || ce.pChange || 0,
-          bid: ce.bid || ce.best_bid || ce.bidPrice || (ceLtp > 0 ? ceLtp - 0.5 : 0),
-          ask: ce.ask || ce.best_ask || ce.askPrice || (ceLtp > 0 ? ceLtp + 0.5 : 0),
-          bidQty: ce.bidQty || ce.bidQuantity || 500,
-          askQty: ce.askQty || ce.askQuantity || 500,
+          bid: ce.bid || ce.best_bid || ce.bidPrice || null,
+          ask: ce.ask || ce.best_ask || ce.askPrice || null,
+          bidQty: ce.bidQty || ce.bidQuantity || null,
+          askQty: ce.askQty || ce.askQuantity || null,
           volume: ceVol,
           oi: ceOi,
           oiChange: ce.oiChange || ce.change_in_oi || 0,
           oiChangePercent: ce.oiChangePercent || 0,
-          iv: ce.iv || ce.IV || 14.5,
-          greeks: ce.greeks || calculateBlackScholesGreeks("CE", spotPrice, strike, 7 / 365, (ce.iv || 14.5) / 100),
+          iv: ce.iv || ce.IV || null,
+          greeks: ce.greeks || (spotPrice > 0 && ce.iv ? calculateBlackScholesGreeks("CE", spotPrice, strike, dteYears, ce.iv / 100) : null),
           premium: ceLtp * ceVol,
-          moneyness: classifyMoneyness("CE", strike, spotPrice, atmStrike),
-          intrinsicValue: Math.max(0, spotPrice - strike),
-          timeValue: Math.max(0, ceLtp - Math.max(0, spotPrice - strike)),
+          moneyness: spotPrice > 0 ? classifyMoneyness("CE", strike, spotPrice, atmStrike) : ("OTM" as const),
+          intrinsicValue: spotPrice > 0 ? Math.max(0, spotPrice - strike) : 0,
+          timeValue: spotPrice > 0 ? Math.max(0, ceLtp - Math.max(0, spotPrice - strike)) : ceLtp,
           oiBuildup: ce.oiBuildup || (ce.change > 0 && ce.oiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP"),
           volumeOiRatio: ceOi > 0 ? parseFloat((ceVol / ceOi).toFixed(2)) : 0,
         };
@@ -165,20 +185,20 @@ export async function GET(request: NextRequest) {
           ltp: peLtp,
           change: pe.change || 0,
           changePercent: pe.changePercent || pe.pChange || 0,
-          bid: pe.bid || pe.best_bid || pe.bidPrice || (peLtp > 0 ? peLtp - 0.5 : 0),
-          ask: pe.ask || pe.best_ask || pe.askPrice || (peLtp > 0 ? peLtp + 0.5 : 0),
-          bidQty: pe.bidQty || pe.bidQuantity || 500,
-          askQty: pe.askQty || pe.askQuantity || 500,
+          bid: pe.bid || pe.best_bid || pe.bidPrice || null,
+          ask: pe.ask || pe.best_ask || pe.askPrice || null,
+          bidQty: pe.bidQty || pe.bidQuantity || null,
+          askQty: pe.askQty || pe.askQuantity || null,
           volume: peVol,
           oi: peOi,
           oiChange: pe.oiChange || pe.change_in_oi || 0,
           oiChangePercent: pe.oiChangePercent || 0,
-          iv: pe.iv || pe.IV || 14.8,
-          greeks: pe.greeks || calculateBlackScholesGreeks("PE", spotPrice, strike, 7 / 365, (pe.iv || 14.8) / 100),
+          iv: pe.iv || pe.IV || null,
+          greeks: pe.greeks || (spotPrice > 0 && pe.iv ? calculateBlackScholesGreeks("PE", spotPrice, strike, dteYears, pe.iv / 100) : null),
           premium: peLtp * peVol,
-          moneyness: classifyMoneyness("PE", strike, spotPrice, atmStrike),
-          intrinsicValue: Math.max(0, strike - spotPrice),
-          timeValue: Math.max(0, peLtp - Math.max(0, strike - spotPrice)),
+          moneyness: spotPrice > 0 ? classifyMoneyness("PE", strike, spotPrice, atmStrike) : ("OTM" as const),
+          intrinsicValue: spotPrice > 0 ? Math.max(0, strike - spotPrice) : 0,
+          timeValue: spotPrice > 0 ? Math.max(0, peLtp - Math.max(0, strike - spotPrice)) : peLtp,
           oiBuildup: pe.oiBuildup || (pe.change > 0 && pe.oiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP"),
           volumeOiRatio: peOi > 0 ? parseFloat((peVol / peOi).toFixed(2)) : 0,
         };
@@ -186,10 +206,10 @@ export async function GET(request: NextRequest) {
         strikesList.push({
           strike,
           isATM: strike === atmStrike,
-          distanceFromSpot: strike - spotPrice,
-          distancePct: parseFloat((((strike - spotPrice) / spotPrice) * 100).toFixed(2)),
-          moneynessCall: classifyMoneyness("CE", strike, spotPrice, atmStrike),
-          moneynessPut: classifyMoneyness("PE", strike, spotPrice, atmStrike),
+          distanceFromSpot: spotPrice > 0 ? strike - spotPrice : 0,
+          distancePct: spotPrice > 0 ? parseFloat((((strike - spotPrice) / spotPrice) * 100).toFixed(2)) : 0,
+          moneynessCall: spotPrice > 0 ? classifyMoneyness("CE", strike, spotPrice, atmStrike) : ("OTM" as const),
+          moneynessPut: spotPrice > 0 ? classifyMoneyness("PE", strike, spotPrice, atmStrike) : ("OTM" as const),
           call: callQuote,
           put: putQuote,
         });
@@ -204,7 +224,7 @@ export async function GET(request: NextRequest) {
             time: new Date(Date.now() - Math.random() * 3600000).toLocaleTimeString("en-IN", { hour12: false }),
             timestamp: Date.now() - Math.floor(Math.random() * 3600000),
             expiry: selectedExpiry,
-            daysToExpiry: 7,
+            daysToExpiry: calculateDaysToExpiry(selectedExpiry),
             optionType: "CE",
             side: "BUY",
             strike,
@@ -216,9 +236,9 @@ export async function GET(request: NextRequest) {
             lots: Math.round(ceVol / (isCrypto ? 1 : 50)),
             oi: ceOi,
             volumeOiRatio: callQuote.volumeOiRatio,
-            iv: callQuote.iv || 14.5,
-            delta: callQuote.greeks?.delta || 0.5,
-            theta: callQuote.greeks?.theta || -8.5,
+            iv: callQuote.iv ?? null,
+            delta: callQuote.greeks?.delta ?? null,
+            theta: callQuote.greeks?.theta ?? null,
             sentiment: tradeClass.sentiment,
             sentimentConfidence: tradeClass.confidence,
             signalType: tradeClass.signalType,
@@ -234,7 +254,7 @@ export async function GET(request: NextRequest) {
             time: new Date(Date.now() - Math.random() * 3600000).toLocaleTimeString("en-IN", { hour12: false }),
             timestamp: Date.now() - Math.floor(Math.random() * 3600000),
             expiry: selectedExpiry,
-            daysToExpiry: 7,
+            daysToExpiry: calculateDaysToExpiry(selectedExpiry),
             optionType: "PE",
             side: "SELL",
             strike,
@@ -246,9 +266,9 @@ export async function GET(request: NextRequest) {
             lots: Math.round(peVol / (isCrypto ? 1 : 50)),
             oi: peOi,
             volumeOiRatio: putQuote.volumeOiRatio,
-            iv: putQuote.iv || 14.8,
-            delta: putQuote.greeks?.delta || -0.5,
-            theta: putQuote.greeks?.theta || -8.2,
+            iv: putQuote.iv ?? null,
+            delta: putQuote.greeks?.delta ?? null,
+            theta: putQuote.greeks?.theta ?? null,
             sentiment: tradeClass.sentiment,
             sentimentConfidence: tradeClass.confidence,
             signalType: tradeClass.signalType,
@@ -279,11 +299,31 @@ export async function GET(request: NextRequest) {
       if (f.signalType === "UNUSUAL_ACTIVITY" || f.signalType === "LARGE_ACTIVITY") unusualTradeCount++;
     }
 
-    const bullishPercentage = totalFlowTurnover > 0 ? Math.round((bullishTurnover / totalFlowTurnover) * 100) : 50;
-    const bearishPercentage = totalFlowTurnover > 0 ? 100 - bullishPercentage : 50;
+    const bullishPercentage = totalFlowTurnover > 0 ? Math.round((bullishTurnover / totalFlowTurnover) * 100) : null;
+    const bearishPercentage = totalFlowTurnover > 0 && bullishPercentage !== null ? 100 - bullishPercentage : null;
 
-    const overallSentiment = bullishPercentage > 55 ? "BULLISH" : bearishPercentage > 55 ? "BEARISH" : "NEUTRAL";
-    const overallConfidence = Math.max(bullishPercentage, bearishPercentage);
+    const overallSentiment = totalFlowTurnover > 0 && bullishPercentage !== null
+      ? (bullishPercentage > 55 ? "BULLISH" : (bearishPercentage ?? 0) > 55 ? "BEARISH" : "NEUTRAL")
+      : null;
+    const overallConfidence = totalFlowTurnover > 0 && bullishPercentage !== null
+      ? Math.max(bullishPercentage, bearishPercentage ?? 0)
+      : null;
+
+    // Calculate ATM IV and skew from real strikes
+    const atmStrikeRow = strikesList.find((s) => s.isATM) || strikesList[Math.floor(strikesList.length / 2)];
+    const calculatedAtmIv = (atmStrikeRow?.call?.iv ?? atmStrikeRow?.put?.iv) ?? null;
+
+    const callsWithIv = strikesList.map((s) => s.call?.iv).filter((v): v is number => typeof v === "number" && v > 0);
+    const putsWithIv = strikesList.map((s) => s.put?.iv).filter((v): v is number => typeof v === "number" && v > 0);
+    const avgCallIv = callsWithIv.length > 0 ? parseFloat((callsWithIv.reduce((a, b) => a + b, 0) / callsWithIv.length).toFixed(2)) : null;
+    const avgPutIv = putsWithIv.length > 0 ? parseFloat((putsWithIv.reduce((a, b) => a + b, 0) / putsWithIv.length).toFixed(2)) : null;
+    const ivSkew = (avgCallIv !== null && avgPutIv !== null) ? {
+      callIVAverage: avgCallIv,
+      putIVAverage: avgPutIv,
+      skewPct: parseFloat((avgPutIv - avgCallIv).toFixed(2)),
+    } : null;
+
+    const dte = calculateDaysToExpiry(selectedExpiry);
 
     const snapshot: OptionTerminalSnapshot = {
       underlying,
@@ -292,24 +332,23 @@ export async function GET(request: NextRequest) {
       spotChangePercent: spotChangePct,
       marketStatus,
       selectedExpiry,
-      daysToExpiry: 7,
-      isWeekly: true,
-      availableExpiries: availableExpiriesRaw.map((e: string, idx: number) => ({
-        expiry: e,
-        daysToExpiry: (idx + 1) * 7,
-        isWeekly: idx < 3,
-        label: `${e} (${(idx + 1) * 7} DTE)`,
-      })),
+      daysToExpiry: dte,
+      isWeekly: dte <= 7,
+      availableExpiries: availableExpiriesRaw.map((e: string) => {
+        const itemDte = calculateDaysToExpiry(e);
+        return {
+          expiry: e,
+          daysToExpiry: itemDte,
+          isWeekly: itemDte <= 7,
+          label: `${e} (${itemDte} DTE)`,
+        };
+      }),
       atmStrike,
       maxPain,
-      spotVsMaxPainDistance: maxPain !== null ? parseFloat((spotPrice - maxPain).toFixed(2)) : null,
+      spotVsMaxPainDistance: maxPain !== null && spotPrice > 0 ? parseFloat((spotPrice - maxPain).toFixed(2)) : null,
       pcr,
-      atmIV: 14.5,
-      ivSkew: {
-        callIVAverage: 14.2,
-        putIVAverage: 14.9,
-        skewPct: 0.7,
-      },
+      atmIV: calculatedAtmIv,
+      ivSkew,
       supportZone,
       resistanceZone,
       flowSummary: {
@@ -326,11 +365,11 @@ export async function GET(request: NextRequest) {
       strikes: strikesList,
       flowTrades: flowTrades.slice(0, 50),
       source: provider,
-      environment: "LIVE",
-      freshnessStatus: "LIVE",
-      dataAgeMs: 120,
-      latencyMs: 18,
-      timestamp: Date.now(),
+      environment: marketDataMode === "LIVE" ? "LIVE" : "PAPER",
+      freshnessStatus: chainData?.freshness_status || chainData?.freshnessStatus || (spotPrice > 0 ? "LIVE" : "UNAVAILABLE"),
+      dataAgeMs: chainData?.dataAgeMs ?? (chainData?.received_timestamp ? Date.now() - chainData.received_timestamp : 0),
+      latencyMs: chainData?.latencyMs ?? 0,
+      timestamp: chainData?.timestamp ?? chainData?.exchange_timestamp ?? Date.now(),
     };
 
     return NextResponse.json({

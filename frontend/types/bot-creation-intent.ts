@@ -71,6 +71,9 @@ export interface BotCreationIntent {
   maxLeverage?: number | null;
   fundingRate?: number | null;
 
+  canonicalContractId?: string;
+  uiDispatchTimestamp?: number;
+
   timestamp: number;
 
   origin: "LIVE_FEED" | "OPTIONS" | "FUTURES";

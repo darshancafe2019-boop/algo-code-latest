@@ -400,14 +400,14 @@ export function getMarketRowStatus({
     };
   }
 
-  // Provider configured but no fresh tick received yet -> Truthful LAST TRADED
+  // Provider configured but no fresh tick received yet on open or 24x7 market -> Truthful UNAVAILABLE
   return {
-    label: `${pLabel} • LAST TRADED`,
-    state: "closed",
+    label: `${pLabel} • UNAVAILABLE`,
+    state: "unavailable",
     provider,
     providerLabel: pLabel,
     marketSession,
-    priceState: "LAST_TRADED",
+    priceState: "UNAVAILABLE",
     isLive: false,
     isStale: false,
   };

@@ -58,10 +58,10 @@ interface OptionsControlCenterProps {
 
 export function OptionsControlCenter({
   underlying = "NIFTY",
-  spotPrice = 24350.0,
-  pcr = 1.05,
-  maxPain = 24300.0,
-  availableExpiries = ["2026-09-04", "2026-09-18"],
+  spotPrice = 0,
+  pcr = 0,
+  maxPain = 0,
+  availableExpiries = [],
   chainData,
 }: OptionsControlCenterProps) {
   // 1. Core State

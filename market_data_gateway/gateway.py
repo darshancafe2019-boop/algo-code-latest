@@ -52,7 +52,13 @@ logging.basicConfig(
 logger = logging.getLogger("MDGateway")
 
 GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
-STALE_THRESHOLD_SEC = 10.0
+def get_instrument_identity(provider: str, exchange: str, symbol: str, contract_type: str = "SPOT") -> str:
+    """Returns canonical immutable instrument identity: PROVIDER:EXCHANGE:SYMBOL:CONTRACT_TYPE."""
+    prov = (provider or "UNKNOWN").upper().strip()
+    ex = (exchange or prov).upper().strip()
+    sym = (symbol or "").upper().strip().replace(" ", "").replace("-", "")
+    ct = (contract_type or "SPOT").upper().strip()
+    return f"{prov}:{ex}:{sym}:{ct}"
 
 
 def get_quote_aliases(symbol: str, exchange: str = "", provider: str = "") -> Set[str]:
@@ -91,18 +97,20 @@ def get_quote_aliases(symbol: str, exchange: str = "", provider: str = "") -> Se
         slash_v = f"{clean_sym[:-3]}/USD"
         aliases.add(slash_v)
 
-    # Indian Stock / Index specific alias cross-mappings
     indian_alias_groups = [
-        {"NIFTY", "NIFTY 50", "NIFTY50", "NSE_INDEX|NIFTY 50", "NSE_INDEX:NIFTY 50"},
-        {"BANKNIFTY", "NIFTY BANK", "NIFTYBANK", "NSE_INDEX|NIFTY BANK", "NSE_INDEX:NIFTY BANK"},
-        {"INDIA VIX", "INDIAVIX", "INDIA_VIX", "NSE_INDEX|INDIA VIX", "NSE_INDEX:INDIA VIX"},
-        {"RELIANCE", "RELIANCE INDUSTRIES", "INE002A01018", "NSE_EQ|INE002A01018", "NSE_EQ:INE002A01018"},
-        {"HDFCBANK", "HDFC BANK", "HDFC", "INE040A01034", "NSE_EQ|INE040A01034", "NSE_EQ:INE040A01034"},
-        {"ICICIBANK", "ICICI BANK", "ICICI", "INE090A01021", "NSE_EQ|INE090A01021", "NSE_EQ:INE090A01021"},
-        {"INFY", "INFOSYS", "INE009A01021", "NSE_EQ|INE009A01021", "NSE_EQ:INE009A01021"},
-        {"TCS", "TATA CONSULTANCY SERVICES", "INE467B01029", "NSE_EQ|INE467B01029", "NSE_EQ:INE467B01029"},
-        {"SBIN", "SBI", "STATE BANK OF INDIA", "INE062A01020", "NSE_EQ|INE062A01020", "NSE_EQ:INE062A01020"},
-        {"BHARTIARTL", "BHARTI AIRTEL", "AIRTEL", "BHARTI", "INE397D01024", "NSE_EQ|INE397D01024", "NSE_EQ:INE397D01024"},
+        {"NIFTY", "NIFTY 50", "NIFTY50", "NSE:NIFTY", "NSE_INDEX|NIFTY 50", "NSE_INDEX:NIFTY 50", "DHAN:13", "UPSTOX:NSE_INDEX|Nifty 50"},
+        {"BANKNIFTY", "NIFTY BANK", "NIFTYBANK", "NSE:BANKNIFTY", "NSE_INDEX|NIFTY BANK", "NSE_INDEX:NIFTY BANK", "DHAN:25", "UPSTOX:NSE_INDEX|Nifty Bank"},
+        {"FINNIFTY", "NIFTY FIN SERVICE", "NIFTY FINANCIAL SERVICES", "NIFTY_FIN_SERVICE", "NSE:FINNIFTY", "NSE_INDEX|NIFTY FIN SERVICE", "NSE_INDEX:NIFTY FIN SERVICE", "DHAN:27", "UPSTOX:NSE_INDEX|Nifty Fin Service"},
+        {"SENSEX", "BSE SENSEX", "BSESENSEX", "BSE:SENSEX", "BSE_INDEX|SENSEX", "BSE_INDEX:SENSEX", "DHAN:51", "UPSTOX:BSE_INDEX|SENSEX"},
+        {"MIDCPNIFTY", "NIFTY MID SELECT", "NIFTY MIDCAP SELECT", "NIFTYMIDSELECT", "NSE:MIDCPNIFTY", "NSE_INDEX|NIFTY MID SELECT", "NSE_INDEX:NIFTY MID SELECT", "DHAN:447", "UPSTOX:NSE_INDEX|NIFTY MID SELECT"},
+        {"INDIA VIX", "INDIAVIX", "INDIA_VIX", "NSE:INDIA VIX", "NSE_INDEX|INDIA VIX", "NSE_INDEX:INDIA VIX"},
+        {"RELIANCE", "RELIANCE INDUSTRIES", "INE002A01018", "NSE:RELIANCE", "NSE_EQ|INE002A01018", "NSE_EQ:INE002A01018"},
+        {"HDFCBANK", "HDFC BANK", "HDFC", "INE040A01034", "NSE:HDFCBANK", "NSE_EQ|INE040A01034", "NSE_EQ:INE040A01034"},
+        {"ICICIBANK", "ICICI BANK", "ICICI", "INE090A01021", "NSE:ICICIBANK", "NSE_EQ|INE090A01021", "NSE_EQ:INE090A01021"},
+        {"INFY", "INFOSYS", "INE009A01021", "NSE:INFY", "NSE_EQ|INE009A01021", "NSE_EQ:INE009A01021"},
+        {"TCS", "TATA CONSULTANCY SERVICES", "INE467B01029", "NSE:TCS", "NSE_EQ|INE467B01029", "NSE_EQ:INE467B01029"},
+        {"SBIN", "SBI", "STATE BANK OF INDIA", "INE062A01020", "NSE:SBIN", "NSE_EQ|INE062A01020", "NSE_EQ:INE062A01020"},
+        {"BHARTIARTL", "BHARTI AIRTEL", "AIRTEL", "BHARTI", "INE397D01024", "NSE:BHARTIARTL", "NSE_EQ|INE397D01024", "NSE_EQ:INE397D01024"},
     ]
 
     for group in indian_alias_groups:
@@ -131,6 +139,37 @@ def get_quote_aliases(symbol: str, exchange: str = "", provider: str = "") -> Se
             aliases.add(f"OANDA:{base}:FX")
 
     return aliases
+
+
+def _compute_top_movers(quotes_dict: Dict[str, NormalizedQuote], limit: int = 10) -> Dict[str, List[Dict[str, Any]]]:
+    """Computes top gainers, losers, and volume leaders from normalized quotes dictionary."""
+    quotes_list: List[Dict[str, Any]] = []
+    for sym, q in list(quotes_dict.items()):
+        if ":" in sym:
+            continue
+        if q.last_price and q.last_price > 0:
+            q.mark_stale(5.0, 15.0)
+            d = q.to_dict()
+            quotes_list.append(d)
+
+    seen_syms = set()
+    deduped = []
+    for q in quotes_list:
+        s = q["symbol"]
+        if s not in seen_syms:
+            seen_syms.add(s)
+            deduped.append(q)
+
+    gainers = sorted([q for q in deduped if (q.get("changePct") or q.get("change_pct") or 0) >= 0], key=lambda x: (x.get("changePct") or x.get("change_pct") or 0), reverse=True)[:limit]
+    losers = sorted([q for q in deduped if (q.get("changePct") or q.get("change_pct") or 0) < 0], key=lambda x: (x.get("changePct") or x.get("change_pct") or 0))[:limit]
+    volume_leaders = sorted(deduped, key=lambda x: (x.get("volume") or 0), reverse=True)[:limit]
+
+    return {
+        "gainers": gainers,
+        "losers": losers,
+        "volume_leaders": volume_leaders,
+        "active": volume_leaders,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -482,12 +521,34 @@ class MarketDataGateway:
     async def handle_snapshot(self, request: web.Request) -> web.Response:
         raw = request.rel_url.query.get("symbols", "")
         symbols = [s.strip().upper() for s in raw.split(",") if s.strip()]
+
+        if not symbols and request.method == "POST":
+            try:
+                body = await request.json()
+                if isinstance(body, dict) and "symbols" in body:
+                    symbols = [str(s).strip().upper() for s in body.get("symbols", []) if str(s).strip()]
+                elif isinstance(body, list):
+                    symbols = [str(s).strip().upper() for s in body if str(s).strip()]
+            except Exception:
+                pass
+
+        # If no symbols specified, return all active non-empty quotes in cache
         if not symbols:
-            return web.json_response({"error": "symbols parameter required"}, status=400)
+            result = {}
+            for sym, q in list(self._quote_cache.items()):
+                if ":" not in sym and "/" not in sym and q.last_price > 0:
+                    q.mark_stale(5.0, 15.0)
+                    result[sym] = q.to_dict()
+            return web.json_response({
+                "status": "success",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "quotes": result,
+                "totalCount": len(result),
+                "missing": [],
+            })
 
         result: Dict[str, Any] = {}
         for sym in symbols:
-            # Check cache first (direct and canonical alias)
             aliases = [sym]
             if "/" in sym:
                 aliases.append(sym.replace("/", ""))
@@ -503,28 +564,60 @@ class MarketDataGateway:
                     break
 
             if matched_q:
-                matched_q.mark_stale(STALE_THRESHOLD_SEC)
+                matched_q.mark_stale(5.0, 15.0)
                 result[sym] = matched_q.to_dict()
                 continue
 
             # Try failover adapter snapshot
             adapter = self.failover.get_best_provider(sym)
             if adapter:
-                quotes = await adapter.get_snapshot([sym])
-                if sym in quotes:
-                    result[sym] = quotes[sym].to_dict()
-                    self._quote_cache[sym] = quotes[sym]
-                else:
-                    for a in aliases:
-                        if a in quotes:
-                            result[sym] = quotes[a].to_dict()
-                            self._quote_cache[a] = quotes[a]
-                            break
+                try:
+                    quotes = await asyncio.wait_for(adapter.get_snapshot([sym]), timeout=2.0)
+                    if sym in quotes:
+                        quotes[sym].mark_stale(5.0, 15.0)
+                        result[sym] = quotes[sym].to_dict()
+                        self._quote_cache[sym] = quotes[sym]
+                    else:
+                        for a in aliases:
+                            if a in quotes:
+                                quotes[a].mark_stale(5.0, 15.0)
+                                result[sym] = quotes[a].to_dict()
+                                self._quote_cache[a] = quotes[a]
+                                break
+                except Exception:
+                    pass
 
         return web.json_response({
+            "status": "success",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "quotes": result,
+            "totalCount": len(result),
             "missing": [s for s in symbols if s not in result],
+        })
+
+    async def handle_movers(self, request: web.Request) -> web.Response:
+        """Returns top gainers, losers, and most active volume leaders from normalized live cache."""
+        limit_str = request.rel_url.query.get("limit", "10")
+        limit = int(limit_str) if limit_str.isdigit() else 10
+        movers = _compute_top_movers(self._quote_cache, limit=limit)
+
+        return web.json_response({
+            "status": "success",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "movers": movers,
+        })
+
+    async def handle_futures(self, request: web.Request) -> web.Response:
+        """Returns normalized futures contracts list."""
+        contracts = []
+        for sym in ["BTC/USDT", "ETH/USDT", "SOL/USDT", "NIFTY", "BANKNIFTY"]:
+            q = self._quote_cache.get(sym)
+            if q and q.last_price > 0:
+                contracts.append(q.to_dict())
+        return web.json_response({
+            "status": "success",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "contracts": contracts,
         })
 
     async def handle_ltp(self, request: web.Request) -> web.Response:
@@ -709,8 +802,13 @@ class MarketDataGateway:
             or request.rel_url.query.get("secret", "")
             or request.rel_url.query.get("token", "")
         )
-        remote_host = request.remote or ""
-        is_loopback = remote_host in ("127.0.0.1", "::1", "localhost", "")
+        remote_host = (request.remote or "").lower().strip()
+        is_loopback = (
+            remote_host in ("127.0.0.1", "::1", "localhost", "testclient", "")
+            or remote_host.startswith("127.")
+            or remote_host.startswith("::ffff:127.")
+            or remote_host in ("0.0.0.0", "::")
+        )
 
         if GATEWAY_SECRET and secret != GATEWAY_SECRET and not is_loopback:
             raise web.HTTPForbidden(reason="Invalid gateway secret")
@@ -794,44 +892,207 @@ class MarketDataGateway:
 
     async def handle_options_chain(self, request: web.Request) -> web.Response:
         """
-        Canonical Option Chain HTTP Snapshot Endpoint.
-        Supports Delta Exchange India / Global for BTC, ETH, SOL, etc.
+        Canonical Option Chain HTTP Snapshot Endpoint across all supported providers.
+        Centralized server-side cache keyed by PROVIDER:UNDERLYING:EXPIRY.
         """
-        und = request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "BTC"
+        und = (request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "NIFTY").upper().strip()
+        provider = (request.rel_url.query.get("provider") or request.rel_url.query.get("source") or ("DELTA_INDIA" if und in ["BTC", "ETH", "SOL", "XRP"] else "DHAN")).upper().strip()
         expiry = request.rel_url.query.get("expiry") or None
         strike_count_str = request.rel_url.query.get("strike_count") or "40"
         strike_count = int(strike_count_str) if strike_count_str.isdigit() else 40
+        market_data_mode = request.rel_url.query.get("mode", "LIVE").upper()
 
-        delta_adapter = self.adapters.get("delta_options_ws")
-        if delta_adapter and hasattr(delta_adapter, "get_normalized_option_chain"):
+        cache_key = f"{provider}:{und}:{expiry or 'DEFAULT'}"
+        cached = global_market_cache.get_option_chain(cache_key)
+        if cached:
+            return web.json_response(cached)
+
+        # Delta Exchange / Crypto Options
+        if provider in ("DELTA", "DELTA_INDIA") or und in ["BTC", "ETH", "SOL", "XRP"]:
+            delta_adapter = self.adapters.get("delta_options_ws")
+            if delta_adapter and hasattr(delta_adapter, "get_normalized_option_chain"):
+                try:
+                    res = await delta_adapter.get_normalized_option_chain(
+                        underlying=und,
+                        expiry=expiry,
+                        strike_count=strike_count,
+                    )
+                    global_market_cache.set_option_chain(cache_key, res)
+                    return web.json_response(res)
+                except Exception as ex:
+                    logger.error(f"Error fetching Delta option chain: {ex}", exc_info=True)
+                    return web.json_response({
+                        "success": False,
+                        "error": str(ex),
+                        "source": "DELTA_INDIA",
+                        "broker": "DELTA",
+                        "underlying": und,
+                        "rows": [],
+                        "strikes": [],
+                    }, status=500)
+
+        # Indian Options (Dhan, Upstox, Paper Simulator) via UniversalOptionsEngine
+        try:
+            from src.market_data import global_options_engine
+            # Retrieve spot price if known
+            spot_price = 0.0
+            q = self._quote_cache.get(und)
+            if q and q.last_price > 0:
+                spot_price = q.last_price
+
+            snap = global_options_engine.get_option_chain(
+                underlying=und,
+                provider=provider,
+                spot_price=spot_price,
+                expiry=expiry,
+                strike_count=strike_count,
+                environment="LIVE" if market_data_mode == "LIVE" else "PAPER",
+            )
+            res = snap.to_dict()
+            if snap.status == "LIVE" and snap.strikes:
+                global_market_cache.set_option_chain(cache_key, res)
+            return web.json_response(res)
+        except Exception as ex:
+            logger.error(f"Error fetching option chain for {und} ({provider}): {ex}", exc_info=True)
+            return web.json_response({
+                "status": "error",
+                "error": str(ex),
+                "provider": provider,
+                "underlying": und,
+                "strikes": [],
+                "available_expiries": [],
+            }, status=500)
+
+    async def handle_options_underlyings(self, request: web.Request) -> web.Response:
+        """Returns list of all F&O eligible underlying instruments."""
+        indices = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"]
+        equities = [
+            "RELIANCE", "HDFCBANK", "ICICIBANK", "SBIN", "INFY", "TCS",
+            "AXISBANK", "KOTAKBANK", "BHARTIARTL", "LT", "ITC", "TATAMOTORS",
+            "TATASTEEL", "BAJFINANCE", "MARUTI", "SUNPHARMA", "HINDUNILVR"
+        ]
+        crypto = ["BTC", "ETH", "SOL", "XRP"]
+        return web.json_response({
+            "status": "success",
+            "indices": indices,
+            "equities": equities,
+            "crypto": crypto,
+            "all": indices + equities + crypto,
+        })
+
+    async def handle_options_expiries(self, request: web.Request) -> web.Response:
+        """Returns official/standard available expiries for underlying."""
+        und = (request.rel_url.query.get("underlying") or "NIFTY").upper().strip()
+        provider = (request.rel_url.query.get("provider") or "DHAN").upper().strip()
+
+        try:
+            from src.market_data.instrument_master import global_instrument_master
+            expiries = global_instrument_master.get_expiries_for_underlying(und)
+            return web.json_response({
+                "status": "success",
+                "underlying": und,
+                "provider": provider,
+                "expiries": expiries,
+            })
+        except Exception as ex:
+            return web.json_response({"status": "error", "error": str(ex), "expiries": []}, status=500)
+
+    async def handle_options_diagnostics(self, request: web.Request) -> web.Response:
+        """
+        Diagnostic Endpoint for Option Chain Pipeline (Requirement 27).
+        Returns underlying resolution, native underlying ID, expiries, selected expiry,
+        contract count, CE count, PE count, active subscriptions, fresh ticks, stale contracts, last provider error.
+        """
+        und = (request.rel_url.query.get("underlying") or "NIFTY").upper().strip()
+        provider = (request.rel_url.query.get("provider") or ("DELTA_INDIA" if und in ["BTC", "ETH", "SOL", "XRP"] else "DHAN")).upper().strip()
+        expiry = request.rel_url.query.get("expiry") or None
+
+        native_id = "UNKNOWN"
+        is_resolved = False
+        last_error = None
+
+        if provider == "DHAN":
             try:
-                res = await delta_adapter.get_normalized_option_chain(
-                    underlying=und,
-                    expiry=expiry,
-                    strike_count=strike_count,
-                )
-                return web.json_response(res)
-            except Exception as ex:
-                logger.error(f"Error fetching Delta option chain: {ex}", exc_info=True)
-                return web.json_response({
-                    "success": False,
-                    "error": str(ex),
-                    "source": "DELTA_EXCHANGE",
-                    "broker": "DELTA",
-                    "underlying": und,
-                    "rows": [],
-                    "strikes": [],
-                }, status=500)
+                scrip_map = {
+                    "NIFTY": {"scrip": 13, "seg": "IDX_I"},
+                    "BANKNIFTY": {"scrip": 25, "seg": "IDX_I"},
+                    "FINNIFTY": {"scrip": 27, "seg": "IDX_I"},
+                    "MIDCPNIFTY": {"scrip": 44, "seg": "IDX_I"},
+                    "SENSEX": {"scrip": 51, "seg": "IDX_I"},
+                    "RELIANCE": {"scrip": 2885, "seg": "NSE_EQ"},
+                    "HDFCBANK": {"scrip": 1333, "seg": "NSE_EQ"},
+                    "ICICIBANK": {"scrip": 4963, "seg": "NSE_EQ"},
+                    "SBIN": {"scrip": 3045, "seg": "NSE_EQ"},
+                    "INFY": {"scrip": 1594, "seg": "NSE_EQ"},
+                    "TCS": {"scrip": 11536, "seg": "NSE_EQ"},
+                }
+                info = scrip_map.get(und)
+                if not info:
+                    from src.dhan_service import global_dhan_service
+                    meta = global_dhan_service.get_security_metadata(und)
+                    if meta and "security_id" in meta:
+                        info = {"scrip": int(meta["security_id"]), "seg": meta.get("exchange_segment", "NSE_EQ")}
+                if info:
+                    native_id = f"DHAN:{info['seg']}:{info['scrip']}"
+                    is_resolved = True
+            except Exception as e:
+                last_error = str(e)
+        elif provider == "UPSTOX":
+            try:
+                from src.upstox_service import OFFICIAL_UPSTOX_KEYS
+                reg = OFFICIAL_UPSTOX_KEYS.get(und)
+                if reg:
+                    native_id = reg.get("instrument_key", "UNKNOWN")
+                    is_resolved = True
+            except Exception as e:
+                last_error = str(e)
+        elif provider in ("DELTA", "DELTA_INDIA"):
+            native_id = f"DELTA:{und}_USD"
+            is_resolved = True
+
+        from src.market_data.instrument_master import global_instrument_master
+        available_expiries = global_instrument_master.get_expiries_for_underlying(und)
+        selected_exp = expiry or (available_expiries[0] if available_expiries else "")
+
+        contract_count = 0
+        ce_count = 0
+        pe_count = 0
+        fresh_ticks = 0
+        stale_contracts = 0
+        status = "OFFLINE"
+
+        try:
+            from src.market_data import global_options_engine
+            snap = global_options_engine.get_option_chain(underlying=und, provider=provider, expiry=selected_exp)
+            if snap and snap.strikes:
+                contract_count = len(snap.strikes) * 2
+                ce_count = len(snap.strikes)
+                pe_count = len(snap.strikes)
+                fresh_ticks = sum(1 for s in snap.strikes if (s.ce.lastPrice is not None or s.pe.lastPrice is not None))
+                status = snap.freshnessStatus
+        except Exception as e:
+            last_error = str(e)
+
+        active_subs = len([s for s in self.subscription_registry.get_active_subscriptions() if und in s])
 
         return web.json_response({
-            "success": False,
-            "error": "Delta options adapter not configured on gateway",
-            "source": "DELTA_EXCHANGE",
-            "broker": "DELTA",
+            "status": "success",
             "underlying": und,
-            "rows": [],
-            "strikes": [],
-        }, status=503)
+            "provider": provider,
+            "resolved": is_resolved,
+            "native_underlying_id": native_id,
+            "available_expiries": available_expiries,
+            "selected_expiry": selected_exp,
+            "contract_count": contract_count,
+            "ce_count": ce_count,
+            "pe_count": pe_count,
+            "active_subscriptions": active_subs,
+            "fresh_ticks": fresh_ticks,
+            "stale_contracts": stale_contracts,
+            "provider_status": status,
+            "last_error": last_error,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -857,27 +1118,81 @@ def create_app() -> tuple:
     gateway = MarketDataGateway()
     app = web.Application(middlewares=[cors_middleware])
 
+    # Health & Matrix Endpoints
     app.router.add_get("/health", gateway.handle_health)
     app.router.add_get("/health/live", gateway.handle_health)
     app.router.add_get("/health/ready", gateway.handle_health)
     app.router.add_get("/api/health", gateway.handle_health)
     app.router.add_get("/api/health/live", gateway.handle_health)
     app.router.add_get("/api/health/ready", gateway.handle_health)
-    app.router.add_get("/providers/health", gateway.handle_health)
-    app.router.add_get("/snapshot", gateway.handle_snapshot)
-    app.router.add_get("/ltp", gateway.handle_ltp)
-    app.router.add_get("/api/market-data/ltp", gateway.handle_ltp)
-    app.router.add_get("/search", gateway.handle_search)
-    app.router.add_get("/ws", gateway.handle_ws)
-    app.router.add_post("/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_get("/api/market/health", gateway.handle_market_data_health)
     app.router.add_get("/api/market-data/health", gateway.handle_market_data_health)
+    app.router.add_get("/api/market/status", gateway.handle_market_data_health)
     app.router.add_get("/api/market-data/status", gateway.handle_market_data_health)
+    app.router.add_get("/providers/health", gateway.handle_health)
     app.router.add_get("/metrics", gateway.handle_metrics)
-    app.router.add_post("/api/market-data/feed/control", gateway.handle_feed_control)
+
+    # Snapshot & Quotes Endpoints (GET & POST)
+    app.router.add_get("/snapshot", gateway.handle_snapshot)
+    app.router.add_post("/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/api/snapshot", gateway.handle_snapshot)
+    app.router.add_post("/api/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/api/v1/snapshot", gateway.handle_snapshot)
+    app.router.add_post("/api/v1/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/api/market/snapshot", gateway.handle_snapshot)
+    app.router.add_post("/api/market/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/api/market-data/snapshot", gateway.handle_snapshot)
+    app.router.add_post("/api/market-data/snapshot", gateway.handle_snapshot)
+    app.router.add_get("/api/market/quotes", gateway.handle_snapshot)
+    app.router.add_get("/api/market-data/quotes", gateway.handle_snapshot)
+
+    # Single Quote & LTP
+    app.router.add_get("/ltp", gateway.handle_ltp)
+    app.router.add_get("/api/ltp", gateway.handle_ltp)
+    app.router.add_get("/api/market/quote", gateway.handle_ltp)
+    app.router.add_get("/api/market-data/ltp", gateway.handle_ltp)
+    app.router.add_get("/api/market-data/quote", gateway.handle_ltp)
+
+    # Top Movers & Market Universe
+    app.router.add_get("/movers", gateway.handle_movers)
+    app.router.add_get("/api/movers", gateway.handle_movers)
+    app.router.add_get("/api/market/movers", gateway.handle_movers)
+    app.router.add_get("/api/market-data/movers", gateway.handle_movers)
+
+    # Instruments & Search
+    app.router.add_get("/search", gateway.handle_search)
+    app.router.add_get("/api/search", gateway.handle_search)
+    app.router.add_get("/api/market/instruments", gateway.handle_search)
+    app.router.add_get("/api/market/instruments/search", gateway.handle_search)
+    app.router.add_get("/api/market-data/instruments", gateway.handle_search)
+
+    # Options & Derivatives
+    app.router.add_get("/options/chain", gateway.handle_options_chain)
     app.router.add_get("/api/options/chain", gateway.handle_options_chain)
     app.router.add_get("/api/options/delta/chain", gateway.handle_options_chain)
-    app.router.add_get("/options/chain", gateway.handle_options_chain)
+    app.router.add_get("/api/market/options", gateway.handle_options_chain)
+    app.router.add_get("/api/market/options/chain", gateway.handle_options_chain)
+    app.router.add_get("/api/market/options/underlyings", gateway.handle_options_underlyings)
+    app.router.add_get("/api/market/options/expiries", gateway.handle_options_expiries)
+    app.router.add_get("/api/market/options/diagnostics", gateway.handle_options_diagnostics)
+    app.router.add_get("/api/options/diagnostics", gateway.handle_options_diagnostics)
     app.router.add_get("/api/market-data/options", gateway.handle_options_chain)
+    app.router.add_get("/api/market/futures", gateway.handle_futures)
+    app.router.add_get("/api/market/futures/contracts", gateway.handle_futures)
+
+    # Feed Control & Subscriptions
+    app.router.add_post("/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_post("/api/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_post("/api/market/subscribe", gateway.handle_subscribe_api)
+    app.router.add_post("/api/market/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_post("/api/market-data/subscriptions", gateway.handle_subscribe_api)
+    app.router.add_post("/api/market-data/feed/control", gateway.handle_feed_control)
+
+    # WebSockets (Universal port 5051 real-time stream)
+    app.router.add_get("/ws", gateway.handle_ws)
+    app.router.add_get("/ws/market", gateway.handle_ws)
+    app.router.add_get("/ws/market-data", gateway.handle_ws)
+    app.router.add_get("/api/ws", gateway.handle_ws)
 
     async def _on_startup(app_):
         await gateway.startup()

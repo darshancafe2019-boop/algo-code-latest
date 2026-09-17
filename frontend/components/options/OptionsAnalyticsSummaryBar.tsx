@@ -21,13 +21,15 @@ export function OptionsAnalyticsSummaryBar({
   atmStrike,
   maxPain,
   pcr,
-  atmIV = 14.8,
+  atmIV,
   callResistanceStrike,
   putSupportStrike,
   currency = "₹",
 }: OptionsAnalyticsSummaryBarProps) {
-  const pcrValue = pcr?.pcr_oi > 0 ? pcr.pcr_oi : 1.15;
-  const pcrSentiment = pcrValue > 1.2 ? "BULLISH BIAS" : pcrValue < 0.8 ? "BEARISH BIAS" : "NEUTRAL / BALANCED";
+  const pcrValue = pcr?.pcr_oi !== null && pcr?.pcr_oi !== undefined && pcr.pcr_oi > 0 ? pcr.pcr_oi : null;
+  const pcrSentiment = pcrValue !== null
+    ? (pcrValue > 1.2 ? "BULLISH BIAS" : pcrValue < 0.8 ? "BEARISH BIAS" : "NEUTRAL / BALANCED")
+    : "AWAITING DATA";
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 font-mono">
@@ -38,10 +40,10 @@ export function OptionsAnalyticsSummaryBar({
           <Target className="w-3 h-3 text-cyan-400" />
         </div>
         <div className="text-sm font-bold text-white tracking-tight">
-          {formatMoney(atmStrike > 0 ? atmStrike : spotPrice, currency)}
+          {atmStrike > 0 ? formatMoney(atmStrike, currency) : "—"}
         </div>
         <div className="text-[10px] text-cyan-400">
-          Spot: {formatMoney(spotPrice, currency)}
+          Spot: {spotPrice > 0 ? formatMoney(spotPrice, currency) : "—"}
         </div>
       </div>
 
@@ -52,7 +54,7 @@ export function OptionsAnalyticsSummaryBar({
           <Activity className="w-3 h-3 text-emerald-400" />
         </div>
         <div className="text-sm font-bold text-emerald-400 tracking-tight">
-          {pcrValue.toFixed(2)}
+          {pcrValue !== null ? pcrValue.toFixed(2) : "—"}
         </div>
         <div className="text-[9px] font-semibold text-slate-400">
           {pcrSentiment}
@@ -66,7 +68,7 @@ export function OptionsAnalyticsSummaryBar({
           <Zap className="w-3 h-3 text-amber-400" />
         </div>
         <div className="text-sm font-bold text-amber-400 tracking-tight">
-          {formatMoney(maxPain > 0 ? maxPain : (atmStrike || spotPrice), currency)}
+          {maxPain && maxPain > 0 ? formatMoney(maxPain, currency) : "—"}
         </div>
         <div className="text-[10px] text-slate-400">
           Option Seller Min Loss
@@ -80,10 +82,10 @@ export function OptionsAnalyticsSummaryBar({
           <Layers className="w-3 h-3 text-purple-400" />
         </div>
         <div className="text-sm font-bold text-purple-400 tracking-tight">
-          {atmIV.toFixed(1)}% IV
+          {typeof atmIV === "number" && atmIV > 0 ? `${atmIV.toFixed(1)}% IV` : "—"}
         </div>
         <div className="text-[10px] text-slate-400">
-          IV Rank: 42% (Normal)
+          {typeof atmIV === "number" && atmIV > 0 ? "Implied Volatility" : "No IV Available"}
         </div>
       </div>
 
@@ -94,7 +96,7 @@ export function OptionsAnalyticsSummaryBar({
           <TrendingDown className="w-3 h-3 text-rose-400" />
         </div>
         <div className="text-sm font-bold text-rose-400 tracking-tight">
-          {formatMoney(callResistanceStrike || atmStrike * 1.02, currency)}
+          {callResistanceStrike && callResistanceStrike > 0 ? formatMoney(callResistanceStrike, currency) : "—"}
         </div>
         <div className="text-[10px] text-slate-400">
           Max Call Concentration
@@ -108,7 +110,7 @@ export function OptionsAnalyticsSummaryBar({
           <TrendingUp className="w-3 h-3 text-emerald-400" />
         </div>
         <div className="text-sm font-bold text-emerald-400 tracking-tight">
-          {formatMoney(putSupportStrike || atmStrike * 0.98, currency)}
+          {putSupportStrike && putSupportStrike > 0 ? formatMoney(putSupportStrike, currency) : "—"}
         </div>
         <div className="text-[10px] text-slate-400">
           Max Put Concentration

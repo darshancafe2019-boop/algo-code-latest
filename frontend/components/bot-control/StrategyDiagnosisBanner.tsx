@@ -16,9 +16,9 @@ export function StrategyDiagnosisBanner() {
     refetchInterval: 5000,
   });
 
-  const regime = data?.market_direction || "TRENDING";
-  const symbol = data?.symbol || "BTC/USDT";
-  const price = data?.price || 65420.0;
+  const regime = data?.market_direction || "NEUTRAL";
+  const symbol = data?.symbol || "NIFTY";
+  const price = data?.price || 0;
 
   return (
     <div className="bg-gradient-to-r from-[#121824] via-[#0E1729] to-[#121824] border border-cyan-500/20 rounded-xl p-4 mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -49,7 +49,7 @@ export function StrategyDiagnosisBanner() {
 
         <div className="bg-[#0B0F17] px-3 py-1.5 rounded-lg border border-[#1A2333]">
           <span className="text-slate-400">Market Price: </span>
-          <span className="font-bold text-white">{formatMoney(price, "$")}</span>
+          <span className="font-bold text-white">{price > 0 ? formatMoney(price, "$") : "—"}</span>
         </div>
       </div>
     </div>

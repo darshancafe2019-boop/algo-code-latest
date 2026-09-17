@@ -51,17 +51,7 @@ export function AuditableTradeLedgerTable({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [selectedTrade, setSelectedTrade] = useState<TradeItem | null>(null);
-
-  const rawList: TradeItem[] = Array.isArray(trades) && trades.length > 0 ? trades : [
-    { id: "101178", symbol: "BTC/USDT", direction: "LONG", entry_price: 64250.0, exit_price: 64680.0, position_size: 0.1, net_pnl: 43.0, fees: 2.1, status: "CLOSED", strategy_name: "Trend Confluence", timestamp: "Today, 14:20:15", latency_ms: 18, slippage_bps: 1.2 },
-    { id: "101177", symbol: "ETH/USDT", direction: "LONG", entry_price: 3420.0, exit_price: 3495.0, position_size: 2.0, net_pnl: 150.0, fees: 3.5, status: "CLOSED", strategy_name: "Breakout Hunter", timestamp: "Today, 12:45:30", latency_ms: 22, slippage_bps: 0.8 },
-    { id: "101176", symbol: "NIFTY 50", direction: "SHORT", entry_price: 24420.0, exit_price: 24310.0, position_size: 50.0, net_pnl: 95.0, fees: 1.8, status: "CLOSED", strategy_name: "Trend Confluence", timestamp: "Today, 11:10:04", latency_ms: 15, slippage_bps: 1.5 },
-    { id: "101175", symbol: "SOL/USDT", direction: "LONG", entry_price: 172.5, exit_price: 178.0, position_size: 15.0, net_pnl: 82.5, fees: 2.0, status: "CLOSED", strategy_name: "Mean Reversion", timestamp: "Today, 09:50:18", latency_ms: 28, slippage_bps: 2.1 },
-    { id: "101174", symbol: "BTC-28AUG-65000-C", direction: "LONG", entry_price: 1250.0, exit_price: 1445.0, position_size: 1.0, net_pnl: 195.0, fees: 3.2, status: "CLOSED", strategy_name: "Delta Options Scalper", timestamp: "Today, 08:30:22", latency_ms: 12, slippage_bps: 0.5 },
-    { id: "101173", symbol: "AVAX/USDT", direction: "LONG", entry_price: 26.5, exit_price: 27.2, position_size: 80.0, net_pnl: 56.0, fees: 1.5, status: "CLOSED", strategy_name: "EMA Momentum", timestamp: "Yesterday, 22:15:10", latency_ms: 20, slippage_bps: 1.1 },
-    { id: "101172", symbol: "SOL/USDT", direction: "SHORT", entry_price: 178.0, exit_price: 181.0, position_size: 15.0, net_pnl: -45.0, fees: 2.0, status: "CLOSED", strategy_name: "Mean Reversion", timestamp: "Yesterday, 19:40:55", latency_ms: 32, slippage_bps: 2.4 },
-    { id: "101171", symbol: "ETH/USDT", direction: "SHORT", entry_price: 3480.0, exit_price: 3435.0, position_size: 2.0, net_pnl: 90.0, fees: 3.4, status: "CLOSED", strategy_name: "Breakout Hunter", timestamp: "Yesterday, 16:12:30", latency_ms: 19, slippage_bps: 0.9 },
-  ];
+  const rawList: TradeItem[] = Array.isArray(trades) ? trades : [];
 
   // Filtering
   const filtered = rawList.filter((t) => {

@@ -35,7 +35,6 @@ import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
-import { MarketAnalystDrawer } from "@/components/analyst/MarketAnalystDrawer";
 import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
 import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
 import { ProviderFailoverBanner } from "@/components/providers/ProviderFailoverBanner";
@@ -72,16 +71,16 @@ export function Navbar({
   const [isMarketAnalystOpen, setIsMarketAnalystOpen] = useState(false);
   const [ticker, setTicker] = useState<TickerData>({
     symbol: activeSymbol || "BTC/USDT",
-    last: 65420.0,
-    change_pct: 0.55,
-    change_val: 350.0,
-    high: 66000.0,
-    low: 64500.0,
-    volume: 1250.0,
+    last: 0,
+    change_pct: 0,
+    change_val: 0,
+    high: 0,
+    low: 0,
+    volume: 0,
   });
 
   const [priceFlash, setPriceFlash] = useState<"up" | "down" | null>(null);
-  const prevPriceRef = useRef<number>(65420.0);
+  const prevPriceRef = useRef<number>(0);
 
   // Activate All Bots Mutation
   const activateAllMutation = useMutation({
@@ -118,9 +117,9 @@ export function Navbar({
     const handleNewPrice = (newPrice: number, data: any) => {
       if (!isSubscribed) return;
       if (prevPriceRef.current !== newPrice) {
-        if (newPrice > prevPriceRef.current) {
+        if (newPrice > prevPriceRef.current && prevPriceRef.current > 0) {
           setPriceFlash("up");
-        } else if (newPrice < prevPriceRef.current) {
+        } else if (newPrice < prevPriceRef.current && prevPriceRef.current > 0) {
           setPriceFlash("down");
         }
         prevPriceRef.current = newPrice;
@@ -134,9 +133,9 @@ export function Navbar({
         last: newPrice,
         change_pct: data.change_pct !== undefined ? Number(data.change_pct) : 0,
         change_val: data.change_val !== undefined ? Number(data.change_val) : 0,
-        high: data.high || newPrice * 1.02,
-        low: data.low || newPrice * 0.98,
-        volume: data.volume || 1000,
+        high: data.high || newPrice,
+        low: data.low || newPrice,
+        volume: data.volume || 0,
       });
     };
 
@@ -188,7 +187,7 @@ export function Navbar({
 
   // If live store has quote, use it; otherwise fallback to SSE stream
   const currentSymbol = liveQuote?.symbol || ticker?.symbol || activeSymbol || "NIFTY";
-  const currentPrice = liveQuote?.lastPrice ?? ticker?.last ?? 23398.10;
+  const currentPrice = liveQuote?.lastPrice ?? (ticker?.last && ticker.last > 0 ? ticker.last : null);
   const currentChangePct = liveQuote?.changePercent ?? ticker?.change_pct ?? 0;
   const currentChangeVal = liveQuote?.change ?? ticker?.change_val ?? 0;
   const currentFlash = liveQuote?.flashDirection || priceFlash;
@@ -196,255 +195,193 @@ export function Navbar({
   const currencySymbol = isIndianAsset ? "₹" : "$";
   const isPositive = currentChangePct >= 0;
   const isLiveFeed = liveQuote ? !liveQuote.isStale : (feedHealth.connectionStatus === "LIVE");
-  const latencyDisplay = (liveQuote?.feedLatencyMs || feedHealth.latencyMs || 42).toFixed(0);
+  const measuredLatency = liveQuote?.feedLatencyMs ?? feedHealth.latencyMs;
+  const latencyDisplay = measuredLatency ? measuredLatency.toFixed(0) : "—";
 
   return (
     <>
       <ProviderFailoverBanner />
-      <header className="sticky top-0 z-40 w-full border-b border-[#1A2A3F] bg-[#0B0E17]/95 backdrop-blur px-4 py-2 flex items-center justify-between shadow-md">
-        {/* Left Branding and Nav Links */}
-        <div className="flex items-center gap-6">
-          <div
-            onClick={() => setActiveTab("home")}
-            className="flex items-center gap-2 cursor-pointer group select-none"
-          >
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-500 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
-              <div className="h-full w-full bg-[#0B0E17] rounded-[6px] flex items-center justify-center">
-                <Radio className="h-4 w-4 text-cyan-400 animate-pulse" />
+      <header className="sticky top-0 z-40 w-full border-b border-[#1A2A3F] bg-[#0B0E17]/95 backdrop-blur px-3 sm:px-4 py-1.5 flex flex-col gap-1.5 shadow-md font-sans select-none">
+        {/* Top Control Bar Row */}
+        <div className="flex items-center justify-between w-full gap-2 sm:gap-4">
+          {/* Left Branding and Primary Nav Links */}
+          <div className="flex items-center gap-4 sm:gap-6 shrink-0">
+            <div
+              onClick={() => setActiveTab("home")}
+              className="flex items-center gap-2 cursor-pointer group select-none"
+            >
+              <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-cyan-600 via-cyan-500 to-blue-500 p-0.5 shadow-lg shadow-cyan-500/20 group-hover:shadow-cyan-500/40 transition-shadow">
+                <div className="h-full w-full bg-[#0B0E17] rounded-[6px] flex items-center justify-center">
+                  <Radio className="h-4 w-4 text-cyan-400 animate-pulse" />
+                </div>
               </div>
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
-                  QUANT.OS
-                </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
-                  PRO
-                </span>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-sm tracking-wider bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+                    QUANT.OS
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/60">
+                    PRO
+                  </span>
+                </div>
+                <p className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
+                  INSTITUTIONAL MARKET FEED
+                </p>
               </div>
-              <p className="text-[9px] text-slate-400 font-mono tracking-tight hidden sm:block">
-                INSTITUTIONAL MARKET FEED
-              </p>
             </div>
           </div>
 
-          {/* Navigation Pill List */}
-          <nav className="hidden lg:flex items-center gap-1">
-            {[
-              { id: "home", label: "Executive Home", icon: Landmark },
-              { id: "orchestrator", label: "AI Orchestrator", icon: BrainCircuit },
-              { id: "terminal", label: "Terminal", icon: Terminal },
-              { id: "options", label: "Option Chain", icon: Layers },
-              { id: "universe", label: "Market Universe", icon: Globe },
-              { id: "bots", label: "Bots Fleet", icon: Bot },
-              { id: "strategies", label: "Strategy Matrix", icon: Sparkles },
-              { id: "pnl", label: "P&L Journal", icon: TrendingUp },
-              { id: "tax", label: "Tax Intelligence", icon: Landmark },
-              { id: "system", label: "System Health", icon: Activity },
-            ].map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    isActive
-                      ? "bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 shadow-sm"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 border border-transparent"
-                  }`}
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </nav>
-        </div>
+          {/* Center Real-Time Market Ticker & Provider Selector */}
+          <div className="flex items-center gap-2 sm:gap-3 bg-[#121824] px-2.5 sm:px-3.5 py-1 rounded-xl border border-[#1A2A3F] min-w-0 max-w-xl">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <span className="text-xs font-bold text-slate-300">{currentSymbol}</span>
+              <span
+                className={`text-xs sm:text-sm font-mono font-bold transition-all duration-200 ${
+                  currentFlash === "up"
+                    ? "text-emerald-300 bg-emerald-950/80 px-1.5 rounded shadow-sm shadow-emerald-500/30"
+                    : currentFlash === "down"
+                      ? "text-red-300 bg-red-950/80 px-1.5 rounded shadow-sm shadow-red-500/30"
+                      : "text-white"
+                }`}
+              >
+                {currentPrice != null && currentPrice > 0 ? formatMoney(currentPrice, currencySymbol) : "—"}
+              </span>
+            </div>
 
-        {/* Center Real-Time Market Ticker */}
-        <div className="flex items-center gap-3 bg-[#121824] px-3.5 py-1 rounded-xl border border-[#1A2A3F]">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-300">{currentSymbol}</span>
-            <span
-              className={`text-xs sm:text-sm font-mono font-bold transition-all duration-200 ${
-                currentFlash === "up"
-                  ? "text-emerald-300 bg-emerald-950/80 px-1.5 rounded shadow-sm shadow-emerald-500/30"
-                  : currentFlash === "down"
-                    ? "text-red-300 bg-red-950/80 px-1.5 rounded shadow-sm shadow-red-500/30"
-                    : "text-white"
+            <div
+              className={`hidden xs:flex items-center gap-0.5 text-xs font-semibold shrink-0 ${
+                isPositive ? "text-emerald-400" : "text-red-400"
               }`}
             >
-              {formatMoney(currentPrice, currencySymbol)}
-            </span>
+              {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+              <span>
+                {isPositive ? "+" : ""}
+                {currentChangePct.toFixed(2)}%
+              </span>
+            </div>
+
+            {/* Global Provider Control Plane Selector */}
+            <div className="shrink-0">
+              <ProviderHeaderSelector />
+            </div>
+
+            <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono border-l border-slate-800 pl-2.5 shrink-0">
+              <span className={`flex items-center gap-1 ${isLiveFeed ? "text-emerald-400" : "text-amber-400"}`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
+                {isLiveFeed ? "LIVE" : "STALE"}
+              </span>
+              <span className="text-slate-500">•</span>
+              <span className="text-slate-400">{latencyDisplay !== "—" ? `${latencyDisplay}ms` : "—"}</span>
+            </div>
           </div>
 
-          <div
-            className={`flex items-center gap-0.5 text-xs font-semibold ${
-              isPositive ? "text-emerald-400" : "text-red-400"
-            }`}
-          >
-            {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
-            <span>
-              {isPositive ? "+" : ""}
-              {currentChangePct.toFixed(2)}%
-            </span>
-          </div>
+          {/* Right Top Action Buttons */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* AI Bot Copilot Trigger */}
+            <button
+              onClick={() => setIsBotAssistantOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition shadow-md shadow-cyan-950/40"
+              title="Open AI Bot Copilot & Autonomous Resolver (Ctrl+J / Cmd+J)"
+            >
+              <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
+              <span className="hidden sm:inline">Copilot</span>
+            </button>
 
-          {/* Global Provider Control Plane Selector */}
-          <ProviderHeaderSelector />
+            {/* Command Palette Quick Trigger */}
+            <button
+              onClick={() => onOpenCommandPalette?.()}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition"
+              title="Open Command Palette (Ctrl+K)"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
+              <span className="hidden md:inline">Commands</span>
+            </button>
 
-          <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono border-l border-slate-800 pl-3">
-            <span className={`flex items-center gap-1 ${isLiveFeed ? "text-emerald-400" : "text-amber-400"}`}>
-              <span className={`h-1.5 w-1.5 rounded-full ${isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
-              {isLiveFeed ? "LIVE" : "STALE"}
-            </span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-400">{latencyDisplay}ms</span>
+            {/* Theme & Appearance Palette Button */}
+            <button
+              onClick={openAppearanceDrawer}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
+              title="Open Theme & Appearance Editor"
+            >
+              <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
+              <span className="hidden xl:inline">{themeConfig.name}</span>
+            </button>
+
+            {/* Activate All Bots Button */}
+            <button
+              onClick={() => activateAllMutation.mutate()}
+              disabled={activateAllMutation.isPending}
+              className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg transition-all ${
+                activateSuccess
+                  ? "bg-emerald-600 text-white shadow-emerald-600/30"
+                  : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/25 active:scale-95"
+              } disabled:opacity-50`}
+            >
+              {activateAllMutation.isPending ? (
+                <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
+              ) : activateSuccess ? (
+                <CheckCircle className="h-3.5 w-3.5 text-white" />
+              ) : (
+                <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" />
+              )}
+              <span className="hidden sm:inline">
+                {activateAllMutation.isPending
+                  ? "STARTING..."
+                  : activateSuccess
+                    ? "STARTED!"
+                    : "START ALL"}
+              </span>
+            </button>
+
+            {/* Emergency Kill Switch Button */}
+            <button
+              onClick={() => killSwitchMutation.mutate()}
+              disabled={killSwitchMutation.isPending}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all ${
+                killSwitchActive
+                  ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30"
+                  : "bg-red-600/90 hover:bg-red-600 text-white shadow-red-600/30 active:scale-95"
+              }`}
+              title="Emergency Kill Switch - Stops all bots and locks execution"
+            >
+              <ShieldAlert className="h-3.5 w-3.5" />
+              <span className="hidden md:inline">
+                {killSwitchActive ? "UNLOCK" : "KILL SWITCH"}
+              </span>
+            </button>
           </div>
         </div>
 
-      {/* Right Top Action Buttons */}
-      <div className="flex items-center gap-2">
-        {/* AI Bot Copilot & Self-Healing Trigger */}
-        <button
-          onClick={() => setIsBotAssistantOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/20 to-teal-500/20 hover:from-cyan-500/30 hover:to-teal-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition shadow-md shadow-cyan-950/40"
-          title="Open AI Bot Copilot & Autonomous Resolver (Ctrl+J / Cmd+J)"
-        >
-          <Bot className="h-4 w-4 text-cyan-400 animate-pulse" />
-          <span className="hidden sm:inline">Bot Copilot</span>
-          <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-cyan-950 text-cyan-300 border border-cyan-800 font-mono">
-            Ctrl+J
-          </kbd>
-        </button>
-
-        {/* Market Analyst Copilot Quick Trigger */}
-        <button
-          onClick={() => setIsMarketAnalystOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition shadow-sm"
-          title="Open Read-Only GPT Market Analyst Copilot"
-        >
-          <BrainCircuit className="h-3.5 w-3.5 text-emerald-400" />
-          <span className="hidden sm:inline">Market Analyst</span>
-          <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
-            GPT
-          </span>
-        </button>
-
-        {/* Command Palette Quick Trigger */}
-        <button
-          onClick={() => onOpenCommandPalette?.()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500/10 to-blue-500/10 hover:from-cyan-500/20 hover:to-blue-500/20 border border-cyan-500/30 text-cyan-300 text-xs font-semibold transition"
-          title="Open Command Palette (Ctrl+K)"
-        >
-          <Sparkles className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="hidden sm:inline">Commands</span>
-          <kbd className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
-            Ctrl+K
-          </kbd>
-        </button>
-
-        {/* Theme & Appearance Palette Button */}
-        <button
-          onClick={openAppearanceDrawer}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-[var(--theme-text-primary)] hover:border-[var(--theme-accent)]/40 text-xs font-bold transition-all"
-          title="Open Theme & Appearance Editor"
-        >
-          <Paintbrush className="h-3.5 w-3.5 text-[var(--theme-accent)]" />
-          <span className="hidden lg:inline">{themeConfig.name}</span>
-        </button>
-
-        {/* Guided Tutorial Button */}
-        <button
-          onClick={() => onOpenTutorial?.()}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-[#1A2A3F] text-cyan-300 hover:text-cyan-200 text-xs font-bold transition-colors"
-          title="17-Step In-App Tutorial Walkthrough"
-        >
-          <HelpCircle className="h-3.5 w-3.5 text-cyan-400" />
-          <span className="hidden md:inline">How to Use</span>
-        </button>
-
-        {/* Activate All Bots Button */}
-        <button
-          onClick={() => activateAllMutation.mutate()}
-          disabled={activateAllMutation.isPending}
-          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs shadow-lg transition-all ${activateSuccess
-              ? "bg-emerald-600 text-white shadow-emerald-600/30"
-              : "bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-white shadow-emerald-500/25 active:scale-95"
-            } disabled:opacity-50`}
-        >
-          {activateAllMutation.isPending ? (
-            <RefreshCw className="h-3.5 w-3.5 animate-spin text-white" />
-          ) : activateSuccess ? (
-            <CheckCircle className="h-3.5 w-3.5 text-white" />
-          ) : (
-            <Zap className="h-3.5 w-3.5 text-amber-300 fill-amber-300" />
-          )}
-          <span className="hidden sm:inline">
-            {activateAllMutation.isPending
-              ? "ACTIVATING..."
-              : activateSuccess
-                ? "ALL ACTIVATED!"
-                : "ACTIVATE ALL"}
-          </span>
-        </button>
-
-        {/* Emergency Kill Switch Button */}
-        <button
-          onClick={() => killSwitchMutation.mutate()}
-          disabled={killSwitchMutation.isPending}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold shadow-lg flex items-center gap-1.5 transition-all ${killSwitchActive
-              ? "bg-amber-600 hover:bg-amber-500 text-white shadow-amber-600/30"
-              : "bg-red-600/90 hover:bg-red-600 text-white shadow-red-600/30 active:scale-95"
-            }`}
-          title="Emergency Kill Switch - Stops all bots and locks execution"
-        >
-          <ShieldAlert className="h-3.5 w-3.5" />
-          <span className="hidden md:inline">
-            {killSwitchActive ? "UNLOCK KILL SWITCH" : "KILL SWITCH"}
-          </span>
-        </button>
-      </div>
-
-      {/* Navigation Tabs Bar */}
-      <nav className="px-4 flex items-center gap-1 overflow-x-auto scrollbar-none py-1 bg-[#0A0E17]">
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={item.id}
-              id={`nav-tab-${item.id}`}
-              data-tab={item.id}
-              onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${isActive
-                  ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-sm font-bold"
-                  : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent"
+        {/* Navigation Tabs Sub-Row */}
+        <nav className="w-full flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5 border-t border-[#141F30]">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button
+                key={item.id}
+                id={`nav-tab-${item.id}`}
+                data-tab={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all shrink-0 ${
+                  isActive
+                    ? "bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 shadow-sm font-bold"
+                    : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 border border-transparent"
                 }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{item.label}</span>
-            </button>
-          );
-        })}
-      </nav>
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
 
-      {/* Market Analyst Copilot Modal/Drawer */}
-      <MarketAnalystDrawer
-        isOpen={isMarketAnalystOpen}
-        onClose={() => setIsMarketAnalystOpen(false)}
-        symbol={ticker?.symbol || activeSymbol || "BTC/USDT"}
-        assetClass="crypto"
-        exchange="binance"
-      />
-
-      {/* AI Bot Copilot & Self-Healing Modal */}
-      <BotAssistantModal
-        isOpen={isBotAssistantOpen}
-        onClose={() => setIsBotAssistantOpen(false)}
-      />
-    </header>
+        {/* AI Bot Copilot & Self-Healing Modal */}
+        <BotAssistantModal
+          isOpen={isBotAssistantOpen}
+          onClose={() => setIsBotAssistantOpen(false)}
+        />
+      </header>
     </>
   );
 }

@@ -51,7 +51,10 @@ const chainCache = new Map<string, { data: DhanOptionChainResult; expiresAt: num
 
 export async function fetchDhanExpiryList(underlying: string): Promise<string[]> {
   const cleanSym = underlying.toUpperCase().trim();
-  const scrip = DHAN_OFFICIAL_SCRIP_MAP[cleanSym] || { securityId: "13", segment: "IDX_I" };
+  const scrip = DHAN_OFFICIAL_SCRIP_MAP[cleanSym];
+  if (!scrip) {
+    return [];
+  }
   const creds = DHAN_CONFIG.getCredentials();
 
   if (!creds.accessToken || !creds.clientId) {
@@ -88,7 +91,10 @@ export async function fetchDhanOptionChain(
   requestedExpiry?: string
 ): Promise<DhanOptionChainResult | null> {
   const cleanSym = underlying.toUpperCase().trim();
-  const scrip = DHAN_OFFICIAL_SCRIP_MAP[cleanSym] || { securityId: "13", segment: "IDX_I" };
+  const scrip = DHAN_OFFICIAL_SCRIP_MAP[cleanSym];
+  if (!scrip) {
+    return null;
+  }
   const creds = DHAN_CONFIG.getCredentials();
 
   if (!creds.accessToken || !creds.clientId) {

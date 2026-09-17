@@ -28,6 +28,7 @@ interface SimpleMarketsHeaderProps {
   liveCount: number;
   providerCount?: number;
   lastUpdateMs?: number;
+  averageLatencyMs?: number;
   isLiveFeed: boolean;
   feedStatus?: "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE";
   searchQuery: string;
@@ -67,6 +68,7 @@ export function SimpleMarketsHeader({
   liveCount,
   providerCount = 0,
   lastUpdateMs = 0,
+  averageLatencyMs = 0,
   isLiveFeed = false,
   feedStatus,
   searchQuery,
@@ -89,6 +91,15 @@ export function SimpleMarketsHeader({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const effectiveStatus = feedStatus || (isLiveFeed ? "LIVE" : "STALE");
+
+  const formattedLastTick =
+    lastUpdateMs > 0
+      ? lastUpdateMs > 60000
+        ? `${Math.floor(lastUpdateMs / 60000)}m ago`
+        : lastUpdateMs > 1000
+        ? `${(lastUpdateMs / 1000).toFixed(1)}s ago`
+        : `${lastUpdateMs}ms ago`
+      : "—";
 
   // Keyboard shortcut: '/' or Ctrl/Cmd+K to focus search
   useEffect(() => {
@@ -155,7 +166,7 @@ export function SimpleMarketsHeader({
             )}
           </div>
 
-          {/* Telemetry Summary Sub-Row with Enhanced Contrast & Readability */}
+          {/* Telemetry Summary Sub-Row with Truthful Metrics */}
           <div className="flex items-center flex-wrap gap-2 text-[13px] font-mono text-slate-400">
             <span>
               <strong className="text-slate-100 font-bold">{totalInstruments}</strong> Instruments
@@ -170,8 +181,16 @@ export function SimpleMarketsHeader({
             </span>
             <span className="text-slate-600">•</span>
             <span>
-              Last update <strong className="text-cyan-400 font-bold">{lastUpdateMs}ms</strong>
+              Last tick <strong className="text-cyan-400 font-bold">{formattedLastTick}</strong>
             </span>
+            {averageLatencyMs > 0 && (
+              <>
+                <span className="text-slate-600">•</span>
+                <span>
+                  Latency <strong className="text-slate-200 font-bold">{averageLatencyMs}ms</strong>
+                </span>
+              </>
+            )}
             {onOpenDiagnostics && (
               <>
                 <span className="text-slate-600">•</span>
@@ -182,7 +201,7 @@ export function SimpleMarketsHeader({
                   title="Open live market data feed diagnostics inspector"
                 >
                   <Radio className="w-3 h-3 text-cyan-400" />
-                  <span>DEV FEED</span>
+                  <span>FEED DIAGNOSTICS</span>
                 </button>
               </>
             )}

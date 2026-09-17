@@ -692,9 +692,37 @@ class DhanBrokerAdapter(BrokerAdapter):
             "BHARTIARTL": {"scrip": 10604, "seg": "NSE_EQ"},
             "ITC": {"scrip": 1660, "seg": "NSE_EQ"},
             "LT": {"scrip": 11483, "seg": "NSE_EQ"},
+            "KOTAKBANK": {"scrip": 1922, "seg": "NSE_EQ"},
+            "AXISBANK": {"scrip": 5900, "seg": "NSE_EQ"},
+            "TATAMOTORS": {"scrip": 3456, "seg": "NSE_EQ"},
+            "TATASTEEL": {"scrip": 3499, "seg": "NSE_EQ"},
+            "BAJFINANCE": {"scrip": 317, "seg": "NSE_EQ"},
+            "MARUTI": {"scrip": 10999, "seg": "NSE_EQ"},
+            "SUNPHARMA": {"scrip": 3351, "seg": "NSE_EQ"},
+            "HINDUNILVR": {"scrip": 1394, "seg": "NSE_EQ"},
         }
         und_key = underlying.upper().replace(" ", "").replace(".NS", "")
-        scrip_info = scrip_map.get(und_key, {"scrip": 13, "seg": "IDX_I"})
+        scrip_info = scrip_map.get(und_key)
+
+        # Dynamic fallback to DhanService security master catalog
+        if not scrip_info:
+            try:
+                from src.dhan_service import global_dhan_service
+                sec_meta = global_dhan_service.get_security_metadata(und_key)
+                if sec_meta and "security_id" in sec_meta:
+                    scrip_info = {
+                        "scrip": int(sec_meta["security_id"]),
+                        "seg": sec_meta.get("exchange_segment", "NSE_EQ"),
+                    }
+            except Exception:
+                pass
+
+        if not scrip_info:
+            return {
+                "status": "error",
+                "error": "UNRESOLVED_INSTRUMENT",
+                "message": f"Could not resolve Dhan underlying security ID for '{underlying}'. Never defaulting to NIFTY."
+            }
 
         # 1. Fetch available expiries from Dhan if not provided or to populate expiry list
         exp_list: List[str] = []
@@ -708,16 +736,16 @@ class DhanBrokerAdapter(BrokerAdapter):
         except Exception as e:
             logger.warning(f"Dhan expirylist error: {e}")
 
+        # Choose requested expiry or nearest valid expiry from official list
         chosen_expiry = expiry or (exp_list[0] if exp_list else "")
-        if not chosen_expiry:
-            chosen_expiry = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
         # 2. Query Dhan Option Chain
-        payload = {
+        payload: Dict[str, Any] = {
             "UnderlyingScrip": scrip_info["scrip"],
             "UnderlyingSeg": scrip_info["seg"],
-            "Expiry": chosen_expiry,
         }
+        if chosen_expiry:
+            payload["Expiry"] = chosen_expiry
 
         resp = self._make_request("POST", "optionchain", data=payload)
         if not isinstance(resp, dict) or resp.get("status") == "failed" or "data" not in resp:
@@ -726,6 +754,16 @@ class DhanBrokerAdapter(BrokerAdapter):
         data = resp.get("data", {})
         spot_price = float(data.get("last_price", 0.0))
         raw_oc = data.get("oc", {})
+
+        # Helper to convert to float or None
+        def _to_float(v: Any) -> Optional[float]:
+            if v is None:
+                return None
+            try:
+                f = float(v)
+                return f if f > 0 else (0.0 if f == 0 else None)
+            except (ValueError, TypeError):
+                return None
 
         # 3. Transform raw Dhan OC map into structured strikes ladder
         strikes: List[Dict[str, Any]] = []
@@ -744,6 +782,9 @@ class DhanBrokerAdapter(BrokerAdapter):
             ce_greeks = ce_raw.get("greeks", {}) or {}
             pe_greeks = pe_raw.get("greeks", {}) or {}
 
+            ce_ltp = _to_float(ce_raw.get("last_price") or ce_raw.get("top_bid_price"))
+            pe_ltp = _to_float(pe_raw.get("last_price") or pe_raw.get("top_bid_price"))
+
             strikes.append({
                 "strike": k,
                 "is_atm": is_atm,
@@ -751,33 +792,33 @@ class DhanBrokerAdapter(BrokerAdapter):
                 "ce": {
                     "instrument_id": f"DHAN_{ce_raw.get('security_id', '')}",
                     "symbol": f"{und_key} {chosen_expiry} {int(k)} CE",
-                    "ltp": float(ce_raw.get("last_price") or ce_raw.get("top_bid_price") or 0.0),
-                    "bid": float(ce_raw.get("top_bid_price") or 0.0),
-                    "ask": float(ce_raw.get("top_ask_price") or 0.0),
+                    "ltp": ce_ltp,
+                    "bid": _to_float(ce_raw.get("top_bid_price")),
+                    "ask": _to_float(ce_raw.get("top_ask_price")),
                     "volume": float(ce_raw.get("volume") or 0.0),
                     "open_interest": float(ce_raw.get("oi") or 0.0),
                     "oi_change": float(ce_raw.get("oi", 0) - ce_raw.get("previous_oi", 0)),
-                    "iv": float(ce_raw.get("implied_volatility") or 0.0),
-                    "delta": float(ce_greeks.get("delta") or 0.0),
-                    "gamma": float(ce_greeks.get("gamma") or 0.0),
-                    "theta": float(ce_greeks.get("theta") or 0.0),
-                    "vega": float(ce_greeks.get("vega") or 0.0),
+                    "iv": _to_float(ce_raw.get("implied_volatility")),
+                    "delta": _to_float(ce_greeks.get("delta")),
+                    "gamma": _to_float(ce_greeks.get("gamma")),
+                    "theta": _to_float(ce_greeks.get("theta")),
+                    "vega": _to_float(ce_greeks.get("vega")),
                     "security_id": str(ce_raw.get("security_id", "")),
                 },
                 "pe": {
                     "instrument_id": f"DHAN_{pe_raw.get('security_id', '')}",
                     "symbol": f"{und_key} {chosen_expiry} {int(k)} PE",
-                    "ltp": float(pe_raw.get("last_price") or pe_raw.get("top_bid_price") or 0.0),
-                    "bid": float(pe_raw.get("top_bid_price") or 0.0),
-                    "ask": float(pe_raw.get("top_ask_price") or 0.0),
+                    "ltp": pe_ltp,
+                    "bid": _to_float(pe_raw.get("top_bid_price")),
+                    "ask": _to_float(pe_raw.get("top_ask_price")),
                     "volume": float(pe_raw.get("volume") or 0.0),
                     "open_interest": float(pe_raw.get("oi") or 0.0),
                     "oi_change": float(pe_raw.get("oi", 0) - pe_raw.get("previous_oi", 0)),
-                    "iv": float(pe_raw.get("implied_volatility") or 0.0),
-                    "delta": float(pe_greeks.get("delta") or 0.0),
-                    "gamma": float(pe_greeks.get("gamma") or 0.0),
-                    "theta": float(pe_greeks.get("theta") or 0.0),
-                    "vega": float(pe_greeks.get("vega") or 0.0),
+                    "iv": _to_float(pe_raw.get("implied_volatility")),
+                    "delta": _to_float(pe_greeks.get("delta")),
+                    "gamma": _to_float(pe_greeks.get("gamma")),
+                    "theta": _to_float(pe_greeks.get("theta")),
+                    "vega": _to_float(pe_greeks.get("vega")),
                     "security_id": str(pe_raw.get("security_id", "")),
                 }
             })

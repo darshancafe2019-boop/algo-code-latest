@@ -1206,7 +1206,7 @@ class OandaForexProvider(BaseMarketProvider):
                 "strategy_enabled": 1,
                 "last_price": rate,
                 "change_24h": chg,
-                "volume_24h": 450000000.0,
+                "volume_24h": 0.0,
                 "volatility_score": 45.0 if cat == "Cross" else 35.0,
                 "volatility_category": "Medium",
                 "momentum_score": 60.0,

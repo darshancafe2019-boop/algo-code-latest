@@ -23,51 +23,6 @@ interface PositionRiskTableProps {
 export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTableProps) {
   const [activeActionId, setActiveActionId] = useState<string | number | null>(null);
 
-  const mockOpenPositions: RiskPosition[] = positions.length > 0 ? positions : [
-    {
-      id: "pos-1",
-      bot_id: "btc-scalper",
-      symbol: "BTC/USDT",
-      direction: "LONG",
-      quantity: 0.05,
-      entry_price: 64200.0,
-      current_price: 65420.0,
-      stop_loss: 63200.0,
-      take_profit: 67200.0,
-      position_value: 3271.0,
-      margin_used: 3271.0,
-      risk_amount: 50.0,
-      risk_pct: 0.5,
-      leverage: 1.0,
-      asset_class: "Crypto",
-      unrealized_pnl: 61.0,
-      distance_to_sl_pct: 3.4,
-      distance_to_tp_pct: 2.7,
-      risk_status: "SAFE",
-    },
-    {
-      id: "pos-2",
-      bot_id: "nifty-trend",
-      symbol: "NIFTY-24SEP-24500-CE",
-      direction: "LONG",
-      quantity: 50,
-      entry_price: 140.0,
-      current_price: 165.0,
-      stop_loss: 110.0,
-      take_profit: 200.0,
-      position_value: 8250.0,
-      margin_used: 8250.0,
-      risk_amount: 1500.0,
-      risk_pct: 1.5,
-      leverage: 1.0,
-      asset_class: "Options",
-      unrealized_pnl: 1250.0,
-      distance_to_sl_pct: 33.3,
-      distance_to_tp_pct: 21.2,
-      risk_status: "SAFE",
-    },
-  ];
-
   const handleClosePosition = async (id: string | number) => {
     setActiveActionId(id);
     try {
@@ -89,43 +44,60 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
             Open Position Risk Ledger
           </h3>
           <p className="text-[11px] text-[#7C8CA3]">
-            Live mark-to-market valuations, distance to stop-loss, risk in dollars, and protection bounds.
+            Real-time margin utilization, stop-loss distance, and liquidation exposure across all active broker positions.
           </p>
         </div>
-        <span className="text-[10px] px-2.5 py-0.5 rounded font-mono font-bold uppercase bg-[rgba(37,99,235,0.18)] text-[#22D3EE] border border-[#00E890]/40">
-          {mockOpenPositions.length} Positions Active
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="px-2.5 py-1 bg-[rgba(37,99,235,0.18)] text-cyan-300 border border-cyan-500/40 rounded-xl text-xs font-mono font-bold">
+            {positions.length} Positions Active
+          </span>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="p-1.5 rounded-lg bg-[#07101A] border border-[#1A2A3F] text-slate-400 hover:text-white transition"
+              title="Refresh positions"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl">
-        <div className="overflow-x-auto custom-scrollbar">
+      {/* Table Card */}
+      <div className="bg-[#09110E] border border-[#1A2A3F] rounded-2xl overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
           <table className="w-full text-left text-xs font-mono">
-            <thead className="bg-[#0A130F] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#122033]">
+            <thead className="bg-[#07101A] text-[#52627A] text-[10px] uppercase tracking-wider border-b border-[#142233]">
               <tr>
-                <th className="py-3 px-4">Symbol / Asset</th>
-                <th className="py-3 px-3">Side</th>
-                <th className="py-3 px-3">Qty</th>
-                <th className="py-3 px-3">Entry / Mark</th>
-                <th className="py-3 px-3">Exposure / Margin</th>
-                <th className="py-3 px-3">SL / TP</th>
-                <th className="py-3 px-3">Risk ($ / %)</th>
-                <th className="py-3 px-3">Unrealized P&L</th>
-                <th className="py-3 px-3">Status</th>
-                <th className="py-3 px-4 text-right">Protection Actions</th>
+                <th className="py-2.5 px-3">Position / Bot</th>
+                <th className="py-2.5 px-3">Side / Size</th>
+                <th className="py-2.5 px-3 text-right">Entry Price</th>
+                <th className="py-2.5 px-3 text-right">Mark Price</th>
+                <th className="py-2.5 px-3 text-right">SL / TP</th>
+                <th className="py-2.5 px-3 text-right">Margin / Risk</th>
+                <th className="py-2.5 px-3 text-right">Unrealized P&L</th>
+                <th className="py-2.5 px-3 text-center">Status</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#122033]/60 text-slate-200">
-              {mockOpenPositions.map((pos) => {
-                const isLong = pos.direction.toUpperCase() === "LONG";
-                const isProfit = (pos.unrealized_pnl || 0) >= 0;
-                return (
-                  <tr key={pos.id} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
-                    {/* Symbol */}
-                    <td className="py-3.5 px-4 font-bold text-white">
-                      <span className="block">{pos.symbol}</span>
-                      <span className="text-[10px] text-[#52627A] font-normal">{pos.asset_class}</span>
-                    </td>
+            <tbody className="divide-y divide-[#142233] text-slate-200">
+              {positions.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-slate-500 font-sans text-xs">
+                    No active open positions in risk ledger.
+                  </td>
+                </tr>
+              ) : (
+                positions.map((pos) => {
+                  const isLong = (pos.direction || "").toUpperCase() === "LONG";
+                  const isProfit = (pos.unrealized_pnl || 0) >= 0;
+                  return (
+                    <tr key={pos.id} className="hover:bg-[rgba(37,99,235,0.18)]/30 transition-colors">
+                      {/* Symbol */}
+                      <td className="py-3.5 px-4 font-bold text-white">
+                        <span className="block">{pos.symbol}</span>
+                        <span className="text-[10px] text-[#52627A] font-normal">{pos.asset_class}</span>
+                      </td>
 
                     {/* Side */}
                     <td className="py-3.5 px-3">
@@ -215,7 +187,7 @@ export function PositionRiskTable({ positions = [], onRefresh }: PositionRiskTab
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

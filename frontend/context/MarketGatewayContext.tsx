@@ -5,10 +5,11 @@
  * Provides a single, resilient WebSocket connection per browser tab to the Market Data Gateway.
  * Features:
  * 1. Direct gateway WebSocket connection with exponential backoff & jitter.
- * 2. Automatic HTTP quote polling fallback during temporary WS reconnections.
+ * 2. Automatic HTTP quote polling fallback during temporary WS reconnections (batching 50 symbols).
  * 3. Heartbeat watchdog detecting silent socket stalls.
- * 4. Automatic resubscription on reconnect.
- * 5. Clean teardown with zero leaked timers or duplicate connections.
+ * 4. Automatic resubscription on reconnect without truncation.
+ * 5. Out-of-order tick and REST rejection.
+ * 6. Provider-segregated quote routing preventing cross-provider collisions.
  */
 
 import React, {
@@ -22,7 +23,7 @@ import React, {
 import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
-import { getQuoteAliases, canonicalizeMarketSymbol } from "@/lib/market-data/canonical-symbol";
+import { getQuoteAliases } from "@/lib/market-data/canonical-symbol";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,7 +49,7 @@ export interface NormalizedQuote {
   age_seconds: number;
 }
 
-export type ConnectionStatus = "CONNECTING" | "LIVE" | "RECONNECTING" | "STALE" | "DISCONNECTED";
+export type ConnectionStatus = "CONNECTING" | "CONNECTED" | "LIVE" | "RECONNECTING" | "STALE" | "DISCONNECTED";
 
 export type SubscriptionReason =
   | "WATCHLIST"
@@ -80,7 +81,7 @@ interface MarketGatewayContextValue {
   /** True when any provider has a non-LIVE status */
   hasProviderWarning: boolean;
   /** Fast non-reactive quote getter */
-  getQuote: (symbol: string) => NormalizedQuote | null;
+  getQuote: (symbol: string, exchange?: string, provider?: string) => NormalizedQuote | null;
   /** Targeted single-symbol quote listener: triggers ONLY when this symbol updates */
   subscribeSymbolQuote: (symbol: string, callback: (quote: NormalizedQuote) => void) => () => void;
 }
@@ -172,10 +173,11 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (!mountedRef.current || wsRef.current !== ws || (ws as any)._isClosing) return;
       reconnectAttemptRef.current = 0;
       lastHeartbeatRef.current = Date.now();
-      setConnectionStatus("LIVE");
-      useMarketFeedStore.getState().setConnectionStatus("LIVE");
+      // Socket connected is CONNECTED, individual quotes determine LIVE
+      setConnectionStatus("CONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
 
-      // Re-subscribe to all active symbols
+      // Re-subscribe to ALL active symbols
       const allSubs: string[] = [];
       subRefsRef.current.forEach((ref, sym) => {
         const hasActive = Array.from(ref.reasons.values()).some((c) => c > 0);
@@ -195,20 +197,36 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         if (msg.type === "QUOTE" && msg.data) {
           const quote = msg.data as NormalizedQuote;
           const sym = quote.symbol.toUpperCase();
-          const aliases = getQuoteAliases(quote.symbol, quote.exchange, quote.provider);
+          const provider = (quote.provider || "UNKNOWN").toUpperCase();
+          const incomingTs = new Date(quote.event_timestamp || quote.received_timestamp).getTime();
 
+          // Check out-of-order arrival
+          const existingKey = `${provider}:${sym}`;
+          const existing = quotesRef.current.get(existingKey) || quotesRef.current.get(sym);
+          if (existing) {
+            const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
+            if (existingTs > 0 && incomingTs < existingTs) {
+              return; // Reject older tick
+            }
+          }
+
+          // Provider-scoped storage
+          quotesRef.current.set(existingKey, quote);
+          pendingQuotesRef.current.set(existingKey, quote);
+
+          const aliases = getQuoteAliases(quote.symbol, quote.exchange, quote.provider);
           aliases.forEach((alias) => {
+            if (alias.startsWith("BINANCE:") && provider !== "BINANCE") return;
+            if (alias.startsWith("DELTA:") && provider !== "DELTA") return;
+            if (alias.startsWith("DHAN:") && provider !== "DHAN") return;
+            if (alias.startsWith("UPSTOX:") && provider !== "UPSTOX") return;
+            if (alias.startsWith("OANDA:") && provider !== "OANDA") return;
+
             quotesRef.current.set(alias, quote);
             pendingQuotesRef.current.set(alias, quote);
           });
 
-          // Development-only real-time tick logger (Requirement 4)
-          if (process.env.NODE_ENV === "development" || typeof window !== "undefined") {
-            const ageMs = quote.age_seconds != null ? Math.round(quote.age_seconds * 1000) : 0;
-            console.log(`[MARKET-LIVE] ${quote.provider?.toUpperCase() || "GATEWAY"} ${quote.symbol} LTP=${quote.last_price} age=${ageMs}ms`);
-          }
-
-          // Fast ingestion into central Zustand marketFeedStore across aliases
+          // Fast ingestion into central Zustand marketFeedStore
           useMarketFeedStore.getState().ingestTick({
             symbol: sym,
             exchange: quote.exchange,
@@ -229,14 +247,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
             ageMs: (quote.age_seconds || 0) * 1000,
           });
 
-          // Fast targeted notification to components listening specifically to this symbol or its aliases
+          // Targeted notification
           aliases.forEach((alias) => {
             const symListeners = symbolListenersRef.current.get(alias);
             if (symListeners && symListeners.size > 0) {
               symListeners.forEach((fn) => {
-                try {
-                  fn(quote);
-                } catch {}
+                try { fn(quote); } catch {}
               });
             }
           });
@@ -253,14 +269,18 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
                 updates.forEach((q, s) => next.set(s, q));
                 return next;
               });
-              setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
             });
           }
         } else if (msg.type === "SNAPSHOT" && msg.data) {
           const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
           snapshotEntries.forEach(([rawSym, q]) => {
             const sym = rawSym.toUpperCase();
+            const provider = (q.provider || "UNKNOWN").toUpperCase();
+            const provKey = `${provider}:${sym}`;
+
+            quotesRef.current.set(provKey, q);
             quotesRef.current.set(sym, q);
+            pendingQuotesRef.current.set(provKey, q);
             pendingQuotesRef.current.set(sym, q);
 
             useMarketFeedStore.getState().ingestTick({
@@ -286,12 +306,11 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
             const symListeners = symbolListenersRef.current.get(sym);
             if (symListeners && symListeners.size > 0) {
               symListeners.forEach((fn) => {
-                try {
-                  fn(q);
-                } catch {}
+                try { fn(q); } catch {}
               });
             }
           });
+
           if (batchFrameRef.current === null) {
             batchFrameRef.current = requestAnimationFrame(() => {
               batchFrameRef.current = null;
@@ -300,14 +319,13 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
               pendingQuotesRef.current.clear();
               setQuotes((prev) => {
                 const next = new Map(prev);
-                updates.forEach((q, sym) => next.set(sym, q));
+                updates.forEach((q, s) => next.set(s, q));
                 return next;
               });
             });
           }
         } else if (msg.type === "HEARTBEAT") {
-          setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
-          useMarketFeedStore.getState().setConnectionStatus("LIVE");
+          setConnectionStatus((prev) => (prev !== "CONNECTED" && prev !== "LIVE" ? "CONNECTED" : prev));
         }
       } catch {
         // Safe: ignore malformed frames
@@ -316,7 +334,6 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
     ws.onerror = () => {
       if (!mountedRef.current || wsRef.current !== ws || (ws as any)._isClosing) return;
-      // Do not log noisy console errors; state will transition cleanly onclose
     };
 
     ws.onclose = () => {
@@ -326,7 +343,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       }
       scheduleReconnect();
     };
-  }, [getGatewayWsUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [getGatewayWsUrl]);
 
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -348,12 +365,13 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }, delay);
   }, [connectWS]);
 
-  // ─── HTTP Fallback Poller during WS Reconnection ─────────────────────────────
+  // ─── HTTP Fallback Poller during WS Reconnection (Batched, NO 10-symbol limit) ───
 
   useEffect(() => {
     const pollFallbackSnapshots = async () => {
       if (!mountedRef.current) return;
-      if (connectionStatus === "LIVE") return; // WS is live, no fallback needed
+      // Only poll REST if socket is not open
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
       const activeSymbols: string[] = [];
       subRefsRef.current.forEach((ref, sym) => {
@@ -363,24 +381,65 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
       if (activeSymbols.length === 0) return;
 
-      try {
-        const symbolsParam = encodeURIComponent(activeSymbols.slice(0, 10).join(","));
-        const res = await apiClient.get<any>(`/api/market/snapshot?symbols=${symbolsParam}`, {
-          timeoutMs: 4000,
-          deduplicate: true,
-        });
-
-        if (res.ok && res.data?.quotes) {
-          setQuotes((prev) => {
-            const next = new Map(prev);
-            Object.entries(res.data.quotes as Record<string, NormalizedQuote>).forEach(([sym, q]) => {
-              next.set(sym.toUpperCase(), q);
-            });
-            return next;
+      // Recover ALL active subscriptions in safe batches of 50
+      const batchSize = 50;
+      for (let i = 0; i < activeSymbols.length; i += batchSize) {
+        const batch = activeSymbols.slice(i, i + batchSize);
+        try {
+          const symbolsParam = encodeURIComponent(batch.join(","));
+          const res = await apiClient.get<any>(`/api/market/snapshot?symbols=${symbolsParam}`, {
+            timeoutMs: 4000,
+            deduplicate: true,
           });
+
+          if (res.ok && res.data?.quotes) {
+            const incoming = res.data.quotes as Record<string, NormalizedQuote>;
+            setQuotes((prev) => {
+              const next = new Map(prev);
+              Object.entries(incoming).forEach(([rawSym, q]) => {
+                const sym = rawSym.toUpperCase();
+                const provider = (q.provider || "UNKNOWN").toUpperCase();
+                const incomingTs = new Date(q.event_timestamp || q.received_timestamp).getTime();
+                const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
+
+                if (existing) {
+                  const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
+                  if (existingTs > 0 && incomingTs < existingTs) {
+                    return; // Reject older REST recovery
+                  }
+                }
+
+                quotesRef.current.set(`${provider}:${sym}`, q);
+                quotesRef.current.set(sym, q);
+                next.set(`${provider}:${sym}`, q);
+                next.set(sym, q);
+
+                useMarketFeedStore.getState().ingestTick({
+                  symbol: sym,
+                  exchange: q.exchange,
+                  provider: q.provider,
+                  lastPrice: q.last_price,
+                  bid: q.bid,
+                  ask: q.ask,
+                  volume: q.volume,
+                  open: q.open,
+                  high: q.high,
+                  low: q.low,
+                  close: q.close,
+                  changePercent: q.change_pct ?? 0,
+                  eventTimestamp: q.event_timestamp,
+                  feedLatencyMs: q.feed_latency_ms,
+                  dataMode: q.data_mode,
+                  isStale: q.is_stale,
+                  ageMs: (q.age_seconds || 0) * 1000,
+                });
+              });
+              return next;
+            });
+          }
+        } catch {
+          // Ignore individual batch failure
         }
-      } catch {
-        // Silent fallback
       }
     };
 
@@ -396,7 +455,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     heartbeatWatchdogRef.current = setInterval(() => {
       if (!mountedRef.current) return;
       const age = Date.now() - lastHeartbeatRef.current;
-      if (age > HEARTBEAT_STALE_MS && connectionStatus === "LIVE") {
+      if (age > HEARTBEAT_STALE_MS && (connectionStatus === "CONNECTED" || connectionStatus === "LIVE")) {
         setConnectionStatus("STALE");
       }
     }, 5000);
@@ -459,42 +518,34 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         heartbeatWatchdogRef.current = null;
       }
       if (wsRef.current) {
-        const socket = wsRef.current;
-        (socket as any)._isClosing = true;
-        socket.onmessage = null;
-        socket.onerror = null;
-        socket.onclose = null;
-        if (socket.readyState === WebSocket.CONNECTING) {
-          socket.onopen = () => {
-            try {
-              socket.close(1000, "Component unmounted");
-            } catch {}
-          };
-        } else if (socket.readyState === WebSocket.OPEN) {
-          try {
-            socket.close(1000, "Component unmounted");
-          } catch {}
-        }
+        (wsRef.current as any)._isClosing = true;
+        try {
+          wsRef.current.close(1000, "Component unmounted");
+        } catch {}
         wsRef.current = null;
       }
     };
-  }, [isAuthenticated, connectWS]);
+  }, [connectWS]);
 
-  // ─── Subscribe / Unsubscribe API ─────────────────────────────────────────────
+  // ─── Public API ─────────────────────────────────────────────────────────────
 
   const subscribe = useCallback((symbol: string, reason: SubscriptionReason) => {
     if (!symbol) return;
     const sym = symbol.toUpperCase().trim();
-    const refs = subRefsRef.current;
-    if (!refs.has(sym)) refs.set(sym, { reasons: new Map() });
-    const ref = refs.get(sym)!;
-    ref.reasons.set(reason, (ref.reasons.get(reason) ?? 0) + 1);
 
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    let ref = subRefsRef.current.get(sym);
+    if (!ref) {
+      ref = { reasons: new Map() };
+      subRefsRef.current.set(sym, ref);
+    }
+    const currentCount = ref.reasons.get(reason) ?? 0;
+    ref.reasons.set(reason, currentCount + 1);
+
+    if (currentCount === 0 && wsRef.current?.readyState === WebSocket.OPEN) {
       try {
         wsRef.current.send(JSON.stringify({ action: "subscribe", symbols: [sym], reason }));
       } catch {
-        // Ignore send errors; reconnect will sync subscriptions
+        // Ignore
       }
     }
   }, []);
@@ -525,12 +576,37 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }
   }, []);
 
-  const getQuote = useCallback((symbol: string): NormalizedQuote | null => {
+  const getQuote = useCallback((symbol: string, exchange?: string, provider?: string): NormalizedQuote | null => {
     if (!symbol) return null;
     const sym = symbol.toUpperCase().trim();
+    const prov = (provider || "").toUpperCase();
+    const ex = (exchange || "").toUpperCase();
+
+    // 1. Direct provider-scoped key
+    if (prov) {
+      const provKey = `${prov}:${sym}`;
+      if (quotesRef.current.has(provKey)) return quotesRef.current.get(provKey)!;
+      if (ex) {
+        const provExKey = `${prov}:${ex}:${sym}`;
+        if (quotesRef.current.has(provExKey)) return quotesRef.current.get(provExKey)!;
+      }
+    }
+    if (ex) {
+      const exKey = `${ex}:${sym}`;
+      if (quotesRef.current.has(exKey)) return quotesRef.current.get(exKey)!;
+    }
+
+    // 2. Direct symbol match
     const direct = quotesRef.current.get(sym);
-    if (direct) return direct;
-    const aliases = getQuoteAliases(symbol);
+    if (direct) {
+      if (prov && direct.provider && direct.provider.toUpperCase() !== prov) {
+        const provDirect = quotesRef.current.get(`${prov}:${sym}`);
+        if (provDirect) return provDirect;
+      }
+      return direct;
+    }
+
+    const aliases = getQuoteAliases(symbol, exchange, provider);
     for (const a of aliases) {
       const q = quotesRef.current.get(a);
       if (q) return q;

@@ -174,13 +174,13 @@ export function MarketUniverse() {
         return res.data as { success: boolean; summary: UniverseSummaryStats };
       } catch {
         return {
-          success: true,
+          success: false,
           summary: {
-            total_instruments: 229,
-            asset_classes_covered: 10,
-            active_markets: 7,
-            providers_connected: 3,
-            average_feed_latency_ms: 120,
+            total_instruments: 0,
+            asset_classes_covered: 0,
+            active_markets: 0,
+            providers_connected: 0,
+            average_feed_latency_ms: 0,
             timestamp: new Date().toISOString(),
           },
         };
@@ -272,17 +272,18 @@ export function MarketUniverse() {
     watchlistSymbols,
   ]);
 
-  // Dynamically subscribe to all currently displayed market universe symbols
+  // Dynamically subscribe to ALL currently displayed market universe symbols (No arbitrary 80 limit)
   useEffect(() => {
     if (displayedInstruments.length === 0) return;
     const symbolsToSub = displayedInstruments
-      .slice(0, 80)
       .map((it) => it.canonical_symbol || it.provider_symbol || it.symbol)
       .filter((s): s is string => Boolean(s));
 
-    symbolsToSub.forEach((sym) => subscribe(sym, "WATCHLIST"));
+    const uniqueSymbols = Array.from(new Set(symbolsToSub));
+
+    uniqueSymbols.forEach((sym) => subscribe(sym, "WATCHLIST"));
     return () => {
-      symbolsToSub.forEach((sym) => unsubscribe(sym, "WATCHLIST"));
+      uniqueSymbols.forEach((sym) => unsubscribe(sym, "WATCHLIST"));
     };
   }, [displayedInstruments, subscribe, unsubscribe]);
 
@@ -300,23 +301,17 @@ export function MarketUniverse() {
     // Check providerHealth returned from backend/gateway
     if (providerHealth && providerHealth.length > 0) {
       providerHealth.forEach((p) => {
-        const status = (p.status || "").toUpperCase();
-        const isOk = ["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED", "CONNECTED", "DELAYED"].includes(status);
-        if (isOk) {
-          const id = (p.provider_id || "").toLowerCase();
-          if (id.includes("dhan")) active.add("DHAN");
-          else if (id.includes("upstox")) active.add("UPSTOX");
-          else if (id.includes("delta")) active.add("DELTA");
-          else if (id.includes("binance")) active.add("BINANCE");
-          else if (id.includes("fyers")) active.add("FYERS");
+        const s = (p.status || "").toUpperCase();
+        if (s === "LIVE" || s === "CONNECTED" || s === "OK" || s === "READY" || s === "AUTHENTICATED" || s === "PUBLIC_FEED") {
+          active.add(p.provider_name?.toUpperCase() || p.provider_id.toUpperCase());
         }
       });
     }
 
-    // Also check active quotes
+    // Also check live quotes from store
     quotes.forEach((q) => {
-      if (q && !q.is_stale && (q.age_seconds ?? 0) < 60) {
-        const p = (q.provider || "").toLowerCase();
+      if (q && q.last_price && q.last_price > 0 && !q.is_stale) {
+        const p = q.provider.toLowerCase();
         if (p.includes("dhan")) active.add("DHAN");
         else if (p.includes("upstox")) active.add("UPSTOX");
         else if (p.includes("delta")) active.add("DELTA");
@@ -329,42 +324,55 @@ export function MarketUniverse() {
 
   const providerCount = healthyProviders.size;
 
-  const liveCount = useMemo(() => {
-    let count = 0;
-    rawInstruments.forEach((inst) => {
+  const { liveCount, newestTickElapsedMs, averageFeedLatencyMs } = useMemo(() => {
+    let live = 0;
+    let maxTs = 0;
+    let totalLatency = 0;
+    let latencyCount = 0;
+    const now = Date.now();
+
+    displayedInstruments.forEach((inst) => {
       const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol || "";
       if (sym) {
-        const q = getQuote(sym) || (inst.symbol ? getQuote(inst.symbol) : null) || (inst.provider_symbol ? getQuote(inst.provider_symbol) : null);
-        if (q && q.last_price != null && q.last_price > 0 && !q.is_stale && (q.age_seconds ?? 0) < 60) {
-          count++;
+        const q = getQuote(sym, inst.exchange, inst.provider);
+        if (q && q.last_price != null && q.last_price > 0) {
+          const tsStr = q.event_timestamp || q.received_timestamp;
+          if (tsStr) {
+            const ms = new Date(tsStr).getTime();
+            if (!isNaN(ms) && ms > maxTs) {
+              maxTs = ms;
+            }
+          }
+          const ageSec = q.age_seconds ?? (now - new Date(q.event_timestamp || q.received_timestamp).getTime()) / 1000;
+          if (!q.is_stale && ageSec <= 5) {
+            live++;
+          }
+          if (q.feed_latency_ms != null && q.feed_latency_ms >= 0) {
+            totalLatency += q.feed_latency_ms;
+            latencyCount++;
+          }
         }
       }
     });
-    return count;
-  }, [rawInstruments, quotes, getQuote]);
+
+    const elapsed = maxTs > 0 ? Math.max(0, now - maxTs) : 0;
+    const avgLatency = latencyCount > 0 ? Math.round(totalLatency / latencyCount) : 0;
+
+    return {
+      liveCount: live,
+      newestTickElapsedMs: elapsed,
+      averageFeedLatencyMs: avgLatency,
+    };
+  }, [displayedInstruments, quotes, getQuote]);
 
   const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE" => {
     if (connectionStatus === "RECONNECTING" || connectionStatus === "CONNECTING") return "RECONNECTING";
     if (connectionStatus === "DISCONNECTED" && providerCount === 0) return "OFFLINE";
     if (liveCount > 0) return "LIVE";
-    if (providerCount > 0 || connectionStatus === "LIVE") return "PARTIAL";
+    if (providerCount > 0 || connectionStatus === "CONNECTED" || connectionStatus === "LIVE") return "PARTIAL";
     if (connectionStatus === "STALE") return "STALE";
     return "OFFLINE";
   }, [connectionStatus, providerCount, liveCount]);
-
-  const averageFeedLatencyMs = useMemo(() => {
-    let total = 0;
-    let count = 0;
-    quotes.forEach((q) => {
-      if (q && (q.provider.includes("dhan") || q.provider.includes("delta") || q.provider.includes("upstox") || q.provider.includes("binance"))) {
-        if (q.feed_latency_ms != null && q.feed_latency_ms >= 0) {
-          total += q.feed_latency_ms;
-          count++;
-        }
-      }
-    });
-    return count > 0 ? Math.round(total / count) : 0;
-  }, [quotes]);
 
   const handleLaunchOptionChainDirect = (underlying: string, exchange?: string, provider?: string) => {
     const params = new URLSearchParams({ underlying });
@@ -386,8 +394,9 @@ export function MarketUniverse() {
           totalInstruments={displayedInstruments.length || rawInstruments.length}
           liveCount={liveCount}
           providerCount={providerCount}
-          lastUpdateMs={averageFeedLatencyMs}
-          isLiveFeed={liveCount > 0 && connectionStatus === "LIVE"}
+          lastUpdateMs={newestTickElapsedMs}
+          averageLatencyMs={averageFeedLatencyMs}
+          isLiveFeed={liveCount > 0 && (connectionStatus === "CONNECTED" || connectionStatus === "LIVE")}
           feedStatus={feedStatus}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}

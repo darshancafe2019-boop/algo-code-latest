@@ -28,6 +28,7 @@ export interface MarketInstrument {
   tradability: string;
   data_status: "LIVE" | "STALE" | "DEGRADED" | "DISCONNECTED" | string;
   data_source: string;
+  provider?: string;
   data_age_ms?: number;
   latency_ms?: number;
   broker_symbol_mappings?: Record<string, string> | string;

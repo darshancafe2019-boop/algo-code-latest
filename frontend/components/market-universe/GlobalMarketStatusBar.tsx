@@ -25,9 +25,9 @@ export function GlobalMarketStatusBar({
   onSyncUniverse,
   lastUpdatedTimestamp,
 }: GlobalMarketStatusBarProps) {
-  const totalInstruments = stats?.total_instruments || 229;
-  const liveFeeds = stats?.live_feeds || 6;
-  const avgLatency = stats?.avg_latency_ms || 28;
+  const totalInstruments = stats?.total_instruments != null ? stats.total_instruments : "—";
+  const liveFeeds = stats?.live_feeds != null ? stats.live_feeds : "—";
+  const avgLatency = stats?.avg_latency_ms != null ? `${Math.round(stats.avg_latency_ms)} ms` : "—";
 
   return (
     <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 shadow-xl select-none font-sans">

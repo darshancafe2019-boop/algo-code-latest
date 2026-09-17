@@ -200,9 +200,9 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
   const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
   forwardHeaders.set("X-Forwarded-For", clientIp);
 
-  const isStream = subPath.startsWith("stream") || subPath.includes("/stream");
+  const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options");
-  const timeoutMs = isStream ? 60000 : (isHeavy ? 30000 : 15000);
+  const timeoutMs = isStream ? 15000 : (isHeavy ? 30000 : 15000);
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -223,6 +223,14 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
 
   const controller = new AbortController();
   const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
+
+  if (req.signal) {
+    req.signal.addEventListener("abort", () => {
+      try {
+        controller.abort();
+      } catch {}
+    });
+  }
 
   try {
     const backendRes = await fetch(targetUrl, {

@@ -72,8 +72,12 @@ export function dispatchBotCreation(
   queryParams.set("symbol", intentWithId.symbol);
   queryParams.set("side", intentWithId.side);
   queryParams.set("origin", intentWithId.origin);
+  if (intentWithId.canonicalSymbol) queryParams.set("canonicalSymbol", intentWithId.canonicalSymbol);
+  if (intentWithId.canonicalContractId) queryParams.set("canonicalContractId", intentWithId.canonicalContractId);
   if (intentWithId.assetClass) queryParams.set("assetClass", intentWithId.assetClass);
   if (intentWithId.broker) queryParams.set("broker", intentWithId.broker);
+  if (intentWithId.marketDataSource) queryParams.set("marketDataSource", intentWithId.marketDataSource);
+  if (intentWithId.instrumentId) queryParams.set("instrumentId", intentWithId.instrumentId);
   if (intentWithId.underlying) queryParams.set("underlying", intentWithId.underlying);
   if (intentWithId.expiry) queryParams.set("expiry", intentWithId.expiry);
   if (intentWithId.strike != null) queryParams.set("strike", String(intentWithId.strike));
@@ -86,13 +90,9 @@ export function dispatchBotCreation(
   if (intentWithId.lotSize != null) queryParams.set("lotSize", String(intentWithId.lotSize));
   if (intentWithId.mode) queryParams.set("mode", intentWithId.mode);
 
-  const isOptionOrigin =
-    intentWithId.origin === "OPTIONS" ||
-    intentWithId.assetClass === "OPTIONS" ||
-    intentWithId.assetClass === "OPTION" ||
-    intentWithId.assetClass === "CRYPTO_OPTIONS" ||
-    Boolean(intentWithId.strike);
-
-  const targetPath = isOptionOrigin ? "/strategy/create" : "/bots/create";
+  // Normal BUY/SELL from Options, Futures, and Live Feed navigate directly to /bots/create
+  const targetPath = ((intentWithId.mode as string) === "strategy" || (intentWithId as any).targetRoute === "/strategy/create")
+    ? "/strategy/create"
+    : "/bots/create";
   router.push(`${targetPath}?${queryParams.toString()}`);
 }

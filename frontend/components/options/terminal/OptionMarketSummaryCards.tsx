@@ -33,7 +33,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
 
   const pcr = snapshot.pcr;
   const flow = snapshot.flowSummary;
-  const isPcrBullish = (pcr.pcrOI || 0) >= 1.0;
+  const isPcrBullish = pcr.pcrOI !== null ? pcr.pcrOI >= 1.0 : null;
   const isFlowBullish = flow.overallSentiment === "BULLISH";
 
   const totalOI = (pcr.totalCallOI || 0) + (pcr.totalPutOI || 0);
@@ -83,13 +83,17 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <span>PCR (OI)</span>
           <span
             className={`text-[10px] sm:text-xs font-black px-1 rounded ${
-              isPcrBullish ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"
+              isPcrBullish === null
+                ? "bg-slate-800 text-slate-400"
+                : isPcrBullish
+                ? "bg-emerald-500/20 text-emerald-300"
+                : "bg-rose-500/20 text-rose-300"
             }`}
           >
-            {isPcrBullish ? "BULLISH" : "BEARISH"}
+            {isPcrBullish === null ? "—" : isPcrBullish ? "BULLISH" : "BEARISH"}
           </span>
         </div>
-        <div className={`text-sm sm:text-base md:text-lg font-black mt-1 ${isPcrBullish ? "text-emerald-400" : "text-amber-400"}`}>
+        <div className={`text-sm sm:text-base md:text-lg font-black mt-1 ${isPcrBullish === true ? "text-emerald-400" : isPcrBullish === false ? "text-amber-400" : "text-slate-400"}`}>
           {pcr.pcrOI !== null ? pcr.pcrOI.toFixed(2) : "N/A"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
@@ -121,14 +125,16 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
       <div className="p-3 rounded-xl bg-[#090E17] border border-slate-800/90 flex flex-col justify-between">
         <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>ATM STRIKE</span>
-          <span className="text-purple-400 text-[10px] sm:text-xs font-bold">IV {snapshot.atmIV || "14.5"}%</span>
+          <span className="text-purple-400 text-[10px] sm:text-xs font-bold">
+            IV {snapshot.atmIV ? `${snapshot.atmIV}%` : "—"}
+          </span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-purple-300 mt-1">
-          {formatNumber(snapshot.atmStrike)}
+          {snapshot.atmStrike ? formatNumber(snapshot.atmStrike) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Total OI</span>
-          <span className="text-slate-300">{formatIndianQuantity(totalOI)}</span>
+          <span className="text-slate-300">{totalOI > 0 ? formatIndianQuantity(totalOI) : "—"}</span>
         </div>
       </div>
 
@@ -139,11 +145,17 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <Activity className="w-3.5 h-3.5 text-cyan-400" />
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-slate-100 mt-1">
-          {formatIndianCurrency(flow.totalFlowTurnover, currency)}
+          {flow.totalFlowTurnover > 0 ? formatIndianCurrency(flow.totalFlowTurnover, currency) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
-          <span className="text-emerald-400">{flow.bullishPercentage}% Bull</span>
-          <span className="text-rose-400">{flow.bearishPercentage}% Bear</span>
+          {flow.bullishPercentage !== null ? (
+            <>
+              <span className="text-emerald-400">{flow.bullishPercentage}% Bull</span>
+              <span className="text-rose-400">{flow.bearishPercentage}% Bear</span>
+            </>
+          ) : (
+            <span className="text-slate-500">No Flow Data</span>
+          )}
         </div>
       </div>
 
@@ -159,10 +171,12 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
               ? "text-emerald-400"
               : flow.overallSentiment === "BEARISH"
               ? "text-rose-400"
-              : "text-slate-300"
+              : "text-slate-400"
           }`}
         >
-          {flow.overallSentiment} ({flow.confidence}%)
+          {flow.overallSentiment && flow.confidence !== null
+            ? `${flow.overallSentiment} (${flow.confidence}%)`
+            : "UNAVAILABLE"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Classification</span>

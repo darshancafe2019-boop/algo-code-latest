@@ -42,11 +42,11 @@ export function OrderDestinationModal({
   const instrumentId = bot.instrument_key || (bot.symbol.includes("RELIANCE") ? "NSE_EQ|INE002A01018" : bot.symbol.replace("/", "").replace(":", ""));
   
   // Sizing & estimates
-  const estPrice = bot.position?.entry_price || (bot.symbol.includes("BTC") ? 65840.0 : (bot.symbol.includes("RELIANCE") ? 2520.0 : (bot.symbol.includes("NIFTY") ? 24500.0 : (bot.symbol.includes("SOL") ? 135.0 : 100.0))));
-  const leverage = bot.symbol.includes("BTC") ? 10 : (bot.symbol.includes("RELIANCE") ? 5 : 1);
-  const quantity = bot.symbol.includes("BTC") ? 0.15 : (bot.symbol.includes("RELIANCE") ? 50 : 1);
-  const estNotional = Math.round(quantity * estPrice * 100) / 100;
-  const estMargin = Math.round((estNotional / Math.max(1, leverage)) * 100) / 100;
+  const estPrice = bot.position?.entry_price || (bot as any).last_price || (bot as any).current_price || (bot.position as any)?.mark_price || 0;
+  const leverage = (bot as any).config?.capital?.leverage || (bot as any).leverage || 1;
+  const quantity = (bot as any).config?.capital?.lot_size || (bot.position as any)?.quantity || bot.position?.size || 1;
+  const estNotional = estPrice > 0 ? Math.round(quantity * estPrice * 100) / 100 : 0;
+  const estMargin = estNotional > 0 ? Math.round((estNotional / Math.max(1, leverage)) * 100) / 100 : 0;
   const currencySymbol = bot.asset_class === "INDIAN_STOCKS" || bot.asset_class === "NSE" || bot.symbol.includes("RELIANCE") || bot.symbol.includes("NIFTY") ? "₹" : "$";
 
   const isBrokerConfigured = bot.feed_status !== "NOT CONFIGURED";

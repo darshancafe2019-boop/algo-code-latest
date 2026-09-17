@@ -110,11 +110,11 @@ export const LiveTickerItem = memo(function LiveTickerItem({
       };
     }
 
-    const currentPrice = price ?? quote?.last_price ?? 0;
+    const currentPrice = price ?? quote?.last_price ?? null;
 
     // Format price with appropriate decimals
     let formattedP = "—";
-    if (currentPrice > 0) {
+    if (currentPrice !== null && currentPrice > 0) {
       formattedP = formatMoney(currentPrice, currencySymbol);
     }
 
@@ -143,7 +143,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     const stale = quote?.is_stale || quote?.freshness_status === "STALE" || ageMs > 25000;
     const status = stale ? "STALE" : quote?.freshness_status || "LIVE";
     const provider = (quote?.provider || source || "GATEWAY").toUpperCase();
-    const latency = quote?.feed_latency_ms || 14;
+    const latency = quote?.feed_latency_ms != null ? quote.feed_latency_ms : null;
 
     return {
       formattedPrice: formattedP,
@@ -200,6 +200,10 @@ export const LiveTickerItem = memo(function LiveTickerItem({
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-0.5">
             <ShieldAlert className="h-2.5 w-2.5 text-[#F59E0B]" />
             <span>CONFIG REQ</span>
+          </span>
+        ) : freshnessStatus === "MARKET_CLOSED" ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#475569]/20 text-[#94A3B8] border border-[#475569]/40 flex items-center gap-0.5">
+            <span>CLOSED</span>
           </span>
         ) : isStale ? (
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 flex items-center gap-0.5">
@@ -280,7 +284,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[#52627A]">Latency:</span>
-                  <span className="font-medium text-[#19C5FF] tabular-nums">{latencyMs}ms</span>
+                  <span className="font-medium text-[#19C5FF] tabular-nums">{latencyMs != null ? `${Math.round(latencyMs)}ms` : "—"}</span>
                 </div>
                 {quote?.high !== undefined && quote?.low !== undefined && quote.high !== null && quote.low !== null && (
                   <div className="flex justify-between border-t border-[#122033] pt-1 mt-1 text-[10px]">

@@ -596,22 +596,12 @@ class UniversalOptionsEngine:
                 underlying=und,
                 spot_price=float(raw_dhan_chain.get("spot_price") or spot_price),
                 selected_expiry=expiry or raw_dhan_chain.get("selected_expiry", ""),
-                latency_ms=24.0,
+                latency_ms=None,
                 freshness_status=freshness,
             )
 
-        if environment == "PAPER":
-            return self.generate_paper_option_chain(
-                underlying=und,
-                spot_price=spot_price,
-                expiry=expiry,
-                strike_count=strike_count,
-                provider="DHAN",
-                broker_account_id="ba_dhan_paper",
-                broker_account_alias="Dhan Paper",
-            )
-
-        # In LIVE mode without valid provider data, strictly return NO_DATA (never invent fake options)
+        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
+        # Never generate synthetic replacement prices under the DHAN identity
         now_iso = datetime.now(timezone.utc).isoformat()
         return OptionChainSnapshot(
             underlying=und,
@@ -636,7 +626,7 @@ class UniversalOptionsEngine:
             exchange="NSE",
             segment="OPTIONS",
             currency="INR",
-            freshnessStatus="PROVIDER_UNAVAILABLE",
+            freshnessStatus="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
             latencyMs=None,
             dataAgeMs=0.0,
             diagnostics=self.diagnostics,
@@ -659,7 +649,7 @@ class UniversalOptionsEngine:
         upstox_service = UpstoxService()
 
         is_auth = upstox_service.is_authenticated
-        freshness = "CONNECTED" if is_auth or environment == "PAPER" else "AUTHENTICATION_FAILED"
+        freshness = "CONNECTED" if is_auth else "AUTHENTICATION_FAILED"
 
         raw_upstox_chain = None
         if is_auth:
@@ -682,21 +672,12 @@ class UniversalOptionsEngine:
                 underlying=und,
                 spot_price=spot_price,
                 selected_expiry=expiry or raw_upstox_chain.get("selected_expiry", ""),
-                latency_ms=28.0,
+                latency_ms=None,
                 freshness_status=freshness,
             )
 
-        if environment == "PAPER":
-            return self.generate_paper_option_chain(
-                underlying=und,
-                spot_price=spot_price,
-                expiry=expiry,
-                strike_count=strike_count,
-                provider="UPSTOX",
-                broker_account_id="ba_upstox_paper",
-                broker_account_alias="Upstox Paper",
-            )
-
+        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
+        # Never generate synthetic replacement prices under the UPSTOX identity
         now_iso = datetime.now(timezone.utc).isoformat()
         return OptionChainSnapshot(
             underlying=und,
@@ -721,7 +702,7 @@ class UniversalOptionsEngine:
             exchange="NSE",
             segment="OPTIONS",
             currency="INR",
-            freshnessStatus="PROVIDER_UNAVAILABLE",
+            freshnessStatus="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
             latencyMs=None,
             dataAgeMs=0.0,
             diagnostics=self.diagnostics,
@@ -837,18 +818,8 @@ class UniversalOptionsEngine:
                 freshness_status="CONNECTED",
             )
 
-        if environment == "PAPER":
-            paper_snap = self.generate_paper_option_chain(
-                underlying=crypto_und,
-                spot_price=spot_price,
-                expiry=expiry,
-                strike_count=strike_count,
-            )
-            paper_snap.provider = "BINANCE"
-            paper_snap.brokerAccountId = "ba_binance_paper"
-            paper_snap.brokerAccountAlias = "Binance Options Paper"
-            return paper_snap
-
+        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
+        # Never generate synthetic replacement prices under the BINANCE identity
         now_iso = datetime.now(timezone.utc).isoformat()
         return OptionChainSnapshot(
             underlying=crypto_und,
@@ -872,7 +843,7 @@ class UniversalOptionsEngine:
             exchange="BINANCE",
             segment="OPTIONS",
             currency="USDT",
-            freshnessStatus="NO_DATA",
+            freshnessStatus="PROVIDER_UNAVAILABLE",
             latencyMs=None,
             dataAgeMs=0.0,
             diagnostics=self.diagnostics,
@@ -1293,7 +1264,7 @@ class UniversalOptionsEngine:
                 "segment": "OPTIONS",
                 "feed": "REST",
                 "status": "CONNECTED" if is_dhan_auth else "AUTHENTICATION_REQUIRED",
-                "latency_ms": 24.0 if is_dhan_auth else None,
+                "latency_ms": None,
                 "last_update": now_iso,
             })
         except Exception:
@@ -1322,7 +1293,7 @@ class UniversalOptionsEngine:
                 "segment": "OPTIONS",
                 "feed": "REST",
                 "status": "CONNECTED" if is_upstox_auth else "AUTHENTICATION_REQUIRED",
-                "latency_ms": 28.0 if is_upstox_auth else None,
+                "latency_ms": None,
                 "last_update": now_iso,
             })
         except Exception:

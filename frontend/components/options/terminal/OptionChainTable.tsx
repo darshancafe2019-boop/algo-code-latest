@@ -1,5 +1,3 @@
-"use client";
-
 import { formatNumber } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import {
@@ -152,10 +150,15 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
         ? `${type === "CE" ? "C" : "P"}-${underlying}-${strike}-${selectedExpiry.replace(/\s+/g, "")}`
         : `${underlying} ${strike} ${type}`);
 
+    const canonicalContractId = quote.instrumentId
+      ? `${broker}:${broker === "DELTA" ? "DELTA" : "NSE_FO"}:${underlying}:${selectedExpiry || quote.expiry}:${strike}:${type}:${quote.instrumentId}`
+      : `${broker}:${broker === "DELTA" ? "DELTA" : "NSE_FO"}:${underlying}:${selectedExpiry || quote.expiry}:${strike}:${type}:${quote.securityId || sym}`;
+
     return {
       broker,
       source: quote.provider || source || (isCrypto ? "DELTA_EXCHANGE" : "DHAN"),
       symbol: sym,
+      contractId: canonicalContractId,
       productId: quote.securityId || quote.instrumentId || strike,
       instrumentId: quote.instrumentId || quote.symbol,
       securityId: quote.securityId,
@@ -165,6 +168,8 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
       optionType: type === "CE" ? "CALL" : "PUT",
       side,
       ltp: quote.ltp,
+      change: quote.change,
+      changePercent: quote.changePercent,
       bid: quote.bid > 0 ? quote.bid : quote.ltp,
       ask: quote.ask > 0 ? quote.ask : quote.ltp,
       bidSize: quote.bidQty,
@@ -176,8 +181,12 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
       gamma: quote.greeks?.gamma,
       theta: quote.greeks?.theta,
       vega: quote.greeks?.vega,
+      greeks: quote.greeks,
       oi: quote.oi,
+      oiChange: quote.oiChange,
+      oiBuildup: quote.oiBuildup,
       volume: quote.volume,
+      timestamp: quote.timestamp,
     };
   };
 

@@ -98,6 +98,22 @@ class MarketDataCache:
             "alias_keys": len(self._alias_map),
         }
 
+        # Option chains cache: key -> (timestamp, data)
+        self._option_chains: Dict[str, tuple[float, Dict[str, Any]]] = {}
+
+    def get_option_chain(self, key: str) -> Optional[Dict[str, Any]]:
+        entry = self._option_chains.get(key)
+        if not entry:
+            return None
+        ts, data = entry
+        if time.time() - ts > 3.0:
+            self._option_chains.pop(key, None)
+            return None
+        return data
+
+    def set_option_chain(self, key: str, data: Dict[str, Any], ttl: float = 3.0) -> None:
+        self._option_chains[key] = (time.time(), data)
+
     def get_all_quotes(self) -> Dict[str, NormalizedQuote]:
         return dict(self._quotes)
 

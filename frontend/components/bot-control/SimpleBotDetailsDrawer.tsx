@@ -410,7 +410,7 @@ export function SimpleBotDetailsDrawer({
                 </div>
                 <div className="flex items-center gap-1.5 text-[10px] text-[var(--theme-text-muted)]">
                   <Radio className="h-3 w-3 text-cyan-400" />
-                  <span>{liveQuote ? `${Math.round(liveQuote.feed_latency_ms || 16)}ms` : "Live Stream"}</span>
+                  <span>{liveQuote?.feed_latency_ms != null ? `${Math.round(liveQuote.feed_latency_ms)}ms` : (liveQuote ? "Live Stream" : "—")}</span>
                 </div>
               </div>
 
@@ -419,20 +419,24 @@ export function SimpleBotDetailsDrawer({
                 <div className="text-center">
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Mark Price</span>
                   <span className="font-extrabold text-sm text-white">
-                    {bot.symbol.includes("NIFTY") || bot.symbol.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "TATAMOTORS"].some(s => bot.symbol.toUpperCase().includes(s)) ? "₹" : "$"}
-                    {formatNumber(liveQuote.last_price || pos.entry_price || 2450.0, 2)}
+                    {liveQuote?.last_price || pos.entry_price ? (
+                      <>
+                        {bot.symbol.includes("NIFTY") || bot.symbol.includes("BANK") || ["RELIANCE", "TCS", "INFY", "HDFCBANK", "TATAMOTORS"].some(s => bot.symbol.toUpperCase().includes(s)) ? "₹" : "$"}
+                        {formatNumber(liveQuote?.last_price || pos.entry_price || 0, 2)}
+                      </>
+                    ) : "—"}
                   </span>
                 </div>
                 <div className="text-center border-x border-[var(--theme-border-subtle)]">
                   <span className="text-[10px] text-emerald-400 block">Best Bid</span>
                   <span className="font-bold text-emerald-300">
-                    {(liveQuote?.bid || liveQuote?.last_price || 2449.5).toFixed(2)}
+                    {liveQuote?.bid != null ? Number(liveQuote.bid).toFixed(2) : (liveQuote?.last_price != null ? Number(liveQuote.last_price).toFixed(2) : "—")}
                   </span>
                 </div>
                 <div className="text-center">
                   <span className="text-[10px] text-rose-400 block">Best Ask</span>
                   <span className="font-bold text-rose-300">
-                    {(liveQuote?.ask || (liveQuote?.last_price ? liveQuote.last_price + 0.5 : 2450.5)).toFixed(2)}
+                    {liveQuote?.ask != null ? Number(liveQuote.ask).toFixed(2) : (liveQuote?.last_price != null ? Number(liveQuote.last_price).toFixed(2) : "—")}
                   </span>
                 </div>
               </div>
@@ -445,7 +449,7 @@ export function SimpleBotDetailsDrawer({
                     <span>Dhan Margin Available:</span>
                   </div>
                   <span className="font-bold text-emerald-400">
-                    {formatMoney(Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 1250000.0), "₹")}
+                    {formatMoney(Number(dhanFundsData.funds.availMargin || dhanFundsData.funds.availabelBalance || 0), "₹")}
                   </span>
                 </div>
               )}

@@ -37,12 +37,15 @@ class NormalizedQuote:
     low: Optional[float] = None
     open: Optional[float] = None
     close: Optional[float] = None
+    change: Optional[float] = None
     change_pct: Optional[float] = None
     vwap: Optional[float] = None
     high_52w: Optional[float] = None
     low_52w: Optional[float] = None
     
     # Asset Classification & Metadata
+    segment: Optional[str] = None  # e.g. "INDEX", "EQUITY", "FUTURES", "OPTIONS", "CRYPTO"
+    instrument_key: Optional[str] = None
     market: str = "STOCKS"         # STOCKS | STOCK_FUTURES | STOCK_OPTIONS | CRYPTO | CRYPTO_FUTURES | CRYPTO_OPTIONS | INDICES | INDEX_FUTURES | INDEX_OPTIONS
     instrument_type: str = "SPOT"  # SPOT | FUTURES | OPTIONS_CALL | OPTIONS_PUT | INDEX
     company_name: Optional[str] = None
@@ -62,6 +65,7 @@ class NormalizedQuote:
     basis: Optional[float] = None
     basis_pct: Optional[float] = None
     oi: Optional[float] = None
+    open_interest: Optional[float] = None
     oi_change: Optional[float] = None
     funding_rate: Optional[float] = None
     next_funding_time: Optional[str] = None
@@ -96,6 +100,11 @@ class NormalizedQuote:
         if not self.event_timestamp:
             self.event_timestamp = now_iso
         
+        if self.oi is None and self.open_interest is not None:
+            self.oi = self.open_interest
+        elif self.open_interest is None and self.oi is not None:
+            self.open_interest = self.oi
+        
         # Auto-compute spread if bid and ask exist
         if self.bid is not None and self.ask is not None and self.spread is None:
             self.spread = round(max(0.0, float(self.ask) - float(self.bid)), 4)
@@ -115,24 +124,101 @@ class NormalizedQuote:
         except Exception:
             return 9999.0
 
-    def mark_stale(self, threshold_sec: float = 10.0) -> "NormalizedQuote":
-        self.is_stale = self.age_seconds > threshold_sec
-        if self.is_stale and self.status == "LIVE":
-            self.status = "STALE"
+    @property
+    def age_ms(self) -> int:
+        return int(self.age_seconds * 1000)
+
+    def mark_stale(
+        self,
+        live_threshold_sec: float = 5.0,
+        delayed_threshold_sec: float = 15.0,
+        threshold_sec: Optional[float] = None,
+    ) -> "NormalizedQuote":
+        if threshold_sec is not None:
+            live_threshold_sec = threshold_sec
+        age = self.age_seconds
+        self.is_stale = age > live_threshold_sec
+        if self.last_price is None or self.last_price <= 0:
+            self.status = "UNAVAILABLE"
+        elif age <= live_threshold_sec:
+            if self.status != "MARKET_CLOSED":
+                self.status = "LIVE"
+        elif age <= delayed_threshold_sec:
+            if self.status != "MARKET_CLOSED":
+                self.status = "DELAYED"
+        else:
+            if self.status != "MARKET_CLOSED":
+                self.status = "STALE"
         return self
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        d["age_seconds"] = round(self.age_seconds, 2)
-        
+        age_sec = round(self.age_seconds, 2)
+        age_ms = self.age_ms
+        d["age_seconds"] = age_sec
+        d["ageMs"] = age_ms
+
         # Canonical provider normalization
-        if d.get("provider") == "dhan_ws":
-            d["raw_provider"] = "dhan_ws"
+        prov_raw = (d.get("provider") or "").lower()
+        if "dhan" in prov_raw:
+            d["raw_provider"] = d.get("provider")
             d["provider"] = "dhan"
-        elif d.get("provider") in ("delta_options_ws", "delta_ws"):
+        elif "upstox" in prov_raw:
+            d["raw_provider"] = d.get("provider")
+            d["provider"] = "upstox"
+        elif "delta" in prov_raw:
             d["raw_provider"] = d.get("provider")
             d["provider"] = "delta"
-        
+        elif "binance" in prov_raw:
+            d["raw_provider"] = d.get("provider")
+            d["provider"] = "binance"
+
+        # Epoch timestamps
+        try:
+            event_dt = datetime.fromisoformat(self.event_timestamp.replace("Z", "+00:00"))
+            d["sourceTimestamp"] = int(event_dt.timestamp() * 1000)
+        except Exception:
+            d["sourceTimestamp"] = int(time.time() * 1000)
+
+        try:
+            recv_dt = datetime.fromisoformat(self.received_timestamp.replace("Z", "+00:00"))
+            d["receivedAt"] = int(recv_dt.timestamp() * 1000)
+        except Exception:
+            d["receivedAt"] = int(time.time() * 1000)
+
+        # Dynamic Freshness Rules (0-5s = LIVE, 5-15s = DELAYED, >15s = STALE)
+        if self.last_price is None or self.last_price <= 0:
+            status_val = "UNAVAILABLE"
+        elif age_sec <= 5.0:
+            status_val = "MARKET_CLOSED" if self.status == "MARKET_CLOSED" else "LIVE"
+        elif age_sec <= 15.0:
+            status_val = "MARKET_CLOSED" if self.status == "MARKET_CLOSED" else "DELAYED"
+        else:
+            status_val = "MARKET_CLOSED" if self.status == "MARKET_CLOSED" else "STALE"
+        d["status"] = status_val
+        d["freshnessStatus"] = status_val
+
+        # Normalized schema attributes
+        d["ltp"] = self.last_price
+        d["price"] = self.last_price
+        d["lastPrice"] = self.last_price
+        d["instrument_key"] = d.get("instrument_key") or self.instrument_key or self.symbol
+        d["instrumentKey"] = d["instrument_key"]
+        d["segment"] = d.get("exchange_segment") or d.get("market") or "INDEX"
+        d["previous_close"] = self.close if self.close and self.close > 0 else None
+        d["previousClose"] = d["previous_close"]
+        d["change"] = self.change if self.change is not None else (round(self.last_price - self.close, 2) if self.close and self.close > 0 and self.last_price else None)
+        d["change_pct"] = self.change_pct if self.change_pct is not None else (round(((self.last_price - self.close) / self.close) * 100.0, 2) if self.close and self.close > 0 and self.last_price else None)
+        d["change_percent"] = d["change_pct"]
+        d["changePct"] = d["change_pct"]
+        d["openInterest"] = d.get("oi")
+        d["age_ms"] = age_ms
+        d["event_timestamp"] = d["sourceTimestamp"]
+        d["received_at"] = d["receivedAt"]
+        d["source"] = getattr(self, "source", None) or f"{d.get('provider', 'gateway')}_websocket"
+        d["connection_id"] = getattr(self, "connection_id", "gateway_conn_1")
+        d["sequence"] = self.sequence
+
         # Compatibility fields for table rendering
         if d.get("bid") is not None and "bid_price" not in d:
             d["bid_price"] = d["bid"]
@@ -140,16 +226,10 @@ class NormalizedQuote:
             d["ask_price"] = d["ask"]
         if d.get("oi") is not None and "open_interest" not in d:
             d["open_interest"] = d["oi"]
-        if d.get("close") is not None and "previous_close" not in d:
-            d["previous_close"] = d["close"]
-        if d.get("event_timestamp") and "event_time" not in d:
-            d["event_time"] = d["event_timestamp"]
-        if d.get("received_timestamp") and "received_at" not in d:
-            d["received_at"] = d["received_timestamp"]
         if d.get("feed_latency_ms") is not None and "freshness_ms" not in d:
             d["freshness_ms"] = d["feed_latency_ms"]
 
-        if d.get("provider") in ("dhan", "dhan_ws"):
+        if d.get("provider") == "dhan":
             try:
                 from src.dhan_service import global_dhan_service
                 meta = global_dhan_service.resolve_symbol(self.symbol)

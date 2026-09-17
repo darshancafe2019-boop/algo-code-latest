@@ -68,7 +68,7 @@ export function EcoPositionVisualizer({
               isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
-            {isProfit ? `+${currency}{formatMoney(pnl, "$")}` : `-${currency}{formatMoney(Math.abs(pnl || 0), "$")}`}
+            {isProfit ? `+${formatMoney(pnl, currency)}` : `-${formatMoney(Math.abs(pnl || 0), currency)}`}
           </span>
           <span
             className={`text-[10px] font-bold tabular-nums ${

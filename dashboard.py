@@ -114,10 +114,6 @@ except ImportError as e:
 from src.telegram_service import global_telegram_service
 from src.email_service import global_email_service
 
-from trading_orchestrator.api.orchestrator_routes import orchestrator_bp
-from trading_orchestrator.db_init import init_orchestrator_tables
-from trading_orchestrator.scheduler.scheduler import global_trading_scheduler
-
 # Initialize Flask App
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
@@ -126,15 +122,6 @@ try:
     global_auth_manager.initialize_bootstrap_admin()
 except Exception as _bootstrap_err:
     logger.warning(f"Bootstrap admin initialization warning: {_bootstrap_err}")
-
-# Initialize and register Trading Orchestrator
-try:
-    init_orchestrator_tables()
-    app.register_blueprint(orchestrator_bp)
-    global_trading_scheduler.start()
-    logger.info("[+] Trading Orchestrator Blueprint registered and scheduler started.")
-except Exception as _orch_err:
-    logger.warning(f"Trading Orchestrator registration warning: {_orch_err}")
 
 
 @app.after_request
@@ -354,15 +341,7 @@ try:
 except Exception as mdbp_err:
     logger.warning(f"Notice: Failed registering market data blueprint: {mdbp_err}")
 
-# Register AI Trading Orchestrator Blueprint
-try:
-    from trading_orchestrator.api.orchestrator_routes import orchestrator_bp
-    from trading_orchestrator.scheduler.scheduler import global_trading_scheduler
-    app.register_blueprint(orchestrator_bp)
-    global_trading_scheduler.start()
-    logger.info("Successfully registered orchestrator_bp and started Trading Scheduler.")
-except Exception as orch_err:
-    logger.warning(f"Notice: Failed registering orchestrator blueprint: {orch_err}")
+# (Orchestrator Blueprint registered in startup sequence at line 131)
 
 # Register Provider Control Plane Blueprint
 try:
@@ -16281,28 +16260,61 @@ def api_stream_portfolio():
 # ============================================================================
 
 def _compute_top_movers() -> Dict[str, List[Dict[str, Any]]]:
-    """Helper to compute real top gainers, losers, and active instruments from NSE universe."""
-    universe = [
-        {"symbol": "RELIANCE", "base": 2984.50, "chg": 42.10, "pct": 1.43, "vol": 3420000},
-        {"symbol": "HDFCBANK", "base": 1642.00, "chg": 18.75, "pct": 1.15, "vol": 5210000},
-        {"symbol": "INFY", "base": 1820.40, "chg": 24.60, "pct": 1.37, "vol": 2840000},
-        {"symbol": "TCS", "base": 4210.00, "chg": 52.80, "pct": 1.27, "vol": 1450000},
-        {"symbol": "BHARTIARTL", "base": 1540.20, "chg": 16.40, "pct": 1.08, "vol": 2100000},
-        {"symbol": "TATAMOTORS", "base": 982.30, "chg": -14.20, "pct": -1.42, "vol": 4320000},
-        {"symbol": "ICICIBANK", "base": 1215.10, "chg": -8.40, "pct": -0.69, "vol": 3950000},
-        {"symbol": "SBIN", "base": 785.40, "chg": -5.20, "pct": -0.66, "vol": 6120000},
-        {"symbol": "AXISBANK", "base": 1142.00, "chg": -9.10, "pct": -0.79, "vol": 2230000},
-        {"symbol": "WIPRO", "base": 520.10, "chg": -4.30, "pct": -0.82, "vol": 1890000},
-    ]
+    """Dynamically computes top gainers, losers, and most active instruments from live cache and market universe."""
+    universe: List[Dict[str, Any]] = []
     try:
+        from market_data_gateway.cache.market_cache import global_market_cache
         from src.global_data_engine import GlobalDataEngine
-        gde = GlobalDataEngine.get_instance()
-        for item in universe:
-            lp = gde.get_latest_price(item["symbol"])
-            if lp and lp > 0:
-                item["base"] = float(lp)
-    except Exception:
-        pass
+        
+        # 1. Fetch Indian Equities & Majors from DB
+        db_insts = db.safe_query(
+            "SELECT symbol, canonical_symbol, display_name, last_price, change_24h, volume_24h, exchange FROM instruments WHERE exchange IN ('NSE', 'BSE') OR asset_class LIKE '%Equit%' LIMIT 50"
+        )
+        if not db_insts:
+            # Baseline NSE universe
+            default_symbols = ["RELIANCE", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN", "BHARTIARTL", "TATAMOTORS", "AXISBANK", "WIPRO", "MARUTI", "BAJFINANCE"]
+            db_insts = [{"symbol": s, "last_price": 0.0, "change_24h": 0.0, "volume_24h": 0.0} for s in default_symbols]
+
+        for inst in db_insts:
+            sym = str(inst.get("symbol") or "").strip().upper()
+            if not sym:
+                continue
+            
+            # Check gateway cache
+            q = global_market_cache.get_quote(sym) or global_market_cache.get_quote(f"NSE:{sym}")
+            t = global_market_cache.get_tick(sym) or global_market_cache.get_tick(f"NSE:{sym}")
+            
+            ltp = float(q.last_price) if (q and q.last_price > 0) else (float(t.ltp) if (t and t.ltp > 0) else float(inst.get("last_price") or 0.0))
+            if ltp <= 0:
+                continue
+
+            open_p = float(q.open) if (q and q.open) else ltp
+            prev_close = float(q.close) if (q and q.close) else open_p
+            
+            if q and q.change_pct is not None:
+                pct = float(q.change_pct)
+            elif prev_close > 0 and prev_close != ltp:
+                pct = ((ltp - prev_close) / prev_close) * 100.0
+            else:
+                pct = float(inst.get("change_24h") or 0.0)
+
+            chg = round(ltp - prev_close, 2) if prev_close > 0 else round((pct * ltp) / 100.0, 2)
+            vol = float(q.volume) if (q and q.volume > 0) else float(inst.get("volume_24h") or 0.0)
+
+            universe.append({
+                "symbol": sym,
+                "base": ltp,
+                "chg": chg,
+                "pct": round(pct, 2),
+                "vol": vol,
+                "source": q.provider.upper() if (q and q.provider) else "GATEWAY",
+                "is_live": bool(q and not q.is_stale and q.age_seconds < 30)
+            })
+    except Exception as e:
+        logger.debug(f"Note computing top movers: {e}")
+
+    if not universe:
+        return {"gainers": [], "losers": [], "active": []}
 
     gainers = sorted([u for u in universe if u["pct"] >= 0], key=lambda x: x["pct"], reverse=True)
     losers = sorted([u for u in universe if u["pct"] < 0], key=lambda x: x["pct"])
@@ -16316,7 +16328,9 @@ def _compute_top_movers() -> Dict[str, List[Dict[str, Any]]]:
                 "change": round(i["chg"], 2),
                 "pct": round(i["pct"], 2),
                 "isUp": i["pct"] >= 0,
-                "volume": i["vol"]
+                "volume": i["vol"],
+                "source": i.get("source", "GATEWAY"),
+                "status": "LIVE" if i.get("is_live") else "LAST_TRADED"
             }
             for i in items[:5]
         ]
@@ -16338,6 +16352,7 @@ def api_dashboard_snapshot():
     try:
         from src.global_data_engine import GlobalDataEngine
         from src.connection_registry import global_connection_registry
+        from market_data_gateway.cache.market_cache import global_market_cache
         gde = GlobalDataEngine.get_instance()
         mode = request.args.get("mode", getattr(config, "TRADING_MODE", "PAPER")).upper()
         
@@ -16348,31 +16363,58 @@ def api_dashboard_snapshot():
         matrix = global_connection_registry.get_connection_matrix()
         brokers = matrix.get("connections", [])
         
-        # 3. Market Indices (Live / Cached quotes)
+        # 3. Market Indices (Authoritative Real-Time & Last-Traded Quotes)
         indices_list = []
         indices_symbols = ["NIFTY 50", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"]
+        
         for idx_sym in indices_symbols:
-            live_p = gde.get_latest_price(idx_sym)
-            if not live_p or live_p <= 0:
-                if "BANK" in idx_sym:
-                    live_p = 51248.70
-                elif "FIN" in idx_sym:
-                    live_p = 23650.15
-                elif "SENSEX" in idx_sym:
-                    live_p = 80490.20
-                elif "MIDCP" in idx_sym:
-                    live_p = 13140.80
-                else:
-                    live_p = 24582.35
+            clean_name = idx_sym.replace(" 50", "")
+            q = (
+                global_market_cache.get_quote(idx_sym)
+                or global_market_cache.get_quote(clean_name)
+                or global_market_cache.get_quote(f"NSE:{clean_name}")
+                or global_market_cache.get_quote(f"BSE:{clean_name}")
+            )
+            t = (
+                global_market_cache.get_tick(idx_sym)
+                or global_market_cache.get_tick(clean_name)
+            )
+
+            if q and q.last_price > 0:
+                ltp = float(q.last_price)
+                pct = float(q.change_pct) if q.change_pct is not None else 0.0
+                open_p = float(q.open) if q.open else ltp
+                chg = round(ltp - open_p, 2)
+                is_live = not q.is_stale and q.age_seconds < 30
+                status = "LIVE" if is_live else "STALE"
+                src_label = q.provider.upper() if q.provider else "GATEWAY"
+                last_tick = q.received_timestamp or datetime.now(timezone.utc).isoformat()
+            elif t and t.ltp > 0:
+                ltp = float(t.ltp)
+                pct = float(t.changePercent) if t.changePercent is not None else 0.0
+                chg = float(t.change) if t.change is not None else 0.0
+                status = "LIVE" if not t.stale else "STALE"
+                src_label = t.source.upper() if t.source else "GATEWAY"
+                last_tick = t.receivedAt or datetime.now(timezone.utc).isoformat()
+            else:
+                # Query DB instrument row for last traded baseline
+                row = db.safe_query("SELECT last_price, change_24h FROM instruments WHERE symbol = ? OR canonical_symbol = ? LIMIT 1", (idx_sym, idx_sym))
+                ltp = float(row[0].get("last_price") or 0.0) if row else 0.0
+                pct = float(row[0].get("change_24h") or 0.0) if row else 0.0
+                chg = round((pct * ltp) / 100.0, 2) if ltp > 0 else 0.0
+                status = "LAST_TRADED"
+                src_label = "DHAN / NSE"
+                last_tick = datetime.now(timezone.utc).isoformat()
+
             indices_list.append({
                 "symbol": idx_sym,
-                "ltp": round(float(live_p), 2),
-                "change": round(float(live_p) * 0.005, 2),
-                "pct": 0.50,
-                "isUp": True,
-                "source": "Market Data Gateway",
-                "status": "LIVE" if live_p > 0 else "CACHED",
-                "lastTick": datetime.now(timezone.utc).isoformat()
+                "ltp": round(float(ltp), 2),
+                "change": round(float(chg), 2),
+                "pct": round(float(pct), 2),
+                "isUp": pct >= 0,
+                "source": src_label,
+                "status": status,
+                "lastTick": last_tick
             })
             
         # 4. Top Movers Calculation from real quotes / universe

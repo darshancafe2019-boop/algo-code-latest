@@ -49,6 +49,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "NIFTY50",
         "trading_symbol": "NIFTY",
+        "canonical_symbol": "NIFTY",
     },
     "NIFTY 50": {
         "instrument_key": "NSE_INDEX|Nifty 50",
@@ -59,6 +60,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "NIFTY50",
         "trading_symbol": "NIFTY",
+        "canonical_symbol": "NIFTY",
     },
     "BANKNIFTY": {
         "instrument_key": "NSE_INDEX|Nifty Bank",
@@ -69,6 +71,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "NIFTYBANK",
         "trading_symbol": "BANKNIFTY",
+        "canonical_symbol": "BANKNIFTY",
     },
     "NIFTY BANK": {
         "instrument_key": "NSE_INDEX|Nifty Bank",
@@ -79,6 +82,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "NIFTYBANK",
         "trading_symbol": "BANKNIFTY",
+        "canonical_symbol": "BANKNIFTY",
     },
     "INDIA VIX": {
         "instrument_key": "NSE_INDEX|India VIX",
@@ -89,6 +93,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.01,
         "isin": "INDIAVIX",
         "trading_symbol": "INDIA VIX",
+        "canonical_symbol": "INDIA VIX",
     },
     "INDIAVIX": {
         "instrument_key": "NSE_INDEX|India VIX",
@@ -99,6 +104,29 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.01,
         "isin": "INDIAVIX",
         "trading_symbol": "INDIA VIX",
+        "canonical_symbol": "INDIA VIX",
+    },
+    "FINNIFTY": {
+        "instrument_key": "NSE_INDEX|Nifty Fin Service",
+        "name": "NIFTY FINANCIAL SERVICES",
+        "exchange": "NSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 25,
+        "tick_size": 0.05,
+        "isin": "FINNIFTY",
+        "trading_symbol": "FINNIFTY",
+        "canonical_symbol": "FINNIFTY",
+    },
+    "MIDCPNIFTY": {
+        "instrument_key": "NSE_INDEX|NIFTY MID SELECT",
+        "name": "NIFTY MIDCAP SELECT",
+        "exchange": "NSE_INDEX",
+        "asset_class": "INDIAN_INDICES",
+        "lot_size": 50,
+        "tick_size": 0.05,
+        "isin": "MIDCPNIFTY",
+        "trading_symbol": "MIDCPNIFTY",
+        "canonical_symbol": "MIDCPNIFTY",
     },
 
     # Core High-Liquidity Indian Equities
@@ -111,6 +139,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE002A01018",
         "trading_symbol": "RELIANCE",
+        "canonical_symbol": "RELIANCE",
     },
     "HDFCBANK": {
         "instrument_key": "NSE_EQ|INE040A01034",
@@ -121,6 +150,18 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE040A01034",
         "trading_symbol": "HDFCBANK",
+        "canonical_symbol": "HDFCBANK",
+    },
+    "HDFC BANK": {
+        "instrument_key": "NSE_EQ|INE040A01034",
+        "name": "HDFC Bank Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE040A01034",
+        "trading_symbol": "HDFCBANK",
+        "canonical_symbol": "HDFCBANK",
     },
     "ICICIBANK": {
         "instrument_key": "NSE_EQ|INE090A01021",
@@ -131,6 +172,29 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE090A01021",
         "trading_symbol": "ICICIBANK",
+        "canonical_symbol": "ICICIBANK",
+    },
+    "ICICI BANK": {
+        "instrument_key": "NSE_EQ|INE090A01021",
+        "name": "ICICI Bank Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE090A01021",
+        "trading_symbol": "ICICIBANK",
+        "canonical_symbol": "ICICIBANK",
+    },
+    "ICICI": {
+        "instrument_key": "NSE_EQ|INE090A01021",
+        "name": "ICICI Bank Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE090A01021",
+        "trading_symbol": "ICICIBANK",
+        "canonical_symbol": "ICICIBANK",
     },
     "INFY": {
         "instrument_key": "NSE_EQ|INE009A01021",
@@ -141,6 +205,18 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE009A01021",
         "trading_symbol": "INFY",
+        "canonical_symbol": "INFY",
+    },
+    "INFOSYS": {
+        "instrument_key": "NSE_EQ|INE009A01021",
+        "name": "Infosys Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE009A01021",
+        "trading_symbol": "INFY",
+        "canonical_symbol": "INFY",
     },
     "TCS": {
         "instrument_key": "NSE_EQ|INE467B01029",
@@ -151,6 +227,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE467B01029",
         "trading_symbol": "TCS",
+        "canonical_symbol": "TCS",
     },
     "SBIN": {
         "instrument_key": "NSE_EQ|INE062A01020",
@@ -161,6 +238,29 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE062A01020",
         "trading_symbol": "SBIN",
+        "canonical_symbol": "SBIN",
+    },
+    "SBI": {
+        "instrument_key": "NSE_EQ|INE062A01020",
+        "name": "State Bank of India",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE062A01020",
+        "trading_symbol": "SBIN",
+        "canonical_symbol": "SBIN",
+    },
+    "STATE BANK OF INDIA": {
+        "instrument_key": "NSE_EQ|INE062A01020",
+        "name": "State Bank of India",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE062A01020",
+        "trading_symbol": "SBIN",
+        "canonical_symbol": "SBIN",
     },
     "BHARTIARTL": {
         "instrument_key": "NSE_EQ|INE397D01024",
@@ -171,6 +271,29 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE397D01024",
         "trading_symbol": "BHARTIARTL",
+        "canonical_symbol": "BHARTIARTL",
+    },
+    "BHARTI AIRTEL": {
+        "instrument_key": "NSE_EQ|INE397D01024",
+        "name": "Bharti Airtel Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE397D01024",
+        "trading_symbol": "BHARTIARTL",
+        "canonical_symbol": "BHARTIARTL",
+    },
+    "AIRTEL": {
+        "instrument_key": "NSE_EQ|INE397D01024",
+        "name": "Bharti Airtel Limited",
+        "exchange": "NSE_EQ",
+        "asset_class": "INDIAN_EQUITIES",
+        "lot_size": 1,
+        "tick_size": 0.05,
+        "isin": "INE397D01024",
+        "trading_symbol": "BHARTIARTL",
+        "canonical_symbol": "BHARTIARTL",
     },
     "KOTAKBANK": {
         "instrument_key": "NSE_EQ|INE237A01028",
@@ -181,6 +304,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE237A01028",
         "trading_symbol": "KOTAKBANK",
+        "canonical_symbol": "KOTAKBANK",
     },
     "LT": {
         "instrument_key": "NSE_EQ|INE018A01030",
@@ -191,6 +315,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE018A01030",
         "trading_symbol": "LT",
+        "canonical_symbol": "LT",
     },
     "AXISBANK": {
         "instrument_key": "NSE_EQ|INE238A01034",
@@ -201,6 +326,7 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
         "tick_size": 0.05,
         "isin": "INE238A01034",
         "trading_symbol": "AXISBANK",
+        "canonical_symbol": "AXISBANK",
     },
 }
 
@@ -461,9 +587,56 @@ class UpstoxService:
                 "message": "Invalid or expired access token (UDAPI100050). Please re-authenticate." if code == "UDAPI100050" else err_str,
             }
 
-    def get_ltp(self, symbol: str) -> Dict[str, Any]:
-        """Fetches real-time LTP for a symbol using Upstox V3 /v3/market-quote/ltp."""
-        ik = self.resolve_instrument_key(symbol) or symbol
+    def resolve_canonical_symbol(self, input_str: str) -> str:
+        """
+        Maps any Upstox instrument_key, ISIN, symbol, or alias to canonical symbol.
+        Examples:
+          'NSE_INDEX|Nifty 50' -> 'NIFTY'
+          'NSE_EQ|INE090A01021' -> 'ICICIBANK'
+          'ICICI BANK' -> 'ICICIBANK'
+          'NSE_EQ|INE062A01020' -> 'SBIN'
+          'NSE_INDEX|India VIX' -> 'INDIA VIX'
+          'NSE_EQ|INE397D01024' -> 'BHARTIARTL'
+        """
+        if not input_str:
+            return ""
+        clean = str(input_str).strip()
+        clean_upper = clean.upper()
+        clean_compact = clean_upper.replace(" ", "").replace("_", "").replace("|", ":")
+
+        # 1. Direct registry lookup
+        if clean_upper in OFFICIAL_UPSTOX_KEYS:
+            return OFFICIAL_UPSTOX_KEYS[clean_upper].get("canonical_symbol") or OFFICIAL_UPSTOX_KEYS[clean_upper]["trading_symbol"]
+
+        # 2. Iterate keys
+        for key, meta in OFFICIAL_UPSTOX_KEYS.items():
+            ik = meta.get("instrument_key", "").upper()
+            ik_compact = ik.replace(" ", "").replace("_", "").replace("|", ":")
+            isin = meta.get("isin", "").upper()
+            ts = meta.get("trading_symbol", "").upper()
+            cs = meta.get("canonical_symbol", ts)
+            name = meta.get("name", "").upper()
+
+            if clean_upper == ik or clean_upper == ik.replace("|", ":"):
+                return cs
+            if clean_compact == ik_compact:
+                return cs
+            if isin and clean_upper == isin:
+                return cs
+            if clean_upper == ts or clean_compact == ts.replace(" ", "").replace("_", ""):
+                return cs
+            if clean_upper == name:
+                return cs
+
+        # 3. Fallback extraction if format is EXCHANGE|SYMBOL
+        if "|" in clean:
+            return clean.split("|", 1)[1].strip()
+        if ":" in clean:
+            return clean.split(":", 1)[1].strip()
+        return clean
+
+    def get_ltp(self, symbol: Union[str, List[str]]) -> Dict[str, Any]:
+        """Fetches real-time LTP for one or more symbols/instrument keys using Upstox V3 /v3/market-quote/ltp."""
         if not self.is_authenticated:
             return {
                 "status": "error",
@@ -471,20 +644,59 @@ class UpstoxService:
                 "error_code": "UDAPI100050",
                 "message": "Upstox access token expired or not configured. Please re-authenticate in Settings -> Brokers.",
             }
+
+        # Parse inputs
+        if isinstance(symbol, str):
+            symbols_list = [s.strip() for s in symbol.split(",") if s.strip()]
+        else:
+            symbols_list = [str(s).strip() for s in symbol if str(s).strip()]
+
+        if not symbols_list:
+            return {"status": "error", "message": "No symbols or instrument keys provided."}
+
+        key_to_orig: Dict[str, str] = {}
+        for s in symbols_list:
+            ik = self.resolve_instrument_key(s) or s
+            key_to_orig[ik] = s
+
+        ik_param = ",".join(key_to_orig.keys())
+        now_iso = datetime.now(timezone.utc).isoformat()
+
         try:
-            data = self._make_request("market-quote/ltp", params={"instrument_key": ik}, timeout=5.0)
+            data = self._make_request("market-quote/ltp", params={"instrument_key": ik_param}, timeout=6.0)
             if data.get("status") == "success" and "data" in data:
-                formatted_key = ik.replace("|", ":")
-                q_data = data["data"].get(formatted_key) or data["data"].get(ik) or {}
-                last_price = float(q_data.get("last_price") or 0.0)
-                return {
+                raw_data = data["data"]
+                normalized_map: Dict[str, Any] = {}
+                first_entry = None
+
+                for ik, orig_sym in key_to_orig.items():
+                    formatted_key = ik.replace("|", ":")
+                    q_data = raw_data.get(formatted_key) or raw_data.get(ik) or {}
+                    last_price = float(q_data.get("last_price") or 0.0)
+                    can_sym = self.resolve_canonical_symbol(ik)
+
+                    item = {
+                        "symbol": can_sym,
+                        "instrument_key": ik,
+                        "last_price": last_price,
+                        "ltp": last_price,
+                        "timestamp": now_iso,
+                    }
+                    normalized_map[ik] = item
+                    normalized_map[formatted_key] = item
+                    normalized_map[can_sym] = item
+                    normalized_map[orig_sym] = item
+                    if first_entry is None:
+                        first_entry = item
+
+                res_dict = {
                     "status": "success",
-                    "symbol": symbol,
-                    "instrument_key": ik,
-                    "last_price": last_price,
-                    "ltp": last_price,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "data": normalized_map,
+                    "quotes": normalized_map,
                 }
+                if len(symbols_list) == 1 and first_entry:
+                    res_dict.update(first_entry)
+                return res_dict
             return data
         except Exception as e:
             return {"status": "error", "message": str(e)}

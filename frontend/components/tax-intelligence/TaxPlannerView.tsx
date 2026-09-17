@@ -13,7 +13,7 @@ interface TaxPlannerViewProps {
 export function TaxPlannerView({ summary, currency }: TaxPlannerViewProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}{formatMoney(Math.abs(val), "$")}`;
+    return formatMoney(Math.abs(val), prefix);
   };
 
   return (

@@ -55,6 +55,84 @@ GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-
 STALE_THRESHOLD_SEC = 10.0
 
 
+def get_quote_aliases(symbol: str, exchange: str = "", provider: str = "") -> Set[str]:
+    aliases: Set[str] = set()
+    s = (symbol or "").strip().upper()
+    if not s:
+        return aliases
+
+    aliases.add(s)
+
+    # If symbol contains exchange/provider prefix
+    clean_sym = s
+    prefix = ""
+    if ":" in s:
+        parts = s.split(":", 1)
+        prefix = parts[0]
+        clean_sym = parts[1]
+        # Remove suffix like :SPOT, :PERP, :EQ
+        if ":" in clean_sym:
+            clean_sym = clean_sym.split(":", 1)[0]
+        aliases.add(clean_sym)
+    elif "|" in s:
+        parts = s.split("|", 1)
+        prefix = parts[0]
+        clean_sym = parts[1]
+        aliases.add(clean_sym)
+
+    # Slash variations
+    if "/" in clean_sym:
+        no_slash = clean_sym.replace("/", "")
+        aliases.add(no_slash)
+    elif clean_sym.endswith("USDT") and len(clean_sym) > 4:
+        slash_v = f"{clean_sym[:-4]}/USDT"
+        aliases.add(slash_v)
+    elif clean_sym.endswith("USD") and len(clean_sym) > 3:
+        slash_v = f"{clean_sym[:-3]}/USD"
+        aliases.add(slash_v)
+
+    # Indian Stock / Index specific alias cross-mappings
+    indian_alias_groups = [
+        {"NIFTY", "NIFTY 50", "NIFTY50", "NSE_INDEX|NIFTY 50", "NSE_INDEX:NIFTY 50"},
+        {"BANKNIFTY", "NIFTY BANK", "NIFTYBANK", "NSE_INDEX|NIFTY BANK", "NSE_INDEX:NIFTY BANK"},
+        {"INDIA VIX", "INDIAVIX", "INDIA_VIX", "NSE_INDEX|INDIA VIX", "NSE_INDEX:INDIA VIX"},
+        {"RELIANCE", "RELIANCE INDUSTRIES", "INE002A01018", "NSE_EQ|INE002A01018", "NSE_EQ:INE002A01018"},
+        {"HDFCBANK", "HDFC BANK", "HDFC", "INE040A01034", "NSE_EQ|INE040A01034", "NSE_EQ:INE040A01034"},
+        {"ICICIBANK", "ICICI BANK", "ICICI", "INE090A01021", "NSE_EQ|INE090A01021", "NSE_EQ:INE090A01021"},
+        {"INFY", "INFOSYS", "INE009A01021", "NSE_EQ|INE009A01021", "NSE_EQ:INE009A01021"},
+        {"TCS", "TATA CONSULTANCY SERVICES", "INE467B01029", "NSE_EQ|INE467B01029", "NSE_EQ:INE467B01029"},
+        {"SBIN", "SBI", "STATE BANK OF INDIA", "INE062A01020", "NSE_EQ|INE062A01020", "NSE_EQ:INE062A01020"},
+        {"BHARTIARTL", "BHARTI AIRTEL", "AIRTEL", "BHARTI", "INE397D01024", "NSE_EQ|INE397D01024", "NSE_EQ:INE397D01024"},
+    ]
+
+    for group in indian_alias_groups:
+        if any(item in aliases for item in group):
+            aliases.update(group)
+
+    # Provider/Exchange specific aliases
+    ex_u = (exchange or "").upper()
+    prov_u = (provider or "").upper()
+
+    for base in list(aliases):
+        if "BINANCE" in ex_u or "BINANCE" in prov_u or prefix == "BINANCE":
+            aliases.add(f"BINANCE:{base}")
+            aliases.add(f"BINANCE:{base}:SPOT")
+            aliases.add(f"BINANCE:{base}:PERP")
+        if "DELTA" in ex_u or "DELTA" in prov_u or prefix == "DELTA":
+            aliases.add(f"DELTA:{base}")
+            aliases.add(f"DELTA:{base}:PERP")
+        if "NSE" in ex_u or "DHAN" in prov_u or "UPSTOX" in prov_u or prefix in ("NSE", "DHAN", "UPSTOX"):
+            aliases.add(f"NSE:{base}")
+            aliases.add(f"NSE:{base}:EQ")
+            aliases.add(f"DHAN:{base}")
+            aliases.add(f"UPSTOX:{base}")
+        if "OANDA" in ex_u or prefix == "OANDA":
+            aliases.add(f"OANDA:{base}")
+            aliases.add(f"OANDA:{base}:FX")
+
+    return aliases
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # GATEWAY APPLICATION
 # ─────────────────────────────────────────────────────────────────────────────
@@ -165,10 +243,12 @@ class MarketDataGateway:
 
         def _on_quote(quote: NormalizedQuote) -> None:
             """Called by any adapter when a new quote arrives."""
-            self._quote_cache[quote.symbol] = quote
+            aliases = get_quote_aliases(quote.symbol, quote.exchange, quote.provider)
+            for a in aliases:
+                self._quote_cache[a] = quote
             # Update canonical cache as well
             global_market_cache.put_normalized_quote(quote)
-            asyncio.ensure_future(self._broadcast_quote(quote))
+            asyncio.ensure_future(self._broadcast_quote(quote, aliases))
 
         # Bridge DhanFeedManager singleton ticks directly into gateway quote cache
         try:
@@ -196,9 +276,11 @@ class MarketDataGateway:
                     feed_latency_ms=float(tick.get("freshness_ms") or 0.0),
                     data_mode="REAL_TIME",
                 )
-                self._quote_cache[sym] = quote
+                aliases = get_quote_aliases(quote.symbol, quote.exchange, quote.provider)
+                for a in aliases:
+                    self._quote_cache[a] = quote
                 global_market_cache.put_normalized_quote(quote)
-                asyncio.ensure_future(self._broadcast_quote(quote))
+                asyncio.ensure_future(self._broadcast_quote(quote, aliases))
 
             global_dhan_feed_manager.add_callback(_on_dhan_tick)
         except Exception as bridge_err:
@@ -239,7 +321,12 @@ class MarketDataGateway:
     async def _on_new_subscription(self, symbol: str) -> None:
         adapter = self.failover.get_best_provider(symbol)
         if adapter:
-            await adapter.subscribe([symbol])
+            clean_sym = symbol
+            if ":" in symbol:
+                clean_sym = symbol.split(":", 1)[1]
+                if ":" in clean_sym:
+                    clean_sym = clean_sym.split(":", 1)[0]
+            await adapter.subscribe([symbol, clean_sym])
 
     async def _on_remove_subscription(self, symbol: str) -> None:
         for adapter in self.adapters.values():
@@ -248,14 +335,15 @@ class MarketDataGateway:
 
     # ─── WebSocket fan-out ────────────────────────────────────────────────────
 
-    async def _broadcast_quote(self, quote: NormalizedQuote) -> None:
+    async def _broadcast_quote(self, quote: NormalizedQuote, aliases: Optional[Set[str]] = None) -> None:
         """Send a quote update to subscribed WebSocket clients."""
         payload = json.dumps({"type": "QUOTE", "data": quote.to_dict()})
-        sym = quote.symbol.upper()
+        if aliases is None:
+            aliases = get_quote_aliases(quote.symbol, quote.exchange, quote.provider)
         async with self._ws_lock:
             dead_clients = []
             for client_id, (ws, subscriptions) in list(self._ws_clients.items()):
-                if "*" in subscriptions or sym in subscriptions:
+                if "*" in subscriptions or not subscriptions.isdisjoint(aliases):
                     try:
                         await ws.send_str(payload)
                     except Exception:

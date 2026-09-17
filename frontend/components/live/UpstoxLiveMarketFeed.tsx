@@ -92,18 +92,56 @@ export const INITIAL_UPSTOX_INSTRUMENTS = [
   { key: "NSE_EQ|INE397D01024", symbol: "BHARTIARTL", name: "Bharti Airtel", category: "STOCK" },
 ];
 
-const INSTRUMENT_LOOKUP = new Map(INITIAL_UPSTOX_INSTRUMENTS.map((inst) => [inst.key, inst]));
-const SYMBOL_LOOKUP = new Map(INITIAL_UPSTOX_INSTRUMENTS.map((inst) => [inst.symbol, inst]));
+const ALIAS_TO_INSTRUMENT = new Map<string, typeof INITIAL_UPSTOX_INSTRUMENTS[number]>();
+
+INITIAL_UPSTOX_INSTRUMENTS.forEach((inst) => {
+  const aliases = [
+    inst.key,
+    inst.key.replace("|", ":"),
+    inst.symbol,
+    inst.name,
+    inst.symbol.toUpperCase(),
+    inst.symbol.replace(/\s+/g, ""),
+  ];
+  if (inst.symbol === "NIFTY") {
+    aliases.push("NIFTY 50", "NIFTY50", "NSE_INDEX|NIFTY 50", "NSE_INDEX:NIFTY 50");
+  } else if (inst.symbol === "BANKNIFTY") {
+    aliases.push("NIFTY BANK", "NIFTYBANK", "NSE_INDEX|NIFTY BANK", "NSE_INDEX:NIFTY BANK");
+  } else if (inst.symbol === "INDIA VIX") {
+    aliases.push("INDIAVIX", "INDIA_VIX", "India VIX", "NSE_INDEX|India VIX", "NSE_INDEX:India VIX");
+  } else if (inst.symbol === "RELIANCE") {
+    aliases.push("INE002A01018", "NSE_EQ|INE002A01018", "NSE_EQ:INE002A01018");
+  } else if (inst.symbol === "HDFCBANK") {
+    aliases.push("HDFC BANK", "HDFC", "INE040A01034", "NSE_EQ|INE040A01034", "NSE_EQ:INE040A01034");
+  } else if (inst.symbol === "ICICIBANK") {
+    aliases.push("ICICI BANK", "ICICI", "INE090A01021", "NSE_EQ|INE090A01021", "NSE_EQ:INE090A01021");
+  } else if (inst.symbol === "INFY") {
+    aliases.push("INFOSYS", "INE009A01021", "NSE_EQ|INE009A01021", "NSE_EQ:INE009A01021");
+  } else if (inst.symbol === "TCS") {
+    aliases.push("INE467B01029", "NSE_EQ|INE467B01029", "NSE_EQ:INE467B01029");
+  } else if (inst.symbol === "SBIN") {
+    aliases.push("SBI", "STATE BANK OF INDIA", "INE062A01020", "NSE_EQ|INE062A01020", "NSE_EQ:INE062A01020");
+  } else if (inst.symbol === "BHARTIARTL") {
+    aliases.push("BHARTI AIRTEL", "AIRTEL", "BHARTI", "INE397D01024", "NSE_EQ|INE397D01024", "NSE_EQ:INE397D01024");
+  }
+
+  aliases.forEach((a) => {
+    ALIAS_TO_INSTRUMENT.set(a.trim().toUpperCase(), inst);
+    ALIAS_TO_INSTRUMENT.set(a.trim().toUpperCase().replace(/\s+/g, ""), inst);
+    ALIAS_TO_INSTRUMENT.set(a.trim().toUpperCase().replace("|", ":"), inst);
+  });
+});
 
 function normalizeUpstoxQuote(data: any, existingPrevLtt?: number): UpstoxQuoteTick | null {
   if (!data || typeof data !== "object") return null;
 
   const rawKey = String(data.instrument_key || data.instrumentKey || data.security_id || data.symbol || "").trim();
-  let matchedInst = INSTRUMENT_LOOKUP.get(rawKey);
-  if (!matchedInst) {
-    const rawSym = String(data.symbol || "").trim().toUpperCase();
-    matchedInst = SYMBOL_LOOKUP.get(rawSym);
-  }
+  const rawSym = String(data.symbol || "").trim();
+  
+  const matchedInst = ALIAS_TO_INSTRUMENT.get(rawKey.toUpperCase()) ||
+                      ALIAS_TO_INSTRUMENT.get(rawKey.toUpperCase().replace(/\s+/g, "")) ||
+                      ALIAS_TO_INSTRUMENT.get(rawSym.toUpperCase()) ||
+                      ALIAS_TO_INSTRUMENT.get(rawSym.toUpperCase().replace(/\s+/g, ""));
 
   const symbol = matchedInst ? matchedInst.symbol : String(data.symbol || rawKey || "UNKNOWN").trim().toUpperCase();
   const display_name = matchedInst ? matchedInst.name : symbol;
@@ -312,6 +350,10 @@ export function UpstoxLiveMarketFeed() {
         const norm = normalizeUpstoxQuote(typeof raw === "object" ? { ...raw, instrument_key: key } : { instrument_key: key, ltp: raw });
         if (norm) {
           normalizedMap[norm.symbol] = norm;
+          normalizedMap[norm.instrument_key] = norm;
+          normalizedMap[norm.instrument_key.replace("|", ":")] = norm;
+          normalizedMap[norm.symbol.replace(/\s+/g, "")] = norm;
+          normalizedMap[norm.display_name] = norm;
           if (norm.previous_ltt) prevLttRef.current[norm.symbol] = norm.previous_ltt;
           prevPriceRef.current[norm.symbol] = norm.last_price;
         }
@@ -368,16 +410,29 @@ export function UpstoxLiveMarketFeed() {
                   setPriceFlash((prev) => ({
                     ...prev,
                     [sym]: newPrice > oldPrice ? "up" : "down",
+                    [norm.symbol]: newPrice > oldPrice ? "up" : "down",
                   }));
                   setTimeout(() => {
-                    setPriceFlash((prev) => ({ ...prev, [sym]: null }));
+                    setPriceFlash((prev) => ({ ...prev, [sym]: null, [norm.symbol]: null }));
                   }, 800);
                 }
 
                 prevPriceRef.current[sym] = newPrice;
-                if (newLtt > 0) prevLttRef.current[sym] = newLtt;
+                prevPriceRef.current[norm.symbol] = newPrice;
+                if (newLtt > 0) {
+                  prevLttRef.current[sym] = newLtt;
+                  prevLttRef.current[norm.symbol] = newLtt;
+                }
 
-                setQuotes((prev) => ({ ...prev, [sym]: norm }));
+                setQuotes((prev) => ({
+                  ...prev,
+                  [sym]: norm,
+                  [norm.symbol]: norm,
+                  [norm.instrument_key]: norm,
+                  [norm.instrument_key.replace("|", ":")]: norm,
+                  [norm.symbol.replace(/\s+/g, "")]: norm,
+                  [norm.display_name]: norm,
+                }));
                 setLocalTickCount((prev) => prev + 1);
               }
             }
@@ -720,7 +775,7 @@ export function UpstoxLiveMarketFeed() {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           {filteredInstruments.map((inst) => {
-            const q = quotes[inst.symbol];
+            const q = quotes[inst.symbol] || quotes[inst.key] || quotes[inst.key.replace("|", ":")] || quotes[inst.symbol.replace(/\s+/g, "")] || quotes[inst.name];
             const isSelected = selectedSymbol === inst.symbol;
 
             return (
@@ -761,9 +816,12 @@ export function UpstoxLiveMarketFeed() {
                     </div>
                   </div>
                 ) : (
-                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 text-xs text-slate-500 flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-                    <span>FETCHING LTP...</span>
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 text-xs text-slate-500 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className={`h-1.5 w-1.5 rounded-full ${isWsConnected ? "bg-emerald-400" : "bg-purple-400"} animate-pulse`} />
+                      <span>{isWsConnected ? "SUBSCRIBED" : !isAuthenticated ? "AUTH REQUIRED" : "CONNECTING..."}</span>
+                    </div>
+                    <span className="text-[10px] text-slate-500">UPSTOX V3</span>
                   </div>
                 )}
               </div>

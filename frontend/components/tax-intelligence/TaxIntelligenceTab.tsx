@@ -351,13 +351,13 @@ export function TaxIntelligenceTab() {
                         <div className="flex justify-between">
                           <span className="text-slate-500">Realized P&L:</span>
                           <span className={seg.realized_pnl !== null ? (seg.realized_pnl >= 0 ? "text-emerald-400 font-semibold" : "text-rose-400 font-semibold") : "text-slate-500"}>
-                            {seg.realized_pnl !== null ? `₹{formatMoney(Math.round(seg.realized_pnl), "$")}` : "N/A"}
+                            {seg.realized_pnl !== null ? formatMoney(Math.round(seg.realized_pnl), "₹") : "N/A"}
                           </span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-slate-500">Est. Tax:</span>
                           <span className="text-amber-400 font-semibold">
-                            {seg.estimated_tax !== null ? `₹{formatMoney(Math.round(seg.estimated_tax), "$")}` : "N/A"}
+                            {seg.estimated_tax !== null ? formatMoney(Math.round(seg.estimated_tax), "₹") : "N/A"}
                           </span>
                         </div>
                         <div className="flex justify-between">

@@ -214,6 +214,36 @@ def init_orchestrator_tables() -> None:
         """
     )
 
+    # 8. Canonical Scheduled Tasks Registry
+    db.safe_execute(
+        """
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            description TEXT DEFAULT '',
+            type TEXT NOT NULL DEFAULT 'AI_WORKFLOW',
+            prompt TEXT DEFAULT '',
+            schedule TEXT NOT NULL,
+            timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
+            status TEXT NOT NULL DEFAULT 'ACTIVE',
+            enabled INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            next_run_at TEXT,
+            last_run_at TEXT,
+            last_run_status TEXT DEFAULT 'IDLE',
+            run_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            fingerprint TEXT UNIQUE NOT NULL,
+            idempotency_key TEXT UNIQUE,
+            created_by TEXT DEFAULT 'SYSTEM',
+            metadata_json TEXT DEFAULT '{}'
+        )
+        """
+    )
 
-# Automatically initialize schema upon module load
-init_orchestrator_tables()
+
+# Explicit invocation only
+# if __name__ == "__main__": init_orchestrator_tables()
+
+

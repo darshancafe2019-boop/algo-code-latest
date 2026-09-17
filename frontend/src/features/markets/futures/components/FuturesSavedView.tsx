@@ -68,7 +68,7 @@ export function FuturesSavedView({ contracts }: FuturesSavedViewProps) {
                     <div>
                       <span className="text-[9px] text-slate-500 uppercase block">Mark Price</span>
                       <span className="font-bold text-white text-sm">
-                        {isConnected && c.mark_price != null ? `${currSymbol}{formatMoney(c.mark_price, "$")}` : "—"}
+                        {isConnected && c.mark_price != null ? formatMoney(c.mark_price, currSymbol) : "—"}
                       </span>
                     </div>
                     <div>

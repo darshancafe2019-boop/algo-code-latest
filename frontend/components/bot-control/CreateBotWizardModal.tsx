@@ -1279,7 +1279,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                           <span className="text-[10px] text-[#7C8CA3] font-semibold uppercase">Last Traded Price (LTP)</span>
                           <div className="flex items-baseline gap-2 mt-1">
                             <span className="text-xl font-extrabold font-mono text-white">
-                              {currency === "INR" ? `₹{formatMoney(ltp, "$")}` : `${formatMoney(ltp, "$")}`}
+                              {currency === "INR" ? formatMoney(ltp, "₹") : formatMoney(ltp, "$")}
                             </span>
                             <span className={`text-xs font-mono font-bold flex items-center ${isPositive ? "text-emerald-400" : "text-red-400"}`}>
                               {isPositive ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
@@ -2188,7 +2188,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                       {
                         label: "Capital Allocation & Risk Bounds",
                         status: allocatedCapital <= totalCapital && allocatedCapital > 0 ? "PASSED" : "FAILED",
-                        evidence: `Allocated {formatMoney(allocatedCapital, "$")} (${allocationPct}% of {formatMoney(totalCapital, "$")}). Max trade risk: ${formatCurrency(calculateRiskAmount(allocatedCapital, riskPerTradePct), currency)}.`,
+                        evidence: `Allocated ${formatMoney(allocatedCapital, "$")} (${allocationPct}% of ${formatMoney(totalCapital, "$")}). Max trade risk: ${formatCurrency(calculateRiskAmount(allocatedCapital, riskPerTradePct), currency)}.`,
                       },
                       {
                         label: "Quantitative Indicators & Rules",

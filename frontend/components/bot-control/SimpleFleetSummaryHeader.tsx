@@ -6,7 +6,6 @@ import {
   Plus,
   Play,
   Bot,
-  CalendarClock,
   TrendingUp,
   TrendingDown,
   Layers,
@@ -95,15 +94,6 @@ export function SimpleFleetSummaryHeader({
 
         {/* Global Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* AI Scheduled Trading Framework */}
-          <Link
-            href="/trading-orchestrator"
-            className="h-8 px-3 rounded-lg bg-[#0F2238] border border-[#22D3EE]/40 hover:border-[#22D3EE] text-[#22D3EE] font-semibold text-[11px] transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
-          >
-            <CalendarClock className="h-3.5 w-3.5" />
-            <span>AI Scheduler</span>
-          </Link>
-
           {/* Create Bot */}
           <button
             onClick={onCreateBot}

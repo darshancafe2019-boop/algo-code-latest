@@ -50,9 +50,9 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">ATM:</span>
           <span className="font-bold text-cyan-300">
             {atmStrike !== null && atmStrike !== undefined && atmStrike > 0
-              ? `${currency}{formatMoney(Math.round(atmStrike), "$")}`
+              ? formatMoney(Math.round(atmStrike), currency)
               : spotPrice > 0
-              ? `${currency}{formatMoney(Math.round(spotPrice), "$")}`
+              ? formatMoney(Math.round(spotPrice), currency)
               : "—"}
           </span>
           <span
@@ -109,7 +109,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Max Pain:</span>
           <span className="font-bold text-amber-300">
             {maxPain !== null && maxPain !== undefined && maxPain > 0
-              ? `${currency}{formatMoney(Math.round(maxPain), "$")}`
+              ? formatMoney(Math.round(maxPain), currency)
               : "—"}
           </span>
         </div>
@@ -131,7 +131,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Call Wall:</span>
           <span className="font-semibold text-rose-400">
             {callResistanceStrike !== null && callResistanceStrike !== undefined && callResistanceStrike > 0
-              ? `${currency}{formatMoney(Math.round(callResistanceStrike), "$")}`
+              ? formatMoney(Math.round(callResistanceStrike), currency)
               : "—"}
           </span>
         </div>
@@ -143,7 +143,7 @@ export function OptionsCompactMetricsBar({
           <span className="text-[11px] text-slate-500 uppercase font-semibold">Put Wall:</span>
           <span className="font-semibold text-emerald-400">
             {putSupportStrike !== null && putSupportStrike !== undefined && putSupportStrike > 0
-              ? `${currency}{formatMoney(Math.round(putSupportStrike), "$")}`
+              ? formatMoney(Math.round(putSupportStrike), currency)
               : "—"}
           </span>
         </div>

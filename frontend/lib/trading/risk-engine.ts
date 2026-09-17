@@ -80,7 +80,7 @@ export class UniversalRiskEngine {
         return {
           passed: false,
           code: "MAX_ORDER_VALUE_EXCEEDED",
-          blockedReason: `Estimated order value ₹{formatMoney(notional, "$")} exceeds hard risk limit of ₹{formatMoney(this.limits.maxOrderValue, "$")}.`,
+          blockedReason: `Estimated order value ${formatMoney(notional, "₹")} exceeds hard risk limit of ${formatMoney(this.limits.maxOrderValue, "₹")}.`,
         };
       }
     }

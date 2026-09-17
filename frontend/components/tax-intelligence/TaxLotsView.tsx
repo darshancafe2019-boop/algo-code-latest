@@ -15,7 +15,7 @@ export function TaxLotsView({ lots, currency }: TaxLotsViewProps) {
 
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}{formatMoney(val, "$")}`;
+    return formatMoney(val, prefix);
   };
 
   const filtered = lots.filter(

@@ -115,7 +115,7 @@ export function MarketScannerPanel({
 
               <div className="flex items-center justify-between text-[11px] pt-1 border-t border-[#122033]">
                 <span className="text-white font-bold">
-                  {inst.last_price ? `${currSymbol}{formatMoney(inst.last_price, "$")}` : "N/A"}
+                  {inst.last_price ? formatMoney(inst.last_price, currSymbol) : "N/A"}
                 </span>
                 <span className="text-[10px] text-cyan-300">
                   Vol: {inst.volume_24h ? (inst.volume_24h / 1000).toFixed(1) + "k" : "—"}

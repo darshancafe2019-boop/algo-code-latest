@@ -22,6 +22,7 @@ import React, {
 import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
+import { getQuoteAliases, canonicalizeMarketSymbol } from "@/lib/market-data/canonical-symbol";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -144,7 +145,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // ─── WebSocket connection ───────────────────────────────────────────────────
 
   const connectWS = useCallback(() => {
-    if (!mountedRef.current || !isAuthenticated) return;
+    if (!mountedRef.current) return;
     if (wsRef.current) {
       if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
         return;
@@ -194,10 +195,20 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         if (msg.type === "QUOTE" && msg.data) {
           const quote = msg.data as NormalizedQuote;
           const sym = quote.symbol.toUpperCase();
-          quotesRef.current.set(sym, quote);
-          pendingQuotesRef.current.set(sym, quote);
+          const aliases = getQuoteAliases(quote.symbol, quote.exchange, quote.provider);
 
-          // Fast ingestion into central Zustand marketFeedStore
+          aliases.forEach((alias) => {
+            quotesRef.current.set(alias, quote);
+            pendingQuotesRef.current.set(alias, quote);
+          });
+
+          // Development-only real-time tick logger (Requirement 4)
+          if (process.env.NODE_ENV === "development" || typeof window !== "undefined") {
+            const ageMs = quote.age_seconds != null ? Math.round(quote.age_seconds * 1000) : 0;
+            console.log(`[MARKET-LIVE] ${quote.provider?.toUpperCase() || "GATEWAY"} ${quote.symbol} LTP=${quote.last_price} age=${ageMs}ms`);
+          }
+
+          // Fast ingestion into central Zustand marketFeedStore across aliases
           useMarketFeedStore.getState().ingestTick({
             symbol: sym,
             exchange: quote.exchange,
@@ -218,32 +229,30 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
             ageMs: (quote.age_seconds || 0) * 1000,
           });
 
-          // Fast targeted notification to components listening specifically to this symbol
-          const symListeners = symbolListenersRef.current.get(sym);
-          if (symListeners && symListeners.size > 0) {
-            symListeners.forEach((fn) => {
-              try {
-                fn(quote);
-              } catch {}
-            });
-          }
+          // Fast targeted notification to components listening specifically to this symbol or its aliases
+          aliases.forEach((alias) => {
+            const symListeners = symbolListenersRef.current.get(alias);
+            if (symListeners && symListeners.size > 0) {
+              symListeners.forEach((fn) => {
+                try {
+                  fn(quote);
+                } catch {}
+              });
+            }
+          });
 
           if (batchFrameRef.current === null) {
             batchFrameRef.current = requestAnimationFrame(() => {
               batchFrameRef.current = null;
               if (!mountedRef.current || pendingQuotesRef.current.size === 0) return;
-              const now = Date.now();
-              // Throttle full Map state recreation to ~150ms to keep table views smooth without React thrashing
-              if (now - lastQuotesStateUpdateRef.current > 150) {
-                lastQuotesStateUpdateRef.current = now;
-                const updates = new Map(pendingQuotesRef.current);
-                pendingQuotesRef.current.clear();
-                setQuotes((prev) => {
-                  const next = new Map(prev);
-                  updates.forEach((q, s) => next.set(s, q));
-                  return next;
-                });
-              }
+              const updates = new Map(pendingQuotesRef.current);
+              pendingQuotesRef.current.clear();
+              lastQuotesStateUpdateRef.current = Date.now();
+              setQuotes((prev) => {
+                const next = new Map(prev);
+                updates.forEach((q, s) => next.set(s, q));
+                return next;
+              });
               setConnectionStatus((prev) => (prev !== "LIVE" ? "LIVE" : prev));
             });
           }
@@ -400,7 +409,6 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // ─── Provider Health Polling ─────────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     let isCancelled = false;
 
     const fetchHealth = async () => {
@@ -424,22 +432,11 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       isCancelled = true;
       clearInterval(timer);
     };
-  }, [isAuthenticated]);
+  }, []);
 
   // ─── Initial Connection & Cleanup ────────────────────────────────────────────
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      if (wsRef.current) {
-        try {
-          wsRef.current.close();
-        } catch {}
-        wsRef.current = null;
-      }
-      setConnectionStatus("DISCONNECTED");
-      return;
-    }
-
     mountedRef.current = true;
     connectWS();
 
@@ -530,7 +527,15 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
   const getQuote = useCallback((symbol: string): NormalizedQuote | null => {
     if (!symbol) return null;
-    return quotesRef.current.get(symbol.toUpperCase().trim()) || null;
+    const sym = symbol.toUpperCase().trim();
+    const direct = quotesRef.current.get(sym);
+    if (direct) return direct;
+    const aliases = getQuoteAliases(symbol);
+    for (const a of aliases) {
+      const q = quotesRef.current.get(a);
+      if (q) return q;
+    }
+    return null;
   }, []);
 
   const subscribeSymbolQuote = useCallback((symbol: string, callback: (quote: NormalizedQuote) => void) => {

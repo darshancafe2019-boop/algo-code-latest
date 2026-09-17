@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/formatters";
+import { formatMoney, formatNumber } from "@/lib/formatters";
 import React from "react";
 import {
   TrendingUp,
@@ -108,7 +108,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
                   : "text-[#FF3B5C]"
               )}
             >
-              {unPnl === null ? "—" : `${isUnPnlPos ? "+" : "-"}₹{formatMoney(Math.abs(unPnl), "$")}`}
+              {unPnl === null ? "—" : `${isUnPnlPos ? "+" : "-"}₹${formatNumber(Math.abs(unPnl), 2)}`}
             </div>
             <div className="text-xs text-[#52627A] flex items-center gap-1 mt-1">
               {unPnl !== null && (
@@ -140,7 +140,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
                   : "text-[#FF3B5C]"
               )}
             >
-              {relPnl === null ? "—" : `${isRelPnlPos ? "+" : "-"}₹{formatMoney(Math.abs(relPnl), "$")}`}
+              {relPnl === null ? "—" : `${isRelPnlPos ? "+" : "-"}₹${formatNumber(Math.abs(relPnl), 2)}`}
             </div>
             <div className="text-xs text-[#52627A] mt-1">
               <span>Cumulative Booked</span>

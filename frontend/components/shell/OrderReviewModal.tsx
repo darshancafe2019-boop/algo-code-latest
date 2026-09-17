@@ -103,7 +103,7 @@ export function OrderReviewModal({
             <div>
               <span className="text-[#52627A] block text-[10px]">PRICE:</span>
               <span className="text-[#F4F7FA] font-bold tabular-nums">
-                {order.orderType === "MARKET" ? "MARKET (LTP)" : `₹{formatMoney(order.price, "$")}`}
+                {order.orderType === "MARKET" ? "MARKET (LTP)" : formatMoney(order.price, "₹")}
               </span>
             </div>
             {order.estimatedMargin !== undefined && (

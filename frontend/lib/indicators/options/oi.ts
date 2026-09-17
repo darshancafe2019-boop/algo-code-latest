@@ -1,4 +1,5 @@
 import { formatMoney } from "@/lib/formatters";
+import { formatIndianQuantity } from "@/lib/options/options-analytics-engine";
 import { CandleData, IndicatorDefinition, IndicatorResult, IndicatorSignal, OptionsDataFeed } from "../types";
 
 export interface OIResultValue {
@@ -30,14 +31,14 @@ export const OpenInterest: IndicatorDefinition<OIResultValue> = {
         signal = {
           type: "BULLISH",
           score: 0.5,
-          reason: `Fresh Build-Up: Open Interest expanded by +{formatMoney(oiChg, "$")} contracts`,
+          reason: `Fresh Build-Up: Open Interest expanded by +${formatIndianQuantity(oiChg)} contracts`,
           timestamp: Date.now(),
         };
       } else if (oiChg < 0) {
         signal = {
           type: "BEARISH",
           score: -0.5,
-          reason: `Long Unwinding / Short Covering: Open Interest dropped by {formatMoney(oiChg, "$")} contracts`,
+          reason: `Long Unwinding / Short Covering: Open Interest dropped by ${formatIndianQuantity(oiChg)} contracts`,
           timestamp: Date.now(),
         };
       }

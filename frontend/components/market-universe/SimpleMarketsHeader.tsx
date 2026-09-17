@@ -29,7 +29,7 @@ interface SimpleMarketsHeaderProps {
   providerCount?: number;
   lastUpdateMs?: number;
   isLiveFeed: boolean;
-  feedStatus?: "LIVE" | "PARTIAL" | "MARKETS CLOSED" | "RECONNECTING" | "STALE" | "OFFLINE";
+  feedStatus?: "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE";
   searchQuery: string;
   onSearchChange: (q: string) => void;
   activeCategory: string;
@@ -135,12 +135,7 @@ export function SimpleMarketsHeader({
             ) : effectiveStatus === "PARTIAL" ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-cyan-500/10 border-cyan-500/30 text-cyan-400">
                 <span className="w-2 h-2 rounded-full bg-cyan-400" />
-                <span>● PARTIAL</span>
-              </div>
-            ) : effectiveStatus === "MARKETS CLOSED" ? (
-              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-slate-800 border-slate-700 text-slate-300">
-                <span className="w-2 h-2 rounded-full bg-slate-400" />
-                <span>● MARKETS CLOSED</span>
+                <span>● CONNECTED</span>
               </div>
             ) : effectiveStatus === "RECONNECTING" ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-400 animate-pulse">
@@ -177,6 +172,20 @@ export function SimpleMarketsHeader({
             <span>
               Last update <strong className="text-cyan-400 font-bold">{lastUpdateMs}ms</strong>
             </span>
+            {onOpenDiagnostics && (
+              <>
+                <span className="text-slate-600">•</span>
+                <button
+                  type="button"
+                  onClick={onOpenDiagnostics}
+                  className="px-2 py-0.5 rounded bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 text-[11px] font-bold transition flex items-center gap-1 cursor-pointer"
+                  title="Open live market data feed diagnostics inspector"
+                >
+                  <Radio className="w-3 h-3 text-cyan-400" />
+                  <span>DEV FEED</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 

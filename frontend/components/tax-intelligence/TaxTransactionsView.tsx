@@ -22,7 +22,7 @@ export function TaxTransactionsView({
   const formatCurrency = (val: number | null | undefined, placeholder = "N/A") => {
     if (val === null || val === undefined) return placeholder;
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}{formatMoney(Math.abs(val), "$")}`;
+    return formatMoney(Math.abs(val), prefix);
   };
 
   const filtered = (transactions || []).filter((t: any) => {

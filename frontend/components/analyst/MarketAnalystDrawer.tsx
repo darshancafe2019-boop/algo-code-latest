@@ -72,7 +72,7 @@ export function MarketAnalystDrawer({
       setErrorMessage(null);
 
       try {
-        const res = await fetch("/api/analysis/market", {
+        const res = await fetch("/api/market-analysis", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -123,10 +123,6 @@ const DeltaLiveMarketFeed = dynamic(
   () => import("@/components/live/DeltaLiveMarketFeed").then((m) => m.DeltaLiveMarketFeed),
   { ssr: false, loading: () => null }
 );
-const TradingOrchestratorView = dynamic(
-  () => import("@/components/trading-orchestrator/TradingOrchestratorView").then((m) => m.TradingOrchestratorView),
-  { ssr: false, loading: () => null }
-);
 
 
 function MainApp() {
@@ -174,13 +170,6 @@ function MainApp() {
         {(activeTab === "home" || activeTab === "dashboard") && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
-          </ErrorBoundary>
-        )}
-
-        {/* 0.1 AI-Assisted Trading Orchestrator */}
-        {(activeTab === "orchestrator" || activeTab === "trading-orchestrator") && (
-          <ErrorBoundary title="Trading Orchestrator Failed">
-            <TradingOrchestratorView />
           </ErrorBoundary>
         )}
 
@@ -442,16 +431,9 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 0.1 AI-Assisted Scheduled Trading Orchestrator */}
-        {(activeTab === "orchestrator" || activeTab === "trading-orchestrator") && (
-          <ErrorBoundary title="Trading Orchestrator Failed">
-            <TradingOrchestratorView />
-          </ErrorBoundary>
-        )}
-
         {/* Fallback for unhandled or unexpected tab IDs to prevent blank/black screen */}
         {![
-          "home", "dashboard", "orchestrator", "trading-orchestrator", "live", "live-feed", "live-data", "markets", "market-universe", "watchlist",
+          "home", "dashboard", "live", "live-feed", "live-data", "markets", "market-universe", "watchlist",
           "command-center", "terminal", "options", "orderbook", "bot-control", "bots",
           "strategy-builder", "strategies", "indicators", "scanner", "risk-management", "risk",
           "providers", "backtesting", "backtest", "research", "performance", "pnl",

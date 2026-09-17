@@ -83,6 +83,23 @@ ASSET_CLASS_HINTS: Dict[str, str] = {
 def _get_asset_class(symbol: str) -> str:
     """Infer asset class from symbol (best-effort)."""
     sym = symbol.strip().upper()
+
+    # Direct prefix matching for explicit provider routing
+    if sym.startswith("BINANCE:"):
+        return "BINANCE_CRYPTO"
+    if sym.startswith("DELTA:"):
+        return "DELTA_CRYPTO"
+    if sym.startswith("DHAN:") or sym.startswith("NSE:") or sym.startswith("BSE:"):
+        return "INDIAN_EQUITIES"
+    if sym.startswith("UPSTOX:"):
+        return "INDIAN_EQUITIES"
+    if sym.startswith("FYERS:"):
+        return "INDIAN_EQUITIES"
+    if sym.startswith("TWELVE_DATA:") or sym.startswith("NASDAQ:") or sym.startswith("NYSE:"):
+        return "GLOBAL_EQUITIES"
+    if sym.startswith("OANDA:"):
+        return "FOREX"
+
     if sym in ASSET_CLASS_HINTS:
         return ASSET_CLASS_HINTS[sym]
 
@@ -129,8 +146,26 @@ class FailoverManager:
         Return the highest-priority LIVE/DELAYED adapter for the symbol.
         Falls back down the chain if primary is DISCONNECTED/STALE/NOT_CONFIGURED.
         """
-        asset_class = _get_asset_class(symbol)
-        chain = FAILOVER_CHAINS.get(asset_class, ["yahoo_fallback"])
+        sym_upper = symbol.strip().upper()
+
+        # Explicit prefix priority override
+        if sym_upper.startswith("BINANCE:"):
+            chain = ["binance_ws", "yahoo_fallback"]
+        elif sym_upper.startswith("DELTA:"):
+            chain = ["delta_options_ws", "yahoo_fallback"]
+        elif sym_upper.startswith("DHAN:"):
+            chain = ["dhan_ws", "upstox_ws", "fyers_ws", "angelone", "yahoo_fallback"]
+        elif sym_upper.startswith("UPSTOX:"):
+            chain = ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"]
+        elif sym_upper.startswith("FYERS:"):
+            chain = ["fyers_ws", "dhan_ws", "upstox_ws", "angelone", "yahoo_fallback"]
+        elif sym_upper.startswith("TWELVE_DATA:") or sym_upper.startswith("NASDAQ:") or sym_upper.startswith("NYSE:"):
+            chain = ["twelve_data", "polygon", "alpaca_iex", "yahoo_fallback"]
+        elif sym_upper.startswith("OANDA:"):
+            chain = ["twelve_data", "yahoo_fallback"]
+        else:
+            asset_class = _get_asset_class(symbol)
+            chain = FAILOVER_CHAINS.get(asset_class, ["yahoo_fallback"])
 
         for provider_id in chain:
             adapter = self._adapters.get(provider_id)

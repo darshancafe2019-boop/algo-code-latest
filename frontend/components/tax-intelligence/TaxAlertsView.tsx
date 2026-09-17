@@ -21,7 +21,7 @@ interface TaxAlertsViewProps {
 export function TaxAlertsView({ alerts, currency }: TaxAlertsViewProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}{formatMoney(val, "$")}`;
+    return formatMoney(val, prefix);
   };
 
   const getSeverityIcon = (severity: string, type: string) => {

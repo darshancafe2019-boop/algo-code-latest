@@ -26,6 +26,10 @@ import {
   TerminalViewMode,
   ActionableOptionContract,
 } from "@/types/option-terminal";
+import {
+  formatIndianCurrency,
+  formatIndianQuantity,
+} from "@/lib/options/options-analytics-engine";
 
 import { OptionTerminalHeader } from "./OptionTerminalHeader";
 import { OptionMarketSummaryCards } from "./OptionMarketSummaryCards";
@@ -293,28 +297,28 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     if (filterConfig.minOI > 0) {
       chips.push({
         id: "oi_min",
-        label: `OI ≥ {formatMoney(filterConfig.minOI, "$")}`,
+        label: `OI ≥ ${formatIndianQuantity(filterConfig.minOI)}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, minOI: 0 })),
       });
     }
     if (filterConfig.maxOI !== undefined && filterConfig.maxOI > 0) {
       chips.push({
         id: "oi_max",
-        label: `OI ≤ {formatMoney(filterConfig.maxOI, "$")}`,
+        label: `OI ≤ ${formatIndianQuantity(filterConfig.maxOI)}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, maxOI: undefined })),
       });
     }
     if (filterConfig.minVolume > 0) {
       chips.push({
         id: "vol_min",
-        label: `Vol ≥ {formatMoney(filterConfig.minVolume, "$")}`,
+        label: `Vol ≥ ${formatIndianQuantity(filterConfig.minVolume)}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, minVolume: 0 })),
       });
     }
     if (filterConfig.maxVolume !== undefined && filterConfig.maxVolume > 0) {
       chips.push({
         id: "vol_max",
-        label: `Vol ≤ {formatMoney(filterConfig.maxVolume, "$")}`,
+        label: `Vol ≤ ${formatIndianQuantity(filterConfig.maxVolume)}`,
         onRemove: () => setFilterConfig((prev) => ({ ...prev, maxVolume: undefined })),
       });
     }

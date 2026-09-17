@@ -115,13 +115,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
     // Format price with appropriate decimals
     let formattedP = "—";
     if (currentPrice > 0) {
-      if (resolvedCurrency === "USD" && currentPrice >= 1000) {
-        formattedP = `${currencySymbol}{formatMoney(currentPrice, "$")}`;
-      } else if (resolvedCurrency === "USD") {
-        formattedP = `${currencySymbol}{formatMoney(currentPrice, "$")}`;
-      } else {
-        formattedP = `₹{formatMoney(currentPrice, "$")}`;
-      }
+      formattedP = formatMoney(currentPrice, currencySymbol);
     }
 
     // Change percentage calculation

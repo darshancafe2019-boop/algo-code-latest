@@ -20,6 +20,7 @@ import { TopMoversBoard } from "./TopMoversBoard";
 import { GlobalMarketHeatmap } from "./GlobalMarketHeatmap";
 import { MarketScannerWorkbench } from "./MarketScannerWorkbench";
 import { ProviderHealthDashboard } from "./ProviderHealthDashboard";
+import { MarketDataDiagnosticsPanel } from "./MarketDataDiagnosticsPanel";
 import { MarketSkeleton } from "./MarketSkeleton";
 import { ErrorBoundary } from "../ErrorBoundary";
 import { useWatchlist } from "@/hooks/useWatchlist";
@@ -205,19 +206,6 @@ export function MarketUniverse() {
     return universeData?.instruments || [];
   }, [universeData]);
 
-  useEffect(() => {
-    if (rawInstruments.length === 0) return;
-    const symbolsToSub = rawInstruments
-      .slice(0, 30)
-      .map((it) => it.canonical_symbol || it.provider_symbol || it.symbol)
-      .filter((s): s is string => Boolean(s));
-
-    symbolsToSub.forEach((sym) => subscribe(sym, "WATCHLIST"));
-    return () => {
-      symbolsToSub.forEach((sym) => unsubscribe(sym, "WATCHLIST"));
-    };
-  }, [rawInstruments, subscribe, unsubscribe]);
-
   // Client-side Filtering & Category counts
   const categoryCounts = useMemo(() => {
     const counts: Record<string, number> = { ALL: rawInstruments.length };
@@ -284,6 +272,20 @@ export function MarketUniverse() {
     watchlistSymbols,
   ]);
 
+  // Dynamically subscribe to all currently displayed market universe symbols
+  useEffect(() => {
+    if (displayedInstruments.length === 0) return;
+    const symbolsToSub = displayedInstruments
+      .slice(0, 80)
+      .map((it) => it.canonical_symbol || it.provider_symbol || it.symbol)
+      .filter((s): s is string => Boolean(s));
+
+    symbolsToSub.forEach((sym) => subscribe(sym, "WATCHLIST"));
+    return () => {
+      symbolsToSub.forEach((sym) => unsubscribe(sym, "WATCHLIST"));
+    };
+  }, [displayedInstruments, subscribe, unsubscribe]);
+
   const activeFiltersCount = [
     filters.exchange !== "ALL",
     Boolean(filters.minPrice),
@@ -299,13 +301,14 @@ export function MarketUniverse() {
     if (providerHealth && providerHealth.length > 0) {
       providerHealth.forEach((p) => {
         const status = (p.status || "").toUpperCase();
-        const isOk = ["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED"].includes(status);
+        const isOk = ["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED", "CONNECTED", "DELAYED"].includes(status);
         if (isOk) {
           const id = (p.provider_id || "").toLowerCase();
           if (id.includes("dhan")) active.add("DHAN");
           else if (id.includes("upstox")) active.add("UPSTOX");
           else if (id.includes("delta")) active.add("DELTA");
           else if (id.includes("binance")) active.add("BINANCE");
+          else if (id.includes("fyers")) active.add("FYERS");
         }
       });
     }
@@ -330,13 +333,9 @@ export function MarketUniverse() {
     let count = 0;
     rawInstruments.forEach((inst) => {
       const sym = inst.canonical_symbol || inst.symbol || inst.provider_symbol || "";
-      const isCrypto = (inst.asset_class || "").toUpperCase() === "CRYPTO" || ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE"].some((c) => sym.toUpperCase().includes(c));
-      const isMarketOpen = isCrypto || inst.market_status !== "CLOSED";
-
-      if (sym && isMarketOpen) {
+      if (sym) {
         const q = getQuote(sym) || (inst.symbol ? getQuote(inst.symbol) : null) || (inst.provider_symbol ? getQuote(inst.provider_symbol) : null);
-        if (q && !q.last_price && q.last_price !== 0) return;
-        if (q && !q.is_stale && (q.age_seconds ?? 0) < 30) {
+        if (q && q.last_price != null && q.last_price > 0 && !q.is_stale && (q.age_seconds ?? 0) < 60) {
           count++;
         }
       }
@@ -344,15 +343,13 @@ export function MarketUniverse() {
     return count;
   }, [rawInstruments, quotes, getQuote]);
 
-  const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "MARKETS CLOSED" | "RECONNECTING" | "STALE" | "OFFLINE" => {
+  const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE" => {
     if (connectionStatus === "RECONNECTING" || connectionStatus === "CONNECTING") return "RECONNECTING";
-    if (providerCount === 0 && connectionStatus === "DISCONNECTED") return "OFFLINE";
+    if (connectionStatus === "DISCONNECTED" && providerCount === 0) return "OFFLINE";
     if (liveCount > 0) return "LIVE";
-    if (providerCount > 0) {
-      if (connectionStatus === "STALE") return "STALE";
-      return "MARKETS CLOSED";
-    }
-    return "STALE";
+    if (providerCount > 0 || connectionStatus === "LIVE") return "PARTIAL";
+    if (connectionStatus === "STALE") return "STALE";
+    return "OFFLINE";
   }, [connectionStatus, providerCount, liveCount]);
 
   const averageFeedLatencyMs = useMemo(() => {
@@ -627,28 +624,12 @@ export function MarketUniverse() {
         </div>
       )}
 
-      {/* Diagnostics Modal */}
-      {isDiagnosticsModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#0B111E] border border-[#1A2A3F] w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-4 border-b border-[#1A2A3F] bg-[#080D17] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-bold text-white font-sans">Market Data Ingestion &amp; Provider Status</h3>
-              </div>
-              <button
-                onClick={() => setIsDiagnosticsModalOpen(false)}
-                className="p-1.5 rounded-lg bg-[#141E33] hover:bg-slate-800 text-slate-400 hover:text-white"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-4 max-h-[75vh] overflow-y-auto">
-              <ProviderHealthDashboard />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Feed Diagnostics Panel */}
+      <MarketDataDiagnosticsPanel
+        instruments={displayedInstruments.length > 0 ? displayedInstruments : rawInstruments}
+        isOpen={isDiagnosticsModalOpen}
+        onClose={() => setIsDiagnosticsModalOpen(false)}
+      />
     </div>
   );
 }

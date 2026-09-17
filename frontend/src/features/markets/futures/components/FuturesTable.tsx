@@ -245,14 +245,14 @@ export function FuturesTable({ contracts, isLoading }: FuturesTableProps) {
                     {/* 5. Mark Price (Null Safe) */}
                     <td className="py-3.5 px-3 text-right font-bold text-white">
                       {isConnected && c.mark_price != null
-                        ? `${currSymbol}{formatMoney(c.mark_price, "$")}`
+                        ? formatMoney(c.mark_price, currSymbol)
                         : "—"}
                     </td>
 
                     {/* 6. Index Price (Null Safe) */}
                     <td className="py-3.5 px-3 text-right text-slate-400">
                       {isConnected && c.index_price != null
-                        ? `${currSymbol}{formatMoney(c.index_price, "$")}`
+                        ? formatMoney(c.index_price, currSymbol)
                         : "—"}
                     </td>
 

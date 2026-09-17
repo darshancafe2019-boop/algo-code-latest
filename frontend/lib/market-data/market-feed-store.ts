@@ -1,6 +1,7 @@
 "use client";
 
 import { create } from "zustand";
+import { getQuoteAliases } from "./canonical-symbol";
 
 export interface NormalizedMarketTick {
   symbol: string;
@@ -166,6 +167,11 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
         };
 
         updatedQuotes[sym] = normalized;
+        const aliases = getQuoteAliases(tick.symbol, tick.exchange, tick.provider);
+        aliases.forEach((alias) => {
+          updatedQuotes[alias] = normalized;
+        });
+
         if (normalized.securityId) {
           updatedSecQuotes[normalized.securityId] = normalized;
         }
@@ -242,7 +248,16 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
   getQuote: (symbol) => {
     const sym = symbol.toUpperCase();
     const quotes = get().quotesBySymbol;
-    return quotes[sym] || quotes[sym.replace(" 50", "")] || quotes[sym.replace("/", "")];
+    return (
+      quotes[sym] ||
+      quotes[sym.replace(" 50", "")] ||
+      quotes[sym.replace(" ", "")] ||
+      quotes[sym.replace("/", "")] ||
+      quotes[`NSE:${sym}`] ||
+      quotes[`BSE:${sym}`] ||
+      quotes[`NSE:${sym.replace(" 50", "")}`] ||
+      quotes[`BSE:${sym.replace(" ", "")}`]
+    );
   },
 }));
 
@@ -252,10 +267,16 @@ export function useSymbolQuote(symbol?: string | null): NormalizedMarketTick | u
   return useMarketFeedStore((state) => {
     if (!symbol) return undefined;
     const sym = symbol.toUpperCase();
+    const quotes = state.quotesBySymbol;
     return (
-      state.quotesBySymbol[sym] ||
-      state.quotesBySymbol[sym.replace(" 50", "")] ||
-      state.quotesBySymbol[sym.replace("/", "")]
+      quotes[sym] ||
+      quotes[sym.replace(" 50", "")] ||
+      quotes[sym.replace(" ", "")] ||
+      quotes[sym.replace("/", "")] ||
+      quotes[`NSE:${sym}`] ||
+      quotes[`BSE:${sym}`] ||
+      quotes[`NSE:${sym.replace(" 50", "")}`] ||
+      quotes[`BSE:${sym.replace(" ", "")}`]
     );
   });
 }

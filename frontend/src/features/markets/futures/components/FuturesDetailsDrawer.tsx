@@ -367,7 +367,7 @@ export function FuturesDetailsDrawer({
           <div>
             <span className="text-[8px] text-slate-500 block uppercase">LTP</span>
             <strong className="text-white truncate block">
-              {contract.last_price != null ? `${currency}{formatMoney(contract.last_price, "$")}` : "—"}
+              {contract.last_price != null ? formatMoney(contract.last_price, currency) : "—"}
             </strong>
           </div>
           <div>
@@ -637,7 +637,7 @@ export function FuturesDetailsDrawer({
                 <div>
                   <span className="text-slate-500 block text-[9px]">Est. Liquidation Price</span>
                   <strong className="text-amber-400">
-                    {liqResult?.liquidationPrice ? `${currency}{formatMoney(liqResult.liquidationPrice, "$")}` : "—"}
+                    {liqResult?.liquidationPrice ? formatMoney(liqResult.liquidationPrice, currency) : "—"}
                   </strong>
                 </div>
                 <div>

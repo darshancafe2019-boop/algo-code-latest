@@ -661,7 +661,7 @@ export function BuildSection() {
               <div className="font-extrabold text-sm text-emerald-400">
                 {strategyEvaluation.max_profit === null
                   ? "Unlimited"
-                  : `${selectedUnderlying.currencySymbol}{formatMoney(strategyEvaluation.max_profit, "$")}`}
+                  : formatMoney(strategyEvaluation.max_profit, selectedUnderlying.currencySymbol)}
               </div>
               <div className="text-[10px] text-slate-400">Defined Cap</div>
             </div>
@@ -671,7 +671,7 @@ export function BuildSection() {
               <div className="font-extrabold text-sm text-rose-400">
                 {strategyEvaluation.max_loss === null
                   ? "Undefined (Tail Risk)"
-                  : `${selectedUnderlying.currencySymbol}{formatMoney(strategyEvaluation.max_loss, "$")}`}
+                  : formatMoney(strategyEvaluation.max_loss, selectedUnderlying.currencySymbol)}
               </div>
               <div className="text-[10px] text-slate-400">Worst Case Scenario</div>
             </div>

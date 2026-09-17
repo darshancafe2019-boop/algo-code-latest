@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 
 from market_data_gateway.models.tick import MarketTick
 from market_data_gateway.adapters.base import NormalizedQuote
+from src.upstox_service import global_upstox_service
 
 logger = logging.getLogger("Normalizer.Upstox")
 
@@ -46,11 +47,13 @@ class UpstoxNormalizer:
         if ltp < 0:
             return None
 
-        # Determine symbol
-        sym = symbol_name or instrument_key
-        if "|" in sym:
-            sym = sym.split("|")[-1]
-        sym = sym.replace("Nifty 50", "NIFTY").replace("Nifty Bank", "BANKNIFTY")
+        # Determine canonical symbol
+        sym = global_upstox_service.resolve_canonical_symbol(symbol_name or instrument_key)
+        if not sym:
+            sym = symbol_name or instrument_key
+            if "|" in sym:
+                sym = sym.split("|")[-1]
+            sym = sym.replace("Nifty 50", "NIFTY").replace("Nifty Bank", "BANKNIFTY")
 
         # Exchange
         exchange = "NSE"

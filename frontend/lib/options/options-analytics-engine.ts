@@ -419,14 +419,14 @@ export function classifyTradeFlow(
  * Professional Indian Currency & Number Formatter
  */
 export function formatIndianCurrency(val: number | null | undefined, currency: string = "₹"): string {
-  if (val === null || val === undefined || isNaN(val)) return "N/A";
+  if (val === null || val === undefined || isNaN(val)) return "—";
   const absVal = Math.abs(val);
   const sign = val < 0 ? "-" : "";
 
   if (currency === "$") {
     if (absVal >= 1000000) return `${sign}$${(absVal / 1000000).toFixed(2)}M`;
     if (absVal >= 1000) return `${sign}$${(absVal / 1000).toFixed(2)}K`;
-    return `${sign}$${val.toFixed(2)}`;
+    return `${sign}$${absVal.toFixed(2)}`;
   }
 
   if (absVal >= 10000000) {
@@ -441,14 +441,14 @@ export function formatIndianCurrency(val: number | null | undefined, currency: s
     return `${sign}${currency}${(absVal / 1000).toFixed(2)} K`;
   }
 
-  return `${sign}${currency}${val.toFixed(2)}`;
+  return `${sign}${currency}${absVal.toFixed(2)}`;
 }
 
 /**
  * Formats integer volume / open interest in Indian format (L, Cr, K)
  */
 export function formatIndianQuantity(val: number | null | undefined): string {
-  if (val === null || val === undefined || isNaN(val)) return "N/A";
+  if (val === null || val === undefined || isNaN(val)) return "—";
   const absVal = Math.abs(val);
   const sign = val < 0 ? "-" : "";
 
@@ -462,5 +462,5 @@ export function formatIndianQuantity(val: number | null | undefined): string {
     return `${sign}${(absVal / 1000).toFixed(1)} K`;
   }
 
-  return `${sign}{formatMoney(Math.round(absVal), "$")}`;
+  return `${sign}${Math.round(absVal).toLocaleString("en-IN")}`;
 }

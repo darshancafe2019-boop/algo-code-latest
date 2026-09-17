@@ -1,3 +1,5 @@
+"use client";
+
 import { formatNumber } from "@/lib/formatters";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";

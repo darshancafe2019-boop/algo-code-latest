@@ -170,7 +170,7 @@ export function OrderReviewModal({
             <div>
               <span className="text-[9px] text-slate-500 uppercase block">Mark / Index</span>
               <strong className="text-slate-200 block">
-                {contract.mark_price != null ? `${currSymbol}{formatMoney(contract.mark_price, "$")}` : "—"}
+                {contract.mark_price != null ? formatMoney(contract.mark_price, currSymbol) : "—"}
               </strong>
             </div>
           </div>

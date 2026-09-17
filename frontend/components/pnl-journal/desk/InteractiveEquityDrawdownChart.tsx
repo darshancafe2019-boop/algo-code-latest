@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { TrendingUp, ShieldAlert, Maximize2, Activity } from "lucide-react";
 import { EquityCurvePoint } from "@/types/pnl-journal";
@@ -93,7 +93,7 @@ export const InteractiveEquityDrawdownChart: React.FC<InteractiveEquityDrawdownC
   const activePoint = hoverIndex !== null ? points[hoverIndex] : points[points.length - 1];
 
   const formatMoney = (val: number) => {
-    return `${val < 0 ? "-" : ""}${currencySymbol}{formatMoney(Math.abs(val), "$")}`;
+    return formatCurrency(val, currencySymbol);
   };
 
   return (

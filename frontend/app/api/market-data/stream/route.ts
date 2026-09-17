@@ -189,12 +189,17 @@ export async function GET(req: NextRequest) {
                 if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") {
                   return;
                 }
+                if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") {
+                  return;
+                }
               }
 
               // Symbol filtering if specific symbols were requested
               if (requestedSymbols.length > 0) {
                 const matches = requestedSymbols.some((s) => {
-                  return s === sym || s === sym.replace("/", "") || s.replace("/", "") === sym;
+                  const sClean = s.replace(/[\s/|_:]+/g, "").toUpperCase();
+                  const symClean = sym.replace(/[\s/|_:]+/g, "").toUpperCase();
+                  return s === sym || sClean === symClean || s === sym.replace("/", "") || s.replace("/", "") === sym;
                 });
                 if (!matches) return;
               }
@@ -214,6 +219,12 @@ export async function GET(req: NextRequest) {
                     continue;
                   }
                   if (providerFilter === "delta" && quoteProvider !== "delta" && quoteProvider !== "delta_options_ws") {
+                    continue;
+                  }
+                  if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") {
+                    continue;
+                  }
+                  if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") {
                     continue;
                   }
                 }

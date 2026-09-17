@@ -44,7 +44,6 @@ export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "markets", label: "Markets", path: "/markets", icon: LineChart },
   { id: "live", label: "Live Feed", path: "/live", icon: Radio },
   { id: "bots", label: "Bots", path: "/bots", icon: Bot },
-  { id: "orchestrator", label: "AI Scheduler", path: "/trading-orchestrator", icon: CalendarClock },
   { id: "strategies", label: "Strategy", path: "/strategy/create", icon: Code },
   { id: "options", label: "Options", path: "/options", icon: Zap },
   { id: "futures", label: "Futures", path: "/futures", icon: TrendingUp },
@@ -80,7 +79,6 @@ export function LeftNavigationSidebar({
     }
     if (activeTab === item.id) return true;
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
-    if (item.id === "orchestrator" && (pathname?.startsWith("/trading-orchestrator") || activeTab === "orchestrator" || activeTab === "trading-orchestrator")) return true;
     if (item.id === "strategies" && (pathname?.startsWith("/strategy") || pathname === "/strategies" || pathname === "/strategy-builder" || activeTab === "strategies" || activeTab === "strategy-builder")) return true;
     if (item.id === "crypto" && (pathname?.startsWith("/crypto") || activeTab === "crypto-derivatives" || activeTab === "crypto-futures" || activeTab === "crypto-options" || activeTab === "crypto-options-chain")) return true;
     if (item.id === "portfolio" && (pathname === "/positions" || pathname === "/orders" || pathname === "/capital" || pathname === "/capital-funds" || pathname === "/pnl" || pathname === "/journal" || activeTab === "positions" || activeTab === "orders" || activeTab === "portfolio" || activeTab === "pnl" || activeTab === "trade-journal")) return true;

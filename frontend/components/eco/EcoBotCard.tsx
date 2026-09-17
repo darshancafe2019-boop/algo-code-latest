@@ -94,7 +94,7 @@ export function EcoBotCard({
               isProfit ? "text-[#00E890]" : "text-[#FF3B5C]"
             }`}
           >
-            {isProfit ? `+${currency}{formatMoney(pnl, "$")}` : `-${currency}{formatMoney(Math.abs(pnl), "$")}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})
+            {isProfit ? `+${formatMoney(pnl, currency)}` : `-${formatMoney(Math.abs(pnl), currency)}`} ({isProfit ? `+${pnlPct}%` : `${pnlPct}%`})
           </span>
         </div>
 

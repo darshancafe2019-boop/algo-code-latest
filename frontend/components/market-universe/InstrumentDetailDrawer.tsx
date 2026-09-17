@@ -127,7 +127,7 @@ export function InstrumentDetailDrawer({
                   <span className="text-[#52627A] text-[10px] uppercase font-bold">Last Traded Price</span>
                   <div className="text-right">
                     <span className="text-xl font-bold text-white block">
-                      {instrument.last_price ? `${currSymbol}{formatMoney(instrument.last_price, "$")}` : "N/A"}
+                      {instrument.last_price ? formatMoney(instrument.last_price, currSymbol) : "N/A"}
                     </span>
                     <span className={`text-xs font-bold ${isPositive ? "text-[#22D3EE]" : "text-red-400"}`}>
                       {isPositive ? "+" : ""}{(instrument.change_24h || 0).toFixed(2)}%

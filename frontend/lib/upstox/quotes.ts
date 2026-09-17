@@ -51,7 +51,7 @@ export async function getLtp(
   const changePct = prevClose > 0 ? +((change / prevClose) * 100).toFixed(2) : 0;
 
   const instMeta = PRIMARY_UPSTOX_INSTRUMENTS.find((i) => i.instrumentKey === instrumentKey);
-  const symbol = instMeta ? instMeta.symbol : instrumentKey.split("|")[1] || instrumentKey;
+  const symbol = instMeta ? (instMeta.tradingSymbol || instMeta.symbol) : instrumentKey.split("|")[1] || instrumentKey;
 
   return {
     provider: "UPSTOX",
@@ -65,6 +65,68 @@ export async function getLtp(
     change,
     changePct,
   };
+}
+
+/**
+ * Fetches normalized Last Traded Price (LTP) for multiple instruments simultaneously.
+ */
+export async function getMultipleLtp(
+  keysOrSymbols: string[],
+  oauthToken?: string | null
+): Promise<Record<string, NormalizedLtp>> {
+  if (!keysOrSymbols || keysOrSymbols.length === 0) return {};
+
+  const validKeys = keysOrSymbols
+    .map((k) => resolveInstrumentKey(k) || k)
+    .filter((k) => k && k.includes("|"));
+
+  if (validKeys.length === 0) return {};
+
+  const response = await upstoxFetch<any>("/market-quote/ltp", {
+    params: { instrument_key: validKeys.join(",") },
+    oauthToken,
+  });
+
+  const rawData = response?.data || {};
+  const normalized: Record<string, NormalizedLtp> = {};
+  const nowIso = new Date().toISOString();
+
+  for (const key of validKeys) {
+    const quoteData = rawData[key] || rawData[key.replace("|", ":")];
+    if (!quoteData || typeof quoteData.last_price !== "number") continue;
+
+    const ltp = quoteData.last_price;
+    const prevClose = quoteData.previous_close || ltp;
+    const change = +(ltp - prevClose).toFixed(2);
+    const changePct = prevClose > 0 ? +((change / prevClose) * 100).toFixed(2) : 0;
+
+    const instMeta = PRIMARY_UPSTOX_INSTRUMENTS.find((i) => i.instrumentKey === key);
+    const symbol = instMeta ? (instMeta.tradingSymbol || instMeta.symbol) : key.split("|")[1] || key;
+
+    const entry: NormalizedLtp = {
+      provider: "UPSTOX",
+      instrumentKey: key,
+      symbol,
+      ltp,
+      previousClose: prevClose,
+      lastTradeTime: quoteData.last_trade_time
+        ? new Date(quoteData.last_trade_time).toISOString()
+        : nowIso,
+      receivedAt: nowIso,
+      source: "LIVE",
+      change,
+      changePct,
+    };
+
+    normalized[key] = entry;
+    normalized[key.replace("|", ":")] = entry;
+    normalized[symbol] = entry;
+    if (instMeta?.symbol && instMeta.symbol !== symbol) {
+      normalized[instMeta.symbol] = entry;
+    }
+  }
+
+  return normalized;
 }
 
 /**

@@ -420,7 +420,9 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 )
                 self._quote_cache[sym] = q
                 self._quote_cache[sym.upper()] = q
+                self._quote_cache[sym.replace(" ", "")] = q
                 self._quote_cache[f"NSE:{sym}"] = q
+                self._quote_cache[f"UPSTOX:{sym}"] = q
                 self._quote_cache[ik] = q
                 self._quote_cache[ik.upper()] = q
                 self._quote_cache[ik.replace("|", ":")] = q
@@ -439,6 +441,9 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             pass
 
     def _key_to_symbol(self, ik: str) -> str:
+        can = global_upstox_service.resolve_canonical_symbol(ik)
+        if can:
+            return can
         ik_clean = ik.strip().upper()
         for sym, meta in OFFICIAL_UPSTOX_KEYS.items():
             if (
@@ -447,7 +452,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 or sym.upper() == ik_clean
                 or meta["name"].upper() == ik_clean
             ):
-                return sym
+                return meta.get("canonical_symbol") or sym
         if "|" in ik:
             return ik.split("|")[-1]
         if ":" in ik:

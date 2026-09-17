@@ -106,13 +106,18 @@ class GlobalDataEngine:
             if norm_sym in self._quote_cache:
                 return self._quote_cache[norm_sym]["price"]
 
-        # Baseline crypto asset fallbacks
-        if "BTC" in norm_sym:
-            return 65420.0
-        elif "ETH" in norm_sym:
-            return 3480.0
-        elif "SOL" in norm_sym:
-            return 152.40
+        # Check Central Market Data Gateway cache
+        try:
+            from market_data_gateway.cache.market_cache import global_market_cache
+            q = global_market_cache.get_quote(norm_sym)
+            if q and q.last_price > 0:
+                return float(q.last_price)
+            t = global_market_cache.get_tick(norm_sym)
+            if t and t.ltp > 0:
+                return float(t.ltp)
+        except Exception:
+            pass
+
         return None
 
     def get_portfolio_snapshot(self, mode: str = "PAPER", max_age_sec: float = 1.5) -> Dict[str, Any]:

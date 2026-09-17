@@ -473,7 +473,7 @@ export function calculateLiveTaxIntelligence(
         type: "HOLDING_THRESHOLD",
         severity: "INFO",
         title: `Tax Holding Period Optimization: ${longRunningPos.symbol}`,
-        message: `Position currently has ₹{formatMoney(Math.round(longRunningPos.unrealized_pnl), "$")} unrealized gains. Review holding threshold to transition from STCG (${rules.rates.equity_stcg}%) to LTCG (${rules.rates.equity_ltcg}%).`,
+        message: `Position currently has ${formatMoney(Math.round(longRunningPos.unrealized_pnl), "₹")} unrealized gains. Review holding threshold to transition from STCG (${rules.rates.equity_stcg}%) to LTCG (${rules.rates.equity_ltcg}%).`,
         source: "Source: Tax Engine Analyzer",
         actionable: "View Tax Lots",
       });

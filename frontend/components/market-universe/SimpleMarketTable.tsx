@@ -15,6 +15,7 @@ import {
 import { MarketInstrument } from "@/types/market-universe";
 import { formatPrice, formatPercent, formatVolume, formatQuantity, formatNumber, formatMoney } from "@/lib/formatters";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
+import { useSymbolQuote } from "@/lib/market-data/market-feed-store";
 import { getMarketRowStatus, normalizeProvider } from "@/lib/market-data/row-status";
 
 interface SimpleMarketTableProps {
@@ -477,43 +478,47 @@ const MemoizedMarketRow = memo(function MarketRow({
   onLaunchOptionChain,
   onLaunchTrade,
 }: MarketRowProps) {
-  const { getQuote, connectionStatus } = useMarketGatewayContext();
+  const { getQuote, connectionStatus, providerHealth } = useMarketGatewayContext();
   const sym = instrument.canonical_symbol || instrument.provider_symbol || instrument.symbol || "UNKNOWN";
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
-  // Comprehensive multi-key real-time live quote lookup
-  const lookupKeys = [
-    sym,
-    sym.toUpperCase(),
-    instrument.canonical_symbol,
-    instrument.canonical_symbol?.toUpperCase(),
-    instrument.symbol,
-    instrument.symbol?.toUpperCase(),
-    instrument.provider_symbol,
-    instrument.provider_symbol?.toUpperCase(),
-    sym.replace("/", ""),
-    instrument.canonical_symbol ? instrument.canonical_symbol.replace("/", "") : null,
-    instrument.id,
-  ].filter(Boolean) as string[];
+  // Reactive subscription to real-time live ticks for this instrument
+  const liveTick = useSymbolQuote(sym);
 
-  let rawQuote: any = null;
-  for (const k of lookupKeys) {
-    const q = getQuote(k);
-    if (q) {
-      rawQuote = q;
-      break;
-    }
-  }
+  // Derive authoritative raw quote from reactive tick or gateway context cache
+  const rawQuote = liveTick ? {
+    symbol: liveTick.symbol,
+    exchange: liveTick.exchange,
+    provider: liveTick.provider,
+    last_price: liveTick.lastPrice,
+    bid: liveTick.bid,
+    ask: liveTick.ask,
+    volume: liveTick.volume,
+    high: liveTick.high,
+    low: liveTick.low,
+    open: liveTick.open,
+    close: liveTick.close,
+    change: liveTick.change,
+    change_pct: liveTick.changePercent,
+    is_stale: liveTick.isStale,
+    age_seconds: (liveTick.ageMs || 0) / 1000,
+    event_timestamp: liveTick.eventTimestamp,
+    received_timestamp: liveTick.receivedTimestamp,
+    status: liveTick.status,
+  } : (
+    getQuote(sym) ||
+    (instrument.canonical_symbol ? getQuote(instrument.canonical_symbol) : null) ||
+    (instrument.symbol ? getQuote(instrument.symbol) : null)
+  );
 
   // Derive active healthy providers from gateway
-  const { providerHealth } = useMarketGatewayContext();
   const healthyProvidersSet = React.useMemo(() => {
     const set = new Set<string>();
     if (providerHealth && providerHealth.length > 0) {
       providerHealth.forEach((p) => {
         const s = (p.status || "").toUpperCase();
-        if (["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED"].includes(s)) {
+        if (["LIVE", "UP", "ACTIVE", "READY", "AUTHENTICATED", "PUBLIC_FEED", "CONNECTED", "DELAYED"].includes(s)) {
           const norm = normalizeProvider(p.provider_id);
           if (norm) set.add(norm.toUpperCase());
         }
@@ -532,7 +537,12 @@ const MemoizedMarketRow = memo(function MarketRow({
   const liveQuote = rawQuote;
   const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
   const price = hasLivePrice ? liveQuote.last_price : instrument.last_price;
-  const changePct = liveQuote?.change_pct != null ? liveQuote.change_pct : (instrument.change_pct_24h ?? instrument.change_24h ?? 0);
+  
+  // Calculate dynamic change and % based on validated previous close
+  const prevClose = (liveQuote as any)?.previous_close || liveQuote?.close || liveQuote?.open || (instrument as any).previous_close || (price && liveQuote?.change_pct ? price / (1 + liveQuote.change_pct / 100) : price);
+  const changePct = liveQuote?.change_pct != null 
+    ? liveQuote.change_pct 
+    : (prevClose && prevClose > 0 && price ? ((price - prevClose) / prevClose) * 100 : (instrument.change_pct_24h ?? instrument.change_24h ?? 0));
   const isPositive = changePct >= 0;
   const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
 
@@ -546,6 +556,7 @@ const MemoizedMarketRow = memo(function MarketRow({
   const dataAgeSec = liveQuote?.age_seconds ?? 999;
   const isStaleFeed = rowStatus.isStale;
   const isLiveFeed = rowStatus.isLive;
+  const flash = liveTick?.flashDirection;
 
   // Truthful provider status badge
   const statusBadge =
@@ -577,7 +588,7 @@ const MemoizedMarketRow = memo(function MarketRow({
     ) : (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11.5px] font-bold bg-slate-800/80 text-slate-400 border border-slate-700/80 whitespace-nowrap">
         <span className="w-2 h-2 rounded-full bg-slate-500 shrink-0" />
-        NO LIVE PROVIDER
+        {rowStatus.label || "NO LIVE PROVIDER"}
       </span>
     );
 

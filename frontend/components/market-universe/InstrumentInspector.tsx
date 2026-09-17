@@ -368,13 +368,13 @@ export function InstrumentInspector({
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h High</span>
                 <span className="text-slate-200 font-bold">
-                  {high24h ? `${currSymbol}{formatMoney(high24h, "$")}` : "—"}
+                  {high24h ? formatMoney(high24h, currSymbol) : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">
                 <span className="text-[10px] text-slate-500 uppercase block">24h Low</span>
                 <span className="text-slate-200 font-bold">
-                  {low24h ? `${currSymbol}{formatMoney(low24h, "$")}` : "—"}
+                  {low24h ? formatMoney(low24h, currSymbol) : "—"}
                 </span>
               </div>
               <div className="p-2.5 bg-slate-900/60 border border-slate-800/60 rounded-xl space-y-1">

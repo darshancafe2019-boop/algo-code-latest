@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   ShieldAlert,
@@ -35,7 +35,7 @@ export const BrokerReconciliationDesk: React.FC<BrokerReconciliationDeskProps> =
   };
 
   const formatMoney = (val: number) => {
-    return `${currencySymbol}{formatMoney(val, "$")}`;
+    return formatCurrency(val, currencySymbol);
   };
 
   return (

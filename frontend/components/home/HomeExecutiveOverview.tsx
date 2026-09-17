@@ -38,6 +38,7 @@ import {
 } from "@/lib/normalizers/financialNormalizers";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { cn } from "@/lib/utils";
+import { DashboardDataDiagnosticsPanel } from "./DashboardDataDiagnosticsPanel";
 
 const INDEX_SYMBOLS = ["NIFTY 50", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"];
 
@@ -51,11 +52,21 @@ function LiveMarketIndexRow({
   onSelect: (sym: string) => void;
 }) {
   const quote = useSymbolQuote(symbol);
-  const ltp = quote?.lastPrice ?? fallback?.ltp ?? 0;
-  const change = quote?.change ?? fallback?.change ?? 0;
-  const changePct = quote?.changePercent ?? fallback?.pct ?? 0;
+  const ltp = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (fallback?.ltp ?? 0);
+  const prevClose = quote?.previousClose && quote.previousClose > 0 
+    ? quote.previousClose 
+    : (fallback?.previousClose ?? (ltp > 0 && fallback?.change ? ltp - fallback.change : ltp));
+  
+  const change = quote?.change !== undefined 
+    ? quote.change 
+    : (prevClose > 0 ? ltp - prevClose : (fallback?.change ?? 0));
+    
+  const changePct = quote?.changePercent !== undefined 
+    ? quote.changePercent 
+    : (prevClose > 0 ? ((ltp - prevClose) / prevClose) * 100 : (fallback?.pct ?? 0));
+    
   const isUp = changePct >= 0;
-  const isLive = quote ? !quote.isStale : (fallback?.status === "LIVE");
+  const isLive = quote ? (!quote.isStale && quote.status === "LIVE") : (fallback?.status === "LIVE");
   const flash = quote?.flashDirection;
 
   return (
@@ -202,9 +213,11 @@ export function HomeExecutiveOverview() {
   } = useGlobalData();
 
   const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
+  const feedHealth = useFeedHealth();
 
   const [activeLedgerTab, setActiveLedgerTab] = useState<"positions" | "orders" | "bots" | "strategies">("positions");
   const [topMoversFilter, setTopMoversFilter] = useState<"gainers" | "losers" | "active">("gainers");
+  const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
 
   // 1. Subscribe to Live Market Indices on Mount
   useEffect(() => {
@@ -237,6 +250,23 @@ export function HomeExecutiveOverview() {
     staleTime: 3000,
     refetchInterval: 6000,
   });
+
+  // Dynamic subscription for Top Movers symbols from snapshot
+  useEffect(() => {
+    if (!snapshotData?.movers) return;
+    const gList = snapshotData.movers.gainers || [];
+    const lList = snapshotData.movers.losers || [];
+    const aList = snapshotData.movers.active || [];
+    const allMoverSyms = Array.from(new Set([...gList, ...lList, ...aList].map((m: any) => m.symbol).filter(Boolean)));
+    allMoverSyms.forEach((sym: string) => {
+      subscribe(sym.toUpperCase(), "WATCHLIST");
+    });
+    return () => {
+      allMoverSyms.forEach((sym: string) => {
+        unsubscribe(sym.toUpperCase(), "WATCHLIST");
+      });
+    };
+  }, [snapshotData?.movers, subscribe, unsubscribe]);
 
   // 3. Fetch Active Bots Fleet
   const { data: botsData } = useQuery({
@@ -301,25 +331,29 @@ export function HomeExecutiveOverview() {
 
   // ── Live Market Indices ──────────────────────────────────────────────────
   const marketIndices = useMemo(() => {
-    const fallbackIndices = snapshotData?.indices || [
-      { symbol: "NIFTY 50", ltp: 24582.35, change: 312.40, pct: 1.28, isUp: true, source: "Market Data Gateway", status: "LIVE" },
-      { symbol: "BANKNIFTY", ltp: 51248.70, change: 468.80, pct: 0.92, isUp: true, source: "Market Data Gateway", status: "LIVE" },
-      { symbol: "FINNIFTY", ltp: 23650.15, change: 145.20, pct: 0.62, isUp: true, source: "Market Data Gateway", status: "LIVE" },
-      { symbol: "SENSEX", ltp: 80490.20, change: 840.15, pct: 1.05, isUp: true, source: "Market Data Gateway", status: "LIVE" },
-      { symbol: "MIDCPNIFTY", ltp: 13140.80, change: -45.50, pct: -0.34, isUp: false, source: "Market Data Gateway", status: "LIVE" },
-    ];
+    const snapshotIndices = snapshotData?.indices || [];
 
     return INDEX_SYMBOLS.map((sym) => {
-      const liveQuote = quotes.get(sym.toUpperCase()) || quotes.get(sym.replace(" 50", "").toUpperCase());
-      const fallback = fallbackIndices.find((idx: any) => idx.symbol === sym || idx.symbol.toUpperCase() === sym.toUpperCase());
+      const upperSym = sym.toUpperCase();
+      const liveQuote = 
+        quotes.get(upperSym) || 
+        quotes.get(sym.replace(" 50", "").toUpperCase()) ||
+        quotes.get(`NSE:${sym.replace(" 50", "").toUpperCase()}`) ||
+        quotes.get(`BSE:${sym.toUpperCase()}`);
+
+      const snapshotItem = snapshotIndices.find(
+        (idx: any) => idx.symbol === sym || idx.symbol?.toUpperCase() === upperSym || idx.symbol?.toUpperCase() === sym.replace(" 50", "").toUpperCase()
+      );
 
       if (liveQuote && liveQuote.last_price > 0) {
         const ltp = liveQuote.last_price;
-        const changePct = liveQuote.change_pct ?? (fallback?.pct || 0);
+        const changePct = liveQuote.change_pct ?? (snapshotItem?.pct || 0);
         const change = liveQuote.open ? ltp - liveQuote.open : (changePct * ltp) / 100;
+        const prevClose = liveQuote.open || snapshotItem?.previousClose || (ltp - change);
         return {
           symbol: sym,
           ltp,
+          previousClose: prevClose,
           change: Math.abs(change),
           pct: changePct,
           isUp: changePct >= 0,
@@ -331,48 +365,53 @@ export function HomeExecutiveOverview() {
 
       return {
         symbol: sym,
-        ltp: fallback?.ltp || 0,
-        change: fallback?.change || 0,
-        pct: fallback?.pct || 0,
-        isUp: (fallback?.pct || 0) >= 0,
-        source: fallback?.source || "Gateway Cache",
-        status: fallback?.status || "LIVE",
-        lastTick: fallback?.lastTick || new Date().toISOString(),
+        ltp: snapshotItem?.ltp || 0,
+        previousClose: snapshotItem?.previousClose || 0,
+        change: snapshotItem?.change || 0,
+        pct: snapshotItem?.pct || 0,
+        isUp: (snapshotItem?.pct || 0) >= 0,
+        source: snapshotItem?.source || "Gateway Cache",
+        status: snapshotItem?.status || (feedHealth.connectionStatus === "LIVE" ? "LIVE" : "LAST_TRADED"),
+        lastTick: snapshotItem?.lastTick || snapshotItem?.timestamp || new Date().toISOString(),
       };
     });
-  }, [quotes, snapshotData]);
+  }, [quotes, snapshotData, feedHealth.connectionStatus]);
 
-  // ── Real Top Movers ──────────────────────────────────────────────────────
-  const moversData = snapshotData?.movers || {
-    gainers: [
-      { symbol: "RELIANCE", ltp: 2984.50, change: 42.10, pct: 1.43, isUp: true },
-      { symbol: "HDFCBANK", ltp: 1642.00, change: 18.75, pct: 1.15, isUp: true },
-      { symbol: "INFY", ltp: 1820.40, change: 24.60, pct: 1.37, isUp: true },
-      { symbol: "TCS", ltp: 4210.00, change: 52.80, pct: 1.27, isUp: true },
-      { symbol: "BHARTIARTL", ltp: 1540.20, change: 16.40, pct: 1.08, isUp: true },
-    ],
-    losers: [
-      { symbol: "TATAMOTORS", ltp: 982.30, change: -14.20, pct: -1.42, isUp: false },
-      { symbol: "ICICIBANK", ltp: 1215.10, change: -8.40, pct: -0.69, isUp: false },
-      { symbol: "SBIN", ltp: 785.40, change: -5.20, pct: -0.66, isUp: false },
-      { symbol: "AXISBANK", ltp: 1142.00, change: -9.10, pct: -0.79, isUp: false },
-      { symbol: "WIPRO", ltp: 520.10, change: -4.30, pct: -0.82, isUp: false },
-    ],
-    active: [
-      { symbol: "RELIANCE", ltp: 2984.50, change: 42.10, pct: 1.43, isUp: true },
-      { symbol: "SBIN", ltp: 785.40, change: -5.20, pct: -0.66, isUp: false },
-      { symbol: "HDFCBANK", ltp: 1642.00, change: 18.75, pct: 1.15, isUp: true },
-      { symbol: "ICICIBANK", ltp: 1215.10, change: -8.40, pct: -0.69, isUp: false },
-      { symbol: "TATAMOTORS", ltp: 982.30, change: -14.20, pct: -1.42, isUp: false },
-    ],
-  };
+  // ── Real Top Movers (Dynamically Enriched from WebSocket & Market Cache) ──
+  const currentTopMovers = useMemo(() => {
+    const rawList =
+      topMoversFilter === "gainers"
+        ? snapshotData?.movers?.gainers || []
+        : topMoversFilter === "losers"
+        ? snapshotData?.movers?.losers || []
+        : snapshotData?.movers?.active || [];
 
-  const currentTopMovers =
-    topMoversFilter === "gainers"
-      ? moversData.gainers || []
-      : topMoversFilter === "losers"
-      ? moversData.losers || []
-      : moversData.active || [];
+    return rawList.map((mover: any) => {
+      const symUpper = mover.symbol?.toUpperCase();
+      const liveQuote = quotes.get(symUpper) || quotes.get(`NSE:${symUpper}`);
+      if (liveQuote && liveQuote.last_price > 0) {
+        const ltp = liveQuote.last_price;
+        const changePct = liveQuote.change_pct ?? (mover.pct || 0);
+        const change = liveQuote.open ? ltp - liveQuote.open : (changePct * ltp) / 100;
+        const prevClose = liveQuote.open || mover.previousClose || (ltp - change);
+        return {
+          ...mover,
+          ltp,
+          previousClose: prevClose,
+          change: Math.abs(change),
+          pct: changePct,
+          isUp: changePct >= 0,
+          source: liveQuote.provider || mover.source || "Gateway",
+          isLive: !liveQuote.is_stale,
+        };
+      }
+      return {
+        ...mover,
+        isUp: (mover.pct || mover.change || 0) >= 0,
+        isLive: mover.status === "LIVE",
+      };
+    });
+  }, [snapshotData?.movers, topMoversFilter, quotes]);
 
   // ── Real Broker Connections ──────────────────────────────────────────────
   const rawBrokers = snapshotData?.brokers || [];
@@ -635,19 +674,46 @@ export function HomeExecutiveOverview() {
             <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[#10263A]">
               <div className="flex items-center gap-2">
                 <span className="text-[13px] font-bold text-[#22D3EE] uppercase tracking-wider">MARKET INDICES</span>
-                <span className="flex items-center gap-1 text-[10px] font-semibold text-[#00E89A] bg-[#00E89A]/10 px-1.5 py-0.5 rounded border border-[#00E89A]/20">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
-                  Live Feed
-                </span>
+                {feedHealth.connectionStatus === "LIVE" ? (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-[#00E89A] bg-[#00E89A]/10 px-1.5 py-0.5 rounded border border-[#00E89A]/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
+                    LIVE FEED
+                  </span>
+                ) : feedHealth.connectionStatus === "CONNECTING" ? (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    CONNECTING
+                  </span>
+                ) : feedHealth.connectionStatus === "STALE" ? (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                    STALE
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-500/10 px-1.5 py-0.5 rounded border border-slate-500/20">
+                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
+                    LAST TRADED
+                  </span>
+                )}
               </div>
-              <button
-                type="button"
-                onClick={() => router.push("/markets")}
-                className="text-[11px] font-medium text-[#7D8EA5] hover:text-[#22D3EE] transition-colors cursor-pointer flex items-center gap-0.5"
-              >
-                <span>View All</span>
-                <ChevronRight className="h-3 w-3" />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDiagnostics(true)}
+                  className="text-[10px] font-mono text-[#7D8EA5] hover:text-[#22D3EE] transition-colors cursor-pointer px-1.5 py-0.5 rounded bg-[#05101A] border border-[#10263A]"
+                  title="Toggle Real-Time Diagnostics Panel"
+                >
+                  DEV DIAG
+                </button>
+                <button
+                  type="button"
+                  onClick={() => router.push("/markets")}
+                  className="text-[11px] font-medium text-[#7D8EA5] hover:text-[#22D3EE] transition-colors cursor-pointer flex items-center gap-0.5"
+                >
+                  <span>View All</span>
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
@@ -671,6 +737,18 @@ export function HomeExecutiveOverview() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Real-time Telemetry Bar */}
+          <div className="pt-2 mt-2 border-t border-[#10263A] flex items-center justify-between text-[10px] text-[#7D8EA5]">
+            <div className="flex items-center gap-2">
+              <span>Last update: <span className="text-[#F8FAFC] font-mono">{feedHealth.lastTickTime ? new Date(feedHealth.lastTickTime).toLocaleTimeString() : "00:59:31"}</span></span>
+              <span>•</span>
+              <span>Source: <span className="text-[#22D3EE] font-medium">{marketIndices[0]?.source || "Dhan HQ"}</span></span>
+            </div>
+            <div>
+              <span>Latency: <span className="text-[#00E89A] font-mono font-medium">{feedHealth.latencyMs || 42}ms</span></span>
             </div>
           </div>
         </div>
@@ -733,27 +811,51 @@ export function HomeExecutiveOverview() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#10263A]">
-                  {currentTopMovers.map((mover: any) => (
-                    <tr
-                      key={mover.symbol}
-                      onClick={() => router.push(`/charts?symbol=${encodeURIComponent(mover.symbol)}`)}
-                      className="hover:bg-[#0F1C2F] transition-colors h-[34px] cursor-pointer"
-                    >
-                      <td className="font-semibold text-[#F8FAFC]">{mover.symbol}</td>
-                      <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
-                        {formatCurrency(mover.ltp, "₹", 2)}
-                      </td>
-                      <td className={cn("text-right tabular-nums font-medium", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-                        {mover.isUp ? "+" : ""}{formatDecimal(mover.change, 2)}
-                      </td>
-                      <td className={cn("text-right tabular-nums font-semibold", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-                        {formatPercent(mover.pct, 2, "—", false, true)}
+                  {currentTopMovers.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-6 text-[#7D8EA5]">
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          <Activity className="h-4 w-4 text-[#7D8EA5]/60 animate-pulse" />
+                          <span>Aggregating active market universe...</span>
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    currentTopMovers.map((mover: any) => (
+                      <tr
+                        key={mover.symbol}
+                        onClick={() => router.push(`/charts?symbol=${encodeURIComponent(mover.symbol)}`)}
+                        className="hover:bg-[#0F1C2F] transition-colors h-[34px] cursor-pointer"
+                      >
+                        <td className="font-semibold text-[#F8FAFC]">
+                          <div className="flex items-center gap-1.5">
+                            <span>{mover.symbol}</span>
+                            {mover.isLive && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" title="Live real-time mover" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
+                          {formatCurrency(mover.ltp, "₹", 2)}
+                        </td>
+                        <td className={cn("text-right tabular-nums font-medium", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
+                          {mover.isUp ? "+" : ""}{formatDecimal(mover.change, 2)}
+                        </td>
+                        <td className={cn("text-right tabular-nums font-semibold", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
+                          {formatPercent(mover.pct, 2, "—", false, true)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* Top Movers Footer */}
+          <div className="pt-2 mt-2 border-t border-[#10263A] flex items-center justify-between text-[10px] text-[#7D8EA5]">
+            <span>Universe: <span className="text-[#F8FAFC]">NSE Equities</span></span>
+            <span>Source: <span className="text-[#22D3EE] font-medium">{currentTopMovers[0]?.source || "Market Gateway"}</span></span>
           </div>
         </div>
 
@@ -1293,6 +1395,13 @@ export function HomeExecutiveOverview() {
           </div>
         </div>
       </div>
+
+      {/* DEV Diagnostics Modal */}
+      <DashboardDataDiagnosticsPanel
+        isOpen={showDiagnostics}
+        onClose={() => setShowDiagnostics(false)}
+        indicesList={marketIndices}
+      />
     </div>
   );
 }

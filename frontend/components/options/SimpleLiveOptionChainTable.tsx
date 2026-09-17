@@ -146,7 +146,7 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
       <div className="bg-[#0A1020] border border-slate-800 rounded-2xl p-12 text-center text-slate-400 font-mono text-xs space-y-2">
         <div className="text-sm font-bold text-white">CONNECTING TO {sourceName.toUpperCase()} OPTION FEED...</div>
         <p className="text-slate-500">
-          Synchronizing derivative contracts for {spotPrice > 0 ? `${currency}{formatMoney(spotPrice, "$")}` : "underlying"}...
+          Synchronizing derivative contracts for {spotPrice > 0 ? formatMoney(spotPrice, currency) : "underlying"}...
         </p>
       </div>
     );

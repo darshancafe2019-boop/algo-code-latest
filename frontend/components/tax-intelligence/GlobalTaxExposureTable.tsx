@@ -16,7 +16,7 @@ export function GlobalTaxExposureTable({
 }: GlobalTaxExposureTableProps) {
   const formatCurrency = (val: number) => {
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return `${prefix}{formatMoney(val, "$")}`;
+    return formatMoney(val, prefix);
   };
 
   const getConfidenceBadge = (confidence: TaxConfidenceLevel) => {

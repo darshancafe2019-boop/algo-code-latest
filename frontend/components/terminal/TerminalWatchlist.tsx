@@ -148,7 +148,7 @@ export function TerminalWatchlist() {
 
                 <div className="text-right font-mono shrink-0">
                   <div className="text-xs font-bold text-[var(--theme-text-primary)]">
-                    {inst.last_price ? `${currSymbol}{formatMoney(inst.last_price, "$")}` : "—"}
+                    {inst.last_price ? formatMoney(inst.last_price, currSymbol) : "—"}
                   </div>
                   <div
                     className={`text-[10px] font-bold flex items-center justify-end gap-0.5 ${

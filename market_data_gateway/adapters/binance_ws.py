@@ -39,13 +39,18 @@ MAX_BACKOFF_SEC = 60.0
 
 
 def _canonical_to_binance(symbol: str) -> Optional[str]:
-    """Convert 'BTC/USDT' -> 'btcusdt' for Binance stream naming."""
-    if "/" in symbol:
-        parts = symbol.split("/")
+    """Convert 'BTC/USDT' or 'BINANCE:BTC/USDT' or 'BINANCE:BTC/USDT:SPOT' -> 'btcusdt' for Binance stream naming."""
+    clean = symbol.strip().upper()
+    if clean.startswith("BINANCE:"):
+        clean = clean[len("BINANCE:"):]
+    if clean.endswith(":SPOT") or clean.endswith(":PERP"):
+        clean = clean.rsplit(":", 1)[0]
+    if "/" in clean:
+        parts = clean.split("/")
         if len(parts) == 2:
             return (parts[0] + parts[1]).lower()
     # Already concatenated format e.g. "BTCUSDT"
-    return symbol.lower()
+    return clean.replace("/", "").replace("-", "").lower()
 
 
 def _binance_to_canonical(raw_symbol: str) -> str:

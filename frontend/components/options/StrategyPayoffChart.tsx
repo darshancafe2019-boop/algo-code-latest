@@ -103,7 +103,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
             <span className="text-emerald-400 font-bold">
               {maxProfit === "UNLIMITED"
                 ? "UNLIMITED"
-                : `${currencySymbol}{formatMoney(Number(maxProfit), "$")}`}
+                : formatMoney(Number(maxProfit), currencySymbol)}
             </span>
           </div>
 
@@ -112,7 +112,7 @@ export function StrategyPayoffChart(props: StrategyPayoffChartProps) {
             <span className="text-rose-400 font-bold">
               {maxLoss === "UNLIMITED"
                 ? "UNLIMITED"
-                : `${currencySymbol}{formatMoney(Number(maxLoss), "$")}`}
+                : formatMoney(Number(maxLoss), currencySymbol)}
             </span>
           </div>
 

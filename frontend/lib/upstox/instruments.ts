@@ -291,8 +291,12 @@ export function resolveInstrumentKey(input: string): string | null {
   if (clean.includes("|") && (clean.startsWith("NSE_") || clean.startsWith("BSE_") || clean.startsWith("MCX_"))) {
     return clean;
   }
+  if (clean.includes(":") && (clean.startsWith("NSE_") || clean.startsWith("BSE_") || clean.startsWith("MCX_"))) {
+    return clean.replace(":", "|");
+  }
 
   const normalized = clean.toUpperCase().replace(/\s+/g, " ");
+  const compact = normalized.replace(/\s+/g, "");
 
   const match = PRIMARY_UPSTOX_INSTRUMENTS.find(
     (inst) =>
@@ -300,7 +304,11 @@ export function resolveInstrumentKey(input: string): string | null {
       inst.tradingSymbol.toUpperCase() === normalized ||
       inst.name.toUpperCase() === normalized ||
       inst.isin?.toUpperCase() === normalized ||
-      inst.instrumentKey.toUpperCase() === normalized
+      inst.instrumentKey.toUpperCase() === normalized ||
+      inst.symbol.toUpperCase().replace(/\s+/g, "") === compact ||
+      inst.tradingSymbol.toUpperCase().replace(/\s+/g, "") === compact ||
+      inst.name.toUpperCase().replace(/\s+/g, "") === compact ||
+      (inst.isin && inst.isin.toUpperCase().replace(/\s+/g, "") === compact)
   );
 
   return match ? match.instrumentKey : null;

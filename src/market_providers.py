@@ -1,4 +1,5 @@
 import logging
+import os
 import time
 import math
 import json
@@ -269,89 +270,173 @@ class NSEMarketProvider(BaseMarketProvider):
         instruments = []
         now_utc = datetime.now(timezone.utc).isoformat()
 
-        # 1. Top NSE Equities
-        stocks_catalog = [
-            ("RELIANCE", "Reliance Industries Limited", "Energy", 2910.50, 6800000, 1.2, "INE002A01018"),
-            ("TCS", "Tata Consultancy Services Ltd", "IT", 4180.20, 2100000, 0.8, "INE467B01029"),
-            ("INFY", "Infosys Limited", "IT", 1820.40, 4300000, -0.4, "INE009A01021"),
-            ("HDFCBANK", "HDFC Bank Limited", "Banking", 1640.80, 8900000, 0.5, "INE040A01034"),
-            ("ICICIBANK", "ICICI Bank Limited", "Banking", 1180.30, 7200000, 1.4, "INE090A01021"),
-            ("SBIN", "State Bank of India", "Banking", 815.60, 9400000, 1.1, "INE062A01020"),
-            ("ITC", "ITC Limited", "FMCG", 495.20, 5600000, 0.3, "INE154A01025"),
-            ("BHARTIARTL", "Bharti Airtel Limited", "Telecom", 1460.90, 3100000, 0.9, "INE397D01024"),
-            ("KOTAKBANK", "Kotak Mahindra Bank Ltd", "Banking", 1790.00, 2400000, -0.2, "INE237A01028"),
-            ("LT", "Larsen & Toubro Limited", "Infrastructure", 3620.50, 1800000, 0.7, "INE018A01030"),
-            ("AXISBANK", "Axis Bank Limited", "Banking", 1190.20, 4800000, 0.6, "INE238A01034"),
-            ("HCLTECH", "HCL Technologies Ltd", "IT", 1680.00, 2200000, 1.0, "INE860A01027"),
-            ("ASIANPAINT", "Asian Paints Limited", "Consumer", 2980.00, 1100000, -0.5, "INE021A01026"),
-            ("TITAN", "Titan Company Limited", "Consumer", 3450.60, 950000, 1.3, "INE280A01028"),
-            ("MARUTI", "Maruti Suzuki India Ltd", "Automobile", 12400.00, 420000, 0.4, "INE585B01010"),
-            ("SUNPHARMA", "Sun Pharmaceutical Industries", "Healthcare", 1720.50, 1400000, 0.8, "INE044A01036"),
-            ("ULTRACEMCO", "UltraTech Cement Limited", "Materials", 11250.00, 290000, 0.6, "INE481G01011"),
-            ("TATAMOTORS", "Tata Motors Limited", "Automobile", 1080.40, 8100000, 2.1, "INE155A01022"),
-            ("TATASTEEL", "Tata Steel Limited", "Metals", 158.20, 18500000, 1.7, "INE081A01020"),
-            ("POWERGRID", "Power Grid Corporation", "Utilities", 335.80, 6200000, 0.2, "INE752E01010"),
-            ("NTPC", "NTPC Limited", "Utilities", 395.40, 7800000, 0.9, "INE733E01010"),
-            ("BAJFINANCE", "Bajaj Finance Limited", "Financials", 6890.00, 1100000, 1.8, "INE296A01024"),
-            ("WIPRO", "Wipro Limited", "IT", 525.00, 3900000, -0.1, "INE075A01022"),
-            ("ONGC", "Oil & Natural Gas Corporation", "Energy", 310.40, 8400000, 0.7, "INE213A01029"),
-            ("COALINDIA", "Coal India Limited", "Energy", 515.60, 5200000, 1.0, "INE522F01014"),
-            ("ADANIENT", "Adani Enterprises Limited", "Diversified", 3120.00, 2600000, 2.4, "INE423A01024"),
-            ("ADANIPORTS", "Adani Ports & SEZ Ltd", "Infrastructure", 1480.00, 3400000, 1.5, "INE742F01042"),
-            ("ZOMATO", "Zomato Limited", "Internet / Services", 260.50, 22000000, 3.2, "INE758T01015"),
-            ("TRENT", "Trent Limited (Tata Group)", "Retail", 6950.00, 1400000, 3.8, "INE849A01020"),
-            ("BEL", "Bharat Electronics Limited", "Defense", 295.00, 11000000, 1.6, "INE263A01024")
-        ]
+        # 1. Load Full Universe of 5000+ Indian Equities from Upstox Master
+        master_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "upstox_equity_master.json"
+        )
+        seen_equities = set()
 
-        for sym, comp, sec, ltp, vol, chg, isin in stocks_catalog:
-            vol_score = 72.0 if sym in ["ZOMATO", "TRENT", "TATAMOTORS", "ADANIENT"] else 45.0
-            instruments.append({
-                "instrument_id": f"NSE_EQ_{sym}",
-                "provider_symbol": f"{sym}.NS",
-                "canonical_symbol": sym,
-                "symbol": sym,
-                "display_symbol": f"{sym} — {comp}",
-                "display_name": f"{sym} — {comp}",
-                "company_name": comp,
-                "exchange": "NSE",
-                "mic": "XNSE",
-                "country": "IN",
-                "currency": "INR",
-                "asset_class": "Stock",
-                "canonical_asset_class": "INDIAN_STOCKS",
-                "instrument_type": "EQUITY",
-                "underlying_id": "",
-                "underlying_symbol": sym,
-                "series": "EQ",
-                "isin": isin,
-                "lot_size": 1.0,
-                "tick_size": 0.05,
-                "contract_size": 1.0,
-                "price_multiplier": 1.0,
-                "expiry": "",
-                "option_type": "NONE",
-                "strike": 0.0,
-                "segment": "CASH",
-                "market_status": "OPEN",
-                "tradability": "TRADABLE",
-                "data_status": "NO_LIVE_PROVIDER",
-                "data_source": "STATIC_METADATA",
-                "broker_symbol_mappings": {"zerodha": f"NSE:{sym}", "angel": sym},
-                "contract_status": "ACTIVE",
-                "paper_enabled": 1,
-                "live_enabled": 1,
-                "strategy_enabled": 1,
-                "last_price": ltp,
-                "change_24h": chg,
-                "volume_24h": vol,
-                "volatility_score": vol_score,
-                "volatility_category": "High" if vol_score >= 55 else "Medium",
-                "momentum_score": 75.0 if chg > 1.0 else 50.0,
-                "directional_bias": "BULLISH" if chg > 0.5 else ("BEARISH" if chg < -0.5 else "NEUTRAL"),
-                "is_swing_candidate": 1 if vol_score > 60 else 0,
-                "is_scalping_candidate": 1 if vol > 5000000 else 0,
-                "is_hedge_candidate": 0
-            })
+        # Specific curated list for top stocks
+        stocks_catalog_map = {
+            "RELIANCE": ("Reliance Industries Limited", "Energy", 2910.50, 6800000, 1.2, "INE002A01018"),
+            "TCS": ("Tata Consultancy Services Ltd", "IT", 4180.20, 2100000, 0.8, "INE467B01029"),
+            "INFY": ("Infosys Limited", "IT", 1820.40, 4300000, -0.4, "INE009A01021"),
+            "HDFCBANK": ("HDFC Bank Limited", "Banking", 1640.80, 8900000, 0.5, "INE040A01034"),
+            "ICICIBANK": ("ICICI Bank Limited", "Banking", 1180.30, 7200000, 1.4, "INE090A01021"),
+            "SBIN": ("State Bank of India", "Banking", 815.60, 9400000, 1.1, "INE062A01020"),
+            "ITC": ("ITC Limited", "FMCG", 495.20, 5600000, 0.3, "INE154A01025"),
+            "BHARTIARTL": ("Bharti Airtel Limited", "Telecom", 1460.90, 3100000, 0.9, "INE397D01024"),
+            "KOTAKBANK": ("Kotak Mahindra Bank Ltd", "Banking", 1790.00, 2400000, -0.2, "INE237A01028"),
+            "LT": ("Larsen & Toubro Limited", "Infrastructure", 3620.50, 1800000, 0.7, "INE018A01030"),
+            "AXISBANK": ("Axis Bank Limited", "Banking", 1190.20, 4800000, 0.6, "INE238A01034"),
+            "HCLTECH": ("HCL Technologies Ltd", "IT", 1680.00, 2200000, 1.0, "INE860A01027"),
+            "ASIANPAINT": ("Asian Paints Limited", "Consumer", 2980.00, 1100000, -0.5, "INE021A01026"),
+            "TITAN": ("Titan Company Limited", "Consumer", 3450.60, 950000, 1.3, "INE280A01028"),
+            "MARUTI": ("Maruti Suzuki India Ltd", "Automobile", 12400.00, 420000, 0.4, "INE585B01010"),
+            "SUNPHARMA": ("Sun Pharmaceutical Industries", "Healthcare", 1720.50, 1400000, 0.8, "INE044A01036"),
+            "ULTRACEMCO": ("UltraTech Cement Limited", "Materials", 11250.00, 290000, 0.6, "INE481G01011"),
+            "TATAMOTORS": ("Tata Motors Limited", "Automobile", 1080.40, 8100000, 2.1, "INE155A01022"),
+            "TATASTEEL": ("Tata Steel Limited", "Metals", 158.20, 18500000, 1.7, "INE081A01020"),
+            "POWERGRID": ("Power Grid Corporation", "Utilities", 335.80, 6200000, 0.2, "INE752E01010"),
+            "NTPC": ("NTPC Limited", "Utilities", 395.40, 7800000, 0.9, "INE733E01010"),
+            "BAJFINANCE": ("Bajaj Finance Limited", "Financials", 6890.00, 1100000, 1.8, "INE296A01024"),
+            "WIPRO": ("Wipro Limited", "IT", 525.00, 3900000, -0.1, "INE075A01022"),
+            "ONGC": ("Oil & Natural Gas Corporation", "Energy", 310.40, 8400000, 0.7, "INE213A01029"),
+            "COALINDIA": ("Coal India Limited", "Energy", 515.60, 5200000, 1.0, "INE522F01014"),
+            "ADANIENT": ("Adani Enterprises Limited", "Diversified", 3120.00, 2600000, 2.4, "INE423A01024"),
+            "ADANIPORTS": ("Adani Ports & SEZ Ltd", "Infrastructure", 1480.00, 3400000, 1.5, "INE742F01042"),
+            "ZOMATO": ("Zomato Limited", "Internet / Services", 260.50, 22000000, 3.2, "INE758T01015"),
+            "TRENT": ("Trent Limited (Tata Group)", "Retail", 6950.00, 1400000, 3.8, "INE849A01020"),
+            "BEL": ("Bharat Electronics Limited", "Defense", 295.00, 11000000, 1.6, "INE263A01024")
+        }
+
+        if os.path.exists(master_file):
+            try:
+                with open(master_file, "r", encoding="utf-8") as f:
+                    master_items = json.load(f)
+                    for item in master_items:
+                        sym = (item.get("symbol") or "").strip().upper()
+                        if not sym or sym in seen_equities:
+                            continue
+                        seen_equities.add(sym)
+                        ex = (item.get("exchange") or "NSE").strip().upper()
+                        comp = item.get("company_name", sym)
+                        isin = item.get("isin", "")
+                        lot = float(item.get("lot_size", 1.0) or 1.0)
+                        tick = float(item.get("tick_size", 0.05) or 0.05)
+
+                        if sym in stocks_catalog_map:
+                            comp, sec, ltp, vol, chg, isin = stocks_catalog_map[sym]
+                        else:
+                            ltp = 100.0
+                            vol = 100000.0
+                            chg = 0.0
+
+                        vol_score = 72.0 if sym in ["ZOMATO", "TRENT", "TATAMOTORS", "ADANIENT"] else 45.0
+                        instruments.append({
+                            "instrument_id": f"{ex}_EQ_{sym}",
+                            "provider_symbol": f"{sym}.NS" if ex == "NSE" else f"{sym}.BO",
+                            "canonical_symbol": sym,
+                            "symbol": sym,
+                            "display_symbol": f"{sym} — {comp}",
+                            "display_name": f"{sym} — {comp}",
+                            "company_name": comp,
+                            "exchange": ex,
+                            "mic": "XNSE" if ex == "NSE" else "XBOM",
+                            "country": "IN",
+                            "currency": "INR",
+                            "asset_class": "Stock",
+                            "canonical_asset_class": "INDIAN_STOCKS",
+                            "instrument_type": "EQUITY",
+                            "underlying_id": "",
+                            "underlying_symbol": sym,
+                            "series": "EQ",
+                            "isin": isin,
+                            "lot_size": lot,
+                            "tick_size": tick,
+                            "contract_size": 1.0,
+                            "price_multiplier": 1.0,
+                            "expiry": "",
+                            "option_type": "NONE",
+                            "strike": 0.0,
+                            "segment": "CASH",
+                            "market_status": "OPEN",
+                            "tradability": "TRADABLE",
+                            "data_status": "NO_LIVE_PROVIDER",
+                            "data_source": "UPSTOX_MASTER",
+                            "broker_symbol_mappings": {
+                                "upstox": item.get("instrument_key", f"{ex}_EQ|{isin or sym}"),
+                                "zerodha": f"{ex}:{sym}",
+                                "angel": sym
+                            },
+                            "contract_status": "ACTIVE",
+                            "paper_enabled": 1,
+                            "live_enabled": 1,
+                            "strategy_enabled": 1,
+                            "last_price": ltp,
+                            "change_24h": chg,
+                            "volume_24h": vol,
+                            "volatility_score": vol_score,
+                            "volatility_category": "High" if vol_score >= 55 else "Medium",
+                            "momentum_score": 75.0 if chg > 1.0 else 50.0,
+                            "directional_bias": "BULLISH" if chg > 0.5 else ("BEARISH" if chg < -0.5 else "NEUTRAL"),
+                            "is_swing_candidate": 1 if vol_score > 60 else 0,
+                            "is_scalping_candidate": 1 if vol > 5000000 else 0,
+                            "is_hedge_candidate": 0
+                        })
+            except Exception as e:
+                logger.warning(f"Failed to load master equities in NSEMarketProvider: {e}")
+
+        # Fallback if master was empty
+        if not instruments:
+            for sym, (comp, sec, ltp, vol, chg, isin) in stocks_catalog_map.items():
+                instruments.append({
+                    "instrument_id": f"NSE_EQ_{sym}",
+                    "provider_symbol": f"{sym}.NS",
+                    "canonical_symbol": sym,
+                    "symbol": sym,
+                    "display_symbol": f"{sym} — {comp}",
+                    "display_name": f"{sym} — {comp}",
+                    "company_name": comp,
+                    "exchange": "NSE",
+                    "mic": "XNSE",
+                    "country": "IN",
+                    "currency": "INR",
+                    "asset_class": "Stock",
+                    "canonical_asset_class": "INDIAN_STOCKS",
+                    "instrument_type": "EQUITY",
+                    "underlying_id": "",
+                    "underlying_symbol": sym,
+                    "series": "EQ",
+                    "isin": isin,
+                    "lot_size": 1.0,
+                    "tick_size": 0.05,
+                    "contract_size": 1.0,
+                    "price_multiplier": 1.0,
+                    "expiry": "",
+                    "option_type": "NONE",
+                    "strike": 0.0,
+                    "segment": "CASH",
+                    "market_status": "OPEN",
+                    "tradability": "TRADABLE",
+                    "data_status": "NO_LIVE_PROVIDER",
+                    "data_source": "STATIC_METADATA",
+                    "broker_symbol_mappings": {"zerodha": f"NSE:{sym}", "angel": sym},
+                    "contract_status": "ACTIVE",
+                    "paper_enabled": 1,
+                    "live_enabled": 1,
+                    "strategy_enabled": 1,
+                    "last_price": ltp,
+                    "change_24h": chg,
+                    "volume_24h": vol,
+                    "volatility_score": 45.0,
+                    "volatility_category": "Medium",
+                    "momentum_score": 50.0,
+                    "directional_bias": "NEUTRAL",
+                    "is_swing_candidate": 0,
+                    "is_scalping_candidate": 0,
+                    "is_hedge_candidate": 0
+                })
 
         # 2. NSE Benchmark Indices
         indices_catalog = [

@@ -631,7 +631,41 @@ class InstrumentResolver:
                 suggested_action="Specify exact contract: 'ETH/USDT' for Spot or 'ETH-PERP' for Futures.",
             )
 
-        # 6. Fallback - Symbol Not Found
+        # 6. Check Upstox 5000+ Indian Stock Master
+        try:
+            from src.upstox_service import global_upstox_service
+            u_meta = global_upstox_service.get_instrument_metadata(clean_query)
+            if u_meta:
+                sym = u_meta.get("canonical_symbol") or u_meta.get("trading_symbol") or clean_query
+                ex = u_meta.get("exchange", "NSE_EQ").replace("_EQ", "").replace("_INDEX", "")
+                ik = u_meta.get("instrument_key", f"{ex}_EQ|{sym}")
+                is_index = "INDEX" in u_meta.get("exchange", "") or "INDICES" in u_meta.get("asset_class", "")
+
+                inst = CanonicalInstrument(
+                    instrument_id=f"{ex}:{sym}:{'INDEX' if is_index else 'EQUITY'}",
+                    asset_class=AssetClass.INDIAN_STOCKS,
+                    instrument_type=InstrumentType.INDEX if is_index else InstrumentType.SPOT,
+                    provider="upstox",
+                    exchange=ex,
+                    base_asset=sym,
+                    quote_asset="INR",
+                    canonical_symbol=sym,
+                    provider_symbol=ik,
+                    exchange_symbol=sym,
+                    tick_size=float(u_meta.get("tick_size", 0.05) or 0.05),
+                    quantity_step=1.0,
+                    lot_size=float(u_meta.get("lot_size", 1.0) or 1.0),
+                    tradable=not is_index,
+                    data_supported=True,
+                    execution_supported=not is_index,
+                    settlement_asset="INR",
+                    metadata=u_meta,
+                )
+                return cls._validate_instrument_context(inst, clean_query, asset_class, instrument_type, provider)
+        except Exception:
+            pass
+
+        # 7. Fallback - Symbol Not Found
         return ResolutionResult(
             status=ResolutionStatus.NOT_FOUND,
             query=clean_query,

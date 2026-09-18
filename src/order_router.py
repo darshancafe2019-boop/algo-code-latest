@@ -48,19 +48,28 @@ class MultiAssetOrderRouter:
             elif asset_class == "Forex" and not getattr(config, "FOREX_LIVE_TRADING", False):
                 return False, "FOREX_LIVE_TRADING flag is disabled.", {}
 
-        # Route to Adapter
-        if exchange in ["delta_exchange", "delta_india", "delta_global"] or asset_class in ["Crypto_Options", "Crypto_Futures"] or (inst and inst.get("exchange") in ["DELTA_EXCHANGE", "DELTA_INDIA"]):
+        # Route to Authoritative Execution Adapter without duplication
+        ex_lower = (exchange or "").lower()
+        if ex_lower in ["delta_exchange", "delta_india", "delta_global", "delta"] or asset_class in ["Crypto_Options", "Crypto_Futures"] or (inst and inst.get("exchange") in ["DELTA_EXCHANGE", "DELTA_INDIA"]):
             adapter_name = "Delta Exchange Adapter (Crypto Spot/Futures/Options)"
-        elif asset_class == "Crypto":
-            adapter_name = "CCXT Binance Adapter"
+        elif ex_lower in ["binance", "binance_futures", "binance_spot"] or (asset_class == "Crypto" and "BTC" in symbol or "ETH" in symbol or "USDT" in symbol):
+            adapter_name = "Binance Unified Adapter (Spot/Futures/Options)"
+        elif ex_lower in ["fyers", "fyers_api"]:
+            adapter_name = "Fyers API v3 Broker Adapter"
+        elif ex_lower in ["angelone", "angel", "smartapi"]:
+            adapter_name = "Angel One SmartAPI Broker Adapter"
+        elif ex_lower in ["zerodha", "kite"]:
+            adapter_name = "Zerodha Kite Connect v3 Broker Adapter"
+        elif ex_lower in ["exness", "mt5", "exness_fx"]:
+            adapter_name = "Exness MT5 Multi-Asset Broker Adapter"
         elif asset_class == "Stock" and inst and inst.get("country") == "IN":
             adapter_name = "Upstox Indian Stock Broker Adapter (NSE/BSE)"
+        elif asset_class == "Forex" or ex_lower in ["forex", "oanda"]:
+            adapter_name = "Exness / Forex Execution Adapter"
         elif asset_class == "Stock":
             adapter_name = "Global Stock Broker Adapter (Alpaca/Paper)"
-        elif asset_class == "Forex":
-            adapter_name = "Forex Broker Adapter (OANDA Paper)"
         else:
-            adapter_name = "Paper Execution Adapter"
+            adapter_name = "Quant.OS Authoritative Paper Execution Engine"
 
         mode_str = "LIVE REAL-MONEY" if is_live else "PAPER SIMULATION"
         logger.info(f"Routed {signal_type} for {symbol} ({asset_class}) via {adapter_name} [{mode_str}] @ ${price:,.2f}")

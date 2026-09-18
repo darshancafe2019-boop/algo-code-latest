@@ -42,8 +42,11 @@ class StockMarketDataService:
         """Runs initial discovery if catalog is empty."""
         if global_stock_master.count() == 0:
             stocks = global_stock_discovery_engine.discover_all_stocks()
-            for s in stocks:
-                StockRepository.upsert_instrument(s)
+            try:
+                StockRepository.bulk_upsert_instruments(stocks)
+            except Exception as e:
+                import logging
+                logging.getLogger("StockService").warning("Initial stock repository sync notice: %s", e)
 
     def get_stocks(self, criteria: StockFilterCriteria) -> Dict[str, Any]:
         """Runs screener query and returns paginated enriched items."""

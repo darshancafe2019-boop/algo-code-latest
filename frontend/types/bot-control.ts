@@ -513,10 +513,7 @@ export function calculateRiskRewardRatio(stopLossPct: number, takeProfitPct: num
 
 export function formatCurrency(amount: number, currency: string = "INR"): string {
   const symbol = currency === "INR" || currency === "₹" ? "₹" : currency === "USDT" ? "USDT " : "$";
-  if (currency === "INR" || currency === "₹") {
-    return `${symbol}{formatMoney(amount, "$")}`;
-  }
-  return `${symbol}{formatMoney(amount, "$")}`;
+  return formatMoney(amount, symbol);
 }
 
 export interface ValidationEvidenceItem {

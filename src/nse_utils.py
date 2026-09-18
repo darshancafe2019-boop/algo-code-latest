@@ -75,6 +75,29 @@ class NseUtils:
     # 1. Master Equity List
     def get_equity_full_list(self, list_only: bool = False) -> Union[List[str], pd.DataFrame]:
         try:
+            from src.upstox_service import global_upstox_service
+            upstox_insts = global_upstox_service.get_equity_instruments()
+            if upstox_insts and len(upstox_insts) > 100:
+                if list_only:
+                    return [item["trading_symbol"] for item in upstox_insts]
+                records = [
+                    {
+                        "SYMBOL": item["trading_symbol"],
+                        "NAME OF COMPANY": item.get("name") or f"{item['trading_symbol']} Ltd",
+                        " SERIES": "EQ",
+                        " DATE OF LISTING": "N/A",
+                        " FACE VALUE": 10,
+                        "ISIN": item.get("isin", ""),
+                        "instrument_key": item.get("instrument_key", ""),
+                        "lot_size": item.get("lot_size", 1),
+                    }
+                    for item in upstox_insts
+                ]
+                return pd.DataFrame(records)
+        except Exception as e:
+            logger.debug("Upstox master load note: %s", e)
+
+        try:
             url = "https://archives.nseindia.com/content/equities/EQUITY_L.csv"
             resp = self.session.get(url, headers=self.headers, timeout=4.0)
             if resp.status_code == 200:

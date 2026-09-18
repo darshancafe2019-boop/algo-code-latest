@@ -40,7 +40,6 @@ interface OptionChainTableProps {
   onActionBuy?: (contract: ActionableOptionContract) => void;
   onActionSell?: (contract: ActionableOptionContract) => void;
   onActionDepth?: (contract: ActionableOptionContract) => void;
-  onActionOrderBook?: (contract?: ActionableOptionContract) => void;
 }
 
 type SortField =
@@ -91,7 +90,6 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
   onActionBuy,
   onActionSell,
   onActionDepth,
-  onActionOrderBook,
 }) => {
   const [sortField, setSortField] = useState<SortField>("strike");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -392,6 +390,61 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
     });
   };
 
+  // Compute dynamic column counts to ensure the header spans match exactly
+  const activeCallColCount = useMemo(() => {
+    let count = 1; // Direct Actions (Trade) column
+    if (columnConfig.previousOi) count++;
+    if (columnConfig.oi) count++;
+    if (columnConfig.oiChange) count++;
+    if (columnConfig.previousVolume) count++;
+    if (columnConfig.volume) count++;
+    if (columnConfig.volumeOiRatio) count++;
+    if (columnConfig.buildupBadge) count++;
+    if (columnConfig.iv) count++;
+    if (columnConfig.delta) count++;
+    if (columnConfig.gamma) count++;
+    if (columnConfig.theta) count++;
+    if (columnConfig.vega) count++;
+    if (columnConfig.bidQty) count++;
+    if (columnConfig.bid) count++;
+    if (columnConfig.ask) count++;
+    if (columnConfig.askQty) count++;
+    if (columnConfig.spread) count++;
+    if (columnConfig.averagePrice) count++;
+    if (columnConfig.ltp) count++;
+    if (columnConfig.change) count++;
+    if (columnConfig.changePercent) count++;
+    return count;
+  }, [columnConfig]);
+
+  const activePutColCount = useMemo(() => {
+    let count = 1; // Direct Actions (Trade) column
+    if (columnConfig.ltp) count++;
+    if (columnConfig.change) count++;
+    if (columnConfig.changePercent) count++;
+    if (columnConfig.averagePrice) count++;
+    if (columnConfig.spread) count++;
+    if (columnConfig.bidQty) count++;
+    if (columnConfig.bid) count++;
+    if (columnConfig.ask) count++;
+    if (columnConfig.askQty) count++;
+    if (columnConfig.delta) count++;
+    if (columnConfig.gamma) count++;
+    if (columnConfig.theta) count++;
+    if (columnConfig.vega) count++;
+    if (columnConfig.iv) count++;
+    if (columnConfig.buildupBadge) count++;
+    if (columnConfig.volumeOiRatio) count++;
+    if (columnConfig.previousVolume) count++;
+    if (columnConfig.volume) count++;
+    if (columnConfig.oiChange) count++;
+    if (columnConfig.previousOi) count++;
+    if (columnConfig.oi) count++;
+    return count;
+  }, [columnConfig]);
+
+  const totalColumns = activeCallColCount + 1 + activePutColCount;
+
   return (
     <div className="bg-[#090E17] border border-slate-800/90 rounded-2xl overflow-hidden shadow-xl font-mono text-xs sm:text-[13px] md:text-sm lg:text-[14px] 2xl:text-[15px] select-none">
       {/* Table Container with Horizontal Scroll and Sticky Header */}
@@ -402,20 +455,23 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
             <tr className="text-xs sm:text-sm md:text-base uppercase font-extrabold text-slate-400 tracking-wider">
               {/* Calls Side Banner */}
               <th
-                colSpan={25}
+                colSpan={activeCallColCount}
                 className="py-2 sm:py-2.5 px-4 text-center bg-rose-950/30 text-rose-300 border-r border-slate-800/80"
               >
                 CALL OPTIONS (CE)
               </th>
 
               {/* Center Strike Banner */}
-              <th className="py-2 sm:py-2.5 px-4 text-center bg-purple-950/40 text-purple-300 font-black border-x border-slate-800 min-w-[140px] sm:min-w-[160px]">
+              <th
+                colSpan={1}
+                className="py-2 sm:py-2.5 px-4 text-center bg-purple-950/40 text-purple-300 font-black border-x border-slate-800 min-w-[140px] sm:min-w-[160px]"
+              >
                 STRIKE LADDER
               </th>
 
               {/* Puts Side Banner */}
               <th
-                colSpan={25}
+                colSpan={activePutColCount}
                 className="py-2 sm:py-2.5 px-4 text-center bg-emerald-950/30 text-emerald-300 border-l border-slate-800/80"
               >
                 PUT OPTIONS (PE)
@@ -695,7 +751,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           <tbody className="divide-y divide-slate-800/60 font-mono">
             {sortedStrikes.length === 0 ? (
               <tr>
-                <td colSpan={40} className="py-12 text-center text-slate-500">
+                <td colSpan={totalColumns} className="py-12 text-center text-slate-500">
                   No options contracts matching filter criteria.
                 </td>
               </tr>
@@ -707,6 +763,9 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
 
                 const isCallSelected = selectedStrike === row.strike && selectedOptionType === "CE";
                 const isPutSelected = selectedStrike === row.strike && selectedOptionType === "PE";
+
+                const isCallTradable = Boolean(call && call.ltp !== null && call.ltp !== undefined && call.ltp > 0);
+                const isPutTradable = Boolean(put && put.ltp !== null && put.ltp !== undefined && put.ltp > 0);
 
                 const callPosition = findPosition(row.strike, "CE");
                 const putPosition = findPosition(row.strike, "PE");
@@ -726,10 +785,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     ? "bg-purple-950/20"
                     : "bg-transparent";
 
-                const callPrevOi = call ? call.oi - call.oiChange : null;
-                const putPrevOi = put ? put.oi - put.oiChange : null;
-                const callSpread = call && call.ask > 0 && call.bid > 0 ? call.ask - call.bid : null;
-                const putSpread = put && put.ask > 0 && put.bid > 0 ? put.ask - put.bid : null;
+                const callPrevOi = call && call.oi !== null && call.oi !== undefined && call.oiChange !== null && call.oiChange !== undefined
+                  ? call.oi - call.oiChange
+                  : null;
+                const putPrevOi = put && put.oi !== null && put.oi !== undefined && put.oiChange !== null && put.oiChange !== undefined
+                  ? put.oi - put.oiChange
+                  : null;
+                const callSpread = call && call.ask !== null && call.bid !== null && call.ask > 0 && call.bid > 0 ? call.ask - call.bid : null;
+                const putSpread = put && put.ask !== null && put.bid !== null && put.ask > 0 && put.bid > 0 ? put.ask - put.bid : null;
 
                 return (
                   <tr
@@ -741,12 +804,12 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {/* CALLS CELLS */}
                     {columnConfig.previousOi && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {callPrevOi !== null && callPrevOi !== undefined && callPrevOi > 0 ? formatIndianQuantity(callPrevOi) : "—"}
+                        {callPrevOi !== null && callPrevOi !== undefined ? formatIndianQuantity(callPrevOi) : "—"}
                       </td>
                     )}
                     {columnConfig.oi && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-200 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call?.oi && call.oi > 0 ? formatIndianQuantity(call.oi) : "—"}
+                        {call && call.oi !== null && call.oi !== undefined ? formatIndianQuantity(call.oi) : "—"}
                       </td>
                     )}
                     {columnConfig.oiChange && (
@@ -759,22 +822,24 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                             : "text-slate-400"
                         }`}
                       >
-                        {call && call.oiChange !== null && call.oiChange !== undefined && call.oiChange !== 0 ? `${call.oiChange > 0 ? "+" : ""}${formatIndianQuantity(call.oiChange)}` : "—"}
+                        {call && call.oiChange !== null && call.oiChange !== undefined
+                          ? `${call.oiChange > 0 ? "+" : ""}${formatIndianQuantity(call.oiChange)}`
+                          : "—"}
                       </td>
                     )}
                     {columnConfig.previousVolume && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call?.previousVolume !== undefined && call?.previousVolume !== null && call.previousVolume > 0 ? formatIndianQuantity(call.previousVolume) : "—"}
+                        {call && call.previousVolume !== null && call.previousVolume !== undefined ? formatIndianQuantity(call.previousVolume) : "—"}
                       </td>
                     )}
                     {columnConfig.volume && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call?.volume && call.volume > 0 ? formatIndianQuantity(call.volume) : "—"}
+                        {call && call.volume !== null && call.volume !== undefined ? formatIndianQuantity(call.volume) : "—"}
                       </td>
                     )}
                     {columnConfig.volumeOiRatio && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-300 font-bold text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call ? `${call.volumeOiRatio.toFixed(1)}x` : "—"}
+                        {call && call.volumeOiRatio !== null && call.volumeOiRatio !== undefined ? `${call.volumeOiRatio.toFixed(1)}x` : "—"}
                       </td>
                     )}
                     {columnConfig.buildupBadge && (
@@ -784,47 +849,47 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.iv && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-300 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call?.iv ? `${call.iv.toFixed(1)}%` : "—"}
+                        {call && call.iv !== null && call.iv !== undefined && call.iv > 0 ? `${call.iv.toFixed(1)}%` : "—"}
                       </td>
                     )}
                     {columnConfig.delta && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.greeks?.delta !== undefined ? call.greeks.delta.toFixed(3) : "—"}
+                        {call?.greeks?.delta !== undefined && call?.greeks?.delta !== null ? call.greeks.delta.toFixed(3) : "—"}
                       </td>
                     )}
                     {columnConfig.gamma && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.greeks?.gamma !== undefined ? call.greeks.gamma.toFixed(4) : "—"}
+                        {call?.greeks?.gamma !== undefined && call?.greeks?.gamma !== null ? call.greeks.gamma.toFixed(4) : "—"}
                       </td>
                     )}
                     {columnConfig.theta && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-rose-300 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.greeks?.theta !== undefined ? call.greeks.theta.toFixed(2) : "—"}
+                        {call?.greeks?.theta !== undefined && call?.greeks?.theta !== null ? call.greeks.theta.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.vega && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.greeks?.vega !== undefined ? call.greeks.vega.toFixed(2) : "—"}
+                        {call?.greeks?.vega !== undefined && call?.greeks?.vega !== null ? call.greeks.vega.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.bidQty && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.bidQty ? formatIndianQuantity(call.bidQty) : "—"}
+                        {call && call.bidQty !== null && call.bidQty !== undefined ? formatIndianQuantity(call.bidQty) : "—"}
                       </td>
                     )}
                     {columnConfig.bid && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.bid ? call.bid.toFixed(2) : "—"}
+                        {call && call.bid !== null && call.bid !== undefined ? call.bid.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.ask && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.ask ? call.ask.toFixed(2) : "—"}
+                        {call && call.ask !== null && call.ask !== undefined ? call.ask.toFixed(2) : "—"}
                       </td>
                     )}
                     {columnConfig.askQty && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-slate-400 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.askQty ? formatIndianQuantity(call.askQty) : "—"}
+                        {call && call.askQty !== null && call.askQty !== undefined ? formatIndianQuantity(call.askQty) : "—"}
                       </td>
                     )}
                     {columnConfig.spread && (
@@ -834,18 +899,20 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.averagePrice && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-300 text-[11px] sm:text-xs md:text-[13px]`}>
-                        {call?.averagePrice ? formatIndianCurrency(call.averagePrice, currency) : "—"}
+                        {call && call.averagePrice !== null && call.averagePrice !== undefined ? formatIndianCurrency(call.averagePrice, currency) : "—"}
                       </td>
                     )}
                     {columnConfig.ltp && (
                       <td
-                        onClick={() => call && onSelectOption(row.strike, "CE", call)}
-                        className={`py-2 px-2.5 text-right cursor-pointer font-extrabold text-rose-300 hover:text-white text-xs sm:text-sm md:text-base ${callBgClass} ${
+                        onClick={() => call && isCallTradable && onSelectOption(row.strike, "CE", call)}
+                        className={`py-2 px-2.5 text-right font-extrabold text-xs sm:text-sm md:text-base ${callBgClass} ${
+                          isCallTradable ? "cursor-pointer text-rose-300 hover:text-white" : "text-slate-500 cursor-default"
+                        } ${
                           isCallSelected ? "ring-2 ring-cyan-400 bg-cyan-500/20" : ""
                         }`}
-                        title="Click to inspect Call quote"
+                        title={isCallTradable ? "Click to inspect Call quote" : "Quote unavailable"}
                       >
-                        {call ? formatIndianCurrency(call.ltp, currency) : "—"}
+                        {call && call.ltp !== null && call.ltp !== undefined && call.ltp > 0 ? formatIndianCurrency(call.ltp, currency) : "—"}
                       </td>
                     )}
 
@@ -855,31 +922,43 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         <div className="flex items-center justify-end gap-1.5">
                           <button
                             type="button"
+                            disabled={!isCallTradable}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!isCallTradable) return;
                               if (onActionBuy) {
                                 onActionBuy(resolveContract(row.strike, "CE", call, "BUY"));
                               } else if (onQuickTrade) {
                                 onQuickTrade(row.strike, "CE", "BUY", call.ltp);
                               }
                             }}
-                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Buy this option and open Bot Creation"
+                            className={`px-2.5 py-1 rounded font-extrabold text-[11px] sm:text-xs shadow-md transition flex items-center gap-1 ${
+                              isCallTradable
+                                ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
+                                : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
+                            }`}
+                            title={isCallTradable ? "Buy this option and open Bot Creation" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
                           <button
                             type="button"
+                            disabled={!isCallTradable}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!isCallTradable) return;
                               if (onActionSell) {
                                 onActionSell(resolveContract(row.strike, "CE", call, "SELL"));
                               } else if (onQuickTrade) {
                                 onQuickTrade(row.strike, "CE", "SELL", call.ltp);
                               }
                             }}
-                            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Sell this option and open Bot Creation"
+                            className={`px-2.5 py-1 rounded font-extrabold text-[11px] sm:text-xs shadow-md transition flex items-center gap-1 ${
+                              isCallTradable
+                                ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
+                                : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
+                            }`}
+                            title={isCallTradable ? "Sell this option and open Bot Creation" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>
@@ -896,19 +975,6 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           >
                             <BookOpen className="w-3.5 h-3.5" />
                           </button>
-                          {onActionOrderBook && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onActionOrderBook(resolveContract(row.strike, "CE", call, "BUY"));
-                              }}
-                              className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-purple-950 hover:text-purple-300 hover:border-purple-500/50 text-slate-400 border border-slate-700/80 transition"
-                              title="Open Order Book for this contract"
-                            >
-                              <Layers className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>
@@ -918,19 +984,19 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {columnConfig.change && (
                       <td
                         className={`py-2 px-2 text-right text-[11px] sm:text-xs md:text-[13px] ${callBgClass} ${
-                          call && call.change >= 0 ? "text-emerald-400" : "text-rose-400"
+                          call && call.change !== null && call.change !== undefined && call.change >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {call ? `${call.change >= 0 ? "+" : ""}${call.change.toFixed(2)}` : "—"}
+                        {call && call.change !== null && call.change !== undefined && isCallTradable ? `${call.change >= 0 ? "+" : ""}${call.change.toFixed(2)}` : "—"}
                       </td>
                     )}
                     {columnConfig.changePercent && (
                       <td
                         className={`py-2 px-2 text-right text-[11px] sm:text-xs md:text-[13px] ${callBgClass} ${
-                          call && call.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
+                          call && call.changePercent !== null && call.changePercent !== undefined && call.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {call ? `${call.changePercent >= 0 ? "+" : ""}${call.changePercent.toFixed(2)}%` : "—"}
+                        {call && call.changePercent !== null && call.changePercent !== undefined && isCallTradable ? `${call.changePercent >= 0 ? "+" : ""}${call.changePercent.toFixed(2)}%` : "—"}
                       </td>
                     )}
 
@@ -1007,31 +1073,43 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         <div className="flex items-center justify-start gap-1.5">
                           <button
                             type="button"
+                            disabled={!isPutTradable}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!isPutTradable) return;
                               if (onActionBuy) {
                                 onActionBuy(resolveContract(row.strike, "PE", put, "BUY"));
                               } else if (onQuickTrade) {
                                 onQuickTrade(row.strike, "PE", "BUY", put.ltp);
                               }
                             }}
-                            className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Buy this option and open Bot Creation"
+                            className={`px-2.5 py-1 rounded font-extrabold text-[11px] sm:text-xs shadow-md transition flex items-center gap-1 ${
+                              isPutTradable
+                                ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
+                                : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
+                            }`}
+                            title={isPutTradable ? "Buy this option and open Bot Creation" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
                           <button
                             type="button"
+                            disabled={!isPutTradable}
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!isPutTradable) return;
                               if (onActionSell) {
                                 onActionSell(resolveContract(row.strike, "PE", put, "SELL"));
                               } else if (onQuickTrade) {
                                 onQuickTrade(row.strike, "PE", "SELL", put.ltp);
                               }
                             }}
-                            className="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-[11px] sm:text-xs shadow-md transition active:scale-95 flex items-center gap-1"
-                            title="Sell this option and open Bot Creation"
+                            className={`px-2.5 py-1 rounded font-extrabold text-[11px] sm:text-xs shadow-md transition flex items-center gap-1 ${
+                              isPutTradable
+                                ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
+                                : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
+                            }`}
+                            title={isPutTradable ? "Sell this option and open Bot Creation" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>
@@ -1048,19 +1126,6 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           >
                             <BookOpen className="w-3.5 h-3.5" />
                           </button>
-                          {onActionOrderBook && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onActionOrderBook(resolveContract(row.strike, "PE", put, "BUY"));
-                              }}
-                              className="p-1 sm:p-1.5 rounded bg-slate-800 hover:bg-purple-950 hover:text-purple-300 hover:border-purple-500/50 text-slate-400 border border-slate-700/80 transition"
-                              title="Open Order Book for this contract"
-                            >
-                              <Layers className="w-3.5 h-3.5" />
-                            </button>
-                          )}
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>
@@ -1070,11 +1135,13 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {/* PUTS CELLS */}
                     {columnConfig.ltp && (
                       <td
-                        onClick={() => put && onSelectOption(row.strike, "PE", put)}
-                        className={`py-2 px-2.5 text-left cursor-pointer font-extrabold text-emerald-300 hover:text-white text-xs sm:text-sm md:text-base ${putBgClass} ${
+                        onClick={() => put && isPutTradable && onSelectOption(row.strike, "PE", put)}
+                        className={`py-2 px-2.5 text-left font-extrabold text-xs sm:text-sm md:text-base ${putBgClass} ${
+                          isPutTradable ? "cursor-pointer text-emerald-300 hover:text-white" : "text-slate-500 cursor-default"
+                        } ${
                           isPutSelected ? "ring-2 ring-cyan-400 bg-cyan-500/20" : ""
                         }`}
-                        title="Click to inspect Put quote"
+                        title={isPutTradable ? "Click to inspect Put quote" : "Quote unavailable"}
                       >
                         {put && put.ltp !== null && put.ltp !== undefined && put.ltp > 0 ? formatIndianCurrency(put.ltp, currency) : "—"}
                       </td>
@@ -1082,19 +1149,19 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {columnConfig.change && (
                       <td
                         className={`py-2 px-2 text-left text-[11px] sm:text-xs md:text-[13px] ${putBgClass} ${
-                          put && put.change >= 0 ? "text-emerald-400" : "text-rose-400"
+                          put && put.change !== null && put.change !== undefined && put.change >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {put && put.ltp ? `${put.change >= 0 ? "+" : ""}${put.change.toFixed(2)}` : "—"}
+                        {put && put.change !== null && put.change !== undefined && isPutTradable ? `${put.change >= 0 ? "+" : ""}${put.change.toFixed(2)}` : "—"}
                       </td>
                     )}
                     {columnConfig.changePercent && (
                       <td
                         className={`py-2 px-2 text-left text-[11px] sm:text-xs md:text-[13px] ${putBgClass} ${
-                          put && put.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
+                          put && put.changePercent !== null && put.changePercent !== undefined && put.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {put && put.ltp ? `${put.changePercent >= 0 ? "+" : ""}${put.changePercent.toFixed(2)}%` : "—"}
+                        {put && put.changePercent !== null && put.changePercent !== undefined && isPutTradable ? `${put.changePercent >= 0 ? "+" : ""}${put.changePercent.toFixed(2)}%` : "—"}
                       </td>
                     )}
                     {columnConfig.averagePrice && (

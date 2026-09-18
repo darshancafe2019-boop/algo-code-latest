@@ -8932,32 +8932,40 @@ def get_instruments_master(
         ex = str(d.get("exchange", "")).upper()
         ac = str(d.get("asset_class", "")).upper()
         sym = str(d.get("canonical_symbol") or d.get("symbol") or "").upper()
+        stored_prov = str(d.get("provider") or "").lower()
 
-        # Dynamic Provider & Session resolution
-        if ex in ["DELTA", "BINANCE", "BYBIT"] or ac in ["CRYPTO", "CRYPTOCURRENCY"] or any(c in sym for c in ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE"]):
-            d["provider"] = "binance" if ex == "BINANCE" else "delta"
+        # Authoritative Market & Session resolution
+        d["market"] = ex if ex else "UNKNOWN"
+
+        if ex in ["BINANCE"] or "BINANCE" in sym or "binance" in stored_prov:
+            d["provider"] = "binance"
             d["market_status"] = "OPEN"
             d["marketSession"] = "24X7"
-            d["priceState"] = "LIVE_TRADE"
-        elif ex in ["NSE", "BSE", "NFO", "MCX"] or "INDIAN" in ac or "STOCK" in ac or "EQUITY" in ac or sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]:
-            d["provider"] = "upstox"
+            d["priceState"] = "LAST_TRADED"
+        elif ex in ["DELTA"] or "DELTA" in sym or "delta" in stored_prov:
+            d["provider"] = "delta"
+            d["market_status"] = "OPEN"
+            d["marketSession"] = "24X7"
+            d["priceState"] = "LAST_TRADED"
+        elif ex in ["NSE", "BSE", "NFO", "MCX"] or "INDIAN" in ac or "STOCK" in ac or "EQUITY" in ac or sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"]:
+            d["provider"] = "upstox" if ("upstox" in stored_prov or "UPSTOX" in sym) else "dhan"
             d["market_status"] = "OPEN" if nse_is_open else "CLOSED"
             d["marketSession"] = "OPEN" if nse_is_open else "CLOSED"
-            d["priceState"] = "LIVE_TRADE" if nse_is_open else "LAST_TRADED"
+            d["priceState"] = "LAST_TRADED"
+        elif ex in ["OANDA", "FOREX", "FX"] or "FOREX" in ac or "FX" in ac or "oanda" in stored_prov:
+            d["provider"] = "oanda"
+            d["market_status"] = "OPEN"
+            d["marketSession"] = "24X7"
+            d["priceState"] = "LAST_TRADED"
         elif ex in ["NASDAQ", "NYSE"] or "GLOBAL" in ac or "US" in ac:
             d["provider"] = "twelve_data"
             d["market_status"] = "OPEN" if us_is_open else "CLOSED"
             d["marketSession"] = "OPEN" if us_is_open else "CLOSED"
-            d["priceState"] = "LIVE_TRADE" if us_is_open else "LAST_TRADED"
-        elif ex in ["FOREX", "OANDA", "FX"] or "FOREX" in ac or "FX" in ac or "COMMODIT" in ac:
-            d["provider"] = "twelve_data"
-            d["market_status"] = "OPEN"
-            d["marketSession"] = "24X7"
-            d["priceState"] = "LIVE_TRADE"
+            d["priceState"] = "LAST_TRADED"
         else:
-            d["provider"] = d.get("provider") or "upstox"
-            d["market_status"] = d.get("market_status") or "CLOSED"
-            d["marketSession"] = d.get("market_status") or "CLOSED"
+            d["provider"] = stored_prov if stored_prov else "paper"
+            d["market_status"] = "CLOSED"
+            d["marketSession"] = "CLOSED"
             d["priceState"] = "LAST_TRADED"
 
         enriched_rows.append(d)

@@ -28,12 +28,14 @@ import {
   Paintbrush,
   BrainCircuit,
   Landmark,
+  Database,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { executeCommand } from "@/lib/commandClient";
 import { apiClient } from "@/lib/apiClient";
 import { useActiveBot } from "@/context/ActiveBotContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useQuantDataCore } from "@/context/QuantDataCoreContext";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
 import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
@@ -65,6 +67,7 @@ export function Navbar({
   const queryClient = useQueryClient();
   const { activeSymbol } = useActiveBot();
   const { openAppearanceDrawer, config: themeConfig } = useTheme();
+  const { openDataDrawer, providersSummary } = useQuantDataCore();
   const [activateSuccess, setActivateSuccess] = useState(false);
   const [killSwitchActive, setKillSwitchActive] = useState(false);
   const [isBotAssistantOpen, setIsBotAssistantOpen] = useState(false);
@@ -277,6 +280,20 @@ export function Navbar({
 
           {/* Right Top Action Buttons */}
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Global QuantDataCore Drawer Trigger */}
+            <button
+              onClick={openDataDrawer}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#121824] hover:bg-[#1A2A3F] border border-cyan-500/30 text-xs font-mono font-semibold text-slate-200 hover:text-white transition shadow-sm"
+              title="Open Global QuantDataCore Telemetry Drawer"
+            >
+              <Database className="h-3.5 w-3.5 text-cyan-400" />
+              <span className="font-bold text-cyan-400">DATA</span>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="hidden xl:inline text-[11px] text-slate-400">
+                {providersSummary.connectedProviders}/{providersSummary.totalProviders} prov
+              </span>
+            </button>
+
             {/* AI Bot Copilot Trigger */}
             <button
               onClick={() => setIsBotAssistantOpen(true)}

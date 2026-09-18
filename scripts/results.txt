@@ -1,0 +1,11 @@
+=== 5,000+ UPSTOX INDIAN STOCKS VERIFICATION ===
+1. Upstox Equities Ingested: 5280
+2. MARUTI Key: NSE_EQ|INE585B01010
+3. RELIANCE Key from ISIN: NSE_EQ|INE002A01018
+4. Canonical Symbol for NSE_EQ|INE002A01018: RELIANCE
+5. TATA Search Results Count: 10
+6. GlobalSymbolMaster Indian Equities Count: 5280
+7. NSEMarketProvider Total Instruments Count: 5362
+8. Global Stock Master Discovered Count: 5313
+9. Canonical InstrumentResolver status for MARUTI: RESOLVED, Provider: upstox
+=== ALL CHECKS COMPLETED SUCCESSFULLY ===

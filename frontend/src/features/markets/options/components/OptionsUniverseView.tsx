@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   Layers,
@@ -181,8 +181,40 @@ export function OptionsUniverseView({
   const strikesList = data?.strikes || (data as any)?.rows || [];
 
   const currencySymbol = isCrypto ? "$" : "₹";
-  const stepSize = spotPrice > 40000 ? 500 : spotPrice > 15000 ? 100 : 50;
-  const atmStrike = data?.atm_strike || (data as any)?.atmStrike || (spotPrice > 0 ? Math.round(spotPrice / stepSize) * stepSize : 0);
+  const getStepSize = (und: string, spot: number) => {
+    const u = und.toUpperCase().replace(" ", "").replace(".NS", "");
+    if (u === "NIFTY" || u === "NIFTY50" || u === "NIFTY 50") return 50;
+    if (u === "BANKNIFTY" || u === "BANK NIFTY") return 100;
+    if (u === "FINNIFTY" || u === "NIFTY FINANCIAL SERVICES") return 50;
+    if (u === "MIDCPNIFTY" || u === "NIFTY MID SELECT") return 25;
+    if (u === "SENSEX" || u === "BSE SENSEX" || u === "BANKEX") return 100;
+    if (u === "BTC") return 500;
+    if (u === "ETH") return 50;
+    if (u === "SOL") return 5;
+    return spot > 5000 ? 100 : spot > 2000 ? 50 : spot > 1000 ? 20 : 10;
+  };
+
+  const stepSize = getStepSize(underlying, spotPrice);
+  const atmStrike = useMemo(() => {
+    if (data?.atm_strike) return data.atm_strike;
+    if ((data as any)?.atmStrike) return (data as any).atmStrike;
+    if (strikesList && strikesList.length > 0 && spotPrice > 0) {
+      let closest = strikesList[0]?.strike || strikesList[0]?.strikePrice;
+      let minDiff = Math.abs(closest - spotPrice);
+      for (const s of strikesList) {
+        const k = s?.strike ?? s?.strikePrice;
+        if (typeof k === "number") {
+          const diff = Math.abs(k - spotPrice);
+          if (diff < minDiff) {
+            minDiff = diff;
+            closest = k;
+          }
+        }
+      }
+      if (closest !== undefined) return closest;
+    }
+    return spotPrice > 0 ? Math.round(spotPrice / stepSize) * stepSize : 0;
+  }, [data, strikesList, spotPrice, stepSize]);
 
   // Execution Mutation
   const singleOptionMutation = useMutation({

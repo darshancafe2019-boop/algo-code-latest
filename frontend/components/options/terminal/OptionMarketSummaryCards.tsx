@@ -31,9 +31,28 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
 }) => {
   if (!snapshot) return null;
 
-  const pcr = snapshot.pcr;
-  const flow = snapshot.flowSummary;
-  const isPcrBullish = pcr.pcrOI !== null ? pcr.pcrOI >= 1.0 : null;
+  const pcr = snapshot.pcr || {
+    pcrOI: null,
+    pcrVolume: null,
+    totalCallOI: 0,
+    totalPutOI: 0,
+    totalCallVolume: 0,
+    totalPutVolume: 0,
+    totalCallOIChange: 0,
+    totalPutOIChange: 0,
+  };
+  const flow = snapshot.flowSummary || {
+    totalFlowVolume: 0,
+    totalFlowTurnover: 0,
+    bullishTurnover: 0,
+    bearishTurnover: 0,
+    bullishPercentage: null,
+    bearishPercentage: null,
+    overallSentiment: "UNAVAILABLE" as const,
+    confidence: null,
+    unusualTradeCount: 0,
+  };
+  const isPcrBullish = pcr.pcrOI !== null && pcr.pcrOI !== undefined ? pcr.pcrOI >= 1.0 : null;
   const isFlowBullish = flow.overallSentiment === "BULLISH";
 
   const totalOI = (pcr.totalCallOI || 0) + (pcr.totalPutOI || 0);
@@ -96,11 +115,11 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           </span>
         </div>
         <div className={`text-sm sm:text-base md:text-lg font-black mt-1 ${isPcrBullish === true ? "text-emerald-400" : isPcrBullish === false ? "text-amber-400" : "text-slate-400"}`}>
-          {pcr.pcrOI !== null && pcr.pcrOI > 0 ? pcr.pcrOI.toFixed(2) : "N/A"}
+          {pcr.pcrOI !== null && pcr.pcrOI !== undefined && pcr.pcrOI > 0 ? pcr.pcrOI.toFixed(2) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Vol PCR</span>
-          <span className="text-slate-200">{pcr.pcrVolume !== null && pcr.pcrVolume > 0 ? pcr.pcrVolume.toFixed(2) : "N/A"}</span>
+          <span className="text-slate-200">{pcr.pcrVolume !== null && pcr.pcrVolume !== undefined && pcr.pcrVolume > 0 ? pcr.pcrVolume.toFixed(2) : "—"}</span>
         </div>
       </div>
 
@@ -116,7 +135,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Spot Diff</span>
           <span className={snapshot.spotVsMaxPainDistance && snapshot.spotVsMaxPainDistance > 0 ? "text-emerald-400" : "text-rose-400"}>
-            {snapshot.spotVsMaxPainDistance !== null && snapshot.maxPain && snapshot.maxPain > 0
+            {snapshot.spotVsMaxPainDistance !== null && snapshot.spotVsMaxPainDistance !== undefined && snapshot.maxPain && snapshot.maxPain > 0
               ? `${snapshot.spotVsMaxPainDistance > 0 ? "+" : ""}${snapshot.spotVsMaxPainDistance}`
               : "—"}
           </span>
@@ -128,7 +147,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
         <div className="flex items-center justify-between text-xs text-slate-400 font-bold">
           <span>ATM STRIKE</span>
           <span className="text-purple-400 text-[10px] sm:text-xs font-bold">
-            IV {snapshot.atmIV ? `${snapshot.atmIV}%` : "—"}
+            IV {snapshot.atmIV !== null && snapshot.atmIV !== undefined && snapshot.atmIV > 0 ? `${snapshot.atmIV}%` : "—"}
           </span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-purple-300 mt-1">
@@ -150,7 +169,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           {flow.totalFlowTurnover > 0 ? formatIndianCurrency(flow.totalFlowTurnover, currency) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
-          {flow.bullishPercentage !== null ? (
+          {flow.bullishPercentage !== null && flow.bullishPercentage !== undefined ? (
             <>
               <span className="text-emerald-400">{flow.bullishPercentage}% Bull</span>
               <span className="text-rose-400">{flow.bearishPercentage}% Bear</span>
@@ -176,7 +195,7 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
               : "text-slate-400"
           }`}
         >
-          {flow.overallSentiment && flow.confidence !== null
+          {flow.overallSentiment && flow.overallSentiment !== "UNAVAILABLE" && flow.confidence !== null
             ? `${flow.overallSentiment} (${flow.confidence}%)`
             : "UNAVAILABLE"}
         </div>
@@ -193,7 +212,11 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <Flame className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-orange-300 mt-1">
-          {flow.unusualTradeCount} Anomalies
+          {flow.unusualTradeCount !== null && flow.unusualTradeCount !== undefined && flow.unusualTradeCount > 0
+            ? `${flow.unusualTradeCount} Anomalies`
+            : flow.totalFlowVolume > 0
+            ? "0 Anomalies"
+            : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Vol / OI Spike</span>

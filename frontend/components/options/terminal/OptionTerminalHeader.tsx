@@ -106,12 +106,41 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
     }
   };
 
-  const getConnectionBadge = () => {
+  const getProviderConnectionBadge = () => {
+    const isAuthErr =
+      freshnessStatus === "AUTHENTICATION_FAILED" ||
+      freshnessStatus === "AUTH_FAILED" ||
+      freshnessStatus === "AUTH_REQUIRED";
+    if (isAuthErr) {
+      return (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold" title="Provider API credentials required or invalid">
+          <span className="w-2 h-2 rounded-full bg-rose-400" />
+          {source}: AUTH REQ
+        </span>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-xs sm:text-sm font-mono font-bold">
+        <span className="w-2 h-2 rounded-full bg-emerald-400" />
+        {source}: CONNECTED
+      </span>
+    );
+  };
+
+  const getDataFreshnessBadge = () => {
     if (freshnessStatus === "LIVE") {
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          DATA: LIVE {latencyMs > 0 ? `(${latencyMs}ms)` : ""}
+          FEED: LIVE {latencyMs > 0 ? `(${latencyMs}ms)` : ""}
+        </span>
+      );
+    }
+    if (marketStatus === "CLOSED") {
+      return (
+        <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-xs sm:text-sm font-mono font-bold">
+          <span className="w-2 h-2 rounded-full bg-slate-500" />
+          FEED: CLOSED
         </span>
       );
     }
@@ -119,7 +148,7 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
-          DATA: DELAYED ({Math.round(dataAgeMs / 1000)}s)
+          FEED: DELAYED ({Math.round(dataAgeMs / 1000)}s)
         </span>
       );
     }
@@ -127,7 +156,7 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-amber-400" />
-          DATA: STALE ({Math.round(dataAgeMs / 1000)}s)
+          FEED: STALE ({Math.round(dataAgeMs / 1000)}s)
         </span>
       );
     }
@@ -135,14 +164,14 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-rose-400" />
-          DATA: AUTH FAILED
+          FEED: LOCKED
         </span>
       );
     }
     return (
       <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 text-slate-400 border border-slate-700 text-xs sm:text-sm font-mono font-bold">
         <span className="w-2 h-2 rounded-full bg-slate-500" />
-        DATA: UNAVAILABLE
+        FEED: NO DATA
       </span>
     );
   };
@@ -244,24 +273,16 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
             </select>
           )}
 
-          {/* Execution Environment */}
-          {onChangeEnvironment && (
-            <button
-              type="button"
-              onClick={() => onChangeEnvironment(environment === "LIVE" ? "PAPER" : "LIVE")}
-              className={`px-2.5 py-1.5 rounded-lg font-bold text-xs sm:text-sm transition border ${
-                environment === "LIVE"
-                  ? "bg-rose-500/20 text-rose-300 border-rose-500/40"
-                  : "bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
-              }`}
-            >
-              {environment === "LIVE" ? "EXEC: LIVE" : "EXEC: PAPER"}
-            </button>
-          )}
+          {/* Execution Environment Badge (Strict PAPER mode enforcement) */}
+          <span className="px-2.5 py-1.5 rounded-lg font-bold text-xs sm:text-sm bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+            EXEC: PAPER
+          </span>
 
+          {/* Provider Connection status badge */}
+          {getProviderConnectionBadge()}
 
-          {/* Connection status badge */}
-          {getConnectionBadge()}
+          {/* Data Freshness status badge */}
+          {getDataFreshnessBadge()}
 
           {/* Refresh button */}
           <button

@@ -78,18 +78,21 @@ export const GlobalHeader = memo(function GlobalHeader({
       </div>
 
       {/* ── RIGHT SECTION: PROVIDER SELECTOR + PAPER MODE + USER CONTROL ───────────── */}
-      <div className="flex items-center gap-2.5 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
         {/* Compact Multi-Broker / Provider Header Selector */}
-        <ProviderHeaderSelector />
-        {/* Paper Mode Control Button */}
-        <div className="h-[40px] px-3.5 flex items-center gap-2 rounded-lg bg-[#168BFF]/15 border border-[#168BFF]/40 text-[#17C5FF] font-sans text-[12px] font-bold shadow-xs">
+        <div className="hidden sm:block">
+          <ProviderHeaderSelector />
+        </div>
+
+        {/* Paper Mode Control Badge */}
+        <div className="h-[38px] px-2.5 sm:px-3.5 flex items-center gap-1.5 sm:gap-2 rounded-lg bg-[#168BFF]/15 border border-[#168BFF]/40 text-[#17C5FF] font-sans text-[11px] sm:text-[12px] font-bold shadow-xs whitespace-nowrap">
           <span className="h-2 w-2 rounded-full bg-[#22D3EE] animate-pulse" />
           <span className="tracking-wide">PAPER MODE</span>
         </div>
 
         {/* Risk / Killswitch Status */}
         {isKillSwitchActive && (
-          <div className="h-[40px] flex items-center gap-1.5 px-3 rounded-lg bg-[#FF3B5C]/15 border border-[#FF3B5C]/40 font-mono text-xs font-bold text-[#FF3B5C]">
+          <div className="h-[38px] flex items-center gap-1.5 px-2.5 sm:px-3 rounded-lg bg-[#FF3B5C]/15 border border-[#FF3B5C]/40 font-mono text-xs font-bold text-[#FF3B5C] whitespace-nowrap">
             <Shield className="h-3.5 w-3.5" />
             <span>HALTED</span>
           </div>
@@ -109,7 +112,7 @@ export const GlobalHeader = memo(function GlobalHeader({
         <button
           type="button"
           onClick={() => router.push("/settings")}
-          className="h-[38px] w-[38px] flex items-center justify-center rounded-lg text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422] border border-[#12304A] transition-colors cursor-pointer hidden sm:flex"
+          className="h-[38px] w-[38px] flex items-center justify-center rounded-lg text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422] border border-[#12304A] transition-colors cursor-pointer hidden md:flex"
           title="Terminal Settings"
         >
           <SettingsIcon className="h-4 w-4" />
@@ -125,7 +128,7 @@ export const GlobalHeader = memo(function GlobalHeader({
             <div className="h-6 w-6 rounded-md bg-[#168BFF]/20 text-[#22D3EE] flex items-center justify-center font-bold text-xs">
               {user?.username?.[0]?.toUpperCase() || "A"}
             </div>
-            <span className="hidden md:inline font-semibold text-xs text-[#F8FAFC]">
+            <span className="hidden lg:inline font-semibold text-xs text-[#F8FAFC]">
               {user?.username || "admin"}
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-[#7D8EA5]" />
@@ -177,6 +180,16 @@ export const GlobalHeader = memo(function GlobalHeader({
             </div>
           )}
         </div>
+
+        {/* Mobile Hamburger Menu Toggle */}
+        <button
+          type="button"
+          onClick={() => setMobileCommandSheetOpen(true)}
+          className="flex md:hidden items-center justify-center h-[38px] w-[38px] rounded-lg border border-[#12304A] bg-[#0A1422] text-[#7D8EA5] hover:text-[#F8FAFC] transition-colors"
+          aria-label="Open mobile navigation menu"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
       </div>
     </header>
   );

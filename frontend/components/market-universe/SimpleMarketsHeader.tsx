@@ -36,6 +36,10 @@ interface SimpleMarketsHeaderProps {
   activeCategory: string;
   onSelectCategory: (cat: string) => void;
   categoryCounts?: Record<string, number>;
+  activeView?: "TABLE" | "TOP_MOVERS" | "HEATMAP" | "STREAM" | "DEPTH" | "DIAGNOSTICS";
+  onSelectView?: (view: "TABLE" | "TOP_MOVERS" | "HEATMAP" | "STREAM" | "DEPTH" | "DIAGNOSTICS") => void;
+  selectedProvider?: string;
+  onSelectProvider?: (provider: string) => void;
   onOpenFilters: () => void;
   onOpenExplore?: (view: "top_movers" | "heatmap" | "scanner") => void;
   onOpenDiagnostics?: () => void;
@@ -75,6 +79,10 @@ export function SimpleMarketsHeader({
   activeCategory,
   onSelectCategory,
   categoryCounts = {},
+  activeView = "TABLE",
+  onSelectView,
+  selectedProvider = "ALL",
+  onSelectProvider,
   onOpenFilters,
   onOpenExplore,
   onOpenDiagnostics,
@@ -122,9 +130,30 @@ export function SimpleMarketsHeader({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Provider matrix configuration
+  const PROVIDERS_LIST = [
+    { id: "ALL", name: "ALL FEEDS", color: "cyan" },
+    { id: "UPSTOX", name: "UPSTOX V3", color: "purple" },
+    { id: "DHAN", name: "DHANHQ v2", color: "emerald" },
+    { id: "DELTA", name: "DELTA INDIA", color: "blue" },
+    { id: "BINANCE", name: "BINANCE", color: "amber" },
+    { id: "OANDA", name: "OANDA FOREX", color: "sky" },
+    { id: "GLOBAL", name: "GLOBAL DATA", color: "indigo" },
+    { id: "PAPER", name: "PAPER SIM", color: "slate" },
+  ];
+
+  const SUB_VIEWS = [
+    { id: "TABLE", label: "MARKET TABLE", icon: Layers },
+    { id: "TOP_MOVERS", label: "TOP MOVERS", icon: TrendingUp },
+    { id: "HEATMAP", label: "HEATMAP", icon: Grid },
+    { id: "STREAM", label: "STREAM OBSERVATORY", icon: Radio },
+    { id: "DEPTH", label: "ORDER BOOK (L2)", icon: Activity },
+    { id: "DIAGNOSTICS", label: "GATEWAY HEALTH", icon: Radar },
+  ] as const;
+
   return (
     <div className="bg-[#0B1224] border border-slate-800/90 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3.5 font-sans select-none">
-      {/* 1. Header First Row: Title & Status | Universal Search | Filters | More Menu */}
+      {/* 1. Top Row: Title & Status | Universal Search | Filters | More Menu */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         {/* Left: Title & Live Diagnostics Summary */}
         <div className="space-y-1.5">
@@ -132,7 +161,7 @@ export function SimpleMarketsHeader({
             <h1 className="text-2xl sm:text-[26px] font-black tracking-tight text-white flex items-center gap-2.5">
               <span>MARKETS</span>
               <span className="text-cyan-400 font-mono text-[11px] font-bold px-2 py-0.5 rounded bg-cyan-500/10 border border-cyan-500/30 tracking-wider">
-                UNIVERSE
+                COMMAND CENTER
               </span>
             </h1>
 
@@ -345,7 +374,66 @@ export function SimpleMarketsHeader({
         </div>
       </div>
 
-      {/* 2. Category Navigation Segmented Bar */}
+      {/* 2. Provider Strip Bar */}
+      <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pt-1 pb-1 border-t border-slate-800/80">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold shrink-0 mr-1">
+          PROVIDERS:
+        </span>
+        {PROVIDERS_LIST.map((p) => {
+          const isSelected = (selectedProvider || "ALL") === p.id;
+          return (
+            <button
+              key={p.id}
+              onClick={() => onSelectProvider?.(p.id)}
+              className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all flex items-center gap-1.5 shrink-0 border ${
+                isSelected
+                  ? "bg-cyan-500/20 border-cyan-500 text-cyan-300 shadow-sm"
+                  : "bg-[#080E20] border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700"
+              }`}
+            >
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  p.id === "PAPER"
+                    ? "bg-slate-500"
+                    : p.id === "ALL"
+                    ? "bg-cyan-400"
+                    : "bg-emerald-400"
+                }`}
+              />
+              <span>{p.name}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 3. Sub-Views Switcher Navigation Bar */}
+      {onSelectView && (
+        <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pt-1 pb-1 border-t border-slate-800/60">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold shrink-0 mr-1">
+            VIEW:
+          </span>
+          {SUB_VIEWS.map((v) => {
+            const isActive = activeView === v.id;
+            const Icon = v.icon;
+            return (
+              <button
+                key={v.id}
+                onClick={() => onSelectView(v.id)}
+                className={`px-3 py-1.5 rounded-xl font-mono text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+                  isActive
+                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20 font-black"
+                    : "bg-[#080E20] text-slate-300 hover:text-white hover:bg-slate-800/90 border border-slate-800/70"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{v.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 4. Category Navigation Segmented Bar (STOCKS, CRYPTO, FOREX, OPTIONS, etc.) */}
       <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar pb-1 pt-1.5 border-t border-slate-800/80">
         {MARKET_CATEGORIES.map((cat) => {
           const isActive = activeCategory === cat.id;

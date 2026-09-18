@@ -785,9 +785,17 @@ class DhanBrokerAdapter(BrokerAdapter):
             ce_ltp = _to_float(ce_raw.get("last_price") or ce_raw.get("top_bid_price"))
             pe_ltp = _to_float(pe_raw.get("last_price") or pe_raw.get("top_bid_price"))
 
+            ce_oi = _to_float(ce_raw.get("oi"))
+            pe_oi = _to_float(pe_raw.get("oi"))
+            ce_vol = _to_float(ce_raw.get("volume"))
+            pe_vol = _to_float(pe_raw.get("volume"))
+
+            ce_oi_change = _to_float(ce_raw.get("oi_change")) if ce_raw.get("oi_change") is not None else (_to_float(ce_raw.get("oi", 0) - ce_raw.get("previous_oi", 0)) if ce_raw.get("previous_oi") is not None else None)
+            pe_oi_change = _to_float(pe_raw.get("oi_change")) if pe_raw.get("oi_change") is not None else (_to_float(pe_raw.get("oi", 0) - pe_raw.get("previous_oi", 0)) if pe_raw.get("previous_oi") is not None else None)
+
             strikes.append({
                 "strike": k,
-                "is_atm": is_atm,
+                "is_atm": False,
                 "distance_pct": dist_pct,
                 "ce": {
                     "instrument_id": f"DHAN_{ce_raw.get('security_id', '')}",
@@ -795,9 +803,9 @@ class DhanBrokerAdapter(BrokerAdapter):
                     "ltp": ce_ltp,
                     "bid": _to_float(ce_raw.get("top_bid_price")),
                     "ask": _to_float(ce_raw.get("top_ask_price")),
-                    "volume": float(ce_raw.get("volume") or 0.0),
-                    "open_interest": float(ce_raw.get("oi") or 0.0),
-                    "oi_change": float(ce_raw.get("oi", 0) - ce_raw.get("previous_oi", 0)),
+                    "volume": ce_vol,
+                    "open_interest": ce_oi,
+                    "oi_change": ce_oi_change,
                     "iv": _to_float(ce_raw.get("implied_volatility")),
                     "delta": _to_float(ce_greeks.get("delta")),
                     "gamma": _to_float(ce_greeks.get("gamma")),
@@ -811,9 +819,9 @@ class DhanBrokerAdapter(BrokerAdapter):
                     "ltp": pe_ltp,
                     "bid": _to_float(pe_raw.get("top_bid_price")),
                     "ask": _to_float(pe_raw.get("top_ask_price")),
-                    "volume": float(pe_raw.get("volume") or 0.0),
-                    "open_interest": float(pe_raw.get("oi") or 0.0),
-                    "oi_change": float(pe_raw.get("oi", 0) - pe_raw.get("previous_oi", 0)),
+                    "volume": pe_vol,
+                    "open_interest": pe_oi,
+                    "oi_change": pe_oi_change,
                     "iv": _to_float(pe_raw.get("implied_volatility")),
                     "delta": _to_float(pe_greeks.get("delta")),
                     "gamma": _to_float(pe_greeks.get("gamma")),
@@ -825,6 +833,13 @@ class DhanBrokerAdapter(BrokerAdapter):
 
         # Sort strikes ascending
         strikes.sort(key=lambda x: x["strike"])
+
+        # Tag exact single closest ATM strike matching spot price
+        if spot_price > 0 and strikes:
+            atm_idx = min(range(len(strikes)), key=lambda i: abs(strikes[i]["strike"] - spot_price))
+            for i, s in enumerate(strikes):
+                s["is_atm"] = (i == atm_idx)
+                s["distance_pct"] = round(((s["strike"] - spot_price) / spot_price) * 100.0, 2)
 
         # Filter strike count around spot if requested
         if strike_count and strike_count > 0 and len(strikes) > strike_count:

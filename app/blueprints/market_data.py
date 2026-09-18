@@ -72,17 +72,31 @@ def get_market_data_ltp():
         logger.debug("Gateway :5051 direct LTP probe note: %s", gw_err)
 
     # 2. Fallback to Central Market Cache
-    cached = global_market_cache.get_quote(symbol)
-    if not cached and "/" in symbol:
-        cached = global_market_cache.get_quote(symbol.replace("/", ""))
+    aliases = [symbol]
+    if symbol == "NIFTY":
+        aliases.extend(["NIFTY 50", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
+    elif symbol == "NIFTY 50":
+        aliases.extend(["NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
+    elif symbol == "BANKNIFTY":
+        aliases.extend(["BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
+    elif symbol == "BANK NIFTY":
+        aliases.extend(["BANKNIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
+    elif "/" in symbol:
+        aliases.append(symbol.replace("/", ""))
+
+    cached = None
+    for a in aliases:
+        cached = global_market_cache.get_quote(a) or global_market_cache.get(a)
+        if cached:
+            break
 
     if cached:
         ltp_val = cached.get("ltp") if isinstance(cached, dict) else getattr(cached, "ltp", None)
         if ltp_val is None:
-            ltp_val = cached.get("price") if isinstance(cached, dict) else getattr(cached, "price", 0.0)
+            ltp_val = cached.get("price") if isinstance(cached, dict) else getattr(cached, "price", getattr(cached, "last_price", 0.0))
 
         if ltp_val and float(ltp_val) > 0:
-            ts_raw = cached.get("timestamp") if isinstance(cached, dict) else getattr(cached, "timestamp", None)
+            ts_raw = cached.get("timestamp") if isinstance(cached, dict) else getattr(cached, "timestamp", getattr(cached, "received_timestamp", None))
             now_ts = datetime.now(timezone.utc).timestamp()
             if isinstance(ts_raw, datetime):
                 quote_ts = ts_raw.timestamp()
@@ -93,10 +107,17 @@ def get_market_data_ltp():
 
             age_ms = max(0, int((now_ts - quote_ts) * 1000))
             provider_val = cached.get("provider") if isinstance(cached, dict) else getattr(cached, "provider", "CENTRAL_CACHE")
+            prev_close_val = cached.get("close") if isinstance(cached, dict) else getattr(cached, "close", getattr(cached, "previous_close", None))
+            open_val = cached.get("open") if isinstance(cached, dict) else getattr(cached, "open", None)
+            change_pct_val = cached.get("change_pct") if isinstance(cached, dict) else getattr(cached, "change_pct", None)
+            
             return jsonify({
                 "ok": True,
                 "symbol": symbol,
                 "price": float(ltp_val),
+                "previous_close": float(prev_close_val) if prev_close_val else (float(open_val) if open_val else None),
+                "open": float(open_val) if open_val else None,
+                "change_pct": float(change_pct_val) if change_pct_val is not None else None,
                 "source": str(provider_val or "CENTRAL_CACHE").upper(),
                 "status": "LIVE" if age_ms < 15000 else "STALE",
                 "timestamp": int(quote_ts * 1000),
@@ -152,8 +173,23 @@ def get_market_quote():
             "message": "Symbol query parameter is required"
         }), 400
 
-    # 1. Query Central In-Memory Market Cache
-    cached = global_market_cache.get(symbol)
+    # 1. Query Central In-Memory Market Cache with alias resolution
+    aliases = [symbol]
+    if symbol == "NIFTY":
+        aliases.extend(["NIFTY 50", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
+    elif symbol == "NIFTY 50":
+        aliases.extend(["NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
+    elif symbol == "BANKNIFTY":
+        aliases.extend(["BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
+    elif symbol == "BANK NIFTY":
+        aliases.extend(["BANKNIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
+
+    cached = None
+    for a in aliases:
+        cached = global_market_cache.get(a) or global_market_cache.get_quote(a)
+        if cached:
+            break
+
     if cached:
         if isinstance(cached, dict):
             c_ltp = cached.get("ltp") or cached.get("last_price") or cached.get("price")
@@ -165,9 +201,10 @@ def get_market_quote():
             c_low = cached.get("low")
             c_open = cached.get("open")
             c_close = cached.get("close") or cached.get("previous_close")
-            c_ts = cached.get("timestamp") or cached.get("event_timestamp")
+            c_ts = cached.get("timestamp") or cached.get("event_timestamp") or cached.get("received_timestamp")
             c_prov = cached.get("provider")
             c_qual = cached.get("data_quality", "VALIDATED_LIVE")
+            c_pct = cached.get("change_pct")
         else:
             c_ltp = getattr(cached, "ltp", getattr(cached, "last_price", getattr(cached, "price", None)))
             c_bid = getattr(cached, "bid", None)
@@ -178,9 +215,10 @@ def get_market_quote():
             c_low = getattr(cached, "low", None)
             c_open = getattr(cached, "open", None)
             c_close = getattr(cached, "close", getattr(cached, "previous_close", None))
-            c_ts = getattr(cached, "timestamp", getattr(cached, "event_timestamp", None))
+            c_ts = getattr(cached, "timestamp", getattr(cached, "event_timestamp", getattr(cached, "received_timestamp", None)))
             c_prov = getattr(cached, "provider", None)
             c_qual = getattr(cached, "data_quality", "VALIDATED_LIVE")
+            c_pct = getattr(cached, "change_pct", None)
 
         stale_info = global_stale_protection.is_stale(symbol, c_ts)
         ts_str = c_ts.isoformat() if hasattr(c_ts, "isoformat") else (str(c_ts) if c_ts else None)
@@ -199,6 +237,8 @@ def get_market_quote():
                 "low": c_low,
                 "open": c_open,
                 "close": c_close,
+                "previous_close": c_close or c_open,
+                "change_pct": c_pct,
                 "timestamp": ts_str,
                 "is_stale": stale_info.get("is_stale", False),
                 "data_quality": c_qual

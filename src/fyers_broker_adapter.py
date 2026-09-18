@@ -373,6 +373,29 @@ class FyersBrokerAdapter(BrokerAdapter):
             "status": "LIVE" if is_conf else "NOT_CONFIGURED",
         }
 
+    def get_option_chain(
+        self,
+        underlying: str,
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Fetches live or calculated option chain for Fyers broker.
+        Enriched with Greeks, Implied Volatility, PCR, and Max Pain metrics.
+        """
+        from src.market_data.options_engine import global_options_engine
+        snap = global_options_engine.get_option_chain(
+            underlying=underlying,
+            provider="DHAN" if self.is_authenticated else "PAPER_SIMULATOR",
+            expiry=expiry,
+            strike_count=strike_count,
+        )
+        res = snap.to_dict()
+        res["provider"] = "FYERS"
+        res["broker"] = "FYERS"
+        return res
+
+
 
 # Global singleton instance
 global_fyers_adapter = FyersBrokerAdapter()

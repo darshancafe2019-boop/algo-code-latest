@@ -50,22 +50,24 @@ class FundingRateEngine:
         self,
         symbol: str,
         venue: MarketVenue = MarketVenue.BINANCE,
-        base_rate_8h: float = 0.0001,
+        base_rate_8h: Optional[float] = None,
+        raw_rate: Optional[float] = None,
     ) -> FundingRateData:
         """Generates structured FundingRateData with live countdown and APR metrics."""
-        apr = self.calculate_annualized_apr(base_rate_8h)
+        effective_rate = raw_rate if raw_rate is not None else (base_rate_8h if base_rate_8h is not None else 0.0001)
+        apr = self.calculate_annualized_apr(effective_rate)
         next_funding_time, countdown_sec = self.calculate_countdown()
 
         # Deterministic predicted rate variation
-        predicted = round(base_rate_8h * 1.05, 6)
+        predicted = round(effective_rate * 1.05, 6)
 
         return FundingRateData(
             symbol=symbol,
             venue=venue,
-            funding_rate_8h=base_rate_8h,
+            funding_rate_8h=effective_rate,
             funding_rate_annualized=apr,
             predicted_next_rate=predicted,
             next_funding_time=next_funding_time,
             countdown_seconds=countdown_sec,
-            historical_avg_7d=round(base_rate_8h * 0.92, 6),
+            historical_avg_7d=round(effective_rate * 0.92, 6),
         )

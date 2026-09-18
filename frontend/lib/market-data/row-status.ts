@@ -165,7 +165,7 @@ export function resolveInstrumentProvider(
   const ac = (instrument.asset_class || "").toUpperCase();
   const instProv = ((instrument as any).provider || "").toUpperCase();
 
-  // 1. If real-time quote specifies provider, that is the authoritative source
+  // 1. Authoritative real-time quote provider origin
   if (rawQuote?.provider) {
     const norm = normalizeProvider(rawQuote.provider);
     if (norm) {
@@ -173,20 +173,28 @@ export function resolveInstrumentProvider(
     }
   }
 
-  // 2. Direct Exchange / Symbol Prefix Mapping (Never allow provider mismatch)
-  if (ex === "BINANCE" || sym.startsWith("BINANCE:") || instProv.includes("BINANCE") || instProv.includes("CCXT")) {
+  // 2. Explicit instrument provider from database / registry
+  if (instProv) {
+    const norm = normalizeProvider(instProv);
+    if (norm) {
+      return { provider: norm, providerLabel: norm.toUpperCase() };
+    }
+  }
+
+  // 3. Exact Exchange mapping
+  if (ex === "BINANCE" || sym.startsWith("BINANCE:")) {
     return { provider: "binance", providerLabel: "BINANCE" };
   }
 
-  if (ex === "DELTA" || sym.startsWith("DELTA:") || instProv.includes("DELTA")) {
+  if (ex === "DELTA" || sym.startsWith("DELTA:")) {
     return { provider: "delta", providerLabel: "DELTA" };
   }
 
-  if (ex === "OANDA" || sym.startsWith("OANDA:") || instProv.includes("OANDA")) {
+  if (ex === "OANDA" || sym.startsWith("OANDA:") || ac === "FOREX" || ac.includes("FOREX")) {
     return { provider: "oanda", providerLabel: "OANDA" };
   }
 
-  // 3. Indian Equities & Indices (NSE, BSE, NFO, MCX)
+  // 4. Indian Equities & Indices (NSE, BSE, NFO, MCX)
   if (
     ex === "NSE" ||
     ex === "BSE" ||
@@ -202,65 +210,25 @@ export function resolveInstrumentProvider(
     sym === "NIFTY" ||
     sym === "BANKNIFTY" ||
     sym === "FINNIFTY" ||
-    sym === "MIDCPNIFTY"
+    sym === "MIDCPNIFTY" ||
+    sym === "SENSEX"
   ) {
     if (sym.startsWith("UPSTOX:") || instProv.includes("UPSTOX")) {
-      return { provider: "upstox", providerLabel: "UPSTOX" };
-    }
-    if (sym.startsWith("DHAN:") || instProv.includes("DHAN")) {
-      return { provider: "dhan", providerLabel: "DHAN" };
-    }
-    if (healthyProvidersSet?.has("DHAN")) {
-      return { provider: "dhan", providerLabel: "DHAN" };
-    }
-    if (healthyProvidersSet?.has("UPSTOX")) {
       return { provider: "upstox", providerLabel: "UPSTOX" };
     }
     return { provider: "dhan", providerLabel: "DHAN" };
   }
 
-  // 4. US / Global Equities (NASDAQ, NYSE) -> Twelve Data / Alpaca
+  // 5. US / Global Equities (NASDAQ, NYSE)
   if (
     ex === "NASDAQ" ||
     ex === "NYSE" ||
     sym.startsWith("NASDAQ:") ||
     sym.startsWith("NYSE:") ||
-    sym.startsWith("TWELVE_DATA:") ||
     ac.includes("GLOBAL") ||
     ac.includes("US")
   ) {
-    return { provider: "twelve_data", providerLabel: "TWELVE DATA" };
-  }
-
-  // 5. Forex pairs
-  if (ac === "FOREX" || ac.includes("FOREX") || sym.endsWith("=X")) {
-    if (healthyProvidersSet?.has("TWELVE_DATA")) {
-      return { provider: "twelve_data", providerLabel: "TWELVE DATA" };
-    }
-    return { provider: "oanda", providerLabel: "OANDA" };
-  }
-
-  // 6. Generic crypto fallback (if exchange wasn't Binance or Delta)
-  const isCrypto =
-    ac === "CRYPTO" ||
-    ac.includes("CRYPTO") ||
-    ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "PEPE", "SHIB", "AVAX", "LINK"].some((c) =>
-      sym.includes(c)
-    );
-
-  if (isCrypto) {
-    if (healthyProvidersSet?.has("BINANCE") || healthyProvidersSet?.has("BINANCE_WS")) {
-      return { provider: "binance", providerLabel: "BINANCE" };
-    }
-    return { provider: "delta", providerLabel: "DELTA" };
-  }
-
-  // 7. Explicit instrument.provider fallback
-  if ((instrument as any).provider) {
-    const norm = normalizeProvider((instrument as any).provider);
-    if (norm) {
-      return { provider: norm, providerLabel: norm.toUpperCase() };
-    }
+    return { provider: "twelve_data", providerLabel: "GLOBAL DATA" };
   }
 
   return { provider: null, providerLabel: null };

@@ -20,6 +20,9 @@ export const metadata: Metadata = {
 import { BackendAvailabilityBanner } from "@/components/common/BackendAvailabilityBanner";
 import { AuthGuard } from "@/components/auth/AuthGuard";
 
+import { QuantDataCoreProvider } from "@/context/QuantDataCoreContext";
+import { GlobalDataDrawer } from "@/components/layout/GlobalDataDrawer";
+
 export default function RootLayout({
   children,
 }: {
@@ -106,12 +109,15 @@ export default function RootLayout({
               <ActiveBotProvider>
                 <GlobalLayoutProvider>
                   <MarketGatewayProvider>
-                    <GlobalDataProvider>
-                      <BackendAvailabilityBanner />
-                      <AuthGuard>
-                        {children}
-                      </AuthGuard>
-                    </GlobalDataProvider>
+                    <QuantDataCoreProvider>
+                      <GlobalDataProvider>
+                        <BackendAvailabilityBanner />
+                        <GlobalDataDrawer />
+                        <AuthGuard>
+                          {children}
+                        </AuthGuard>
+                      </GlobalDataProvider>
+                    </QuantDataCoreProvider>
                   </MarketGatewayProvider>
                 </GlobalLayoutProvider>
               </ActiveBotProvider>

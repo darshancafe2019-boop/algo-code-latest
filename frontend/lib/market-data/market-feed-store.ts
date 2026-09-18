@@ -38,58 +38,152 @@ export interface NormalizedMarketTick {
   depth?: any;
 }
 
+export interface StreamEvent {
+  id: string;
+  receivedTime: string;
+  exchangeTime: string;
+  provider: string;
+  symbol: string;
+  eventType: string;
+  ltp: number | null;
+  bid: number | null;
+  ask: number | null;
+  quantity: number | null;
+  oi: number | null;
+  sequence: number | null;
+  latency: number;
+  rawPayload?: any;
+}
+
+export interface ProviderStat {
+  provider: string;
+  status: "CONNECTED" | "DEGRADED" | "RECONNECTING" | "STALE" | "OFFLINE" | "AUTH_REQUIRED";
+  latencyMs: number;
+  lastTickAgeMs: number;
+  subCount: number;
+  msgPerSec: number;
+  errorCount: number;
+  lastMessageAt: string | null;
+}
+
 export interface MarketFeedHealthState {
   connectionStatus: "DISCONNECTED" | "CONNECTING" | "CONNECTED" | "LIVE" | "RECONNECTING" | "STALE" | "ERROR";
   marketStatus: "OPEN" | "CLOSED" | "PRE_OPEN" | "UNKNOWN";
   ticksPerSec: number;
   latencyMs: number;
+  p95LatencyMs: number;
   activeSubscriptions: number;
   lastTickTime: string | null;
   lastTickAgeMs: number;
   reconnectCount: number;
   parserErrors: number;
   droppedPackets: number;
+  sequenceGaps: number;
+  staleCount: number;
+  totalMessages: number;
   primaryProvider: string;
+  providers: Record<string, ProviderStat>;
 }
 
 interface MarketFeedStore {
   quotesBySymbol: Record<string, NormalizedMarketTick>;
   quotesBySecurityId: Record<string, NormalizedMarketTick>;
   health: MarketFeedHealthState;
+  streamEvents: StreamEvent[];
+  isStreamPaused: boolean;
   
   // Actions
-  ingestTick: (tick: Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null }) => void;
-  ingestBatch: (ticks: Array<Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null }>) => void;
+  ingestTick: (tick: Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null; rawPayload?: any }) => void;
+  ingestBatch: (ticks: Array<Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null; rawPayload?: any }>) => void;
+  appendStreamEvent: (event: StreamEvent) => void;
+  clearStreamEvents: () => void;
+  setStreamPaused: (paused: boolean) => void;
   recalculateFreshness: () => void;
   setConnectionStatus: (status: MarketFeedHealthState["connectionStatus"]) => void;
   setMarketStatus: (status: MarketFeedHealthState["marketStatus"]) => void;
   setHealthMetrics: (metrics: Partial<MarketFeedHealthState>) => void;
+  updateProviderStat: (provider: string, stat: Partial<ProviderStat>) => void;
   clearFlash: (symbol: string) => void;
   getQuote: (symbol: string, exchange?: string, provider?: string) => NormalizedMarketTick | undefined;
 }
 
 // Micro-batching queues keyed by immutable instrument identity
-let pendingTicks: Record<string, Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null }> = {};
+let pendingTicks: Record<string, Partial<NormalizedMarketTick> & { symbol: string; lastPrice?: number | null; rawPayload?: any }> = {};
 let batchRafId: number | null = null;
 let tickCounter = 0;
 let lastTickRateTime = Date.now();
+const latencyWindow: number[] = [];
 const flashTimers = new Map<string, NodeJS.Timeout>();
+
+const INITIAL_PROVIDERS: Record<string, ProviderStat> = {
+  DHAN: { provider: "DHAN", status: "OFFLINE", latencyMs: 0, lastTickAgeMs: 0, subCount: 0, msgPerSec: 0, errorCount: 0, lastMessageAt: null },
+  UPSTOX: { provider: "UPSTOX", status: "OFFLINE", latencyMs: 0, lastTickAgeMs: 0, subCount: 0, msgPerSec: 0, errorCount: 0, lastMessageAt: null },
+  DELTA: { provider: "DELTA", status: "OFFLINE", latencyMs: 0, lastTickAgeMs: 0, subCount: 0, msgPerSec: 0, errorCount: 0, lastMessageAt: null },
+  PAPER: { provider: "PAPER", status: "CONNECTED", latencyMs: 0, lastTickAgeMs: 0, subCount: 0, msgPerSec: 0, errorCount: 0, lastMessageAt: null },
+};
 
 export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
   quotesBySymbol: {},
   quotesBySecurityId: {},
+  streamEvents: [],
+  isStreamPaused: false,
   health: {
     connectionStatus: "CONNECTING",
     marketStatus: "UNKNOWN",
     ticksPerSec: 0,
     latencyMs: 0,
+    p95LatencyMs: 0,
     activeSubscriptions: 0,
     lastTickTime: null,
     lastTickAgeMs: 0,
     reconnectCount: 0,
     parserErrors: 0,
     droppedPackets: 0,
+    sequenceGaps: 0,
+    staleCount: 0,
+    totalMessages: 0,
     primaryProvider: "DHAN",
+    providers: INITIAL_PROVIDERS,
+  },
+
+  appendStreamEvent: (event) => {
+    if (get().isStreamPaused) return;
+    set((state) => ({
+      streamEvents: [event, ...state.streamEvents].slice(0, 3000),
+    }));
+  },
+
+  clearStreamEvents: () => {
+    set({ streamEvents: [] });
+  },
+
+  setStreamPaused: (paused) => {
+    set({ isStreamPaused: paused });
+  },
+
+  updateProviderStat: (provider, stat) => {
+    const provKey = provider.toUpperCase();
+    set((state) => {
+      const current = state.health.providers[provKey] || {
+        provider: provKey,
+        status: "OFFLINE",
+        latencyMs: 0,
+        lastTickAgeMs: 0,
+        subCount: 0,
+        msgPerSec: 0,
+        errorCount: 0,
+        lastMessageAt: null,
+      };
+      return {
+        health: {
+          ...state.health,
+          providers: {
+            ...state.health.providers,
+            [provKey]: { ...current, ...stat },
+          },
+        },
+      };
+    });
   },
 
   ingestTick: (tick) => {
@@ -118,16 +212,63 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
       const updatedQuotes = { ...state.quotesBySymbol };
       const updatedSecQuotes = { ...state.quotesBySecurityId };
       let lastLatency = state.health.latencyMs;
+      const newEvents: StreamEvent[] = [];
+      const updatedProviders = { ...state.health.providers };
 
       for (const tick of ticks) {
-        const sym = tick.symbol.toUpperCase();
+        const sym = (tick.symbol || "UNKNOWN").toUpperCase();
         const provider = (tick.provider || "UNKNOWN").toUpperCase();
         const exchange = (tick.exchange || "UNKNOWN").toUpperCase();
         const primaryKey = `${provider}:${sym}`;
 
+        // Compute latency
+        const incomingTime = tick.eventTimestamp ? new Date(tick.eventTimestamp).getTime() : now;
+        const latency = tick.feedLatencyMs ?? (Math.max(0, now - incomingTime));
+        if (latency >= 0) {
+          lastLatency = latency;
+          latencyWindow.push(latency);
+          if (latencyWindow.length > 200) latencyWindow.shift();
+        }
+
+        // Add to Stream Events buffer
+        newEvents.push({
+          id: `${provider}_${sym}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          receivedTime: tick.receivedTimestamp || nowIso,
+          exchangeTime: tick.eventTimestamp || nowIso,
+          provider,
+          symbol: sym,
+          eventType: tick.status || "TICK",
+          ltp: tick.lastPrice ?? null,
+          bid: tick.bid ?? null,
+          ask: tick.ask ?? null,
+          quantity: tick.bidQty ?? tick.askQty ?? null,
+          oi: tick.oi ?? null,
+          sequence: null,
+          latency,
+          rawPayload: tick.rawPayload,
+        });
+
+        // Update provider telemetry
+        const prevProvStat = updatedProviders[provider] || {
+          provider,
+          status: "CONNECTED",
+          latencyMs: latency,
+          lastTickAgeMs: 0,
+          subCount: 1,
+          msgPerSec: 1,
+          errorCount: 0,
+          lastMessageAt: nowIso,
+        };
+        updatedProviders[provider] = {
+          ...prevProvStat,
+          status: "CONNECTED",
+          latencyMs: latency,
+          lastTickAgeMs: 0,
+          lastMessageAt: nowIso,
+        };
+
         // Reject out-of-order updates
         const existing = updatedQuotes[primaryKey] || updatedQuotes[sym];
-        const incomingTime = tick.eventTimestamp ? new Date(tick.eventTimestamp).getTime() : now;
         const existingTime = existing?.eventTimestamp ? new Date(existing.eventTimestamp).getTime() : 0;
         if (existing && existingTime > 0 && incomingTime < existingTime) {
           continue;
@@ -143,8 +284,6 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
         const prevClose = tick.previousClose ?? existing?.previousClose ?? tick.close ?? newLtp;
         const rawChange = tick.change ?? (prevClose != null && newLtp != null && prevClose > 0 ? newLtp - prevClose : null);
         const rawChangePct = tick.changePercent ?? (prevClose != null && rawChange != null && prevClose > 0 ? (rawChange / prevClose) * 100 : null);
-        const latency = tick.feedLatencyMs ?? existing?.feedLatencyMs ?? 0;
-        if (latency > 0) lastLatency = latency;
 
         const ageMs = Math.max(0, now - incomingTime);
         const isStale = ageMs > 5000;
@@ -237,7 +376,7 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
         }
       }
 
-      // Calculate rolling tick rate per second
+      // Calculate rolling tick rate per second and p95 latency
       let currentTicksPerSec = state.health.ticksPerSec;
       const elapsedRateMs = now - lastTickRateTime;
       if (elapsedRateMs >= 1000) {
@@ -246,15 +385,30 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
         lastTickRateTime = now;
       }
 
+      let p95 = lastLatency;
+      if (latencyWindow.length > 0) {
+        const sorted = [...latencyWindow].sort((a, b) => a - b);
+        const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+        p95 = sorted[idx];
+      }
+
+      const mergedStreamEvents = state.isStreamPaused
+        ? state.streamEvents
+        : [...newEvents, ...state.streamEvents].slice(0, 3000);
+
       return {
         quotesBySymbol: updatedQuotes,
         quotesBySecurityId: updatedSecQuotes,
+        streamEvents: mergedStreamEvents,
         health: {
           ...state.health,
           ticksPerSec: currentTicksPerSec,
           latencyMs: lastLatency,
+          p95LatencyMs: p95,
           lastTickTime: nowIso,
           lastTickAgeMs: 0,
+          totalMessages: state.health.totalMessages + ticks.length,
+          providers: updatedProviders,
         },
       };
     });

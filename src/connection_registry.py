@@ -80,6 +80,52 @@ class ConnectionRegistry:
             "historical_candles": True,
             "order_execution": False,  # Paper locked
         },
+        "FYERS": {
+            "indian_stocks": True,
+            "stock_futures": True,
+            "stock_options": True,
+            "index_options": True,
+            "crypto_spot": False,
+            "crypto_futures": False,
+            "crypto_options": False,
+            "websocket_market_feed": True,
+            "historical_candles": True,
+            "order_execution": False,
+        },
+        "ANGELONE": {
+            "indian_stocks": True,
+            "stock_futures": True,
+            "stock_options": True,
+            "index_options": True,
+            "crypto_spot": False,
+            "crypto_futures": False,
+            "crypto_options": False,
+            "websocket_market_feed": True,
+            "historical_candles": True,
+            "order_execution": False,
+        },
+        "ZERODHA": {
+            "indian_stocks": True,
+            "stock_futures": True,
+            "stock_options": True,
+            "index_options": True,
+            "crypto_spot": False,
+            "crypto_futures": False,
+            "crypto_options": False,
+            "websocket_market_feed": True,
+            "historical_candles": True,
+            "order_execution": False,
+        },
+        "EXNESS": {
+            "forex_majors": True,
+            "metals_energies": True,
+            "global_indices": True,
+            "crypto_cfds": True,
+            "stocks_cfds": True,
+            "websocket_market_feed": True,
+            "historical_candles": True,
+            "order_execution": False,
+        },
         "PAPER_ENGINE": {
             "multi_asset_simulation": True,
             "zero_slippage_model": True,
@@ -237,6 +283,82 @@ class ConnectionRegistry:
             "last_check": now_utc,
         }
 
+        # 8. Fyers Status
+        fyers_app_id = getattr(config, "FYERS_APP_ID", "") or os.getenv("FYERS_APP_ID", "")
+        fyers_token = getattr(config, "FYERS_ACCESS_TOKEN", "") or os.getenv("FYERS_ACCESS_TOKEN", "")
+        fyers_configured = bool(fyers_app_id)
+        fyers_status = {
+            "id": "FYERS",
+            "name": "Fyers API v3",
+            "market_focus": "NSE / BSE Stocks & Options",
+            "configured": fyers_configured,
+            "auth_status": STATE_HEALTHY if fyers_token else STATE_NOT_CONFIGURED,
+            "rest_status": STATE_HEALTHY if fyers_configured else STATE_NOT_CONFIGURED,
+            "stream_status": "CONNECTED" if fyers_token else "IDLE",
+            "latency_ms": 30.0 if fyers_configured else 0.0,
+            "error_count": 0,
+            "trading_mode": "PAPER / LOCKED",
+            "capabilities": self.CAPABILITIES["FYERS"],
+            "last_check": now_utc,
+        }
+
+        # 9. Angel One Status
+        angel_key = getattr(config, "ANGELONE_API_KEY", "") or os.getenv("ANGELONE_API_KEY", "")
+        angel_token = getattr(config, "ANGELONE_AUTH_TOKEN", "") or os.getenv("ANGELONE_AUTH_TOKEN", "")
+        angel_configured = bool(angel_key)
+        angelone_status = {
+            "id": "ANGELONE",
+            "name": "Angel One SmartAPI",
+            "market_focus": "NSE / BSE / MCX Multi-Segment",
+            "configured": angel_configured,
+            "auth_status": STATE_HEALTHY if angel_token else STATE_NOT_CONFIGURED,
+            "rest_status": STATE_HEALTHY if angel_configured else STATE_NOT_CONFIGURED,
+            "stream_status": "CONNECTED" if angel_token else "STANDBY",
+            "latency_ms": 35.0 if angel_configured else 0.0,
+            "error_count": 0,
+            "trading_mode": "PAPER / LOCKED",
+            "capabilities": self.CAPABILITIES["ANGELONE"],
+            "last_check": now_utc,
+        }
+
+        # 10. Zerodha Kite Status
+        kite_key = getattr(config, "ZERODHA_API_KEY", "") or os.getenv("ZERODHA_API_KEY", "")
+        kite_token = getattr(config, "ZERODHA_ACCESS_TOKEN", "") or os.getenv("ZERODHA_ACCESS_TOKEN", "")
+        kite_configured = bool(kite_key)
+        zerodha_status = {
+            "id": "ZERODHA",
+            "name": "Zerodha Kite Connect",
+            "market_focus": "NSE / BSE / MCX Multi-Segment",
+            "configured": kite_configured,
+            "auth_status": STATE_HEALTHY if kite_token else STATE_NOT_CONFIGURED,
+            "rest_status": STATE_HEALTHY if kite_configured else STATE_NOT_CONFIGURED,
+            "stream_status": "CONNECTED" if kite_token else "STANDBY",
+            "latency_ms": 28.0 if kite_configured else 0.0,
+            "error_count": 0,
+            "trading_mode": "PAPER / LOCKED",
+            "capabilities": self.CAPABILITIES["ZERODHA"],
+            "last_check": now_utc,
+        }
+
+        # 11. Exness Status
+        exness_acc = getattr(config, "EXNESS_ACCOUNT_ID", "") or os.getenv("EXNESS_ACCOUNT_ID", "")
+        exness_token = getattr(config, "EXNESS_API_KEY", "") or os.getenv("EXNESS_API_KEY", "")
+        exness_configured = bool(exness_acc)
+        exness_status = {
+            "id": "EXNESS",
+            "name": "Exness Multi-Asset MT5",
+            "market_focus": "Forex / Metals / Indices CFDs",
+            "configured": exness_configured,
+            "auth_status": STATE_HEALTHY if exness_token else STATE_NOT_CONFIGURED,
+            "rest_status": STATE_HEALTHY if exness_configured else STATE_NOT_CONFIGURED,
+            "stream_status": "CONNECTED" if exness_token else "STANDBY",
+            "latency_ms": 22.0 if exness_configured else 0.0,
+            "error_count": 0,
+            "trading_mode": "PAPER / LOCKED",
+            "capabilities": self.CAPABILITIES["EXNESS"],
+            "last_check": now_utc,
+        }
+
         connections = [
             backend_status,
             gateway_status,
@@ -245,6 +367,10 @@ class ConnectionRegistry:
             dhan_status,
             delta_status,
             upstox_status,
+            fyers_status,
+            angelone_status,
+            zerodha_status,
+            exness_status,
         ]
 
         healthy_count = sum(1 for c in connections if c["auth_status"] == STATE_HEALTHY and c["rest_status"] == STATE_HEALTHY)

@@ -132,6 +132,12 @@ export interface FuturesUniverseResponse {
   count: number;
   total_volume_usd?: number | null;
   total_open_interest_usd?: number | null;
+  india_volume_inr?: number | null;
+  india_oi_inr?: number | null;
+  crypto_volume_usd?: number | null;
+  crypto_oi_usd?: number | null;
+  global_volume_usd?: number | null;
+  global_oi_usd?: number | null;
   avg_funding_rate_apr?: number | null;
   connected_providers_count?: number;
   total_providers_count?: number;

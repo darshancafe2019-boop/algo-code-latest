@@ -7,6 +7,8 @@ US/Global Equities, Indices, Forex, and Commodities.
 """
 
 import logging
+import os
+import json
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -506,6 +508,59 @@ class GlobalSymbolMaster:
 
         for inst in instruments:
             self.register_instrument(inst)
+
+        # Ingest 5000+ Upstox Indian Equities
+        master_file = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "upstox_equity_master.json"
+        )
+        if os.path.exists(master_file):
+            try:
+                with open(master_file, "r", encoding="utf-8") as f:
+                    eq_data = json.load(f)
+                    for item in eq_data:
+                        sym = (item.get("symbol") or "").strip().upper()
+                        if not sym:
+                            continue
+                        ex = (item.get("exchange") or "NSE").strip().upper()
+                        name = item.get("company_name", sym)
+                        isin = item.get("isin", "")
+                        ik = item.get("instrument_key", "")
+                        lot = float(item.get("lot_size", 1.0) or 1.0)
+                        tick = float(item.get("tick_size", 0.05) or 0.05)
+
+                        aliases = [sym, f"{sym}.NS", f"{sym}.BO", f"{ex}:{sym}", f"{sym}-EQ"]
+                        if isin:
+                            aliases.append(isin)
+                        if ik:
+                            aliases.append(ik)
+                            aliases.append(ik.replace("|", ":"))
+
+                        eq_inst = CanonicalInstrument(
+                            instrument_id=f"{ex}:{sym}:EQ",
+                            display_symbol=sym,
+                            provider_symbol=sym,
+                            exchange=ex,
+                            asset_class=AssetClass.INDIAN_EQUITIES,
+                            instrument_type=InstrumentType.EQUITY,
+                            base_currency=sym,
+                            quote_currency="INR",
+                            price_precision=2,
+                            quantity_precision=0,
+                            tick_size=tick,
+                            lot_size=lot,
+                            contract_multiplier=1.0,
+                            timezone="Asia/Kolkata",
+                            trading_session="09:15-15:30 IST",
+                            feed_status=FeedClassification.REAL_TIME,
+                            provider="upstox",
+                            has_options=False,
+                            has_futures=False,
+                            aliases=aliases,
+                        )
+                        self.register_instrument(eq_inst)
+                logger.info(f"Loaded {len(eq_data)} Upstox Indian Equities into GlobalSymbolMaster.")
+            except Exception as e:
+                logger.warning(f"Failed loading Upstox equity master into GlobalSymbolMaster: {e}")
 
     def register_instrument(self, inst: CanonicalInstrument):
         self._registry[inst.instrument_id] = inst

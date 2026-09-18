@@ -108,36 +108,38 @@ class StockDiscoveryEngine:
             )
             discovered.append(inst)
 
-        # Step 2: Ingest from local cached Upstox master files if present
-        cache_nse = CACHE_DIR / "upstox_nse_cache.json"
-        if cache_nse.exists():
+        # Step 2: Ingest from authoritative 5,000+ Upstox equity master
+        upstox_master_file = Path(__file__).resolve().parent.parent.parent / "data" / "upstox_equity_master.json"
+        if upstox_master_file.exists():
             try:
-                with open(cache_nse, "r", encoding="utf-8") as f:
+                with open(upstox_master_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     for item in data:
-                        if item.get("instrument_type") == "EQUITY" and item.get("segment") == "NSE_EQ":
-                            sym = item.get("trading_symbol") or item.get("symbol")
-                            if sym:
-                                inst_id = f"upstox:NSE:{item.get('instrument_key') or sym}"
-                                discovered.append(
-                                    StockInstrument(
-                                        instrument_id=inst_id,
-                                        symbol=sym,
-                                        company_name=item.get("name") or sym,
-                                        exchange="NSE",
-                                        region="INDIA",
-                                        currency="INR",
-                                        isin=item.get("isin"),
-                                        provider_token=item.get("instrument_key"),
-                                        lot_size=item.get("lot_size") or 1,
-                                        tick_size=item.get("tick_size") or 0.05,
-                                        session_timezone="Asia/Kolkata",
-                                        primary_provider="upstox",
-                                        last_metadata_refresh=now_utc,
-                                    )
-                                )
+                        sym = (item.get("symbol") or "").strip().upper()
+                        if not sym:
+                            continue
+                        ex = (item.get("exchange") or "NSE").strip().upper()
+                        ik = item.get("instrument_key") or f"{ex}_EQ|{sym}"
+                        inst_id = f"upstox:{ex}:{ik}"
+                        discovered.append(
+                            StockInstrument(
+                                instrument_id=inst_id,
+                                symbol=sym,
+                                company_name=item.get("company_name") or sym,
+                                exchange=ex,
+                                region="INDIA",
+                                currency="INR",
+                                isin=item.get("isin"),
+                                provider_token=ik,
+                                lot_size=int(float(item.get("lot_size", 1.0) or 1.0)),
+                                tick_size=float(item.get("tick_size", 0.05) or 0.05),
+                                session_timezone="Asia/Kolkata",
+                                primary_provider="upstox",
+                                last_metadata_refresh=now_utc,
+                            )
+                        )
             except Exception as e:
-                logger.warning(f"Failed parsing Upstox local cache: {e}")
+                logger.warning(f"Failed parsing Upstox equity master: {e}")
 
         # Register in Master Catalog (Deduplicating by instrument_id)
         deduped = {}

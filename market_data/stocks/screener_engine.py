@@ -23,14 +23,87 @@ class StockScreenerEngine:
         all_instruments = global_stock_master.get_all()
         all_quotes = global_stock_quote_engine.get_all_quotes()
 
-        # Step 1: Materialize enriched records
-        rows = []
+        # Step 1: Filter raw candidate records
+        matching_pairs = []
         for inst in all_instruments:
             q = all_quotes.get(inst.instrument_id)
             if not q:
                 continue
 
-            # Calculate fast technicals snapshot
+            basic_record = {
+                "instrument_id": inst.instrument_id,
+                "symbol": inst.symbol,
+                "company_name": inst.company_name,
+                "exchange": inst.exchange,
+                "region": inst.region,
+                "currency": inst.currency,
+                "instrument_type": inst.instrument_type,
+                "isin": inst.isin,
+                "sector": inst.sector,
+                "industry": inst.industry,
+                "market_cap_category": inst.market_cap_category,
+                "index_memberships": inst.index_memberships,
+                "is_fno_enabled": inst.is_fno_enabled,
+                "trading_status": inst.trading_status,
+                "last_price": q.last_price,
+                "open_price": q.open_price,
+                "high_price": q.high_price,
+                "low_price": q.low_price,
+                "previous_close": q.previous_close,
+                "change_abs": q.change_abs,
+                "change_pct": q.change_pct,
+                "volume_shares": q.volume_shares,
+                "relative_volume": q.relative_volume or 1.0,
+                "turnover": q.turnover_quote_currency,
+                "high_52w": q.high_52w,
+                "low_52w": q.low_52w,
+                "market_status": q.market_status,
+                "data_quality": q.data_quality,
+            }
+
+            if StockFilterEngine.matches(basic_record, criteria):
+                matching_pairs.append((inst, q, basic_record))
+
+        # Step 2: Sorting
+        sort_key = criteria.sort_by
+        reverse = criteria.sort_direction.lower() == "desc"
+
+        def get_sort_val(item):
+            v = item[2].get(sort_key)
+            if v is None:
+                return -999999999.0 if reverse else 999999999.0
+            return v
+
+        matching_pairs.sort(key=get_sort_val, reverse=reverse)
+
+        # Step 3: Pagination
+        total = len(matching_pairs)
+        page = max(1, criteria.page)
+        page_size = max(1, min(200, criteria.page_size))
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        paginated_pairs = matching_pairs[start_idx:end_idx]
+
+        # Step 4: Enrich paginated page items with live quotes, technicals, fundamentals & analysis
+        global_stock_quote_engine.refresh_quotes_live([inst.instrument_id for inst, _, _ in paginated_pairs])
+
+        paginated_records = []
+        for inst, old_q, rec in paginated_pairs:
+            q = global_stock_quote_engine.get_quote(inst.instrument_id) or old_q
+            rec["last_price"] = q.last_price
+            rec["open_price"] = q.open_price
+            rec["high_price"] = q.high_price
+            rec["low_price"] = q.low_price
+            rec["previous_close"] = q.previous_close
+            rec["change_abs"] = q.change_abs
+            rec["change_pct"] = q.change_pct
+            rec["volume_shares"] = q.volume_shares
+            rec["high_52w"] = q.high_52w
+            rec["low_52w"] = q.low_52w
+            if q.market_cap:
+                rec["market_cap"] = q.market_cap
+            rec["data_quality"] = q.data_quality
+
             candles = global_stock_historical_engine.get_candles(
                 symbol=inst.symbol,
                 timeframe="1d",
@@ -58,43 +131,14 @@ class StockScreenerEngine:
                 timeframe="1d"
             )
 
-            record = {
-                "instrument_id": inst.instrument_id,
-                "symbol": inst.symbol,
-                "company_name": inst.company_name,
-                "exchange": inst.exchange,
-                "region": inst.region,
-                "currency": inst.currency,
-                "instrument_type": inst.instrument_type,
-                "isin": inst.isin,
-                "sector": inst.sector,
-                "industry": inst.industry,
-                "market_cap_category": inst.market_cap_category,
-                "index_memberships": inst.index_memberships,
-                "is_fno_enabled": inst.is_fno_enabled,
-                "trading_status": inst.trading_status,
-                
-                # Quote metrics
-                "last_price": q.last_price,
-                "open_price": q.open_price,
-                "high_price": q.high_price,
-                "low_price": q.low_price,
-                "previous_close": q.previous_close,
-                "change_abs": q.change_abs,
-                "change_pct": q.change_pct,
+            full_record = {
+                **rec,
                 "bid": q.bid,
                 "ask": q.ask,
                 "spread": q.spread,
-                "volume_shares": q.volume_shares,
-                "relative_volume": q.relative_volume or 1.0,
-                "turnover": q.turnover_quote_currency,
                 "turnover_usd": q.turnover_usd,
                 "turnover_inr": q.turnover_inr,
                 "vwap": q.vwap,
-                "high_52w": q.high_52w,
-                "low_52w": q.low_52w,
-                "market_status": q.market_status,
-                "data_quality": q.data_quality,
                 "data_age_ms": q.data_age_ms,
                 "provider": q.provider,
                 "timestamp_exchange": q.timestamp_exchange,
@@ -127,33 +171,10 @@ class StockScreenerEngine:
                 "confidence_score": analysis.confidence_score,
                 "summary_explanation": analysis.summary_explanation,
             }
-
-            # Filter validation
-            if StockFilterEngine.matches(record, criteria):
-                rows.append(record)
-
-        # Step 2: Sorting
-        sort_key = criteria.sort_by
-        reverse = criteria.sort_direction.lower() == "desc"
-
-        def get_sort_val(r):
-            v = r.get(sort_key)
-            if v is None:
-                return -999999999.0 if reverse else 999999999.0
-            return v
-
-        rows.sort(key=get_sort_val, reverse=reverse)
-
-        # Step 3: Pagination
-        total = len(rows)
-        page = max(1, criteria.page)
-        page_size = max(1, min(200, criteria.page_size))
-        start_idx = (page - 1) * page_size
-        end_idx = start_idx + page_size
-        paginated = rows[start_idx:end_idx]
+            paginated_records.append(full_record)
 
         return {
-            "items": paginated,
+            "items": paginated_records,
             "total": total,
             "page": page,
             "pageSize": page_size,

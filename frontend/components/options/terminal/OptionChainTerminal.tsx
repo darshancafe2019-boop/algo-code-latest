@@ -48,7 +48,6 @@ import {
 } from "./ColumnCustomizerModal";
 import { OptionFilterModal, DEFAULT_FILTER_CONFIG } from "./OptionFilterModal";
 import { SelectedOptionInspectionDrawer } from "../SelectedOptionInspectionDrawer";
-import { OptionOrderBookDrawer } from "./OptionOrderBookDrawer";
 
 interface OptionChainTerminalProps {
   initialUnderlying?: string;
@@ -122,7 +121,6 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   // Modals & Drawers
   const [isColumnModalOpen, setIsColumnModalOpen] = useState(false);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [isOrderBookDrawerOpen, setIsOrderBookDrawerOpen] = useState(false);
   const [columnConfig, setColumnConfig] = useState<ColumnVisibilityConfig>(DEFAULT_COLUMN_CONFIG);
   const [filterConfig, setFilterConfig] = useState<OptionFilterConfig>(DEFAULT_FILTER_CONFIG);
 
@@ -678,17 +676,12 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     setIsDepthOpen(true);
   }, []);
 
-  const handleActionOrderBook = useCallback(() => {
-    setIsOrderBookDrawerOpen(true);
-  }, []);
-
   // Keyboard Shortcuts Handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setIsTicketOpen(false);
         setIsDepthOpen(false);
-        setIsOrderBookDrawerOpen(false);
         setIsDrawerOpen(false);
         setIsColumnModalOpen(false);
         setIsFilterModalOpen(false);
@@ -785,17 +778,6 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
               </button>
             );
           })}
-          <button
-            type="button"
-            onClick={() => setIsOrderBookDrawerOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-cyan-300 font-mono font-bold text-xs sm:text-sm border border-slate-700 transition flex-shrink-0"
-            title="Open In-Place Order Book"
-          >
-            <span>📑 Order Book</span>
-            <span className="px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 text-[10px] font-mono">
-              {orders.length}
-            </span>
-          </button>
         </div>
 
         <div className="hidden sm:flex items-center pr-2 flex-shrink-0 text-slate-400 font-mono text-xs sm:text-sm gap-4">
@@ -852,7 +834,6 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
             onActionBuy={handleActionBuy}
             onActionSell={handleActionSell}
             onActionDepth={handleActionDepth}
-            onActionOrderBook={handleActionOrderBook}
           />
         </div>
       )}
@@ -896,13 +877,6 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           if (act === "BUY") handleActionBuy(c);
           if (act === "SELL") handleActionSell(c);
         }}
-      />
-
-      {/* Actionable In-Place Option Order Book Drawer */}
-      <OptionOrderBookDrawer
-        isOpen={isOrderBookDrawerOpen}
-        onClose={() => setIsOrderBookDrawerOpen(false)}
-        currency={currency}
       />
 
       {/* Column Customizer Modal */}

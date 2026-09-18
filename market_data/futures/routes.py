@@ -55,29 +55,46 @@ def get_futures_universe():
     if fresh_only:
         contracts = [c for c in contracts if c.status in ["CONNECTED", "LIVE"] and c.freshness_status == "LIVE"]
 
-    # Calculate real dynamic telemetry summary metrics excluding SIM or disconnected nulls
-    real_connected_contracts = [
-        c for c in contracts
-        if c.status in ["CONNECTED", "LIVE"] and c.market_data_provider != "PAPER_SIM"
-    ]
-    total_volume = sum(c.volume_24h_usd for c in real_connected_contracts if c.volume_24h_usd is not None)
-    total_oi = sum(c.open_interest_usd for c in real_connected_contracts if c.open_interest_usd is not None)
+    # Segregate regional metrics strictly (Never mix INR with USD without explicit normalization)
+    india_contracts = [c for c in contracts if c.exchange in ["NSE", "BSE", "MCX"] or c.currency == "INR" or c.market_data_provider in ["UPSTOX", "DHAN"]]
+    crypto_contracts = [c for c in contracts if c.exchange in ["BINANCE", "DELTA_INDIA", "DELTA"] or c.market_data_provider in ["BINANCE_USDM", "BINANCE_COINM", "DELTA_INDIA", "DELTA"]]
+    global_contracts = [c for c in contracts if c not in india_contracts and c not in crypto_contracts]
 
-    active_fundings = [
+    india_vol_inr = sum(c.volume_24h_usd for c in india_contracts if c.volume_24h_usd is not None)
+    india_oi_inr = sum(c.open_interest_usd for c in india_contracts if c.open_interest_usd is not None)
+
+    crypto_vol_usd = sum(c.volume_24h_usd for c in crypto_contracts if c.volume_24h_usd is not None)
+    crypto_oi_usd = sum(c.open_interest_usd for c in crypto_contracts if c.open_interest_usd is not None)
+
+    global_vol_usd = sum(c.volume_24h_usd for c in global_contracts if c.volume_24h_usd is not None)
+    global_oi_usd = sum(c.open_interest_usd for c in global_contracts if c.open_interest_usd is not None)
+
+    # Normalized USD Notional (INR / 83.9 + USD)
+    total_vol_usd = round(crypto_vol_usd + global_vol_usd + (india_vol_inr / 83.9), 2)
+    total_oi_usd = round(crypto_oi_usd + global_oi_usd + (india_oi_inr / 83.9), 2)
+
+    # Funding rate APR applies ONLY to perpetual contracts
+    perp_fundings = [
         c.funding_rate.funding_rate_annualized
-        for c in real_connected_contracts
-        if c.funding_rate and c.funding_rate.funding_rate_annualized is not None
+        for c in crypto_contracts
+        if c.contract_type.value == "PERPETUAL" and c.funding_rate and c.funding_rate.funding_rate_annualized is not None
     ]
-    avg_funding_apr = round(sum(active_fundings) / len(active_fundings), 2) if active_fundings else None
+    avg_funding_apr = round(sum(perp_fundings) / len(perp_fundings), 2) if perp_fundings else None
 
-    connected_providers = len(set(c.market_data_provider for c in real_connected_contracts))
+    connected_providers = len(set(c.market_data_provider for c in contracts if c.status in ["CONNECTED", "LIVE"] and c.market_data_provider != "PAPER_SIM"))
     total_providers = len(set(c.market_data_provider for c in contracts if c.market_data_provider != "PAPER_SIM")) or 5
 
     return jsonify({
         "status": "SUCCESS",
         "count": len(contracts),
-        "total_volume_usd": total_volume,
-        "total_open_interest_usd": total_oi,
+        "total_volume_usd": total_vol_usd,
+        "total_open_interest_usd": total_oi_usd,
+        "india_volume_inr": india_vol_inr,
+        "india_oi_inr": india_oi_inr,
+        "crypto_volume_usd": crypto_vol_usd,
+        "crypto_oi_usd": crypto_oi_usd,
+        "global_volume_usd": global_vol_usd,
+        "global_oi_usd": global_oi_usd,
         "avg_funding_rate_apr": avg_funding_apr,
         "connected_providers_count": connected_providers,
         "total_providers_count": total_providers,

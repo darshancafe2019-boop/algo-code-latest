@@ -86,10 +86,24 @@ class StockRepository:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_stock_sector ON stock_instruments(sector)")
 
     @classmethod
-    def upsert_instrument(cls, inst: StockInstrument) -> None:
+    def bulk_upsert_instruments(cls, insts: List[StockInstrument]) -> int:
+        """Atomically inserts or updates a list of stock instruments in a single database transaction."""
+        if not insts:
+            return 0
+        cls.init_schema()
+        rows = [
+            (
+                inst.instrument_id, inst.symbol, inst.company_name, inst.exchange, inst.region, inst.currency,
+                inst.instrument_type, inst.isin, inst.provider_token, inst.sector, inst.industry,
+                inst.market_cap_category, json.dumps(inst.index_memberships), inst.trading_status,
+                inst.tick_size, inst.lot_size, inst.session_timezone, inst.primary_provider,
+                1 if inst.is_fno_enabled else 0, inst.last_metadata_refresh, json.dumps(inst.metadata)
+            )
+            for inst in insts
+        ]
         with db.get_db_transaction() as conn:
             cursor = conn.cursor()
-            cursor.execute(
+            cursor.executemany(
                 """
                 INSERT OR REPLACE INTO stock_instruments (
                     instrument_id, symbol, company_name, exchange, region, currency,
@@ -99,14 +113,13 @@ class StockRepository:
                     is_fno_enabled, last_metadata_refresh, metadata
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (
-                    inst.instrument_id, inst.symbol, inst.company_name, inst.exchange, inst.region, inst.currency,
-                    inst.instrument_type, inst.isin, inst.provider_token, inst.sector, inst.industry,
-                    inst.market_cap_category, json.dumps(inst.index_memberships), inst.trading_status,
-                    inst.tick_size, inst.lot_size, inst.session_timezone, inst.primary_provider,
-                    1 if inst.is_fno_enabled else 0, inst.last_metadata_refresh, json.dumps(inst.metadata)
-                )
+                rows
             )
+        return len(rows)
+
+    @classmethod
+    def upsert_instrument(cls, inst: StockInstrument) -> None:
+        cls.bulk_upsert_instruments([inst])
 
     @classmethod
     def get_favorites(cls) -> List[str]:

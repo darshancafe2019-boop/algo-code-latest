@@ -26,6 +26,8 @@ import { ErrorBoundary } from "../ErrorBoundary";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { StocksUniverseView } from "@/src/features/markets/stocks";
+import { MarketStreamObservatory } from "@/components/live/MarketStreamObservatory";
+import { MarketDepthViewer } from "@/components/live/MarketDepthViewer";
 import {
   X,
   TrendingUp,
@@ -47,6 +49,8 @@ export function MarketUniverse() {
   const initialSearch = searchParams.get("search") || "";
 
   const [activeCategory, setActiveCategory] = useState<string>(initialCategory);
+  const [activeView, setActiveView] = useState<"TABLE" | "TOP_MOVERS" | "HEATMAP" | "STREAM" | "DEPTH" | "DIAGNOSTICS">("TABLE");
+  const [selectedProvider, setSelectedProvider] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>(initialSearch);
   const [selectedInstrument, setSelectedInstrument] = useState<MarketInstrument | null>(null);
   const [activeWatchlistId, setActiveWatchlistId] = useState<string>("wl_main");
@@ -149,7 +153,7 @@ export function MarketUniverse() {
       if (assetClassParam !== "ALL") params.set("asset_class", assetClassParam);
       if (debouncedSearch) params.set("query", debouncedSearch);
       if (filters.exchange !== "ALL") params.set("exchange", filters.exchange);
-      params.set("limit", "150");
+      params.set("limit", "500");
 
       try {
         const res = await apiClient.get<MarketUniverseResponse>(`/api/universe/instruments?${params.toString()}`);
@@ -245,6 +249,23 @@ export function MarketUniverse() {
       });
     }
 
+    // Provider filter
+    if (selectedProvider !== "ALL") {
+      const pFilter = selectedProvider.toLowerCase();
+      list = list.filter((it) => {
+        const prov = (it.provider || "").toLowerCase();
+        const ex = (it.exchange || "").toLowerCase();
+        if (pFilter === "dhan") return prov.includes("dhan") || ex === "dhan";
+        if (pFilter === "upstox") return prov.includes("upstox") || ex === "upstox";
+        if (pFilter === "delta") return prov.includes("delta") || ex === "delta";
+        if (pFilter === "binance") return prov.includes("binance") || ex === "binance";
+        if (pFilter === "oanda") return prov.includes("oanda") || ex === "oanda";
+        if (pFilter === "paper") return prov.includes("paper") || ex === "paper";
+        if (pFilter === "global") return prov.includes("global") || ex === "nasdaq" || ex === "nyse";
+        return true;
+      });
+    }
+
     // Price range filters
     if (filters.minPrice) {
       const min = parseFloat(filters.minPrice);
@@ -270,6 +291,7 @@ export function MarketUniverse() {
   }, [
     rawInstruments,
     activeCategory,
+    selectedProvider,
     optionsUnderlyingFilter,
     futuresUnderlyingFilter,
     filters,
@@ -293,6 +315,7 @@ export function MarketUniverse() {
 
   const activeFiltersCount = [
     filters.exchange !== "ALL",
+    selectedProvider !== "ALL",
     Boolean(filters.minPrice),
     Boolean(filters.maxPrice),
     Boolean(filters.minVolume),
@@ -320,6 +343,7 @@ export function MarketUniverse() {
         else if (p.includes("upstox")) active.add("UPSTOX");
         else if (p.includes("delta")) active.add("DELTA");
         else if (p.includes("binance")) active.add("BINANCE");
+        else if (p.includes("oanda")) active.add("OANDA");
       }
     });
 
@@ -407,6 +431,10 @@ export function MarketUniverse() {
           activeCategory={activeCategory}
           onSelectCategory={setActiveCategory}
           categoryCounts={categoryCounts}
+          activeView={activeView}
+          onSelectView={setActiveView}
+          selectedProvider={selectedProvider}
+          onSelectProvider={setSelectedProvider}
           onOpenFilters={() => setIsFilterDrawerOpen(true)}
           onOpenExplore={(view) => setExploreModalView(view)}
           onOpenDiagnostics={() => setIsDiagnosticsModalOpen(true)}
@@ -489,13 +517,63 @@ export function MarketUniverse() {
         </div>
       )}
 
-      {/* 4. Main Market Content Area: Unified Full-Width Table */}
-      <ErrorBoundary title="Market Table Error">
+      {/* 4. Main Market Content Area: Dynamic Sub-Views */}
+      <ErrorBoundary title="Market Main View Error">
         {isLoading && !universeData ? (
           <MarketSkeleton />
         ) : error && !universeData ? (
           <div className="p-6 bg-rose-950/40 border border-rose-800 rounded-2xl text-xs text-rose-300 font-mono">
             <span>Failed to load market universe: {(error as Error).message}</span>
+          </div>
+        ) : activeView === "TOP_MOVERS" ? (
+          <div className="w-full bg-[#0B111E] border border-slate-800 rounded-2xl p-4">
+            <TopMoversBoard
+              onSelectInstrument={(inst) => {
+                setSelectedInstrument(inst);
+                setActiveView("TABLE");
+              }}
+            />
+          </div>
+        ) : activeView === "HEATMAP" ? (
+          <div className="w-full bg-[#0B111E] border border-slate-800 rounded-2xl p-4">
+            <GlobalMarketHeatmap
+              onSelectInstrument={(inst) => {
+                setSelectedInstrument(inst);
+                setActiveView("TABLE");
+              }}
+            />
+          </div>
+        ) : activeView === "STREAM" ? (
+          <div className="w-full">
+            <MarketStreamObservatory />
+          </div>
+        ) : activeView === "DEPTH" ? (
+          <div className="w-full">
+            <MarketDepthViewer
+              quote={
+                selectedInstrument
+                  ? (getQuote(
+                      selectedInstrument.canonical_symbol || selectedInstrument.symbol || "",
+                      selectedInstrument.exchange,
+                      selectedInstrument.provider
+                    ) as any)
+                  : (quotes.get("NIFTY") || quotes.get("BTCUSDT") || null as any)
+              }
+              provider={selectedInstrument?.provider || "DELTA"}
+            />
+          </div>
+        ) : activeView === "DIAGNOSTICS" ? (
+          <div className="w-full bg-[#0B111E] border border-slate-800 rounded-2xl p-4">
+            <ProviderHealthDashboard
+              onSyncCompleted={() => {
+                queryClient.invalidateQueries({ queryKey: ["providerHealth"] });
+                queryClient.invalidateQueries({ queryKey: ["marketUniverseMaster"] });
+              }}
+            />
+          </div>
+        ) : activeCategory === "STOCKS" ? (
+          <div className="w-full min-w-0">
+            <StocksUniverseView />
           </div>
         ) : (
           <div className="w-full min-w-0">

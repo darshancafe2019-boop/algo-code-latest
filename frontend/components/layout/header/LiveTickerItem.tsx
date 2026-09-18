@@ -118,10 +118,11 @@ export const LiveTickerItem = memo(function LiveTickerItem({
       formattedP = formatMoney(currentPrice, currencySymbol);
     }
 
-    // Change percentage calculation
+    // Change percentage calculation using authoritative previous close
+    const baseClose = (quote as any)?.previous_close || (quote as any)?.close || quote?.open;
     let chgPct = quote?.change_pct ?? null;
-    if (chgPct === null && quote?.open && quote.open > 0 && currentPrice > 0) {
-      chgPct = ((currentPrice - quote.open) / quote.open) * 100;
+    if (chgPct === null && baseClose && baseClose > 0 && currentPrice !== null && currentPrice > 0) {
+      chgPct = ((currentPrice - baseClose) / baseClose) * 100;
     }
 
     const direction: "up" | "down" | "neutral" =

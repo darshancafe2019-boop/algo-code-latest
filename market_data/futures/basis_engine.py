@@ -29,7 +29,8 @@ class BasisEngine:
             spot_price = 1.0
 
         basis_abs = round(futures_price - spot_price, 4)
-        basis_pct = round((basis_abs / spot_price) * 100, 3)
+        basis_pct_raw = (basis_abs / spot_price) * 100
+        basis_pct = round(basis_pct_raw, 3)
 
         # Contango / Backwardation regime
         if basis_pct > 0.05:
@@ -41,7 +42,7 @@ class BasisEngine:
 
         # Annualized basis for cash-and-carry
         days = days_to_expiry if days_to_expiry and days_to_expiry > 0 else 30
-        annualized = round((basis_pct / days) * 365, 2)
+        annualized = round((basis_pct_raw / days) * 365, 2)
 
         return BasisData(
             symbol=symbol,

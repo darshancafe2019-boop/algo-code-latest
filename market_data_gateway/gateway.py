@@ -27,6 +27,8 @@ from aiohttp import web
 
 from market_data_gateway.adapters.base import NormalizedQuote, ProviderHealth
 from market_data_gateway.adapters.binance_ws import BinanceWSAdapter
+from market_data_gateway.adapters.binance_usdm_ws import BinanceUSDMWSAdapter
+from market_data_gateway.adapters.binance_coinm_ws import BinanceCoinMWSAdapter
 from market_data_gateway.adapters.upstox_ws import UpstoxWSAdapter
 from market_data_gateway.adapters.dhan_ws import DhanWSAdapter
 from market_data_gateway.adapters.fyers_ws import FyersWSAdapter
@@ -34,6 +36,7 @@ from market_data_gateway.adapters.simulation_feed import SimulationFeedAdapter
 from market_data_gateway.adapters.angelone_smartapi import AngelOneAdapter
 from market_data_gateway.adapters.yahoo_fallback import YahooFallbackAdapter
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
+from market_data_gateway.adapters.oanda_ws import OandaWSAdapter
 from market_data_gateway.adapters.twelve_data_ws import TwelveDataWSAdapter
 from market_data_gateway.adapters.alpaca_iex_ws import AlpacaIEXWSAdapter
 from market_data_gateway.adapters.not_configured_stub import NotConfiguredAdapter
@@ -198,10 +201,13 @@ class MarketDataGateway:
                     "Set ALPACA_API_KEY and ALPACA_API_SECRET in .env to activate",
                 ),
                 "binance_ws": BinanceWSAdapter(),
+                "binance_usdm": BinanceUSDMWSAdapter(),
+                "binance_coinm": BinanceCoinMWSAdapter(),
                 "delta_options_ws": DeltaOptionsWSAdapter(),
                 "dhan_ws": DhanWSAdapter(),
                 "upstox_ws": UpstoxWSAdapter(),
                 "fyers_ws": FyersWSAdapter(),
+                "oanda": OandaWSAdapter(),
                 "sim_feed": SimulationFeedAdapter(),
                 "angelone": AngelOneAdapter(),
                 "yahoo_fallback": YahooFallbackAdapter(poll_interval_sec=60.0),
@@ -875,6 +881,7 @@ class MarketDataGateway:
                         reason = cmd.get("reason", "CHART_VIEW")
 
                         if action == "subscribe":
+                            provider_hint = cmd.get("provider")
                             for sym in syms:
                                 subscriptions.add(sym)
                                 self.subscription_registry.subscribe(sym, reason, source=client_id)
@@ -889,6 +896,39 @@ class MarketDataGateway:
                             for sym in syms:
                                 subscriptions.discard(sym)
                                 self.subscription_registry.unsubscribe(sym, reason, source=client_id)
+                        elif action == "change_depth":
+                            depth_levels = int(cmd.get("depth", 5))
+                            symbol = cmd.get("symbol", "").upper()
+                            logger.info("[GATEWAY][WS] Client %s changed depth to %d for %s", client_id, depth_levels, symbol)
+                            await ws.send_str(json.dumps({
+                                "type": "DEPTH_CONFIG",
+                                "symbol": symbol,
+                                "depth": depth_levels,
+                                "status": "APPLIED",
+                            }))
+                        elif action == "select_provider":
+                            provider_name = cmd.get("provider", "").lower()
+                            logger.info("[GATEWAY][WS] Client %s selected provider %s", client_id, provider_name)
+                            await ws.send_str(json.dumps({
+                                "type": "PROVIDER_SELECTED",
+                                "provider": provider_name,
+                                "status": "ACTIVE",
+                            }))
+                        elif action == "select_symbol":
+                            symbol = cmd.get("symbol", "").upper()
+                            if symbol:
+                                subscriptions.add(symbol)
+                                self.subscription_registry.subscribe(symbol, "DETAIL_VIEW", source=client_id)
+                                if symbol in self._quote_cache:
+                                    await ws.send_str(json.dumps({
+                                        "type": "QUOTE",
+                                        "data": self._quote_cache[symbol].to_dict(),
+                                    }))
+                        elif action == "ping":
+                            await ws.send_str(json.dumps({
+                                "type": "PONG",
+                                "timestamp": datetime.now(timezone.utc).isoformat(),
+                            }))
                         elif action == "snapshot":
                             result = {}
                             for sym in syms:

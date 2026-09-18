@@ -43,8 +43,12 @@ export const GlobalStatusRail = memo(function GlobalStatusRail({
     refetchInterval: 8000,
   });
 
-  const liveProvidersCount = providers.filter((p) => p.status === "LIVE").length || 2;
-  const totalProvidersCount = providers.length || 4;
+  const liveProvidersCount = Array.isArray(providers)
+    ? providers.filter((p) => p.status === "LIVE" || p.health === "HEALTHY").length
+    : 0;
+  const totalProvidersCount = Array.isArray(providers) && providers.length > 0
+    ? providers.length
+    : (statusData?.providers_count ?? (providers?.length || 0));
   const isKillSwitchActive = Boolean(
     riskSummary?.globalKillSwitchActive || statusData?.system_summary?.kill_switch_active
   );

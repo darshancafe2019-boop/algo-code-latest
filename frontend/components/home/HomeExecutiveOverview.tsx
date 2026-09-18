@@ -11,9 +11,6 @@ import {
   Percent,
   CheckCircle2,
   Lock,
-  ExternalLink,
-  Play,
-  Pause,
   ChevronRight,
   BarChart2,
   MoreVertical,
@@ -23,19 +20,12 @@ import {
   formatCurrency,
   formatPercent,
   formatDecimal,
-  formatQuantity,
   toFiniteNumber,
   safeArray,
 } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
-import {
-  normalizePositions,
-  normalizeOrders,
-  NormalizedPosition,
-  NormalizedOrder,
-} from "@/lib/normalizers/financialNormalizers";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { cn } from "@/lib/utils";
 import { DashboardDataDiagnosticsPanel } from "./DashboardDataDiagnosticsPanel";
@@ -52,17 +42,23 @@ function LiveMarketIndexRow({
   onSelect: (sym: string) => void;
 }) {
   const quote = useSymbolQuote(symbol);
-  const ltp = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (fallback?.ltp && fallback.ltp > 0 ? fallback.ltp : null);
-  const prevClose = quote?.previousClose && quote.previousClose > 0 
+  const rawLtp = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (fallback?.ltp && fallback.ltp > 0 ? fallback.ltp : null);
+  const ltp = rawLtp !== null && rawLtp > 0 ? rawLtp : null;
+
+  const rawPrevClose = quote?.previousClose && quote.previousClose > 0 
     ? quote.previousClose 
     : (fallback?.previousClose && fallback.previousClose > 0 ? fallback.previousClose : null);
+  const prevClose = rawPrevClose !== null && rawPrevClose > 0 ? rawPrevClose : null;
   
-  const change = ltp !== null && prevClose !== null ? ltp - prevClose : (quote?.change !== undefined ? quote.change : null);
+  const change = ltp !== null && prevClose !== null 
+    ? ltp - prevClose 
+    : (ltp !== null && quote?.change !== undefined && quote.change !== null ? quote.change : (ltp !== null && fallback?.change !== undefined && fallback.change !== null ? fallback.change : null));
+
   const changePct = ltp !== null && prevClose !== null && prevClose > 0 
     ? ((ltp - prevClose) / prevClose) * 100 
-    : (quote?.changePercent !== undefined ? quote.changePercent : null);
+    : (ltp !== null && quote?.changePercent !== undefined && quote.changePercent !== null ? quote.changePercent : (ltp !== null && fallback?.pct !== undefined && fallback.pct !== null ? fallback.pct : null));
     
-  const isUp = (changePct ?? 0) >= 0;
+  const isUp = changePct !== null ? changePct >= 0 : true;
   const isLive = quote ? (!quote.isStale && quote.status === "LIVE") : (fallback?.status === "LIVE");
   const flash = quote?.flashDirection;
 
@@ -104,102 +100,6 @@ function LiveMarketIndexRow({
   );
 }
 
-function LivePositionTableRow({
-  pos,
-  idx,
-  onClose,
-}: {
-  pos: NormalizedPosition;
-  idx: number;
-  onClose: (pos: NormalizedPosition) => void;
-}) {
-  const quote = useSymbolQuote(pos.symbol);
-  const livePrice = quote?.lastPrice && quote.lastPrice > 0 ? quote.lastPrice : (pos.currentPrice || pos.entryPrice || 0);
-  const isLong = pos.direction === "LONG";
-  const entryPrice = pos.entryPrice || 1;
-  const qty = pos.quantity || 1;
-  const livePnl = isLong ? (livePrice - entryPrice) * qty : (entryPrice - livePrice) * qty;
-  const livePnlPct = entryPrice > 0 ? (livePnl / (entryPrice * qty)) * 100 : 0;
-  const isPnlPositive = livePnl >= 0;
-  const flash = quote?.flashDirection;
-  const isLive = quote ? !quote.isStale : true;
-
-  return (
-    <tr className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
-      <td className="font-semibold text-[#F8FAFC]">
-        <div className="flex items-center gap-1.5">
-          <span>{pos.symbol}</span>
-          <span className="text-[9px] font-mono text-[#7D8EA5] px-1 py-0.2 rounded bg-[#10263A]">
-            {pos.executionBroker || "Paper"}
-          </span>
-          <span
-            className={cn("h-1.5 w-1.5 rounded-full", isLive ? "bg-[#00E89A]" : "bg-[#F59E0B]")}
-            title={isLive ? "Live Feed" : "Stale"}
-          />
-        </div>
-      </td>
-      <td className="text-center">
-        <span
-          className={cn(
-            "px-2 py-0.5 rounded-[6px] text-[10px] font-semibold",
-            isLong
-              ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
-              : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
-          )}
-        >
-          {pos.direction}
-        </span>
-      </td>
-      <td className="text-right text-[#F8FAFC] tabular-nums">
-        {formatQuantity(pos.quantity)}
-      </td>
-      <td className="text-right text-[#7D8EA5] tabular-nums">
-        {formatCurrency(pos.entryPrice, "₹", 2)}
-      </td>
-      <td className="text-right text-[#F8FAFC] tabular-nums font-medium">
-        <span
-          className={cn(
-            "transition-all duration-200 px-1 py-0.5 rounded",
-            flash === "up" && "bg-emerald-950/80 text-emerald-300 font-bold",
-            flash === "down" && "bg-red-950/80 text-red-300 font-bold"
-          )}
-        >
-          {formatCurrency(livePrice, "₹", 2)}
-        </span>
-      </td>
-      <td
-        className={cn(
-          "text-right font-semibold tabular-nums",
-          isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
-        )}
-      >
-        {isPnlPositive ? `+${formatCurrency(livePnl, "₹", 2)}` : formatCurrency(livePnl, "₹", 2)}
-      </td>
-      <td
-        className={cn(
-          "text-right font-medium tabular-nums",
-          isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
-        )}
-      >
-        {formatPercent(livePnlPct, 2, "—", false, true)}
-      </td>
-      <td className="text-center">
-        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
-          ● {pos.status || "OPEN"}
-        </span>
-      </td>
-      <td className="text-right">
-        <button
-          onClick={() => onClose(pos)}
-          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-red-950/60 hover:bg-red-900 text-red-300 border border-red-800/60 transition"
-        >
-          Exit
-        </button>
-      </td>
-    </tr>
-  );
-}
-
 export function HomeExecutiveOverview() {
   const router = useRouter();
   const {
@@ -212,7 +112,6 @@ export function HomeExecutiveOverview() {
   const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
   const feedHealth = useFeedHealth();
 
-  const [activeLedgerTab, setActiveLedgerTab] = useState<"positions" | "orders" | "bots" | "strategies">("positions");
   const [topMoversFilter, setTopMoversFilter] = useState<"gainers" | "losers" | "active">("gainers");
   const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
 
@@ -238,7 +137,7 @@ export function HomeExecutiveOverview() {
   }, [subscribe, unsubscribe, rawPositions]);
 
   // 2. Fetch Authoritative Dashboard Snapshot (Requirement 33)
-  const { data: snapshotData } = useQuery({
+  const { data: snapshotData, isLoading: isSnapshotLoading, isError: isSnapshotError } = useQuery({
     queryKey: ["dashboardSnapshot", tradingMode],
     queryFn: async () => {
       const res = await apiClient.get<any>(`/api/dashboard/snapshot?mode=${tradingMode}`, { timeoutMs: 5000 });
@@ -265,57 +164,6 @@ export function HomeExecutiveOverview() {
     };
   }, [snapshotData?.movers, subscribe, unsubscribe]);
 
-  // 3. Fetch Active Bots Fleet
-  const { data: botsData } = useQuery({
-    queryKey: ["homeBotsFleet", tradingMode],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/bots", { timeoutMs: 4000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return Array.isArray(data) ? data : data?.bots || data?.instances || [];
-    },
-    staleTime: 5000,
-    refetchInterval: 8000,
-  });
-
-  // 4. Fetch Active Strategies
-  const { data: strategiesData } = useQuery({
-    queryKey: ["homeStrategiesList"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/strategies/visual", { timeoutMs: 4000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return Array.isArray(data) ? data : data?.strategies || [];
-    },
-    staleTime: 10000,
-  });
-
-  // 5. Fetch Recent Alerts
-  const { data: alertsData } = useQuery({
-    queryKey: ["homeAlertsList"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/alerts", { timeoutMs: 4000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return Array.isArray(data) ? data : data?.notifications || data?.alerts || [];
-    },
-    staleTime: 4000,
-    refetchInterval: 8000,
-  });
-
-  // 6. Fetch System Logs
-  const { data: logsData } = useQuery({
-    queryKey: ["homeLogsList"],
-    queryFn: async () => {
-      const res = await apiClient.get<any>("/api/logs?limit=8", { timeoutMs: 4000 });
-      if (!res.ok) return [];
-      const data = res.data;
-      return Array.isArray(data) ? data : data?.logs || data?.records || [];
-    },
-    staleTime: 4000,
-    refetchInterval: 8000,
-  });
-
   // ── Authoritative Financial Metrics ──────────────────────────────────────
   const balance = portfolioSnapshot?.equity ?? snapshotData?.portfolio?.equity ?? null;
   const todaysPnl = portfolioSnapshot?.dailyPnl ?? snapshotData?.pnl?.dailyPnl ?? 0;
@@ -336,6 +184,7 @@ export function HomeExecutiveOverview() {
         quotes.get(upperSym) || 
         quotes.get(sym.replace(" 50", "").toUpperCase()) ||
         quotes.get(`NSE:${sym.replace(" 50", "").toUpperCase()}`) ||
+        quotes.get(`NSE_INDEX|${sym}`) ||
         quotes.get(`BSE:${sym.toUpperCase()}`);
 
       const snapshotItem = snapshotIndices.find(
@@ -344,29 +193,39 @@ export function HomeExecutiveOverview() {
 
       if (liveQuote && liveQuote.last_price > 0) {
         const ltp = liveQuote.last_price;
-        const changePct = liveQuote.change_pct ?? (snapshotItem?.pct || 0);
-        const change = liveQuote.open ? ltp - liveQuote.open : (changePct * ltp) / 100;
-        const prevClose = liveQuote.open || snapshotItem?.previousClose || (ltp - change);
+        const prevClose = liveQuote.close || liveQuote.open || snapshotItem?.previousClose || null;
+        let changePct = liveQuote.change_pct;
+        if (changePct === null && prevClose && prevClose > 0) {
+          changePct = ((ltp - prevClose) / prevClose) * 100;
+        } else if (changePct === null && snapshotItem?.pct !== undefined) {
+          changePct = snapshotItem.pct;
+        }
+        const change = prevClose && prevClose > 0 ? ltp - prevClose : (changePct !== null ? (changePct * ltp) / 100 : null);
         return {
           symbol: sym,
           ltp,
           previousClose: prevClose,
-          change: Math.abs(change),
+          change: change !== null ? Math.abs(change) : null,
           pct: changePct,
-          isUp: changePct >= 0,
+          isUp: (changePct ?? 0) >= 0,
           source: liveQuote.provider || "Gateway",
           status: liveQuote.is_stale ? "STALE" : "LIVE",
           lastTick: liveQuote.received_timestamp || new Date().toISOString(),
         };
       }
 
+      const ltp = snapshotItem?.ltp && snapshotItem.ltp > 0 ? snapshotItem.ltp : null;
+      const prevClose = snapshotItem?.previousClose && snapshotItem.previousClose > 0 ? snapshotItem.previousClose : null;
+      const pct = ltp !== null ? (snapshotItem?.pct ?? null) : null;
+      const change = ltp !== null && prevClose !== null ? ltp - prevClose : (ltp !== null ? (snapshotItem?.change ?? null) : null);
+
       return {
         symbol: sym,
-        ltp: snapshotItem?.ltp || 0,
-        previousClose: snapshotItem?.previousClose || 0,
-        change: snapshotItem?.change || 0,
-        pct: snapshotItem?.pct || 0,
-        isUp: (snapshotItem?.pct || 0) >= 0,
+        ltp,
+        previousClose: prevClose,
+        change: change !== null ? Math.abs(change) : null,
+        pct,
+        isUp: (pct ?? 0) >= 0,
         source: snapshotItem?.source || "Gateway Cache",
         status: snapshotItem?.status || (feedHealth.connectionStatus === "LIVE" ? "LIVE" : "LAST_TRADED"),
         lastTick: snapshotItem?.lastTick || snapshotItem?.timestamp || new Date().toISOString(),
@@ -388,16 +247,21 @@ export function HomeExecutiveOverview() {
       const liveQuote = quotes.get(symUpper) || quotes.get(`NSE:${symUpper}`);
       if (liveQuote && liveQuote.last_price > 0) {
         const ltp = liveQuote.last_price;
-        const changePct = liveQuote.change_pct ?? (mover.pct || 0);
-        const change = liveQuote.open ? ltp - liveQuote.open : (changePct * ltp) / 100;
-        const prevClose = liveQuote.open || mover.previousClose || (ltp - change);
+        const prevClose = liveQuote.close || liveQuote.open || mover.previousClose || null;
+        let changePct = liveQuote.change_pct;
+        if (changePct === null && prevClose && prevClose > 0) {
+          changePct = ((ltp - prevClose) / prevClose) * 100;
+        } else if (changePct === null && mover.pct !== undefined) {
+          changePct = mover.pct;
+        }
+        const change = prevClose && prevClose > 0 ? ltp - prevClose : (changePct !== null ? (changePct * ltp) / 100 : 0);
         return {
           ...mover,
           ltp,
           previousClose: prevClose,
           change: Math.abs(change),
           pct: changePct,
-          isUp: changePct >= 0,
+          isUp: (changePct ?? 0) >= 0,
           source: liveQuote.provider || mover.source || "Gateway",
           isLive: !liveQuote.is_stale,
         };
@@ -409,122 +273,6 @@ export function HomeExecutiveOverview() {
       };
     });
   }, [snapshotData?.movers, topMoversFilter, quotes]);
-
-  // ── Real Broker Connections ──────────────────────────────────────────────
-  const rawBrokers = snapshotData?.brokers || [];
-  const brokers = rawBrokers.length > 0 ? rawBrokers.map((b: any) => ({
-    name: b.name || b.id,
-    status: b.auth_status === "HEALTHY" && b.rest_status === "HEALTHY" ? "ONLINE" : (b.auth_status === "AUTH_FAILED" ? "AUTH_FAILED" : (b.configured ? "ONLINE" : "ACTIVE")),
-    latency: b.latency_ms ? `${Math.round(b.latency_ms)}ms` : "—",
-    isLive: b.configured ?? true,
-    isPaper: b.id === "PAPER_ENGINE" || b.id === "QUANTOS_PAPER",
-  })) : [];
-
-  // ── Real System Health ───────────────────────────────────────────────────
-  const systemHealth = snapshotData?.health?.services || [];
-
-  // ── Real Normalized Positions & Live MTM P&L ─────────────────────────────
-  const normalizedPositions = useMemo(() => {
-    const rawList = safeArray(rawPositions);
-    const normalized = normalizePositions(rawList);
-
-    // Enrich each position with real-time mark-to-market LTP from MarketGateway quotes
-    return normalized.map((pos) => {
-      const quote = quotes.get(pos.symbol.toUpperCase());
-      const livePrice = quote?.last_price && quote.last_price > 0 ? quote.last_price : pos.currentPrice;
-      const isLong = pos.direction === "LONG";
-      const entryPrice = pos.entryPrice || 1;
-      const qty = pos.quantity || 1;
-      const livePnl = isLong ? (livePrice - entryPrice) * qty : (entryPrice - livePrice) * qty;
-      const livePnlPct = entryPrice > 0 ? (livePnl / (entryPrice * qty)) * 100 : 0;
-
-      return {
-        ...pos,
-        currentPrice: livePrice,
-        pnl: livePnl !== null && !isNaN(livePnl) ? Number(livePnl.toFixed(2)) : null,
-        pnlPct: livePnlPct !== null && !isNaN(livePnlPct) ? Number(livePnlPct.toFixed(2)) : null,
-        feedStatus: quote?.is_stale ? "STALE" : "LIVE",
-      };
-    });
-  }, [rawPositions, quotes]);
-
-  // ── Real Normalized Orders ───────────────────────────────────────────────
-  const normalizedOrders = useMemo(() => {
-    const rawList = safeArray(rawOrders);
-    return normalizeOrders(rawList);
-  }, [rawOrders]);
-
-  // ── Real Active Bots Fleet ───────────────────────────────────────
-  const displayBots = useMemo(() => {
-    const rawList = safeArray(botsData);
-    return rawList.map((bot: any, idx: number) => ({
-      id: bot.id || `bot-${idx}`,
-      name: bot.name || bot.slug || "Trading Bot",
-      broker: bot.broker || (bot.execution_mode === "PAPER" ? "Paper Simulator" : "Dhan HQ"),
-      instrument: bot.symbol || bot.instrument || "NIFTY",
-      strategy: bot.strategy || bot.strategy_name || "EMA Breakout",
-      timeframe: bot.timeframe || "5m",
-      status: (bot.status || "IDLE").toUpperCase(),
-      capital: bot.allocated_capital ? formatCurrency(bot.allocated_capital, "₹", 0) : "₹1,00,000",
-      pnl: bot.current_pnl !== undefined ? (bot.current_pnl >= 0 ? `+${formatCurrency(bot.current_pnl, "₹", 0)}` : formatCurrency(bot.current_pnl, "₹", 0)) : "₹0",
-    }));
-  }, [botsData]);
-
-  // ── Real Saved Strategies ────────────────────────────────────────────────
-  const displayStrategies = useMemo(() => {
-    const rawList = safeArray(strategiesData);
-    if (rawList.length > 0) {
-      return rawList.map((st: any, idx: number) => ({
-        name: st.name || st.title || `Strategy #${idx + 1}`,
-        instrument: st.symbol || st.instrument || "MULTI-ASSET",
-        type: st.type || (st.asset_class ? st.asset_class.replace("_", " ") : "Options / Equities"),
-        winRate: st.win_rate ? formatPercent(st.win_rate, 1) : "—",
-        profitFactor: st.profit_factor ? formatDecimal(st.profit_factor, 2) : "—",
-        status: (st.status || "ACTIVE").toUpperCase(),
-      }));
-    }
-    return [
-      { name: "Institutional 0-DTE Straddle", instrument: "NIFTY", type: "Options", winRate: "72.4%", profitFactor: "2.14", status: "ACTIVE" },
-      { name: "Multi-Timeframe Trend Confluence", instrument: "CRYPTO / PERP", type: "Futures", winRate: "66.0%", profitFactor: "1.95", status: "ACTIVE" },
-      { name: "Intraday VWAP Pullback", instrument: "NSE EQUITIES", type: "Equities", winRate: "64.2%", profitFactor: "1.78", status: "ACTIVE" },
-      { name: "Delta Neutral Iron Condor", instrument: "BANKNIFTY", type: "Options", winRate: "78.1%", profitFactor: "2.35", status: "ACTIVE" },
-      { name: "Orderbook Imbalance Scalper", instrument: "BTC / USDT", type: "High-Freq", winRate: "69.5%", profitFactor: "2.05", status: "ACTIVE" },
-    ];
-  }, [strategiesData]);
-
-  // ── Real Alerts & Logs ───────────────────────────────────────────────────
-  const recentAlerts = useMemo(() => {
-    const rawList = safeArray(alertsData);
-    if (rawList.length > 0) {
-      return rawList.slice(0, 5).map((a: any) => {
-        const level = (a.level || a.severity || "INFO").toUpperCase();
-        return {
-          text: a.message || a.title || a.text || "System Alert",
-          time: a.timestamp ? a.timestamp.substring(11, 19) : new Date().toLocaleTimeString(),
-          type: level === "CRITICAL" || level === "ERROR" ? "orange" : (level === "WARNING" ? "amber" : "blue"),
-        };
-      });
-    }
-    return snapshotData?.alerts || [
-      { text: "Dhan HQ feed connected • 42ms ping • Normal operation", time: new Date().toLocaleTimeString(), type: "blue" },
-      { text: "Paper execution engine operational • Zero risk breaches", time: new Date().toLocaleTimeString(), type: "blue" },
-    ];
-  }, [alertsData, snapshotData]);
-
-  const systemLogs = useMemo(() => {
-    const rawList = safeArray(logsData);
-    if (rawList.length > 0) {
-      return rawList.slice(0, 5).map((l: any) => ({
-        text: typeof l === "string" ? l : (l.message || l.text || JSON.stringify(l)),
-        time: l.timestamp ? l.timestamp.substring(11, 19) : new Date().toLocaleTimeString(),
-        isCyan: true,
-      }));
-    }
-    return snapshotData?.logs || [
-      { text: "Market gateway active on port 5051 • Unified tick stream", time: new Date().toLocaleTimeString(), isCyan: true },
-      { text: "Authoritative P&L reconciliation passed (0 discrepancies)", time: new Date().toLocaleTimeString(), isGreen: true },
-    ];
-  }, [logsData, snapshotData]);
 
   return (
     <div className="w-full space-y-3.5 font-sans max-w-[1600px] mx-auto px-4 pt-4 pb-12 bg-[#05101A]">
@@ -650,10 +398,10 @@ export function HomeExecutiveOverview() {
         </div>
       </div>
 
-      {/* ── 2. FIRST MAIN ROW: THREE-COLUMN STRUCTURE ───────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-        {/* LEFT COLUMN: MARKET INDICES (Col-Span 4) */}
-        <div className="lg:col-span-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
+      {/* ── 2. FIRST MAIN ROW: TWO-COLUMN STRUCTURE (MARKET INDICES + TOP MOVERS) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5">
+        {/* LEFT COLUMN: MARKET INDICES */}
+        <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[#10263A]">
               <div className="flex items-center gap-2">
@@ -737,8 +485,8 @@ export function HomeExecutiveOverview() {
           </div>
         </div>
 
-        {/* CENTER COLUMN: TOP MOVERS (NSE) (Col-Span 4) */}
-        <div className="lg:col-span-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
+        {/* RIGHT COLUMN: TOP MOVERS (NSE) */}
+        <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[#10263A]">
               <span className="text-[13px] font-bold text-[#F8FAFC] uppercase tracking-wider">TOP MOVERS (NSE)</span>
@@ -799,8 +547,22 @@ export function HomeExecutiveOverview() {
                     <tr>
                       <td colSpan={4} className="text-center py-6 text-[#7D8EA5]">
                         <div className="flex flex-col items-center justify-center gap-1">
-                          <Activity className="h-4 w-4 text-[#7D8EA5]/60 animate-pulse" />
-                          <span>Aggregating active market universe...</span>
+                          {isSnapshotLoading ? (
+                            <>
+                              <Activity className="h-4 w-4 text-[#7D8EA5]/60 animate-pulse" />
+                              <span>Fetching top market movers...</span>
+                            </>
+                          ) : isSnapshotError || feedHealth.connectionStatus === "DISCONNECTED" ? (
+                            <>
+                              <span className="text-amber-400 font-medium">Market feed offline</span>
+                              <span className="text-[10px] text-slate-500">Standby for tick updates</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-slate-400 font-medium">No active movers in this session</span>
+                              <span className="text-[10px] text-slate-500">Awaiting market ticks</span>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -840,542 +602,6 @@ export function HomeExecutiveOverview() {
           <div className="pt-2 mt-2 border-t border-[#10263A] flex items-center justify-between text-[10px] text-[#7D8EA5]">
             <span>Universe: <span className="text-[#F8FAFC]">NSE Equities</span></span>
             <span>Source: <span className="text-[#22D3EE] font-medium">{currentTopMovers[0]?.source || "Market Gateway"}</span></span>
-          </div>
-        </div>
-
-        {/* RIGHT COLUMN: BROKER CONNECTIONS + SYSTEM HEALTH + TRADING MODE (Col-Span 4) */}
-        <div className="lg:col-span-4 space-y-3.5">
-          {/* BROKER CONNECTIONS PANEL */}
-          <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">BROKER CONNECTIONS</span>
-              <span className="text-[10px] font-semibold text-[#00E89A] flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
-                4/4 ONLINE
-              </span>
-            </div>
-
-            <div className="space-y-1.5">
-              {brokers.map((broker: any) => (
-                <div
-                  key={broker.name}
-                  onClick={() => router.push("/security")}
-                  className="px-2.5 py-1.5 rounded-lg bg-[#0C1727] border border-[#12304A] hover:border-[#168BFF]/40 transition-colors cursor-pointer flex items-center justify-between text-[11px]"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className={cn("h-2 w-2 rounded-full", broker.status === "ONLINE" || broker.status === "ACTIVE" ? "bg-[#00E89A]" : "bg-[#F59E0B]")} />
-                    <span className="font-medium text-[#F8FAFC]">{broker.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-[#00E89A]/10 text-[#00E89A] border border-[#00E89A]/20">
-                      {broker.status}
-                    </span>
-                    <span className="text-[#22D3EE] font-mono tabular-nums text-[11px]">{broker.latency}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SYSTEM HEALTH PANEL */}
-          <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">SYSTEM HEALTH</span>
-              <span className="text-[10px] font-medium text-[#7D8EA5]">TELEMETRY</span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-              {systemHealth.map((item: any) => (
-                <div
-                  key={item.service}
-                  className="flex items-center justify-between py-0.5"
-                >
-                  <span className="text-[#7D8EA5]">{item.service}</span>
-                  <div className="flex items-center gap-1 text-[#00E89A]">
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A]" />
-                    <span className="font-medium text-[10px]">{item.status}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* TRADING MODE PANEL */}
-          <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3">
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">TRADING MODE</span>
-              <span className="text-[10px] uppercase text-[#17C5FF] bg-[#17C5FF]/10 px-1.5 py-0.2 rounded border border-[#17C5FF]/30 font-semibold">
-                ACTIVE: {tradingMode}
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-1.5">
-              {/* PAPER */}
-              <button
-                type="button"
-                className="h-[34px] flex items-center justify-between px-2.5 rounded-lg bg-[#168BFF]/15 border border-[#168BFF] text-[#17C5FF] text-[11px] font-bold cursor-pointer shadow-xs"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#22D3EE]" />
-                  <span>PAPER</span>
-                </div>
-                <span className="text-[9px] font-bold text-[#22D3EE]">ACTIVE</span>
-              </button>
-
-              {/* SHADOW */}
-              <button
-                type="button"
-                className="h-[34px] flex items-center justify-between px-2.5 rounded-lg bg-[#0C1727] border border-[#12304A] hover:border-[#7C3AED]/50 text-[#7C3AED] text-[11px] font-medium cursor-pointer"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#7C3AED]" />
-                  <span>SHADOW</span>
-                </div>
-              </button>
-
-              {/* LIVE LOCKED */}
-              <button
-                type="button"
-                disabled
-                className="h-[34px] flex items-center justify-between px-2.5 rounded-lg bg-[#0C1727] border border-[#12304A] text-[#F59E0B] text-[11px] font-medium opacity-90 cursor-not-allowed"
-              >
-                <div className="flex items-center gap-1.5">
-                  <Lock className="h-3 w-3 text-[#F59E0B]" />
-                  <span>LOCKED</span>
-                </div>
-                <span className="text-[9px] text-[#F59E0B] font-semibold">SAFETY</span>
-              </button>
-
-              {/* LIVE */}
-              <button
-                type="button"
-                disabled
-                className="h-[34px] flex items-center justify-between px-2.5 rounded-lg bg-[#0C1727]/50 border border-[#12304A]/50 text-[#52627A] text-[11px] font-medium cursor-not-allowed"
-              >
-                <div className="flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-[#FF3B5C]/40" />
-                  <span>LIVE</span>
-                </div>
-                <span className="text-[9px] text-[#52627A]">OFF</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ── 3. FULL-WIDTH POSITIONS / LEDGER PANEL ───────────────── */}
-      <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-4">
-        {/* Tab Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-2 border-b border-[#10263A]">
-          <div className="flex items-center gap-1 bg-[#05101A] p-1 rounded-lg border border-[#12304A]">
-            <button
-              type="button"
-              onClick={() => setActiveLedgerTab("positions")}
-              className={cn(
-                "h-[32px] px-3.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
-                activeLedgerTab === "positions"
-                  ? "bg-[#0F6FD9] text-[#F8FAFC] border border-[#0EA5E9] shadow-xs"
-                  : "bg-transparent text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422]"
-              )}
-            >
-              Positions ({normalizedPositions.length})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveLedgerTab("orders")}
-              className={cn(
-                "h-[32px] px-3.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
-                activeLedgerTab === "orders"
-                  ? "bg-[#0F6FD9] text-[#F8FAFC] border border-[#0EA5E9] shadow-xs"
-                  : "bg-transparent text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422]"
-              )}
-            >
-              Orders ({normalizedOrders.length})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveLedgerTab("bots")}
-              className={cn(
-                "h-[32px] px-3.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
-                activeLedgerTab === "bots"
-                  ? "bg-[#0F6FD9] text-[#F8FAFC] border border-[#0EA5E9] shadow-xs"
-                  : "bg-transparent text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422]"
-              )}
-            >
-              Bots ({displayBots.length})
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveLedgerTab("strategies")}
-              className={cn(
-                "h-[32px] px-3.5 rounded-md text-[12px] font-semibold transition-colors cursor-pointer",
-                activeLedgerTab === "strategies"
-                  ? "bg-[#0F6FD9] text-[#F8FAFC] border border-[#0EA5E9] shadow-xs"
-                  : "bg-transparent text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422]"
-              )}
-            >
-              Strategies ({displayStrategies.length})
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (activeLedgerTab === "positions") router.push("/positions");
-              else if (activeLedgerTab === "orders") router.push("/orders");
-              else if (activeLedgerTab === "bots") router.push("/bots");
-              else if (activeLedgerTab === "strategies") router.push("/strategies");
-            }}
-            className="flex items-center gap-1 text-[11px] font-medium text-[#22D3EE] hover:underline cursor-pointer"
-          >
-            <span>Full View</span>
-            <ExternalLink className="h-3 w-3" />
-          </button>
-        </div>
-
-        {/* Tab 1: Positions Table */}
-        {activeLedgerTab === "positions" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[34px]">
-                  <th className="pb-1.5 text-left font-medium">Symbol</th>
-                  <th className="pb-1.5 text-center font-medium">Type</th>
-                  <th className="pb-1.5 text-right font-medium">Qty</th>
-                  <th className="pb-1.5 text-right font-medium">Avg Price</th>
-                  <th className="pb-1.5 text-right font-medium">LTP</th>
-                  <th className="pb-1.5 text-right font-medium">P&L</th>
-                  <th className="pb-1.5 text-right font-medium">P&L %</th>
-                  <th className="pb-1.5 text-center font-medium">Status</th>
-                  <th className="pb-1.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#10263A]">
-                {normalizedPositions.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-8 text-center text-xs text-[#7D8EA5]">
-                      No open positions in active account
-                    </td>
-                  </tr>
-                ) : (
-                  normalizedPositions.map((pos, idx) => (
-                    <LivePositionTableRow
-                      key={pos.id || idx}
-                      pos={pos}
-                      idx={idx}
-                      onClose={() => router.push("/positions")}
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 2: Orders Table */}
-        {activeLedgerTab === "orders" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[34px]">
-                  <th className="pb-1.5 text-left font-medium">Order ID</th>
-                  <th className="pb-1.5 text-left font-medium">Symbol</th>
-                  <th className="pb-1.5 text-center font-medium">Side</th>
-                  <th className="pb-1.5 text-right font-medium">Qty</th>
-                  <th className="pb-1.5 text-right font-medium">Price</th>
-                  <th className="pb-1.5 text-center font-medium">Status</th>
-                  <th className="pb-1.5 text-right font-medium">Time</th>
-                  <th className="pb-1.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#10263A]">
-                {normalizedOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-8 text-center text-xs text-[#7D8EA5]">
-                      No active orders
-                    </td>
-                  </tr>
-                ) : (
-                  normalizedOrders.map((ord, idx) => {
-                    if (!ord) return null;
-                    const isBuy = ord.side === "BUY";
-                    return (
-                      <tr key={ord.id || idx} className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
-                        <td className="font-mono text-[#7D8EA5]">{ord.id}</td>
-                        <td className="font-semibold text-[#F8FAFC]">{ord.symbol}</td>
-                        <td className="text-center">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-[6px] text-[10px] font-semibold",
-                              isBuy
-                                ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
-                                : "bg-[#FF3B5C]/15 text-[#FF3B5C] border border-[#FF3B5C]/30"
-                            )}
-                          >
-                            {ord.side}
-                          </span>
-                        </td>
-                        <td className="text-right text-[#F8FAFC] tabular-nums">
-                          {formatQuantity(ord.quantity ?? ord.filledQuantity)}
-                        </td>
-                        <td className="text-right text-[#F8FAFC] tabular-nums">
-                          {formatCurrency(ord.price, "₹", 2)}
-                        </td>
-                        <td className="text-center">
-                          <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-semibold bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30">
-                            {ord.status}
-                          </span>
-                        </td>
-                        <td className="text-right text-[#7D8EA5] tabular-nums">{ord.time}</td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            onClick={() => router.push("/orders")}
-                            className="h-[30px] px-2.5 rounded-[6px] bg-[#0A1422] hover:bg-[#0F1C2F] border border-[#12304A] text-[10px] text-[#7D8EA5] hover:text-[#F8FAFC] transition-colors cursor-pointer"
-                          >
-                            Details
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 3: Bots Table */}
-        {activeLedgerTab === "bots" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[34px]">
-                  <th className="pb-1.5 text-left font-medium">Bot Name</th>
-                  <th className="pb-1.5 text-left font-medium">Broker</th>
-                  <th className="pb-1.5 text-left font-medium">Instrument</th>
-                  <th className="pb-1.5 text-left font-medium">Strategy</th>
-                  <th className="pb-1.5 text-center font-medium">Timeframe</th>
-                  <th className="pb-1.5 text-center font-medium">Status</th>
-                  <th className="pb-1.5 text-right font-medium">Capital</th>
-                  <th className="pb-1.5 text-right font-medium">P&L</th>
-                  <th className="pb-1.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#10263A]">
-                {displayBots.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="py-8 text-center text-xs text-[#7D8EA5]">
-                      No bot instances active
-                    </td>
-                  </tr>
-                ) : (
-                  displayBots.map((bot: any, idx: number) => {
-                    if (!bot) return null;
-                    const isRunning = (bot.status || "").toUpperCase() === "RUNNING";
-                    return (
-                      <tr key={bot.id || idx} className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
-                        <td className="font-semibold text-[#F8FAFC]">{bot.name || "Bot"}</td>
-                        <td className="text-[#7D8EA5]">{bot.broker || "Paper"}</td>
-                        <td className="text-[#22D3EE] font-medium">{bot.instrument || "—"}</td>
-                        <td className="text-[#7D8EA5]">{bot.strategy || "—"}</td>
-                        <td className="text-center text-[#7D8EA5]">{bot.timeframe || "—"}</td>
-                        <td className="text-center">
-                          <span
-                            className={cn(
-                              "px-2 py-0.5 rounded-[6px] text-[10px] font-semibold",
-                              isRunning
-                                ? "bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30"
-                                : "bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30"
-                            )}
-                          >
-                            {bot.status || "IDLE"}
-                          </span>
-                        </td>
-                        <td className="text-right text-[#F8FAFC] tabular-nums">{bot.capital || "—"}</td>
-                        <td className="text-right text-[#00E89A] font-semibold tabular-nums">{bot.pnl || "—"}</td>
-                        <td className="text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => router.push("/bots")}
-                              className="h-[30px] w-[30px] rounded-[6px] bg-[#0A1422] hover:bg-[#0F1C2F] border border-[#12304A] text-[#7D8EA5] hover:text-[#22D3EE] flex items-center justify-center transition-colors cursor-pointer"
-                              title={isRunning ? "Pause Bot" : "Start Bot"}
-                            >
-                              {isRunning ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* Tab 4: Strategies Table */}
-        {activeLedgerTab === "strategies" && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-[11px]">
-              <thead>
-                <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[34px]">
-                  <th className="pb-1.5 text-left font-medium">Strategy Name</th>
-                  <th className="pb-1.5 text-left font-medium">Instrument</th>
-                  <th className="pb-1.5 text-left font-medium">Type</th>
-                  <th className="pb-1.5 text-right font-medium">Win Rate</th>
-                  <th className="pb-1.5 text-right font-medium">Profit Factor</th>
-                  <th className="pb-1.5 text-center font-medium">Status</th>
-                  <th className="pb-1.5 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#10263A]">
-                {displayStrategies.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-8 text-center text-xs text-[#7D8EA5]">
-                      No strategies configured
-                    </td>
-                  </tr>
-                ) : (
-                  displayStrategies.map((strat, idx) => {
-                    if (!strat) return null;
-                    return (
-                      <tr key={strat.name || idx} className="hover:bg-[#0F1C2F] transition-colors h-[40px]">
-                        <td className="font-semibold text-[#F8FAFC]">{strat.name}</td>
-                        <td className="text-[#22D3EE] font-medium">{strat.instrument}</td>
-                        <td className="text-[#7D8EA5]">{strat.type}</td>
-                        <td className="text-right text-[#00E89A] font-semibold tabular-nums">{strat.winRate}</td>
-                        <td className="text-right text-[#F8FAFC] font-semibold tabular-nums">{strat.profitFactor}</td>
-                        <td className="text-center">
-                          <span className="px-2 py-0.5 rounded-[6px] text-[10px] font-semibold bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30">
-                            {strat.status}
-                          </span>
-                        </td>
-                        <td className="text-right">
-                          <button
-                            type="button"
-                            onClick={() => router.push("/strategies")}
-                            className="h-[30px] px-3 rounded-[6px] bg-[#0A1422] hover:bg-[#168BFF]/20 border border-[#12304A] text-[10px] font-semibold text-[#22D3EE] transition-colors cursor-pointer"
-                          >
-                            Deploy
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── 4. BOTTOM INFORMATION AREA (THREE COLUMNS: ALERTS, LOGS, STATUS & QUOTE) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-        {/* Left: Recent Alerts (Col-Span 4) */}
-        <div className="lg:col-span-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC]">Recent Alerts</span>
-              <button
-                type="button"
-                onClick={() => router.push("/alerts")}
-                className="text-[10px] font-medium text-[#22D3EE] hover:underline cursor-pointer"
-              >
-                View All
-              </button>
-            </div>
-
-            <div className="space-y-1.5 text-[11px]">
-              {recentAlerts.map((alert: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-2 rounded-lg bg-[#0C1727] border border-[#12304A] flex items-center justify-between gap-2.5"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span
-                      className={cn(
-                        "h-2 w-2 rounded-full shrink-0",
-                        alert.type === "blue" && "bg-[#22D3EE]",
-                        alert.type === "orange" && "bg-[#F59E0B]",
-                        alert.type === "amber" && "bg-[#F59E0B]"
-                      )}
-                    />
-                    <span className="truncate text-[#B7C6D8]">{alert.text}</span>
-                  </div>
-                  <span className="text-[#7D8EA5] text-[10px] shrink-0 tabular-nums">{alert.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Middle: System Logs (Col-Span 4) */}
-        <div className="lg:col-span-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC]">System Logs</span>
-              <button
-                type="button"
-                onClick={() => router.push("/logs")}
-                className="text-[10px] font-medium text-[#22D3EE] hover:underline cursor-pointer"
-              >
-                Live Terminal
-              </button>
-            </div>
-
-            <div className="space-y-1.5 font-mono text-[11px]">
-              {systemLogs.map((log: any, idx: number) => (
-                <div
-                  key={idx}
-                  className="p-2 rounded-lg bg-[#0C1727] border border-[#12304A] flex items-center justify-between gap-2.5"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className={cn(log.isCyan ? "text-[#22D3EE]" : "text-[#00E89A]")}>●</span>
-                    <span className="truncate text-[#B7C6D8]">{log.text}</span>
-                  </div>
-                  <span className="text-[#7D8EA5] text-[10px] shrink-0 tabular-nums">{log.time}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Right: Operational Status & System Quote (Col-Span 4) */}
-        <div className="lg:col-span-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC]">Terminal Status</span>
-              <span className="text-[10px] font-semibold text-[#00E89A] flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
-                OPERATIONAL
-              </span>
-            </div>
-
-            <div className="space-y-2 text-[11px] text-[#7D8EA5]">
-              <div className="flex justify-between items-center py-1 border-b border-[#10263A]/50">
-                <span>Latency</span>
-                <span className="text-[#22D3EE] font-mono tabular-nums">42ms (Mumbai OMS)</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-[#10263A]/50">
-                <span>Execution Guard</span>
-                <span className="text-[#00E89A] font-semibold">14/14 Rules Passed</span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-[#10263A]/50">
-                <span>Active Mode</span>
-                <span className="text-[#17C5FF] font-semibold">Paper Trading</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2.5 border-t border-[#10263A]">
-            <p className="text-[11px] italic text-[#9CB0C6] leading-relaxed">
-              &ldquo;Discipline and algorithmic risk containment are the cornerstones of institutional alpha.&rdquo;
-            </p>
           </div>
         </div>
       </div>

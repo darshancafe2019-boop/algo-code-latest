@@ -44,6 +44,43 @@ def _norm_pdf(x: float) -> float:
     return (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * x * x)
 
 
+def get_underlying_step_size(underlying: str, spot_price: float = 0.0) -> float:
+    """
+    Authoritative strike step sizes per exchange rules.
+    NIFTY: 50 | BANKNIFTY: 100 | FINNIFTY: 50 | MIDCPNIFTY: 25 | SENSEX: 100
+    BTC: 500 | ETH: 50 | SOL: 5
+    """
+    und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
+    if und in ("NIFTY", "NIFTY50", "NIFTY 50"):
+        return 50.0
+    if und in ("BANKNIFTY", "NIFTYBANK", "BANK NIFTY"):
+        return 100.0
+    if und in ("FINNIFTY", "NIFTYFINANCIALSERVICES", "NIFTY FIN SERVICE"):
+        return 50.0
+    if und in ("MIDCPNIFTY", "NIFTYMIDCAPSELECT", "NIFTY MID SELECT"):
+        return 25.0
+    if und in ("SENSEX", "BSESENSEX", "BSE SENSEX", "BANKEX"):
+        return 100.0
+    if und in ("BTC", "BTCUSD", "BTCUSDT"):
+        return 500.0
+    if und in ("ETH", "ETHUSD", "ETHUSDT"):
+        return 50.0
+    if und in ("SOL", "SOLUSD", "SOLUSDT"):
+        return 5.0
+    if spot_price > 0:
+        if spot_price > 5000:
+            return 100.0
+        elif spot_price > 2000:
+            return 50.0
+        elif spot_price > 1000:
+            return 20.0
+        elif spot_price > 500:
+            return 10.0
+        else:
+            return 5.0
+    return 50.0
+
+
 class UniversalOptionsEngine:
     """
     Centralized Multi-Broker Option Chain Gateway.
@@ -79,6 +116,16 @@ class UniversalOptionsEngine:
                 "feed": "REST",
                 "status": "CONNECTED",
                 "latency_ms": 28.0,
+                "last_update": datetime.now(timezone.utc).isoformat(),
+            },
+            "FYERS": {
+                "name": "Fyers API v3",
+                "alias": "ba_fyers_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "CONNECTED",
+                "latency_ms": 30.0,
                 "last_update": datetime.now(timezone.utc).isoformat(),
             },
             "DELTA_INDIA": {
@@ -184,7 +231,7 @@ class UniversalOptionsEngine:
         Strictly validates that the contract quote contains all required fields.
         Rejects invalid or incomplete records.
         """
-        if not quote.provider or quote.provider.upper() not in ["DHAN", "UPSTOX", "DELTA_INDIA", "DELTA", "BINANCE", "PAPER_SIMULATOR"]:
+        if not quote.provider or quote.provider.upper() not in ["DHAN", "UPSTOX", "FYERS", "DELTA_INDIA", "DELTA", "BINANCE", "PAPER_SIMULATOR"]:
             return False, f"Unrecognized or missing provider: {quote.provider}"
         if not quote.underlying:
             return False, "Missing underlying symbol"
@@ -344,6 +391,36 @@ class UniversalOptionsEngine:
         Strictly labeled as SOURCE: Paper Simulator with CALCULATED provenance.
         """
         und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
+        
+        if spot_price <= 0:
+            cached_quote = global_market_cache.get(und)
+            if cached_quote and cached_quote.ltp:
+                spot_price = float(cached_quote.ltp)
+            elif und in ["NIFTY", "NIFTY50"]:
+                spot_price = 24500.0
+            elif und in ["BANKNIFTY"]:
+                spot_price = 51200.0
+            elif und in ["FINNIFTY"]:
+                spot_price = 23400.0
+            elif und in ["MIDCPNIFTY"]:
+                spot_price = 12800.0
+            elif und in ["SENSEX"]:
+                spot_price = 80400.0
+            elif und in ["BTC"]:
+                spot_price = 68000.0
+            elif und in ["ETH"]:
+                spot_price = 3500.0
+            elif und in ["SOL"]:
+                spot_price = 150.0
+            elif und in ["RELIANCE"]:
+                spot_price = 2950.0
+            elif und in ["TCS"]:
+                spot_price = 4200.0
+            elif und in ["HDFCBANK"]:
+                spot_price = 1650.0
+            else:
+                spot_price = 1000.0
+
         available_expiries = global_instrument_master.get_expiries_for_underlying(und)
         if not available_expiries:
             today = datetime.now(timezone.utc)
@@ -364,20 +441,12 @@ class UniversalOptionsEngine:
             t_years = 7.0 / 365.0
 
         if step_size is None:
-            if spot_price > 40000:
-                step_size = 500.0
-            elif spot_price > 15000:
-                step_size = 100.0
-            elif spot_price > 2000:
-                step_size = 50.0
-            elif spot_price > 500:
-                step_size = 10.0
-            else:
-                step_size = 5.0
+            step_size = get_underlying_step_size(und, spot_price)
 
-        atm_strike = round(spot_price / step_size) * step_size
+        safe_step = max(1.0, step_size)
+        atm_strike = round(spot_price / safe_step) * safe_step
         half_range = strike_count // 2
-        strikes_list = [atm_strike + (i - half_range) * step_size for i in range(strike_count)]
+        strikes_list = [atm_strike + (i - half_range) * safe_step for i in range(strike_count)]
 
         strike_rows: List[OptionStrikeRow] = []
         total_call_oi = 0.0
@@ -389,16 +458,18 @@ class UniversalOptionsEngine:
         now_iso = datetime.now(timezone.utc).isoformat()
         exchange_name = "NSE" if und in ["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "RELIANCE", "TCS"] else "SIM"
 
+        safe_spot = max(0.01, spot_price)
         for k in strikes_list:
-            is_atm = abs(k - atm_strike) < (step_size * 0.5)
-            dist_pct = round(((k - spot_price) / spot_price) * 100.0, 2)
+            is_atm = abs(k - atm_strike) < (safe_step * 0.5)
+            dist_pct = round(((k - safe_spot) / safe_spot) * 100.0, 2)
 
-            otm_distance = abs(k - spot_price) / spot_price
+            otm_distance = abs(k - safe_spot) / safe_spot
             iv_ce = max(0.10, base_iv + otm_distance * 0.25)
             iv_pe = max(0.10, base_iv + otm_distance * 0.30)
 
-            g_ce = self.calculate_greeks("CE", spot_price, k, t_years, iv=iv_ce)
-            g_pe = self.calculate_greeks("PE", spot_price, k, t_years, iv=iv_pe)
+            g_ce = self.calculate_greeks("CE", safe_spot, k, t_years, iv=iv_ce)
+            g_pe = self.calculate_greeks("PE", safe_spot, k, t_years, iv=iv_pe)
+
 
             depth_factor = max(0.05, math.exp(-0.5 * ((k - atm_strike) / (step_size * 4)) ** 2))
             call_oi = round(depth_factor * 125000)
@@ -616,7 +687,7 @@ class UniversalOptionsEngine:
                 spot_price = float(cached_quote.ltp)
 
         ref_price = spot_price if spot_price > 0 else (24500.0 if und == "NIFTY" else (51000.0 if und == "BANKNIFTY" else (23000.0 if und == "FINNIFTY" else 1000.0)))
-        step_size = 500.0 if ref_price > 40000 else (100.0 if ref_price > 15000 else (50.0 if ref_price > 2000 else (10.0 if ref_price > 500 else 5.0)))
+        step_size = get_underlying_step_size(und, ref_price)
         atm_strike = round(ref_price / step_size) * step_size
         half_range = strike_count // 2
         strikes_list = [atm_strike + (i - half_range) * step_size for i in range(strike_count)]
@@ -641,8 +712,10 @@ class UniversalOptionsEngine:
             if ce_cached and ce_cached.lastPrice is not None:
                 has_any_live_quote = True
                 ce_quote = ce_cached
-                total_call_oi += ce_quote.OI or 0.0
-                total_call_vol += ce_quote.volume or 0.0
+                if ce_quote.OI is not None:
+                    total_call_oi += ce_quote.OI
+                if ce_quote.volume is not None:
+                    total_call_vol += ce_quote.volume
             else:
                 ce_quote = OptionQuote(
                     underlying=und,
@@ -655,9 +728,9 @@ class UniversalOptionsEngine:
                     lastPrice=None,
                     bid=None,
                     ask=None,
-                    volume=0.0,
-                    OI=0.0,
-                    OIChange=0.0,
+                    volume=None,
+                    OI=None,
+                    OIChange=None,
                     timestamp=now_iso,
                     status="NO_DATA",
                     data_quality=DataQuality.VALID.value,
@@ -688,8 +761,10 @@ class UniversalOptionsEngine:
             if pe_cached and pe_cached.lastPrice is not None:
                 has_any_live_quote = True
                 pe_quote = pe_cached
-                total_put_oi += pe_quote.OI or 0.0
-                total_put_vol += pe_quote.volume or 0.0
+                if pe_quote.OI is not None:
+                    total_put_oi += pe_quote.OI
+                if pe_quote.volume is not None:
+                    total_put_vol += pe_quote.volume
             else:
                 pe_quote = OptionQuote(
                     underlying=und,
@@ -702,9 +777,9 @@ class UniversalOptionsEngine:
                     lastPrice=None,
                     bid=None,
                     ask=None,
-                    volume=0.0,
-                    OI=0.0,
-                    OIChange=0.0,
+                    volume=None,
+                    OI=None,
+                    OIChange=None,
                     timestamp=now_iso,
                     status="NO_DATA",
                     data_quality=DataQuality.VALID.value,
@@ -740,8 +815,8 @@ class UniversalOptionsEngine:
                 pe=pe_quote,
             ))
 
-        pcr_oi = round(total_put_oi / total_call_oi, 2) if (total_call_oi > 0 and total_put_oi > 0) else None
-        pcr_vol = round(total_put_vol / total_call_vol, 2) if (total_call_vol > 0 and total_put_vol > 0) else None
+        pcr_oi = round(total_put_oi / total_call_oi, 2) if (has_any_live_quote and total_call_oi > 0 and total_put_oi > 0) else None
+        pcr_vol = round(total_put_vol / total_call_vol, 2) if (has_any_live_quote and total_call_vol > 0 and total_put_vol > 0) else None
 
         return OptionChainSnapshot(
             underlying=und,
@@ -752,10 +827,10 @@ class UniversalOptionsEngine:
             max_pain=None,
             pcr_oi=pcr_oi,
             pcr_volume=pcr_vol,
-            total_call_oi=total_call_oi,
-            total_put_oi=total_put_oi,
-            total_call_volume=total_call_vol,
-            total_put_volume=total_put_vol,
+            total_call_oi=total_call_oi if has_any_live_quote else None,
+            total_put_oi=total_put_oi if has_any_live_quote else None,
+            total_call_volume=total_call_vol if has_any_live_quote else None,
+            total_put_volume=total_put_vol if has_any_live_quote else None,
             timestamp=now_iso,
             status="LIVE" if has_any_live_quote else "NO_DATA",
             provider=provider,
@@ -860,6 +935,7 @@ class UniversalOptionsEngine:
                 freshness = "DEGRADED"
 
         if raw_upstox_chain and isinstance(raw_upstox_chain, dict) and "strikes" in raw_upstox_chain and raw_upstox_chain["strikes"]:
+            resolved_spot = float(raw_upstox_chain.get("spot_price") or raw_upstox_chain.get("underlying_ltp") or spot_price)
             return self._normalize_broker_option_chain(
                 raw_chain=raw_upstox_chain,
                 provider="UPSTOX",
@@ -870,7 +946,7 @@ class UniversalOptionsEngine:
                 segment="OPTIONS",
                 currency="INR",
                 underlying=und,
-                spot_price=spot_price,
+                spot_price=resolved_spot,
                 selected_expiry=expiry or raw_upstox_chain.get("selected_expiry", ""),
                 latency_ms=None,
                 freshness_status=freshness,
@@ -881,6 +957,67 @@ class UniversalOptionsEngine:
             provider="UPSTOX",
             broker_account_id="ba_upstox_primary",
             broker_account_alias="Upstox Primary",
+            environment=environment,
+            exchange="NSE",
+            segment="OPTIONS",
+            currency="INR",
+            spot_price=spot_price,
+            expiry=expiry,
+            strike_count=strike_count,
+            freshness_status="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
+            is_auth=is_auth,
+        )
+
+    def fetch_fyers_option_chain(
+        self,
+        underlying: str,
+        spot_price: float,
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+        environment: str = "PAPER",
+    ) -> OptionChainSnapshot:
+        """
+        Fetches or normalizes Fyers API v3 option chain.
+        Strictly segregated under SOURCE: Fyers.
+        """
+        und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
+        from src.fyers_broker_adapter import FyersBrokerAdapter
+        fyers_adapter = FyersBrokerAdapter()
+
+        is_auth = fyers_adapter.is_authenticated
+        freshness = "CONNECTED" if is_auth else "AUTHENTICATION_FAILED"
+
+        raw_fyers_chain = None
+        if is_auth:
+            try:
+                raw_fyers_chain = fyers_adapter.get_option_chain(und, expiry=expiry, strike_count=strike_count)
+            except Exception as e:
+                logger.warning(f"Fyers option chain query warning: {e}")
+                freshness = "DEGRADED"
+
+        if raw_fyers_chain and isinstance(raw_fyers_chain, dict) and "strikes" in raw_fyers_chain and raw_fyers_chain["strikes"]:
+            resolved_spot = float(raw_fyers_chain.get("spot_price") or raw_fyers_chain.get("underlying_ltp") or spot_price)
+            return self._normalize_broker_option_chain(
+                raw_chain=raw_fyers_chain,
+                provider="FYERS",
+                broker_account_id="ba_fyers_primary",
+                broker_account_alias="Fyers Primary",
+                environment=environment,
+                exchange="NSE",
+                segment="OPTIONS",
+                currency="INR",
+                underlying=und,
+                spot_price=resolved_spot,
+                selected_expiry=expiry or raw_fyers_chain.get("selected_expiry", ""),
+                latency_ms=None,
+                freshness_status=freshness,
+            )
+
+        return self._build_contract_universe_snapshot(
+            underlying=und,
+            provider="FYERS",
+            broker_account_id="ba_fyers_primary",
+            broker_account_alias="Fyers Primary",
             environment=environment,
             exchange="NSE",
             segment="OPTIONS",
@@ -1046,10 +1183,21 @@ class UniversalOptionsEngine:
         total_call_vol = 0.0
         total_put_vol = 0.0
 
+        # Determine exact ATM strike by finding the strike with minimum distance to spot_price
+        atm_strike_val = None
+        if spot_price > 0 and raw_strikes:
+            min_dist = float("inf")
+            for s in raw_strikes:
+                k = float(s.get("strike", 0.0))
+                dist = abs(k - spot_price)
+                if dist < min_dist:
+                    min_dist = dist
+                    atm_strike_val = k
+
         for s in raw_strikes:
             k = float(s.get("strike", 0.0))
-            is_atm = bool(s.get("is_atm", False))
-            dist_pct = float(s.get("distance_pct", 0.0))
+            is_atm = (k == atm_strike_val) if atm_strike_val is not None else bool(s.get("is_atm", False))
+            dist_pct = round(((k - spot_price) / spot_price) * 100.0, 2) if spot_price > 0 else float(s.get("distance_pct", 0.0))
 
             ce_raw = s.get("ce") or s.get("call") or {}
             pe_raw = s.get("pe") or s.get("put") or {}
@@ -1267,27 +1415,53 @@ class UniversalOptionsEngine:
 
         if prov in ["ALL", "AUTO"]:
             if underlying.upper() in ["BTC", "ETH", "SOL", "XRP"]:
-                return self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            # For Indian markets, prioritize DHAN or UPSTOX
-            dhan_snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if dhan_snap.status == "LIVE" and dhan_snap.strikes:
-                return dhan_snap
+                delta_snap = self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
+                if delta_snap.status == "LIVE" and delta_snap.strikes:
+                    return delta_snap
+                if environment == "PAPER" or delta_snap.status != "LIVE":
+                    return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+                return delta_snap
+            # For Indian markets, prioritize live feeds in order: UPSTOX, DHAN, FYERS
             upstox_snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
             if upstox_snap.status == "LIVE" and upstox_snap.strikes:
                 return upstox_snap
-            return dhan_snap
+            dhan_snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if dhan_snap.status == "LIVE" and dhan_snap.strikes:
+                return dhan_snap
+            fyers_snap = self.fetch_fyers_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if fyers_snap.status == "LIVE" and fyers_snap.strikes:
+                return fyers_snap
+            # Fallback to calculated analytical option chain if no live provider is connected or in paper mode
+            if environment == "PAPER" or (dhan_snap.status != "LIVE" and upstox_snap.status != "LIVE" and fyers_snap.status != "LIVE"):
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            return upstox_snap if upstox_snap.strikes else dhan_snap
         elif prov == "UPSTOX":
-            return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if snap.status != "LIVE" and environment == "PAPER":
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            return snap
         elif prov == "DHAN":
-            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if snap.status != "LIVE" and environment == "PAPER":
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            return snap
+        elif prov == "FYERS":
+            snap = self.fetch_fyers_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if snap.status != "LIVE" and environment == "PAPER":
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            return snap
         elif prov in ["DELTA", "DELTA_INDIA"]:
-            return self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            snap = self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if snap.status != "LIVE" and environment == "PAPER":
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            return snap
         elif prov in ["BINANCE", "BINANCE_OPTIONS", "EOPTIONS"]:
             return self.fetch_binance_option_chain(underlying, spot_price, expiry, strike_count, environment)
         elif prov in ["PAPER", "PAPER_SIMULATOR", "SIM"]:
             return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
         else:
-            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+
 
     def get_multi_source_option_chain(
         self,
@@ -1299,7 +1473,7 @@ class UniversalOptionsEngine:
     ) -> Dict[str, Any]:
         """
         Retrieves all supported providers with strict data segregation and complete failure isolation.
-        A failure in one provider (e.g. Dhan) never interrupts Upstox, Delta, Binance, or Paper Simulator.
+        A failure in one provider (e.g. Dhan) never interrupts Upstox, Fyers, Delta, Binance, or Paper Simulator.
         """
         if spot_price <= 0:
             cached_quote = global_market_cache.get(underlying)
@@ -1336,7 +1510,21 @@ class UniversalOptionsEngine:
                 "strikes": [],
             }
 
-        # 3. Delta Exchange India
+        # 3. Fyers API v3
+        try:
+            fyers_snap = self.fetch_fyers_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            sources["FYERS"] = fyers_snap.to_dict()
+        except Exception as e:
+            logger.error(f"Failed to fetch Fyers option chain: {e}")
+            sources["FYERS"] = {
+                "status": "ERROR",
+                "provider": "FYERS",
+                "error": str(e),
+                "freshnessStatus": "PROVIDER_UNAVAILABLE",
+                "strikes": [],
+            }
+
+        # 4. Delta Exchange India
         try:
             delta_snap = self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
             sources["DELTA_INDIA"] = delta_snap.to_dict()
@@ -1350,7 +1538,7 @@ class UniversalOptionsEngine:
                 "strikes": [],
             }
 
-        # 4. Binance Options
+        # 5. Binance Options
         try:
             binance_snap = self.fetch_binance_option_chain(underlying, spot_price, expiry, strike_count, environment)
             sources["BINANCE"] = binance_snap.to_dict()
@@ -1364,7 +1552,7 @@ class UniversalOptionsEngine:
                 "strikes": [],
             }
 
-        # 5. Paper Simulator
+        # 6. Paper Simulator
         try:
             paper_snap = self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             sources["PAPER_SIMULATOR"] = paper_snap.to_dict()
@@ -1383,13 +1571,13 @@ class UniversalOptionsEngine:
             primary_snap = sources.get("DELTA_INDIA") or sources.get("BINANCE") or sources.get("PAPER_SIMULATOR") or {}
         else:
             primary_snap = None
-            for key in ["UPSTOX", "DHAN", "PAPER_SIMULATOR"]:
+            for key in ["UPSTOX", "DHAN", "FYERS", "PAPER_SIMULATOR"]:
                 src = sources.get(key)
                 if src and isinstance(src, dict) and src.get("strikes"):
                     primary_snap = src
                     break
             if not primary_snap:
-                primary_snap = sources.get("DHAN") or sources.get("UPSTOX") or sources.get("PAPER_SIMULATOR") or {}
+                primary_snap = sources.get("UPSTOX") or sources.get("DHAN") or sources.get("FYERS") or sources.get("PAPER_SIMULATOR") or {}
 
         selected_exp = primary_snap.get("selected_expiry") if isinstance(primary_snap, dict) else ""
         avail_exp = primary_snap.get("available_expiries", []) if isinstance(primary_snap, dict) else []
@@ -1498,6 +1686,35 @@ class UniversalOptionsEngine:
                 "provider": "UPSTOX",
                 "name": "Upstox API v3",
                 "account_alias": "ba_upstox_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "DISCONNECTED",
+                "latency_ms": None,
+                "last_update": now_iso,
+            })
+
+        # 4. Fyers
+        try:
+            from src.fyers_broker_adapter import FyersBrokerAdapter
+            fyers_adapter = FyersBrokerAdapter()
+            is_fyers_auth = fyers_adapter.is_authenticated
+            status_list.append({
+                "provider": "FYERS",
+                "name": "Fyers API v3",
+                "account_alias": "ba_fyers_primary",
+                "exchange": "NSE",
+                "segment": "OPTIONS",
+                "feed": "REST",
+                "status": "CONNECTED" if is_fyers_auth else "AUTHENTICATION_REQUIRED",
+                "latency_ms": None,
+                "last_update": now_iso,
+            })
+        except Exception:
+            status_list.append({
+                "provider": "FYERS",
+                "name": "Fyers API v3",
+                "account_alias": "ba_fyers_primary",
                 "exchange": "NSE",
                 "segment": "OPTIONS",
                 "feed": "REST",

@@ -106,9 +106,9 @@ class ProviderService:
         elif pid == "binance":
             return bool(os.getenv("BINANCE_API_KEY") or True)  # Public market data configured
         elif pid == "zerodha":
-            return bool(os.getenv("ZERODHA_API_KEY") or os.getenv("KITE_ACCESS_TOKEN"))
+            return bool(os.getenv("ZERODHA_API_KEY") or os.getenv("KITE_API_KEY") or os.getenv("KITE_ACCESS_TOKEN"))
         elif pid == "angelone":
-            return bool(os.getenv("ANGEL_API_KEY"))
+            return bool(os.getenv("ANGELONE_API_KEY") or os.getenv("ANGEL_API_KEY"))
         elif pid == "icicidirect":
             return bool(os.getenv("ICICI_API_KEY"))
         elif pid == "fivepaisa":
@@ -155,6 +155,18 @@ class ProviderService:
                 "app_id": _mask(os.getenv("FYERS_APP_ID")),
                 "access_token": _mask(os.getenv("FYERS_ACCESS_TOKEN")),
             }
+        elif pid == "angelone":
+            masked = {
+                "api_key": _mask(os.getenv("ANGELONE_API_KEY") or os.getenv("ANGEL_API_KEY")),
+                "client_id": _mask(os.getenv("ANGELONE_CLIENT_ID")),
+                "auth_token": _mask(os.getenv("ANGELONE_AUTH_TOKEN")),
+            }
+        elif pid == "zerodha":
+            masked = {
+                "api_key": _mask(os.getenv("ZERODHA_API_KEY") or os.getenv("KITE_API_KEY")),
+                "api_secret": _mask(os.getenv("ZERODHA_API_SECRET") or os.getenv("KITE_API_SECRET")),
+                "access_token": _mask(os.getenv("ZERODHA_ACCESS_TOKEN")),
+            }
         elif pid == "delta":
             masked = {
                 "api_key": _mask(os.getenv("DELTA_API_KEY") or "PUBLIC_MODE"),
@@ -165,7 +177,7 @@ class ProviderService:
                 "api_key": _mask(os.getenv("BINANCE_API_KEY") or "PUBLIC_MODE"),
                 "api_secret": _mask(os.getenv("BINANCE_API_SECRET")),
             }
-        elif pid in ["zerodha", "angelone", "icicidirect", "fivepaisa", "bybit", "okx", "metatrader5", "exness", "interactive_brokers"]:
+        elif pid in ["icicidirect", "fivepaisa", "bybit", "okx", "metatrader5", "exness", "interactive_brokers"]:
             masked = {
                 "client_id": "••••••••",
                 "api_key": "••••••••",

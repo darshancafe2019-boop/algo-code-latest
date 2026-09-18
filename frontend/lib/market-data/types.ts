@@ -180,23 +180,23 @@ export interface OptionStrikeData {
   call: {
     symbol: string;
     securityId: string;
-    ltp: number;
-    bid: number;
-    ask: number;
-    volume: number;
-    openInterest: number;
-    oiChange: number;
+    ltp: number | null;
+    bid: number | null;
+    ask: number | null;
+    volume: number | null;
+    openInterest: number | null;
+    oiChange: number | null;
     greeks?: OptionGreeks;
   } | null;
   put: {
     symbol: string;
     securityId: string;
-    ltp: number;
-    bid: number;
-    ask: number;
-    volume: number;
-    openInterest: number;
-    oiChange: number;
+    ltp: number | null;
+    bid: number | null;
+    ask: number | null;
+    volume: number | null;
+    openInterest: number | null;
+    oiChange: number | null;
     greeks?: OptionGreeks;
   } | null;
 }
@@ -208,15 +208,15 @@ export interface OptionChainSnapshot {
   availableExpiries: string[];
   strikes: OptionStrikeData[];
   pcr: {
-    pcrOI: number;
-    pcrVolume: number;
+    pcrOI: number | null;
+    pcrVolume: number | null;
     totalCallOI: number;
     totalPutOI: number;
     totalCallVolume: number;
     totalPutVolume: number;
   };
-  maxPain: number;
-  atmIV: number;
+  maxPain: number | null;
+  atmIV: number | null;
   timestamp: number;
   freshness: FreshnessStatus;
 }

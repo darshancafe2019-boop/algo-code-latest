@@ -65,6 +65,20 @@ FYERS_SECRET_ID = os.getenv("FYERS_SECRET_ID", os.getenv("FYERS_SECRET_KEY", "")
 FYERS_REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI", "http://localhost:3100/api/fyers/callback")
 FYERS_ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN", "")
 
+# Angel One SmartAPI Integration
+ANGELONE_API_KEY = os.getenv("ANGELONE_API_KEY", os.getenv("ANGEL_API_KEY", "vWV7mMfq"))
+ANGELONE_CLIENT_ID = os.getenv("ANGELONE_CLIENT_ID", os.getenv("ANGEL_CLIENT_ID", ""))
+ANGELONE_PIN = os.getenv("ANGELONE_PIN", os.getenv("ANGEL_PIN", ""))
+ANGELONE_TOTP_SECRET = os.getenv("ANGELONE_TOTP_SECRET", os.getenv("ANGEL_TOTP_SECRET", ""))
+ANGELONE_AUTH_TOKEN = os.getenv("ANGELONE_AUTH_TOKEN", "")
+ANGELONE_FEED_TOKEN = os.getenv("ANGELONE_FEED_TOKEN", "")
+
+# Zerodha Kite Connect Integration
+ZERODHA_API_KEY = os.getenv("ZERODHA_API_KEY", os.getenv("KITE_API_KEY", "3et9e1s3cd6k9ss9"))
+ZERODHA_API_SECRET = os.getenv("ZERODHA_API_SECRET", os.getenv("KITE_API_SECRET", "4j0fv6skn99h17e6ndmd6obvxsy230x5"))
+ZERODHA_REDIRECT_URI = os.getenv("ZERODHA_REDIRECT_URI", "http://localhost:3100/api/zerodha/callback")
+ZERODHA_ACCESS_TOKEN = os.getenv("ZERODHA_ACCESS_TOKEN", os.getenv("KITE_ACCESS_TOKEN", ""))
+
 # Delta Exchange Options Integration
 DELTA_REST_URL = os.getenv("DELTA_REST_URL", "https://api.india.delta.exchange").rstrip("/")
 DELTA_PUBLIC_WS_URL = os.getenv("DELTA_PUBLIC_WS_URL", "wss://public-socket.india.delta.exchange")

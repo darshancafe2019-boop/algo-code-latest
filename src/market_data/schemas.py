@@ -216,16 +216,36 @@ class OptionChainSnapshot:
         if not self.streamKey:
             self.streamKey = f"{self.provider}:{self.brokerAccountId}:{self.environment}:{self.exchange}:{self.segment}:{self.underlying}"
 
+    @property
+    def atm_strike(self) -> float:
+        """Returns the strike marked ATM or closest to spot price."""
+        for s in self.strikes:
+            if getattr(s, "is_atm", False):
+                return float(s.strike)
+        if self.strikes and self.spot_price > 0:
+            closest = min(self.strikes, key=lambda s: abs(s.strike - self.spot_price))
+            return float(closest.strike)
+        elif self.strikes:
+            return float(self.strikes[len(self.strikes) // 2].strike)
+        return float(self.spot_price)
+
     def to_dict(self) -> Dict[str, Any]:
+        atm = self.atm_strike
         return {
             "status": self.status,
             "underlying": self.underlying,
             "spot_price": self.spot_price,
+            "spot": self.spot_price,
+            "atm_strike": atm,
+            "atmStrike": atm,
             "selected_expiry": self.selected_expiry,
+            "selectedExpiry": self.selected_expiry,
             "available_expiries": self.available_expiries,
+            "availableExpiries": self.available_expiries,
             "strike_count": len(self.strikes),
             "total_available_strikes": len(self.strikes),
             "max_pain": self.max_pain,
+            "maxPain": self.max_pain,
             "pcr": {
                 "pcr_oi": self.pcr_oi,
                 "pcr_volume": self.pcr_volume,
@@ -234,6 +254,12 @@ class OptionChainSnapshot:
                 "total_call_volume": self.total_call_volume,
                 "total_put_volume": self.total_put_volume,
             },
+            "pcr_oi": self.pcr_oi,
+            "pcr_volume": self.pcr_volume,
+            "total_call_oi": self.total_call_oi,
+            "total_put_oi": self.total_put_oi,
+            "totalCallOI": self.total_call_oi,
+            "totalPutOI": self.total_put_oi,
             "support_zones": self.support_zones,
             "resistance_zones": self.resistance_zones,
             "timestamp": self.timestamp,
@@ -251,7 +277,9 @@ class OptionChainSnapshot:
             "streamKey": self.streamKey,
             "diagnostics": self.diagnostics.to_dict() if self.diagnostics else None,
             "strikes": [s.to_dict() for s in self.strikes],
+            "rows": [s.to_dict() for s in self.strikes],
         }
+
 
 
 @dataclass

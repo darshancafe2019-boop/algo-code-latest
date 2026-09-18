@@ -36,11 +36,14 @@ import { CanonicalFuturesContract } from "../types/futures";
 import { FuturesTopBar } from "./FuturesTopBar";
 import { FuturesMarketSummaryBar } from "./FuturesMarketSummaryBar";
 import { SimpleFuturesTable } from "./SimpleFuturesTable";
-import { FuturesAdvancedCollapsible } from "./FuturesAdvancedCollapsible";
 import { FuturesDetailsDrawer } from "./FuturesDetailsDrawer";
 import { OrderReviewModal } from "./OrderReviewModal";
 
 // Subtab Views
+import { FuturesDepthViewer } from "./FuturesDepthViewer";
+import { FuturesTimeAndSales } from "./FuturesTimeAndSales";
+import { FuturesTermStructureView } from "./FuturesTermStructureView";
+import { FuturesStreamObservatory } from "./FuturesStreamObservatory";
 import { FundingRateHeatmap } from "./FundingRateHeatmap";
 import { BasisArbitrageMatrix } from "./BasisArbitrageMatrix";
 import { FuturesHealthView } from "./FuturesHealthView";
@@ -53,6 +56,10 @@ import { FuturesRiskView } from "./FuturesRiskView";
 export type FuturesTabId =
   | "UNIVERSE"
   | "MARKETS"
+  | "DEPTH"
+  | "TAPE"
+  | "STREAM"
+  | "TERM_STRUCTURE"
   | "FUNDING"
   | "STRATEGIES"
   | "POSITIONS"
@@ -280,7 +287,11 @@ export function FuturesUniverseView({
         <div className="flex items-center gap-1 min-w-0">
           {[
             { id: "UNIVERSE", label: "Overview", icon: Zap },
-            { id: "MARKETS", label: "Markets", icon: TrendingUp },
+            { id: "MARKETS", label: "Market Table", icon: TrendingUp },
+            { id: "DEPTH", label: "Order Book (L2)", icon: Layers },
+            { id: "TAPE", label: "Time & Sales", icon: Activity },
+            { id: "STREAM", label: "Stream Tape", icon: Radio },
+            { id: "TERM_STRUCTURE", label: "Term Structure", icon: BarChart3 },
             { id: "FUNDING", label: "Funding & Basis", icon: Flame },
             { id: "STRATEGIES", label: "Strategies", icon: Sliders },
             { id: "POSITIONS", label: "Positions", icon: Activity },
@@ -348,11 +359,17 @@ export function FuturesUniverseView({
         <div className="min-w-0 w-full space-y-3">
           {currentTab === "UNIVERSE" || currentTab === "MARKETS" ? (
             <div className="space-y-3 w-full min-w-0">
-              {/* Market Summary Bar: 3 Clean Metrics */}
+              {/* Market Summary Bar: Segregated Regional Metrics */}
               <FuturesMarketSummaryBar
-                totalVolumeUsd={totalVolume}
-                totalOpenInterestUsd={totalOI}
-                avgFundingRateApr={avgFundingAPR}
+                totalVolumeUsd={universeData?.total_volume_usd}
+                totalOpenInterestUsd={universeData?.total_open_interest_usd}
+                indiaVolumeInr={universeData?.india_volume_inr}
+                indiaOiInr={universeData?.india_oi_inr}
+                cryptoVolumeUsd={universeData?.crypto_volume_usd}
+                cryptoOiUsd={universeData?.crypto_oi_usd}
+                globalVolumeUsd={universeData?.global_volume_usd}
+                globalOiUsd={universeData?.global_oi_usd}
+                avgFundingRateApr={universeData?.avg_funding_rate_apr}
               />
 
               {/* Fast, Clean, Non-overlapping Contracts Table */}
@@ -372,14 +389,18 @@ export function FuturesUniverseView({
                   }}
                 />
               </div>
-
-              {/* Collapsible Advanced Analytics Section */}
-              <FuturesAdvancedCollapsible
-                contracts={filteredContracts}
-                heatmapData={heatmapData}
-                isHeatmapLoading={isHeatmapLoading}
-              />
             </div>
+          ) : currentTab === "DEPTH" ? (
+            <FuturesDepthViewer contract={activeContract} />
+          ) : currentTab === "TAPE" ? (
+            <FuturesTimeAndSales contract={activeContract} />
+          ) : currentTab === "STREAM" ? (
+            <FuturesStreamObservatory />
+          ) : currentTab === "TERM_STRUCTURE" ? (
+            <FuturesTermStructureView
+              contracts={filteredContracts}
+              onSelectContract={(c) => setSelectedContract(c)}
+            />
           ) : currentTab === "FUNDING" ? (
             <div className="space-y-4">
               <div className="flex items-center gap-2 p-1.5 bg-[#080E1C] border border-[#12304A] rounded-xl w-fit font-mono text-xs">

@@ -388,6 +388,70 @@ OFFICIAL_UPSTOX_KEYS: Dict[str, Dict[str, Any]] = {
 # Backward compatibility alias
 UPSTOX_INSTRUMENT_MAP = OFFICIAL_UPSTOX_KEYS
 
+# 5,000+ Indian Equity Master Storage & In-Memory Indexes
+UPSTOX_EQUITY_MASTER_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "upstox_equity_master.json"
+)
+
+_UPSTOX_EQUITY_MASTER: List[Dict[str, Any]] = []
+_UPSTOX_EQUITY_BY_KEY: Dict[str, Dict[str, Any]] = {}
+_UPSTOX_EQUITY_BY_SYMBOL: Dict[str, Dict[str, Any]] = {}
+_UPSTOX_EQUITY_BY_ISIN: Dict[str, Dict[str, Any]] = {}
+
+
+def _load_upstox_equity_master() -> None:
+    global _UPSTOX_EQUITY_MASTER, _UPSTOX_EQUITY_BY_KEY, _UPSTOX_EQUITY_BY_SYMBOL, _UPSTOX_EQUITY_BY_ISIN
+    if _UPSTOX_EQUITY_MASTER:
+        return
+    if os.path.exists(UPSTOX_EQUITY_MASTER_FILE):
+        try:
+            with open(UPSTOX_EQUITY_MASTER_FILE, "r", encoding="utf-8") as f:
+                items = json.load(f)
+                _UPSTOX_EQUITY_MASTER = items
+                for item in items:
+                    sym = item.get("symbol", "").upper().strip()
+                    ts = item.get("trading_symbol", "").upper().strip()
+                    ik = item.get("instrument_key", "").strip()
+                    isin = item.get("isin", "").upper().strip()
+                    ex = item.get("exchange", "NSE").upper().strip()
+
+                    meta = {
+                        "instrument_key": ik,
+                        "name": item.get("company_name", sym),
+                        "exchange": f"{ex}_EQ",
+                        "asset_class": "INDIAN_EQUITIES",
+                        "lot_size": float(item.get("lot_size", 1.0) or 1.0),
+                        "tick_size": float(item.get("tick_size", 0.05) or 0.05),
+                        "isin": isin,
+                        "trading_symbol": ts or sym,
+                        "canonical_symbol": sym,
+                        "exchange_token": str(item.get("exchange_token", "")),
+                        "currency": "INR",
+                        "segment": item.get("segment", f"{ex}_EQ"),
+                        "is_tradable": bool(item.get("is_tradable", True)),
+                    }
+
+                    if ik:
+                        _UPSTOX_EQUITY_BY_KEY[ik] = meta
+                        _UPSTOX_EQUITY_BY_KEY[ik.replace("|", ":")] = meta
+                        _UPSTOX_EQUITY_BY_KEY[ik.upper()] = meta
+                    if sym:
+                        _UPSTOX_EQUITY_BY_SYMBOL[sym] = meta
+                        _UPSTOX_EQUITY_BY_SYMBOL[f"{ex}:{sym}"] = meta
+                        _UPSTOX_EQUITY_BY_SYMBOL[f"{sym}.NS"] = meta
+                        _UPSTOX_EQUITY_BY_SYMBOL[f"{sym}.BO"] = meta
+                    if ts and ts != sym:
+                        _UPSTOX_EQUITY_BY_SYMBOL[ts] = meta
+                    if isin:
+                        _UPSTOX_EQUITY_BY_ISIN[isin] = meta
+
+            logger.info("Loaded and indexed %d Upstox Indian equity instruments.", len(items))
+        except Exception as e:
+            logger.warning("Failed to load Upstox equity master: %s", e)
+
+
+_load_upstox_equity_master()
+
 
 class UpstoxService:
     """
@@ -511,28 +575,137 @@ class UpstoxService:
         }
 
     def resolve_instrument_key(self, symbol: str) -> Optional[str]:
-        """Maps canonical symbol or ISIN to official Upstox instrument_key."""
-        clean_sym = symbol.strip().upper().replace(" ", "").replace("_", "")
+        """Maps canonical symbol, trading symbol, ISIN, or alias to official Upstox instrument_key across 5000+ instruments."""
+        if not symbol:
+            return None
+        sym_str = str(symbol).strip()
+        clean_upper = sym_str.upper()
+        clean_compact = clean_upper.replace(" ", "").replace("_", "")
+
+        # 1. Check official curated registry
+        if clean_upper in OFFICIAL_UPSTOX_KEYS:
+            return OFFICIAL_UPSTOX_KEYS[clean_upper]["instrument_key"]
         for key, meta in OFFICIAL_UPSTOX_KEYS.items():
             k_clean = key.strip().upper().replace(" ", "").replace("_", "")
-            if clean_sym == k_clean or clean_sym == meta["isin"]:
+            if clean_compact == k_clean or clean_compact == meta.get("isin", "").upper():
                 return meta["instrument_key"]
-        if symbol in OFFICIAL_UPSTOX_KEYS:
-            return OFFICIAL_UPSTOX_KEYS[symbol]["instrument_key"]
-        # If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|...
-        if "|" in symbol and (symbol.startswith("NSE_") or symbol.startswith("BSE_")):
-            return symbol
+
+        # 2. Check 5000+ Indian Equity In-Memory Indexes (O(1) lookups)
+        if clean_upper in _UPSTOX_EQUITY_BY_SYMBOL:
+            return _UPSTOX_EQUITY_BY_SYMBOL[clean_upper]["instrument_key"]
+        if clean_upper in _UPSTOX_EQUITY_BY_ISIN:
+            return _UPSTOX_EQUITY_BY_ISIN[clean_upper]["instrument_key"]
+        if sym_str in _UPSTOX_EQUITY_BY_KEY:
+            return _UPSTOX_EQUITY_BY_KEY[sym_str]["instrument_key"]
+
+        # 3. Check normalized variations (strip .NS, .BO, -EQ, etc.)
+        if clean_upper.endswith(".NS") or clean_upper.endswith(".BO"):
+            base_sym = clean_upper.rsplit(".", 1)[0]
+            if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
+                return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
+
+        if clean_upper.endswith("-EQ"):
+            base_sym = clean_upper.rsplit("-", 1)[0]
+            if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
+                return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
+
+        if clean_upper.startswith("NSE:") or clean_upper.startswith("BSE:"):
+            base_sym = clean_upper.split(":", 1)[1]
+            if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
+                return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
+
+        # 4. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|...
+        if "|" in sym_str and (sym_str.startswith("NSE_") or sym_str.startswith("BSE_")):
+            return sym_str
+
         return None
 
     def get_instrument_metadata(self, symbol: str) -> Optional[Dict[str, Any]]:
-        """Retrieves structured instrument metadata for an Indian stock or index."""
-        clean_sym = symbol.strip().upper()
-        if clean_sym in OFFICIAL_UPSTOX_KEYS:
-            return OFFICIAL_UPSTOX_KEYS[clean_sym]
+        """Retrieves structured instrument metadata for any of 5000+ Indian stocks or indices."""
+        if not symbol:
+            return None
+        sym_str = str(symbol).strip()
+        clean_upper = sym_str.upper()
+
+        # 1. Curated indices registry
+        if clean_upper in OFFICIAL_UPSTOX_KEYS:
+            return OFFICIAL_UPSTOX_KEYS[clean_upper]
         for key, meta in OFFICIAL_UPSTOX_KEYS.items():
-            if clean_sym == key.upper():
+            if clean_upper == key.upper():
                 return meta
+
+        # 2. Check 5000+ Indian Equity Master
+        if clean_upper in _UPSTOX_EQUITY_BY_SYMBOL:
+            return _UPSTOX_EQUITY_BY_SYMBOL[clean_upper]
+        if clean_upper in _UPSTOX_EQUITY_BY_ISIN:
+            return _UPSTOX_EQUITY_BY_ISIN[clean_upper]
+        if sym_str in _UPSTOX_EQUITY_BY_KEY:
+            return _UPSTOX_EQUITY_BY_KEY[sym_str]
+
+        # 3. Strip variations
+        if clean_upper.endswith(".NS") or clean_upper.endswith(".BO") or clean_upper.endswith("-EQ"):
+            base_sym = clean_upper.replace(".NS", "").replace(".BO", "").replace("-EQ", "")
+            if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
+                return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]
+
         return None
+
+    def search_equity_instruments(
+        self,
+        query: str,
+        exchange: Optional[str] = None,
+        limit: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """Searches across the 5000+ Upstox Indian equity instrument catalog."""
+        q = (query or "").strip().upper()
+        ex_filter = exchange.strip().upper() if exchange else None
+        results: List[Dict[str, Any]] = []
+
+        # If query matches an index
+        for k, v in OFFICIAL_UPSTOX_KEYS.items():
+            if q and (q in k.upper() or q in v.get("name", "").upper()):
+                results.append(v)
+                if len(results) >= limit:
+                    return results
+
+        # Search equity universe
+        for item in _UPSTOX_EQUITY_MASTER:
+            sym = item.get("symbol", "").upper()
+            ts = item.get("trading_symbol", "").upper()
+            name = item.get("company_name", "").upper()
+            isin = item.get("isin", "").upper()
+            ex = item.get("exchange", "NSE").upper()
+
+            if ex_filter and ex != ex_filter:
+                continue
+
+            if not q or (q in sym or q in ts or q in name or q in isin):
+                results.append(item)
+                if len(results) >= limit:
+                    break
+
+        return results
+
+    def get_all_equity_instruments(
+        self,
+        exchange: Optional[str] = None,
+        limit: Optional[int] = None,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        """Returns paginated or full list of the 5000+ Upstox Indian equity instruments."""
+        ex_filter = exchange.strip().upper() if exchange else None
+        if ex_filter:
+            filtered = [i for i in _UPSTOX_EQUITY_MASTER if i.get("exchange", "NSE").upper() == ex_filter]
+        else:
+            filtered = _UPSTOX_EQUITY_MASTER
+
+        if limit is not None:
+            return filtered[offset : offset + limit]
+        return filtered[offset:]
+
+    def get_equity_instruments_count(self) -> int:
+        """Returns total count of registered Indian equities."""
+        return len(_UPSTOX_EQUITY_MASTER)
 
     def _make_request(
         self,
@@ -644,9 +817,10 @@ class UpstoxService:
 
     def resolve_canonical_symbol(self, input_str: str) -> str:
         """
-        Maps any Upstox instrument_key, ISIN, symbol, or alias to canonical symbol.
+        Maps any Upstox instrument_key, ISIN, symbol, or alias to canonical symbol across 5000+ instruments.
         Examples:
           'NSE_INDEX|Nifty 50' -> 'NIFTY'
+          'NSE_EQ|INE002A01018' -> 'RELIANCE'
           'NSE_EQ|INE090A01021' -> 'ICICIBANK'
           'ICICI BANK' -> 'ICICIBANK'
           'NSE_EQ|INE062A01020' -> 'SBIN'
@@ -663,7 +837,17 @@ class UpstoxService:
         if clean_upper in OFFICIAL_UPSTOX_KEYS:
             return OFFICIAL_UPSTOX_KEYS[clean_upper].get("canonical_symbol") or OFFICIAL_UPSTOX_KEYS[clean_upper]["trading_symbol"]
 
-        # 2. Iterate keys
+        # 2. 5000+ Equity index lookup
+        if clean in _UPSTOX_EQUITY_BY_KEY:
+            return _UPSTOX_EQUITY_BY_KEY[clean]["canonical_symbol"]
+        if clean_upper in _UPSTOX_EQUITY_BY_KEY:
+            return _UPSTOX_EQUITY_BY_KEY[clean_upper]["canonical_symbol"]
+        if clean_upper in _UPSTOX_EQUITY_BY_ISIN:
+            return _UPSTOX_EQUITY_BY_ISIN[clean_upper]["canonical_symbol"]
+        if clean_upper in _UPSTOX_EQUITY_BY_SYMBOL:
+            return _UPSTOX_EQUITY_BY_SYMBOL[clean_upper]["canonical_symbol"]
+
+        # 3. Iterate keys
         for key, meta in OFFICIAL_UPSTOX_KEYS.items():
             ik = meta.get("instrument_key", "").upper()
             ik_compact = ik.replace(" ", "").replace("_", "").replace("|", ":")
@@ -683,7 +867,7 @@ class UpstoxService:
             if clean_upper == name:
                 return cs
 
-        # 3. Fallback extraction if format is EXCHANGE|SYMBOL
+        # 4. Fallback extraction if format is EXCHANGE|SYMBOL
         if "|" in clean:
             return clean.split("|", 1)[1].strip()
         if ":" in clean:
@@ -954,6 +1138,42 @@ class UpstoxService:
                 logger.warning("Upstox orders query error: %s", e)
         return []
 
+    def get_option_expiries(self, underlying: str = "NIFTY") -> List[str]:
+        """Queries dynamic active option expiries for underlying from Upstox."""
+        if not self.is_authenticated:
+            return []
+        und_clean = underlying.upper().strip()
+        reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
+        instrument_key = reg_entry.get("instrument_key")
+        if not instrument_key:
+            if und_clean in ["NIFTY", "NIFTY 50", "NIFTY50"]:
+                instrument_key = "NSE_INDEX|Nifty 50"
+            elif und_clean in ["BANKNIFTY", "NIFTY BANK"]:
+                instrument_key = "NSE_INDEX|Nifty Bank"
+            elif und_clean in ["FINNIFTY", "NIFTY FIN SERVICE"]:
+                instrument_key = "NSE_INDEX|Nifty Fin Service"
+            elif und_clean in ["MIDCPNIFTY", "NIFTY MID SELECT", "NIFTY MIDCAP SELECT"]:
+                instrument_key = "NSE_INDEX|NIFTY MID SELECT"
+            elif und_clean in ["SENSEX", "BSE SENSEX"]:
+                instrument_key = "BSE_INDEX|SENSEX"
+            elif und_clean in ["RELIANCE"]:
+                instrument_key = "NSE_EQ|INE002A01018"
+            elif und_clean in ["TCS"]:
+                instrument_key = "NSE_EQ|INE467B01029"
+            elif und_clean in ["HDFCBANK"]:
+                instrument_key = "NSE_EQ|INE040A01034"
+            else:
+                return []
+        try:
+            res = self._make_request("option/contract", params={"instrument_key": instrument_key}, api_version="v2")
+            if res.get("status") == "success" and "data" in res:
+                contracts = res.get("data", [])
+                expiries = sorted(list(set(c.get("expiry") for c in contracts if c.get("expiry"))))
+                return expiries
+        except Exception as e:
+            logger.warning("Upstox get_option_expiries error: %s", e)
+        return []
+
     def get_option_chain(
         self,
         underlying: str = "NIFTY",
@@ -967,13 +1187,11 @@ class UpstoxService:
         if not self.is_authenticated:
             return {"status": "error", "error": "UPSTOX_CREDENTIALS_MISSING", "message": "Upstox credentials not configured"}
 
-        # Map symbol to official Upstox instrument key
         und_clean = underlying.upper().strip()
         reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
         instrument_key = reg_entry.get("instrument_key")
 
         if not instrument_key:
-            # Check known indices
             if und_clean in ["NIFTY", "NIFTY 50", "NIFTY50"]:
                 instrument_key = "NSE_INDEX|Nifty 50"
             elif und_clean in ["BANKNIFTY", "NIFTY BANK"]:
@@ -986,23 +1204,116 @@ class UpstoxService:
                 instrument_key = "BSE_INDEX|SENSEX"
             elif und_clean in ["INDIA VIX", "INDIAVIX"]:
                 instrument_key = "NSE_INDEX|India VIX"
+            elif und_clean in ["RELIANCE"]:
+                instrument_key = "NSE_EQ|INE002A01018"
+            elif und_clean in ["TCS"]:
+                instrument_key = "NSE_EQ|INE467B01029"
+            elif und_clean in ["HDFCBANK"]:
+                instrument_key = "NSE_EQ|INE040A01034"
             else:
                 return {
                     "status": "error",
                     "error": "UNRESOLVED_INSTRUMENT",
-                    "message": f"Could not resolve Upstox instrument key for underlying '{underlying}'. Never defaulting to NSE_INDEX."
+                    "message": f"Could not resolve Upstox instrument key for underlying '{underlying}'."
                 }
 
-        params = {"instrument_key": instrument_key}
-        if expiry:
-            params["expiry_date"] = expiry
+        # Fetch available expiries if not provided
+        avail_exp = self.get_option_expiries(underlying)
+        target_expiry = expiry if (expiry and (not avail_exp or expiry in avail_exp)) else (avail_exp[0] if avail_exp else None)
+
+        if not target_expiry:
+            return {"status": "error", "error": "NO_EXPIRIES", "message": f"No active expiries found for {underlying} on Upstox"}
+
+        params = {"instrument_key": instrument_key, "expiry_date": target_expiry}
 
         try:
             res = self._make_request("option/chain", params=params, api_version="v2")
-            return res
+            raw_items = res.get("data", [])
+            strikes = []
+            spot_price = 0.0
+
+            for item in raw_items:
+                spot_price = float(item.get("underlying_spot_price") or spot_price)
+                k = float(item.get("strike_price") or 0.0)
+                c_opt = item.get("call_options") or {}
+                p_opt = item.get("put_options") or {}
+                c_md = c_opt.get("market_data") or {}
+                p_md = p_opt.get("market_data") or {}
+                c_grk = c_opt.get("option_greeks") or {}
+                p_grk = p_opt.get("option_greeks") or {}
+
+                ce_obj = {
+                    "instrument_key": c_opt.get("instrument_key"),
+                    "ltp": float(c_md.get("ltp") or c_md.get("close_price") or 0.0),
+                    "bid": float(c_md.get("bid_price") or 0.0),
+                    "ask": float(c_md.get("ask_price") or 0.0),
+                    "bid_qty": int(c_md.get("bid_qty") or 0),
+                    "ask_qty": int(c_md.get("ask_qty") or 0),
+                    "volume": float(c_md.get("volume") or 0.0),
+                    "open_interest": float(c_md.get("oi") or 0.0),
+                    "oi": float(c_md.get("oi") or 0.0),
+                    "delta": float(c_grk.get("delta") or 0.0),
+                    "gamma": float(c_grk.get("gamma") or 0.0),
+                    "theta": float(c_grk.get("theta") or 0.0),
+                    "vega": float(c_grk.get("vega") or 0.0),
+                    "iv": float(c_grk.get("iv") or 0.0),
+                }
+
+                pe_obj = {
+                    "instrument_key": p_opt.get("instrument_key"),
+                    "ltp": float(p_md.get("ltp") or p_md.get("close_price") or 0.0),
+                    "bid": float(p_md.get("bid_price") or 0.0),
+                    "ask": float(p_md.get("ask_price") or 0.0),
+                    "bid_qty": int(p_md.get("bid_qty") or 0),
+                    "ask_qty": int(p_md.get("ask_qty") or 0),
+                    "volume": float(p_md.get("volume") or 0.0),
+                    "open_interest": float(p_md.get("oi") or 0.0),
+                    "oi": float(p_md.get("oi") or 0.0),
+                    "delta": float(p_grk.get("delta") or 0.0),
+                    "gamma": float(p_grk.get("gamma") or 0.0),
+                    "theta": float(p_grk.get("theta") or 0.0),
+                    "vega": float(p_grk.get("vega") or 0.0),
+                    "iv": float(p_grk.get("iv") or 0.0),
+                }
+
+                is_atm = abs(k - spot_price) < 50.0 if spot_price > 0 else False
+                strikes.append({
+                    "strike": k,
+                    "strike_price": k,
+                    "is_atm": is_atm,
+                    "ce": ce_obj,
+                    "pe": pe_obj,
+                    "call": ce_obj,
+                    "put": pe_obj,
+                })
+
+            if strikes and strike_count > 0 and len(strikes) > strike_count:
+                atm_idx = 0
+                min_dist = float("inf")
+                for idx, s in enumerate(strikes):
+                    dist = abs(s["strike"] - spot_price)
+                    if dist < min_dist:
+                        min_dist = dist
+                        atm_idx = idx
+                half = strike_count // 2
+                start = max(0, atm_idx - half)
+                strikes = strikes[start : start + strike_count]
+
+            return {
+                "status": "success",
+                "provider": "UPSTOX",
+                "underlying": underlying,
+                "spot_price": spot_price,
+                "selected_expiry": target_expiry,
+                "available_expiries": avail_exp,
+                "strikes": strikes,
+                "rows": strikes,
+                "data": res.get("data", []),
+            }
         except Exception as e:
             logger.warning("Upstox option chain query error: %s", e)
             return {"status": "error", "message": str(e)}
+
 
     def get_safe_diagnostic(self) -> Dict[str, Any]:
         """

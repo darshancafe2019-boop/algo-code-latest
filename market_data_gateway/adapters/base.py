@@ -43,6 +43,14 @@ class NormalizedQuote:
     high_52w: Optional[float] = None
     low_52w: Optional[float] = None
     
+    # Order Flow & Quantities
+    last_quantity: Optional[float] = None
+    bid_quantity: Optional[float] = None
+    ask_quantity: Optional[float] = None
+    buy_quantity: Optional[float] = None
+    sell_quantity: Optional[float] = None
+    event_type: str = "TICK"  # TICK | TRADE | DEPTH | GREEKS | STATUS
+    
     # Asset Classification & Metadata
     segment: Optional[str] = None  # e.g. "INDEX", "EQUITY", "FUTURES", "OPTIONS", "CRYPTO"
     instrument_key: Optional[str] = None
@@ -83,8 +91,8 @@ class NormalizedQuote:
     greeks: Optional[Dict[str, Any]] = None  # {delta, gamma, theta, vega, rho}
     
     # Provenance & Data Quality
-    event_timestamp: str = ""              # ISO-8601 UTC from provider
-    received_timestamp: str = ""           # ISO-8601 UTC when received
+    event_timestamp: str = ""              # ISO-8601 UTC from provider (exchangeTimestamp)
+    received_timestamp: str = ""           # ISO-8601 UTC when received at gateway (receivedTimestamp)
     feed_latency_ms: float = 0.0
     data_mode: str = "REAL_TIME"           # REAL_TIME | DELAYED | EOD | CACHED
     status: str = "LIVE"                   # LIVE | PRE_OPEN | OPEN | CLOSED | AFTER_HOURS | HALTED | STALE | DISCONNECTED | UNAVAILABLE
@@ -100,6 +108,16 @@ class NormalizedQuote:
         if not self.event_timestamp:
             self.event_timestamp = now_iso
         
+        # Calculate feed latency if timestamps present
+        try:
+            evt_dt = datetime.fromisoformat(self.event_timestamp.replace("Z", "+00:00"))
+            rcv_dt = datetime.fromisoformat(self.received_timestamp.replace("Z", "+00:00"))
+            lat = (rcv_dt.timestamp() - evt_dt.timestamp()) * 1000.0
+            if lat >= 0 and self.feed_latency_ms <= 0:
+                self.feed_latency_ms = round(lat, 2)
+        except Exception:
+            pass
+
         if self.oi is None and self.open_interest is not None:
             self.oi = self.open_interest
         elif self.open_interest is None and self.oi is not None:
@@ -107,12 +125,12 @@ class NormalizedQuote:
         
         # Auto-compute spread if bid and ask exist
         if self.bid is not None and self.ask is not None and self.spread is None:
-            self.spread = round(max(0.0, float(self.ask) - float(self.bid)), 4)
+            self.spread = round(max(0.0, float(self.ask) - float(self.bid)), 6)
             
         # Auto-compute basis if spot and future price exist
         if self.spot_price and (self.future_price or self.last_price) and self.basis is None:
             fp = self.future_price if self.future_price is not None else self.last_price
-            self.basis = round(fp - self.spot_price, 4)
+            self.basis = round(fp - self.spot_price, 6)
             if self.spot_price > 0:
                 self.basis_pct = round((self.basis / self.spot_price) * 100.0, 4)
 
@@ -205,6 +223,15 @@ class NormalizedQuote:
         d["instrument_key"] = d.get("instrument_key") or self.instrument_key or self.symbol
         d["instrumentKey"] = d["instrument_key"]
         d["segment"] = d.get("exchange_segment") or d.get("market") or "INDEX"
+        d["eventType"] = self.event_type
+        d["exchangeTimestamp"] = d["sourceTimestamp"]
+        d["receivedTimestamp"] = d["receivedAt"]
+        d["isStale"] = d["is_stale"] = (status_val == "STALE")
+        d["lastQuantity"] = self.last_quantity
+        d["bidQuantity"] = self.bid_quantity
+        d["askQuantity"] = self.ask_quantity
+        d["buyQuantity"] = self.buy_quantity
+        d["sellQuantity"] = self.sell_quantity
         d["previous_close"] = self.close if self.close and self.close > 0 else None
         d["previousClose"] = d["previous_close"]
         d["change"] = self.change if self.change is not None else (round(self.last_price - self.close, 2) if self.close and self.close > 0 and self.last_price else None)
@@ -224,6 +251,10 @@ class NormalizedQuote:
             d["bid_price"] = d["bid"]
         if d.get("ask") is not None and "ask_price" not in d:
             d["ask_price"] = d["ask"]
+        if d.get("bid_quantity") is not None and "bidQty" not in d:
+            d["bidQty"] = d["bid_quantity"]
+        if d.get("ask_quantity") is not None and "askQty" not in d:
+            d["askQty"] = d["ask_quantity"]
         if d.get("oi") is not None and "open_interest" not in d:
             d["open_interest"] = d["oi"]
         if d.get("feed_latency_ms") is not None and "freshness_ms" not in d:

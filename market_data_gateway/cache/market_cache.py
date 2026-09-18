@@ -93,6 +93,9 @@ class MarketDataCache:
         self._quotes[quote.symbol] = quote
         self._quotes[quote.symbol.upper()] = quote
 
+    def get_normalized_quote(self, key: str) -> Optional[NormalizedQuote]:
+        return self.get_quote(key)
+
     def get_stats(self) -> Dict[str, Any]:
         return {
             "cached_ticks": len(self._ticks),

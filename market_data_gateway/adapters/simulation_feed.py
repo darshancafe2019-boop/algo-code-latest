@@ -47,6 +47,13 @@ class SimulationFeedAdapter(BaseProviderAdapter):
         self._quote_cache: Dict[str, NormalizedQuote] = {}
 
     async def connect(self) -> None:
+        import os
+        if os.environ.get("FEED_MODE", "").upper() != "SIMULATION":
+            self._running = False
+            self._status = "IDLE"
+            logger.info("Simulation feed idle (FEED_MODE!=SIMULATION). Synthetic ticks disabled in production.")
+            return
+
         self._running = True
         self._status = "LIVE"
         if self._task is None or self._task.done():

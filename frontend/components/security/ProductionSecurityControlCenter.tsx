@@ -144,11 +144,15 @@ export function ProductionSecurityControlCenter() {
     queryKey: ["authoritativeSecurityOverview"],
     queryFn: async () => {
       const res = await fetch("/api/security/overview");
+      if (res.status === 401) {
+        return { status: "unauthenticated", telemetry: {} as any, checkup: [] };
+      }
       if (!res.ok) throw new Error("Failed to load security overview");
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 15000,
     staleTime: 5000,
+    retry: 1,
   });
 
   // 2. Fetch User Profile
@@ -165,11 +169,15 @@ export function ProductionSecurityControlCenter() {
     queryKey: ["authMeSession"],
     queryFn: async () => {
       const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        return { status: "unauthenticated", authenticated: false, user: null, session: null, permissions: [] };
+      }
       if (!res.ok) throw new Error("Failed to load user profile");
       return res.json();
     },
-    refetchInterval: 10000,
+    refetchInterval: 15000,
     staleTime: 5000,
+    retry: 1,
   });
 
   // 3. Fetch Sessions
@@ -181,14 +189,18 @@ export function ProductionSecurityControlCenter() {
     status: string;
     sessions: SessionItem[];
   }>({
-    queryKey: ["authSessionsList"],
+    queryKey: ["authActiveSessions"],
     queryFn: async () => {
       const res = await fetch("/api/auth/sessions");
-      if (!res.ok) throw new Error("Failed to fetch sessions");
+      if (res.status === 401) {
+        return { status: "unauthenticated", sessions: [] };
+      }
+      if (!res.ok) throw new Error("Failed to load sessions");
       return res.json();
     },
-    refetchInterval: 8000,
-    staleTime: 4000,
+    refetchInterval: 15000,
+    staleTime: 5000,
+    retry: 1,
   });
 
   // 4. Fetch Trading Protection

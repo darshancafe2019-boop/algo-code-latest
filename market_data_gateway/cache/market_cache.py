@@ -23,6 +23,8 @@ class MarketDataCache:
         self._quotes: Dict[str, NormalizedQuote] = {}
         # Alias map: alias_key -> canonical_symbol
         self._alias_map: Dict[str, str] = {}
+        # Option chains cache: key -> (timestamp, data)
+        self._option_chains: Dict[str, tuple[float, Dict[str, Any]]] = {}
         self._lock = asyncio.Lock()
 
     def set_tick(self, tick: MarketTick, quote: Optional[NormalizedQuote] = None) -> None:
@@ -97,9 +99,6 @@ class MarketDataCache:
             "cached_quotes": len(self._quotes),
             "alias_keys": len(self._alias_map),
         }
-
-        # Option chains cache: key -> (timestamp, data)
-        self._option_chains: Dict[str, tuple[float, Dict[str, Any]]] = {}
 
     def get_option_chain(self, key: str) -> Optional[Dict[str, Any]]:
         entry = self._option_chains.get(key)

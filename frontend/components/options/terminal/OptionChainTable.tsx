@@ -741,35 +741,35 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     {/* CALLS CELLS */}
                     {columnConfig.previousOi && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {callPrevOi !== null ? formatIndianQuantity(callPrevOi) : "—"}
+                        {callPrevOi !== null && callPrevOi !== undefined && callPrevOi > 0 ? formatIndianQuantity(callPrevOi) : "—"}
                       </td>
                     )}
                     {columnConfig.oi && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-200 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call ? formatIndianQuantity(call.oi) : "—"}
+                        {call?.oi && call.oi > 0 ? formatIndianQuantity(call.oi) : "—"}
                       </td>
                     )}
                     {columnConfig.oiChange && (
                       <td
                         className={`py-2 px-2 text-right ${callBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
-                          call && call.oiChange > 0
+                          call && call.oiChange && call.oiChange > 0
                             ? "text-emerald-400"
-                            : call && call.oiChange < 0
+                            : call && call.oiChange && call.oiChange < 0
                             ? "text-rose-400"
                             : "text-slate-400"
                         }`}
                       >
-                        {call ? `${call.oiChange > 0 ? "+" : ""}${formatIndianQuantity(call.oiChange)}` : "—"}
+                        {call && call.oiChange !== null && call.oiChange !== undefined && call.oiChange !== 0 ? `${call.oiChange > 0 ? "+" : ""}${formatIndianQuantity(call.oiChange)}` : "—"}
                       </td>
                     )}
                     {columnConfig.previousVolume && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call?.previousVolume !== undefined ? formatIndianQuantity(call.previousVolume) : "—"}
+                        {call?.previousVolume !== undefined && call?.previousVolume !== null && call.previousVolume > 0 ? formatIndianQuantity(call.previousVolume) : "—"}
                       </td>
                     )}
                     {columnConfig.volume && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {call ? formatIndianQuantity(call.volume) : "—"}
+                        {call?.volume && call.volume > 0 ? formatIndianQuantity(call.volume) : "—"}
                       </td>
                     )}
                     {columnConfig.volumeOiRatio && (
@@ -1076,7 +1076,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         }`}
                         title="Click to inspect Put quote"
                       >
-                        {put ? formatIndianCurrency(put.ltp, currency) : "—"}
+                        {put && put.ltp !== null && put.ltp !== undefined && put.ltp > 0 ? formatIndianCurrency(put.ltp, currency) : "—"}
                       </td>
                     )}
                     {columnConfig.change && (
@@ -1085,7 +1085,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           put && put.change >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {put ? `${put.change >= 0 ? "+" : ""}${put.change.toFixed(2)}` : "—"}
+                        {put && put.ltp ? `${put.change >= 0 ? "+" : ""}${put.change.toFixed(2)}` : "—"}
                       </td>
                     )}
                     {columnConfig.changePercent && (
@@ -1094,7 +1094,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           put && put.changePercent >= 0 ? "text-emerald-400" : "text-rose-400"
                         }`}
                       >
-                        {put ? `${put.changePercent >= 0 ? "+" : ""}${put.changePercent.toFixed(2)}%` : "—"}
+                        {put && put.ltp ? `${put.changePercent >= 0 ? "+" : ""}${put.changePercent.toFixed(2)}%` : "—"}
                       </td>
                     )}
                     {columnConfig.averagePrice && (
@@ -1159,40 +1159,40 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                     )}
                     {columnConfig.volumeOiRatio && (
                       <td className={`py-2 px-1.5 text-left ${putBgClass} text-slate-300 font-bold text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {put ? `${put.volumeOiRatio.toFixed(1)}x` : "—"}
+                        {put && put.volumeOiRatio > 0 ? `${put.volumeOiRatio.toFixed(1)}x` : "—"}
                       </td>
                     )}
                     {columnConfig.previousVolume && (
                       <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {put?.previousVolume !== undefined ? formatIndianQuantity(put.previousVolume) : "—"}
+                        {put?.previousVolume !== undefined && put?.previousVolume !== null && put.previousVolume > 0 ? formatIndianQuantity(put.previousVolume) : "—"}
                       </td>
                     )}
                     {columnConfig.volume && (
                       <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {put ? formatIndianQuantity(put.volume) : "—"}
+                        {put?.volume && put.volume > 0 ? formatIndianQuantity(put.volume) : "—"}
                       </td>
                     )}
                     {columnConfig.oiChange && (
                       <td
                         className={`py-2 px-2 text-left ${putBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
-                          put && put.oiChange > 0
+                          put && put.oiChange && put.oiChange > 0
                             ? "text-emerald-400"
-                            : put && put.oiChange < 0
+                            : put && put.oiChange && put.oiChange < 0
                             ? "text-rose-400"
                             : "text-slate-400"
                         }`}
                       >
-                        {put ? `${put.oiChange > 0 ? "+" : ""}${formatIndianQuantity(put.oiChange)}` : "—"}
+                        {put && put.oiChange !== null && put.oiChange !== undefined && put.oiChange !== 0 ? `${put.oiChange > 0 ? "+" : ""}${formatIndianQuantity(put.oiChange)}` : "—"}
                       </td>
                     )}
                     {columnConfig.previousOi && (
                       <td className={`py-2 px-2 text-left ${putBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {putPrevOi !== null ? formatIndianQuantity(putPrevOi) : "—"}
+                        {putPrevOi !== null && putPrevOi !== undefined && putPrevOi > 0 ? formatIndianQuantity(putPrevOi) : "—"}
                       </td>
                     )}
                     {columnConfig.oi && (
                       <td className={`py-2 px-2 text-left ${putBgClass} text-slate-200 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
-                        {put ? formatIndianQuantity(put.oi) : "—"}
+                        {put?.oi && put.oi > 0 ? formatIndianQuantity(put.oi) : "—"}
                       </td>
                     )}
                   </tr>

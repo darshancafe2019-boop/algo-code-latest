@@ -15,6 +15,8 @@ import {
   X
 } from "lucide-react";
 
+import { MARKET_CATEGORIES } from "./SimpleMarketsHeader";
+
 interface MarketCategoryNavigationProps {
   activeCategory: string;
   onSelectCategory: (cat: string) => void;
@@ -28,21 +30,7 @@ export function MarketCategoryNavigation({
   searchQuery,
   onSearchChange,
 }: MarketCategoryNavigationProps) {
-  const categories = [
-    { id: "ALL", label: "All Markets" },
-    { id: "WATCHLISTS", label: "My Watchlists" },
-    { id: "CRYPTO", label: "Crypto" },
-    { id: "INDIA", label: "Indian Indices" },
-    { id: "GLOBAL INDICES", label: "Global Indices" },
-    { id: "STOCKS", label: "Equities" },
-    { id: "FOREX", label: "Forex" },
-    { id: "COMMODITIES", label: "Commodities" },
-    { id: "OPTIONS", label: "Options Chains" },
-    { id: "FUTURES", label: "Futures Hub" },
-    { id: "TOP MOVERS", label: "Top Movers" },
-    { id: "HEATMAP", label: "Heatmap" },
-    { id: "SCANNER", label: "Scanners" },
-  ];
+  const categories = MARKET_CATEGORIES;
 
   return (
     <div className="bg-[#0B131E] border border-[#1A2A3F] rounded-2xl p-3.5 shadow-xl select-none font-sans space-y-3">

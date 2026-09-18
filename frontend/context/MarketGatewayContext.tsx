@@ -124,19 +124,24 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const batchFrameRef = useRef<number | null>(null);
   const lastQuotesStateUpdateRef = useRef<number>(0);
+  const scheduleReconnectRef = useRef<() => void>(() => {});
+  const connectWSRef = useRef<() => void>(() => {});
 
   // Resolve optimal gateway WebSocket URL
   const getGatewayWsUrl = useCallback((): string => {
     if (typeof window === "undefined") return "ws://127.0.0.1:5051/ws";
 
-    if (process.env.NEXT_PUBLIC_MARKET_WS_URL) {
-      return process.env.NEXT_PUBLIC_MARKET_WS_URL;
-    }
     if (process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL) {
       return process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL;
     }
+    if (process.env.NEXT_PUBLIC_MARKET_WS_URL) {
+      return process.env.NEXT_PUBLIC_MARKET_WS_URL;
+    }
 
-    const host = window.location.hostname || "127.0.0.1";
+    let host = window.location.hostname || "127.0.0.1";
+    if (host === "localhost") {
+      host = "127.0.0.1";
+    }
     const port = process.env.NEXT_PUBLIC_MARKET_GATEWAY_PORT || "5051";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
@@ -165,11 +170,25 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       ws = new WebSocket(wsUrl);
       wsRef.current = ws;
     } catch {
-      scheduleReconnect();
+      scheduleReconnectRef.current();
       return;
     }
 
+    const connectTimeout = setTimeout(() => {
+      if (ws.readyState === WebSocket.CONNECTING) {
+        try {
+          (ws as any)._isClosing = true;
+          ws.close();
+        } catch {}
+        if (wsRef.current === ws) {
+          wsRef.current = null;
+        }
+        scheduleReconnectRef.current();
+      }
+    }, 5000);
+
     ws.onopen = () => {
+      clearTimeout(connectTimeout);
       if (!mountedRef.current || wsRef.current !== ws || (ws as any)._isClosing) return;
       reconnectAttemptRef.current = 0;
       lastHeartbeatRef.current = Date.now();
@@ -324,8 +343,9 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
               });
             });
           }
-        } else if (msg.type === "HEARTBEAT") {
-          setConnectionStatus((prev) => (prev !== "CONNECTED" && prev !== "LIVE" ? "CONNECTED" : prev));
+        } else if (msg.type === "GATEWAY_READY" || msg.type === "READY" || msg.type === "HEARTBEAT") {
+          setConnectionStatus("CONNECTED");
+          useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
         }
       } catch {
         // Safe: ignore malformed frames
@@ -333,17 +353,21 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     };
 
     ws.onerror = () => {
+      clearTimeout(connectTimeout);
       if (!mountedRef.current || wsRef.current !== ws || (ws as any)._isClosing) return;
     };
 
     ws.onclose = () => {
+      clearTimeout(connectTimeout);
       if (!mountedRef.current || (ws as any)._isClosing) return;
       if (wsRef.current === ws) {
         wsRef.current = null;
       }
-      scheduleReconnect();
+      scheduleReconnectRef.current();
     };
   }, [getGatewayWsUrl]);
+
+  connectWSRef.current = connectWS;
 
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -360,10 +384,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
     reconnectTimerRef.current = setTimeout(() => {
       if (mountedRef.current) {
-        connectWS();
+        connectWSRef.current();
       }
     }, delay);
-  }, [connectWS]);
+  }, []);
+
+  scheduleReconnectRef.current = scheduleReconnect;
 
   // ─── HTTP Fallback Poller during WS Reconnection (Batched, NO 10-symbol limit) ───
 

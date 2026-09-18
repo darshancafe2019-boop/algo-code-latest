@@ -302,6 +302,31 @@ class UniversalOptionsEngine:
             base_iv=base_iv,
         )
 
+    def generate_standardized_chain(
+        self,
+        underlying: str,
+        spot_price: float,
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+        step_size: Optional[float] = None,
+        base_iv: float = 0.18,
+        provider: str = "DHAN",
+        broker_account_id: Optional[str] = None,
+        broker_account_alias: Optional[str] = None,
+    ) -> OptionChainSnapshot:
+        """Generates a standardized option chain for tests or paper simulation with explicit provider attribution."""
+        return self.generate_paper_option_chain(
+            underlying=underlying,
+            spot_price=spot_price,
+            expiry=expiry,
+            strike_count=strike_count,
+            step_size=step_size,
+            base_iv=base_iv,
+            provider=provider,
+            broker_account_id=broker_account_id or f"ba_{provider.lower()}_primary",
+            broker_account_alias=broker_account_alias or f"{provider} Primary",
+        )
+
     def generate_paper_option_chain(
         self,
         underlying: str,
@@ -552,6 +577,201 @@ class UniversalOptionsEngine:
         global_market_cache.set_option_chain(und, selected_expiry, snapshot.to_dict())
         return snapshot
 
+    def _build_contract_universe_snapshot(
+        self,
+        underlying: str,
+        provider: str,
+        broker_account_id: str,
+        broker_account_alias: str,
+        environment: str,
+        exchange: str,
+        segment: str,
+        currency: str,
+        spot_price: float,
+        expiry: Optional[str] = None,
+        strike_count: int = 20,
+        freshness_status: str = "AUTH_REQUIRED",
+        is_auth: bool = False,
+    ) -> OptionChainSnapshot:
+        """
+        Builds canonical contract universe ladder from instrument master without fabricating quotes.
+        Complies strictly with Rule 27: A missing live tick must NOT make a valid option contract disappear.
+        """
+        und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
+        now_iso = datetime.now(timezone.utc).isoformat()
+
+        available_expiries = global_instrument_master.get_expiries_for_underlying(und)
+        if not available_expiries:
+            today = datetime.now(timezone.utc)
+            available_expiries = [
+                (today + timedelta(days=i)).strftime("%Y-%m-%d")
+                for i in range(1, 45)
+                if (today + timedelta(days=i)).weekday() == 3
+            ][:8]
+        selected_expiry = expiry if (expiry and expiry in available_expiries) else (available_expiries[0] if available_expiries else "")
+
+        if spot_price <= 0:
+            cached_quote = global_market_cache.get(und)
+            if cached_quote and cached_quote.ltp:
+                spot_price = float(cached_quote.ltp)
+
+        ref_price = spot_price if spot_price > 0 else (24500.0 if und == "NIFTY" else (51000.0 if und == "BANKNIFTY" else (23000.0 if und == "FINNIFTY" else 1000.0)))
+        step_size = 500.0 if ref_price > 40000 else (100.0 if ref_price > 15000 else (50.0 if ref_price > 2000 else (10.0 if ref_price > 500 else 5.0)))
+        atm_strike = round(ref_price / step_size) * step_size
+        half_range = strike_count // 2
+        strikes_list = [atm_strike + (i - half_range) * step_size for i in range(strike_count)]
+
+        strike_rows: List[OptionStrikeRow] = []
+        total_call_oi = 0.0
+        total_put_oi = 0.0
+        total_call_vol = 0.0
+        total_put_vol = 0.0
+        has_any_live_quote = False
+
+        for k in strikes_list:
+            is_atm = abs(k - atm_strike) < (step_size * 0.5)
+            dist_pct = round(((k - ref_price) / ref_price) * 100.0, 2) if ref_price > 0 else 0.0
+
+            ce_inst_id = f"{provider}_{und}_{selected_expiry}_{int(k)}_CE"
+            pe_inst_id = f"{provider}_{und}_{selected_expiry}_{int(k)}_PE"
+
+            ce_cached = self._quote_store.get(ce_inst_id)
+            pe_cached = self._quote_store.get(pe_inst_id)
+
+            if ce_cached and ce_cached.lastPrice is not None:
+                has_any_live_quote = True
+                ce_quote = ce_cached
+                total_call_oi += ce_quote.OI or 0.0
+                total_call_vol += ce_quote.volume or 0.0
+            else:
+                ce_quote = OptionQuote(
+                    underlying=und,
+                    expiry=selected_expiry,
+                    strike=k,
+                    optionType="CE",
+                    symbol=f"{und} {selected_expiry} {int(k)} CE",
+                    exchange=exchange,
+                    provider=provider,
+                    lastPrice=None,
+                    bid=None,
+                    ask=None,
+                    volume=0.0,
+                    OI=0.0,
+                    OIChange=0.0,
+                    timestamp=now_iso,
+                    status="NO_DATA",
+                    data_quality=DataQuality.VALID.value,
+                    provenance=DataProvenance.PROVIDER_DATA.value,
+                    greeks_source="PROVIDER",
+                    customerId="cust_default",
+                    departmentId="dept_quant_trading",
+                    brokerId=provider.lower(),
+                    brokerAccountId=broker_account_id,
+                    brokerAccountAlias=broker_account_alias,
+                    environment=environment,
+                    assetClass="INDIAN_INDICES" if exchange == "NSE" else "DERIVATIVES",
+                    segment=segment,
+                    currency=currency,
+                    instrumentId=ce_inst_id,
+                    sourceStreamId=f"stream_{provider.lower()}",
+                    dataFeed="REST",
+                    receivedTimestamp=now_iso,
+                    exchangeTimestamp=now_iso,
+                    lastUpdated=now_iso,
+                    dataAgeMs=0.0,
+                    latencyMs=None,
+                    freshnessStatus=freshness_status,
+                    connectionStatus="CONNECTED" if is_auth else "DISCONNECTED",
+                    isExecutable=is_auth,
+                )
+
+            if pe_cached and pe_cached.lastPrice is not None:
+                has_any_live_quote = True
+                pe_quote = pe_cached
+                total_put_oi += pe_quote.OI or 0.0
+                total_put_vol += pe_quote.volume or 0.0
+            else:
+                pe_quote = OptionQuote(
+                    underlying=und,
+                    expiry=selected_expiry,
+                    strike=k,
+                    optionType="PE",
+                    symbol=f"{und} {selected_expiry} {int(k)} PE",
+                    exchange=exchange,
+                    provider=provider,
+                    lastPrice=None,
+                    bid=None,
+                    ask=None,
+                    volume=0.0,
+                    OI=0.0,
+                    OIChange=0.0,
+                    timestamp=now_iso,
+                    status="NO_DATA",
+                    data_quality=DataQuality.VALID.value,
+                    provenance=DataProvenance.PROVIDER_DATA.value,
+                    greeks_source="PROVIDER",
+                    customerId="cust_default",
+                    departmentId="dept_quant_trading",
+                    brokerId=provider.lower(),
+                    brokerAccountId=broker_account_id,
+                    brokerAccountAlias=broker_account_alias,
+                    environment=environment,
+                    assetClass="INDIAN_INDICES" if exchange == "NSE" else "DERIVATIVES",
+                    segment=segment,
+                    currency=currency,
+                    instrumentId=pe_inst_id,
+                    sourceStreamId=f"stream_{provider.lower()}",
+                    dataFeed="REST",
+                    receivedTimestamp=now_iso,
+                    exchangeTimestamp=now_iso,
+                    lastUpdated=now_iso,
+                    dataAgeMs=0.0,
+                    latencyMs=None,
+                    freshnessStatus=freshness_status,
+                    connectionStatus="CONNECTED" if is_auth else "DISCONNECTED",
+                    isExecutable=is_auth,
+                )
+
+            strike_rows.append(OptionStrikeRow(
+                strike=k,
+                is_atm=is_atm,
+                distance_pct=dist_pct,
+                ce=ce_quote,
+                pe=pe_quote,
+            ))
+
+        pcr_oi = round(total_put_oi / total_call_oi, 2) if (total_call_oi > 0 and total_put_oi > 0) else None
+        pcr_vol = round(total_put_vol / total_call_vol, 2) if (total_call_vol > 0 and total_put_vol > 0) else None
+
+        return OptionChainSnapshot(
+            underlying=und,
+            spot_price=spot_price,
+            selected_expiry=selected_expiry,
+            available_expiries=available_expiries,
+            strikes=strike_rows,
+            max_pain=None,
+            pcr_oi=pcr_oi,
+            pcr_volume=pcr_vol,
+            total_call_oi=total_call_oi,
+            total_put_oi=total_put_oi,
+            total_call_volume=total_call_vol,
+            total_put_volume=total_put_vol,
+            timestamp=now_iso,
+            status="LIVE" if has_any_live_quote else "NO_DATA",
+            provider=provider,
+            brokerAccountId=broker_account_id,
+            brokerAccountAlias=broker_account_alias,
+            environment=environment,
+            dataFeed="REST",
+            exchange=exchange,
+            segment=segment,
+            currency=currency,
+            freshnessStatus="CONNECTED" if has_any_live_quote else freshness_status,
+            latencyMs=None,
+            dataAgeMs=0.0,
+            diagnostics=self.diagnostics,
+        )
+
     def fetch_dhan_option_chain(
         self,
         underlying: str,
@@ -567,13 +787,10 @@ class UniversalOptionsEngine:
         und = underlying.upper().replace(" ", "").replace("/USDT", "").replace(".NS", "")
         from src.dhan_broker_adapter import DhanBrokerAdapter
         dhan_adapter = DhanBrokerAdapter()
-        now_iso = datetime.now(timezone.utc).isoformat()
 
-        # If Dhan is unconfigured or in paper mode without credentials, return standardized paper chain with Dhan identity
         is_auth = dhan_adapter.is_authenticated
         freshness = "CONNECTED" if is_auth or environment == "PAPER" else "AUTHENTICATION_FAILED"
 
-        # Attempt to query live Dhan option chain if authenticated
         raw_dhan_chain = None
         if is_auth:
             try:
@@ -583,7 +800,6 @@ class UniversalOptionsEngine:
                 freshness = "DEGRADED"
 
         if raw_dhan_chain and isinstance(raw_dhan_chain, dict) and "strikes" in raw_dhan_chain and raw_dhan_chain["strikes"]:
-            # Normalization from Dhan live response
             return self._normalize_broker_option_chain(
                 raw_chain=raw_dhan_chain,
                 provider="DHAN",
@@ -600,36 +816,20 @@ class UniversalOptionsEngine:
                 freshness_status=freshness,
             )
 
-        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
-        # Never generate synthetic replacement prices under the DHAN identity
-        now_iso = datetime.now(timezone.utc).isoformat()
-        return OptionChainSnapshot(
+        return self._build_contract_universe_snapshot(
             underlying=und,
-            spot_price=spot_price,
-            selected_expiry=expiry or "",
-            available_expiries=[],
-            strikes=[],
-            max_pain=None,
-            pcr_oi=None,
-            pcr_volume=None,
-            total_call_oi=0.0,
-            total_put_oi=0.0,
-            total_call_volume=0.0,
-            total_put_volume=0.0,
-            timestamp=now_iso,
-            status="NO_DATA",
             provider="DHAN",
-            brokerAccountId="ba_dhan_primary",
-            brokerAccountAlias="Dhan Primary",
+            broker_account_id="ba_dhan_primary",
+            broker_account_alias="Dhan Primary",
             environment=environment,
-            dataFeed="REST",
             exchange="NSE",
             segment="OPTIONS",
             currency="INR",
-            freshnessStatus="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
-            latencyMs=None,
-            dataAgeMs=0.0,
-            diagnostics=self.diagnostics,
+            spot_price=spot_price,
+            expiry=expiry,
+            strike_count=strike_count,
+            freshness_status="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
+            is_auth=is_auth,
         )
 
     def fetch_upstox_option_chain(
@@ -676,36 +876,20 @@ class UniversalOptionsEngine:
                 freshness_status=freshness,
             )
 
-        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
-        # Never generate synthetic replacement prices under the UPSTOX identity
-        now_iso = datetime.now(timezone.utc).isoformat()
-        return OptionChainSnapshot(
+        return self._build_contract_universe_snapshot(
             underlying=und,
-            spot_price=spot_price,
-            selected_expiry=expiry or "",
-            available_expiries=[],
-            strikes=[],
-            max_pain=None,
-            pcr_oi=None,
-            pcr_volume=None,
-            total_call_oi=0.0,
-            total_put_oi=0.0,
-            total_call_volume=0.0,
-            total_put_volume=0.0,
-            timestamp=now_iso,
-            status="NO_DATA",
             provider="UPSTOX",
-            brokerAccountId="ba_upstox_primary",
-            brokerAccountAlias="Upstox Primary",
+            broker_account_id="ba_upstox_primary",
+            broker_account_alias="Upstox Primary",
             environment=environment,
-            dataFeed="REST",
             exchange="NSE",
             segment="OPTIONS",
             currency="INR",
-            freshnessStatus="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
-            latencyMs=None,
-            dataAgeMs=0.0,
-            diagnostics=self.diagnostics,
+            spot_price=spot_price,
+            expiry=expiry,
+            strike_count=strike_count,
+            freshness_status="PROVIDER_UNAVAILABLE" if is_auth else "AUTH_REQUIRED",
+            is_auth=is_auth,
         )
 
     def fetch_delta_option_chain(
@@ -818,35 +1002,20 @@ class UniversalOptionsEngine:
                 freshness_status="CONNECTED",
             )
 
-        # In both LIVE and PAPER modes, broker options failures strictly return NO_DATA
-        # Never generate synthetic replacement prices under the BINANCE identity
-        now_iso = datetime.now(timezone.utc).isoformat()
-        return OptionChainSnapshot(
+        return self._build_contract_universe_snapshot(
             underlying=crypto_und,
-            spot_price=spot_price,
-            selected_expiry=expiry or "",
-            available_expiries=[],
-            strikes=[],
-            max_pain=None,
-            pcr_oi=None,
-            pcr_volume=None,
-            total_call_oi=0.0,
-            total_put_oi=0.0,
-            total_call_volume=0.0,
-            total_put_volume=0.0,
-            timestamp=now_iso,
-            status="NO_DATA",
             provider="BINANCE",
-            brokerAccountId="ba_binance_primary",
-            brokerAccountAlias="Binance Options Primary",
+            broker_account_id="ba_binance_primary",
+            broker_account_alias="Binance Options Primary",
             environment=environment,
             exchange="BINANCE",
             segment="OPTIONS",
             currency="USDT",
-            freshnessStatus="PROVIDER_UNAVAILABLE",
-            latencyMs=None,
-            dataAgeMs=0.0,
-            diagnostics=self.diagnostics,
+            spot_price=spot_price,
+            expiry=expiry,
+            strike_count=strike_count,
+            freshness_status="PROVIDER_UNAVAILABLE",
+            is_auth=False,
         )
 
     def _normalize_broker_option_chain(
@@ -1096,7 +1265,18 @@ class UniversalOptionsEngine:
             if cached_quote and cached_quote.ltp:
                 spot_price = float(cached_quote.ltp)
 
-        if prov == "UPSTOX":
+        if prov in ["ALL", "AUTO"]:
+            if underlying.upper() in ["BTC", "ETH", "SOL", "XRP"]:
+                return self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            # For Indian markets, prioritize DHAN or UPSTOX
+            dhan_snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if dhan_snap.status == "LIVE" and dhan_snap.strikes:
+                return dhan_snap
+            upstox_snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            if upstox_snap.status == "LIVE" and upstox_snap.strikes:
+                return upstox_snap
+            return dhan_snap
+        elif prov == "UPSTOX":
             return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
         elif prov == "DHAN":
             return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
@@ -1107,7 +1287,7 @@ class UniversalOptionsEngine:
         elif prov in ["PAPER", "PAPER_SIMULATOR", "SIM"]:
             return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
         else:
-            return self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+            return self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
 
     def get_multi_source_option_chain(
         self,
@@ -1199,14 +1379,31 @@ class UniversalOptionsEngine:
             }
 
         # Primary source selection for default view
-        primary_snap = sources.get("DHAN") or sources.get("PAPER_SIMULATOR")
+        if underlying in ["BTC", "ETH", "SOL", "XRP"]:
+            primary_snap = sources.get("DELTA_INDIA") or sources.get("BINANCE") or sources.get("PAPER_SIMULATOR") or {}
+        else:
+            primary_snap = None
+            for key in ["UPSTOX", "DHAN", "PAPER_SIMULATOR"]:
+                src = sources.get(key)
+                if src and isinstance(src, dict) and src.get("strikes"):
+                    primary_snap = src
+                    break
+            if not primary_snap:
+                primary_snap = sources.get("DHAN") or sources.get("UPSTOX") or sources.get("PAPER_SIMULATOR") or {}
+
+        selected_exp = primary_snap.get("selected_expiry") if isinstance(primary_snap, dict) else ""
+        avail_exp = primary_snap.get("available_expiries", []) if isinstance(primary_snap, dict) else []
+        if not avail_exp:
+            avail_exp = global_instrument_master.get_expiries_for_underlying(underlying)
+            if not selected_exp and avail_exp:
+                selected_exp = avail_exp[0]
 
         return {
             "status": "success",
             "underlying": underlying,
             "spot_price": spot_price,
-            "selected_expiry": primary_snap.get("selected_expiry") if isinstance(primary_snap, dict) else "",
-            "available_expiries": primary_snap.get("available_expiries", []) if isinstance(primary_snap, dict) else [],
+            "selected_expiry": selected_exp,
+            "available_expiries": avail_exp,
             "sources": sources,
             "diagnostics": self.diagnostics.to_dict(),
             "timestamp": datetime.now(timezone.utc).isoformat(),

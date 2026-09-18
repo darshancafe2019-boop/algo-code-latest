@@ -24,7 +24,9 @@ from src import db
 
 @pytest.fixture(autouse=True)
 def clean_db():
+    db.safe_execute("DELETE FROM scheduled_tasks WHERE id LIKE 'task_%'")
     yield
+    db.safe_execute("DELETE FROM scheduled_tasks WHERE id LIKE 'task_%'")
 
 
 def test_compute_task_fingerprint_normalization():

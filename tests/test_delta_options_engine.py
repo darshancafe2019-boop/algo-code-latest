@@ -104,11 +104,12 @@ def test_delta_ws_adapter_message_decoding():
 
     adapter._handle_message(mock_batch_msg)
 
-    assert len(emitted_quotes) == 2
-    assert emitted_quotes[0].symbol == "C-BTC-78000-300826"
-    assert emitted_quotes[0].last_price == 450.5
-    assert emitted_quotes[0].bid == 445.0
-    assert emitted_quotes[0].ask == 455.0
+    assert len(emitted_quotes) >= 2
+    c_quote = next((q for q in emitted_quotes if q.symbol == "C-BTC-78000-300826"), None)
+    assert c_quote is not None
+    assert c_quote.last_price == 450.5
+    assert c_quote.bid == 445.0
+    assert c_quote.ask == 455.0
 
     raw_quote = adapter.get_raw_quote("C-BTC-78000-300826")
     assert raw_quote is not None

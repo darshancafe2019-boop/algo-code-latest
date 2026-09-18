@@ -48,6 +48,7 @@ interface SimpleMarketsHeaderProps {
 }
 
 export const MARKET_CATEGORIES = [
+  { id: "WATCHLISTS", label: "WATCHLIST ★" },
   { id: "ALL", label: "ALL" },
   { id: "STOCKS", label: "STOCKS" },
   { id: "INDICES", label: "INDICES" },
@@ -58,10 +59,8 @@ export const MARKET_CATEGORIES = [
   { id: "CRYPTO", label: "CRYPTO" },
   { id: "BONDS", label: "BONDS" },
   { id: "GLOBAL", label: "GLOBAL" },
-  { id: "WATCHLISTS", label: "WATCHLIST ★" },
   { id: "POSITIONS", label: "MY POSITIONS" },
-  { id: "ORDERS", label: "MY ORDERS" },
-];
+] as const;
 
 export function SimpleMarketsHeader({
   totalInstruments,

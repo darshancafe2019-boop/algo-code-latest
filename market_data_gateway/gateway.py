@@ -433,10 +433,36 @@ class MarketDataGateway:
                 "dataMode": getattr(ad, "data_mode", "REAL_TIME"),
             }
 
+        prov_dict = {}
+        for adapter in self.adapters.values():
+            try:
+                st = adapter.get_status()
+                subs = adapter.get_subscribed_symbols() or []
+                prov_dict[adapter.provider_id] = {
+                    "status": st,
+                    "subscriptions": len(subs),
+                    "dataMode": getattr(adapter, "data_mode", "REAL_TIME"),
+                }
+            except Exception:
+                prov_dict[adapter.provider_id] = {"status": "UNKNOWN", "subscriptions": 0}
+
+        valid_quotes = list(self._quote_cache.values())
+        live_cnt = sum(1 for q in valid_quotes if not getattr(q, "is_stale", False) and (getattr(q, "last_price", 0) or 0) > 0)
+        stale_cnt = sum(1 for q in valid_quotes if getattr(q, "is_stale", False) or (getattr(q, "last_price", 0) or 0) <= 0)
+        tick_timestamps = [str(q.received_timestamp) for q in valid_quotes if getattr(q, "received_timestamp", None)]
+        latest_tick = max(tick_timestamps, default=None)
+
         return web.json_response({
             "status": "OK",
+            "gateway": "ready",
+            "websocket": "ready",
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "providers": report,
+            "providers": prov_dict,
+            "subscriptions": len(self.subscription_registry.get_active_symbols()),
+            "live_instruments": live_cnt,
+            "stale_instruments": stale_cnt,
+            "last_tick_at": latest_tick,
+            "errors": [],
             "dhan": _fmt_provider(dhan_stat),
             "delta": _fmt_provider(delta_stat),
             "fyers": _fmt_provider(fyers_stat),
@@ -822,7 +848,22 @@ class MarketDataGateway:
         async with self._ws_lock:
             self._ws_clients[client_id] = (ws, subscriptions)
 
-        logger.info("WS client connected: %s", client_id)
+        logger.info("[GATEWAY][WS] CONNECT client_id=%s remote=%s", client_id, remote_host)
+
+        # Send immediate handshake to client
+        try:
+            await ws.send_str(json.dumps({
+                "type": "GATEWAY_READY",
+                "clientId": client_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "READY",
+                "activeProviders": [
+                    {"id": a.provider_id, "status": a.get_status()}
+                    for a in self.adapters.values()
+                ],
+            }))
+        except Exception:
+            pass
 
         try:
             async for msg in ws:
@@ -1122,6 +1163,8 @@ def create_app() -> tuple:
     app.router.add_get("/health", gateway.handle_health)
     app.router.add_get("/health/live", gateway.handle_health)
     app.router.add_get("/health/ready", gateway.handle_health)
+    app.router.add_get("/health/market-data", gateway.handle_market_data_health)
+    app.router.add_get("/health/providers", gateway.handle_health)
     app.router.add_get("/api/health", gateway.handle_health)
     app.router.add_get("/api/health/live", gateway.handle_health)
     app.router.add_get("/api/health/ready", gateway.handle_health)
@@ -1208,7 +1251,7 @@ def create_app() -> tuple:
 
 async def main():
     port = int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
-    host = os.environ.get("HOST", "0.0.0.0")
+    host = os.environ.get("MARKET_GATEWAY_HOST", "0.0.0.0")
     app, _ = create_app()
     runner = web.AppRunner(app, handle_signals=False)
     await runner.setup()

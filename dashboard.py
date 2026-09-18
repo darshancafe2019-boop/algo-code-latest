@@ -3804,11 +3804,19 @@ def api_options_chain():
             environment=environment,
         )
         # Determine primary snapshot based on requested asset class / environment
-        primary_snap = (
-            multi_data.get("sources", {}).get("DELTA_INDIA")
-            if clean_und in ["BTC", "ETH", "SOL", "XRP"]
-            else (multi_data.get("sources", {}).get("UPSTOX") or multi_data.get("sources", {}).get("DHAN") or multi_data.get("sources", {}).get("PAPER_SIMULATOR") or {})
-        )
+        sources = multi_data.get("sources", {})
+        if clean_und in ["BTC", "ETH", "SOL", "XRP"]:
+            primary_snap = sources.get("DELTA_INDIA") or sources.get("BINANCE") or sources.get("PAPER_SIMULATOR") or {}
+        else:
+            primary_snap = None
+            for key in ["UPSTOX", "DHAN", "PAPER_SIMULATOR"]:
+                src = sources.get(key)
+                if src and isinstance(src, dict) and src.get("strikes"):
+                    primary_snap = src
+                    break
+            if not primary_snap:
+                primary_snap = sources.get("UPSTOX") or sources.get("DHAN") or sources.get("PAPER_SIMULATOR") or {}
+
         multi_data["strikes"] = primary_snap.get("strikes", [])
         multi_data["strike_count"] = len(multi_data["strikes"])
         multi_data["total_available_strikes"] = len(multi_data["strikes"])
@@ -3818,6 +3826,13 @@ def api_options_chain():
         multi_data["environment"] = environment
         multi_data["data_status"] = primary_snap.get("freshnessStatus", "NO_DATA")
         multi_data["latency_ms"] = primary_snap.get("latencyMs")
+        multi_data["available_expiries"] = primary_snap.get("available_expiries", multi_data.get("available_expiries", []))
+        multi_data["selected_expiry"] = primary_snap.get("selected_expiry", multi_data.get("selected_expiry", ""))
+        multi_data["spot_price"] = primary_snap.get("spot_price", spot_price)
+        multi_data["total_call_oi"] = primary_snap.get("total_call_oi", 0.0)
+        multi_data["total_put_oi"] = primary_snap.get("total_put_oi", 0.0)
+        multi_data["total_call_volume"] = primary_snap.get("total_call_volume", 0.0)
+        multi_data["total_put_volume"] = primary_snap.get("total_put_volume", 0.0)
         return jsonify(multi_data)
     else:
         snapshot = global_options_engine.get_option_chain(

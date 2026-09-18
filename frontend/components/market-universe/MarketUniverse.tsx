@@ -212,15 +212,19 @@ export function MarketUniverse() {
     for (const it of rawInstruments) {
       const cls = it.asset_class?.toUpperCase() || "OTHER";
       counts[cls] = (counts[cls] || 0) + 1;
+      if (cls === "EQUITIES" || cls === "EQUITY") counts["STOCKS"] = (counts["STOCKS"] || 0) + 1;
+      if (cls === "INDICES" || cls === "INDEX") counts["INDICES"] = (counts["INDICES"] || 0) + 1;
+      if (cls === "COMMODITY") counts["COMMODITIES"] = (counts["COMMODITIES"] || 0) + 1;
     }
     counts["WATCHLISTS"] = watchlistSymbols.size;
+    counts["WATCHLIST"] = watchlistSymbols.size;
     return counts;
   }, [rawInstruments, watchlistSymbols]);
 
   const displayedInstruments = useMemo(() => {
     let list = [...rawInstruments];
 
-    if (activeCategory === "WATCHLISTS") {
+    if (activeCategory === "WATCHLISTS" || activeCategory === "WATCHLIST") {
       list = list.filter(
         (it) =>
           watchlistSymbols.has(it.canonical_symbol) ||

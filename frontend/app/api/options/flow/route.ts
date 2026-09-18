@@ -134,12 +134,29 @@ export async function GET(request: NextRequest) {
         const ce = item.call || item.ce || {};
         const pe = item.put || item.pe || {};
 
-        const ceLtp = ce.ltp || ce.lastPrice || 0;
-        const peLtp = pe.ltp || pe.lastPrice || 0;
-        const ceOi = ce.oi || ce.openInterest || ce.OI || 0;
-        const peOi = pe.oi || pe.openInterest || pe.OI || 0;
-        const ceVol = ce.volume || 0;
-        const peVol = pe.volume || 0;
+        const rawCeLtp = ce.ltp ?? ce.lastPrice;
+        const ceLtp = (typeof rawCeLtp === "number" && rawCeLtp > 0) ? rawCeLtp : null;
+
+        const rawPeLtp = pe.ltp ?? pe.lastPrice;
+        const peLtp = (typeof rawPeLtp === "number" && rawPeLtp > 0) ? rawPeLtp : null;
+
+        const rawCeOi = ce.oi ?? ce.openInterest ?? ce.OI;
+        const ceOi = (typeof rawCeOi === "number" && rawCeOi > 0) ? rawCeOi : null;
+
+        const rawPeOi = pe.oi ?? pe.openInterest ?? pe.OI;
+        const peOi = (typeof rawPeOi === "number" && rawPeOi > 0) ? rawPeOi : null;
+
+        const rawCeVol = ce.volume ?? ce.Volume;
+        const ceVol = (typeof rawCeVol === "number" && rawCeVol > 0) ? rawCeVol : null;
+
+        const rawPeVol = pe.volume ?? pe.Volume;
+        const peVol = (typeof rawPeVol === "number" && rawPeVol > 0) ? rawPeVol : null;
+
+        const rawCeOiChg = ce.oiChange ?? ce.change_in_oi;
+        const ceOiChange = (typeof rawCeOiChg === "number" && rawCeOiChg !== 0) ? rawCeOiChg : null;
+
+        const rawPeOiChg = pe.oiChange ?? pe.change_in_oi;
+        const peOiChange = (typeof rawPeOiChg === "number" && rawPeOiChg !== 0) ? rawPeOiChg : null;
 
         const dteYears = Math.max(1, calculateDaysToExpiry(selectedExpiry)) / 365;
 
@@ -161,16 +178,16 @@ export async function GET(request: NextRequest) {
           askQty: ce.askQty || ce.askQuantity || null,
           volume: ceVol,
           oi: ceOi,
-          oiChange: ce.oiChange || ce.change_in_oi || 0,
+          oiChange: ceOiChange,
           oiChangePercent: ce.oiChangePercent || 0,
           iv: ce.iv || ce.IV || null,
           greeks: ce.greeks || (spotPrice > 0 && ce.iv ? calculateBlackScholesGreeks("CE", spotPrice, strike, dteYears, ce.iv / 100) : null),
-          premium: ceLtp * ceVol,
+          premium: ceLtp && ceVol ? ceLtp * ceVol : 0,
           moneyness: spotPrice > 0 ? classifyMoneyness("CE", strike, spotPrice, atmStrike) : ("OTM" as const),
           intrinsicValue: spotPrice > 0 ? Math.max(0, spotPrice - strike) : 0,
-          timeValue: spotPrice > 0 ? Math.max(0, ceLtp - Math.max(0, spotPrice - strike)) : ceLtp,
-          oiBuildup: ce.oiBuildup || (ce.change > 0 && ce.oiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP"),
-          volumeOiRatio: ceOi > 0 ? parseFloat((ceVol / ceOi).toFixed(2)) : 0,
+          timeValue: spotPrice > 0 && ceLtp ? Math.max(0, ceLtp - Math.max(0, spotPrice - strike)) : (ceLtp || 0),
+          oiBuildup: ce.oiBuildup || (ceOiChange ? (ce.change > 0 && ceOiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP") : "NEUTRAL"),
+          volumeOiRatio: ceOi && ceVol && ceOi > 0 ? parseFloat((ceVol / ceOi).toFixed(2)) : 0,
         };
 
         const putQuote = {
@@ -191,16 +208,16 @@ export async function GET(request: NextRequest) {
           askQty: pe.askQty || pe.askQuantity || null,
           volume: peVol,
           oi: peOi,
-          oiChange: pe.oiChange || pe.change_in_oi || 0,
+          oiChange: peOiChange,
           oiChangePercent: pe.oiChangePercent || 0,
           iv: pe.iv || pe.IV || null,
           greeks: pe.greeks || (spotPrice > 0 && pe.iv ? calculateBlackScholesGreeks("PE", spotPrice, strike, dteYears, pe.iv / 100) : null),
-          premium: peLtp * peVol,
+          premium: peLtp && peVol ? peLtp * peVol : 0,
           moneyness: spotPrice > 0 ? classifyMoneyness("PE", strike, spotPrice, atmStrike) : ("OTM" as const),
           intrinsicValue: spotPrice > 0 ? Math.max(0, strike - spotPrice) : 0,
-          timeValue: spotPrice > 0 ? Math.max(0, peLtp - Math.max(0, strike - spotPrice)) : peLtp,
-          oiBuildup: pe.oiBuildup || (pe.change > 0 && pe.oiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP"),
-          volumeOiRatio: peOi > 0 ? parseFloat((peVol / peOi).toFixed(2)) : 0,
+          timeValue: spotPrice > 0 && peLtp ? Math.max(0, peLtp - Math.max(0, strike - spotPrice)) : (peLtp || 0),
+          oiBuildup: pe.oiBuildup || (peOiChange ? (pe.change > 0 && peOiChange > 0 ? "LONG_BUILDUP" : "SHORT_BUILDUP") : "NEUTRAL"),
+          volumeOiRatio: peOi && peVol && peOi > 0 ? parseFloat((peVol / peOi).toFixed(2)) : 0,
         };
 
         strikesList.push({

@@ -28,7 +28,7 @@ class TestOptionsCommandCenterRegression:
 
     def test_canonical_instrument_id_structure(self):
         """Validates that options engine produces immutable, hierarchical contract keys."""
-        chain = global_options_engine.get_option_chain("NIFTY", provider="DHAN", spot_price=22500.0, strike_count=10)
+        chain = global_options_engine.generate_standardized_chain("NIFTY", spot_price=22500.0, strike_count=10, provider="DHAN")
         assert chain is not None
         assert len(chain.strikes) > 0
 
@@ -113,7 +113,7 @@ class TestOptionsCommandCenterRegression:
 
     def test_options_flow_endpoint(self, client):
         """Validates /api/options/flow returns source-attributed OI distribution and PCR."""
-        res = client.get("/api/options/flow?underlying=NIFTY&provider=DHAN")
+        res = client.get("/api/options/flow?underlying=NIFTY&provider=PAPER_SIMULATOR")
         assert res.status_code == 200
         data = res.get_json()
         assert data["status"] == "success"

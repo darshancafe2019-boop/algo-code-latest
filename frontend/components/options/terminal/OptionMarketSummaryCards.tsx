@@ -48,13 +48,14 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <span className="text-rose-400 text-[10px] sm:text-xs font-bold">CE RES</span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-rose-300 mt-1">
-          {formatIndianQuantity(pcr.totalCallOI)}
+          {pcr.totalCallOI && pcr.totalCallOI > 0 ? formatIndianQuantity(pcr.totalCallOI) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>ΔOI</span>
-          <span className={pcr.totalCallOIChange >= 0 ? "text-emerald-400" : "text-rose-400"}>
-            {pcr.totalCallOIChange >= 0 ? "+" : ""}
-            {formatIndianQuantity(pcr.totalCallOIChange)}
+          <span className={pcr.totalCallOIChange && pcr.totalCallOIChange > 0 ? "text-emerald-400" : pcr.totalCallOIChange && pcr.totalCallOIChange < 0 ? "text-rose-400" : "text-slate-400"}>
+            {pcr.totalCallOIChange !== null && pcr.totalCallOIChange !== undefined && pcr.totalCallOIChange !== 0
+              ? `${pcr.totalCallOIChange > 0 ? "+" : ""}${formatIndianQuantity(pcr.totalCallOIChange)}`
+              : "—"}
           </span>
         </div>
       </div>
@@ -66,13 +67,14 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <span className="text-emerald-400 text-[10px] sm:text-xs font-bold">PE SUP</span>
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-emerald-300 mt-1">
-          {formatIndianQuantity(pcr.totalPutOI)}
+          {pcr.totalPutOI && pcr.totalPutOI > 0 ? formatIndianQuantity(pcr.totalPutOI) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>ΔOI</span>
-          <span className={pcr.totalPutOIChange >= 0 ? "text-emerald-400" : "text-rose-400"}>
-            {pcr.totalPutOIChange >= 0 ? "+" : ""}
-            {formatIndianQuantity(pcr.totalPutOIChange)}
+          <span className={pcr.totalPutOIChange && pcr.totalPutOIChange > 0 ? "text-emerald-400" : pcr.totalPutOIChange && pcr.totalPutOIChange < 0 ? "text-rose-400" : "text-slate-400"}>
+            {pcr.totalPutOIChange !== null && pcr.totalPutOIChange !== undefined && pcr.totalPutOIChange !== 0
+              ? `${pcr.totalPutOIChange > 0 ? "+" : ""}${formatIndianQuantity(pcr.totalPutOIChange)}`
+              : "—"}
           </span>
         </div>
       </div>
@@ -94,11 +96,11 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           </span>
         </div>
         <div className={`text-sm sm:text-base md:text-lg font-black mt-1 ${isPcrBullish === true ? "text-emerald-400" : isPcrBullish === false ? "text-amber-400" : "text-slate-400"}`}>
-          {pcr.pcrOI !== null ? pcr.pcrOI.toFixed(2) : "N/A"}
+          {pcr.pcrOI !== null && pcr.pcrOI > 0 ? pcr.pcrOI.toFixed(2) : "N/A"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Vol PCR</span>
-          <span className="text-slate-200">{pcr.pcrVolume !== null ? pcr.pcrVolume.toFixed(2) : "N/A"}</span>
+          <span className="text-slate-200">{pcr.pcrVolume !== null && pcr.pcrVolume > 0 ? pcr.pcrVolume.toFixed(2) : "N/A"}</span>
         </div>
       </div>
 
@@ -109,14 +111,14 @@ export const OptionMarketSummaryCards: React.FC<OptionMarketSummaryCardsProps> =
           <Target className="w-3.5 h-3.5 text-cyan-400" />
         </div>
         <div className="text-sm sm:text-base md:text-lg font-black text-cyan-300 mt-1">
-          {formatPrice(snapshot.maxPain)}
+          {snapshot.maxPain !== null && snapshot.maxPain !== undefined && snapshot.maxPain > 0 ? formatPrice(snapshot.maxPain) : "—"}
         </div>
         <div className="text-xs text-slate-400 flex items-center justify-between mt-1 font-semibold">
           <span>Spot Diff</span>
           <span className={snapshot.spotVsMaxPainDistance && snapshot.spotVsMaxPainDistance > 0 ? "text-emerald-400" : "text-rose-400"}>
-            {snapshot.spotVsMaxPainDistance !== null
+            {snapshot.spotVsMaxPainDistance !== null && snapshot.maxPain && snapshot.maxPain > 0
               ? `${snapshot.spotVsMaxPainDistance > 0 ? "+" : ""}${snapshot.spotVsMaxPainDistance}`
-              : "N/A"}
+              : "—"}
           </span>
         </div>
       </div>

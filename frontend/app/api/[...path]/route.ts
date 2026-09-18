@@ -202,7 +202,7 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options");
-  const timeoutMs = isStream ? 15000 : (isHeavy ? 30000 : 15000);
+  const timeoutMs = isHeavy ? 30000 : 15000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -222,7 +222,11 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
   let lastError: any = null;
 
   const controller = new AbortController();
-  const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
+  // Do not abort active SSE streaming connections with a static timer
+  let timeoutTimer: NodeJS.Timeout | null = null;
+  if (!isStream) {
+    timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
+  }
 
   if (req.signal) {
     req.signal.addEventListener("abort", () => {
@@ -241,10 +245,14 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
       cache: "no-store",
     });
 
-    clearTimeout(timeoutTimer);
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer);
+    }
     finalResponse = backendRes;
   } catch (err: any) {
-    clearTimeout(timeoutTimer);
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer);
+    }
     lastError = err;
   }
 

@@ -36,10 +36,11 @@ def get_options_chain():
         return jsonify(res), 200
 
     snapshot = global_options_engine.get_option_chain(
-        provider_name=provider,
         underlying=underlying,
+        provider=provider,
         expiry=expiry,
-        mode=mode
+        strike_count=strike_count,
+        environment="LIVE" if mode == "LIVE" else "PAPER",
     )
 
     return jsonify(snapshot.to_dict()), 200
@@ -55,9 +56,9 @@ def get_options_workstation_overview():
     provider = request.args.get("provider", "DELTA").upper()
 
     snapshot = global_options_engine.get_option_chain(
-        provider_name=provider,
         underlying=underlying,
-        mode="LIVE"
+        provider=provider,
+        environment="LIVE",
     )
     return jsonify({
         "success": True,

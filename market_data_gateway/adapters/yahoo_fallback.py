@@ -37,6 +37,7 @@ YAHOO_SYMBOL_MAP: Dict[str, str] = {
     "SHANGCOMP": "000001.SS",
     # Indian Indices (delayed)
     "NIFTY": "^NSEI", "BANKNIFTY": "^NSEBANK", "SENSEX": "^BSESN",
+    "MIDCPNIFTY": "^NSEMDCP50", "FINNIFTY": "NIFTY_FIN_SERVICE.NS",
     # Forex
     "EUR/USD": "EURUSD=X", "GBP/USD": "GBPUSD=X", "USD/JPY": "JPY=X",
     "USD/INR": "INR=X", "AUD/USD": "AUDUSD=X", "USD/CHF": "CHF=X",
@@ -147,12 +148,29 @@ class YahooFallbackAdapter(BaseProviderAdapter):
             return {}
 
         result: Dict[str, NormalizedQuote] = {}
-        yahoo_syms = [YAHOO_SYMBOL_MAP.get(s, s) for s in symbols]
+        
+        valid_pairs: List[Tuple[str, str]] = []
+        for s in symbols:
+            if s.startswith("C-") or s.startswith("P-") or "-C-" in s or "-P-" in s or s.startswith("O:"):
+                # Option derivatives are not hosted on Yahoo Finance
+                continue
+            if s in YAHOO_SYMBOL_MAP:
+                valid_pairs.append((s, YAHOO_SYMBOL_MAP[s]))
+            elif s.isalpha() and s.isupper():
+                # Standard NSE Indian equity default
+                valid_pairs.append((s, f"{s}.NS"))
+            else:
+                valid_pairs.append((s, s))
+
+        if not valid_pairs:
+            return result
+
         recv_iso = datetime.now(timezone.utc).isoformat()
+        yahoo_tickers_str = " ".join([yp[1] for yp in valid_pairs])
 
         try:
-            tickers = yf.Tickers(" ".join(yahoo_syms))
-            for canon_sym, yahoo_sym in zip(symbols, yahoo_syms):
+            tickers = yf.Tickers(yahoo_tickers_str)
+            for canon_sym, yahoo_sym in valid_pairs:
                 try:
                     ticker = tickers.tickers.get(yahoo_sym)
                     if ticker is None:

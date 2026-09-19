@@ -412,6 +412,7 @@ class ProviderManager:
                     instrument.canonical_symbol,
                     attempt,
                     max_retries,
+                    sleep_time,
                     retryable_err,
                 )
                 time.sleep(sleep_time)

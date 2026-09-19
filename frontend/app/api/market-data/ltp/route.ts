@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "changeme-set-a-strong-random-secret-here";
+const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "";
 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);

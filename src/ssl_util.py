@@ -24,5 +24,5 @@ def get_ssl_context() -> ssl.SSLContext:
 
     try:
         return ssl.create_default_context()
-    except Exception:
-        return ssl._create_unverified_context()
+    except Exception as exc:
+        raise ssl.SSLError(f"Failed to create verified SSL context: {exc}") from exc

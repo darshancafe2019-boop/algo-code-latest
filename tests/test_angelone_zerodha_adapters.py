@@ -114,5 +114,19 @@ class TestRegistryIntegration:
 
     def test_provider_service_detects_credentials(self):
         ps = ProviderService()
-        assert ps._check_is_configured("angelone") is True
-        assert ps._check_is_configured("zerodha") is True
+        orig_angel = os.environ.get("ANGELONE_API_KEY")
+        orig_zerodha = os.environ.get("ZERODHA_API_KEY")
+        os.environ["ANGELONE_API_KEY"] = "test_angel_key"
+        os.environ["ZERODHA_API_KEY"] = "test_zerodha_key"
+        try:
+            assert ps._check_is_configured("angelone") is True
+            assert ps._check_is_configured("zerodha") is True
+        finally:
+            if orig_angel is not None:
+                os.environ["ANGELONE_API_KEY"] = orig_angel
+            else:
+                os.environ.pop("ANGELONE_API_KEY", None)
+            if orig_zerodha is not None:
+                os.environ["ZERODHA_API_KEY"] = orig_zerodha
+            else:
+                os.environ.pop("ZERODHA_API_KEY", None)

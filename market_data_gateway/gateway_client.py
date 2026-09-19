@@ -17,7 +17,7 @@ import requests
 logger = logging.getLogger("MDGateway.Client")
 
 _GATEWAY_URL = os.environ.get("MARKET_GATEWAY_URL", "http://127.0.0.1:5051")
-_GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
+_GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "")
 _DEFAULT_TIMEOUT = 3.0  # seconds
 
 STALE_THRESHOLD_SEC = 10.0

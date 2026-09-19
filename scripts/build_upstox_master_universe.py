@@ -34,7 +34,11 @@ BSE_CDN_URL = "https://assets.upstox.com/market-quote/instruments/exchange/BSE.j
 def fetch_and_decompress(url: str) -> List[Dict[str, Any]]:
     logger.info(f"Downloading master from: {url}")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
-    ctx = ssl.create_default_context()
+    try:
+        from src.ssl_util import get_ssl_context
+        ctx = get_ssl_context()
+    except Exception:
+        ctx = ssl.create_default_context()
     with urllib.request.urlopen(req, context=ctx, timeout=30) as resp:
         raw_data = resp.read()
         decompressed = gzip.decompress(raw_data)

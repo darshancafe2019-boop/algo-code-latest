@@ -219,8 +219,13 @@ class CanonicalFuturesContract:
             asset_prefix = "CRYPTO" if "CRYPTO" in self.segment else ("INDIA" if self.exchange == "NSE" else "GLOBAL")
             self.canonical_symbol = f"{asset_prefix}:{self.exchange}:{self.symbol}:{self.asset_type}"
 
+    @property
+    def currency(self) -> str:
+        return self.quote_currency
+
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
+        d["currency"] = self.quote_currency
         d["contract_type"] = self.contract_type.value if isinstance(self.contract_type, FuturesContractType) else str(self.contract_type)
         d["venue"] = self.venue.value if isinstance(self.venue, MarketVenue) else str(self.venue)
         if self.funding_rate:

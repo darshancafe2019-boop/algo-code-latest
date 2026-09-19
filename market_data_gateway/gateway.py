@@ -54,7 +54,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("MDGateway")
 
-GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
+GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "")
 def get_instrument_identity(provider: str, exchange: str, symbol: str, contract_type: str = "SPOT") -> str:
     """Returns canonical immutable instrument identity: PROVIDER:EXCHANGE:SYMBOL:CONTRACT_TYPE."""
     prov = (provider or "UNKNOWN").upper().strip()
@@ -699,7 +699,7 @@ class MarketDataGateway:
                     logger.debug("Snapshot query note for %s from %s: %s", sym, adapter.provider_id, ex)
 
         if matched_q:
-            matched_q.mark_stale(STALE_THRESHOLD_SEC)
+            matched_q.mark_stale(live_threshold_sec=5.0, delayed_threshold_sec=15.0)
             try:
                 dt = datetime.fromisoformat(matched_q.received_timestamp.replace("Z", "+00:00"))
                 ts_ms = int(dt.timestamp() * 1000)

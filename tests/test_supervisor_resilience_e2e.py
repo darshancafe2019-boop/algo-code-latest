@@ -128,8 +128,9 @@ def run_resilience_suite():
         import asyncio
         import websockets
 
+        gw_secret = os.environ.get("MARKET_GATEWAY_SECRET", "")
         async def check_ws():
-            async with websockets.connect("ws://127.0.0.1:5051/ws?secret=changeme-set-a-strong-random-secret-here", close_timeout=3.0) as ws:
+            async with websockets.connect(f"ws://127.0.0.1:5051/ws?secret={gw_secret}", close_timeout=3.0) as ws:
                 await ws.send('{"action":"subscribe","symbols":["BTC/USDT"],"reason":"RESILIENCE_TEST"}')
                 return True
 

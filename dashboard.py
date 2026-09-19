@@ -8112,9 +8112,20 @@ def api_bots_create():
     }), 200
 
 
-@app.route("/api/bots/<bot_id>", methods=["PUT", "POST"])
+@app.route("/api/bots/<bot_id>", methods=["GET", "PUT", "POST"])
 def api_bots_update(bot_id):
-    """Update configuration of an existing bot instance with version incrementing & audit history."""
+    """Retrieve details or update configuration of an existing bot instance."""
+    if request.method == "GET":
+        try:
+            from src.bot_runtime_service import global_bot_runtime_service
+            snapshot = global_bot_runtime_service.get_fleet_snapshot()
+            for b in snapshot.get("bots", []):
+                if b.get("id") == bot_id or b.get("bot_id") == bot_id:
+                    return jsonify({"status": "success", "bot": b}), 200
+            return jsonify({"status": "error", "message": f"Bot instance '{bot_id}' not found."}), 404
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 500
+
     data = request.get_json(silent=True) or {}
     name = str(data.get("name", "")).strip()
     symbol = str(data.get("symbol", "BTC/USDT")).strip().upper()
@@ -18590,7 +18601,7 @@ def api_market_data_stream():
 
     import os as _os
     _GATEWAY_WS_URL = _os.environ.get("MARKET_GATEWAY_WS_URL", "ws://127.0.0.1:5051/ws")
-    _GATEWAY_SECRET = _os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
+    _GATEWAY_SECRET = _os.environ.get("MARKET_GATEWAY_SECRET", "")
 
     def event_stream():
         """Generator that bridges Gateway 5051 WebSocket to SSE."""

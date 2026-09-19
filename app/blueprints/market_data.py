@@ -3,23 +3,43 @@ QUANT.OS Centralized Market Data Blueprints
 ============================================
 Authoritative endpoints for live market quotes, multi-broker sources status,
 and the multiplexed centralized SSE stream.
+
+All endpoints uniformly utilize the centralized Canonical Market Data Pipeline:
+- /api/market-data/ltp
+- /api/market/quote
+- /api/markets/quote
+- /api/stream/centralized
 """
 
 import json
 import time
 import queue
 import logging
+import urllib.parse
+import urllib.request
+import urllib.error
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, Dict, Any, List
 from flask import Blueprint, jsonify, request, Response
 
 from src.market_data import (
-    global_market_cache,
-    global_stale_protection,
     global_stream_manager,
     global_options_engine,
 )
-from src.ticker_service import get_ticker_service
+from src.market_data.canonical_pipeline import (
+    resolve_canonical_quote,
+    resolve_symbol_aliases,
+    evaluate_quote_freshness,
+    validate_canonical_quote,
+    STATE_LIVE,
+    STATE_DELAYED,
+    STATE_STALE,
+    STATE_UNKNOWN,
+    STATE_INVALID,
+    STATE_NO_DATA,
+    QUALITY_VALIDATED,
+    QUALITY_REJECTED,
+)
 
 market_data_bp = Blueprint("market_data", __name__)
 logger = logging.getLogger("MarketDataRoutes")
@@ -29,135 +49,21 @@ logger = logging.getLogger("MarketDataRoutes")
 def get_market_data_ltp():
     """
     Canonical single-symbol LTP endpoint.
-    Queries Market Data Gateway (port 5051) or local cache with source-aware routing.
-    Returns normalized schema: { symbol, price, source, status, timestamp, ageMs }.
+    Queries the centralized canonical quote resolver with source-aware routing.
+    Returns normalized schema: { symbol, price, source, status, timestamp, ageMs, is_tradeable }.
     """
-    import urllib.parse
-    import urllib.request
-    import os
-
     symbol = request.args.get("symbol", "").strip()
     if not symbol:
         return jsonify({
             "ok": False,
+            "status": "error",
             "code": "INVALID_SYMBOL",
             "symbol": "",
             "message": "Symbol query parameter is required."
         }), 400
 
-    # 1. Try querying Market Data Gateway :5051 directly
-    gateway_port = int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
-    gateway_secret = os.environ.get("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
-    gateway_url = f"http://127.0.0.1:{gateway_port}/ltp?symbol={urllib.parse.quote(symbol, safe='')}"
-
-    try:
-        req = urllib.request.Request(
-            gateway_url,
-            headers={
-                "X-Gateway-Secret": gateway_secret,
-                "Accept": "application/json",
-            }
-        )
-        with urllib.request.urlopen(req, timeout=2.5) as response:
-            if response.status == 200:
-                data = json.loads(response.read().decode("utf-8"))
-                return jsonify(data), 200
-    except urllib.error.HTTPError as http_err:
-        try:
-            err_body = json.loads(http_err.read().decode("utf-8"))
-            return jsonify(err_body), http_err.code
-        except Exception:
-            pass
-    except Exception as gw_err:
-        logger.debug("Gateway :5051 direct LTP probe note: %s", gw_err)
-
-    # 2. Fallback to Central Market Cache
-    aliases = [symbol]
-    if symbol == "NIFTY":
-        aliases.extend(["NIFTY 50", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
-    elif symbol == "NIFTY 50":
-        aliases.extend(["NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
-    elif symbol == "BANKNIFTY":
-        aliases.extend(["BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
-    elif symbol == "BANK NIFTY":
-        aliases.extend(["BANKNIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
-    elif "/" in symbol:
-        aliases.append(symbol.replace("/", ""))
-
-    cached = None
-    for a in aliases:
-        cached = global_market_cache.get_quote(a) or global_market_cache.get(a)
-        if cached:
-            break
-
-    if cached:
-        ltp_val = cached.get("ltp") if isinstance(cached, dict) else getattr(cached, "ltp", None)
-        if ltp_val is None:
-            ltp_val = cached.get("price") if isinstance(cached, dict) else getattr(cached, "price", getattr(cached, "last_price", 0.0))
-
-        if ltp_val and float(ltp_val) > 0:
-            ts_raw = cached.get("timestamp") if isinstance(cached, dict) else getattr(cached, "timestamp", getattr(cached, "received_timestamp", None))
-            now_ts = datetime.now(timezone.utc).timestamp()
-            if isinstance(ts_raw, datetime):
-                quote_ts = ts_raw.timestamp()
-            elif isinstance(ts_raw, (int, float)):
-                quote_ts = float(ts_raw) if ts_raw < 1e11 else float(ts_raw) / 1000.0
-            else:
-                quote_ts = now_ts
-
-            age_ms = max(0, int((now_ts - quote_ts) * 1000))
-            provider_val = cached.get("provider") if isinstance(cached, dict) else getattr(cached, "provider", "CENTRAL_CACHE")
-            prev_close_val = cached.get("close") if isinstance(cached, dict) else getattr(cached, "close", getattr(cached, "previous_close", None))
-            open_val = cached.get("open") if isinstance(cached, dict) else getattr(cached, "open", None)
-            change_pct_val = cached.get("change_pct") if isinstance(cached, dict) else getattr(cached, "change_pct", None)
-            
-            return jsonify({
-                "ok": True,
-                "symbol": symbol,
-                "price": float(ltp_val),
-                "previous_close": float(prev_close_val) if prev_close_val else (float(open_val) if open_val else None),
-                "open": float(open_val) if open_val else None,
-                "change_pct": float(change_pct_val) if change_pct_val is not None else None,
-                "source": str(provider_val or "CENTRAL_CACHE").upper(),
-                "status": "LIVE" if age_ms < 15000 else "STALE",
-                "timestamp": int(quote_ts * 1000),
-                "ageMs": age_ms,
-                "bid": cached.get("bid") if isinstance(cached, dict) else getattr(cached, "bid", None),
-                "ask": cached.get("ask") if isinstance(cached, dict) else getattr(cached, "ask", None),
-                "volume": cached.get("volume") if isinstance(cached, dict) else getattr(cached, "volume", None),
-            }), 200
-
-    # 3. Fallback to Ticker Service
-    ticker_svc = get_ticker_service()
-    if ticker_svc:
-        try:
-            ticker_info = ticker_svc.get_ticker(symbol)
-            if ticker_info and (ticker_info.get("last") or ticker_info.get("price")):
-                price_val = ticker_info.get("last") or ticker_info.get("price")
-                now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-                return jsonify({
-                    "ok": True,
-                    "symbol": symbol,
-                    "price": float(price_val),
-                    "source": str(ticker_info.get("provider") or "TICKER_SERVICE").upper(),
-                    "status": "LIVE",
-                    "timestamp": now_ms,
-                    "ageMs": int(ticker_info.get("cache_age_ms") or 0),
-                    "bid": ticker_info.get("bid"),
-                    "ask": ticker_info.get("ask"),
-                    "volume": ticker_info.get("volume")
-                }), 200
-        except Exception as tick_err:
-            logger.debug("Ticker service probe exception: %s", tick_err)
-
-    # 4. Return honest structured error without fabricated prices
-    return jsonify({
-        "ok": False,
-        "code": "INSTRUMENT_NOT_FOUND",
-        "symbol": symbol,
-        "source": "UNAVAILABLE",
-        "message": f"No live market data quote available for {symbol}."
-    }), 404
+    code, data = resolve_canonical_quote(symbol)
+    return jsonify(data), code
 
 
 @market_data_bp.route("/api/market/quote", methods=["GET"])
@@ -173,116 +79,48 @@ def get_market_quote():
             "message": "Symbol query parameter is required"
         }), 400
 
-    # 1. Query Central In-Memory Market Cache with alias resolution
-    aliases = [symbol]
-    if symbol == "NIFTY":
-        aliases.extend(["NIFTY 50", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
-    elif symbol == "NIFTY 50":
-        aliases.extend(["NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"])
-    elif symbol == "BANKNIFTY":
-        aliases.extend(["BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
-    elif symbol == "BANK NIFTY":
-        aliases.extend(["BANKNIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"])
+    code, res = resolve_canonical_quote(symbol)
 
-    cached = None
-    for a in aliases:
-        cached = global_market_cache.get(a) or global_market_cache.get_quote(a)
-        if cached:
-            break
-
-    if cached:
-        if isinstance(cached, dict):
-            c_ltp = cached.get("ltp") or cached.get("last_price") or cached.get("price")
-            c_bid = cached.get("bid")
-            c_ask = cached.get("ask")
-            c_vol = cached.get("volume")
-            c_oi = cached.get("oi") or cached.get("open_interest")
-            c_high = cached.get("high")
-            c_low = cached.get("low")
-            c_open = cached.get("open")
-            c_close = cached.get("close") or cached.get("previous_close")
-            c_ts = cached.get("timestamp") or cached.get("event_timestamp") or cached.get("received_timestamp")
-            c_prov = cached.get("provider")
-            c_qual = cached.get("data_quality", "VALIDATED_LIVE")
-            c_pct = cached.get("change_pct")
-        else:
-            c_ltp = getattr(cached, "ltp", getattr(cached, "last_price", getattr(cached, "price", None)))
-            c_bid = getattr(cached, "bid", None)
-            c_ask = getattr(cached, "ask", None)
-            c_vol = getattr(cached, "volume", None)
-            c_oi = getattr(cached, "oi", getattr(cached, "open_interest", None))
-            c_high = getattr(cached, "high", None)
-            c_low = getattr(cached, "low", None)
-            c_open = getattr(cached, "open", None)
-            c_close = getattr(cached, "close", getattr(cached, "previous_close", None))
-            c_ts = getattr(cached, "timestamp", getattr(cached, "event_timestamp", getattr(cached, "received_timestamp", None)))
-            c_prov = getattr(cached, "provider", None)
-            c_qual = getattr(cached, "data_quality", "VALIDATED_LIVE")
-            c_pct = getattr(cached, "change_pct", None)
-
-        stale_info = global_stale_protection.is_stale(symbol, c_ts)
-        ts_str = c_ts.isoformat() if hasattr(c_ts, "isoformat") else (str(c_ts) if c_ts else None)
+    if code == 200 and res.get("ok"):
+        ts_ms = res.get("timestamp")
+        ts_iso = datetime.fromtimestamp(ts_ms / 1000.0, timezone.utc).isoformat() if ts_ms else None
         return jsonify({
             "status": "success",
-            "symbol": symbol,
-            "source": c_prov or "CENTRAL_CACHE",
+            "symbol": res.get("symbol", symbol),
+            "source": res.get("source", "CENTRAL_CACHE"),
             "quote": {
-                "symbol": symbol,
-                "ltp": c_ltp,
-                "bid": c_bid,
-                "ask": c_ask,
-                "volume": c_vol,
-                "oi": c_oi,
-                "high": c_high,
-                "low": c_low,
-                "open": c_open,
-                "close": c_close,
-                "previous_close": c_close or c_open,
-                "change_pct": c_pct,
-                "timestamp": ts_str,
-                "is_stale": stale_info.get("is_stale", False),
-                "data_quality": c_qual
+                "symbol": res.get("symbol", symbol),
+                "ltp": res.get("ltp"),
+                "bid": res.get("bid"),
+                "ask": res.get("ask"),
+                "volume": res.get("volume"),
+                "oi": res.get("oi"),
+                "high": res.get("high"),
+                "low": res.get("low"),
+                "open": res.get("open"),
+                "close": res.get("close"),
+                "previous_close": res.get("previous_close"),
+                "change_pct": res.get("change_pct"),
+                "timestamp": ts_iso,
+                "is_stale": (res.get("freshness") != STATE_LIVE),
+                "freshness": res.get("freshness"),
+                "data_quality": res.get("data_quality"),
+                "is_tradeable": res.get("is_tradeable", False),
             },
-            "providerStatus": "LIVE" if not stale_info.get("is_stale", False) else "STALE",
+            "providerStatus": res.get("freshness"),
+            "is_tradeable": res.get("is_tradeable", False),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }), 200
 
-    # 2. Query Resilient Ticker Service
-    ticker_svc = get_ticker_service()
-    if ticker_svc:
-        spot = ticker_svc.get_spot_price(symbol)
-        if spot and spot > 0:
-            now_iso = datetime.now(timezone.utc).isoformat()
-            return jsonify({
-                "status": "success",
-                "symbol": symbol,
-                "source": "TICKER_SERVICE",
-                "quote": {
-                    "symbol": symbol,
-                    "ltp": spot,
-                    "bid": None,
-                    "ask": None,
-                    "volume": None,
-                    "oi": None,
-                    "high": None,
-                    "low": None,
-                    "open": None,
-                    "close": None,
-                    "timestamp": now_iso,
-                    "is_stale": False,
-                    "data_quality": "VALIDATED"
-                },
-                "providerStatus": "LIVE",
-                "timestamp": now_iso
-            }), 200
-
-    # 3. Strictly return no_data when unquoted (never synthesize a fake quote)
+    # Strict Zero-Fabrication Return
     return jsonify({
         "status": "no_data",
         "symbol": symbol,
         "source": "UNAVAILABLE",
         "quote": None,
-        "providerStatus": "NO_DATA",
+        "providerStatus": STATE_NO_DATA,
+        "freshness": STATE_NO_DATA,
+        "is_tradeable": False,
         "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
 
@@ -290,7 +128,8 @@ def get_market_quote():
 @market_data_bp.route("/api/markets/quote", methods=["GET"])
 def get_markets_quote_batch():
     """
-    Returns real quotes for multiple symbols or primary indices.
+    Batch endpoint returning canonical quotes for multiple symbols or primary indices.
+    Each item is evaluated through the single canonical quote pipeline.
     """
     symbols_param = request.args.get("symbols", "")
     if symbols_param:
@@ -298,39 +137,35 @@ def get_markets_quote_batch():
     else:
         symbols = ["BTC", "ETH", "SOL", "NIFTY", "BANKNIFTY", "RELIANCE"]
 
-    results = {}
-    ticker_svc = get_ticker_service()
+    results: Dict[str, Any] = {}
 
     for sym in symbols:
-        cached = global_market_cache.get(sym)
-        if cached:
+        code, res = resolve_canonical_quote(sym)
+        if code == 200 and res.get("ok"):
             results[sym] = {
-                "symbol": cached.symbol,
-                "ltp": cached.ltp,
-                "bid": cached.bid,
-                "ask": cached.ask,
-                "volume": cached.volume,
-                "oi": cached.oi,
-                "timestamp": cached.timestamp.isoformat() if cached.timestamp else None,
-                "source": cached.provider or "CENTRAL_CACHE"
+                "symbol": res.get("symbol", sym),
+                "ltp": res.get("ltp"),
+                "bid": res.get("bid"),
+                "ask": res.get("ask"),
+                "volume": res.get("volume"),
+                "oi": res.get("oi"),
+                "timestamp": res.get("timestamp"),
+                "ageMs": res.get("ageMs", 0),
+                "freshness": res.get("freshness"),
+                "data_quality": res.get("data_quality"),
+                "source": res.get("source"),
+                "is_tradeable": res.get("is_tradeable", False),
             }
-        elif ticker_svc:
-            px = ticker_svc.get_spot_price(sym)
-            if px and px > 0:
-                results[sym] = {
-                    "symbol": sym,
-                    "ltp": px,
-                    "bid": None,
-                    "ask": None,
-                    "volume": None,
-                    "oi": None,
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
-                    "source": "TICKER_SERVICE"
-                }
-            else:
-                results[sym] = None
         else:
-            results[sym] = None
+            results[sym] = {
+                "symbol": sym,
+                "quote": None,
+                "status": STATE_NO_DATA,
+                "freshness": STATE_NO_DATA,
+                "data_quality": QUALITY_REJECTED,
+                "source": "UNAVAILABLE",
+                "is_tradeable": False,
+            }
 
     return jsonify({
         "success": True,
@@ -357,6 +192,12 @@ def stream_centralized_sse():
     """
     Centralized multiplexed SSE stream broadcasting real market ticks,
     normalized quotes, and keep-alive heartbeats.
+    
+    Guarantees:
+    - finally-based unregister on client disconnect or exception
+    - bounded queue with slow-client drop protection
+    - heartbeat every 2 seconds
+    - zero crash propagation to stream manager
     """
     client_id = f"client_{int(time.time() * 1000)}"
     q = global_stream_manager.register_client(client_id)
@@ -370,12 +211,16 @@ def stream_centralized_sse():
                 except queue.Empty:
                     heartbeat = {
                         "type": "HEARTBEAT",
-                        "timestamp": datetime.now(timezone.utc).isoformat()
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "status": "HEALTHY",
+                        "stream_stats": global_stream_manager.get_stream_stats()
                     }
                     yield f"data: {json.dumps(heartbeat)}\n\n"
-        except GeneratorExit:
+        except (GeneratorExit, Exception) as exc:
+            logger.debug("SSE stream termination for %s (%s)", client_id, type(exc).__name__)
+        finally:
             global_stream_manager.unregister_client(client_id)
-            logger.info("Client %s disconnected from centralized stream", client_id)
+            logger.info("Guaranteed unregister completed for stream client %s", client_id)
 
     return Response(
         generate(),

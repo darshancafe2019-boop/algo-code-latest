@@ -257,7 +257,8 @@ class ResilientTickerService:
     def _fetch_from_providers(self, symbol: str, start_perf: float) -> Dict[str, Any]:
         """Tries configured exchanges in priority order with circuit breaker protection."""
         now_iso = datetime.now(timezone.utc).isoformat()
-        
+        from src.market_data.canonical_pipeline import evaluate_quote_freshness, STATE_LIVE, STATE_UNKNOWN
+
         # --- Provider 1: Binance Spot ---
         if self._binance_cb.can_attempt():
             try:
@@ -268,6 +269,9 @@ class ResilientTickerService:
                 
                 last_price = float(raw.get("last") or raw.get("close") or 0.0)
                 if last_price > 0:
+                    source_ts = raw.get("timestamp")
+                    freshness, age_ms, parsed_ts = evaluate_quote_freshness(source_ts)
+                    is_tradeable = (freshness == STATE_LIVE and parsed_ts is not None)
                     payload = {
                         "status": "success",
                         "symbol": symbol,
@@ -281,12 +285,16 @@ class ResilientTickerService:
                         "bid": float(raw["bid"]) if raw.get("bid") is not None else None,
                         "ask": float(raw["ask"]) if raw.get("ask") is not None else None,
                         "provider": "binance",
-                        "is_stale": False,
-                        "data_status": "LIVE",
+                        "source_timestamp": parsed_ts,
+                        "timestamp": parsed_ts,
+                        "age_ms": age_ms,
+                        "freshness": freshness,
+                        "is_stale": (freshness != STATE_LIVE),
+                        "data_status": freshness,
+                        "is_tradeable": is_tradeable,
                         "latency_ms": latency_ms,
-                        "timestamp": now_iso
                     }
-                    logger.debug("[TickerService] Fetched %s from Binance in %dms", symbol, latency_ms)
+                    logger.debug("[TickerService] Fetched %s from Binance in %dms (freshness: %s)", symbol, latency_ms, freshness)
                     return payload
             except (ccxt.RequestTimeout, ccxt.NetworkError, ccxt.RateLimitExceeded) as ex:
                 self._binance_cb.record_failure()
@@ -305,6 +313,9 @@ class ResilientTickerService:
                 
                 last_price = float(raw.get("last") or raw.get("close") or 0.0)
                 if last_price > 0:
+                    source_ts = raw.get("timestamp")
+                    freshness, age_ms, parsed_ts = evaluate_quote_freshness(source_ts)
+                    is_tradeable = (freshness == STATE_LIVE and parsed_ts is not None)
                     payload = {
                         "status": "success",
                         "symbol": symbol,
@@ -318,12 +329,16 @@ class ResilientTickerService:
                         "bid": float(raw["bid"]) if raw.get("bid") is not None else None,
                         "ask": float(raw["ask"]) if raw.get("ask") is not None else None,
                         "provider": "bybit",
-                        "is_stale": False,
-                        "data_status": "LIVE_FALLBACK",
+                        "source_timestamp": parsed_ts,
+                        "timestamp": parsed_ts,
+                        "age_ms": age_ms,
+                        "freshness": freshness,
+                        "is_stale": (freshness != STATE_LIVE),
+                        "data_status": freshness,
+                        "is_tradeable": is_tradeable,
                         "latency_ms": latency_ms,
-                        "timestamp": now_iso
                     }
-                    logger.info("[TickerService] Failover success: Fetched %s from Bybit in %dms", symbol, latency_ms)
+                    logger.info("[TickerService] Failover success: Fetched %s from Bybit in %dms (freshness: %s)", symbol, latency_ms, freshness)
                     return payload
             except Exception as ex:
                 self._bybit_cb.record_failure()
@@ -339,6 +354,9 @@ class ResilientTickerService:
                 
                 last_price = float(raw.get("last") or raw.get("close") or 0.0)
                 if last_price > 0:
+                    source_ts = raw.get("timestamp")
+                    freshness, age_ms, parsed_ts = evaluate_quote_freshness(source_ts)
+                    is_tradeable = (freshness == STATE_LIVE and parsed_ts is not None)
                     payload = {
                         "status": "success",
                         "symbol": symbol,
@@ -352,10 +370,14 @@ class ResilientTickerService:
                         "bid": float(raw["bid"]) if raw.get("bid") is not None else None,
                         "ask": float(raw["ask"]) if raw.get("ask") is not None else None,
                         "provider": "kraken",
-                        "is_stale": False,
-                        "data_status": "LIVE_FALLBACK",
+                        "source_timestamp": parsed_ts,
+                        "timestamp": parsed_ts,
+                        "age_ms": age_ms,
+                        "freshness": freshness,
+                        "is_stale": (freshness != STATE_LIVE),
+                        "data_status": freshness,
+                        "is_tradeable": is_tradeable,
                         "latency_ms": latency_ms,
-                        "timestamp": now_iso
                     }
                     return payload
             except Exception as ex:
@@ -366,8 +388,8 @@ class ResilientTickerService:
 
     def _build_fallback_response(self, symbol: str, reason: str, start_perf: float) -> Dict[str, Any]:
         """Constructs a deterministic, safe fallback payload from DB, memory cache, or catalog."""
-        now_iso = datetime.now(timezone.utc).isoformat()
         latency_ms = max(1, int((time.perf_counter() - start_perf) * 1000))
+        from src.market_data.canonical_pipeline import STATE_STALE, STATE_UNKNOWN, STATE_NO_DATA
 
         # Check Last-Known-Good memory cache
         with self._lock:
@@ -376,15 +398,17 @@ class ResilientTickerService:
                 res["status"] = "warning"
                 res["message"] = f"Live feed reconnecting ({reason}). Displaying cached price snapshot."
                 res["is_stale"] = True
+                res["freshness"] = STATE_STALE
                 res["data_status"] = "CACHED_FALLBACK"
+                res["is_tradeable"] = False
                 res["latency_ms"] = latency_ms
-                res["timestamp"] = now_iso
                 return res
 
         # Check SQLite DB candles_cache
         db_candle = self._query_db_last_candle(symbol)
         if db_candle:
             last_p = float(db_candle.get("close") or 0.0)
+            candle_ts = db_candle.get("timestamp")
             return {
                 "status": "warning",
                 "message": f"Live feed offline. Serving historical DB candle for {symbol}.",
@@ -399,10 +423,13 @@ class ResilientTickerService:
                 "bid": None,
                 "ask": None,
                 "provider": "sqlite_candles_cache",
+                "source_timestamp": candle_ts,
+                "timestamp": candle_ts,
                 "is_stale": True,
+                "freshness": STATE_STALE if candle_ts else STATE_UNKNOWN,
                 "data_status": "DB_FALLBACK",
+                "is_tradeable": False,
                 "latency_ms": latency_ms,
-                "timestamp": now_iso
             }
 
         # Check baseline catalog for known major symbols only
@@ -423,10 +450,13 @@ class ResilientTickerService:
                 "bid": None,
                 "ask": None,
                 "provider": "catalog_anchor",
+                "source_timestamp": None,
+                "timestamp": None,
                 "is_stale": True,
+                "freshness": STATE_UNKNOWN,
                 "data_status": "COLD_FALLBACK",
+                "is_tradeable": False,
                 "latency_ms": latency_ms,
-                "timestamp": now_iso
             }
 
         # Symbol unknown and not found across any provider
@@ -437,10 +467,13 @@ class ResilientTickerService:
             "last": None,
             "price": None,
             "provider": "UNAVAILABLE",
+            "source_timestamp": None,
+            "timestamp": None,
             "is_stale": True,
+            "freshness": STATE_NO_DATA,
             "data_status": "UNAVAILABLE",
+            "is_tradeable": False,
             "latency_ms": latency_ms,
-            "timestamp": now_iso
         }
 
     def _query_db_last_candle(self, symbol: str) -> Optional[Dict[str, Any]]:

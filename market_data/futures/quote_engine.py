@@ -434,6 +434,28 @@ MASTER_FUTURES_SPECS = [
         "max_leverage": 10,
         "expiry": "2026-09-24",
     },
+    # -------------------------------------------------------------------------
+    # 6. 🧪 PAPER SIMULATOR (Virtual Futures Execution)
+    # -------------------------------------------------------------------------
+    {
+        "symbol": "SIM-BTC-PERP",
+        "raw_sym": "BTCUSDT",
+        "underlying": "BTC",
+        "display_name": "Paper Simulator BTC/USDT Perpetual",
+        "venue": MarketVenue.PAPER_SIM,
+        "provider": "PAPER_SIM",
+        "provider_name": "Paper Simulator Engine",
+        "exchange": "SIM",
+        "segment": "PAPER_DERIVATIVES",
+        "contract_type": FuturesContractType.PERPETUAL,
+        "quote_currency": "USDT",
+        "margin_currency": "USDT",
+        "settlement_type": "CASH",
+        "lot_size": 0.001,
+        "tick_size": 0.1,
+        "max_leverage": 100,
+        "expiry": None,
+    },
 ]
 
 
@@ -664,10 +686,10 @@ class FuturesQuoteEngine:
             if ctype == FuturesContractType.PERPETUAL:
                 # Perpetual: Funding rate applies, dated basis does not
                 raw_funding = q.funding_rate if q else None
-                if raw_funding is not None:
-                    funding_data = self.funding_engine.get_funding_data(sym, venue, raw_funding)
-                if mark_price and index_price and index_price > 0:
-                    basis_data = self.basis_engine.calculate_basis(sym, f"{und}/USDT", index_price, mark_price)
+                funding_data = self.funding_engine.get_funding_data(sym, venue, raw_rate=raw_funding)
+                ref_idx = index_price or mark_price or last_price or 1.0
+                ref_mark = mark_price or last_price or index_price or 1.0
+                basis_data = self.basis_engine.calculate_basis(sym, f"{und}/USDT", ref_idx, ref_mark)
             else:
                 # Dated Futures: Days to expiry basis calculation applies; NO perpetual funding
                 days_left = 18  # default front-month days
@@ -683,7 +705,7 @@ class FuturesQuoteEngine:
                 data_status = "LIVE"
             else:
                 freshness = "LAST_TRADED"
-                data_status = "LAST_TRADED"
+                data_status = "CONNECTED"
 
             contract = CanonicalFuturesContract(
                 symbol=sym,

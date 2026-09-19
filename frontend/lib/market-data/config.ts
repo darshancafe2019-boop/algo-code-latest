@@ -74,7 +74,7 @@ export const marketDataConfig: MarketDataConfig = {
   },
   gateway: {
     url: process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051",
-    secret: process.env.MARKET_GATEWAY_SECRET || "changeme-set-a-strong-random-secret-here",
+    secret: process.env.MARKET_GATEWAY_SECRET || "",
   },
   isServer: typeof window === "undefined",
 };

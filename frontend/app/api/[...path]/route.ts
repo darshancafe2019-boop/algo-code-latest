@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
 const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
-const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "changeme-set-a-strong-random-secret-here";
+const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "";
 
 /**
  * Universal Permanent 404-Proof Backend-for-Frontend (BFF) Proxy Handler

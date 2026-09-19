@@ -76,16 +76,29 @@ def compute_authoritative_pnl(
     - P&L %: (Net P&L / (entry_price * quantity)) * 100
     - R-Multiple: (Profit per unit / Planned risk per unit)
     """
-    is_long = direction.upper() in ["LONG", "BUY"]
-    qty = abs(float(quantity or 0.0))
-    entry_p = float(entry_price or 0.0)
-    exit_p = float(exit_price or 0.0)
-    f_total = float(fees or 0.0)
-    slip_total = float(slippage or 0.0)
-    fund_total = float(funding or 0.0)
-    tax_total = float(taxes or 0.0)
+    import math
+    is_long = str(direction or "LONG").upper() in ["LONG", "BUY"]
 
-    if qty <= 0 or entry_p <= 0:
+    def _safe_float(v: Any, default: float = 0.0) -> float:
+        if v is None:
+            return default
+        try:
+            val = float(v)
+            if math.isnan(val) or math.isinf(val):
+                return default
+            return val
+        except (ValueError, TypeError):
+            return default
+
+    qty = abs(_safe_float(quantity, 0.0))
+    entry_p = _safe_float(entry_price, 0.0)
+    exit_p = _safe_float(exit_price, 0.0)
+    f_total = max(0.0, _safe_float(fees, 0.0))
+    slip_total = max(0.0, _safe_float(slippage, 0.0))
+    fund_total = _safe_float(funding, 0.0)
+    tax_total = max(0.0, _safe_float(taxes, 0.0))
+
+    if qty <= 0.0 or entry_p <= 0.0 or exit_p <= 0.0:
         return {
             "gross_pnl": 0.0,
             "net_pnl": 0.0,
@@ -96,7 +109,10 @@ def compute_authoritative_pnl(
             "funding": fund_total,
             "taxes": tax_total,
             "currency": currency,
-            "direction": direction
+            "direction": direction,
+            "is_win": False,
+            "is_loss": False,
+            "is_breakeven": True
         }
 
     # Gross P&L
@@ -155,13 +171,26 @@ def compute_unrealized_pnl(
     """
     Computes real-time mark-to-market unrealized P&L for open positions.
     """
-    is_long = direction.upper() in ["LONG", "BUY"]
-    qty = abs(float(quantity or 0.0))
-    entry_p = float(entry_price or 0.0)
-    live_p = float(live_price or 0.0)
-    fee_total = float(fees or estimated_fees or 0.0)
+    import math
+    is_long = str(direction or "LONG").upper() in ["LONG", "BUY"]
 
-    if qty <= 0 or entry_p <= 0 or live_p <= 0:
+    def _safe_float(v: Any, default: float = 0.0) -> float:
+        if v is None:
+            return default
+        try:
+            val = float(v)
+            if math.isnan(val) or math.isinf(val):
+                return default
+            return val
+        except (ValueError, TypeError):
+            return default
+
+    qty = abs(_safe_float(quantity, 0.0))
+    entry_p = _safe_float(entry_price, 0.0)
+    live_p = _safe_float(live_price, 0.0)
+    fee_total = max(0.0, _safe_float(fees or estimated_fees, 0.0))
+
+    if qty <= 0.0 or entry_p <= 0.0 or live_p <= 0.0:
         return {
             "unrealized_pnl": 0.0,
             "unrealized_gross_pnl": 0.0,

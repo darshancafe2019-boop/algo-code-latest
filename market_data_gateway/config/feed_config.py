@@ -16,7 +16,7 @@ class FeedConfig:
     # Gateway Server Settings
     host: str = os.getenv("MARKET_GATEWAY_HOST", "0.0.0.0")
     port: int = int(os.getenv("MARKET_GATEWAY_PORT", "5051"))
-    secret: str = os.getenv("MARKET_GATEWAY_SECRET", "changeme-set-a-strong-random-secret-here")
+    secret: str = os.getenv("MARKET_GATEWAY_SECRET", "")
     
     # Stale Data & Freshness Thresholds (milliseconds / seconds)
     live_threshold_ms: float = float(os.getenv("FEED_LIVE_THRESHOLD_MS", "1500.0"))

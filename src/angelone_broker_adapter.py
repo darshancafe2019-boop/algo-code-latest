@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from src import config, db
 from src.audit import log_bot_event
+from src.ssl_util import get_ssl_context
 from src.market_data.interfaces import (
     BrokerAdapter,
     BrokerCapability,
@@ -208,7 +209,7 @@ class AngelOneBrokerAdapter(BrokerAdapter):
 
         try:
             req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout_sec, context=get_ssl_context()) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data.get("status") and data.get("data"):
                     tok_data = data["data"]
@@ -248,7 +249,7 @@ class AngelOneBrokerAdapter(BrokerAdapter):
 
         try:
             req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-            with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+            with urllib.request.urlopen(req, timeout=self.timeout_sec, context=get_ssl_context()) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 return {
                     "reachable": True,
@@ -278,7 +279,7 @@ class AngelOneBrokerAdapter(BrokerAdapter):
             try:
                 url = f"{self.BASE_URL}/rest/secure/angelbroking/user/v1/getRMS"
                 req = urllib.request.Request(url, headers=self._get_headers(), method="GET")
-                with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout_sec, context=get_ssl_context()) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     if data.get("status") and data.get("data"):
                         rms = data["data"]
@@ -317,7 +318,7 @@ class AngelOneBrokerAdapter(BrokerAdapter):
             try:
                 url = f"{self.BASE_URL}/rest/secure/angelbroking/order/v1/getPosition"
                 req = urllib.request.Request(url, headers=self._get_headers(), method="GET")
-                with urllib.request.urlopen(req, timeout=self.timeout_sec) as resp:
+                with urllib.request.urlopen(req, timeout=self.timeout_sec, context=get_ssl_context()) as resp:
                     data = json.loads(resp.read().decode("utf-8"))
                     if data.get("status") and isinstance(data.get("data"), list):
                         return data["data"]

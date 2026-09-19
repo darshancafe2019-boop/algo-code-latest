@@ -2699,9 +2699,15 @@ def init_db(force: bool = False) -> None:
                     if col_name not in bot_cols:
                         cursor.execute(f"ALTER TABLE bot_instances ADD COLUMN {col_name} {col_def}")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_is_deleted ON bot_instances(is_deleted)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_coalesce_deleted ON bot_instances(COALESCE(is_deleted, 0))")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_status_deleted ON bot_instances(status, is_deleted)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_active_group ON bot_instances(is_deleted, status, group_name)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_exec_mode ON bot_instances(execution_mode)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_ba_cust ON broker_accounts(customer_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_exp_ledger_cust ON brokerage_expenses_ledger(customer_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_status_id ON trades_log(status, id DESC)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_symbol ON trades_log(symbol)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_exec_mode_status ON trades_log(execution_mode, status)")
                 # Check and alter bot_activity_logs for both event_type and activity_type
                 try:
                     cursor.execute("PRAGMA table_info(bot_activity_logs)")

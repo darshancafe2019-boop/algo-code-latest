@@ -60,21 +60,29 @@ class MarketDataCache:
     def is_redis(self) -> bool:
         return self._is_redis_active
 
-    def set_quote(self, symbol: str, quote: Dict[str, Any], ttl_sec: int = 30) -> None:
-        """Caches a normalized market quote."""
+    def set_quote(self, symbol: str, quote: Dict[str, Any], ttl_sec: int = 30) -> bool:
+        """Caches a normalized market quote after strict canonical validation."""
+        from src.market_data.canonical_pipeline import validate_canonical_quote
+        is_valid, cq, err = validate_canonical_quote(quote, symbol=symbol)
+        if not is_valid or not cq or cq.freshness == "INVALID":
+            logger.warning("MarketDataCache rejected invalid quote for %s: %s", symbol, err or "INVALID_QUOTE")
+            return False
+
+        quote_to_store = cq.to_dict()
         key = f"quote:{symbol.upper()}"
-        val_str = json.dumps(quote)
+        val_str = json.dumps(quote_to_store)
 
         if self._is_redis_active and self._redis_client:
             try:
                 self._redis_client.setex(key, ttl_sec, val_str)
-                return
+                return True
             except Exception as e:
                 logger.debug("Redis set_quote fallback to memory: %s", e)
 
         with self._lock:
             expiry_ts = time.time() + ttl_sec
-            self._memory_store[key] = (expiry_ts, quote)
+            self._memory_store[key] = (expiry_ts, quote_to_store)
+        return True
 
     def get_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Retrieves a cached market quote."""

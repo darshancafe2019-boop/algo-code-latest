@@ -2,13 +2,13 @@
 
 import React from "react";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import OptionsCommandCenter from "@/components/options/OptionsCommandCenter";
+import { OptionsUniverseView } from "@/src/features/markets/options";
 
 export default function OptionsPage() {
   return (
     <DirectPageLayout activeTab="options">
-      <div className="w-full min-w-0">
-        <OptionsCommandCenter />
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+        <OptionsUniverseView initialSource="ALL" initialTab="CHAIN" isSourceLocked={false} />
       </div>
     </DirectPageLayout>
   );

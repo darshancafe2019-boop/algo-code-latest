@@ -38,6 +38,246 @@ function formatGreek(val: number | undefined | null, decimals: number = 2): stri
   return val.toFixed(decimals);
 }
 
+interface OptionChainStrikeRowProps {
+  row: OptionStrikeRow;
+  spotPrice: number;
+  currency: string;
+  sourceName: string;
+  showAdvancedColumns: boolean;
+  isCeSelected: boolean;
+  isPeSelected: boolean;
+  onSelectOption: (strike: number, type: "CE" | "PE", quote: OptionContractQuote | null) => void;
+  onCreateOptionBot: (
+    strike: number,
+    type: "CE" | "PE",
+    side: "BUY" | "SELL",
+    quote: OptionContractQuote | null,
+    e: React.MouseEvent
+  ) => void;
+}
+
+const OptionChainStrikeRowComponent = React.memo(function OptionChainStrikeRowComponent({
+  row,
+  spotPrice,
+  currency,
+  sourceName,
+  showAdvancedColumns,
+  isCeSelected,
+  isPeSelected,
+  onSelectOption,
+  onCreateOptionBot,
+}: OptionChainStrikeRowProps) {
+  const isATM = Boolean(row.is_atm);
+  const ce = (row.ce || (row as any).call || {}) as OptionContractQuote;
+  const pe = (row.pe || (row as any).put || {}) as OptionContractQuote;
+
+  const ceITM = ce?.moneyness === "ITM" || (ce?.strike ? ce.strike < spotPrice : row.strike < spotPrice);
+  const peITM = pe?.moneyness === "ITM" || (pe?.strike ? pe.strike > spotPrice : row.strike > spotPrice);
+
+  const ceLtp = ce?.ltp ?? ce?.markPrice ?? (ce as any)?.last_price ?? (ce as any)?.mark_price ?? null;
+  const peLtp = pe?.ltp ?? pe?.markPrice ?? (pe as any)?.last_price ?? (pe as any)?.mark_price ?? null;
+
+  const ceBid = ce?.bid ?? (ce as any)?.best_bid ?? null;
+  const ceAsk = ce?.ask ?? (ce as any)?.best_ask ?? null;
+  const peBid = pe?.bid ?? (pe as any)?.best_bid ?? null;
+  const peAsk = pe?.ask ?? (pe as any)?.best_ask ?? null;
+
+  const ceOI = ce?.open_interest ?? (ce as any)?.oi ?? null;
+  const peOI = pe?.open_interest ?? (pe as any)?.oi ?? null;
+  const ceVol = ce?.volume ?? null;
+  const peVol = pe?.volume ?? null;
+  const ceIV = ce?.iv ?? (ce as any)?.mark_iv ?? null;
+  const peIV = pe?.iv ?? (pe as any)?.mark_iv ?? null;
+  const ceDelta = ce?.delta ?? null;
+  const peDelta = pe?.delta ?? null;
+
+  return (
+    <tr
+      className={`transition-colors group ${
+        isATM
+          ? "bg-amber-500/15 font-semibold ring-1 ring-amber-500/30"
+          : "hover:bg-slate-800/40"
+      }`}
+    >
+      {/* CALLS: OI */}
+      <td className={`p-2 text-right text-slate-300 font-mono text-[11px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+        {formatVolumeOrOI(ceOI)}
+      </td>
+
+      {/* CALLS: Volume (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-right text-slate-400 font-mono text-[11px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+          {formatVolumeOrOI(ceVol)}
+        </td>
+      )}
+
+      {/* CALLS: IV% (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-right text-purple-300 font-mono text-[11px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+          {ceIV !== null && ceIV > 0 ? `${ceIV.toFixed(1)}%` : "—"}
+        </td>
+      )}
+
+      {/* CALLS: Delta (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-right text-cyan-400 font-mono text-[11px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+          {formatGreek(ceDelta, 2)}
+        </td>
+      )}
+
+      {/* CALLS: Bid */}
+      <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+        {formatPrice(ceBid, currency)}
+      </td>
+
+      {/* CALLS: Ask */}
+      <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
+        {formatPrice(ceAsk, currency)}
+      </td>
+
+      {/* CALLS: LTP (Clickable) */}
+      <td
+        onClick={() => onSelectOption(row.strike, "CE", ce)}
+        className={`p-2 text-right cursor-pointer transition ${
+          ceITM ? "bg-rose-950/20" : ""
+        } ${
+          isCeSelected
+            ? "bg-cyan-500/30 text-cyan-200 font-black ring-1 ring-cyan-400"
+            : "group-hover:text-cyan-300 text-white font-bold"
+        }`}
+      >
+        <div className="flex items-center justify-end gap-1.5">
+          <span className="text-[11px]">{formatPrice(ceLtp, currency)}</span>
+        </div>
+      </td>
+
+      {/* CALLS: TRADE BUTTONS */}
+      <td
+        className={`p-1 text-center border-r border-slate-800 ${ceITM ? "bg-rose-950/20" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => onCreateOptionBot(row.strike, "CE", "BUY", ce, e)}
+            className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
+            title="Create Call BUY Bot"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={(e) => onCreateOptionBot(row.strike, "CE", "SELL", ce, e)}
+            className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
+            title="Create Call SELL Bot"
+          >
+            S
+          </button>
+        </div>
+      </td>
+
+      {/* CENTER: Strike */}
+      <td
+        className={`p-2 text-center font-black border-r border-slate-800 ${
+          isATM
+            ? "bg-amber-500/30 text-amber-200"
+            : "bg-slate-900/90 text-slate-100"
+        }`}
+      >
+        <div className="flex items-center justify-center gap-1">
+          {isATM && (
+            <span className="text-[9px] px-1 rounded bg-amber-500 text-slate-950 font-black">
+              ATM
+            </span>
+          )}
+          <span>{formatNumber(row.strike)}</span>
+        </div>
+      </td>
+
+      {/* PUTS: TRADE BUTTONS */}
+      <td
+        className={`p-1 text-center ${peITM ? "bg-emerald-950/20" : ""}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-center gap-1">
+          <button
+            type="button"
+            onClick={(e) => onCreateOptionBot(row.strike, "PE", "BUY", pe, e)}
+            className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
+            title="Create Put BUY Bot"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            onClick={(e) => onCreateOptionBot(row.strike, "PE", "SELL", pe, e)}
+            className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
+            title="Create Put SELL Bot"
+          >
+            S
+          </button>
+        </div>
+      </td>
+
+      {/* PUTS: LTP (Clickable) */}
+      <td
+        onClick={() => onSelectOption(row.strike, "PE", pe)}
+        className={`p-2 text-left cursor-pointer transition ${
+          peITM ? "bg-emerald-950/20" : ""
+        } ${
+          isPeSelected
+            ? "bg-cyan-500/30 text-cyan-200 font-black ring-1 ring-cyan-400"
+            : "group-hover:text-cyan-300 text-white font-bold"
+        }`}
+      >
+        <div className="flex items-center justify-start gap-1.5">
+          <span className="text-[11px]">{formatPrice(peLtp, currency)}</span>
+        </div>
+      </td>
+
+      {/* PUTS: Bid */}
+      <td className={`p-2 text-left text-slate-400 font-mono text-[10px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+        {formatPrice(peBid, currency)}
+      </td>
+
+      {/* PUTS: Ask */}
+      <td
+        className={`p-2 text-left text-slate-400 font-mono text-[10px] border-r border-slate-800/60 ${
+          peITM ? "bg-emerald-950/15" : ""
+        }`}
+      >
+        {formatPrice(peAsk, currency)}
+      </td>
+
+      {/* PUTS: Delta (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-left text-cyan-400 font-mono text-[11px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+          {formatGreek(peDelta, 2)}
+        </td>
+      )}
+
+      {/* PUTS: IV% (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-left text-purple-300 font-mono text-[11px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+          {peIV !== null && peIV > 0 ? `${peIV.toFixed(1)}%` : "—"}
+        </td>
+      )}
+
+      {/* PUTS: Volume (Advanced) */}
+      {showAdvancedColumns && (
+        <td className={`p-2 text-left text-slate-400 font-mono text-[11px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+          {formatVolumeOrOI(peVol)}
+        </td>
+      )}
+
+      {/* PUTS: OI */}
+      <td className={`p-2 text-left text-slate-300 font-mono text-[11px] ${peITM ? "bg-emerald-950/15" : ""}`}>
+        {formatVolumeOrOI(peOI)}
+      </td>
+    </tr>
+  );
+});
+
 export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionChainTable({
   strikes,
   spotPrice,
@@ -153,26 +393,58 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
   }
 
   return (
-    <div className="bg-[#07101A] border border-slate-800/90 rounded-2xl shadow-2xl overflow-hidden font-mono text-xs select-none">
-      {/* Table Container with Controlled Scroll */}
-      <div className="overflow-x-auto max-h-[640px] scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-        <table className="w-full border-collapse">
-          {/* Sticky Header */}
-          <thead className="sticky top-0 z-20 bg-[#0C1428] border-b border-slate-700 shadow-sm">
-            {/* Top Category Split */}
-            <tr className="border-b border-slate-800 text-[10px] font-black uppercase tracking-wider text-center">
+    <div className="bg-[#070C16] border border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
+      {/* Live Feed Header Metrics Strip */}
+      <div className="px-4 py-2.5 bg-slate-900/60 border-b border-slate-800/80 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 font-mono">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="font-bold text-slate-200">{sourceName.toUpperCase()}</span>
+            <span className="text-slate-500">•</span>
+            <span className="text-slate-400">{brokerAccountAlias}</span>
+          </div>
+          <span className="px-2 py-0.5 rounded bg-slate-800/80 text-[10px] font-mono text-slate-300 border border-slate-700/50">
+            {environment}
+          </span>
+          <span className="px-2 py-0.5 rounded bg-cyan-950/40 text-cyan-300 text-[10px] font-mono border border-cyan-800/40">
+            FEED: {dataFeed}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-4 text-[11px] font-mono text-slate-400">
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">LATENCY:</span>
+            <span className={latencyMs < 50 ? "text-emerald-400" : "text-amber-400"}>{latencyMs}ms</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">AGE:</span>
+            <span className={dataAgeMs < 1000 ? "text-emerald-400" : "text-amber-400"}>{dataAgeMs}ms</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-slate-500">STATUS:</span>
+            <span className="font-bold text-emerald-400">{freshnessStatus}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Container */}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-left select-none">
+          <thead>
+            {/* Header Super-Row */}
+            <tr className="bg-slate-900/90 text-slate-300 text-[11px] font-mono border-b border-slate-800">
               <th
                 colSpan={showAdvancedColumns ? 8 : 5}
-                className="py-1.5 bg-rose-950/20 text-rose-300 border-r border-slate-800"
+                className="py-2.5 px-4 text-center font-bold tracking-wider text-rose-300 bg-rose-950/20 border-r border-slate-800"
               >
                 CALLS (CE)
               </th>
-              <th className="py-1.5 bg-slate-900 text-cyan-400 border-r border-slate-800 w-28 text-center font-extrabold">
+              <th className="py-2.5 px-6 text-center font-black tracking-widest text-amber-300 bg-slate-900 border-r border-slate-800">
                 STRIKE
               </th>
               <th
                 colSpan={showAdvancedColumns ? 8 : 5}
-                className="py-1.5 bg-emerald-950/20 text-emerald-300"
+                className="py-2.5 px-4 text-center font-bold tracking-wider text-emerald-300 bg-emerald-950/20"
               >
                 PUTS (PE)
               </th>
@@ -209,253 +481,20 @@ export const SimpleLiveOptionChainTable = React.memo(function SimpleLiveOptionCh
 
           {/* Table Body */}
           <tbody className="divide-y divide-slate-800/50">
-            {filteredStrikes.map((row) => {
-              const isATM = Boolean(row.is_atm);
-              const ce = (row.ce || (row as any).call || {}) as OptionContractQuote;
-              const pe = (row.pe || (row as any).put || {}) as OptionContractQuote;
-
-              const ceITM = ce?.moneyness === "ITM" || (ce?.strike ? ce.strike < spotPrice : row.strike < spotPrice);
-              const peITM = pe?.moneyness === "ITM" || (pe?.strike ? pe.strike > spotPrice : row.strike > spotPrice);
-
-              const ceLtp = ce?.ltp ?? ce?.markPrice ?? (ce as any)?.last_price ?? (ce as any)?.mark_price ?? null;
-              const peLtp = pe?.ltp ?? pe?.markPrice ?? (pe as any)?.last_price ?? (pe as any)?.mark_price ?? null;
-
-              const ceBid = ce?.bid ?? (ce as any)?.best_bid ?? null;
-              const ceAsk = ce?.ask ?? (ce as any)?.best_ask ?? null;
-              const peBid = pe?.bid ?? (pe as any)?.best_bid ?? null;
-              const peAsk = pe?.ask ?? (pe as any)?.best_ask ?? null;
-
-              const ceOI = ce?.open_interest ?? (ce as any)?.oi ?? null;
-              const peOI = pe?.open_interest ?? (pe as any)?.oi ?? null;
-              const ceVol = ce?.volume ?? null;
-              const peVol = pe?.volume ?? null;
-              const ceIV = ce?.iv ?? (ce as any)?.mark_iv ?? null;
-              const peIV = pe?.iv ?? (pe as any)?.mark_iv ?? null;
-              const ceDelta = ce?.delta ?? null;
-              const peDelta = pe?.delta ?? null;
-
-              const isCeSelected = selectedStrike === row.strike && selectedOptionType === "CE";
-              const isPeSelected = selectedStrike === row.strike && selectedOptionType === "PE";
-
-              return (
-                <tr
-                  key={`${sourceName}_${row.strike}`}
-                  className={`transition-colors group ${
-                    isATM
-                      ? "bg-amber-500/15 font-semibold ring-1 ring-amber-500/30"
-                      : "hover:bg-slate-800/40"
-                  }`}
-                >
-                  {/* CALLS: OI */}
-                  <td
-                    className={`p-2 text-right text-slate-300 font-mono text-[11px] ${
-                      ceITM ? "bg-rose-950/15" : ""
-                    }`}
-                  >
-                    {formatVolumeOrOI(ceOI)}
-                  </td>
-
-                  {/* CALLS: Volume (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-right text-slate-400 font-mono text-[11px] ${
-                        ceITM ? "bg-rose-950/15" : ""
-                      }`}
-                    >
-                      {formatVolumeOrOI(ceVol)}
-                    </td>
-                  )}
-
-                  {/* CALLS: IV% (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-right text-purple-300 font-mono text-[11px] ${
-                        ceITM ? "bg-rose-950/15" : ""
-                      }`}
-                    >
-                      {ceIV !== null && ceIV > 0 ? `${ceIV.toFixed(1)}%` : "—"}
-                    </td>
-                  )}
-
-                  {/* CALLS: Delta (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-right text-cyan-400 font-mono text-[11px] ${
-                        ceITM ? "bg-rose-950/15" : ""
-                      }`}
-                    >
-                      {formatGreek(ceDelta, 2)}
-                    </td>
-                  )}
-
-                  {/* CALLS: Bid */}
-                  <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
-                    {formatPrice(ceBid, currency)}
-                  </td>
-
-                  {/* CALLS: Ask */}
-                  <td className={`p-2 text-right text-slate-400 font-mono text-[10px] ${ceITM ? "bg-rose-950/15" : ""}`}>
-                    {formatPrice(ceAsk, currency)}
-                  </td>
-
-                  {/* CALLS: LTP (Clickable) */}
-                  <td
-                    onClick={() => onSelectOption(row.strike, "CE", ce)}
-                    className={`p-2 text-right cursor-pointer transition ${
-                      ceITM ? "bg-rose-950/20" : ""
-                    } ${
-                      isCeSelected
-                        ? "bg-cyan-500/30 text-cyan-200 font-black ring-1 ring-cyan-400"
-                        : "group-hover:text-cyan-300 text-white font-bold"
-                    }`}
-                  >
-                    <div className="flex items-center justify-end gap-1.5">
-                      <span className="text-[11px]">{formatPrice(ceLtp, currency)}</span>
-                    </div>
-                  </td>
-
-                  {/* CALLS: TRADE BUTTONS */}
-                  <td
-                    className={`p-1 text-center border-r border-slate-800 ${ceITM ? "bg-rose-950/20" : ""}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => handleCreateOptionBot(row.strike, "CE", "BUY", ce, e)}
-                        className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
-                        title="Create Call BUY Bot"
-                      >
-                        B
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleCreateOptionBot(row.strike, "CE", "SELL", ce, e)}
-                        className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
-                        title="Create Call SELL Bot"
-                      >
-                        S
-                      </button>
-                    </div>
-                  </td>
-
-                  {/* CENTER: Strike */}
-                  <td
-                    className={`p-2 text-center font-black border-r border-slate-800 ${
-                      isATM
-                        ? "bg-amber-500/30 text-amber-200"
-                        : "bg-slate-900/90 text-slate-100"
-                    }`}
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      {isATM && (
-                        <span className="text-[9px] px-1 rounded bg-amber-500 text-slate-950 font-black">
-                          ATM
-                        </span>
-                      )}
-                      <span>{formatNumber(row.strike)}</span>
-                    </div>
-                  </td>
-
-                  {/* PUTS: TRADE BUTTONS */}
-                  <td
-                    className={`p-1 text-center ${peITM ? "bg-emerald-950/20" : ""}`}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={(e) => handleCreateOptionBot(row.strike, "PE", "BUY", pe, e)}
-                        className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-slate-950 text-emerald-400 text-[9px] font-bold border border-emerald-500/40 transition-colors"
-                        title="Create Put BUY Bot"
-                      >
-                        B
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleCreateOptionBot(row.strike, "PE", "SELL", pe, e)}
-                        className="px-1.5 py-0.5 rounded bg-rose-500/20 hover:bg-rose-500 hover:text-white text-rose-400 text-[9px] font-bold border border-rose-500/40 transition-colors"
-                        title="Create Put SELL Bot"
-                      >
-                        S
-                      </button>
-                    </div>
-                  </td>
-
-                  {/* PUTS: LTP (Clickable) */}
-                  <td
-                    onClick={() => onSelectOption(row.strike, "PE", pe)}
-                    className={`p-2 text-left cursor-pointer transition ${
-                      peITM ? "bg-emerald-950/20" : ""
-                    } ${
-                      isPeSelected
-                        ? "bg-cyan-500/30 text-cyan-200 font-black ring-1 ring-cyan-400"
-                        : "group-hover:text-cyan-300 text-white font-bold"
-                    }`}
-                  >
-                    <div className="flex items-center justify-start gap-1.5">
-                      <span className="text-[11px]">{formatPrice(peLtp, currency)}</span>
-                    </div>
-                  </td>
-
-                  {/* PUTS: Bid */}
-                  <td className={`p-2 text-left text-slate-400 font-mono text-[10px] ${peITM ? "bg-emerald-950/15" : ""}`}>
-                    {formatPrice(peBid, currency)}
-                  </td>
-
-                  {/* PUTS: Ask */}
-                  <td
-                    className={`p-2 text-left text-slate-400 font-mono text-[10px] border-r border-slate-800/60 ${
-                      peITM ? "bg-emerald-950/15" : ""
-                    }`}
-                  >
-                    {formatPrice(peAsk, currency)}
-                  </td>
-
-                  {/* PUTS: Delta (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-left text-cyan-400 font-mono text-[11px] ${
-                        peITM ? "bg-emerald-950/15" : ""
-                      }`}
-                    >
-                      {formatGreek(peDelta, 2)}
-                    </td>
-                  )}
-
-                  {/* PUTS: IV% (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-left text-purple-300 font-mono text-[11px] ${
-                        peITM ? "bg-emerald-950/15" : ""
-                      }`}
-                    >
-                      {peIV !== null && peIV > 0 ? `${peIV.toFixed(1)}%` : "—"}
-                    </td>
-                  )}
-
-                  {/* PUTS: Volume (Advanced) */}
-                  {showAdvancedColumns && (
-                    <td
-                      className={`p-2 text-left text-slate-400 font-mono text-[11px] ${
-                        peITM ? "bg-emerald-950/15" : ""
-                      }`}
-                    >
-                      {formatVolumeOrOI(peVol)}
-                    </td>
-                  )}
-
-                  {/* PUTS: OI */}
-                  <td
-                    className={`p-2 text-left text-slate-300 font-mono text-[11px] ${
-                      peITM ? "bg-emerald-950/15" : ""
-                    }`}
-                  >
-                    {formatVolumeOrOI(peOI)}
-                  </td>
-                </tr>
-              );
-            })}
+            {filteredStrikes.map((row) => (
+              <OptionChainStrikeRowComponent
+                key={`${sourceName}_${row.strike}`}
+                row={row}
+                spotPrice={spotPrice}
+                currency={currency}
+                sourceName={sourceName}
+                showAdvancedColumns={showAdvancedColumns}
+                isCeSelected={selectedStrike === row.strike && selectedOptionType === "CE"}
+                isPeSelected={selectedStrike === row.strike && selectedOptionType === "PE"}
+                onSelectOption={onSelectOption}
+                onCreateOptionBot={handleCreateOptionBot}
+              />
+            ))}
           </tbody>
         </table>
       </div>

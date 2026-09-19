@@ -16,30 +16,12 @@ let globalActiveRoles = {
 };
 
 export async function GET(req: NextRequest) {
-  // 1. First attempt to fetch from backend Flask provider manager if running
-  try {
-    const backendUrl = `${BACKEND_URL}/api/providers_v2${req.nextUrl.search}`;
-    const res = await fetch(backendUrl, {
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(1500),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.status === "success" && Array.isArray(data.providers)) {
-        return NextResponse.json(data, { status: 200 });
-      }
-    }
-  } catch (_err) {
-    // Fall through to real Gateway + environment telemetry aggregation
-  }
-
-  // 2. Fetch live telemetry from Market Data Gateway (port 5051)
+  // 1. Direct fast Gateway status query
   let gwHealth: any = null;
   try {
     const gwRes = await fetch(`${GATEWAY_URL}/health`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(2000),
+      signal: AbortSignal.timeout(800),
     });
     if (gwRes.ok) {
       gwHealth = await gwRes.json();

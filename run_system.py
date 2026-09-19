@@ -6,14 +6,20 @@ Usage: python run_system.py
 """
 
 import sys
-import subprocess
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent
-ORCHESTRATOR = ROOT_DIR / "scripts" / "dev_orchestrator.py"
+SCRIPTS_DIR = ROOT_DIR / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+import dev_orchestrator
 
 if __name__ == "__main__":
     try:
-        sys.exit(subprocess.call([sys.executable, str(ORCHESTRATOR)] + sys.argv[1:]))
+        dev_orchestrator.main()
     except KeyboardInterrupt:
         sys.exit(0)
+

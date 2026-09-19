@@ -54,8 +54,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: isAuthenticated,
-    staleTime: 3000,
-    refetchInterval: isAuthenticated ? 5000 : false,
+    staleTime: 10000,
+    refetchInterval: isAuthenticated ? 20000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -73,8 +73,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 3000,
-    refetchInterval: isAuthenticated ? 5000 : false,
+    staleTime: 10000,
+    refetchInterval: isAuthenticated ? 20000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -92,8 +92,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 4000,
-    refetchInterval: isAuthenticated ? 6000 : false,
+    staleTime: 10000,
+    refetchInterval: isAuthenticated ? 25000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -111,8 +111,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 15000,
-    refetchInterval: isAuthenticated ? 30000 : false,
+    staleTime: 30000,
+    refetchInterval: isAuthenticated ? 60000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -130,33 +130,59 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data.risk;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 4000,
-    refetchInterval: isAuthenticated ? 6000 : false,
+    staleTime: 10000,
+    refetchInterval: isAuthenticated ? 25000 : false,
     placeholderData: (prev) => prev,
   });
 
-  // 6. Real-time SSE Stream Listener for sub-second portfolio broadcast
+  // 6. Real-time SSE Stream Listener for sub-second portfolio broadcast with 5 FPS throttled UI commit
+  const ssePendingRef = React.useRef<PortfolioSnapshot | null>(null);
+  const sseFrameRef = React.useRef<number | null>(null);
+  const lastSseUpdateRef = React.useRef<number>(0);
+
   useEffect(() => {
     if (!isAuthenticated) return;
+
+    const scheduleCommit = () => {
+      if (sseFrameRef.current !== null) return;
+      sseFrameRef.current = requestAnimationFrame(() => {
+        sseFrameRef.current = null;
+        const now = Date.now();
+        if (now - lastSseUpdateRef.current < 200) {
+          scheduleCommit();
+          return;
+        }
+        const incoming = ssePendingRef.current;
+        if (!incoming) return;
+        lastSseUpdateRef.current = now;
+        setLiveSseSnapshot((prev) => {
+          if (!prev) return incoming;
+          return {
+            ...prev,
+            ...incoming,
+            capitalBreakdown: incoming.capitalBreakdown
+              ? { ...(prev.capitalBreakdown || {}), ...incoming.capitalBreakdown }
+              : prev.capitalBreakdown,
+          };
+        });
+      });
+    };
+
     const handle = apiClient.createResilientEventSource(`/api/stream/portfolio?mode=${tradingMode}`, {
       key: `stream_portfolio_${tradingMode}`,
       onMessage: (parsed) => {
         if (parsed?.type === "PORTFOLIO_SNAPSHOT" && parsed?.data) {
-          setLiveSseSnapshot((prev) => {
-            if (!prev) return parsed.data as PortfolioSnapshot;
-            return {
-              ...prev,
-              ...parsed.data,
-              capitalBreakdown: parsed.data.capitalBreakdown
-                ? { ...(prev.capitalBreakdown || {}), ...parsed.data.capitalBreakdown }
-                : prev.capitalBreakdown,
-            };
-          });
+          ssePendingRef.current = parsed.data as PortfolioSnapshot;
+          scheduleCommit();
         }
       },
     });
 
     return () => {
+      if (sseFrameRef.current !== null) {
+        cancelAnimationFrame(sseFrameRef.current);
+        sseFrameRef.current = null;
+      }
       handle.close();
     };
   }, [tradingMode, isAuthenticated]);

@@ -19,28 +19,20 @@ export function BotControlCenterVNext({ botId = "bot_nifty_trend_v1" }: BotContr
 
   const fetchBot = async () => {
     try {
-      const res = await fetch(`/api/v2/bots/${botId}`);
-      if (res.ok) {
-        const json = await res.json();
-        if (json.status === "success") {
-          setBotData(json.data);
-        }
-      }
+      const [botRes, decRes, sigRes] = await Promise.allSettled([
+        fetch(`/api/v2/bots/${botId}`).then((r) => r.ok ? r.json() : null),
+        fetch(`/api/v2/bots/${botId}/decisions`).then((r) => r.ok ? r.json() : null),
+        fetch(`/api/v2/bots/${botId}/signals`).then((r) => r.ok ? r.json() : null),
+      ]);
 
-      const decRes = await fetch(`/api/v2/bots/${botId}/decisions`);
-      if (decRes.ok) {
-        const decJson = await decRes.json();
-        if (decJson.status === "success") {
-          setDecisions(decJson.data || []);
-        }
+      if (botRes.status === "fulfilled" && botRes.value?.status === "success") {
+        setBotData(botRes.value.data);
       }
-
-      const sigRes = await fetch(`/api/v2/bots/${botId}/signals`);
-      if (sigRes.ok) {
-        const sigJson = await sigRes.json();
-        if (sigJson.status === "success") {
-          setSignals(sigJson.data || []);
-        }
+      if (decRes.status === "fulfilled" && decRes.value?.status === "success") {
+        setDecisions(decRes.value.data || []);
+      }
+      if (sigRes.status === "fulfilled" && sigRes.value?.status === "success") {
+        setSignals(sigRes.value.data || []);
       }
     } catch (e) {
       console.error("Failed to fetch bot details", e);

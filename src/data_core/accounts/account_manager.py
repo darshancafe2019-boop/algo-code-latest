@@ -26,6 +26,7 @@ from src.data_core.models import (
 )
 from src.data_core.capital.ledger import global_capital_ledger
 from src.data_core.events.bus import global_event_bus
+from src.data_core.providers.registry import normalize_provider_id
 
 logger = logging.getLogger("AccountManager")
 
@@ -39,7 +40,8 @@ class AccountManager:
         self._bootstrap_accounts()
 
     def _get_key(self, provider: str, account_id: str, environment: Environment) -> str:
-        return f"{provider.upper()}:{account_id}:{environment.value}"
+        norm_prov = normalize_provider_id(provider)
+        return f"{norm_prov}:{account_id}:{environment.value}"
 
     def _bootstrap_accounts(self) -> None:
         """Initializes canonical broker accounts."""
@@ -191,10 +193,26 @@ class AccountManager:
         )
 
     def get_account(self, provider: str, account_id: str, environment: Environment) -> Optional[BrokerAccount]:
-        """Retrieves a broker account by provider, ID, and environment."""
+        """Retrieves a broker account by provider, ID, and environment with fallback resolution."""
         with self._lock:
-            key = self._get_key(provider, account_id, environment)
-            return self._accounts.get(key)
+            norm_prov = normalize_provider_id(provider)
+            key = self._get_key(norm_prov, account_id, environment)
+            acc = self._accounts.get(key)
+            if acc:
+                return acc
+
+            # Fallback 1: match provider and environment
+            for a in self._accounts.values():
+                if a.environment == environment and a.provider == norm_prov:
+                    return a
+
+            # Fallback 2: in PAPER mode, if account not found, fallback to primary paper account
+            if environment == Environment.PAPER:
+                paper_accs = [a for a in self._accounts.values() if a.environment == Environment.PAPER]
+                if paper_accs:
+                    return paper_accs[0]
+
+            return None
 
     def get_accounts_by_environment(self, environment: Environment) -> List[BrokerAccount]:
         """Returns all accounts belonging to the specified environment."""

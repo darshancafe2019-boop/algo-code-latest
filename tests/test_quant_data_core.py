@@ -50,6 +50,24 @@ def test_provider_capability_matrix_and_authentic_status():
     assert paper.capabilities.account is True
     assert paper.status == ProviderStatus.LIVE
 
+    # Test alias and display name resolution
+    delta1 = reg.get_provider("Delta Exchange India")
+    delta2 = reg.get_provider("DELTA_INDIA")
+    delta3 = reg.get_provider("delta_exchange")
+    delta4 = reg.get_provider("DELTA")
+    assert delta1 is not None
+    assert delta1.provider_id == "DELTA"
+    assert delta2 == delta1
+    assert delta3 == delta1
+    assert delta4 == delta1
+    assert delta1.capabilities.market_data is True
+
+    # Test Dhan and Upstox aliases
+    dhan = reg.get_provider("DhanHQ v2")
+    assert dhan is not None and dhan.provider_id == "DHAN"
+    upstox = reg.get_provider("Upstox V3 Market Data & Orders")
+    assert upstox is not None and upstox.provider_id == "UPSTOX"
+
     reg.record_market_packet("BINANCE_USDM", latency_ms=15.4)
     usdm = reg.get_provider("BINANCE_USDM")
     assert usdm.status == ProviderStatus.LIVE
@@ -235,3 +253,73 @@ def test_global_event_bus_and_secret_redaction():
     assert ev.payload["balance"] == 1000.0
 
     unsub()
+
+
+def test_bot_preflight_validation_with_provider_aliases():
+    """Verify that Bot Preflight Gates pass seamlessly with provider aliases like 'Delta Exchange India'."""
+    from src.data_core.core import quant_data_core
+
+    spec_dict = {
+        "botId": "bot_delta_spread_001",
+        "botName": "BTC Bull Call Spread",
+        "environment": "PAPER",
+        "strategyType": "BULL_CALL_SPREAD",
+        "underlyingCanonicalId": "CRYPTO:BTC",
+        "underlyingSymbol": "BTC",
+        "expiry": "2026-03-27",
+        "marketDataProvider": "Delta Exchange India",
+        "executionBroker": "Delta Exchange India",
+        "executionAccountId": "delta_paper",
+        "capitalAllocation": 10000.0,
+        "currency": "USD",
+        "legs": [
+            {
+                "legId": "leg_buy",
+                "canonicalInstrumentId": "CRYPTO:BTC:20260327:85000:CE",
+                "underlyingCanonicalId": "CRYPTO:BTC",
+                "underlyingSymbol": "BTC",
+                "expiry": "2026-03-27",
+                "strike": 85000.0,
+                "optionType": "CE",
+                "side": "BUY",
+                "quantity": 1.0,
+                "lots": 1,
+                "lotSize": 1.0,
+                "limitPrice": 1200.0,
+                "marketDataProvider": "Delta Exchange India",
+            },
+            {
+                "legId": "leg_sell",
+                "canonicalInstrumentId": "CRYPTO:BTC:20260327:90000:CE",
+                "underlyingCanonicalId": "CRYPTO:BTC",
+                "underlyingSymbol": "BTC",
+                "expiry": "2026-03-27",
+                "strike": 90000.0,
+                "optionType": "CE",
+                "side": "SELL",
+                "quantity": 1.0,
+                "lots": 1,
+                "lotSize": 1.0,
+                "limitPrice": 400.0,
+                "marketDataProvider": "Delta Exchange India",
+            },
+        ],
+    }
+
+    report = quant_data_core.bots.validate_spec(spec_dict)
+    assert report is not None
+    assert report.total_gates == 16
+    assert report.failed_gates == 0
+    assert report.is_deployable is True
+    assert report.to_dict()["isDeployable"] is True
+
+    # Verify Market Data Stream gate specifically
+    mkt_gate = next((g for g in report.gates if g.gate_id == "MARKET_DATA_STREAM"), None)
+    assert mkt_gate is not None
+    assert mkt_gate.status == "PASS"
+
+    # Verify Broker Auth gate specifically
+    auth_gate = next((g for g in report.gates if g.gate_id == "BROKER_AUTH"), None)
+    assert auth_gate is not None
+    assert auth_gate.status == "PASS"
+

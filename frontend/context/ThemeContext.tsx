@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 import {
   AppearanceConfig,
   ThemePreset,
@@ -414,33 +414,59 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   }, [isPreviewActive]);
 
+  const value: ThemeContextType = useMemo(
+    () => ({
+      config,
+      draftConfig,
+      isPreviewActive,
+      isDrawerOpen,
+      setTheme,
+      setMode,
+      setDensity,
+      setTextSize,
+      setAccent,
+      setChartStyle,
+      setHighContrast,
+      updateDraftColors,
+      updateDraftTypography,
+      updateDraftChart,
+      setPreviewActive: setIsPreviewActive,
+      applyDraft,
+      cancelDraft,
+      resetToDefaults,
+      openAppearanceDrawer,
+      closeAppearanceDrawer,
+      exportThemeJson,
+      importThemeJson,
+    }),
+    [
+      config,
+      draftConfig,
+      isPreviewActive,
+      isDrawerOpen,
+      setTheme,
+      setMode,
+      setDensity,
+      setTextSize,
+      setAccent,
+      setChartStyle,
+      setHighContrast,
+      updateDraftColors,
+      updateDraftTypography,
+      updateDraftChart,
+      setIsPreviewActive,
+      applyDraft,
+      cancelDraft,
+      resetToDefaults,
+      openAppearanceDrawer,
+      closeAppearanceDrawer,
+      exportThemeJson,
+      importThemeJson,
+    ]
+  );
+
   return (
-    <ThemeContext.Provider
-      value={{
-        config,
-        draftConfig,
-        isPreviewActive,
-        isDrawerOpen,
-        setTheme,
-        setMode,
-        setDensity,
-        setTextSize,
-        setAccent,
-        setChartStyle,
-        setHighContrast,
-        updateDraftColors,
-        updateDraftTypography,
-        updateDraftChart,
-        setPreviewActive: setIsPreviewActive,
-        applyDraft,
-        cancelDraft,
-        resetToDefaults,
-        openAppearanceDrawer,
-        closeAppearanceDrawer,
-        exportThemeJson,
-        importThemeJson,
-      }}
-    >
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

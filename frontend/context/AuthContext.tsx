@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 
 export interface AuthUser {
   id: string;
@@ -683,33 +683,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const mustChangePassword = Boolean(user?.must_change_password);
 
+  const value: AuthContextType = useMemo(
+    () => ({
+      user,
+      session,
+      isAuthenticated,
+      isLoading,
+      isLocked,
+      mustChangePassword,
+      isQuickFillAvailable,
+      lockoutUntil,
+      failedAttempts,
+      login,
+      verifyEmailOTP,
+      resendEmailOTP,
+      verify2FA,
+      forgotPassword,
+      verifyResetOTP,
+      resetPassword,
+      logout,
+      logoutAll,
+      changePassword,
+      lockTerminal,
+      unlockTerminal,
+      checkSession,
+    }),
+    [
+      user,
+      session,
+      isAuthenticated,
+      isLoading,
+      isLocked,
+      mustChangePassword,
+      isQuickFillAvailable,
+      lockoutUntil,
+      failedAttempts,
+      login,
+      verifyEmailOTP,
+      resendEmailOTP,
+      verify2FA,
+      forgotPassword,
+      verifyResetOTP,
+      resetPassword,
+      logout,
+      logoutAll,
+      changePassword,
+      lockTerminal,
+      unlockTerminal,
+      checkSession,
+    ]
+  );
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        session,
-        isAuthenticated,
-        isLoading,
-        isLocked,
-        mustChangePassword,
-        isQuickFillAvailable,
-        lockoutUntil,
-        failedAttempts,
-        login,
-        verifyEmailOTP,
-        resendEmailOTP,
-        verify2FA,
-        forgotPassword,
-        verifyResetOTP,
-        resetPassword,
-        logout,
-        logoutAll,
-        changePassword,
-        lockTerminal,
-        unlockTerminal,
-        checkSession,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

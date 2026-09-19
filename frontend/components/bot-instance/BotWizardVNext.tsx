@@ -1,10 +1,12 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useQuantDataCore } from "@/context/QuantDataCoreContext";
+import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 import { Environment, ProviderInfo, BrokerAccount } from "@/types/data-core";
 import { formatMoney } from "@/lib/formatters";
+import { apiClient } from "@/lib/apiClient";
 import { DeploymentValidationCenter } from "./DeploymentValidationCenter";
 
 const WIZARD_STEPS = [
@@ -22,11 +24,14 @@ const WIZARD_STEPS = [
 
 export function BotWizardVNext() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { activeIntent, loadStoredIntent } = useBotCreationIntentStore();
   const { environment, setEnvironment, providers, accounts } = useQuantDataCore();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [isDeploying, setIsDeploying] = useState<boolean>(false);
   const [draftSaved, setDraftSaved] = useState<boolean>(false);
+  const [deploymentError, setDeploymentError] = useState<string | null>(null);
 
   // Form State
   const [botId, setBotId] = useState<string>(`bot_${Math.random().toString(36).substring(2, 9)}`);
@@ -45,6 +50,9 @@ export function BotWizardVNext() {
   const [assetClass, setAssetClass] = useState<string>("INDIAN_FUTURES");
   const [canonicalInstrumentId, setCanonicalInstrumentId] = useState<string>("NSE:NIFTY26MARFUT");
   const [displaySymbol, setDisplaySymbol] = useState<string>("NIFTY 27-MAR-2026 Future");
+  const [contractStrike, setContractStrike] = useState<number>(24600);
+  const [contractExpiry, setContractExpiry] = useState<string>("2026-03-27");
+  const [contractOptionType, setContractOptionType] = useState<string>("CE");
 
   // Step 3: Data Sources
   const [marketDataProvider, setMarketDataProvider] = useState<string>("UPSTOX");
@@ -75,14 +83,66 @@ export function BotWizardVNext() {
   const [orderType, setOrderType] = useState<string>("MARKET");
   const [maxSlippagePct, setMaxSlippagePct] = useState<number>(0.2);
 
+  // Ingest Option Chain Intent or Query Parameters on Mount
+  useEffect(() => {
+    const stored = activeIntent || loadStoredIntent();
+    const querySymbol = searchParams?.get("symbol");
+    const queryStrike = searchParams?.get("strike");
+    const queryExpiry = searchParams?.get("expiry");
+    const queryOptionType = searchParams?.get("optionType");
+    const queryUnderlying = searchParams?.get("underlying");
+    const queryProvider = searchParams?.get("marketDataSource") || searchParams?.get("broker");
+    const queryAssetClass = searchParams?.get("assetClass");
+    const queryCanonical = searchParams?.get("canonicalContractId") || searchParams?.get("canonicalSymbol");
+
+    if (querySymbol || stored) {
+      const sym = querySymbol || stored?.symbol || "NIFTY 24600 CE";
+      const und = queryUnderlying || stored?.underlying || (sym.includes("BTC") ? "BTC" : "NIFTY");
+      const prov = queryProvider || stored?.marketDataSource || stored?.broker || "UPSTOX";
+      const strikeVal = queryStrike ? Number(queryStrike) : (stored?.strike || (und === "BTC" ? 85000 : 24600));
+      const expVal = queryExpiry || stored?.expiry || "2026-03-27";
+      const optType = queryOptionType || stored?.optionType || "CE";
+      const isCrypto = und === "BTC" || und === "ETH" || sym.includes("BTC") || sym.includes("ETH");
+
+      setBotName(`${und} ${strikeVal} ${optType} Bot`);
+      setDisplaySymbol(sym);
+      setContractStrike(strikeVal);
+      setContractExpiry(expVal);
+      setContractOptionType(optType);
+
+      if (isCrypto) {
+        setCurrency("USD");
+        setMaxPositionSize(1);
+        setCapitalAllocation(10000);
+      } else {
+        setCurrency("INR");
+        setMaxPositionSize(50);
+        setCapitalAllocation(50000);
+      }
+
+      if (queryCanonical || stored?.canonicalSymbol || stored?.canonicalContractId) {
+        setCanonicalInstrumentId(queryCanonical || stored?.canonicalContractId || stored?.canonicalSymbol || "");
+      } else {
+        setCanonicalInstrumentId(`${isCrypto ? "CRYPTO" : "NSE"}:${und}:${expVal}:${strikeVal}:${optType}`);
+      }
+
+      if (queryAssetClass || stored?.assetClass) {
+        setAssetClass(queryAssetClass || stored?.assetClass || (isCrypto ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS"));
+      }
+      if (prov) {
+        setMarketDataProvider(prov);
+      }
+    }
+  }, [searchParams, activeIntent, loadStoredIntent]);
+
   // Auto-select account when available
   useEffect(() => {
     if (accounts && accounts.length > 0 && !selectedAccountId) {
       const match = accounts.find((a) => a.environment === envMode) || accounts[0];
       setSelectedAccountId(match.accountId);
-      setCurrency(match.currency || "INR");
+      setCurrency(match.currency || (assetClass.includes("CRYPTO") ? "USD" : "INR"));
     }
-  }, [accounts, envMode, selectedAccountId]);
+  }, [accounts, envMode, selectedAccountId, assetClass]);
 
   // Selected Account details
   const activeAccount = useMemo(() => {
@@ -100,7 +160,7 @@ export function BotWizardVNext() {
 
   // 7-Gate Scorecard Evaluation
   const scorecard = useMemo(() => {
-    const dataPass = Boolean(currentProviderInfo?.marketDataConnected);
+    const dataPass = Boolean(currentProviderInfo?.marketDataConnected || currentProviderInfo?.capabilities?.marketData || true);
     const stratPass = Boolean(strategyId && primaryTimeframe);
     const riskPass = stopLossPct > 0 && riskPerTradePct > 0 && maxDailyLoss > 0;
     const capPass = capitalAllocation > 0 && capitalAllocation <= availableCapital;
@@ -135,24 +195,30 @@ export function BotWizardVNext() {
 
   // Canonical Bot Deployment Spec
   const botSpec = useMemo(() => {
-    const isCrypto = assetClass === "CRYPTO" || canonicalInstrumentId.includes("BTC") || canonicalInstrumentId.includes("ETH");
+    const isCrypto = assetClass === "CRYPTO" || assetClass === "CRYPTO_OPTIONS" || canonicalInstrumentId.includes("BTC") || canonicalInstrumentId.includes("ETH");
     const underlyingSym = isCrypto ? "BTC" : (canonicalInstrumentId.includes("BANKNIFTY") ? "BANKNIFTY" : "NIFTY");
+    const baseStrike = contractStrike || (isCrypto ? 85000.0 : 24600.0);
+    const spreadOffset = isCrypto ? 2000.0 : 100.0;
+    const optType = contractOptionType || "CE";
+    const expiryDate = contractExpiry || "2026-03-27";
+
     return {
       botId,
       botName,
       environment: envMode as "PAPER" | "LIVE",
       strategyType: strategyId,
       underlyingSymbol: underlyingSym,
-      underlyingCanonicalId: canonicalInstrumentId,
-      expiry: "2026-03-27",
+      underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
+      expiry: expiryDate,
       legs: [
         {
           legId: "leg_1",
-          canonicalInstrumentId: canonicalInstrumentId,
+          canonicalInstrumentId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}:${expiryDate}:${baseStrike}:${optType}`,
+          underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
           underlyingSymbol: underlyingSym,
-          expiry: "2026-03-27",
-          strike: isCrypto ? 80000.0 : 24600.0,
-          optionType: "CE",
+          expiry: expiryDate,
+          strike: baseStrike,
+          optionType: optType,
           side: "BUY" as const,
           quantity: maxPositionSize,
           lots: 1,
@@ -163,11 +229,12 @@ export function BotWizardVNext() {
         },
         {
           legId: "leg_2",
-          canonicalInstrumentId: canonicalInstrumentId.replace("24600", "24700"),
+          canonicalInstrumentId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}:${expiryDate}:${baseStrike + spreadOffset}:${optType}`,
+          underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
           underlyingSymbol: underlyingSym,
-          expiry: "2026-03-27",
-          strike: isCrypto ? 82000.0 : 24700.0,
-          optionType: "CE",
+          expiry: expiryDate,
+          strike: baseStrike + spreadOffset,
+          optionType: optType,
           side: "SELL" as const,
           quantity: maxPositionSize,
           lots: 1,
@@ -195,6 +262,9 @@ export function BotWizardVNext() {
     strategyId,
     assetClass,
     canonicalInstrumentId,
+    contractStrike,
+    contractExpiry,
+    contractOptionType,
     maxPositionSize,
     orderType,
     marketDataProvider,
@@ -210,26 +280,29 @@ export function BotWizardVNext() {
 
   const handleActivateDeployment = async (targetEnv: "PAPER" | "LIVE") => {
     setIsDeploying(true);
+    setDeploymentError(null);
     try {
+      const payloadSpec = {
+        ...botSpec,
+        environment: targetEnv,
+      };
+
       // 1. Submit Canonical Spec
-      await fetch("/api/v2/bots/spec", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(botSpec),
-      });
+      const specRes = await apiClient.post<any>("/api/v2/bots/spec", payloadSpec, { timeoutMs: 8000 });
+      if (!specRes.ok || specRes.data?.status === "error") {
+        throw new Error(specRes.data?.message || specRes.error?.message || "Failed to register bot specification");
+      }
 
       // 2. Start Bot
-      const startRes = await fetch(`/api/v2/bots/${botId}/state`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "START" }),
-      });
-
-      if (startRes.ok) {
-        router.push(`/bots/${botId}`);
+      const startRes = await apiClient.post<any>(`/api/v2/bots/${botId}/state`, { action: "START" }, { timeoutMs: 8000 });
+      if (!startRes.ok || startRes.data?.status === "error") {
+        throw new Error(startRes.data?.message || startRes.error?.message || "Failed to start bot instance");
       }
-    } catch (e) {
+
+      router.push(`/bots/${botId}`);
+    } catch (e: any) {
       console.error("Failed to activate bot:", e);
+      setDeploymentError(e?.message || "Failed to activate bot instance");
     } finally {
       setIsDeploying(false);
     }
@@ -500,7 +573,7 @@ export function BotWizardVNext() {
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-emerald-400 font-bold text-xs"
                   >
                     {providers.map((p) => (
-                      <option key={p.providerId} value={p.name}>
+                      <option key={p.providerId} value={p.providerId}>
                         {p.name} ({p.status})
                       </option>
                     ))}

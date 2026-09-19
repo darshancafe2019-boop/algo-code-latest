@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -65,11 +66,19 @@ export function LeftNavigationSidebar({
   const router = useRouter();
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
+  // Pre-cache all primary routes for instant zero-lag tab transitions
+  useEffect(() => {
+    CANONICAL_NAV_ITEMS.forEach((item) => {
+      try {
+        router.prefetch(item.path);
+      } catch {}
+    });
+  }, [router]);
+
   const handleNavClick = (item: NavItem) => {
     if (onTabSelect) {
       onTabSelect(item.id);
     }
-    router.push(item.path);
     setMobileDrawerOpen(false);
   };
 
@@ -103,8 +112,10 @@ export function LeftNavigationSidebar({
             const active = isItemActive(item);
 
             return (
-              <button
+              <Link
                 key={item.id}
+                href={item.path}
+                prefetch={true}
                 onClick={() => handleNavClick(item)}
                 title={isCollapsed ? item.label : undefined}
                 className={cn(
@@ -126,7 +137,7 @@ export function LeftNavigationSidebar({
                     {item.label}
                   </span>
                 )}
-              </button>
+              </Link>
             );
           })}
         </div>
@@ -187,8 +198,10 @@ export function LeftNavigationSidebar({
                 const Icon = item.icon;
                 const active = isItemActive(item);
                 return (
-                  <button
+                  <Link
                     key={item.id}
+                    href={item.path}
+                    prefetch={true}
                     onClick={() => handleNavClick(item)}
                     className={cn(
                       "w-full h-10 flex items-center gap-3 px-3 rounded-lg text-xs font-medium transition-colors text-left",
@@ -199,7 +212,7 @@ export function LeftNavigationSidebar({
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     <span>{item.label}</span>
-                  </button>
+                  </Link>
                 );
               })}
             </div>

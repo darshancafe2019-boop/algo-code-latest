@@ -99,24 +99,24 @@ export const GlobalHeader = memo(function GlobalHeader({
         )}
 
         {/* Alerts Shortcut */}
-        <button
-          type="button"
-          onClick={() => router.push("/alerts")}
+        <Link
+          href="/alerts"
+          prefetch={true}
           className="h-[38px] w-[38px] flex items-center justify-center rounded-lg text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422] border border-[#12304A] transition-colors cursor-pointer hidden sm:flex"
           title="Terminal Alerts"
         >
           <Bell className="h-4 w-4" />
-        </button>
+        </Link>
 
         {/* Settings Shortcut */}
-        <button
-          type="button"
-          onClick={() => router.push("/settings")}
+        <Link
+          href="/settings"
+          prefetch={true}
           className="h-[38px] w-[38px] flex items-center justify-center rounded-lg text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0A1422] border border-[#12304A] transition-colors cursor-pointer hidden md:flex"
           title="Terminal Settings"
         >
           <SettingsIcon className="h-4 w-4" />
-        </button>
+        </Link>
 
         {/* User Profile Dropdown */}
         <div className="relative">
@@ -143,28 +143,24 @@ export const GlobalHeader = memo(function GlobalHeader({
                 <p className="font-semibold text-[#F7FAFC] truncate">{user?.username || "Administrator"}</p>
                 <p className="text-[11px] text-[#7C8CA3] truncate font-mono mt-0.5">{user?.email || "admin@quant.os"}</p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  router.push("/settings");
-                }}
+              <Link
+                href="/settings"
+                prefetch={true}
+                onClick={() => setUserMenuOpen(false)}
                 className="w-full flex items-center gap-2 px-3.5 py-2 text-left text-[#B2C0D2] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition-colors cursor-pointer"
               >
                 <SettingsIcon className="h-4 w-4 text-[#22D3EE]" />
                 <span>Settings</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setUserMenuOpen(false);
-                  router.push("/security");
-                }}
+              </Link>
+              <Link
+                href="/security"
+                prefetch={true}
+                onClick={() => setUserMenuOpen(false)}
                 className="w-full flex items-center gap-2 px-3.5 py-2 text-left text-[#B2C0D2] hover:text-[#F7FAFC] hover:bg-[#101B2D] transition-colors cursor-pointer"
               >
                 <Shield className="h-4 w-4 text-[#00E890]" />
-                <span>Security Center</span>
-              </button>
+                <span>Security &amp; API Keys</span>
+              </Link>
               <div className="my-1 border-t border-[#122033]" />
               <button
                 type="button"

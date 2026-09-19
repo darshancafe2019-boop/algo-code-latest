@@ -29,83 +29,99 @@ export default function OptionsCommandCenter() {
     let isMounted = true;
     const fetchChain = async () => {
       try {
-        const url = `/api/v2/options/chain?underlying=${encodeURIComponent(
+        let url = `/api/v2/options/chain?underlying=${encodeURIComponent(
           underlying
         )}&limit=${strikeLimit}${
           selectedExpiry ? `&expiry=${encodeURIComponent(selectedExpiry)}` : ""
         }`;
-        const res = await fetch(url);
-        if (res.ok) {
-          const json = await res.json();
-          if (json.status === "success" && isMounted) {
-            const data: OptionChainSnapshot = {
-              underlying: json.data.underlying || underlying,
-              spotPrice: json.data.spot_price || json.data.spotPrice || 0,
-              expiry: json.data.expiry || "",
-              timestamp: json.data.timestamp || new Date().toISOString(),
-              pcrOi: json.data.pcr_oi || json.data.pcrOi || 1.0,
-              pcrVolume: json.data.pcr_volume || json.data.pcrVolume || 1.0,
-              atmStrike: json.data.atm_strike || json.data.atmStrike || 0,
-              atmIv: json.data.atm_iv || json.data.atmIv || 0,
-              maxPain: json.data.max_pain || json.data.maxPain || 0,
-              totalCallOi: json.data.total_call_oi || json.data.totalCallOi || 0,
-              totalPutOi: json.data.total_put_oi || json.data.totalPutOi || 0,
-              strikes: (json.data.strikes || []).map((s: any) => ({
-                strike: s.strike,
-                call: s.call
-                  ? {
-                      instrumentId: s.call.instrument_id || s.call.instrumentId,
-                      symbol: s.call.symbol,
-                      strike: s.call.strike,
-                      optionType: s.call.option_type || s.call.optionType,
-                      expiry: s.call.expiry,
-                      ltp: s.call.ltp || 0,
-                      bid: s.call.bid || 0,
-                      ask: s.call.ask || 0,
-                      iv: s.call.iv || 0,
-                      delta: s.call.delta || 0,
-                      gamma: s.call.gamma || 0,
-                      theta: s.call.theta || 0,
-                      vega: s.call.vega || 0,
-                      rho: s.call.rho || 0,
-                      oi: s.call.oi || 0,
-                      oiChange: s.call.oi_change || s.call.oiChange || 0,
-                      volume: s.call.volume || 0,
-                      feedAgeMs: s.call.feed_age_ms || s.call.feedAgeMs || 0,
-                      provider: s.call.provider || activeProvider,
-                    }
-                  : null,
-                put: s.put
-                  ? {
-                      instrumentId: s.put.instrument_id || s.put.instrumentId,
-                      symbol: s.put.symbol,
-                      strike: s.put.strike,
-                      optionType: s.put.option_type || s.put.optionType,
-                      expiry: s.put.expiry,
-                      ltp: s.put.ltp || 0,
-                      bid: s.put.bid || 0,
-                      ask: s.put.ask || 0,
-                      iv: s.put.iv || 0,
-                      delta: s.put.delta || 0,
-                      gamma: s.put.gamma || 0,
-                      theta: s.put.theta || 0,
-                      vega: s.put.vega || 0,
-                      rho: s.put.rho || 0,
-                      oi: s.put.oi || 0,
-                      oiChange: s.put.oi_change || s.put.oiChange || 0,
-                      volume: s.put.volume || 0,
-                      feedAgeMs: s.put.feed_age_ms || s.put.feedAgeMs || 0,
-                      provider: s.put.provider || activeProvider,
-                    }
-                  : null,
-              })),
-              expiries: json.data.expiries || [],
-            };
-
-            setChainSnapshot(data);
-            if (!selectedExpiry && data.expiry) {
-              setSelectedExpiry(data.expiry);
+        let res = await fetch(url);
+        let json = res.ok ? await res.json() : null;
+        
+        // Fallback to unified multi-broker options chain if v2 returns empty strikes
+        if (!json || json.status !== "success" || !json.data?.strikes?.length) {
+          const fallbackUrl = `/api/options/chain?underlying=${encodeURIComponent(
+            underlying
+          )}&strike_count=${strikeLimit}${
+            selectedExpiry ? `&expiry=${encodeURIComponent(selectedExpiry)}` : ""
+          }`;
+          const fRes = await fetch(fallbackUrl);
+          if (fRes.ok) {
+            const fJson = await fRes.json();
+            if (fJson.status === "success" || Array.isArray(fJson.strikes)) {
+              json = { status: "success", data: fJson.data || fJson };
             }
+          }
+        }
+
+        if (json && json.status === "success" && json.data && isMounted) {
+          const d = json.data;
+          const data: OptionChainSnapshot = {
+            underlying: d.underlying || underlying,
+            spotPrice: d.spot_price ?? d.spotPrice ?? d.spot ?? 0,
+            expiry: d.expiry || d.selected_expiry || d.selectedExpiry || "",
+            timestamp: d.timestamp || new Date().toISOString(),
+            pcrOi: d.pcr_oi ?? d.pcrOi ?? d.pcr ?? 1.0,
+            pcrVolume: d.pcr_volume ?? d.pcrVolume ?? 1.0,
+            atmStrike: d.atm_strike ?? d.atmStrike ?? 0,
+            atmIv: d.atm_iv ?? d.atmIv ?? 0,
+            maxPain: d.max_pain ?? d.maxPain ?? 0,
+            totalCallOi: d.total_call_oi ?? d.totalCallOi ?? d.totalCallOI ?? 0,
+            totalPutOi: d.total_put_oi ?? d.totalPutOi ?? d.totalPutOI ?? 0,
+            strikes: (d.strikes || []).map((s: any) => ({
+              strike: s.strike ?? s.strike_price ?? s.strikePrice ?? 0,
+              call: s.call
+                ? {
+                    instrumentId: s.call.instrument_id || s.call.instrumentId || `${underlying}-${s.strike}-CE`,
+                    symbol: s.call.symbol || `${underlying} ${s.strike} CE`,
+                    strike: s.call.strike ?? s.strike ?? s.strike_price ?? 0,
+                    optionType: s.call.option_type || s.call.optionType || "CE",
+                    expiry: s.call.expiry || d.selected_expiry || "",
+                    ltp: s.call.ltp ?? s.call.last_price ?? 0,
+                    bid: s.call.bid ?? 0,
+                    ask: s.call.ask ?? 0,
+                    iv: s.call.iv ?? (s.call.greeks?.iv || 0),
+                    delta: s.call.delta ?? (s.call.greeks?.delta || 0),
+                    gamma: s.call.gamma ?? (s.call.greeks?.gamma || 0),
+                    theta: s.call.theta ?? (s.call.greeks?.theta || 0),
+                    vega: s.call.vega ?? (s.call.greeks?.vega || 0),
+                    rho: s.call.rho ?? (s.call.greeks?.rho || 0),
+                    oi: s.call.oi ?? s.call.open_interest ?? 0,
+                    oiChange: s.call.oi_change ?? s.call.oiChange ?? 0,
+                    volume: s.call.volume ?? 0,
+                    feedAgeMs: s.call.feed_age_ms ?? s.call.feedAgeMs ?? 0,
+                    provider: s.call.provider || d.provider || activeProvider,
+                  }
+                : null,
+              put: s.put
+                ? {
+                    instrumentId: s.put.instrument_id || s.put.instrumentId || `${underlying}-${s.strike}-PE`,
+                    symbol: s.put.symbol || `${underlying} ${s.strike} PE`,
+                    strike: s.put.strike ?? s.strike ?? s.strike_price ?? 0,
+                    optionType: s.put.option_type || s.put.optionType || "PE",
+                    expiry: s.put.expiry || d.selected_expiry || "",
+                    ltp: s.put.ltp ?? s.put.last_price ?? 0,
+                    bid: s.put.bid ?? 0,
+                    ask: s.put.ask ?? 0,
+                    iv: s.put.iv ?? (s.put.greeks?.iv || 0),
+                    delta: s.put.delta ?? (s.put.greeks?.delta || 0),
+                    gamma: s.put.gamma ?? (s.put.greeks?.gamma || 0),
+                    theta: s.put.theta ?? (s.put.greeks?.theta || 0),
+                    vega: s.put.vega ?? (s.put.greeks?.vega || 0),
+                    rho: s.put.rho ?? (s.put.greeks?.rho || 0),
+                    oi: s.put.oi ?? s.put.open_interest ?? 0,
+                    oiChange: s.put.oi_change ?? s.put.oiChange ?? 0,
+                    volume: s.put.volume ?? 0,
+                    feedAgeMs: s.put.feed_age_ms ?? s.put.feedAgeMs ?? 0,
+                    provider: s.put.provider || d.provider || activeProvider,
+                  }
+                : null,
+            })),
+            expiries: d.expiries || d.available_expiries || d.availableExpiries || [],
+          };
+
+          setChainSnapshot(data);
+          if (!selectedExpiry && data.expiry) {
+            setSelectedExpiry(data.expiry);
           }
         }
       } catch (err) {

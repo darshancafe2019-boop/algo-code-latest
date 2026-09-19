@@ -40,6 +40,8 @@ frontend/out/
 .vercel/
 
 # OS and IDE files
+*.tsbuildinfo
+tsconfig.tsbuildinfo
 .DS_Store
 */.DS_Store
 */**/.DS_Store

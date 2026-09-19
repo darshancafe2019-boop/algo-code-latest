@@ -18,6 +18,8 @@ Standardized JSON endpoints serving normalized domain data across:
 from __future__ import annotations
 
 import logging
+import uuid
+from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
 
 from src.data_core.models import (
@@ -91,6 +93,25 @@ def get_option_chain():
         expiry=expiry,
         strike_limit=limit,
     )
+    if not snapshot.strikes:
+        try:
+            from src.market_data.options_engine import global_options_engine
+            clean_und = underlying.upper().strip()
+            snap = global_options_engine.get_option_chain(
+                underlying=clean_und,
+                spot_price=0.0,
+                expiry=expiry,
+                strike_count=limit,
+            )
+            if snap:
+                d = snap.to_dict() if hasattr(snap, "to_dict") else snap
+                return jsonify({
+                    "status": "success",
+                    "data": d,
+                })
+        except Exception as e:
+            logger.warning(f"Fallback to global_options_engine failed: {e}")
+
     return jsonify({
         "status": "success",
         "data": snapshot.to_dict(),
@@ -763,7 +784,9 @@ def get_bot_spec(bot_id: str):
 @data_core_bp.route("/bots/<bot_id>/orderbook", methods=["GET"])
 def get_bot_orderbook(bot_id: str):
     """Returns top liquidity, walls, depth imbalance, and large trades."""
-    analytics = quant_data_core.bots.get_orderbook_analytics(bot_id)
+    underlying = request.args.get("underlying")
+    provider = request.args.get("provider")
+    analytics = quant_data_core.bots.get_orderbook_analytics(bot_id, underlying=underlying, provider=provider)
     return jsonify({
         "status": "success",
         "botId": bot_id,
@@ -775,7 +798,9 @@ def get_bot_orderbook(bot_id: str):
 def get_bot_stream_preview(bot_id: str):
     """Returns real-time bounded market data event stream preview."""
     limit = min(100, int(request.args.get("limit", 50)))
-    events = quant_data_core.bots.get_stream_preview(bot_id, limit)
+    underlying = request.args.get("underlying")
+    provider = request.args.get("provider")
+    events = quant_data_core.bots.get_stream_preview(bot_id, limit, underlying=underlying, provider=provider)
     return jsonify({
         "status": "success",
         "botId": bot_id,

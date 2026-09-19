@@ -149,7 +149,7 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
   appendStreamEvent: (event) => {
     if (get().isStreamPaused) return;
     set((state) => ({
-      streamEvents: [event, ...state.streamEvents].slice(0, 3000),
+      streamEvents: [event, ...state.streamEvents].slice(0, 120),
     }));
   },
 
@@ -394,7 +394,7 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
 
       const mergedStreamEvents = state.isStreamPaused
         ? state.streamEvents
-        : [...newEvents, ...state.streamEvents].slice(0, 3000);
+        : [...newEvents, ...state.streamEvents].slice(0, 120);
 
       return {
         quotesBySymbol: updatedQuotes,
@@ -442,7 +442,8 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
           nextStatus = "STALE";
         }
 
-        if (q.ageMs !== ageMs || q.isStale !== isStale || q.status !== nextStatus) {
+        // Only trigger store mutations when status/staleness actually changes state
+        if (q.isStale !== isStale || q.status !== nextStatus) {
           hasChanges = true;
           updated[key] = {
             ...q,
@@ -527,11 +528,11 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
   },
 }));
 
-// Setup periodic client-side freshness invalidation timer
+// Setup periodic client-side freshness invalidation timer (throttled to 3s)
 if (typeof window !== "undefined") {
   setInterval(() => {
     useMarketFeedStore.getState().recalculateFreshness();
-  }, 1000);
+  }, 3000);
 }
 
 // ─── Selector Hooks ──────────────────────────────────────────────────────────

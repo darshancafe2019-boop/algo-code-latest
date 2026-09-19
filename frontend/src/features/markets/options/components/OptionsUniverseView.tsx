@@ -169,8 +169,10 @@ export function OptionsUniverseView({
       }
       return res.data.data || res.data;
     },
-    staleTime: 4000,
-    refetchInterval: () => (apiClient.isOffline() ? false : 5000),
+    enabled: activeTab === "STRATEGIES" || activeTab === "CHAIN",
+    staleTime: 6000,
+    placeholderData: (prev) => prev,
+    refetchInterval: () => (apiClient.isOffline() || activeTab !== "STRATEGIES" ? false : 6000),
     retry: 1,
   });
 

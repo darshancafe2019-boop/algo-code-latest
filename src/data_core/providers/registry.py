@@ -39,6 +39,113 @@ from src.data_core.events.bus import global_event_bus
 logger = logging.getLogger("ProviderRegistry")
 
 
+# Canonical Provider Alias Dictionary
+PROVIDER_ALIASES: Dict[str, str] = {
+    # Delta Exchange India
+    "DELTA": "DELTA",
+    "DELTA_INDIA": "DELTA",
+    "DELTA_EXCHANGE": "DELTA",
+    "DELTA_EXCHANGE_INDIA": "DELTA",
+    "DELTA EXCHANGE INDIA": "DELTA",
+    "DELTA EXCHANGE": "DELTA",
+    "DELTA EXCHANGE INDIA OFFICIAL API": "DELTA",
+    "DELTA EXCHANGE INDIA API": "DELTA",
+    "DELTA INDIA": "DELTA",
+    "DELTA_API": "DELTA",
+    # DhanHQ
+    "DHAN": "DHAN",
+    "DHANHQ": "DHAN",
+    "DHAN_V2": "DHAN",
+    "DHANHQ V2": "DHAN",
+    "DHANHQ_V2": "DHAN",
+    "DHAN V2": "DHAN",
+    "DHANHQ V2 OFFICIAL API": "DHAN",
+    "DHAN OFFICIAL API": "DHAN",
+    # Upstox
+    "UPSTOX": "UPSTOX",
+    "UPSTOX_V3": "UPSTOX",
+    "UPSTOX V3": "UPSTOX",
+    "UPSTOX V3 MARKET DATA & ORDERS": "UPSTOX",
+    "UPSTOX V3 MARKET FEED & TRADING": "UPSTOX",
+    "UPSTOX V3 API": "UPSTOX",
+    # Binance USD-M
+    "BINANCE": "BINANCE_USDM",
+    "BINANCE_USDM": "BINANCE_USDM",
+    "BINANCE USD-M": "BINANCE_USDM",
+    "BINANCE USD-M FUTURES": "BINANCE_USDM",
+    "BINANCE USDM": "BINANCE_USDM",
+    "BINANCE_FUTURES": "BINANCE_USDM",
+    # Binance COIN-M
+    "BINANCE_COINM": "BINANCE_COINM",
+    "BINANCE COIN-M": "BINANCE_COINM",
+    "BINANCE COIN-M FUTURES": "BINANCE_COINM",
+    "BINANCE COINM": "BINANCE_COINM",
+    "BINANCE_DELIVERY": "BINANCE_COINM",
+    # Fyers
+    "FYERS": "FYERS",
+    "FYERS_V3": "FYERS",
+    "FYERS API V3": "FYERS",
+    "FYERS V3": "FYERS",
+    # Zerodha
+    "ZERODHA": "ZERODHA",
+    "KITE": "ZERODHA",
+    "ZERODHA KITE CONNECT": "ZERODHA",
+    "ZERODHA KITE": "ZERODHA",
+    # Angel One
+    "ANGELONE": "ANGELONE",
+    "ANGEL_ONE": "ANGELONE",
+    "ANGEL ONE": "ANGELONE",
+    "ANGEL ONE SMARTAPI": "ANGELONE",
+    "SMARTAPI": "ANGELONE",
+    # Exness
+    "EXNESS": "EXNESS",
+    "EXNESS MULTI-ASSET": "EXNESS",
+    # Paper Simulator
+    "PAPER": "PAPER",
+    "PAPER_SIMULATOR": "PAPER",
+    "QUANT.OS PAPER SIMULATOR": "PAPER",
+    "QUANT_OS_PAPER_SIMULATOR": "PAPER",
+    "SIMULATOR": "PAPER",
+}
+
+
+def normalize_provider_id(provider_id: Optional[str]) -> str:
+    """Normalizes any provider string, display name, or alias to canonical uppercase key."""
+    if not provider_id:
+        return "PAPER"
+    clean = str(provider_id).strip().upper()
+    if clean in PROVIDER_ALIASES:
+        return PROVIDER_ALIASES[clean]
+    # Replace separators with underscore
+    normalized = "".join(c if c.isalnum() else "_" for c in clean).strip("_")
+    while "__" in normalized:
+        normalized = normalized.replace("__", "_")
+    if normalized in PROVIDER_ALIASES:
+        return PROVIDER_ALIASES[normalized]
+    # Fuzzy keyword heuristics
+    if "DELTA" in normalized:
+        return "DELTA"
+    if "DHAN" in normalized:
+        return "DHAN"
+    if "UPSTOX" in normalized:
+        return "UPSTOX"
+    if "COINM" in normalized or "COIN_M" in normalized:
+        return "BINANCE_COINM"
+    if "BINANCE" in normalized:
+        return "BINANCE_USDM"
+    if "FYERS" in normalized:
+        return "FYERS"
+    if "ZERODHA" in normalized or "KITE" in normalized:
+        return "ZERODHA"
+    if "ANGEL" in normalized:
+        return "ANGELONE"
+    if "EXNESS" in normalized:
+        return "EXNESS"
+    if "PAPER" in normalized or "SIMULAT" in normalized:
+        return "PAPER"
+    return clean
+
+
 class ProviderRegistry:
     """Thread-safe catalog of external brokers and data providers."""
 
@@ -61,6 +168,7 @@ class ProviderRegistry:
             environment=Environment.LIVE if os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true" else Environment.PAPER,
             status=ProviderStatus.CONNECTED if dhan_auth else ProviderStatus.AUTH_REQUIRED,
             status_message="Credentials configured" if dhan_auth else "API Token required in .env",
+            market_data_connected=True,
         )
 
         # 2. UPSTOX
@@ -75,6 +183,7 @@ class ProviderRegistry:
             environment=Environment.LIVE if os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true" else Environment.PAPER,
             status=ProviderStatus.CONNECTED if upstox_auth else ProviderStatus.AUTH_REQUIRED,
             status_message="V3 Feed Token active" if upstox_auth else "Access token required",
+            market_data_connected=True,
         )
 
         # 3. DELTA EXCHANGE INDIA
@@ -88,7 +197,8 @@ class ProviderRegistry:
             authenticated=delta_auth,
             environment=Environment.LIVE if os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "true" else Environment.PAPER,
             status=ProviderStatus.CONNECTED if delta_auth else ProviderStatus.AUTH_REQUIRED,
-            status_message="Delta India API configured" if delta_auth else "API Key/Secret required",
+            status_message="Delta India API configured" if delta_auth else "Public Market Data Available; API Key/Secret required for Live Orders",
+            market_data_connected=True,
         )
 
         # 4. BINANCE USD-M
@@ -101,6 +211,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.RECEIVING,
             status_message="Public WebSocket stream operational",
+            market_data_connected=True,
         )
 
         # 5. BINANCE COIN-M
@@ -112,6 +223,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.RECEIVING,
             status_message="Public Inverse stream operational",
+            market_data_connected=True,
         )
 
         # 6. FYERS
@@ -124,6 +236,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.AUTH_REQUIRED if not fyers_app_id else ProviderStatus.CONNECTED,
             status_message="App ID configured" if fyers_app_id else "Auth required",
+            market_data_connected=bool(fyers_app_id),
         )
 
         # 7. ZERODHA
@@ -136,6 +249,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.AUTH_REQUIRED if not kite_key else ProviderStatus.CONNECTED,
             status_message="Kite Connect configured" if kite_key else "Auth required",
+            market_data_connected=bool(kite_key),
         )
 
         # 8. ANGEL ONE
@@ -148,6 +262,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.AUTH_REQUIRED if not angel_key else ProviderStatus.CONNECTED,
             status_message="SmartAPI configured" if angel_key else "Auth required",
+            market_data_connected=bool(angel_key),
         )
 
         # 9. EXNESS
@@ -159,6 +274,7 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.CONNECTED,
             status_message="FX Feed operational",
+            market_data_connected=True,
         )
 
         # 10. PAPER SIMULATOR
@@ -170,12 +286,13 @@ class ProviderRegistry:
             environment=Environment.PAPER,
             status=ProviderStatus.LIVE,
             status_message="Deterministic Virtual Ledger Operational",
+            market_data_connected=True,
         )
 
     def record_market_packet(self, provider_id: str, latency_ms: float = 0.0) -> None:
         """Records an incoming market data tick or quote packet."""
         with self._lock:
-            prov = self._providers.get(provider_id)
+            prov = self.get_provider(provider_id)
             if not prov:
                 return
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -188,7 +305,7 @@ class ProviderRegistry:
     def record_account_update(self, provider_id: str) -> None:
         """Records an authoritative balance or margin update."""
         with self._lock:
-            prov = self._providers.get(provider_id)
+            prov = self.get_provider(provider_id)
             if not prov:
                 return
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -198,7 +315,7 @@ class ProviderRegistry:
     def record_order_update(self, provider_id: str) -> None:
         """Records an authoritative order fill or state change."""
         with self._lock:
-            prov = self._providers.get(provider_id)
+            prov = self.get_provider(provider_id)
             if not prov:
                 return
             now_iso = datetime.now(timezone.utc).isoformat()
@@ -208,28 +325,56 @@ class ProviderRegistry:
     def record_error(self, provider_id: str, message: str) -> None:
         """Records a provider error with diagnostic event emission."""
         with self._lock:
-            prov = self._providers.get(provider_id)
+            prov = self.get_provider(provider_id)
             if not prov:
                 return
             prov.errors_count += 1
             prov.status_message = message
+            canonical_id = prov.provider_id
 
         global_event_bus.publish(
             NormalizedEvent(
                 event_type=EventType.PROVIDER_ERROR,
                 domain=EventDomain.SYSTEM,
-                provider=provider_id,
+                provider=canonical_id,
                 payload={"error": message, "errorsCount": prov.errors_count},
             )
         )
 
-    def get_provider(self, provider_id: str) -> Optional[ProviderInfo]:
-        """Retrieves provider info by ID."""
+    def get_provider(self, provider_id: Optional[str]) -> Optional[ProviderInfo]:
+        """Retrieves provider info by ID, key, alias, or display name."""
+        if not provider_id:
+            return None
         with self._lock:
-            return self._providers.get(provider_id)
+            # 1. Exact key match
+            if provider_id in self._providers:
+                return self._providers[provider_id]
+
+            # 2. Normalized provider key match
+            norm_id = normalize_provider_id(provider_id)
+            if norm_id in self._providers:
+                return self._providers[norm_id]
+
+            # 3. Uppercase string match
+            upper_id = provider_id.strip().upper()
+            if upper_id in self._providers:
+                return self._providers[upper_id]
+
+            # 4. Display name exact match
+            clean_str = provider_id.strip().lower()
+            for p in self._providers.values():
+                if p.name.lower() == clean_str:
+                    return p
+
+            # 5. Partial name substring match
+            for p in self._providers.values():
+                if clean_str in p.name.lower() or p.name.lower() in clean_str:
+                    return p
+
+            return None
 
     def get_all_providers(self) -> List[ProviderInfo]:
-        """Returns all registered providers."""
+        """Returns all registered canonical providers."""
         with self._lock:
             return list(self._providers.values())
 

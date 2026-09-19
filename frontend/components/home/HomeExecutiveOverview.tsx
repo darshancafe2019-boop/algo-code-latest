@@ -266,9 +266,13 @@ export function HomeExecutiveOverview() {
           isLive: !liveQuote.is_stale,
         };
       }
+      const rawPct = mover.pct !== undefined ? mover.pct : 0;
+      const rawChg = mover.change !== undefined ? Math.abs(mover.change) : (mover.ltp ? Math.abs((rawPct * mover.ltp) / 100) : 0);
       return {
         ...mover,
-        isUp: (mover.pct || mover.change || 0) >= 0,
+        change: rawChg,
+        pct: rawPct,
+        isUp: rawPct >= 0,
         isLive: mover.status === "LIVE",
       };
     });
@@ -585,7 +589,7 @@ export function HomeExecutiveOverview() {
                           {formatCurrency(mover.ltp, "₹", 2)}
                         </td>
                         <td className={cn("text-right tabular-nums font-medium", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-                          {mover.isUp ? "+" : ""}{formatDecimal(mover.change, 2)}
+                          {mover.isUp ? "+" : "-"}{formatDecimal(mover.change, 2)}
                         </td>
                         <td className={cn("text-right tabular-nums font-semibold", mover.isUp ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
                           {formatPercent(mover.pct, 2, "—", false, true)}

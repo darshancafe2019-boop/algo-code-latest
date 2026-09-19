@@ -61,7 +61,8 @@ export function GlobalHealthBar() {
       if (!res.ok || !res.data) return null;
       return res.data;
     },
-    refetchInterval: 3000,
+    refetchInterval: 12000,
+    staleTime: 6000,
     placeholderData: (prev) => prev,
   });
 
@@ -72,7 +73,8 @@ export function GlobalHealthBar() {
       if (!res.ok || !res.data) return null;
       return res.data;
     },
-    refetchInterval: 4000,
+    refetchInterval: 15000,
+    staleTime: 8000,
     placeholderData: (prev) => prev,
   });
 
@@ -83,7 +85,8 @@ export function GlobalHealthBar() {
       if (!res.ok || !res.data) return null;
       return res.data?.brokers || null;
     },
-    refetchInterval: 5000,
+    refetchInterval: 15000,
+    staleTime: 8000,
     placeholderData: (prev) => prev,
   });
 

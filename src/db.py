@@ -185,17 +185,31 @@ def get_pg_connection():
     raise RuntimeError("PostgreSQL disabled/unavailable")
 
 
+_sqlite_pragmas_applied = False
+_sqlite_pragmas_lock = threading.Lock()
+
+
 def get_connection() -> sqlite3.Connection:
     """
     Create and return an optimized SQLite connection with 30s timeout and busy_timeout=30000ms.
-    Does NOT change journal_mode on every connect to avoid exclusive lock contention.
+    Applies high-throughput WAL mode, normal synchronous write, memory temp store, 64MB cache, and 256MB mmap.
     """
+    global _sqlite_pragmas_applied
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA busy_timeout=30000;")
         conn.execute("PRAGMA foreign_keys=ON;")
+        conn.execute("PRAGMA synchronous=NORMAL;")
+        conn.execute("PRAGMA temp_store=MEMORY;")
+        conn.execute("PRAGMA cache_size=-64000;")
+        conn.execute("PRAGMA mmap_size=268435456;")
+        if not _sqlite_pragmas_applied:
+            with _sqlite_pragmas_lock:
+                if not _sqlite_pragmas_applied:
+                    conn.execute("PRAGMA journal_mode=WAL;")
+                    _sqlite_pragmas_applied = True
     except Exception:
         pass
     return conn

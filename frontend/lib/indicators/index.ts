@@ -29,6 +29,7 @@ export { KeltnerChannels } from "./volatility/keltner";
 export { StandardDeviation } from "./volatility/standard-deviation";
 
 export { VolumeIndicator } from "./volume/volume";
+export { VolumeStarIndicator } from "./volume/volume-star";
 export { OBV } from "./volume/obv";
 export { MFI } from "./volume/mfi";
 export { CVD } from "./volume/cvd";

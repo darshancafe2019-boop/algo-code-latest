@@ -56,8 +56,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data || { status: "success", data: [], summary: { totalProviders: 0, connectedProviders: 0, liveFeeds: 0, averageLatencyMs: 0, healthy: false } };
     },
-    refetchInterval: isDataDrawerOpen ? 6000 : 30000,
-    staleTime: 10000,
+    refetchInterval: isDataDrawerOpen ? 10000 : false,
+    staleTime: isDataDrawerOpen ? 10000 : 60000,
   });
 
   // 2. Segregated Broker Accounts Query
@@ -69,8 +69,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || [];
     },
-    refetchInterval: isDataDrawerOpen ? 6000 : 30000,
-    staleTime: 10000,
+    refetchInterval: isDataDrawerOpen ? 10000 : false,
+    staleTime: isDataDrawerOpen ? 10000 : 60000,
   });
 
   // 3. Currency-Aware Portfolio Summary Query
@@ -82,8 +82,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || null;
     },
-    refetchInterval: isDataDrawerOpen ? 5000 : 25000,
-    staleTime: 8000,
+    refetchInterval: isDataDrawerOpen ? 8000 : false,
+    staleTime: isDataDrawerOpen ? 8000 : 60000,
   });
 
   // 4. Marked-to-Market Positions Query
@@ -95,8 +95,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || [];
     },
-    refetchInterval: isDataDrawerOpen ? 5000 : 25000,
-    staleTime: 8000,
+    refetchInterval: isDataDrawerOpen ? 8000 : false,
+    staleTime: isDataDrawerOpen ? 8000 : 60000,
   });
 
   // 5. Authoritative Centralized OMS Orders Query
@@ -108,8 +108,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || [];
     },
-    refetchInterval: isDataDrawerOpen ? 6000 : 30000,
-    staleTime: 10000,
+    refetchInterval: isDataDrawerOpen ? 10000 : false,
+    staleTime: isDataDrawerOpen ? 10000 : 60000,
   });
 
   // 6. Append-Only Capital Ledger Query
@@ -121,8 +121,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || [];
     },
-    refetchInterval: isDataDrawerOpen ? 10000 : 45000,
-    staleTime: 15000,
+    refetchInterval: isDataDrawerOpen ? 15000 : false,
+    staleTime: isDataDrawerOpen ? 15000 : 90000,
   });
 
   // 7. Continuous Reconciliation Report Query
@@ -134,8 +134,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || null;
     },
-    refetchInterval: isDataDrawerOpen ? 10000 : 45000,
-    staleTime: 15000,
+    refetchInterval: isDataDrawerOpen ? 15000 : false,
+    staleTime: isDataDrawerOpen ? 15000 : 90000,
   });
 
   // 8. Global System Health
@@ -147,8 +147,8 @@ export function QuantDataCoreProvider({ children }: { children: React.ReactNode 
       );
       return res.data?.data || null;
     },
-    refetchInterval: isDataDrawerOpen ? 6000 : 30000,
-    staleTime: 10000,
+    refetchInterval: isDataDrawerOpen ? 10000 : false,
+    staleTime: isDataDrawerOpen ? 10000 : 60000,
   });
 
   const refreshAll = useCallback(async () => {

@@ -54,8 +54,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: isAuthenticated,
-    staleTime: 10000,
-    refetchInterval: isAuthenticated ? 20000 : false,
+    staleTime: 30000,
+    refetchInterval: isAuthenticated ? 45000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -73,8 +73,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 10000,
-    refetchInterval: isAuthenticated ? 20000 : false,
+    staleTime: 25000,
+    refetchInterval: isAuthenticated ? 40000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -92,8 +92,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 10000,
-    refetchInterval: isAuthenticated ? 25000 : false,
+    staleTime: 30000,
+    refetchInterval: isAuthenticated ? 45000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -111,8 +111,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 30000,
-    refetchInterval: isAuthenticated ? 60000 : false,
+    staleTime: 60000,
+    refetchInterval: isAuthenticated ? 90000 : false,
     placeholderData: (prev) => prev,
   });
 
@@ -130,8 +130,8 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
       return res.data.risk;
     },
     enabled: Boolean(isAuthenticated),
-    staleTime: 10000,
-    refetchInterval: isAuthenticated ? 25000 : false,
+    staleTime: 30000,
+    refetchInterval: isAuthenticated ? 45000 : false,
     placeholderData: (prev) => prev,
   });
 

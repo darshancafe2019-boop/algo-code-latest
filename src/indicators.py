@@ -82,6 +82,12 @@ INDICATOR_REGISTRY: Dict[str, Dict[str, Any]] = {
         "signal_mode": "both", "min_confirmations": 1, "priority": 12,
         "parameters": {"lookback_days": 14, "bin_size": 50.0, "value_area_pct": 70.0}
     },
+    "volume_star": {
+        "id": "volume_star", "name": "Volume Star (FRVP + LVN)", "category": "Volume", "enabled": True, "favorite": True,
+        "timeframe": "5m", "weight": 20.0, "long_enabled": True, "short_enabled": True,
+        "signal_mode": "both", "min_confirmations": 2, "priority": 12.5,
+        "parameters": {"frvp_row_size": 50, "value_area_pct": 70.0, "lookback_bars": 50, "rejection_wick_pct": 0.25}
+    },
 
     # --- MOMENTUM ---
     "macd": {

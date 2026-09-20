@@ -74,7 +74,8 @@ export function OptionsContractSelectorModal({
       if (!res.ok) return null;
       return res.json();
     },
-    staleTime: 30000,
+    enabled: isOpen,
+    staleTime: 60000,
   });
 
   // Fetch Delta Expiries
@@ -85,8 +86,8 @@ export function OptionsContractSelectorModal({
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: provider === "DELTA",
-    staleTime: 30000,
+    enabled: isOpen && provider === "DELTA",
+    staleTime: 60000,
   });
 
   // Fetch Delta Live Option Chain
@@ -99,9 +100,9 @@ export function OptionsContractSelectorModal({
       if (!res.ok) return null;
       return res.json();
     },
-    enabled: provider === "DELTA",
-    staleTime: 5000,
-    refetchInterval: 10000,
+    enabled: isOpen && provider === "DELTA",
+    staleTime: 10000,
+    refetchInterval: isOpen ? 15000 : false,
   });
 
   // Check Provider Connection Readiness
@@ -111,7 +112,8 @@ export function OptionsContractSelectorModal({
       const res = await fetch("/api/binance/status");
       return res.ok ? res.json() : null;
     },
-    staleTime: 10000,
+    enabled: isOpen,
+    staleTime: 30000,
   });
 
   const { data: upstoxStatus } = useQuery({

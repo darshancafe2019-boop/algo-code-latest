@@ -527,6 +527,27 @@ UNIVERSAL_INDICATOR_SCHEMAS: Dict[str, Dict[str, Any]] = {
         "validation_rules": {"period": {"min": 2, "max": 100}}
     },
 
+    "volume_star": {
+        "indicator_id": "volume_star",
+        "name": "Volume Star (FRVP + Market Structure + LVN)",
+        "category": "Volume",
+        "version": "1.0.0",
+        "description": "Market structure trend analysis with Fixed Range Volume Profile (FRVP) and Low Volume Node (LVN) wick rejection signals.",
+        "default_timeframe": "5m",
+        "default_weight": 20.0,
+        "default_parameters": {"frvp_row_size": 50, "value_area_pct": 70.0, "lookback_bars": 50, "rejection_wick_pct": 0.25, "trend_confirm_bars": 2},
+        "default_display": {"color": "#f59e0b", "line_width": 2, "line_style": "solid", "panel": "overlay", "show_on_chart": True},
+        "default_signal": {"long_enabled": True, "short_enabled": True, "signal_mode": "both", "min_confirmations": 2},
+        "parameter_schema": [
+            {"name": "frvp_row_size", "label": "FRVP Row Size (Bins)", "type": "integer", "default": 50, "minimum": 10, "maximum": 200, "step": 5, "tab": "inputs", "description": "Number of price distribution bins for Volume Profile."},
+            {"name": "value_area_pct", "label": "Value Area Volume (%)", "type": "number", "default": 70.0, "minimum": 50.0, "maximum": 95.0, "step": 1.0, "tab": "inputs", "description": "Percentage of total volume enclosing the Value Area (VAH/VAL)."},
+            {"name": "lookback_bars", "label": "Profile Lookback (Bars)", "type": "integer", "default": 50, "minimum": 15, "maximum": 300, "step": 5, "tab": "inputs", "description": "Number of historical candles analyzed for Market Structure & FRVP."},
+            {"name": "rejection_wick_pct", "label": "Min Rejection Wick Ratio", "type": "number", "default": 0.25, "minimum": 0.05, "maximum": 0.8, "step": 0.05, "tab": "inputs", "description": "Minimum wick length as percentage of candle range to confirm LVN rejection."},
+            {"name": "trend_confirm_bars", "label": "Trend Confirmations", "type": "integer", "default": 2, "minimum": 1, "maximum": 5, "step": 1, "tab": "inputs", "description": "Minimum confirmed higher highs/lows or lower highs/lows."}
+        ],
+        "validation_rules": {"frvp_row_size": {"min": 10, "max": 200}, "lookback_bars": {"min": 15, "max": 300}}
+    },
+
     # =========================================================================
     # 5. PRICE & MARKET STRUCTURE INDICATORS
     # =========================================================================

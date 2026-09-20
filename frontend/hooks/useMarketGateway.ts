@@ -90,7 +90,7 @@ export function useMarketGateway(
 /**
  * useMultiMarketGateway
  * =====================
- * Subscribe to multiple symbols at once.
+ * Subscribe to multiple symbols at once with isolated symbol listeners.
  *
  * @example
  *   const quotes = useMultiMarketGateway(["BTC/USDT", "ETH/USDT"], "WATCHLIST");
@@ -99,7 +99,18 @@ export function useMultiMarketGateway(
   symbols: string[],
   reason: SubscriptionReason = "WATCHLIST"
 ): Map<string, NormalizedQuote> {
-  const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
+  const { subscribe, unsubscribe, getQuote, subscribeSymbolQuote } = useMarketGatewayContext();
+
+  const [multiQuotes, setMultiQuotes] = useState<Map<string, NormalizedQuote>>(() => {
+    const initial = new Map<string, NormalizedQuote>();
+    if (getQuote) {
+      symbols.forEach((sym) => {
+        const q = getQuote(sym.toUpperCase());
+        if (q) initial.set(sym.toUpperCase(), q);
+      });
+    }
+    return initial;
+  });
 
   const symbolsKey = useMemo(() => {
     return symbols.map((s) => s.toUpperCase()).sort().join(",");
@@ -107,17 +118,27 @@ export function useMultiMarketGateway(
 
   useEffect(() => {
     symbols.forEach((sym) => subscribe(sym.toUpperCase(), reason));
+    const unsubs: Array<() => void> = [];
+
+    if (subscribeSymbolQuote) {
+      symbols.forEach((sym) => {
+        const u = sym.toUpperCase();
+        const unsub = subscribeSymbolQuote(u, (newQuote) => {
+          setMultiQuotes((prev) => {
+            const next = new Map(prev);
+            next.set(u, newQuote);
+            return next;
+          });
+        });
+        unsubs.push(unsub);
+      });
+    }
+
     return () => {
       symbols.forEach((sym) => unsubscribe(sym.toUpperCase(), reason));
+      unsubs.forEach((fn) => fn());
     };
-  }, [symbolsKey, reason, subscribe, unsubscribe, symbols]);
+  }, [symbolsKey, reason, subscribe, unsubscribe, subscribeSymbolQuote, symbols]);
 
-  return useMemo(() => {
-    const result = new Map<string, NormalizedQuote>();
-    symbols.forEach((sym) => {
-      const q = quotes.get(sym.toUpperCase());
-      if (q) result.set(sym.toUpperCase(), q);
-    });
-    return result;
-  }, [quotes, symbols]);
+  return multiQuotes;
 }

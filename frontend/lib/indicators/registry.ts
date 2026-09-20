@@ -34,6 +34,7 @@ import { StandardDeviation } from "./volatility/standard-deviation";
 
 // Volume Indicators
 import { VolumeIndicator } from "./volume/volume";
+import { VolumeStarIndicator } from "./volume/volume-star";
 import { OBV } from "./volume/obv";
 import { MFI } from "./volume/mfi";
 import { CVD } from "./volume/cvd";
@@ -77,6 +78,7 @@ export class IndicatorRegistry {
     this.register(StandardDeviation);
 
     this.register(VolumeIndicator);
+    this.register(VolumeStarIndicator);
     this.register(OBV);
     this.register(MFI);
     this.register(CVD);

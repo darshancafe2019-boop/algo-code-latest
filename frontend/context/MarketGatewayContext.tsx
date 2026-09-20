@@ -185,10 +185,7 @@ export function MarketGatewayProvider({
 }) {
   const { isAuthenticated } = useAuth();
 
-  const [quotes, setQuotes] =
-    useState<Map<string, NormalizedQuote>>(
-      new Map()
-    );
+
 
   const [
     connectionStatus,
@@ -799,85 +796,7 @@ export function MarketGatewayProvider({
               }
             );
 
-            // ─────────────────────────────────────────────────────────────
-            // Batched React state updates
-            // ─────────────────────────────────────────────────────────────
 
-            const scheduleBatchCommit =
-              () => {
-                if (
-                  batchFrameRef.current !==
-                  null
-                ) {
-                  return;
-                }
-
-                batchFrameRef.current =
-                  requestAnimationFrame(
-                    () => {
-                      batchFrameRef.current =
-                        null;
-
-                      if (
-                        !mountedRef.current ||
-                        pendingQuotesRef
-                          .current
-                          .size ===
-                        0
-                      ) {
-                        return;
-                      }
-
-                      const now =
-                        Date.now();
-
-                      if (
-                        now -
-                        lastQuotesStateUpdateRef.current <
-                        200
-                      ) {
-                        scheduleBatchCommit();
-                        return;
-                      }
-
-                      const updates =
-                        new Map(
-                          pendingQuotesRef.current
-                        );
-
-                      pendingQuotesRef.current.clear();
-
-                      lastQuotesStateUpdateRef.current =
-                        now;
-
-                      setQuotes(
-                        (
-                          prev
-                        ) => {
-                          const next =
-                            new Map(
-                              prev
-                            );
-
-                          updates.forEach(
-                            (
-                              q,
-                              s
-                            ) =>
-                              next.set(
-                                s,
-                                q
-                              )
-                          );
-
-                          return next;
-                        }
-                      );
-                    }
-                  );
-              };
-
-            scheduleBatchCommit();
           }
 
           // ───────────────────────────────────────────────────────────────
@@ -1018,62 +937,7 @@ export function MarketGatewayProvider({
               }
             );
 
-            if (
-              batchFrameRef.current ===
-              null
-            ) {
-              batchFrameRef.current =
-                requestAnimationFrame(
-                  () => {
-                    batchFrameRef.current =
-                      null;
 
-                    if (
-                      !mountedRef.current ||
-                      pendingQuotesRef
-                        .current
-                        .size ===
-                      0
-                    ) {
-                      return;
-                    }
-
-                    const updates =
-                      new Map(
-                        pendingQuotesRef.current
-                      );
-
-                    pendingQuotesRef.current.clear();
-
-                    lastQuotesStateUpdateRef.current =
-                      Date.now();
-
-                    setQuotes(
-                      (
-                        prev
-                      ) => {
-                        const next =
-                          new Map(
-                            prev
-                          );
-
-                        updates.forEach(
-                          (
-                            q,
-                            s
-                          ) =>
-                            next.set(
-                              s,
-                              q
-                            )
-                        );
-
-                        return next;
-                      }
-                    );
-                  }
-                );
-            }
           }
 
           // ───────────────────────────────────────────────────────────────
@@ -1390,149 +1254,147 @@ export function MarketGatewayProvider({
                     NormalizedQuote
                   >;
 
-              setQuotes(
+              Object.entries(
+                incoming
+              ).forEach(
                 (
-                  prev
+                  [
+                    rawSym,
+                    q,
+                  ]
                 ) => {
-                  const next =
-                    new Map(
-                      prev
+                  const sym =
+                    rawSym.toUpperCase();
+
+                  const provider =
+                    (
+                      q.provider ||
+                      "UNKNOWN"
+                    ).toUpperCase();
+
+                  const incomingTs =
+                    new Date(
+                      q.event_timestamp ||
+                      q.received_timestamp
+                    ).getTime();
+
+                  const existing =
+                    quotesRef.current.get(
+                      `${provider}:${sym}`
+                    ) ||
+                    quotesRef.current.get(
+                      sym
                     );
 
-                  Object.entries(
-                    incoming
-                  ).forEach(
-                    (
-                      [
-                        rawSym,
-                        q,
-                      ]
-                    ) => {
-                      const sym =
-                        rawSym.toUpperCase();
+                  if (
+                    existing
+                  ) {
+                    const existingTs =
+                      new Date(
+                        existing.event_timestamp ||
+                        existing.received_timestamp
+                      ).getTime();
 
-                      const provider =
-                        (
-                          q.provider ||
-                          "UNKNOWN"
-                        ).toUpperCase();
-
-                      const incomingTs =
-                        new Date(
-                          q.event_timestamp ||
-                          q.received_timestamp
-                        ).getTime();
-
-                      const existing =
-                        quotesRef.current.get(
-                          `${provider}:${sym}`
-                        ) ||
-                        quotesRef.current.get(
-                          sym
-                        );
-
-                      if (
-                        existing
-                      ) {
-                        const existingTs =
-                          new Date(
-                            existing.event_timestamp ||
-                            existing.received_timestamp
-                          ).getTime();
-
-                        if (
-                          existingTs >
-                          0 &&
-                          incomingTs <
-                          existingTs
-                        ) {
-                          return;
-                        }
-                      }
-
-                      quotesRef.current.set(
-                        `${provider}:${sym}`,
-                        q
-                      );
-
-                      quotesRef.current.set(
-                        sym,
-                        q
-                      );
-
-                      next.set(
-                        `${provider}:${sym}`,
-                        q
-                      );
-
-                      next.set(
-                        sym,
-                        q
-                      );
-
-                      useMarketFeedStore
-                        .getState()
-                        .ingestTick({
-                          symbol:
-                            sym,
-
-                          exchange:
-                            q.exchange,
-
-                          provider:
-                            q.provider,
-
-                          lastPrice:
-                            q.last_price,
-
-                          bid:
-                            q.bid,
-
-                          ask:
-                            q.ask,
-
-                          volume:
-                            q.volume,
-
-                          open:
-                            q.open,
-
-                          high:
-                            q.high,
-
-                          low:
-                            q.low,
-
-                          close:
-                            q.close,
-
-                          changePercent:
-                            q.change_pct ??
-                            0,
-
-                          eventTimestamp:
-                            q.event_timestamp,
-
-                          feedLatencyMs:
-                            q.feed_latency_ms,
-
-                          dataMode:
-                            q.data_mode,
-
-                          isStale:
-                            q.is_stale,
-
-                          ageMs:
-                            (
-                              q.age_seconds ||
-                              0
-                            ) *
-                            1000,
-                        });
+                    if (
+                      existingTs >
+                      0 &&
+                      incomingTs <
+                      existingTs
+                    ) {
+                      return;
                     }
+                  }
+
+                  quotesRef.current.set(
+                    `${provider}:${sym}`,
+                    q
                   );
 
-                  return next;
+                  quotesRef.current.set(
+                    sym,
+                    q
+                  );
+
+                  useMarketFeedStore
+                    .getState()
+                    .ingestTick({
+                      symbol:
+                        sym,
+
+                      exchange:
+                        q.exchange,
+
+                      provider:
+                        q.provider,
+
+                      lastPrice:
+                        q.last_price,
+
+                      bid:
+                        q.bid,
+
+                      ask:
+                        q.ask,
+
+                      volume:
+                        q.volume,
+
+                      open:
+                        q.open,
+
+                      high:
+                        q.high,
+
+                      low:
+                        q.low,
+
+                      close:
+                        q.close,
+
+                      changePercent:
+                        q.change_pct ??
+                        0,
+
+                      eventTimestamp:
+                        q.event_timestamp,
+
+                      feedLatencyMs:
+                        q.feed_latency_ms,
+
+                      dataMode:
+                        q.data_mode,
+
+                      isStale:
+                        q.is_stale,
+
+                      ageMs:
+                        (
+                          q.age_seconds ||
+                          0
+                        ) *
+                        1000,
+                    });
+
+                  const listeners =
+                    symbolListenersRef.current.get(
+                      sym
+                    );
+
+                  if (
+                    listeners &&
+                    listeners.size >
+                    0
+                  ) {
+                    listeners.forEach(
+                      (fn) => {
+                        try {
+                          fn(q);
+                        } catch {
+                          // Ignore listener failure.
+                        }
+                      }
+                    );
+                  }
                 }
               );
             }
@@ -2274,7 +2136,7 @@ export function MarketGatewayProvider({
     MarketGatewayContextValue =
     useMemo(
       () => ({
-        quotes,
+        quotes: quotesRef.current,
 
         subscribe,
 
@@ -2291,7 +2153,6 @@ export function MarketGatewayProvider({
         subscribeSymbolQuote,
       }),
       [
-        quotes,
         subscribe,
         unsubscribe,
         connectionStatus,

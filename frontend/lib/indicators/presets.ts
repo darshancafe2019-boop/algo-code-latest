@@ -75,4 +75,16 @@ export const STANDARD_INDICATOR_PRESETS: IndicatorPreset[] = [
       { id: "obv", timeframe: "15m", parameters: {} },
     ],
   },
+  {
+    id: "preset_volume_star",
+    name: "Volume Star Flow Suite",
+    category: "STRATEGY",
+    description: "Volume Star Market Structure & FRVP combined with VWAP, Volume SMA, and CVD flow.",
+    indicators: [
+      { id: "volume_star", timeframe: "5m", parameters: { frvpRowSize: 50, valueAreaPct: 70, lookbackBars: 50, rejectionWickPct: 0.25 } },
+      { id: "vwap", timeframe: "5m", parameters: {} },
+      { id: "volume", timeframe: "5m", parameters: { smaPeriod: 20 } },
+      { id: "cvd", timeframe: "5m", parameters: {} },
+    ],
+  },
 ];

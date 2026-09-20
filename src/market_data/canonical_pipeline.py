@@ -410,90 +410,161 @@ def resolve_canonical_quote(
     clean_symbol = symbol.strip()
     aliases = resolve_symbol_aliases(clean_symbol)
 
-    # ─── Step 1: Probe Gateway :5051 ─────────────────────────────────────────
-    gw_secret = os.environ.get("MARKET_GATEWAY_SECRET", "").strip()
-    if not gw_secret:
-        # Strict Requirement 7: Fail closed on missing gateway secret; do not use default or log secret.
-        return 500, {
-            "ok": False,
-            "status": "error",
-            "code": "GATEWAY_SECRET_UNCONFIGURED",
-            "symbol": clean_symbol,
-            "message": "MARKET_GATEWAY_SECRET environment variable is missing or unconfigured. Gateway access disabled."
-        }
-
-    port = gateway_port or int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
-    gateway_url = f"http://127.0.0.1:{port}/ltp?symbol={urllib.parse.quote(clean_symbol, safe='')}"
-
-    try:
-        req = urllib.request.Request(
-            gateway_url,
-            headers={
-                "X-Gateway-Secret": gw_secret,
-                "Accept": "application/json",
-            }
-        )
-        with urllib.request.urlopen(req, timeout=timeout_sec) as resp:
-            if resp.status == 200:
-                raw_bytes = resp.read()
-                try:
-                    gw_data = json.loads(raw_bytes.decode("utf-8"))
-                    if gw_data.get("ok") and (gw_data.get("price") or gw_data.get("ltp")):
-                        valid, cq, err = validate_canonical_quote(
-                            gw_data,
-                            symbol=clean_symbol,
-                            default_exchange=gw_data.get("exchange", "UNKNOWN"),
-                            default_provider=gw_data.get("source", "GATEWAY")
-                        )
-                        if valid and cq:
-                            return 200, {
-                                "ok": True,
-                                "status": "success",
-                                "symbol": cq.symbol,
-                                "price": cq.ltp,
-                                "ltp": cq.ltp,
-                                "previous_close": cq.close or cq.open,
-                                "open": cq.open,
-                                "high": cq.high,
-                                "low": cq.low,
-                                "close": cq.close,
-                                "change_pct": cq.change_pct,
-                                "source": cq.provider,
-                                "provider": cq.provider,
-                                "status_display": cq.freshness,
-                                "freshness": cq.freshness,
-                                "timestamp": cq.exchange_timestamp,
-                                "ageMs": cq.age_ms,
-                                "bid": cq.bid,
-                                "ask": cq.ask,
-                                "volume": cq.volume,
-                                "oi": cq.oi,
-                                "data_quality": cq.data_quality,
-                                "is_tradeable": cq.is_tradeable,
-                                "canonical_quote": cq.to_dict()
-                            }
-                except (ValueError, UnicodeDecodeError) as json_err:
-                    logger.debug("Gateway :%d returned invalid JSON for %s: %s", port, clean_symbol, json_err)
-    except urllib.error.HTTPError as http_err:
-        try:
-            err_body = json.loads(http_err.read().decode("utf-8"))
-            if http_err.code in (401, 403):
-                return http_err.code, {
-                    "ok": False,
-                    "status": "error",
-                    "code": "GATEWAY_AUTH_FAILURE",
-                    "symbol": clean_symbol,
-                    "message": "Gateway authentication rejected.",
-                    "details": err_body
-                }
-        except Exception:
-            pass
-    except (urllib.error.URLError, TimeoutError, ConnectionRefusedError, OSError) as net_err:
-        logger.debug("Gateway probe note for %s (%s)", clean_symbol, net_err)
-
-    # ─── Step 2: Probe Central Market Cache ──────────────────────────────────
+    # ─── Step 1 (Fast Path): Probe Central Market Cache In-Memory ─────────────
     from src.market_data.cache_engine import global_market_cache
 
+    for a in aliases:
+        cached = global_market_cache.get_quote(a) or global_market_cache.get(a)
+        if cached:
+            valid, cq, err = validate_canonical_quote(
+                cached,
+                symbol=clean_symbol,
+                default_provider="CENTRAL_CACHE"
+            )
+            if valid and cq and cq.freshness in (STATE_LIVE, STATE_DELAYED):
+                return 200, {
+                    "ok": True,
+                    "status": "success",
+                    "symbol": cq.symbol,
+                    "price": cq.ltp,
+                    "ltp": cq.ltp,
+                    "previous_close": cq.close or cq.open,
+                    "open": cq.open,
+                    "high": cq.high,
+                    "low": cq.low,
+                    "close": cq.close,
+                    "change_pct": cq.change_pct,
+                    "source": cq.provider,
+                    "provider": cq.provider,
+                    "status_display": cq.freshness,
+                    "freshness": cq.freshness,
+                    "timestamp": cq.exchange_timestamp,
+                    "ageMs": cq.age_ms,
+                    "bid": cq.bid,
+                    "ask": cq.ask,
+                    "volume": cq.volume,
+                    "oi": cq.oi,
+                    "data_quality": cq.data_quality,
+                    "is_tradeable": cq.is_tradeable,
+                    "canonical_quote": cq.to_dict()
+                }
+
+    # ─── Step 2 (Fast Path): Probe Ticker Service In-Memory ───────────────────
+    from src.ticker_service import get_ticker_service
+    ticker_svc = get_ticker_service()
+    if ticker_svc:
+        try:
+            ticker_info = ticker_svc.get_ticker(clean_symbol)
+            if ticker_info and (ticker_info.get("last") or ticker_info.get("price")):
+                valid, cq, err = validate_canonical_quote(
+                    ticker_info,
+                    symbol=clean_symbol,
+                    default_provider=ticker_info.get("provider", "TICKER_SERVICE")
+                )
+                if valid and cq and cq.freshness in (STATE_LIVE, STATE_DELAYED):
+                    return 200, {
+                        "ok": True,
+                        "status": "success",
+                        "symbol": cq.symbol,
+                        "price": cq.ltp,
+                        "ltp": cq.ltp,
+                        "previous_close": cq.close or cq.open,
+                        "open": cq.open,
+                        "high": cq.high,
+                        "low": cq.low,
+                        "close": cq.close,
+                        "change_pct": cq.change_pct,
+                        "source": cq.provider,
+                        "provider": cq.provider,
+                        "status_display": cq.freshness,
+                        "freshness": cq.freshness,
+                        "timestamp": cq.exchange_timestamp,
+                        "ageMs": cq.age_ms,
+                        "bid": cq.bid,
+                        "ask": cq.ask,
+                        "volume": cq.volume,
+                        "oi": cq.oi,
+                        "data_quality": cq.data_quality,
+                        "is_tradeable": cq.is_tradeable,
+                        "canonical_quote": cq.to_dict()
+                    }
+        except Exception as e:
+            logger.debug("Ticker service probe exception for %s: %s", clean_symbol, e)
+
+    # ─── Step 3: Probe Gateway :5051 (Network Fallback) ───────────────────────
+    gw_secret = os.environ.get("MARKET_GATEWAY_SECRET", "").strip()
+    if gw_secret:
+        port = gateway_port or int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
+        gateway_url = f"http://127.0.0.1:{port}/ltp?symbol={urllib.parse.quote(clean_symbol, safe='')}"
+
+        try:
+            req = urllib.request.Request(
+                gateway_url,
+                headers={
+                    "X-Gateway-Secret": gw_secret,
+                    "Accept": "application/json",
+                }
+            )
+            probe_timeout = min(timeout_sec, 0.4)
+            with urllib.request.urlopen(req, timeout=probe_timeout) as resp:
+                if resp.status == 200:
+                    raw_bytes = resp.read()
+                    try:
+                        gw_data = json.loads(raw_bytes.decode("utf-8"))
+                        if gw_data.get("ok") and (gw_data.get("price") or gw_data.get("ltp")):
+                            valid, cq, err = validate_canonical_quote(
+                                gw_data,
+                                symbol=clean_symbol,
+                                default_exchange=gw_data.get("exchange", "UNKNOWN"),
+                                default_provider=gw_data.get("source", "GATEWAY")
+                            )
+                            if valid and cq:
+                                return 200, {
+                                    "ok": True,
+                                    "status": "success",
+                                    "symbol": cq.symbol,
+                                    "price": cq.ltp,
+                                    "ltp": cq.ltp,
+                                    "previous_close": cq.close or cq.open,
+                                    "open": cq.open,
+                                    "high": cq.high,
+                                    "low": cq.low,
+                                    "close": cq.close,
+                                    "change_pct": cq.change_pct,
+                                    "source": cq.provider,
+                                    "provider": cq.provider,
+                                    "status_display": cq.freshness,
+                                    "freshness": cq.freshness,
+                                    "timestamp": cq.exchange_timestamp,
+                                    "ageMs": cq.age_ms,
+                                    "bid": cq.bid,
+                                    "ask": cq.ask,
+                                    "volume": cq.volume,
+                                    "oi": cq.oi,
+                                    "data_quality": cq.data_quality,
+                                    "is_tradeable": cq.is_tradeable,
+                                    "canonical_quote": cq.to_dict()
+                                }
+                    except (ValueError, UnicodeDecodeError) as json_err:
+                        logger.debug("Gateway :%d returned invalid JSON for %s: %s", port, clean_symbol, json_err)
+        except urllib.error.HTTPError as http_err:
+            try:
+                err_body = json.loads(http_err.read().decode("utf-8"))
+                if http_err.code in (401, 403):
+                    return http_err.code, {
+                        "ok": False,
+                        "status": "error",
+                        "code": "GATEWAY_AUTH_FAILURE",
+                        "symbol": clean_symbol,
+                        "message": "Gateway authentication rejected.",
+                        "details": err_body
+                    }
+            except Exception:
+                pass
+        except (urllib.error.URLError, TimeoutError, ConnectionRefusedError, OSError) as net_err:
+            logger.debug("Gateway probe note for %s (%s)", clean_symbol, net_err)
+
+    # ─── Step 4: Return any known cached quote (even if stale) as fallback ────
     for a in aliases:
         cached = global_market_cache.get_quote(a) or global_market_cache.get(a)
         if cached:
@@ -530,49 +601,7 @@ def resolve_canonical_quote(
                     "canonical_quote": cq.to_dict()
                 }
 
-    # ─── Step 3: Probe Ticker Service ────────────────────────────────────────
-    from src.ticker_service import get_ticker_service
-    ticker_svc = get_ticker_service()
-    if ticker_svc:
-        try:
-            ticker_info = ticker_svc.get_ticker(clean_symbol)
-            if ticker_info and (ticker_info.get("last") or ticker_info.get("price")):
-                valid, cq, err = validate_canonical_quote(
-                    ticker_info,
-                    symbol=clean_symbol,
-                    default_provider=ticker_info.get("provider", "TICKER_SERVICE")
-                )
-                if valid and cq:
-                    return 200, {
-                        "ok": True,
-                        "status": "success",
-                        "symbol": cq.symbol,
-                        "price": cq.ltp,
-                        "ltp": cq.ltp,
-                        "previous_close": cq.close or cq.open,
-                        "open": cq.open,
-                        "high": cq.high,
-                        "low": cq.low,
-                        "close": cq.close,
-                        "change_pct": cq.change_pct,
-                        "source": cq.provider,
-                        "provider": cq.provider,
-                        "status_display": cq.freshness,
-                        "freshness": cq.freshness,
-                        "timestamp": cq.exchange_timestamp,
-                        "ageMs": cq.age_ms,
-                        "bid": cq.bid,
-                        "ask": cq.ask,
-                        "volume": cq.volume,
-                        "oi": cq.oi,
-                        "data_quality": cq.data_quality,
-                        "is_tradeable": cq.is_tradeable,
-                        "canonical_quote": cq.to_dict()
-                    }
-        except Exception as tick_err:
-            logger.debug("Ticker service probe exception for %s: %s", clean_symbol, tick_err)
-
-    # ─── Step 4: Strict No-Data Response ─────────────────────────────────────
+    # ─── Step 5: Strict No-Data Response ─────────────────────────────────────
     return 404, {
         "ok": False,
         "status": "no_data",

@@ -23,6 +23,7 @@ import {
   Lock,
   X,
   Menu,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +47,7 @@ export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "live", label: "Live Feed", path: "/live", icon: Radio },
   { id: "bots", label: "Bots", path: "/bots", icon: Bot },
   { id: "strategies", label: "Strategy", path: "/strategy/create", icon: Code },
+  { id: "indicators", label: "Indicators", path: "/indicators", icon: Activity },
   { id: "options", label: "Options", path: "/options", icon: Zap },
   { id: "futures", label: "Futures", path: "/futures", icon: TrendingUp },
   { id: "crypto", label: "Crypto", path: "/crypto", icon: Coins },
@@ -88,6 +90,7 @@ export function LeftNavigationSidebar({
     }
     if (activeTab === item.id) return true;
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
+    if (item.id === "indicators" && (pathname?.startsWith("/indicators") || pathname === "/indicator-center" || activeTab === "indicators")) return true;
     if (item.id === "strategies" && (pathname?.startsWith("/strategy") || pathname === "/strategies" || pathname === "/strategy-builder" || activeTab === "strategies" || activeTab === "strategy-builder")) return true;
     if (item.id === "crypto" && (pathname?.startsWith("/crypto") || activeTab === "crypto-derivatives" || activeTab === "crypto-futures" || activeTab === "crypto-options" || activeTab === "crypto-options-chain")) return true;
     if (item.id === "portfolio" && (pathname === "/positions" || pathname === "/orders" || pathname === "/capital" || pathname === "/capital-funds" || pathname === "/pnl" || pathname === "/journal" || activeTab === "positions" || activeTab === "orders" || activeTab === "portfolio" || activeTab === "pnl" || activeTab === "trade-journal")) return true;

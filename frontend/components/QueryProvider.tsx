@@ -9,8 +9,8 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5000,
-            gcTime: 10 * 60 * 1000, // 10 minutes cache retention
+            staleTime: 15000,
+            gcTime: 15 * 60 * 1000, // 15 minutes cache retention
             retry: (failureCount, error: any) => {
               // Never retry if already failed twice
               if (failureCount >= 1) return false;

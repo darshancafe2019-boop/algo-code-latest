@@ -11137,9 +11137,32 @@ def seed_canonical_risk_decisions():
 
 
 def get_bot_instance(bot_id: str) -> Optional[Dict[str, Any]]:
-    """Gets a bot instance by its unique ID."""
+    """Gets a bot instance by its unique ID, checking bot_instances and data_core_persisted_bots."""
     bots = safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
-    return bots[0] if bots else None
+    if bots:
+        return bots[0]
+    dc_bots = safe_query("SELECT * FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
+    if dc_bots:
+        b = dc_bots[0]
+        return {
+            "id": b.get("bot_id"),
+            "name": b.get("name"),
+            "symbol": b.get("canonical_instrument_id") or b.get("provider_instrument_id") or b.get("underlying_symbol"),
+            "strategy": b.get("strategy_id") or "OPTIONS_TREND",
+            "timeframe": "5m",
+            "asset_class": b.get("asset_class"),
+            "exchange": b.get("market_data_provider"),
+            "execution_mode": b.get("environment"),
+            "status": b.get("state"),
+            "created_at": b.get("created_at"),
+            "updated_at": b.get("updated_at"),
+            "allocated_capital": b.get("capital_allocation"),
+            "broker_provider": b.get("execution_broker"),
+            "broker_id": b.get("execution_broker"),
+            "broker_account_id": b.get("account_id"),
+            "config_json": b.get("bot_json") or "{}",
+        }
+    return None
 
 
 # ============================================================================

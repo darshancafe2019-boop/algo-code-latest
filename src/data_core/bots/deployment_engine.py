@@ -422,6 +422,40 @@ class BotDeploymentEngine:
         except Exception as exc:
             logger.exception("Failed to persist bot %s to database: %s", bot_id, exc)
 
+        # Dual-sync into bot_instances table for complete backward compatibility
+        try:
+            bi_sql = """
+            INSERT OR REPLACE INTO bot_instances (
+                id, name, symbol, strategy, timeframe, asset_class, exchange,
+                execution_mode, status, created_at, updated_at, allocated_capital,
+                current_equity, broker_provider, broker_id, broker_account_id,
+                canonical_instrument_id, config_json, is_deleted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+            """
+            bi_params = (
+                bot.bot_id,
+                bot.name,
+                bot.display_symbol or bot.canonical_instrument_id or bot.bot_id,
+                bot.strategy_id or "OPTIONS_TREND",
+                "5m",
+                bot.asset_class,
+                bot.market_data_provider,
+                bot.environment.value if hasattr(bot.environment, 'value') else str(bot.environment),
+                bot.state.value if hasattr(bot.state, 'value') else str(bot.state),
+                bot.created_at,
+                bot.updated_at,
+                float(bot.capital_allocation or 50000.0),
+                float(bot.capital_allocation or 50000.0),
+                bot.execution_broker,
+                bot.execution_broker,
+                bot.account_id,
+                bot.canonical_instrument_id,
+                bot_json,
+            )
+            db.safe_execute(bi_sql, bi_params)
+        except Exception as bi_exc:
+            logger.debug("Dual-sync into bot_instances table note: %s", bi_exc)
+
     def _bootstrap_sample_fleet(self):
         """Seeds standard paper bot instances for immediate operator use."""
         sample_bot = BotDeploymentItem(

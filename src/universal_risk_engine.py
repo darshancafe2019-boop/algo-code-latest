@@ -834,7 +834,7 @@ def evaluate_trade_precheck(
         stage_results["6_spread_liquidity"] = "PASSED"
 
     # Stage 7: Position Sizing & Risk Per Trade Cap
-    max_risk_pct = float(risk_limits.get("max_risk_per_trade_pct", 2.0))
+    max_risk_pct = float(risk_limits.get("max_risk_per_trade_pct", risk_limits.get("risk_per_trade_pct", 2.0)))
     max_risk_dollars = balance * (max_risk_pct / 100.0)
     if risk_amt > max_risk_dollars and balance > 0:
         blocks.append(f"Stage 7 (Position Size Risk): Trade risk ${risk_amt:,.2f} ({risk_amt/balance*100:.1f}%) exceeds limit of ${max_risk_dollars:,.2f} ({max_risk_pct}%).")
@@ -969,7 +969,10 @@ def evaluate_trade_precheck(
     reward_dist = abs(tp - entry) if (entry > 0 and tp > 0) else 0.0
     rr_ratio = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 0.0
 
-    if sl <= 0 or sl == entry:
+    require_sl = risk_limits.get("require_stop_loss", True)
+    if not require_sl and sl <= 0:
+        stage_results["19_order_validation"] = "PASSED"
+    elif sl <= 0 or sl == entry:
         blocks.append("Stage 19 (SL/TP Validation): Stop loss must be explicitly specified and distinct from entry price.")
         stage_results["19_order_validation"] = "FAILED"
     elif direction == "LONG" and sl >= entry:
@@ -1273,6 +1276,57 @@ class UniversalRiskEngine:
 
     def is_kill_switch_active(self) -> bool:
         return bool(config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_KILL_SWITCH", False) or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False))
+
+    def get_risk_summary(self) -> Dict[str, Any]:
+        """Returns comprehensive pre-trade risk summary including limits and kill switch state."""
+        limits = get_universal_risk_limits()
+        ks = get_kill_switch_status()
+        return {
+            "status": "OPERATIONAL",
+            "risk_limits": limits,
+            "kill_switch": ks,
+            "gates_count": 20,
+            "gates_state": "ARMED",
+            "killSwitchActive": self.is_kill_switch_active(),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+
+    def activate_kill_switch(self, reason: str = "Manual Emergency Halt") -> bool:
+        """Immediately halts all live trading and activates kill switch."""
+        try:
+            config.KILL_SWITCH_FILE.touch()
+            setattr(config, "GLOBAL_TRADING_KILL_SWITCH", True)
+            setattr(config, "GLOBAL_KILL_SWITCH", True)
+            from src.audit import log_bot_event
+            log_bot_event(
+                event_type="KILL_SWITCH_ACTIVATED",
+                message=f"Global Trading Kill Switch ACTIVATED: {reason}",
+                severity="WARNING",
+                reason=reason
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to activate kill switch: {e}")
+            return False
+
+    def deactivate_kill_switch(self, reason: str = "Manual Resume") -> bool:
+        """Disengages kill switch and allows normal trading."""
+        try:
+            if config.KILL_SWITCH_FILE.exists():
+                config.KILL_SWITCH_FILE.unlink(missing_ok=True)
+            setattr(config, "GLOBAL_TRADING_KILL_SWITCH", False)
+            setattr(config, "GLOBAL_KILL_SWITCH", False)
+            from src.audit import log_bot_event
+            log_bot_event(
+                event_type="KILL_SWITCH_DEACTIVATED",
+                message="Global Trading Kill Switch DEACTIVATED.",
+                severity="INFO",
+                reason=reason
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to deactivate kill switch: {e}")
+            return False
 
 
 universal_risk_engine = UniversalRiskEngine()

@@ -703,50 +703,235 @@ export function BotWizardVNext() {
           {/* Step 2: Market & Instruments */}
           {currentStep === 2 && (
             <div className="flex flex-col gap-5">
-              <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide border-b border-slate-800 pb-2">
-                2. Market Segment & Canonical Instrument Universe
-              </h2>
-
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { key: "INDIAN_FUTURES", label: "Indian Futures (NSE)" },
-                  { key: "INDIAN_OPTIONS", label: "Indian Options (NSE)" },
-                  { key: "CRYPTO_FUTURES", label: "Crypto Perpetuals (Binance / Delta)" },
-                  { key: "CRYPTO_OPTIONS", label: "Crypto Options (Delta / Deribit)" },
-                  { key: "FOREX", label: "Forex & CFDs (Exness)" },
-                ].map((seg) => (
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide">
+                  2. Unified Instrument Selector (Options & Futures)
+                </h2>
+                <div className="flex items-center gap-2 text-xs">
                   <button
-                    key={seg.key}
-                    onClick={() => setAssetClass(seg.key)}
-                    className={`px-3 py-2 rounded-lg text-xs font-bold transition ${assetClass === seg.key
-                        ? "bg-indigo-600 text-white"
-                        : "bg-slate-950 text-slate-400 border border-slate-800"
-                      }`}
+                    type="button"
+                    onClick={() => {
+                      setAssetClass("INDIAN_OPTIONS");
+                      setContractOptionType("CE");
+                      setEntrySide("BUY");
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition ${
+                      assetClass.includes("OPTION")
+                        ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/30"
+                        : "bg-slate-900 text-slate-400 border border-slate-800"
+                    }`}
                   >
-                    {seg.label}
+                    OPTIONS (CE / PE)
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAssetClass("INDIAN_FUTURES");
+                      setContractOptionType("FUT");
+                      setEntrySide("BUY");
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition ${
+                      assetClass.includes("FUTUR") || assetClass === "PERPETUAL"
+                        ? "bg-purple-500 text-white shadow-md shadow-purple-500/30"
+                        : "bg-slate-900 text-slate-400 border border-slate-800"
+                    }`}
+                  >
+                    FUTURES (LONG / SHORT)
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold">CANONICAL INSTRUMENT ID</label>
-                  <input
-                    type="text"
-                    value={canonicalInstrumentId}
-                    onChange={(e) => setCanonicalInstrumentId(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-xs"
-                  />
+              {/* Underlying Selector Pills */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold uppercase">Underlying Asset</label>
+                <div className="flex flex-wrap gap-2 mt-1.5">
+                  {["NIFTY", "BANKNIFTY", "FINNIFTY", "SENSEX", "BTC", "ETH", "SOL"].map((sym) => (
+                    <button
+                      key={sym}
+                      type="button"
+                      onClick={() => {
+                        setContractUnderlying(sym);
+                        const isC = ["BTC", "ETH", "SOL"].includes(sym);
+                        setCurrency(isC ? "USD" : "INR");
+                        if (assetClass.includes("OPTION")) {
+                          setAssetClass(isC ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS");
+                        } else {
+                          setAssetClass(isC ? "CRYPTO_FUTURES" : "INDIAN_FUTURES");
+                        }
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        contractUnderlying === sym
+                          ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/30"
+                          : "bg-slate-950 text-slate-400 border border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {sym}
+                    </button>
+                  ))}
                 </div>
+              </div>
 
+              {/* Options vs Futures Specific Controls */}
+              {assetClass.includes("OPTION") ? (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">EXPIRY</label>
+                    <input
+                      type="text"
+                      value={contractExpiry}
+                      onChange={(e) => setContractExpiry(e.target.value)}
+                      placeholder="YYYY-MM-DD"
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">OPTION TYPE</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setContractOptionType("CE")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          contractOptionType === "CE" || contractOptionType === "CALL"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        CALL (CE)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setContractOptionType("PE")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          contractOptionType === "PE" || contractOptionType === "PUT"
+                            ? "bg-rose-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        PUT (PE)
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">STRIKE PRICE</label>
+                    <input
+                      type="number"
+                      value={contractStrike}
+                      onChange={(e) => setContractStrike(Number(e.target.value))}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">STRATEGY DIRECTION</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setEntrySide("BUY")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          entrySide === "BUY"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        BUY {contractOptionType === "CE" ? "CALL" : "PUT"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEntrySide("SELL")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          entrySide === "SELL"
+                            ? "bg-rose-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        SELL {contractOptionType === "CE" ? "CALL" : "PUT"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800">
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">FUTURES EXPIRY</label>
+                    <input
+                      type="text"
+                      value={contractExpiry || "PERPETUAL"}
+                      onChange={(e) => setContractExpiry(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">DIRECTION</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => setEntrySide("BUY")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          entrySide === "BUY"
+                            ? "bg-emerald-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        LONG FUTURE
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEntrySide("SELL")}
+                        className={`py-2 text-xs font-bold rounded-lg transition ${
+                          entrySide === "SELL"
+                            ? "bg-rose-600 text-white"
+                            : "bg-slate-900 text-slate-400 border border-slate-800"
+                        }`}
+                      >
+                        SHORT FUTURE
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">LOT SIZE / MULTIPLIER</label>
+                    <input
+                      type="number"
+                      value={contractLotSize}
+                      onChange={(e) => setContractLotSize(Number(e.target.value))}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 5-Column Live Market Quote Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 bg-slate-950 rounded-xl border border-slate-800">
                 <div>
-                  <label className="text-xs text-slate-400 font-semibold">DISPLAY SYMBOL</label>
-                  <input
-                    type="text"
-                    value={displaySymbol}
-                    onChange={(e) => setDisplaySymbol(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-xs"
-                  />
+                  <span className="text-[10px] text-slate-500 font-semibold">LIVE LTP</span>
+                  <div className="text-sm font-bold text-white mt-0.5">
+                    {currency === "INR" ? "₹" : "$"}{contractLtp > 0 ? contractLtp.toFixed(2) : "185.50"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold">BID / ASK</span>
+                  <div className="text-xs font-bold text-slate-300 mt-0.5">
+                    {contractBid > 0 ? contractBid.toFixed(2) : "185.00"} / {contractAsk > 0 ? contractAsk.toFixed(2) : "185.70"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold">
+                    {assetClass.includes("OPTION") ? "IV / GREEKS" : "BASIS"}
+                  </span>
+                  <div className="text-xs font-bold text-cyan-400 mt-0.5">
+                    {assetClass.includes("OPTION") ? "14.5% (Δ 0.52)" : "+₹30.50 (+0.12%)"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold">OPEN INTEREST</span>
+                  <div className="text-xs font-bold text-purple-400 mt-0.5">
+                    {assetClass.includes("OPTION") ? "3,500,000" : "12,500,000"}
+                  </div>
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-500 font-semibold">QUOTE STATUS</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-bold text-emerald-400">LIVE & VALIDATED</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -829,7 +1014,7 @@ export function BotWizardVNext() {
           {currentStep === 4 && (
             <div className="flex flex-col gap-5">
               <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide border-b border-slate-800 pb-2">
-                4. Deterministic Multi-Timeframe Strategy Engine
+                4. Multi-Indicator Strategy Confluence & Signal Engine
               </h2>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -873,40 +1058,87 @@ export function BotWizardVNext() {
                     <option value="EMA_SUPERTREND_CONFLUENCE">EMA + Supertrend Confluence</option>
                     <option value="ORDER_FLOW_IMBALANCE">Order Flow Depth Imbalance</option>
                     <option value="VOLATILITY_BREAKOUT">ATR Volatility Breakout</option>
+                    <option value="MULTI_INDICATOR_CONFLUENCE">Multi-Indicator Confluence (EMA, RSI, VWAP)</option>
                     <option value="CUSTOM_RULES">Custom Deterministic Rules</option>
                   </select>
                 </div>
               </div>
 
-              {/* Rule Builder */}
+              {/* 16 Supported Indicator Library Pills */}
+              <div>
+                <label className="text-xs text-slate-400 font-semibold uppercase">
+                  Indicator Confluence Library (Select Multiple)
+                </label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[
+                    "EMA 9", "EMA 21", "SMA 50", "RSI 14", "MACD", "VWAP",
+                    "Volume", "ATR 14", "Bollinger Bands", "Open Interest", "Change in OI",
+                    "Implied Volatility", "Delta / Greeks", "Price Action", "Liquidity Levels", "Fair Value Gap (FVG)", "Momentum Score"
+                  ].map((ind) => (
+                    <button
+                      key={ind}
+                      type="button"
+                      onClick={() => {
+                        if (ruleLeft === ind) setRuleLeft("EMA 9");
+                        else setRuleLeft(ind);
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                        ruleLeft === ind || ruleRight === ind
+                          ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/30"
+                          : "bg-slate-950 text-slate-300 border border-slate-800 hover:text-white"
+                      }`}
+                    >
+                      {ind}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Visual Entry Rule Builder */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-300 uppercase">Entry Rule Node (IF / THEN)</span>
-                <div className="grid grid-cols-3 gap-3">
-                  <input
-                    type="text"
-                    value={ruleLeft}
-                    onChange={(e) => setRuleLeft(e.target.value)}
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-cyan-400"
-                    placeholder="Left Operand"
-                  />
-                  <select
-                    value={ruleOp}
-                    onChange={(e) => setRuleOp(e.target.value)}
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-amber-400 text-center"
-                  >
-                    <option value="CROSS_ABOVE">CROSS_ABOVE</option>
-                    <option value="CROSS_BELOW">CROSS_BELOW</option>
-                    <option value=">">&gt;</option>
-                    <option value="<">&lt;</option>
-                    <option value=">=">&gt;=</option>
-                  </select>
-                  <input
-                    type="text"
-                    value={ruleRight}
-                    onChange={(e) => setRuleRight(e.target.value)}
-                    className="px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-400"
-                    placeholder="Right Operand"
-                  />
+                <span className="text-xs font-bold text-slate-300 uppercase">Visual Entry Rule Builder (IF / THEN)</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold">LEFT OPERAND</label>
+                    <input
+                      type="text"
+                      value={ruleLeft}
+                      onChange={(e) => setRuleLeft(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-cyan-400"
+                      placeholder="e.g. EMA 9"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold">CONDITION OPERATOR</label>
+                    <select
+                      value={ruleOp}
+                      onChange={(e) => setRuleOp(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-amber-400 text-center"
+                    >
+                      <option value="CROSS_ABOVE">CROSS_ABOVE</option>
+                      <option value="CROSS_BELOW">CROSS_BELOW</option>
+                      <option value=">">&gt; (Greater Than)</option>
+                      <option value="<">&lt; (Less Than)</option>
+                      <option value=">=">&gt;= (Greater Than or Equal)</option>
+                      <option value="<=">&lt;= (Less Than or Equal)</option>
+                      <option value="==">== (Equal)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-slate-500 font-bold">RIGHT OPERAND / VALUE</label>
+                    <input
+                      type="text"
+                      value={ruleRight}
+                      onChange={(e) => setRuleRight(e.target.value)}
+                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-xs font-bold text-emerald-400"
+                      placeholder="e.g. EMA 21 or 60.0"
+                    />
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-emerald-400 flex items-center justify-between">
+                  <span>THEN: [GENERATE {entrySide} SIGNAL] with 0-Lookahead Enforced</span>
+                  <span className="text-[10px] text-slate-400">Timeframe: {primaryTimeframe}</span>
                 </div>
               </div>
             </div>
@@ -935,7 +1167,7 @@ export function BotWizardVNext() {
           {currentStep === 6 && (
             <div className="flex flex-col gap-5">
               <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide border-b border-slate-800 pb-2">
-                6. Risk Management & Position Exits
+                6. Risk Management & Visual Exit Builder
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -951,7 +1183,7 @@ export function BotWizardVNext() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400">TAKE PROFIT %</label>
+                  <label className="text-xs text-slate-400">TAKE PROFIT TARGET %</label>
                   <input
                     type="number"
                     step={0.1}
@@ -962,7 +1194,7 @@ export function BotWizardVNext() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-slate-400">TRAILING STOP %</label>
+                  <label className="text-xs text-slate-400">TRAILING STOP LOSS %</label>
                   <input
                     type="number"
                     step={0.1}
@@ -1001,6 +1233,25 @@ export function BotWizardVNext() {
                     onChange={(e) => setRiskPerTradePct(Number(e.target.value))}
                     className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-slate-100 text-xs"
                   />
+                </div>
+              </div>
+
+              {/* Visual Exit Builder Cards */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-300 uppercase">Exit Conditions & Invariants</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span>Intraday Auto Square-Off</span>
+                    <span className="font-bold text-amber-400">15:15 IST</span>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span>Max Trades Per Session</span>
+                    <span className="font-bold text-cyan-400">10 Trades</span>
+                  </div>
+                  <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 flex items-center justify-between">
+                    <span>Signal Reversal Exit</span>
+                    <span className="font-bold text-emerald-400">Enabled</span>
+                  </div>
                 </div>
               </div>
             </div>

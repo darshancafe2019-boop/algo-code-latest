@@ -41,16 +41,20 @@ export function DecisionLogFeed() {
 
       <div className="space-y-1.5 max-h-[260px] overflow-y-auto pr-1">
         {logs.length === 0 ? (
-          <div className="p-4 text-center text-xs text-[#7D8EA5] font-mono">
-            No decision logs recorded yet. Waiting for bot cycle...
+          <div className="p-6 text-center text-xs text-[#7D8EA5] font-mono">
+            No bot activity yet
           </div>
         ) : (
           logs.map((log: any, index: number) => {
-            const decision = (log.decision || log.direction || "HOLD").toUpperCase();
-            const confidence = Number(log.confidence_score ?? log.bull_score ?? 0).toFixed(1);
-            const isLong = decision === "BUY" || decision === "LONG";
-            const isShort = decision === "SELL" || decision === "SHORT";
-            const isRebalance = decision.includes("REBALANCE") || decision.includes("SCAN");
+            const decision = (log.decision || log.direction || log.event || log.action || "HOLD").toUpperCase();
+            const confidence = log.confidence_score !== undefined || log.bull_score !== undefined
+              ? Number(log.confidence_score ?? log.bull_score ?? 0).toFixed(1)
+              : null;
+            const isLong = decision === "BUY" || decision === "LONG" || decision === "ENTRY SIGNAL";
+            const isShort = decision === "SELL" || decision === "SHORT" || decision === "EXIT SIGNAL";
+            const isRebalance = decision.includes("REBALANCE") || decision.includes("SCAN") || decision.includes("PAUSED") || decision.includes("STARTED");
+            const botLabel = log.bot_name || log.name || log.bot_id || log.bot_instance_id || "System";
+            const regime = log.regime || log.event_type || null;
 
             return (
               <div
@@ -59,16 +63,20 @@ export function DecisionLogFeed() {
               >
                 <div className="flex items-center gap-2 font-mono">
                   <span className="text-[10px] text-[#7D8EA5]">
-                    {log.timestamp ? log.timestamp.split("T")[1]?.slice(0, 8) : "Live"}
+                    {log.timestamp ? (log.timestamp.includes("T") ? log.timestamp.split("T")[1]?.slice(0, 8) : log.timestamp.slice(11, 19)) : "Live"}
                   </span>
-                  <span className="font-semibold text-[#F8FAFC]">{log.bot_id || "bot-1"}</span>
-                  <span className="text-[#7D8EA5]">[{log.regime || "TRENDING"}]</span>
+                  <span className="font-semibold text-[#F8FAFC] truncate max-w-[140px]" title={botLabel}>
+                    {botLabel}
+                  </span>
+                  {regime && <span className="text-[#7D8EA5]">[{regime}]</span>}
                 </div>
 
                 <div className="flex items-center gap-2.5">
-                  <span className="text-[10px] text-[#7D8EA5] font-mono">
-                    Score: <strong className="text-[#22D3EE]">{confidence}%</strong>
-                  </span>
+                  {confidence !== null && (
+                    <span className="text-[10px] text-[#7D8EA5] font-mono">
+                      Score: <strong className="text-[#22D3EE]">{confidence}%</strong>
+                    </span>
+                  )}
 
                   <span
                     className={cn(

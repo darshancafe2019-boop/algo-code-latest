@@ -22,6 +22,8 @@ import {
   formatIndianCurrency,
   formatIndianQuantity,
 } from "@/lib/options/options-analytics-engine";
+import { OptionQuickActionsMenu } from "../OptionQuickActionsMenu";
+import { OptionOrderIntent } from "@/types/option-order-intent";
 
 interface OptionChainTableProps {
   strikes: OptionStrikeRowData[];
@@ -40,6 +42,7 @@ interface OptionChainTableProps {
   onActionBuy?: (contract: ActionableOptionContract) => void;
   onActionSell?: (contract: ActionableOptionContract) => void;
   onActionDepth?: (contract: ActionableOptionContract) => void;
+  onDirectOrder?: (intent: OptionOrderIntent) => void;
 }
 
 type SortField =
@@ -90,6 +93,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
   onActionBuy,
   onActionSell,
   onActionDepth,
+  onDirectOrder,
 }) => {
   const [sortField, setSortField] = useState<SortField>("strike");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
@@ -937,7 +941,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isCallTradable ? "Buy this option and open Bot Creation" : "Quote unavailable for trading"}
+                            title={isCallTradable ? "Direct Order: BUY CALL" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
@@ -958,7 +962,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isCallTradable ? "Sell this option and open Bot Creation" : "Quote unavailable for trading"}
+                            title={isCallTradable ? "Direct Order: SELL CALL" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>
@@ -975,6 +979,18 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           >
                             <BookOpen className="w-3.5 h-3.5" />
                           </button>
+                          <OptionQuickActionsMenu
+                            contract={resolveContract(row.strike, "CE", call, "BUY")}
+                            underlying={underlying}
+                            strike={row.strike}
+                            expiry={selectedExpiry}
+                            onDirectOrder={(intent) => {
+                              if (onDirectOrder) onDirectOrder(intent);
+                              else if (onActionBuy) onActionBuy(resolveContract(row.strike, "CE", call, "BUY"));
+                            }}
+                            onAnalyze={() => onSelectOption(row.strike, "CE", call)}
+                            onPayoff={() => onSelectOption(row.strike, "CE", call)}
+                          />
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>
@@ -1088,7 +1104,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isPutTradable ? "Buy this option and open Bot Creation" : "Quote unavailable for trading"}
+                            title={isPutTradable ? "Direct Order: BUY PUT" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
@@ -1109,7 +1125,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isPutTradable ? "Sell this option and open Bot Creation" : "Quote unavailable for trading"}
+                            title={isPutTradable ? "Direct Order: SELL PUT" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>
@@ -1126,6 +1142,18 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           >
                             <BookOpen className="w-3.5 h-3.5" />
                           </button>
+                          <OptionQuickActionsMenu
+                            contract={resolveContract(row.strike, "PE", put, "BUY")}
+                            underlying={underlying}
+                            strike={row.strike}
+                            expiry={selectedExpiry}
+                            onDirectOrder={(intent) => {
+                              if (onDirectOrder) onDirectOrder(intent);
+                              else if (onActionBuy) onActionBuy(resolveContract(row.strike, "PE", put, "BUY"));
+                            }}
+                            onAnalyze={() => onSelectOption(row.strike, "PE", put)}
+                            onPayoff={() => onSelectOption(row.strike, "PE", put)}
+                          />
                         </div>
                       ) : (
                         <span className="text-slate-600 text-xs">—</span>

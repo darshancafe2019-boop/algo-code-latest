@@ -48,6 +48,15 @@ import {
 } from "./ColumnCustomizerModal";
 import { OptionFilterModal, DEFAULT_FILTER_CONFIG } from "./OptionFilterModal";
 import { SelectedOptionInspectionDrawer } from "../SelectedOptionInspectionDrawer";
+import { DirectOptionOrderPanel } from "../DirectOptionOrderPanel";
+import { OptionOrderPreviewModal } from "../OptionOrderPreviewModal";
+import { RecentDirectOrdersTable } from "../RecentDirectOrdersTable";
+import {
+  OptionOrderIntent,
+  OptionOrderPreview,
+  DirectOrderResult,
+  getStandardOptionLotSize,
+} from "@/types/option-order-intent";
 
 interface OptionChainTerminalProps {
   initialUnderlying?: string;
@@ -138,6 +147,13 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   const [selectedOptionType, setSelectedOptionType] = useState<"CE" | "PE" | null>(null);
   const [selectedQuote, setSelectedQuote] = useState<OptionContractQuote | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  // Actionable Direct Option Execution State
+  const [isDirectOrderPanelOpen, setIsDirectOrderPanelOpen] = useState<boolean>(false);
+  const [selectedDirectIntent, setSelectedDirectIntent] = useState<OptionOrderIntent | null>(null);
+  const [isOrderPreviewOpen, setIsOrderPreviewOpen] = useState<boolean>(false);
+  const [selectedOrderPreview, setSelectedOrderPreview] = useState<OptionOrderPreview | null>(null);
+  const [recentOrdersRefreshTrigger, setRecentOrdersRefreshTrigger] = useState<number>(0);
 
   // Feedback Notification
   const [feedback, setFeedback] = useState<{ status: "success" | "error" | "warn"; message: string } | null>(null);
@@ -594,82 +610,96 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
   };
 
-  // Action Dispatchers -> Direct Bot Creation from Option Chain with Canonical ID & Real Timestamps
-  const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
-    const isAddLeg = searchParams?.get("mode") === "addLeg";
-    const canonicalContractId = contract.contractId || `${contract.broker || contract.source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${contract.optionType}:${contract.instrumentId || contract.securityId || contract.symbol}`;
+  // Direct Option Execution Handler
+  const handleDirectOrder = useCallback((intent: OptionOrderIntent) => {
+    setSelectedDirectIntent(intent);
+    setIsDirectOrderPanelOpen(true);
+  }, []);
 
-    dispatchBotCreation(router, {
-      symbol: contract.symbol,
-      canonicalSymbol: canonicalContractId,
-      canonicalContractId,
-      side: "BUY",
-      assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS",
-      underlying: contract.underlying,
+  // Action Dispatchers -> Direct Option Order Panel with Canonical Intent
+  const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
+    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PUT" : "CALL";
+    const lotSize = contract.lotSize || getStandardOptionLotSize(contract.underlying);
+    const quoteFreshness = (contract as any).quoteStatus || snapshot?.freshnessStatus || "LIVE";
+    const intent: OptionOrderIntent = {
+      broker: contract.broker || source || "DHAN",
       exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
-      broker: contract.broker,
-      marketDataSource: contract.source,
-      instrumentId: contract.instrumentId,
-      securityId: contract.securityId,
+      underlying: contract.underlying,
+      securityId: String(contract.securityId || contract.instrumentId || ""),
       tradingSymbol: contract.symbol,
-      currentPrice: contract.ltp,
+      expiry: contract.expiry,
+      strike: contract.strike,
+      optionType: optType,
+      side: "BUY",
+      quantity: lotSize,
+      lots: 1,
+      lotSize,
+      orderType: "LIMIT",
+      price: contract.ask > 0 ? contract.ask : contract.ltp,
+      productType: "INTRADAY",
+      mode: (tradingMode === "LIVE" ? "LIVE" : "PAPER"),
+      timestamp: new Date().toISOString(),
+      ltp: contract.ltp,
       bid: contract.bid,
       ask: contract.ask,
-      strike: contract.strike,
-      expiry: contract.expiry,
-      optionType: contract.optionType,
-      lotSize: contract.lotSize,
-      delta: contract.delta,
-      gamma: contract.gamma,
-      theta: contract.theta,
-      vega: contract.vega,
       iv: contract.iv,
-      openInterest: contract.oi,
-      volume: contract.volume,
-      timestamp: contract.timestamp || Date.now(),
-      uiDispatchTimestamp: Date.now(),
-      origin: "OPTIONS",
-      mode: isAddLeg ? "addLeg" : "new",
-    });
-  }, [router, searchParams]);
+      oi: contract.oi,
+      quoteStatus: quoteFreshness === "LIVE" || quoteFreshness === "VALIDATED" ? "LIVE" : (quoteFreshness as any),
+    };
+    setSelectedDirectIntent(intent);
+    setIsDirectOrderPanelOpen(true);
+  }, [source, tradingMode, snapshot?.freshnessStatus]);
 
   const handleActionSell = useCallback((contract: ActionableOptionContract) => {
-    const isAddLeg = searchParams?.get("mode") === "addLeg";
-    const canonicalContractId = contract.contractId || `${contract.broker || contract.source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${contract.optionType}:${contract.instrumentId || contract.securityId || contract.symbol}`;
-
-    dispatchBotCreation(router, {
-      symbol: contract.symbol,
-      canonicalSymbol: canonicalContractId,
-      canonicalContractId,
-      side: "SELL",
-      assetClass: contract.broker === "DELTA" ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS",
-      underlying: contract.underlying,
+    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PUT" : "CALL";
+    const lotSize = contract.lotSize || getStandardOptionLotSize(contract.underlying);
+    const quoteFreshness = (contract as any).quoteStatus || snapshot?.freshnessStatus || "LIVE";
+    const intent: OptionOrderIntent = {
+      broker: contract.broker || source || "DHAN",
       exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
-      broker: contract.broker,
-      marketDataSource: contract.source,
-      instrumentId: contract.instrumentId,
-      securityId: contract.securityId,
+      underlying: contract.underlying,
+      securityId: String(contract.securityId || contract.instrumentId || ""),
       tradingSymbol: contract.symbol,
-      currentPrice: contract.ltp,
+      expiry: contract.expiry,
+      strike: contract.strike,
+      optionType: optType,
+      side: "SELL",
+      quantity: lotSize,
+      lots: 1,
+      lotSize,
+      orderType: "LIMIT",
+      price: contract.bid > 0 ? contract.bid : contract.ltp,
+      productType: "INTRADAY",
+      mode: (tradingMode === "LIVE" ? "LIVE" : "PAPER"),
+      timestamp: new Date().toISOString(),
+      ltp: contract.ltp,
       bid: contract.bid,
       ask: contract.ask,
-      strike: contract.strike,
-      expiry: contract.expiry,
-      optionType: contract.optionType,
-      lotSize: contract.lotSize,
-      delta: contract.delta,
-      gamma: contract.gamma,
-      theta: contract.theta,
-      vega: contract.vega,
       iv: contract.iv,
-      openInterest: contract.oi,
-      volume: contract.volume,
-      timestamp: contract.timestamp || Date.now(),
-      uiDispatchTimestamp: Date.now(),
-      origin: "OPTIONS",
-      mode: isAddLeg ? "addLeg" : "new",
+      oi: contract.oi,
+      quoteStatus: quoteFreshness === "LIVE" || quoteFreshness === "VALIDATED" ? "LIVE" : (quoteFreshness as any),
+    };
+    setSelectedDirectIntent(intent);
+    setIsDirectOrderPanelOpen(true);
+  }, [source, tradingMode, snapshot?.freshnessStatus]);
+
+  const handleReviewOrder = useCallback((preview: OptionOrderPreview, updatedIntent: OptionOrderIntent) => {
+    setSelectedOrderPreview(preview);
+    setSelectedDirectIntent(updatedIntent);
+    setIsOrderPreviewOpen(true);
+  }, []);
+
+  const handleOrderSuccess = useCallback(async (result: DirectOrderResult) => {
+    setFeedback({
+      status: "success",
+      message: `${result.mode} Order Placed: ${result.side} ${result.filledQty} ${result.symbol} @ ${currency}${result.averagePrice.toFixed(2)} (#${result.orderId})`,
     });
-  }, [router, searchParams]);
+    setRecentOrdersRefreshTrigger((prev) => prev + 1);
+    await refreshAll();
+    queryClient.invalidateQueries({ queryKey: ["optionTerminalSnapshot"] });
+    queryClient.invalidateQueries({ queryKey: ["optionsPositions"] });
+    queryClient.invalidateQueries({ queryKey: ["optionsOrders"] });
+  }, [currency, refreshAll, queryClient]);
 
   const handleActionDepth = useCallback((contract: ActionableOptionContract) => {
     setDepthContract(contract);
@@ -685,6 +715,8 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         setIsDrawerOpen(false);
         setIsColumnModalOpen(false);
         setIsFilterModalOpen(false);
+        setIsDirectOrderPanelOpen(false);
+        setIsOrderPreviewOpen(false);
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -834,7 +866,16 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
             onActionBuy={handleActionBuy}
             onActionSell={handleActionSell}
             onActionDepth={handleActionDepth}
+            onDirectOrder={handleDirectOrder}
           />
+
+          {/* Recent Direct Orders Audit Table */}
+          <div className="pt-2">
+            <RecentDirectOrdersTable
+              currency={currency}
+              refreshTrigger={recentOrdersRefreshTrigger}
+            />
+          </div>
         </div>
       )}
 
@@ -917,6 +958,25 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           }}
         />
       )}
+
+      {/* Persistent Direct Option Order Panel */}
+      <DirectOptionOrderPanel
+        isOpen={isDirectOrderPanelOpen}
+        intent={selectedDirectIntent}
+        onClose={() => setIsDirectOrderPanelOpen(false)}
+        onReviewOrder={handleReviewOrder}
+        currency={currency}
+      />
+
+      {/* Actionable Option Order Preview Modal */}
+      <OptionOrderPreviewModal
+        isOpen={isOrderPreviewOpen}
+        preview={selectedOrderPreview}
+        intent={selectedDirectIntent}
+        onClose={() => setIsOrderPreviewOpen(false)}
+        onOrderSuccess={handleOrderSuccess}
+        currency={currency}
+      />
     </div>
   );
 };

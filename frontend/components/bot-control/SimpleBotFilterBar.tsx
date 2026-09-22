@@ -38,10 +38,12 @@ interface SimpleBotFilterBarProps {
 
 const PRIMARY_MARKETS = [
   { id: "ALL", label: "All Markets" },
+  { id: "OPTIONS", label: "Options" },
+  { id: "CALL", label: "Calls (CE)" },
+  { id: "PUT", label: "Puts (PE)" },
+  { id: "FUTURES", label: "Futures" },
   { id: "CRYPTO", label: "Crypto" },
   { id: "INDIAN_STOCKS", label: "India NSE" },
-  { id: "FUTURES", label: "Futures" },
-  { id: "OPTIONS", label: "Options" },
 ];
 
 const MORE_MARKETS = [

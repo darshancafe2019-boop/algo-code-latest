@@ -674,7 +674,18 @@ class AuthoritativeTradeLedger:
             "r_multiple": r_mult
         }
 
+    def get_orders(self, mode: str = "ALL", limit: int = 50) -> List[Dict[str, Any]]:
+        """Returns recent orders from the authoritative unified order ledger via GlobalDataEngine."""
+        try:
+            from src.global_data_engine import GlobalDataEngine
+            gde = GlobalDataEngine.get_instance()
+            return gde.get_orders(mode=mode, limit=limit)
+        except Exception as e:
+            logger.warning(f"Failed to fetch orders via GlobalDataEngine: {e}")
+            return []
+
 
 trade_ledger = AuthoritativeTradeLedger()
 global_trade_ledger = trade_ledger
 TradeLedger = AuthoritativeTradeLedger
+

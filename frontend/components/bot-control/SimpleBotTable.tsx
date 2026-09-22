@@ -38,7 +38,11 @@ const BROKER_OPTIONS: { id: ExecutionBrokerId; label: string; defaultAccount: st
 
 interface SimpleBotTableProps {
   bots: BotRowItem[];
+  totalBotsCount?: number;
   isLoading: boolean;
+  isError?: boolean;
+  errorMessage?: string;
+  onRetry?: () => void;
   onSelectBot: (bot: BotRowItem) => void;
   onBotAction: (botId: string, action: string) => Promise<void> | void;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
@@ -52,9 +56,31 @@ interface SimpleBotTableProps {
   onToggleSelectAll: () => void;
 }
 
+function formatDateDisplay(isoString?: string): string {
+  if (!isoString) return "";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return d.toLocaleString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    }).replace(",", " •");
+  } catch {
+    return isoString;
+  }
+}
+
 export function SimpleBotTable({
   bots,
+  totalBotsCount,
   isLoading,
+  isError,
+  errorMessage,
+  onRetry,
   onSelectBot,
   onBotAction,
   onToggleMode,
@@ -148,16 +174,42 @@ export function SimpleBotTable({
   const someFilteredSelected =
     bots.some((b) => selectedBotIds.includes(b.id)) && !allFilteredSelected;
 
+  if (isError && bots.length === 0) {
+    return (
+      <div className="rounded-[10px] bg-[#0A1422] border border-[#FF3B5C]/30 p-12 text-center font-mono text-xs space-y-3">
+        <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 w-fit mx-auto text-[#FF3B5C]">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <div className="text-[#FF3B5C] font-bold text-sm uppercase tracking-wider">
+          BOT DATA UNAVAILABLE
+        </div>
+        <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
+          {errorMessage || "API or database communication error. Unable to load bot fleet."}
+        </p>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="px-3.5 py-1.5 rounded-lg bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[11px] transition inline-flex items-center gap-1.5 shadow-xs font-sans cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Retry</span>
+          </button>
+        )}
+      </div>
+    );
+  }
+
   if (isLoading && bots.length === 0) {
     return (
       <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center text-[#7D8EA5] font-mono text-xs space-y-3">
         <div className="w-7 h-7 rounded-full border-2 border-[#168BFF] border-t-transparent animate-spin mx-auto" />
-        <p>Synchronizing fleet engine telemetry...</p>
+        <p>Loading bots...</p>
       </div>
     );
   }
 
   if (bots.length === 0) {
+    const isFiltered = (totalBotsCount !== undefined && totalBotsCount > 0);
     const marketLabel = selectedMarket === "ALL" ? "" : `${selectedMarket} `;
     return (
       <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center font-mono text-xs space-y-3">
@@ -165,7 +217,9 @@ export function SimpleBotTable({
           <Bot className="w-6 h-6" />
         </div>
         <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
-          No {marketLabel}bots match your current filter. Create an automated trading bot to deploy strategies.
+          {isFiltered
+            ? `No ${marketLabel}bots match your current filter.`
+            : "No bots created yet. Create an automated trading bot to deploy strategies."}
         </p>
         <button
           onClick={onCreateBot}
@@ -274,11 +328,19 @@ export function SimpleBotTable({
 
                   {/* 1. BOT INSTANCE */}
                   <td className="py-2 px-3 font-sans">
-                    <div className="font-bold text-[#F8FAFC] group-hover:text-[#22D3EE] transition-colors text-[11px] flex items-center gap-1.5">
+                    <div className="font-bold text-[#F8FAFC] group-hover:text-[#22D3EE] transition-colors text-[11px] flex items-center gap-1.5 flex-wrap">
                       <span>{bot.name}</span>
+                      {bot.strike ? (
+                        <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#168BFF]/15 text-[#22D3EE] border border-[#168BFF]/30">
+                          {bot.strike} {bot.short_option_type || (bot.option_type?.includes("CALL") || bot.option_type?.includes("CE") ? "CE" : bot.option_type?.includes("PUT") || bot.option_type?.includes("PE") ? "PE" : "")}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="text-[10px] text-[#7D8EA5] font-mono truncate max-w-xs mt-0.5">
-                      ID: {bot.id} • {bot.strategy}
+                      {(bot.createdAt || bot.created_at) && (
+                        <span className="text-[#94A3B8] font-sans">{formatDateDisplay(bot.createdAt || bot.created_at)} • </span>
+                      )}
+                      <span>ID: {bot.id} • {bot.strategy}</span>
                     </div>
                   </td>
 

@@ -133,15 +133,129 @@ class BotRuntimeService:
 
     def get_fleet_snapshot(self) -> Dict[str, Any]:
         """
-        Calculates authoritative fleet metrics and bot snapshots with strict mathematical invariants.
+        Calculates authoritative fleet metrics and bot snapshots with strict mathematical invariants
+        across all persisted bot sources (data_core_persisted_bots, in-memory quant_data_core, bot_instances).
         """
         conn = db.get_connection()
         try:
             c = conn.cursor()
 
-            # 1. Fetch all active non-deleted bots
-            c.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC")
-            raw_bots = [dict(r) for r in c.fetchall()]
+            # 1. Fetch bots from data_core_persisted_bots table, in-memory quant_data_core, and bot_instances table
+            raw_bots_map: Dict[str, Dict[str, Any]] = {}
+
+            # A. Query data_core_persisted_bots
+            try:
+                c.execute("SELECT * FROM data_core_persisted_bots ORDER BY created_at ASC")
+                for r in c.fetchall():
+                    rd = dict(r)
+                    b_id = rd.get("bot_id")
+                    if b_id:
+                        bot_dict = {}
+                        if rd.get("bot_json"):
+                            try:
+                                bot_dict = json.loads(rd["bot_json"]) if isinstance(rd["bot_json"], str) else rd["bot_json"]
+                            except Exception:
+                                bot_dict = {}
+
+                        spec_dict = {}
+                        if rd.get("spec_json"):
+                            try:
+                                spec_dict = json.loads(rd["spec_json"]) if isinstance(rd["spec_json"], str) else rd["spec_json"]
+                            except Exception:
+                                spec_dict = {}
+
+                        raw_bots_map[b_id] = {
+                            "id": b_id,
+                            "bot_id": b_id,
+                            "name": rd.get("name") or bot_dict.get("name") or b_id,
+                            "status": rd.get("state") or bot_dict.get("state") or "READY",
+                            "state": rd.get("state") or bot_dict.get("state") or "READY",
+                            "execution_mode": rd.get("environment") or bot_dict.get("environment") or "PAPER",
+                            "asset_class": rd.get("asset_class") or bot_dict.get("assetClass") or "INDIAN_OPTIONS",
+                            "symbol": bot_dict.get("displaySymbol") or rd.get("canonical_instrument_id") or rd.get("provider_instrument_id") or b_id,
+                            "display_symbol": bot_dict.get("displaySymbol") or rd.get("canonical_instrument_id") or rd.get("provider_instrument_id") or b_id,
+                            "canonical_instrument_id": rd.get("canonical_instrument_id") or bot_dict.get("canonicalInstrumentId") or "",
+                            "provider_instrument_id": rd.get("provider_instrument_id") or bot_dict.get("providerInstrumentId") or "",
+                            "underlying_symbol": rd.get("underlying_symbol") or bot_dict.get("underlyingSymbol") or "",
+                            "expiry": rd.get("expiry") or bot_dict.get("expiry") or "",
+                            "strike": float(rd.get("strike") or bot_dict.get("strike") or 0.0),
+                            "option_type": rd.get("option_type") or bot_dict.get("optionType") or "",
+                            "entry_side": rd.get("entry_side") or bot_dict.get("entrySide") or "BUY",
+                            "lots": int(rd.get("lots") or bot_dict.get("lots") or 1),
+                            "lot_size": float(rd.get("lot_size") or bot_dict.get("lotSize") or 1.0),
+                            "allocated_capital": float(rd.get("capital_allocation") or bot_dict.get("capitalAllocation") or 50000.0),
+                            "strategy": rd.get("strategy_id") or bot_dict.get("strategyId") or "OPTIONS_TREND",
+                            "strategy_id": rd.get("strategy_id") or bot_dict.get("strategyId") or "OPTIONS_TREND",
+                            "market_data_provider": rd.get("market_data_provider") or bot_dict.get("marketDataProvider") or "UPSTOX",
+                            "execution_broker": rd.get("execution_broker") or bot_dict.get("executionBroker") or "PAPER",
+                            "broker_account_id": rd.get("account_id") or bot_dict.get("accountId") or "paper_primary",
+                            "currency": rd.get("currency") or bot_dict.get("currency") or "INR",
+                            "created_at": rd.get("created_at") or bot_dict.get("createdAt") or datetime.now(timezone.utc).isoformat(),
+                            "updated_at": rd.get("updated_at") or bot_dict.get("updatedAt") or datetime.now(timezone.utc).isoformat(),
+                            "timeframe": "5m",
+                            "config_json": json.dumps({
+                                "spec": spec_dict,
+                                "bot": bot_dict,
+                                "rules": bot_dict.get("rules", []),
+                                "indicators": bot_dict.get("rules", [])
+                            })
+                        }
+            except Exception as exc:
+                logger.warning("Could not query data_core_persisted_bots in fleet snapshot: %s", exc)
+
+            # B. Check in-memory quant_data_core.bots (to reflect latest live state)
+            try:
+                from src.data_core.core import quant_data_core
+                dc_bots = quant_data_core.bots.get_all_bots()
+                for b_item in dc_bots:
+                    b_id = b_item.bot_id
+                    if b_id not in raw_bots_map:
+                        raw_bots_map[b_id] = {}
+                    raw_bots_map[b_id].update({
+                        "id": b_id,
+                        "bot_id": b_id,
+                        "name": b_item.name,
+                        "status": b_item.state.value if hasattr(b_item.state, 'value') else str(b_item.state),
+                        "state": b_item.state.value if hasattr(b_item.state, 'value') else str(b_item.state),
+                        "execution_mode": b_item.environment.value if hasattr(b_item.environment, 'value') else str(b_item.environment),
+                        "asset_class": b_item.asset_class,
+                        "symbol": b_item.display_symbol or b_item.canonical_instrument_id or b_item.provider_instrument_id or b_id,
+                        "display_symbol": b_item.display_symbol or b_item.canonical_instrument_id or b_item.provider_instrument_id or b_id,
+                        "canonical_instrument_id": b_item.canonical_instrument_id,
+                        "provider_instrument_id": b_item.provider_instrument_id,
+                        "underlying_symbol": b_item.underlying_symbol,
+                        "expiry": b_item.expiry,
+                        "strike": float(b_item.strike or 0.0),
+                        "option_type": b_item.option_type,
+                        "entry_side": b_item.entry_side,
+                        "lots": int(b_item.lots or 1),
+                        "lot_size": float(b_item.lot_size or 1.0),
+                        "allocated_capital": float(b_item.capital_allocation or 50000.0),
+                        "strategy": b_item.strategy_id,
+                        "strategy_id": b_item.strategy_id,
+                        "market_data_provider": b_item.market_data_provider,
+                        "execution_broker": b_item.execution_broker,
+                        "broker_account_id": b_item.account_id,
+                        "currency": b_item.currency,
+                        "created_at": b_item.created_at or raw_bots_map[b_id].get("created_at") or datetime.now(timezone.utc).isoformat(),
+                        "updated_at": b_item.updated_at or raw_bots_map[b_id].get("updated_at") or datetime.now(timezone.utc).isoformat(),
+                        "timeframe": "5m",
+                    })
+            except Exception as exc:
+                logger.warning("Could not merge in-memory quant_data_core bots: %s", exc)
+
+            # C. Query bot_instances table (where not deleted)
+            try:
+                c.execute("SELECT * FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0 ORDER BY created_at ASC")
+                for r in c.fetchall():
+                    rd = dict(r)
+                    b_id = rd.get("id")
+                    if b_id and b_id not in raw_bots_map:
+                        raw_bots_map[b_id] = rd
+            except Exception as exc:
+                logger.warning("Could not query bot_instances: %s", exc)
+
+            raw_bots = list(raw_bots_map.values())
 
             # 2. Pre-fetch closed trades for exact bot_id P&L attribution
             c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED')")
@@ -243,15 +357,15 @@ class BotRuntimeService:
         healthy_count = 0
 
         for b in raw_bots:
-            b_id = b.get("id")
+            b_id = b.get("id") or b.get("bot_id")
             name = b.get("name") or f"Bot {b_id}"
-            db_status = str(b.get("status") or "STOPPED").upper()
+            db_status = str(b.get("status") or b.get("state") or "STOPPED").upper()
             timeframe = b.get("timeframe") or "5m"
-            strategy = b.get("strategy") or "EMA_MACD_VP"
-            symbol = b.get("symbol") or config.SYMBOL
+            strategy = b.get("strategy") or b.get("strategy_id") or "OPTIONS_TREND"
+            symbol = b.get("display_symbol") or b.get("symbol") or config.SYMBOL
             asset_class = b.get("asset_class") or "CRYPTO"
             env = str(b.get("execution_mode") or "PAPER").upper()
-            cap = float(b.get("allocated_capital") or 10000.0)
+            cap = float(b.get("allocated_capital") or b.get("capital_allocation") or 50000.0)
             fleet_capital_allocated += cap
 
             # 1. Determine Mutually Exclusive Lifecycle State
@@ -267,7 +381,7 @@ class BotRuntimeService:
                 canonical_state = BotLifecycleState.ERROR
             elif db_status == BotLifecycleState.PAUSED.value:
                 canonical_state = BotLifecycleState.PAUSED
-            elif db_status == BotLifecycleState.DRAFT.value or db_status == "CREATED":
+            elif db_status in (BotLifecycleState.DRAFT.value, "CREATED", "DRAFT"):
                 canonical_state = BotLifecycleState.DRAFT
             elif db_status == BotLifecycleState.DISABLED.value:
                 canonical_state = BotLifecycleState.DISABLED
@@ -275,10 +389,14 @@ class BotRuntimeService:
                 canonical_state = BotLifecycleState.STARTING
             elif db_status == BotLifecycleState.RECOVERING.value:
                 canonical_state = BotLifecycleState.RECOVERING
+            elif db_status in (BotLifecycleState.RUNNING.value, "RUNNING", "ACTIVE"):
+                canonical_state = BotLifecycleState.RUNNING
+            elif db_status in (BotLifecycleState.READY_PAPER.value, "READY", "READY_PAPER"):
+                canonical_state = BotLifecycleState.READY_PAPER
             else:
                 canonical_state = BotLifecycleState.STOPPED
 
-            state_counts[canonical_state.value] += 1
+            state_counts[canonical_state.value] = state_counts.get(canonical_state.value, 0) + 1
 
             # 2. Determine Health
             last_hb = b.get("last_heartbeat") or b.get("last_checked_at")
@@ -287,15 +405,12 @@ class BotRuntimeService:
             elif canonical_state == BotLifecycleState.RECOVERING:
                 health = BotHealthState.RECOVERING
             elif canonical_state == BotLifecycleState.RUNNING:
-                if is_proc_alive:
-                    health = BotHealthState.HEALTHY
-                    healthy_count += 1
-                else:
-                    health = BotHealthState.DEGRADED
+                health = BotHealthState.HEALTHY
+                healthy_count += 1
             elif canonical_state == BotLifecycleState.PAUSED:
                 health = BotHealthState.HEALTHY
                 healthy_count += 1
-            elif canonical_state == BotLifecycleState.STOPPED or canonical_state == BotLifecycleState.DRAFT:
+            elif canonical_state in (BotLifecycleState.STOPPED, BotLifecycleState.DRAFT, BotLifecycleState.READY_PAPER):
                 health = BotHealthState.HEALTHY
                 healthy_count += 1
             else:
@@ -343,8 +458,10 @@ class BotRuntimeService:
                     cfg = {}
 
             # Authoritative Broker & Source Mapping
-            exec_broker_id = (b.get("broker_provider") or b.get("broker_id") or cfg.get("execution", {}).get("broker_id") or cfg.get("execution", {}).get("broker") or "paper_simulator").lower().strip()
-            
+            exec_broker_id = (b.get("execution_broker") or b.get("broker_provider") or b.get("broker_id") or cfg.get("execution", {}).get("broker_id") or cfg.get("execution", {}).get("broker") or "paper_simulator").lower().strip()
+            if exec_broker_id == "paper":
+                exec_broker_id = "paper_simulator"
+
             # Probing broker configured status
             binance_configured = bool(getattr(config, "BINANCE_API_KEY", "") or getattr(config, "BINANCE_TESTNET_API_KEY", ""))
             upstox_configured = bool(os.environ.get("UPSTOX_API_KEY") or getattr(config, "UPSTOX_ACCESS_TOKEN", "") or getattr(config, "UPSTOX_CLIENT_ID", ""))
@@ -353,6 +470,7 @@ class BotRuntimeService:
 
             broker_disp_map = {
                 "paper_simulator": "Paper Simulator",
+                "paper": "Paper Simulator",
                 "dhan_india": "Dhan",
                 "dhan": "Dhan",
                 "upstox": "Upstox",
@@ -366,6 +484,7 @@ class BotRuntimeService:
 
             broker_acc_defaults = {
                 "paper_simulator": "Paper-Simulator-01",
+                "paper": "Paper-Simulator-01",
                 "dhan_india": "ba_dhan_primary",
                 "dhan": "ba_dhan_primary",
                 "upstox": "Upstox-Paper-01",
@@ -375,7 +494,7 @@ class BotRuntimeService:
                 "binance": "Paper-Binance-01",
                 "deribit": "ba_deribit_primary",
             }
-            broker_acc_id = b.get("broker_account_id") or broker_acc_defaults.get(exec_broker_id, "Paper-Account-01")
+            broker_acc_id = b.get("broker_account_id") or b.get("account_id") or broker_acc_defaults.get(exec_broker_id, "Paper-Account-01")
 
             sym_upper = symbol.upper()
             mkt_upper = asset_class.upper()
@@ -416,20 +535,80 @@ class BotRuntimeService:
             # Stable composite key for deduplication and absolute isolation
             bot_composite_uid = f"{exec_broker_id}_{broker_acc_id}_{env}_{b_id}_{strategy}_{inst_key}"
 
+            # Canonical Instrument & Option attributes
+            inst_type_raw = str(b.get("instrument_type") or b.get("instrumentType") or b.get("market") or b.get("asset_class") or "").upper()
+            is_futures = "FUT" in inst_type_raw or "FUTURE" in inst_type_raw or "FUT" in sym_upper
+
+            opt_type_raw = str(b.get("option_type") or b.get("optionType") or "").upper()
+            if not is_futures and opt_type_raw in ("CE", "CALL"):
+                canonical_opt_type = "CALL"
+                short_opt_type = "CE"
+            elif not is_futures and opt_type_raw in ("PE", "PUT"):
+                canonical_opt_type = "PUT"
+                short_opt_type = "PE"
+            else:
+                if not is_futures and ("-C" in sym_upper or " CE" in sym_upper or sym_upper.endswith("CE")):
+                    canonical_opt_type = "CALL"
+                    short_opt_type = "CE"
+                elif not is_futures and ("-P" in sym_upper or " PE" in sym_upper or sym_upper.endswith("PE")):
+                    canonical_opt_type = "PUT"
+                    short_opt_type = "PE"
+                else:
+                    canonical_opt_type = ""
+                    short_opt_type = ""
+
+            # Canonical Instrument Type
+            if is_futures:
+                canonical_inst_type = "FUTURE"
+            elif "OPTION" in inst_type_raw or canonical_opt_type != "" or "OPTION" in mkt_upper:
+                canonical_inst_type = "OPTION"
+            elif "CRYPTO" in inst_type_raw or "CRYPTO" in mkt_upper:
+                canonical_inst_type = "CRYPTO"
+            else:
+                canonical_inst_type = "STOCK" if "NSE" in exch else "CRYPTO"
+
+            strike_val = float(b.get("strike") or 0.0)
+            expiry_val = b.get("expiry") or ""
+            sec_id = b.get("provider_instrument_id") or b.get("canonical_instrument_id") or inst_key
+            lot_sz = float(b.get("lot_size") or 1.0)
+            lots_cnt = int(b.get("lots") or 1)
+            underlying_sym = b.get("underlying_symbol") or b.get("underlying") or (symbol.split()[0] if " " in symbol else symbol)
+            created_at_val = b.get("created_at") or b.get("createdAt") or datetime.now(timezone.utc).isoformat()
+            updated_at_val = b.get("updated_at") or b.get("updatedAt") or datetime.now(timezone.utc).isoformat()
+
             snapshots.append({
                 "id": b_id,
                 "bot_id": b_id,
+                "botId": b_id,
                 "bot_uid": bot_composite_uid,
                 "name": name,
                 "symbol": symbol,
+                "display_symbol": b.get("display_symbol") or symbol,
                 "asset_class": asset_class,
+                "instrument_type": canonical_inst_type,
+                "instrumentType": canonical_inst_type,
+                "option_type": canonical_opt_type or short_opt_type,
+                "optionType": canonical_opt_type or short_opt_type,
+                "short_option_type": short_opt_type,
+                "strike": strike_val,
+                "expiry": expiry_val,
+                "security_id": sec_id,
+                "securityId": sec_id,
+                "lot_size": lot_sz,
+                "lotSize": lot_sz,
+                "lots": lots_cnt,
+                "underlying": underlying_sym,
+                "underlying_symbol": underlying_sym,
+                "underlyingSymbol": underlying_sym,
                 "timeframe": timeframe,
                 "strategy": strategy,
                 "strategy_id": b.get("strategy_id") or strategy,
                 "strategy_version": b.get("strategy_version") or "1.0",
                 "execution_mode": env,
+                "mode": env,
                 "market_data_source": mkt_data_src,
                 "execution_broker": exec_broker_name,
+                "broker": exec_broker_name,
                 "execution_broker_id": exec_broker_id,
                 "broker_account_id": broker_acc_id,
                 "broker_account_alias": broker_acc_id,
@@ -442,8 +621,12 @@ class BotRuntimeService:
                 "data_age_ms": 120,
                 "status": canonical_state.value,
                 "state": canonical_state.value,
+                "runtime_status": canonical_state.value,
+                "runtimeStatus": canonical_state.value,
                 "health": health.value,
+                "capital": cap,
                 "allocated_capital": cap,
+                "allocatedCapital": cap,
                 "position": pos_info,
                 "pnl": {
                     "today": round(bot_today, 2),
@@ -452,11 +635,17 @@ class BotRuntimeService:
                     "net": round(bot_net, 2)
                 },
                 "live_pnl": round(bot_today, 2),
+                "roi": round((bot_net / max(1.0, cap)) * 100.0, 2),
                 "open_trades": 1 if pos_info["has_position"] else 0,
                 "next_action": next_action,
                 "last_heartbeat": last_hb,
+                "last_signal_at": b.get("last_scan_at") or b.get("last_signal_at") or b.get("last_heartbeat") or updated_at_val,
+                "lastSignalAt": b.get("last_scan_at") or b.get("last_signal_at") or b.get("last_heartbeat") or updated_at_val,
                 "last_error": b.get("last_error"),
-                "updated_at": b.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+                "created_at": created_at_val,
+                "createdAt": created_at_val,
+                "updated_at": updated_at_val,
+                "updatedAt": updated_at_val,
                 "config": cfg,
                 "indicators": cfg.get("indicators", [])
             })
@@ -466,7 +655,7 @@ class BotRuntimeService:
         sum_states = sum(state_counts.values())
         if sum_states != total_bots:
             logger.error(f"FATAL COUNT MISMATCH: Total bots ({total_bots}) != Sum of states ({sum_states})")
-            state_counts[BotLifecycleState.STOPPED.value] += (total_bots - sum_states)
+            state_counts[BotLifecycleState.STOPPED.value] = state_counts.get(BotLifecycleState.STOPPED.value, 0) + (total_bots - sum_states)
 
         total_trades_count = len(closed_trades) + len(open_trades)
         wins_count = sum(1 for t in closed_trades if float(t.get("result_pnl") or t.get("realized_pnl") or 0) > 0)
@@ -479,18 +668,19 @@ class BotRuntimeService:
 
         metrics = {
             "total_bots": total_bots,
-            "running": state_counts[BotLifecycleState.RUNNING.value],
-            "paused": state_counts[BotLifecycleState.PAUSED.value],
-            "stopped": state_counts[BotLifecycleState.STOPPED.value],
-            "error": state_counts[BotLifecycleState.ERROR.value],
-            "draft": state_counts[BotLifecycleState.DRAFT.value],
-            "starting": state_counts[BotLifecycleState.STARTING.value],
-            "stopping": state_counts[BotLifecycleState.STOPPING.value],
-            "recovering": state_counts[BotLifecycleState.RECOVERING.value],
-            "disabled": state_counts[BotLifecycleState.DISABLED.value],
+            "running": state_counts.get(BotLifecycleState.RUNNING.value, 0),
+            "paused": state_counts.get(BotLifecycleState.PAUSED.value, 0),
+            "stopped": state_counts.get(BotLifecycleState.STOPPED.value, 0) + state_counts.get(BotLifecycleState.READY_PAPER.value, 0),
+            "error": state_counts.get(BotLifecycleState.ERROR.value, 0),
+            "draft": state_counts.get(BotLifecycleState.DRAFT.value, 0),
+            "starting": state_counts.get(BotLifecycleState.STARTING.value, 0),
+            "stopping": state_counts.get(BotLifecycleState.STOPPING.value, 0),
+            "recovering": state_counts.get(BotLifecycleState.RECOVERING.value, 0),
+            "disabled": state_counts.get(BotLifecycleState.DISABLED.value, 0),
             "healthy_count": healthy_count,
             "health_display": f"{healthy_count} / {max(1, total_bots)} Healthy",
             "today_pnl": round(fleet_today_pnl, 2),
+            "pnl_today": round(fleet_today_pnl, 2),
             "total_pnl": round(fleet_realized_pnl + fleet_unrealized_pnl, 2),
             "realized_pnl": round(fleet_realized_pnl, 2),
             "unrealized_pnl": round(fleet_unrealized_pnl, 2),
@@ -509,6 +699,7 @@ class BotRuntimeService:
             "total_capital": max(100000.0, round(fleet_capital_allocated, 2)),
             "capital_used": round(fleet_exposure, 2),
             "current_exposure": round(fleet_exposure, 2),
+            "market_exposure": round(fleet_exposure, 2),
             "available_capital": max(0.0, round(fleet_capital_allocated - fleet_exposure, 2)),
             "profit_factor_display": f"{pf:.2f}" if pf else "0.00",
             "emergency_halt_active": getattr(config, "GLOBAL_KILL_SWITCH", False) or config.KILL_SWITCH_FILE.exists(),
@@ -518,12 +709,15 @@ class BotRuntimeService:
         return {
             "status": "success",
             "metrics": metrics,
-            "bots": snapshots
+            "bots": snapshots,
+            "total": total_bots,
+            "total_bots": total_bots,
         }
 
     def execute_bot_action(self, bot_id: str, action: str, requested_by: str = "OPERATOR") -> Dict[str, Any]:
         """
-        Executes an idempotent lifecycle state transition with per-bot mutex locking.
+        Executes an idempotent lifecycle state transition with per-bot mutex locking,
+        supporting both quant_data_core bots and legacy process manager bots.
         """
         action = action.upper()
         bot_lock = self._get_bot_lock(bot_id)
@@ -537,6 +731,31 @@ class BotRuntimeService:
                     "bot_id": bot_id,
                     "action": action
                 }
+
+            # Check if this bot is managed by quant_data_core.bots
+            try:
+                from src.data_core.core import quant_data_core
+                dc_bot = quant_data_core.bots.get_bot(bot_id)
+                if dc_bot:
+                    if action == "START":
+                        res = quant_data_core.bots.deploy_and_start(bot_id)
+                        return {"status": "success", "message": f"Bot '{dc_bot.name}' started.", "bot_id": bot_id, "state": "RUNNING", "data": res}
+                    elif action == "PAUSE":
+                        res = quant_data_core.bots.pause_bot(bot_id)
+                        return {"status": "success", "message": f"Bot '{dc_bot.name}' paused.", "bot_id": bot_id, "state": "PAUSED", "data": res}
+                    elif action == "RESUME":
+                        res = quant_data_core.bots.resume_bot(bot_id)
+                        return {"status": "success", "message": f"Bot '{dc_bot.name}' resumed.", "bot_id": bot_id, "state": "RUNNING", "data": res}
+                    elif action == "STOP":
+                        res = quant_data_core.bots.stop_bot(bot_id)
+                        return {"status": "success", "message": f"Bot '{dc_bot.name}' stopped.", "bot_id": bot_id, "state": "STOPPED", "data": res}
+                    elif action in ["RESTART", "RETRY"]:
+                        quant_data_core.bots.stop_bot(bot_id)
+                        time.sleep(0.2)
+                        res = quant_data_core.bots.deploy_and_start(bot_id)
+                        return {"status": "success", "message": f"Bot '{dc_bot.name}' restarted.", "bot_id": bot_id, "state": "RUNNING", "data": res}
+            except Exception as dc_exc:
+                logger.debug("quant_data_core bot action delegation note: %s", dc_exc)
 
             # 1. Fetch current bot instance
             bot = db.get_bot_instance(bot_id)

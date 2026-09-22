@@ -1442,6 +1442,8 @@ def api_bot_control():
         res = bot_manager.pause_bot()
     elif action == "RESUME":
         res = bot_manager.resume_bot()
+    elif action == "RESTART":
+        res = bot_manager.restart_bot()
     elif action == "KILL_SWITCH":
         # Requires 2FA confirmation token check
         if confirmation_token != "CONFIRM-KILL-SWITCH":
@@ -7268,10 +7270,40 @@ def api_bots_events_historical():
     """Historical audit event log query for Bot Events stream sub-tab."""
     limit = int(request.args.get("limit", 100))
     bot_id = request.args.get("bot_id")
-    if bot_id and bot_id != "ALL":
-        events = safe_query("SELECT * FROM bot_event_audit WHERE bot_instance_id = ? ORDER BY id DESC LIMIT ?", (bot_id, limit))
-    else:
-        events = safe_query("SELECT * FROM bot_event_audit ORDER BY id DESC LIMIT ?", (limit,))
+    events = []
+    try:
+        if bot_id and bot_id != "ALL":
+            events = safe_query("SELECT * FROM bot_event_audit WHERE bot_instance_id = ? ORDER BY id DESC LIMIT ?", (bot_id, limit))
+        else:
+            events = safe_query("SELECT * FROM bot_event_audit ORDER BY id DESC LIMIT ?", (limit,))
+    except Exception as exc:
+        logger.warning("Error querying bot_event_audit: %s", exc)
+
+    # If empty, also pull recent decisions from quant_data_core
+    if not events:
+        try:
+            from src.data_core.core import quant_data_core
+            dc_events = []
+            for b in quant_data_core.bots.get_all_bots():
+                if bot_id and bot_id != "ALL" and b.bot_id != bot_id:
+                    continue
+                for d in quant_data_core.bots.get_decisions(b.bot_id):
+                    dc_events.append({
+                        "id": d.decision_id,
+                        "bot_instance_id": b.bot_id,
+                        "bot_id": b.name or b.bot_id,
+                        "event_type": "DECISION",
+                        "decision": d.action,
+                        "regime": d.regime,
+                        "confidence_score": round(d.confidence_score * 100.0, 1),
+                        "bull_score": round(d.confidence_score * 100.0, 1),
+                        "timestamp": d.timestamp,
+                    })
+            if dc_events:
+                events = sorted(dc_events, key=lambda x: str(x.get("timestamp", "")), reverse=True)[:limit]
+        except Exception as dc_exc:
+            logger.debug("Error pulling dc_events: %s", dc_exc)
+
     return jsonify({"status": "success", "events": events})
 
 
@@ -7284,11 +7316,13 @@ def api_bots_list():
         return jsonify({
             "status": "success",
             "metrics": snapshot["metrics"],
-            "bots": snapshot["bots"]
+            "bots": snapshot["bots"],
+            "total": snapshot.get("total", len(snapshot["bots"])),
+            "total_bots": snapshot.get("total", len(snapshot["bots"])),
         })
     except Exception as exc:
         logger.error("Error in api_bots_list: %s", exc)
-        return jsonify({"status": "error", "message": str(exc), "bots": []}), 500
+        return jsonify({"status": "error", "message": str(exc), "bots": [], "total": 0, "total_bots": 0}), 500
 
 
 
@@ -8284,27 +8318,42 @@ def execute_permanent_bot_deletion(bot_id: str, force: bool = False) -> Dict[str
     3. Removes timers/jobs/heartbeats/locks/cache/WebSocket subscriptions.
     4. Detaches and safely preserves any open live/paper positions/orders without closing them.
     5. Preserves all historical orders, fills, trades, positions, P&L, journal and audit history in trades_log.
-    6. Removes bot instance row and indicator profile links from SQLite.
+    6. Removes bot instance row from SQLite (bot_instances and data_core_persisted_bots).
     7. Prevents auto-restoration after restart.
     """
     bots = safe_query("SELECT * FROM bot_instances WHERE id = ?", (bot_id,))
+    data_core_bots = []
     if not bots:
+        try:
+            data_core_bots = safe_query("SELECT * FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
+        except Exception:
+            data_core_bots = []
+
+    if not bots and not data_core_bots:
         return {"status": "not_found", "message": f"Bot instance '{bot_id}' not found."}
 
-    bot = dict(bots[0])
+    bot = dict(bots[0]) if bots else dict(data_core_bots[0])
     bot_name = bot.get("name") or bot_id
     process_id_str = bot.get("process_id", "")
 
-    # 1. Stop and terminate worker process
+    # 1. Stop and terminate worker process / quant_data_core bot
     from src.process_manager import multi_bot_manager, cleanup_orphan_bot_process, kill_process_by_pid
     try:
         if force:
-            if process_id_str and process_id_str.isdigit():
+            if process_id_str and str(process_id_str).isdigit():
                 kill_process_by_pid(int(process_id_str), bot_id=bot_id)
         if bot.get("status") in ["RUNNING", "PAUSED", "STARTING", "RECOVERING", "ERROR"] or multi_bot_manager.is_bot_running(bot_id):
             multi_bot_manager.stop_bot(bot_id)
     except Exception as e:
         logger.warning(f"Error stopping worker for bot {bot_id} (force={force}): {e}")
+
+    try:
+        from src.data_core.core import quant_data_core
+        if bot_id in quant_data_core.bots._bots:
+            quant_data_core.bots.stop_bot(bot_id)
+            quant_data_core.bots._bots.pop(bot_id, None)
+    except Exception as e:
+        logger.warning(f"Error stopping/removing data_core bot {bot_id}: {e}")
 
     try:
         cleanup_orphan_bot_process(bot_id)
@@ -8346,6 +8395,10 @@ def execute_permanent_bot_deletion(bot_id: str, force: bool = False) -> Dict[str
         conn.execute("DELETE FROM bot_config_versions WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM bot_indicator_profiles WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+        try:
+            conn.execute("DELETE FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
+        except Exception:
+            pass
         conn.commit()
     except Exception as exc:
         conn.rollback()
@@ -17622,11 +17675,95 @@ def api_options_strategy_preset():
 
 @app.route("/api/options/order/validate", methods=["POST"])
 def api_options_order_validate():
-    """Runs 14-Point Pre-Flight Validation Gate on options trade intent."""
-    from src.market_data.options_workstation_service import global_options_service
+    """Runs Pre-Flight Validation Gate on options trade intent or canonical OptionOrderIntent."""
     payload = request.get_json(force=True, silent=True) or {}
+    
+    # Check if canonical OptionOrderIntent
+    if "strike" in payload and ("optionType" in payload or "option_type" in payload or "underlying" in payload):
+        try:
+            from src.option_order_intent import OptionOrderIntent
+            from src.broker_router import global_broker_router
+            intent = OptionOrderIntent.from_dict(payload)
+            is_valid, err_code, err_msg = global_broker_router.validate_intent(intent)
+            
+            notional = round(intent.quantity * (intent.price if intent.price > 0 else (intent.ltp or 100.0)), 2)
+            fees = round(20.0 + (notional * 0.0005), 2)
+            
+            return jsonify({
+                "is_valid": is_valid,
+                "overall_status": "APPROVED" if is_valid else "REJECTED",
+                "errorCode": err_code if not is_valid else None,
+                "message": err_msg,
+                "required_margin": notional,
+                "estimated_fees": fees,
+                "mode": intent.mode,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as e:
+            return jsonify({
+                "is_valid": False,
+                "overall_status": "REJECTED",
+                "errorCode": "INVALID_PARAMETERS",
+                "message": str(e),
+            }), 400
+
+    from src.market_data.options_workstation_service import global_options_service
     result = global_options_service.validate_order(payload)
     return jsonify(result)
+
+
+@app.route("/api/options/order/direct", methods=["POST"])
+def api_options_order_direct():
+    """
+    Direct Option Order Execution Endpoint.
+    Consumes canonical OptionOrderIntent and executes through OMS and BrokerRouter.
+    """
+    from src.option_order_intent import OptionOrderIntent
+    from src.broker_router import global_broker_router
+    
+    payload = request.get_json(force=True, silent=True) or {}
+    try:
+        intent = OptionOrderIntent.from_dict(payload)
+    except Exception as e:
+        return jsonify({
+            "status": "rejected",
+            "success": False,
+            "errorCode": "INVALID_PARAMETERS",
+            "errorReason": str(e),
+            "message": f"Invalid order parameters: {str(e)}"
+        }), 400
+
+    result = global_broker_router.execute_order(intent)
+    status_code = 200 if result.get("success") else 400
+    if result.get("errorCode") in ["LIVE_TRADING_DISABLED", "KILL_SWITCH_ACTIVE", "AUTH_EXPIRED", "RISK_LIMIT_EXCEEDED"]:
+        status_code = 403
+    return jsonify(result), status_code
+
+
+@app.route("/api/options/order/recent", methods=["GET"])
+def api_options_order_recent():
+    """Returns recent direct option orders from Paper OMS and connected adapters."""
+    from src.broker_router import global_broker_router
+    orders = global_broker_router.get_recent_orders()
+    return jsonify({
+        "status": "success",
+        "count": len(orders),
+        "orders": orders,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+@app.route("/api/options/order/cancel", methods=["POST"])
+def api_options_order_cancel():
+    """Cancels an active or pending option order."""
+    from src.broker_router import global_broker_router
+    payload = request.get_json(force=True, silent=True) or {}
+    order_id = payload.get("order_id") or payload.get("orderId")
+    broker = payload.get("broker")
+    if not order_id:
+        return jsonify({"status": "error", "message": "order_id is required"}), 400
+    res = global_broker_router.cancel_order(order_id, broker)
+    return jsonify(res)
 
 
 @app.route("/api/options/order/execute", methods=["POST"])

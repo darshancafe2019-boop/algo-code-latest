@@ -70,15 +70,18 @@ export function BotControlTab() {
   const {
     data: fleetData,
     isLoading,
+    isError,
+    error: queryError,
     refetch,
   } = useQuery<{
     status: string;
     metrics: FleetMetrics;
     bots: BotRowItem[];
+    total?: number;
   }>({
     queryKey: ["authoritativeFleetBots"],
     queryFn: async () => {
-      const res = await apiClient.get<any>("/api/bots", { timeoutMs: 6000 });
+      const res = await apiClient.get<any>("/api/bots", { timeoutMs: 8000 });
       if (!res.ok) throw new Error(res.error?.message || "Failed to load bot fleet snapshot");
       return res.data;
     },
@@ -136,18 +139,41 @@ export function BotControlTab() {
       // Market filter
       if (selectedMarket !== "ALL") {
         const mkt = (bot.asset_class || "").toUpperCase();
-        if (selectedMarket === "CRYPTO" && !mkt.includes("CRYPTO")) return false;
-        if (selectedMarket === "INDIAN_STOCKS" && !mkt.includes("INDIAN") && !mkt.includes("NSE")) return false;
-        if (selectedMarket === "FUTURES" && !mkt.includes("FUTURES")) return false;
-        if (selectedMarket === "OPTIONS" && !mkt.includes("OPTIONS")) return false;
-        if (selectedMarket === "FOREX" && !mkt.includes("FOREX")) return false;
-        if (selectedMarket === "COMMODITIES" && !mkt.includes("COMMODITIES")) return false;
-        if (selectedMarket === "US_EQUITY" && !mkt.includes("US") && !mkt.includes("EQUITY")) return false;
+        const instType = (bot.instrument_type || bot.instrumentType || "").toUpperCase();
+        const optType = (bot.option_type || bot.optionType || "").toUpperCase();
+        const sym = (bot.symbol || "").toUpperCase();
+        const nameUpper = (bot.name || "").toUpperCase();
+
+        if (selectedMarket === "OPTIONS") {
+          const isOption = mkt.includes("OPTION") || instType === "OPTION" || optType !== "" || sym.includes(" CE") || sym.includes(" PE") || sym.endsWith("CE") || sym.endsWith("PE") || sym.includes("-C") || sym.includes("-P");
+          if (!isOption) return false;
+        } else if (selectedMarket === "CALL") {
+          const isCall = optType === "CALL" || optType === "CE" || sym.includes("CE") || sym.includes("CALL") || nameUpper.includes("CE") || nameUpper.includes("CALL") || sym.includes("-C");
+          if (!isCall) return false;
+        } else if (selectedMarket === "PUT") {
+          const isPut = optType === "PUT" || optType === "PE" || sym.includes("PE") || sym.includes("PUT") || nameUpper.includes("PE") || nameUpper.includes("PUT") || sym.includes("-P");
+          if (!isPut) return false;
+        } else if (selectedMarket === "FUTURES") {
+          const isFut = mkt.includes("FUT") || instType === "FUTURE" || sym.includes("FUT") || nameUpper.includes("FUT");
+          if (!isFut) return false;
+        } else if (selectedMarket === "CRYPTO") {
+          const isCrypto = mkt.includes("CRYPTO") || instType === "CRYPTO" || sym.includes("BTC") || sym.includes("ETH") || sym.includes("SOL") || sym.includes("USDT");
+          if (!isCrypto) return false;
+        } else if (selectedMarket === "INDIAN_STOCKS") {
+          const isIndian = mkt.includes("INDIAN") || mkt.includes("NSE") || (bot.exchange || "").toUpperCase().includes("NSE") || (bot.market_data_source || "").toUpperCase().includes("UPSTOX") || (bot.execution_broker || "").toUpperCase().includes("DHAN") || sym.includes("NIFTY") || sym.includes("BANKNIFTY") || sym.includes("RELIANCE");
+          if (!isIndian) return false;
+        } else if (selectedMarket === "FOREX") {
+          if (!mkt.includes("FOREX")) return false;
+        } else if (selectedMarket === "COMMODITIES") {
+          if (!mkt.includes("COMMODITIES") && !mkt.includes("COMMODITY")) return false;
+        } else if (selectedMarket === "US_EQUITY") {
+          if (!mkt.includes("US") && !mkt.includes("EQUITY")) return false;
+        }
       }
 
       // Broker Source Filter
       if (selectedBroker !== "ALL") {
-        const brk = (bot.execution_broker_id || bot.execution_broker || bot.market_data_source || "").toUpperCase();
+        const brk = (bot.execution_broker_id || bot.execution_broker || bot.broker || bot.market_data_source || "").toUpperCase();
         if (selectedBroker === "PAPER" && !brk.includes("PAPER") && !brk.includes("SIM")) return false;
         if (selectedBroker === "BINANCE" && !brk.includes("BINANCE")) return false;
         if (selectedBroker === "UPSTOX" && !brk.includes("UPSTOX")) return false;
@@ -157,13 +183,25 @@ export function BotControlTab() {
 
       // Status filter
       if (statusFilter !== "ALL") {
-        const st = (bot.status || bot.state || "").toUpperCase();
-        if (st !== statusFilter) return false;
+        const st = (bot.status || bot.state || bot.runtime_status || bot.runtimeStatus || "").toUpperCase();
+        if (statusFilter === "RUNNING" || statusFilter === "ACTIVE") {
+          if (st !== "RUNNING" && st !== "ACTIVE") return false;
+        } else if (statusFilter === "PAUSED") {
+          if (st !== "PAUSED" && st !== "PAUSING") return false;
+        } else if (statusFilter === "STOPPED") {
+          if (st !== "STOPPED" && st !== "STOPPING" && st !== "DRAFT" && st !== "DISABLED" && st !== "READY_PAPER" && st !== "READY") return false;
+        } else if (statusFilter === "DRAFT") {
+          if (st !== "DRAFT" && st !== "CREATED") return false;
+        } else if (statusFilter === "ERROR") {
+          if (st !== "ERROR" && st !== "QUARANTINED") return false;
+        } else {
+          if (st !== statusFilter) return false;
+        }
       }
 
       // Mode / Env filter
       if (envFilter !== "ALL") {
-        const env = (bot.execution_mode || "").toUpperCase();
+        const env = (bot.execution_mode || bot.mode || "").toUpperCase();
         if (env !== envFilter) return false;
       }
 
@@ -175,6 +213,8 @@ export function BotControlTab() {
           bot.symbol.toLowerCase().includes(q) ||
           bot.strategy.toLowerCase().includes(q) ||
           bot.id.toLowerCase().includes(q) ||
+          (bot.underlying && bot.underlying.toLowerCase().includes(q)) ||
+          (bot.underlying_symbol && bot.underlying_symbol.toLowerCase().includes(q)) ||
           (bot.market_data_source && bot.market_data_source.toLowerCase().includes(q)) ||
           (bot.execution_broker && bot.execution_broker.toLowerCase().includes(q)) ||
           (bot.broker_account_id && bot.broker_account_id.toLowerCase().includes(q));
@@ -810,6 +850,10 @@ export function BotControlTab() {
         <SimpleBotTable
           bots={filteredBots}
           isLoading={isLoading}
+          totalBotsCount={rawBots.length}
+          isError={isError}
+          errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
+          onRetry={() => refetch()}
           onSelectBot={handleSelectBot}
           onBotAction={handleBotAction}
           onToggleMode={handleToggleBotMode}
@@ -826,6 +870,10 @@ export function BotControlTab() {
         <BotCardGrid
           bots={filteredBots}
           isLoading={isLoading}
+          totalBotsCount={rawBots.length}
+          isError={isError}
+          errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
+          onRetry={() => refetch()}
           onSelectBot={handleSelectBot}
           onBotAction={handleBotAction}
           onToggleMode={handleToggleBotMode}

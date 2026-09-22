@@ -25,6 +25,10 @@ import { BotRowItem } from "@/types/bot-control";
 interface BotCardGridProps {
   bots: BotRowItem[];
   isLoading: boolean;
+  totalBotsCount?: number;
+  isError?: boolean;
+  errorMessage?: string;
+  onRetry?: () => void;
   onSelectBot: (bot: BotRowItem) => void;
   onBotAction: (botId: string, action: string) => Promise<void> | void;
   onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
@@ -38,6 +42,10 @@ interface BotCardGridProps {
 export function BotCardGrid({
   bots,
   isLoading,
+  totalBotsCount,
+  isError,
+  errorMessage,
+  onRetry,
   onSelectBot,
   onBotAction,
   onToggleMode,
@@ -72,16 +80,40 @@ export function BotCardGrid({
     }
   };
 
-  if (isLoading && bots.length === 0) {
+  if (isLoading && bots.length === 0 && !isError) {
     return (
       <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center text-[#7D8EA5] font-mono text-xs space-y-3">
         <div className="w-7 h-7 rounded-full border-2 border-[#168BFF] border-t-transparent animate-spin mx-auto" />
-        <p>Synchronizing bot fleet cards...</p>
+        <p>Loading bots...</p>
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="rounded-[10px] bg-[#0A1422] border border-[#FF3B5C]/30 p-12 text-center font-mono text-xs space-y-3">
+        <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 w-fit mx-auto text-[#FF3B5C]">
+          <AlertTriangle className="w-6 h-6" />
+        </div>
+        <div className="space-y-1">
+          <p className="text-[#FF3B5C] font-bold uppercase tracking-wider text-xs">BOT DATA UNAVAILABLE</p>
+          <p className="text-[#7D8EA5] text-[11px] font-sans">{errorMessage || "API or Database Connection Error"}</p>
+        </div>
+        {onRetry && (
+          <button
+            onClick={onRetry}
+            className="px-3.5 py-1.5 rounded-lg bg-[#FF3B5C]/20 hover:bg-[#FF3B5C]/30 text-[#FF3B5C] border border-[#FF3B5C]/40 font-semibold text-[11px] transition inline-flex items-center gap-1.5 font-sans cursor-pointer"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>RETRY</span>
+          </button>
+        )}
       </div>
     );
   }
 
   if (bots.length === 0) {
+    const isTrueEmpty = (totalBotsCount !== undefined && totalBotsCount === 0);
     const marketLabel = selectedMarket === "ALL" ? "" : `${selectedMarket} `;
     return (
       <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center font-mono text-xs space-y-3">
@@ -89,7 +121,9 @@ export function BotCardGrid({
           <Bot className="w-6 h-6" />
         </div>
         <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
-          No {marketLabel}bots match your current filter. Create a new automated trading bot to deploy strategies.
+          {isTrueEmpty
+            ? "No bots created yet. Create a new automated trading bot to deploy strategies."
+            : `No ${marketLabel}bots match your current filter.`}
         </p>
         <button
           onClick={onCreateBot}

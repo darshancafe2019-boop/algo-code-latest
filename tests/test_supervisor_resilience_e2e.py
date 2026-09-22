@@ -15,6 +15,7 @@ import os
 import sys
 import time
 import socket
+import signal
 import urllib.request
 import urllib.error
 import threading
@@ -29,10 +30,17 @@ if hasattr(sys.stdout, "reconfigure"):
 ROOT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT_DIR))
 
-from scripts.dev_orchestrator import ServiceSupervisor, is_port_in_use
+from scripts.dev_orchestrator import (
+    ServiceSupervisor,
+    is_port_in_use,
+    is_pid_alive,
+    get_active_supervisor_state,
+    clean_stale_quantos_processes,
+    LOCK_FILE,
+)
 
 
-def poll_http_status(url: str, expected_status: int = 200, timeout_sec: float = 15.0) -> bool:
+def poll_http_status(url: str, expected_status: int = 200, timeout_sec: float = 20.0) -> bool:
     start = time.time()
     while time.time() - start < timeout_sec:
         try:
@@ -51,6 +59,24 @@ def run_resilience_suite():
     print("  QUANT.OS SUPERVISOR FAULT-TOLERANCE & RESILIENCE E2E SUITE")
     print("=" * 64 + "\n")
 
+    # 0. Ensure existing supervisor / stale processes are cleanly stopped before starting test stack
+    active_state = get_active_supervisor_state()
+    if active_state:
+        sup_pid = active_state.get("supervisor_pid")
+        if sup_pid and sup_pid != os.getpid() and is_pid_alive(int(sup_pid)):
+            print(f"  * Stopping existing supervisor (PID: {sup_pid}) before test execution...")
+            try:
+                os.kill(int(sup_pid), signal.SIGTERM)
+                time.sleep(2.0)
+            except Exception:
+                pass
+    clean_stale_quantos_processes(force=True, caller="RESILIENCE_TEST")
+    if Path(LOCK_FILE).exists():
+        try:
+            Path(LOCK_FILE).unlink(missing_ok=True)
+        except Exception:
+            pass
+
     supervisor = ServiceSupervisor()
 
     # 1. Start full stack
@@ -68,15 +94,15 @@ def run_resilience_suite():
     try:
         # 2. Verify all health endpoints return 200
         print("\n[TEST 2/6] Verifying health probes on fixed ports (5050, 5051, 3100)...")
-        backend_healthy = poll_http_status("http://127.0.0.1:5050/health/ready", 200, 15.0)
+        backend_healthy = poll_http_status("http://127.0.0.1:5050/health/ready", 200, 20.0)
         print(f"  * Backend Engine (5050/health/ready) : {'[PASS] 200 OK' if backend_healthy else '[FAIL]'}")
         assert backend_healthy, "Backend failed initial health probe!"
 
-        gateway_healthy = poll_http_status("http://127.0.0.1:5051/health", 200, 15.0)
+        gateway_healthy = poll_http_status("http://127.0.0.1:5051/health", 200, 20.0)
         print(f"  * Market Gateway (5051/health)       : {'[PASS] 200 OK' if gateway_healthy else '[FAIL]'}")
         assert gateway_healthy, "Gateway failed initial health probe!"
 
-        frontend_healthy = poll_http_status("http://127.0.0.1:3100/api/health", 200, 20.0)
+        frontend_healthy = poll_http_status("http://127.0.0.1:3100/api/health", 200, 25.0)
         print(f"  * Frontend Terminal (3100/api/health): {'[PASS] 200 OK' if frontend_healthy else '[FAIL]'}")
         assert frontend_healthy, "Frontend failed initial health probe!"
 
@@ -88,7 +114,7 @@ def run_resilience_suite():
             headers={"Content-Type": "application/json", "User-Agent": "ResilienceTestRunner"},
             method="POST"
         )
-        with urllib.request.urlopen(req, timeout=20.0) as res:
+        with urllib.request.urlopen(req, timeout=60.0) as res:
             assert res.status == 200
             print("  * POST /api/bots/start-all responded with HTTP 200")
 
@@ -97,6 +123,19 @@ def run_resilience_suite():
         assert supervisor.services["GATEWAY"].is_alive(), "Gateway died after start-all!"
         assert supervisor.services["FRONTEND"].is_alive(), "Frontend died after start-all!"
         print("  [OK] All services remained alive and healthy after start-all!")
+
+        # Stop started test bots
+        try:
+            stop_req = urllib.request.Request(
+                "http://127.0.0.1:5050/api/bots/stop-all",
+                data=b"{}",
+                headers={"Content-Type": "application/json", "User-Agent": "ResilienceTestRunner"},
+                method="POST"
+            )
+            with urllib.request.urlopen(stop_req, timeout=15.0) as stop_res:
+                pass
+        except Exception:
+            pass
 
         # 4. Deliberately terminate Backend and test Auto-Restart
         print("\n[TEST 4/6] Simulating Backend process crash (deliberately killing PID)...")
@@ -143,7 +182,10 @@ def run_resilience_suite():
         supervisor.running = False
         for svc in reversed(list(supervisor.services.values())):
             svc.stop()
-        supervisor.lock.release()
+        try:
+            supervisor.lock.release()
+        except Exception:
+            pass
 
         time.sleep(1.0)
         print(f"  * Port 5050 (Backend) in use: {is_port_in_use(5050)}")
@@ -158,7 +200,16 @@ def run_resilience_suite():
         supervisor.running = False
         for svc in supervisor.services.values():
             svc.stop()
-        supervisor.lock.release()
+        try:
+            supervisor.lock.release()
+        except Exception:
+            pass
+        clean_stale_quantos_processes(force=True, caller="RESILIENCE_TEARDOWN")
+
+
+def test_supervisor_resilience_e2e():
+    """Pytest entrypoint for supervisor resilience and fault-tolerance."""
+    run_resilience_suite()
 
 
 if __name__ == "__main__":

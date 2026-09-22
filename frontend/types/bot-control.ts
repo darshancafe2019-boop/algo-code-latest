@@ -121,8 +121,31 @@ export interface BotRowItem {
   last_reconciliation_timestamp?: string;
   status: string;
   state: string;
+  runtime_status?: string;
+  runtimeStatus?: string;
   health: string;
+  mode?: string;
+  instrument_type?: string;
+  instrumentType?: string;
+  option_type?: string;
+  optionType?: string;
+  short_option_type?: string;
+  strike?: number;
+  expiry?: string;
+  security_id?: string;
+  securityId?: string;
+  lot_size?: number;
+  lotSize?: number;
+  lots?: number;
+  underlying?: string;
+  underlying_symbol?: string;
+  underlyingSymbol?: string;
+  display_symbol?: string;
+  broker?: string;
+  capital?: number;
+  allocatedCapital?: number;
   allocated_capital: number;
+  roi?: number;
   position: {
     has_position: boolean;
     direction: string;
@@ -141,8 +164,13 @@ export interface BotRowItem {
   live_pnl: number;
   next_action: string;
   last_heartbeat?: string;
+  last_signal_at?: string;
+  lastSignalAt?: string;
   last_error?: string;
+  created_at?: string;
+  createdAt?: string;
   updated_at: string;
+  updatedAt?: string;
   config: Record<string, any>;
   indicators: any[];
 }

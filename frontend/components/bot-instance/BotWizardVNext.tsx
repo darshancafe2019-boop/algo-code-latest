@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useQuantDataCore } from "@/context/QuantDataCoreContext";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 import { Environment, ProviderInfo, BrokerAccount } from "@/types/data-core";
@@ -25,7 +26,8 @@ const WIZARD_STEPS = [
 export function BotWizardVNext() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { activeIntent, loadStoredIntent } = useBotCreationIntentStore();
+  const queryClient = useQueryClient();
+  const { activeIntent, loadStoredIntent, clearIntent } = useBotCreationIntentStore();
   const { environment, setEnvironment, providers, accounts } = useQuantDataCore();
 
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -53,6 +55,14 @@ export function BotWizardVNext() {
   const [contractStrike, setContractStrike] = useState<number>(24600);
   const [contractExpiry, setContractExpiry] = useState<string>("2026-03-27");
   const [contractOptionType, setContractOptionType] = useState<string>("CE");
+  const [contractUnderlying, setContractUnderlying] = useState<string>("NIFTY");
+  const [entrySide, setEntrySide] = useState<"BUY" | "SELL">("BUY");
+  const [contractLotSize, setContractLotSize] = useState<number>(1);
+  const [contractLtp, setContractLtp] = useState<number>(0);
+  const [contractBid, setContractBid] = useState<number>(0);
+  const [contractAsk, setContractAsk] = useState<number>(0);
+  const [creationOrigin, setCreationOrigin] = useState<string>("MANUAL");
+  const [providerInstrumentId, setProviderInstrumentId] = useState<string>("");
 
   // Step 3: Data Sources
   const [marketDataProvider, setMarketDataProvider] = useState<string>("UPSTOX");
@@ -83,57 +93,117 @@ export function BotWizardVNext() {
   const [orderType, setOrderType] = useState<string>("MARKET");
   const [maxSlippagePct, setMaxSlippagePct] = useState<number>(0.2);
 
-  // Ingest Option Chain Intent or Query Parameters on Mount
+  // Ingest Option Chain Intent or Query Parameters on Mount.
+  // IMPORTANT: preserve the exact option selected in Option Chain.
   useEffect(() => {
     const stored = activeIntent || loadStoredIntent();
+
     const querySymbol = searchParams?.get("symbol");
+    const querySide = searchParams?.get("side");
     const queryStrike = searchParams?.get("strike");
     const queryExpiry = searchParams?.get("expiry");
     const queryOptionType = searchParams?.get("optionType");
     const queryUnderlying = searchParams?.get("underlying");
-    const queryProvider = searchParams?.get("marketDataSource") || searchParams?.get("broker");
+    const queryProvider =
+      searchParams?.get("marketDataSource") || searchParams?.get("broker");
+    const queryBroker = searchParams?.get("broker");
     const queryAssetClass = searchParams?.get("assetClass");
-    const queryCanonical = searchParams?.get("canonicalContractId") || searchParams?.get("canonicalSymbol");
+    const queryCanonical =
+      searchParams?.get("canonicalContractId") ||
+      searchParams?.get("canonicalSymbol");
+    const queryInstrumentId = searchParams?.get("instrumentId");
+    const querySecurityId = searchParams?.get("securityId");
+    const queryLotSize = searchParams?.get("lotSize");
+    const queryLtp = searchParams?.get("ltp");
+    const queryBid = searchParams?.get("bid");
+    const queryAsk = searchParams?.get("ask");
+    const queryOrigin = searchParams?.get("origin");
 
-    if (querySymbol || stored) {
-      const sym = querySymbol || stored?.symbol || "NIFTY 24600 CE";
-      const und = queryUnderlying || stored?.underlying || (sym.includes("BTC") ? "BTC" : "NIFTY");
-      const prov = queryProvider || stored?.marketDataSource || stored?.broker || "UPSTOX";
-      const strikeVal = queryStrike ? Number(queryStrike) : (stored?.strike || (und === "BTC" ? 85000 : 24600));
-      const expVal = queryExpiry || stored?.expiry || "2026-03-27";
-      const optType = queryOptionType || stored?.optionType || "CE";
-      const isCrypto = und === "BTC" || und === "ETH" || sym.includes("BTC") || sym.includes("ETH");
+    if (!querySymbol && !stored) return;
 
-      setBotName(`${und} ${strikeVal} ${optType} Bot`);
-      setDisplaySymbol(sym);
-      setContractStrike(strikeVal);
-      setContractExpiry(expVal);
-      setContractOptionType(optType);
+    const symbol = querySymbol || stored?.symbol || "";
+    const underlying = (queryUnderlying || stored?.underlying || "NIFTY").toUpperCase();
+    const side = querySide || stored?.side || "BUY";
+    const strike = queryStrike ? Number(queryStrike) : Number(stored?.strike || 0);
+    const expiry = queryExpiry || stored?.expiry || "";
+    const rawOptionType = String(queryOptionType || stored?.optionType || "CE").toUpperCase();
+    const optionType = rawOptionType === "CALL" ? "CE" : rawOptionType === "PUT" ? "PE" : rawOptionType;
+    const provider =
+      queryProvider || stored?.marketDataSource || stored?.broker || "UPSTOX";
+    const broker = queryBroker || stored?.broker || "PAPER";
+    const resolvedProviderInstrumentId =
+      queryInstrumentId ||
+      stored?.instrumentId ||
+      querySecurityId ||
+      stored?.securityId ||
+      symbol;
+    const canonicalId =
+      queryCanonical ||
+      stored?.canonicalContractId ||
+      stored?.canonicalSymbol ||
+      resolvedProviderInstrumentId ||
+      symbol;
+    const lotSize = queryLotSize
+      ? Number(queryLotSize)
+      : Number(stored?.lotSize || 1);
+    const ltp = queryLtp
+      ? Number(queryLtp)
+      : Number(stored?.currentPrice || 0);
+    const bid = queryBid ? Number(queryBid) : Number(stored?.bid || 0);
+    const ask = queryAsk ? Number(queryAsk) : Number(stored?.ask || 0);
+    const origin = queryOrigin || stored?.origin || "MANUAL";
 
-      if (isCrypto) {
-        setCurrency("USD");
-        setMaxPositionSize(1);
-        setCapitalAllocation(10000);
-      } else {
-        setCurrency("INR");
-        setMaxPositionSize(50);
-        setCapitalAllocation(50000);
-      }
+    const rawAssetClass =
+      queryAssetClass ||
+      stored?.assetClass ||
+      (["BTC", "ETH", "SOL", "XRP", "BNB"].includes(underlying)
+        ? "CRYPTO_OPTIONS"
+        : "INDIAN_OPTIONS");
 
-      if (queryCanonical || stored?.canonicalSymbol || stored?.canonicalContractId) {
-        setCanonicalInstrumentId(queryCanonical || stored?.canonicalContractId || stored?.canonicalSymbol || "");
-      } else {
-        setCanonicalInstrumentId(`${isCrypto ? "CRYPTO" : "NSE"}:${und}:${expVal}:${strikeVal}:${optType}`);
-      }
+    // Option Chain currently sends OPTIONS for Indian options.
+    const normalizedAssetClass =
+      rawAssetClass === "OPTIONS" ? "INDIAN_OPTIONS" : rawAssetClass;
 
-      if (queryAssetClass || stored?.assetClass) {
-        setAssetClass(queryAssetClass || stored?.assetClass || (isCrypto ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS"));
-      }
-      if (prov) {
-        setMarketDataProvider(prov);
-      }
+    const isCrypto =
+      normalizedAssetClass === "CRYPTO_OPTIONS" ||
+      ["BTC", "ETH", "SOL", "XRP", "BNB"].includes(underlying);
+
+    setBotName(`${underlying} ${strike} ${optionType} ${side} Bot`);
+    setDisplaySymbol(symbol);
+    setContractUnderlying(underlying);
+    setContractStrike(Number.isFinite(strike) ? strike : 0);
+    setContractExpiry(expiry);
+    setContractOptionType(optionType);
+    setEntrySide(side === "SELL" ? "SELL" : "BUY");
+    setContractLotSize(Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 1);
+    setContractLtp(Number.isFinite(ltp) ? ltp : 0);
+    setContractBid(Number.isFinite(bid) ? bid : 0);
+    setContractAsk(Number.isFinite(ask) ? ask : 0);
+    setCreationOrigin(origin);
+    setProviderInstrumentId(resolvedProviderInstrumentId);
+    setCanonicalInstrumentId(canonicalId);
+    setAssetClass(normalizedAssetClass);
+    setMarketDataProvider(provider);
+
+    // Quantity follows the real lot size selected in the chain.
+    setMaxPositionSize(Number.isFinite(lotSize) && lotSize > 0 ? lotSize : 1);
+
+    if (isCrypto) {
+      setCurrency("USD");
+      setCapitalAllocation(10000);
+    } else {
+      setCurrency("INR");
+      setCapitalAllocation(50000);
     }
-  }, [searchParams, activeIntent, loadStoredIntent]);
+
+    // Keep PAPER safe by default. Only route to a live broker when the wizard
+    // environment is explicitly LIVE.
+    if (envMode === "LIVE" && broker && broker !== "PAPER") {
+      setExecutionBroker(broker);
+    } else if (envMode === "PAPER") {
+      setExecutionBroker("PAPER");
+    }
+  }, [searchParams, activeIntent, loadStoredIntent, envMode]);
 
   // Auto-select account when available
   useEffect(() => {
@@ -193,59 +263,64 @@ export function BotWizardVNext() {
     activeAccount,
   ]);
 
-  // Canonical Bot Deployment Spec
+  // Canonical Bot Deployment Spec.
+  // A BUY/SELL click from Option Chain must create exactly ONE selected option leg.
   const botSpec = useMemo(() => {
-    const isCrypto = assetClass === "CRYPTO" || assetClass === "CRYPTO_OPTIONS" || canonicalInstrumentId.includes("BTC") || canonicalInstrumentId.includes("ETH");
-    const underlyingSym = isCrypto ? "BTC" : (canonicalInstrumentId.includes("BANKNIFTY") ? "BANKNIFTY" : "NIFTY");
-    const baseStrike = contractStrike || (isCrypto ? 85000.0 : 24600.0);
-    const spreadOffset = isCrypto ? 2000.0 : 100.0;
-    const optType = contractOptionType || "CE";
-    const expiryDate = contractExpiry || "2026-03-27";
+    const isCrypto =
+      assetClass === "CRYPTO_OPTIONS" || assetClass === "CRYPTO_FUTURES";
+    const exchange = isCrypto ? "DELTA" : "NSE";
+    const underlyingCanonicalId = `${exchange}:${contractUnderlying}`;
+    const actualCanonicalInstrumentId =
+      canonicalInstrumentId ||
+      `${exchange}:${contractUnderlying}:${contractExpiry}:${contractStrike}:${contractOptionType}`;
+    const safeLotSize =
+      Number.isFinite(contractLotSize) && contractLotSize > 0 ? contractLotSize : 1;
 
     return {
       botId,
       botName,
+      description,
+      groupName,
+      tags: tags
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
       environment: envMode as "PAPER" | "LIVE",
       strategyType: strategyId,
-      underlyingSymbol: underlyingSym,
-      underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
-      expiry: expiryDate,
+      assetClass,
+      creationOrigin,
+      underlyingSymbol: contractUnderlying,
+      underlyingCanonicalId,
+      expiry: contractExpiry,
       legs: [
         {
           legId: "leg_1",
-          canonicalInstrumentId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}:${expiryDate}:${baseStrike}:${optType}`,
-          underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
-          underlyingSymbol: underlyingSym,
-          expiry: expiryDate,
-          strike: baseStrike,
-          optionType: optType,
-          side: "BUY" as const,
-          quantity: maxPositionSize,
+          canonicalInstrumentId: actualCanonicalInstrumentId,
+          providerInstrumentId,
+          underlyingCanonicalId,
+          underlyingSymbol: contractUnderlying,
+          displaySymbol,
+          exchange,
+          segment: isCrypto ? "CRYPTO_OPTIONS" : "NSE_FNO",
+          expiry: contractExpiry,
+          strike: contractStrike,
+          optionType: contractOptionType,
+          side: entrySide,
+          quantity: safeLotSize,
           lots: 1,
-          lotSize: maxPositionSize,
-          orderType: orderType,
-          marketDataProvider: marketDataProvider,
-          quote: { ltp: isCrypto ? 2150.0 : 215.0, bid: 214.0, ask: 216.0, feedAgeMs: 14.0 },
-        },
-        {
-          legId: "leg_2",
-          canonicalInstrumentId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}:${expiryDate}:${baseStrike + spreadOffset}:${optType}`,
-          underlyingCanonicalId: `${isCrypto ? "CRYPTO" : "NSE"}:${underlyingSym}`,
-          underlyingSymbol: underlyingSym,
-          expiry: expiryDate,
-          strike: baseStrike + spreadOffset,
-          optionType: optType,
-          side: "SELL" as const,
-          quantity: maxPositionSize,
-          lots: 1,
-          lotSize: maxPositionSize,
-          orderType: orderType,
-          marketDataProvider: marketDataProvider,
-          quote: { ltp: isCrypto ? 1450.0 : 165.0, bid: 164.0, ask: 166.0, feedAgeMs: 14.0 },
+          lotSize: safeLotSize,
+          orderType,
+          marketDataProvider,
+          quote: {
+            ltp: contractLtp,
+            bid: contractBid,
+            ask: contractAsk,
+            feedAgeMs: 0,
+          },
         },
       ],
       marketDataProvider,
-      fallbackMarketDataProvider: "DHAN",
+      fallbackMarketDataProvider: isCrypto ? "DELTA" : "DHAN",
       executionBroker,
       executionAccountId: selectedAccountId || "paper_primary",
       currency,
@@ -253,19 +328,61 @@ export function BotWizardVNext() {
       stopLossPct,
       takeProfitPct,
       trailingStopPct,
+      orderType,
       maxSlippagePct,
+      riskPerTradePct,
+      maxDailyLoss,
+      maxDrawdownPct,
+      marketDataContract: {
+        ltp: true,
+        quotes: true,
+        depthTier,
+        oi: true,
+        funding: isCrypto,
+        greeks: requireGreeks || assetClass.includes("OPTIONS"),
+        timeframes: Array.from(new Set([primaryTimeframe, confirmationTimeframe])),
+      },
+      dataFreshnessContract: {
+        maxTickAgeMs,
+        maxDepthAgeMs: Math.max(3000, maxTickAgeMs),
+        maxCandleAgeMs: 60000,
+        stalePolicy,
+      },
+      rules: [
+        {
+          id: "entry_rule_1",
+          leftOperand: ruleLeft,
+          operator: ruleOp,
+          rightType: "INDICATOR",
+          rightValue: null,
+          rightOperand: ruleRight,
+          timeframe: primaryTimeframe,
+          isMandatory: true,
+        },
+      ],
     };
   }, [
     botId,
     botName,
+    description,
+    groupName,
+    tags,
     envMode,
     strategyId,
     assetClass,
+    creationOrigin,
     canonicalInstrumentId,
+    providerInstrumentId,
+    contractUnderlying,
     contractStrike,
     contractExpiry,
     contractOptionType,
-    maxPositionSize,
+    entrySide,
+    contractLotSize,
+    contractLtp,
+    contractBid,
+    contractAsk,
+    displaySymbol,
     orderType,
     marketDataProvider,
     executionBroker,
@@ -276,30 +393,111 @@ export function BotWizardVNext() {
     takeProfitPct,
     trailingStopPct,
     maxSlippagePct,
+    riskPerTradePct,
+    maxDailyLoss,
+    maxDrawdownPct,
+    depthTier,
+    requireGreeks,
+    maxTickAgeMs,
+    stalePolicy,
+    primaryTimeframe,
+    confirmationTimeframe,
+    ruleLeft,
+    ruleOp,
+    ruleRight,
   ]);
 
   const handleActivateDeployment = async (targetEnv: "PAPER" | "LIVE") => {
+    if (isDeploying) return;
+
     setIsDeploying(true);
     setDeploymentError(null);
+
     try {
+      if (!contractUnderlying || !contractExpiry || !contractOptionType) {
+        throw new Error("Selected option contract is incomplete. Return to Option Chain and select the contract again.");
+      }
+
+      if (!canonicalInstrumentId) {
+        throw new Error("Canonical contract ID is missing. Bot creation was blocked to prevent creating the wrong instrument.");
+      }
+
+      const effectiveProviderInstrumentId =
+        providerInstrumentId || canonicalInstrumentId;
+
       const payloadSpec = {
         ...botSpec,
         environment: targetEnv,
+        legs: (botSpec.legs || []).map((leg) => ({
+          ...leg,
+          providerInstrumentId: leg.providerInstrumentId || effectiveProviderInstrumentId,
+        })),
       };
 
-      // 1. Submit Canonical Spec
-      const specRes = await apiClient.post<any>("/api/v2/bots/spec", payloadSpec, { timeoutMs: 8000 });
+      // 1. Persist and register the bot specification first.
+      const specRes = await apiClient.post<any>(
+        "/api/v2/bots/spec",
+        payloadSpec,
+        { timeoutMs: 12000 }
+      );
+
       if (!specRes.ok || specRes.data?.status === "error") {
-        throw new Error(specRes.data?.message || specRes.error?.message || "Failed to register bot specification");
+        const errorMsg =
+          specRes.data?.message ||
+          specRes.data?.error?.message ||
+          specRes.error?.message ||
+          "Failed to register bot specification";
+        throw new Error(errorMsg);
       }
 
-      // 2. Start Bot
-      const startRes = await apiClient.post<any>(`/api/v2/bots/${botId}/state`, { action: "START" }, { timeoutMs: 8000 });
+      // 2. Authoritatively extract the created bot ID returned by the backend
+      const createdBotId =
+        specRes.data?.botId ||
+        specRes.data?.id ||
+        specRes.data?.data?.botId ||
+        specRes.data?.data?.id;
+
+      if (!createdBotId) {
+        throw new Error("Bot specification was registered but no bot ID was returned from the server.");
+      }
+
+      setBotId(createdBotId);
+
+      // 3. Start the exact persisted bot instance.
+      const startRes = await apiClient.post<any>(
+        `/api/v2/bots/${encodeURIComponent(createdBotId)}/state`,
+        { action: "START" },
+        { timeoutMs: 12000 }
+      );
+
       if (!startRes.ok || startRes.data?.status === "error") {
-        throw new Error(startRes.data?.message || startRes.error?.message || "Failed to start bot instance");
+        const startErrorMsg =
+          startRes.data?.message ||
+          startRes.data?.error?.message ||
+          startRes.error?.message ||
+          "Bot specification registered but bot instance failed to start";
+        throw new Error(startErrorMsg);
       }
 
-      router.push(`/bots/${botId}`);
+      // 4. Remove stale creation intent only after successful create and start.
+      clearIntent();
+
+      // 5. Invalidate React Query caches for bot fleet and data core
+      try {
+        await Promise.allSettled([
+          queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] }),
+          queryClient.invalidateQueries({ queryKey: ["botsList"] }),
+          queryClient.invalidateQueries({ queryKey: ["botsSummary"] }),
+          queryClient.invalidateQueries({ queryKey: ["quantDataCoreBots"] }),
+          queryClient.invalidateQueries({ queryKey: ["dataCoreBots"] }),
+        ]);
+      } catch (cacheErr) {
+        console.warn("Query cache invalidation note:", cacheErr);
+      }
+
+      // 6. Navigate to newly created bot detail view
+      router.replace(`/bots/${encodeURIComponent(createdBotId)}`);
+      router.refresh();
     } catch (e: any) {
       console.error("Failed to activate bot:", e);
       setDeploymentError(e?.message || "Failed to activate bot instance");
@@ -362,13 +560,12 @@ export function BotWizardVNext() {
             <button
               key={step.id}
               onClick={() => setCurrentStep(step.id)}
-              className={`flex flex-col items-center justify-center p-2 rounded-lg text-center transition ${
-                isActive
+              className={`flex flex-col items-center justify-center p-2 rounded-lg text-center transition ${isActive
                   ? "bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-600/30"
                   : isPassed
-                  ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
-                  : "bg-slate-950/60 text-slate-500 hover:text-slate-300 border border-slate-800/50"
-              }`}
+                    ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30"
+                    : "bg-slate-950/60 text-slate-500 hover:text-slate-300 border border-slate-800/50"
+                }`}
             >
               <div className="flex items-center gap-1 text-[10px]">
                 <span>{isPassed ? "✓" : step.id}</span>
@@ -422,13 +619,12 @@ export function BotWizardVNext() {
                           setEnvMode(env);
                           setEnvironment(env);
                         }}
-                        className={`py-2 px-3 rounded-lg text-xs font-bold transition ${
-                          envMode === env
+                        className={`py-2 px-3 rounded-lg text-xs font-bold transition ${envMode === env
                             ? env === "LIVE"
                               ? "bg-rose-600 text-white"
                               : "bg-emerald-600 text-white"
                             : "bg-slate-950 text-slate-400 border border-slate-800"
-                        }`}
+                          }`}
                       >
                         {env} {env === "LIVE" ? "⚡ REAL MONEY" : "🧪 SANDBOX"}
                       </button>
@@ -522,11 +718,10 @@ export function BotWizardVNext() {
                   <button
                     key={seg.key}
                     onClick={() => setAssetClass(seg.key)}
-                    className={`px-3 py-2 rounded-lg text-xs font-bold transition ${
-                      assetClass === seg.key
+                    className={`px-3 py-2 rounded-lg text-xs font-bold transition ${assetClass === seg.key
                         ? "bg-indigo-600 text-white"
                         : "bg-slate-950 text-slate-400 border border-slate-800"
-                    }`}
+                      }`}
                   >
                     {seg.label}
                   </button>
@@ -903,16 +1098,22 @@ export function BotWizardVNext() {
             />
           )}
 
+          {deploymentError && (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-xs text-rose-300">
+              <div className="font-bold">Bot deployment failed</div>
+              <div className="mt-1 text-rose-200/90">{deploymentError}</div>
+            </div>
+          )}
+
           {/* Navigation Controls */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-800 mt-4 text-xs">
             <button
               disabled={currentStep === 1}
               onClick={() => setCurrentStep((prev) => Math.max(1, prev - 1))}
-              className={`px-4 py-2 rounded-lg font-semibold transition ${
-                currentStep > 1
+              className={`px-4 py-2 rounded-lg font-semibold transition ${currentStep > 1
                   ? "bg-slate-800 hover:bg-slate-700 text-slate-200"
                   : "bg-slate-900 text-slate-600 cursor-not-allowed"
-              }`}
+                }`}
             >
               ← Back
             </button>
@@ -924,11 +1125,10 @@ export function BotWizardVNext() {
             <button
               disabled={currentStep === 10}
               onClick={() => setCurrentStep((prev) => Math.min(10, prev + 1))}
-              className={`px-4 py-2 rounded-lg font-bold transition ${
-                currentStep < 10
+              className={`px-4 py-2 rounded-lg font-bold transition ${currentStep < 10
                   ? "bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg"
                   : "bg-slate-900 text-slate-600 cursor-not-allowed"
-              }`}
+                }`}
             >
               Continue →
             </button>

@@ -273,8 +273,18 @@ class BotDeploymentItem:
 
     # Universe
     canonical_instrument_id: str = "NSE:NIFTY26MARFUT"
+    provider_instrument_id: str = ""
     display_symbol: str = "NIFTY FUT"
     asset_class: str = "FUTURES"
+    underlying_symbol: str = ""
+    expiry: str = ""
+    strike: float = 0.0
+    option_type: str = ""
+    entry_side: str = "BUY"
+    lots: int = 1
+    lot_size: float = 1.0
+    legs: List["StrategyLegItem"] = field(default_factory=list)
+    subscription_key: Optional[str] = None
 
     # Contracts
     market_data_contract: MarketDataContract = field(default_factory=MarketDataContract)
@@ -328,8 +338,18 @@ class BotDeploymentItem:
             "accountId": self.account_id,
             "currency": self.currency,
             "canonicalInstrumentId": self.canonical_instrument_id,
+            "providerInstrumentId": self.provider_instrument_id,
             "displaySymbol": self.display_symbol,
             "assetClass": self.asset_class,
+            "underlyingSymbol": self.underlying_symbol,
+            "expiry": self.expiry,
+            "strike": self.strike,
+            "optionType": self.option_type,
+            "entrySide": self.entry_side,
+            "lots": self.lots,
+            "lotSize": self.lot_size,
+            "legs": [leg.to_dict() for leg in self.legs],
+            "subscriptionKey": self.subscription_key,
             "marketDataContract": self.market_data_contract.to_dict(),
             "dataFreshnessContract": self.data_freshness_contract.to_dict(),
             "capitalAllocation": self.capital_allocation,
@@ -565,10 +585,15 @@ class BotDeploymentSpec:
     capital_reservation_id: Optional[str] = None
     market_data_contract: MarketDataContract = field(default_factory=MarketDataContract)
     data_freshness_contract: DataFreshnessContract = field(default_factory=DataFreshnessContract)
+    risk_per_trade_pct: float = 1.0
+    max_daily_loss: float = 2000.0
+    max_drawdown_pct: float = 5.0
     stop_loss_pct: float = 2.0
     take_profit_pct: float = 5.0
     trailing_stop_pct: float = 0.0
+    order_type: str = "MARKET"
     max_slippage_pct: float = 0.5
+    rules: List[StrategyRuleNode] = field(default_factory=list)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     validated_at: Optional[str] = None
 
@@ -593,10 +618,15 @@ class BotDeploymentSpec:
             "capitalReservationId": self.capital_reservation_id,
             "marketDataContract": self.market_data_contract.to_dict(),
             "dataFreshnessContract": self.data_freshness_contract.to_dict(),
+            "riskPerTradePct": self.risk_per_trade_pct,
+            "maxDailyLoss": self.max_daily_loss,
+            "maxDrawdownPct": self.max_drawdown_pct,
             "stopLossPct": self.stop_loss_pct,
             "takeProfitPct": self.take_profit_pct,
             "trailingStopPct": self.trailing_stop_pct,
+            "orderType": self.order_type,
             "maxSlippagePct": self.max_slippage_pct,
+            "rules": [rule.to_dict() for rule in self.rules],
             "createdAt": self.created_at,
             "validatedAt": self.validated_at,
         }

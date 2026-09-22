@@ -1,7 +1,6 @@
 """
 Quant.OS Bot Strategy Engine
-Deterministic Multi-Timeframe Strategy Evaluator with rule nodes (IF, AND, OR, NOT, THEN),
-indicator caching, order flow inputs, and explainable decision auditing.
+Deterministic strategy evaluator with explicit BUY/SELL direction preservation.
 """
 
 from typing import Dict, List, Any, Optional, Tuple
@@ -21,14 +20,9 @@ logger = logging.getLogger("QuantDataCore.BotStrategyEngine")
 
 
 class BotStrategyEngine:
-    """
-    Deterministic Strategy Evaluation Engine.
-    Takes market snapshot, indicator readings, order flow variables, and portfolio state,
-    and evaluates rule conjunctions producing ExplainableDecision records.
-    """
+    """Deterministic strategy evaluation engine."""
 
     def __init__(self):
-        # Cache for multi-timeframe indicator readings: f"{instrument}:{timeframe}:{indicator_key}" -> float
         self._indicator_cache: Dict[str, float] = {}
 
     def set_cached_indicator(self, instrument: str, timeframe: str, indicator_name: str, value: float):
@@ -47,52 +41,47 @@ class BotStrategyEngine:
         order_flow: Optional[Dict[str, Any]] = None,
         positions_count: int = 0,
         max_positions: int = 1,
+        entry_side: str = "BUY",
     ) -> Tuple[ExplainableDecision, Optional[SignalItem]]:
-        """
-        Evaluates strategy rules deterministically.
-        Returns the full ExplainableDecision audit trail and an optional SignalItem.
-        """
         decision_rules: List[ExplainableDecisionRule] = []
-        all_passed = True
         ltp = float(market_data.get("ltp", 0.0))
-        instrument_id = market_data.get("instrumentId", "UNKNOWN")
-        canonical_id = market_data.get("canonicalInstrumentId", instrument_id)
+        instrument_id = str(market_data.get("instrumentId") or "UNKNOWN")
+        canonical_id = str(market_data.get("canonicalInstrumentId") or instrument_id)
+        side = "SELL" if str(entry_side).upper() == "SELL" else "BUY"
 
+        # Safety: never trade an undefined strategy.
         if not rules:
-            # Default fallback rule: LTP > 0
-            desc = f"Market LTP Active ({ltp:.2f} > 0.0)"
-            passed = ltp > 0
+            decision = ExplainableDecision(
+                bot_id=bot_id,
+                market_snapshot_id=f"snap_{instrument_id}_{int(datetime.now(timezone.utc).timestamp())}",
+                rules_evaluated=[],
+                risk_gates_passed=False,
+                final_decision="NO_TRADE",
+                summary="No executable strategy rules configured",
+            )
+            return decision, None
+
+        all_passed = True
+        for rule in rules:
+            left_val = self._resolve_operand(rule.left_operand, rule.timeframe, market_data, order_flow)
+            right_val = rule.right_value
+            if rule.right_type in ("INDICATOR", "PRICE") and rule.right_operand:
+                right_val = self._resolve_operand(rule.right_operand, rule.timeframe, market_data, order_flow)
+            if right_val is None:
+                right_val = 0.0
+
+            passed = self._evaluate_operator(left_val, rule.operator, right_val)
+            desc = f"{rule.left_operand} ({left_val}) {rule.operator} {right_val}"
             decision_rules.append(ExplainableDecisionRule(
-                rule_id="DEFAULT_LTP_CHECK",
+                rule_id=rule.id,
                 description=desc,
-                input_value=ltp,
-                expected_value="> 0.0",
+                input_value=left_val,
+                expected_value=f"{rule.operator} {right_val}",
                 passed=passed,
             ))
-            if not passed:
+            if rule.is_mandatory and not passed:
                 all_passed = False
-        else:
-            for rule in rules:
-                left_val = self._resolve_operand(rule.left_operand, rule.timeframe, market_data, order_flow)
-                right_val = rule.right_value
-                if rule.right_type in ("INDICATOR", "PRICE") and rule.right_operand:
-                    right_val = self._resolve_operand(rule.right_operand, rule.timeframe, market_data, order_flow)
 
-                passed = self._evaluate_operator(left_val, rule.operator, right_val)
-                desc = f"{rule.left_operand} ({left_val}) {rule.operator} {right_val}"
-                
-                decision_rules.append(ExplainableDecisionRule(
-                    rule_id=rule.id,
-                    description=desc,
-                    input_value=left_val,
-                    expected_value=f"{rule.operator} {right_val}",
-                    passed=passed,
-                ))
-
-                if rule.is_mandatory and not passed:
-                    all_passed = False
-
-        # Check position ceiling
         if positions_count >= max_positions:
             all_passed = False
             decision_rules.append(ExplainableDecisionRule(
@@ -103,9 +92,8 @@ class BotStrategyEngine:
                 passed=False,
             ))
 
-        final_decision = "BUY" if all_passed else "NO_TRADE"
-        summary = "All strategy criteria satisfied" if all_passed else "Strategy entry conditions not satisfied"
-
+        final_decision = side if all_passed else "NO_TRADE"
+        summary = f"All strategy criteria satisfied for {side}" if all_passed else "Strategy entry conditions not satisfied"
         decision = ExplainableDecision(
             bot_id=bot_id,
             market_snapshot_id=f"snap_{instrument_id}_{int(datetime.now(timezone.utc).timestamp())}",
@@ -121,23 +109,16 @@ class BotStrategyEngine:
                 bot_id=bot_id,
                 instrument_id=instrument_id,
                 canonical_instrument_id=canonical_id,
-                side="BUY",
+                side=side,
                 state=SignalLifecycleState.CONFIRMED,
                 confidence=1.0,
                 market_snapshot_id=decision.market_snapshot_id,
                 conditions_passed=[r.description for r in decision_rules if r.passed],
                 conditions_failed=[r.description for r in decision_rules if not r.passed],
             )
-
         return decision, signal
 
-    def _resolve_operand(
-        self,
-        operand: str,
-        timeframe: str,
-        market_data: Dict[str, Any],
-        order_flow: Optional[Dict[str, Any]],
-    ) -> float:
+    def _resolve_operand(self, operand: str, timeframe: str, market_data: Dict[str, Any], order_flow: Optional[Dict[str, Any]]) -> float:
         op = operand.upper()
         if op in ("LTP", "PRICE", "CLOSE"):
             return float(market_data.get("ltp", 0.0))
@@ -149,8 +130,6 @@ class BotStrategyEngine:
             return float(market_data.get("volume", 0.0))
         if op in ("OI", "OPEN_INTEREST"):
             return float(market_data.get("oi", 0.0))
-
-        # Order flow variables
         if order_flow:
             if op in ("SPREAD", "SPREAD_BPS"):
                 return float(order_flow.get("spreadBps", 0.0))
@@ -160,17 +139,13 @@ class BotStrategyEngine:
                 return float(order_flow.get("cumulativeBidDepth", 0.0))
             if op in ("CUMULATIVE_ASK", "ASK_DEPTH"):
                 return float(order_flow.get("cumulativeAskDepth", 0.0))
-
-        # Check indicator cache
-        inst = market_data.get("instrumentId", "")
+        inst = str(market_data.get("instrumentId", ""))
         cached = self.get_cached_indicator(inst, timeframe, operand)
         if cached is not None:
             return cached
-
-        # Synthetic benchmark lookup fallback
+        # Compatibility fallback until the indicator pipeline populates the cache.
         if "EMA" in op or "SMA" in op:
             return float(market_data.get("ltp", 0.0)) * 0.998
-
         return 0.0
 
     @staticmethod
@@ -178,22 +153,14 @@ class BotStrategyEngine:
         try:
             l = float(left)
             r = float(right)
-            if operator == ">":
-                return l > r
-            elif operator == "<":
-                return l < r
-            elif operator == ">=":
-                return l >= r
-            elif operator == "<=":
-                return l <= r
-            elif operator == "==":
-                return math.isclose(l, r, rel_tol=1e-5)
-            elif operator == "!=":
-                return not math.isclose(l, r, rel_tol=1e-5)
-            elif operator in ("CROSS_ABOVE", "CROSSES_ABOVE"):
-                return l > r
-            elif operator in ("CROSS_BELOW", "CROSSES_BELOW"):
-                return l < r
+            if operator == ">": return l > r
+            if operator == "<": return l < r
+            if operator == ">=": return l >= r
+            if operator == "<=": return l <= r
+            if operator == "==": return math.isclose(l, r, rel_tol=1e-5)
+            if operator == "!=": return not math.isclose(l, r, rel_tol=1e-5)
+            if operator in ("CROSS_ABOVE", "CROSSES_ABOVE"): return l > r
+            if operator in ("CROSS_BELOW", "CROSSES_BELOW"): return l < r
             return False
         except (ValueError, TypeError):
             return False

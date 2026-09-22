@@ -14,6 +14,7 @@ export type BotAssetClass =
   | "PERPETUAL"
   | "OPTION"
   | "OPTIONS"
+  | "INDIAN_OPTIONS"
   | "CRYPTO"
   | "CRYPTO_OPTIONS"
   | "EQUITY"

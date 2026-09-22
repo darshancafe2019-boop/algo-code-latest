@@ -1202,8 +1202,22 @@ class UniversalOptionsEngine:
             ce_raw = s.get("ce") or s.get("call") or {}
             pe_raw = s.get("pe") or s.get("put") or {}
 
-            ce_inst = str(ce_raw.get("instrument_id") or ce_raw.get("instrument_key") or ce_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_CE")
-            pe_inst = str(pe_raw.get("instrument_id") or pe_raw.get("instrument_key") or pe_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_PE")
+            if provider.upper() == "UPSTOX":
+                from src.upstox_service import global_upstox_service
+                ce_inst = str(ce_raw.get("instrument_key") or ce_raw.get("instrument_id") or "")
+                if not ce_inst or not ce_inst.startswith("NSE_FO|"):
+                    real_ce = global_upstox_service.resolve_option_instrument_key(underlying, selected_expiry, k, "CE")
+                    if real_ce:
+                        ce_inst = real_ce
+
+                pe_inst = str(pe_raw.get("instrument_key") or pe_raw.get("instrument_id") or "")
+                if not pe_inst or not pe_inst.startswith("NSE_FO|"):
+                    real_pe = global_upstox_service.resolve_option_instrument_key(underlying, selected_expiry, k, "PE")
+                    if real_pe:
+                        pe_inst = real_pe
+            else:
+                ce_inst = str(ce_raw.get("instrument_key") or ce_raw.get("instrument_id") or ce_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_CE")
+                pe_inst = str(pe_raw.get("instrument_key") or pe_raw.get("instrument_id") or pe_raw.get("symbol") or f"{provider}_{underlying}_{int(k)}_PE")
 
             def _clean_num(raw_val: Any) -> Optional[float]:
                 if raw_val is None:

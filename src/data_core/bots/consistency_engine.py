@@ -211,7 +211,7 @@ class DeploymentConsistencyEngine:
         gates.append(gate1)
 
         # =========================================================================
-        # 2. EXPIRY CONSISTENCY GATE
+        # 2. EXPIRY CONSISTENCY & VALIDATION GATE
         # =========================================================================
         expiry_mismatches = []
         if spec.strategy_type not in ("CALENDAR_SPREAD", "DIAGONAL_SPREAD"):
@@ -219,27 +219,48 @@ class DeploymentConsistencyEngine:
                 if leg.expiry and spec.expiry and leg.expiry != spec.expiry:
                     expiry_mismatches.append(f"Leg {i+1} expiry '{leg.expiry}' != Strategy expiry '{spec.expiry}'")
 
+        # Expiry Date & Active Catalog Validation for Options
+        is_option_strategy = any(l.option_type in ("CE", "PE", "CALL", "PUT") for l in spec.legs) or bool(spec.expiry and spec.expiry != "PERPETUAL")
+        if is_option_strategy and spec.expiry and spec.expiry != "PERPETUAL":
+            try:
+                exp_date = datetime.strptime(spec.expiry, "%Y-%m-%d").date()
+                today_date = datetime.now(timezone.utc).date()
+                if exp_date < today_date:
+                    expiry_mismatches.append(f"Contract expiry '{spec.expiry}' has already expired (Today: {today_date})")
+            except ValueError:
+                pass
+
+        if not expiry_mismatches and is_option_strategy and spec.expiry and spec.market_data_provider == "UPSTOX":
+            try:
+                from src.upstox_service import global_upstox_service
+                if global_upstox_service.is_authenticated:
+                    active_expiries = global_upstox_service.get_option_expiries(norm_underlying)
+                    if active_expiries and spec.expiry not in active_expiries:
+                        expiry_mismatches.append(f"Expiry '{spec.expiry}' is not active in Upstox contract catalog for {norm_underlying}. Active: {active_expiries[:4]}")
+            except Exception:
+                pass
+
         if expiry_mismatches:
             gate2 = PreflightGateItem(
                 gate_id="EXPIRY_CONSISTENCY",
-                name="Strategy Expiry Consistency",
+                name="Strategy Expiry Consistency & Validity",
                 category="INTEGRITY",
                 status="FAIL",
-                expected=f"All spread legs must share expiry '{spec.expiry}'",
+                expected=f"Valid unexpired contract matching '{spec.expiry}'",
                 actual="; ".join(expiry_mismatches),
-                source="Contract Leg Configuration",
-                correction="Align all option legs to the same expiration cycle",
+                source="Contract Leg Configuration & Broker Catalog",
+                correction="Select a valid, active future expiration cycle from current option chain",
             )
-            blocking.append(f"Expiry Mismatch: {gate2.actual}")
+            blocking.append(f"Expiry Error: {gate2.actual}")
         else:
             gate2 = PreflightGateItem(
                 gate_id="EXPIRY_CONSISTENCY",
-                name="Strategy Expiry Consistency",
+                name="Strategy Expiry Consistency & Validity",
                 category="INTEGRITY",
                 status="PASS",
-                expected=f"All legs match expiry '{spec.expiry}'",
+                expected=f"All legs match valid expiry '{spec.expiry}'",
                 actual=f"Expiry verified ({spec.expiry or 'Perpetual/Spot'})",
-                source="Contract Leg Configuration",
+                source="Contract Leg Configuration & Broker Catalog",
                 correction="",
             )
         gates.append(gate2)

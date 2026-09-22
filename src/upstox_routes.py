@@ -403,3 +403,17 @@ def get_upstox_health():
         ],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }), 200
+
+
+@upstox_blueprint.route("/diagnostics", methods=["GET"])
+@upstox_blueprint.route("/diagnostic", methods=["GET"])
+def get_upstox_diagnostics():
+    """Returns authoritative sanitized diagnostic report and real-time feed bridge status."""
+    diag = global_upstox_service.get_safe_diagnostic()
+    return jsonify({
+        "status": "success",
+        "data": diag,
+        "diagnostics": diag,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }), 200
+

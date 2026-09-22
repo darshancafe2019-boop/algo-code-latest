@@ -702,15 +702,21 @@ def validate_bot_spec():
 
 @data_core_bp.route("/bots/spec", methods=["POST"])
 def register_bot_spec():
-    """Registers and stores a canonical BotDeploymentSpec, running preflight validation."""
+    """Registers a complete canonical BotDeploymentSpec after strict preflight validation."""
     spec_data = request.get_json() or {}
-    report = quant_data_core.bots.validate_spec(spec_data)
 
-    # Convert to spec and register
-    legs_raw = spec_data.get("legs", [])
     from src.data_core.bots.models import StrategyLegItem, BotDeploymentSpec
-    legs = [
-        StrategyLegItem(
+
+    legs_raw = spec_data.get("legs", [])
+    legs = []
+    for l in legs_raw:
+        option_type = str(l.get("optionType", "CE")).upper()
+        if option_type == "CALL":
+            option_type = "CE"
+        elif option_type == "PUT":
+            option_type = "PE"
+
+        legs.append(StrategyLegItem(
             leg_id=l.get("legId", f"leg_{uuid.uuid4().hex[:6]}"),
             canonical_instrument_id=l.get("canonicalInstrumentId", ""),
             provider_instrument_id=l.get("providerInstrumentId", ""),
@@ -719,19 +725,56 @@ def register_bot_spec():
             exchange=l.get("exchange", "NSE"),
             segment=l.get("segment", "NSE_FNO"),
             expiry=l.get("expiry", ""),
-            strike=float(l.get("strike", 0.0)),
-            option_type=l.get("optionType", "CE"),
-            side=l.get("side", "BUY"),
-            quantity=float(l.get("quantity", 1.0)),
-            lots=int(l.get("lots", 1)),
-            lot_size=float(l.get("lotSize", 50.0)),
-            order_type=l.get("orderType", "MARKET"),
+            strike=float(l.get("strike", 0.0) or 0.0),
+            option_type=option_type,
+            side="SELL" if str(l.get("side", "BUY")).upper() == "SELL" else "BUY",
+            quantity=float(l.get("quantity", 1.0) or 1.0),
+            lots=max(1, int(l.get("lots", 1) or 1)),
+            lot_size=float(l.get("lotSize", 1.0) or 1.0),
+            order_type=str(l.get("orderType", spec_data.get("orderType", "MARKET"))).upper(),
             limit_price=l.get("limitPrice"),
             market_data_provider=l.get("marketDataProvider", spec_data.get("marketDataProvider", "UPSTOX")),
             quote=l.get("quote", {}),
-        )
-        for l in legs_raw
-    ]
+        ))
+
+    rules = []
+    for i, r in enumerate(spec_data.get("rules", [])):
+        right_value = r.get("rightValue")
+        rules.append(StrategyRuleNode(
+            id=r.get("id", f"rule_{i + 1}"),
+            left_operand=r.get("leftOperand") or r.get("left_operand") or "LTP",
+            operator=r.get("operator", ">"),
+            right_type=r.get("rightType") or r.get("right_type") or ("INDICATOR" if r.get("rightOperand") else "THRESHOLD"),
+            right_value=float(right_value) if right_value not in (None, "") else None,
+            right_operand=r.get("rightOperand") or r.get("right_operand"),
+            timeframe=r.get("timeframe", "5m"),
+            is_mandatory=bool(r.get("isMandatory", r.get("is_mandatory", True))),
+        ))
+
+    md = spec_data.get("marketDataContract") or {}
+    market_data_contract = MarketDataContract(
+        ltp=bool(md.get("ltp", True)),
+        quotes=bool(md.get("quotes", True)),
+        depth_tier=md.get("depthTier", "FULL_D5"),
+        oi=bool(md.get("oi", False)),
+        funding=bool(md.get("funding", False)),
+        greeks=bool(md.get("greeks", False)),
+        timeframes=list(md.get("timeframes") or ["5m"]),
+    )
+
+    freshness = spec_data.get("dataFreshnessContract") or {}
+    stale_raw = str(freshness.get("stalePolicy", "BLOCK_ENTRY")).upper()
+    try:
+        stale_policy = StaleDataPolicy(stale_raw)
+    except ValueError:
+        stale_policy = StaleDataPolicy.BLOCK_ENTRY
+    data_freshness_contract = DataFreshnessContract(
+        max_tick_age_ms=float(freshness.get("maxTickAgeMs", spec_data.get("maxTickAgeMs", 2000.0))),
+        max_depth_age_ms=float(freshness.get("maxDepthAgeMs", 3000.0)),
+        max_candle_age_ms=float(freshness.get("maxCandleAgeMs", 60000.0)),
+        stale_policy=stale_policy,
+    )
+
     env_val = spec_data.get("environment", "PAPER")
     env = Environment.LIVE if str(env_val).upper() == "LIVE" else Environment.PAPER
 
@@ -741,10 +784,10 @@ def register_bot_spec():
         bot_name=spec_data.get("botName", "Quantitative Bot"),
         description=spec_data.get("description", ""),
         environment=env,
-        strategy_type=spec_data.get("strategyType", "BULL_CALL_SPREAD"),
+        strategy_type=spec_data.get("strategyType", "CUSTOM_RULES"),
         underlying_canonical_id=spec_data.get("underlyingCanonicalId", "NSE:NIFTY50"),
         underlying_symbol=spec_data.get("underlyingSymbol", "NIFTY"),
-        expiry=spec_data.get("expiry", "2026-03-27"),
+        expiry=spec_data.get("expiry", ""),
         legs=legs,
         market_data_provider=spec_data.get("marketDataProvider", "UPSTOX"),
         fallback_market_data_provider=spec_data.get("fallbackMarketDataProvider"),
@@ -752,16 +795,33 @@ def register_bot_spec():
         execution_account_id=spec_data.get("executionAccountId", "paper_primary"),
         currency=spec_data.get("currency", "INR"),
         capital_allocation=float(spec_data.get("capitalAllocation", 50000.0)),
+        market_data_contract=market_data_contract,
+        data_freshness_contract=data_freshness_contract,
+        risk_per_trade_pct=float(spec_data.get("riskPerTradePct", 1.0)),
+        max_daily_loss=float(spec_data.get("maxDailyLoss", 2000.0)),
+        max_drawdown_pct=float(spec_data.get("maxDrawdownPct", 5.0)),
         stop_loss_pct=float(spec_data.get("stopLossPct", 2.0)),
         take_profit_pct=float(spec_data.get("takeProfitPct", 5.0)),
         trailing_stop_pct=float(spec_data.get("trailingStopPct", 0.0)),
+        order_type=str(spec_data.get("orderType", "MARKET")).upper(),
         max_slippage_pct=float(spec_data.get("maxSlippagePct", 0.5)),
+        rules=rules,
         validated_at=datetime.now(timezone.utc).isoformat(),
     )
-    registered = quant_data_core.bots.register_spec(spec_obj)
 
+    report = quant_data_core.bots.validate_spec(spec_obj)
+    if not report.is_deployable:
+        return jsonify({
+            "status": "error",
+            "message": "Bot specification failed preflight validation",
+            "botId": spec_obj.bot_id,
+            "preflightReport": report.to_dict(),
+        }), 422
+
+    registered = quant_data_core.bots.register_spec(spec_obj)
     return jsonify({
         "status": "success",
+        "botId": registered.bot_id,
         "data": registered.to_dict(),
         "preflightReport": report.to_dict(),
     }), 201

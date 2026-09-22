@@ -16,22 +16,64 @@ export async function GET(req: NextRequest) {
   }
 
   const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+  const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
 
   // 1. Attempt to fetch real quote from Central Market Data Gateway
   try {
-    const res = await fetch(`${GATEWAY_URL}/api/v1/quote?symbol=${encodeURIComponent(symbol)}`, {
+    const res = await fetch(`${GATEWAY_URL}/api/market/quote?symbol=${encodeURIComponent(symbol)}`, {
       cache: "no-store",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(2000),
     });
 
     if (res.ok) {
       const data = await res.json();
-      if (data && data.status !== "error") {
+      if (data && data.status !== "error" && (data.last_price || data.price || data.ltp)) {
         return NextResponse.json(data);
       }
     }
   } catch {
     // Gateway fallback
+  }
+
+  // 1b. Attempt snapshot from Gateway
+  try {
+    const snapRes = await fetch(`${GATEWAY_URL}/snapshot?symbols=${encodeURIComponent(symbol)}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(2000),
+    });
+
+    if (snapRes.ok) {
+      const snapData = await snapRes.json();
+      const matched = snapData?.quotes?.[symbol] || snapData?.quotes?.[symbol.replace("/", "")];
+      if (matched && matched.last_price) {
+        return NextResponse.json({
+          status: "success",
+          ...matched,
+        });
+      }
+    }
+  } catch {
+    // Fallthrough to Backend
+  }
+
+  // 1c. Attempt quote from Quantitative Backend Engine
+  try {
+    const bRes = await fetch(`${BACKEND_URL}/api/market-data/quote?symbol=${encodeURIComponent(symbol)}`, {
+      cache: "no-store",
+      headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(2500),
+    });
+
+    if (bRes.ok) {
+      const bData = await bRes.json();
+      if (bData && bData.status !== "error" && (bData.last_price || bData.price || bData.ltp)) {
+        return NextResponse.json(bData);
+      }
+    }
+  } catch {
+    // Fallthrough
   }
 
   // 2. Resolve instrument metadata and session

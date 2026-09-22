@@ -1232,6 +1232,9 @@ def create_app() -> tuple:
     # Single Quote & LTP
     app.router.add_get("/ltp", gateway.handle_ltp)
     app.router.add_get("/api/ltp", gateway.handle_ltp)
+    app.router.add_get("/quote", gateway.handle_ltp)
+    app.router.add_get("/api/quote", gateway.handle_ltp)
+    app.router.add_get("/api/v1/quote", gateway.handle_ltp)
     app.router.add_get("/api/market/quote", gateway.handle_ltp)
     app.router.add_get("/api/market-data/ltp", gateway.handle_ltp)
     app.router.add_get("/api/market-data/quote", gateway.handle_ltp)

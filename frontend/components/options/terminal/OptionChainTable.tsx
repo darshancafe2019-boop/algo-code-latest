@@ -163,7 +163,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
       underlying,
       expiry: selectedExpiry || quote.expiry,
       strike,
-      optionType: type === "CE" ? "CALL" : "PUT",
+      optionType: type,
       side,
       ltp: quote.ltp,
       change: quote.change,

@@ -614,10 +614,148 @@ class UpstoxService:
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
 
-        # 4. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|...
+        # 4. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|... or NSE_FO|...
         if "|" in sym_str and (sym_str.startswith("NSE_") or sym_str.startswith("BSE_")):
             return sym_str
 
+        # 5. Check if symbol is an Option contract description (e.g. NIFTY 23400 CE, NIFTY 2026-09-22 23400 CE, UPSTOX_NSE_NIFTY_23400_CE, etc.)
+        import re
+        exp_match = re.search(r"(\d{4}-\d{2}-\d{2})", sym_str)
+        exp_val = exp_match.group(1) if exp_match else None
+        str_clean = clean_upper.replace(exp_val, "") if exp_val else clean_upper
+
+        und_match = re.search(r"(NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX)", clean_upper)
+        type_match = re.search(r"\b(CE|PE|CALL|PUT)\b", str_clean) or re.search(r"_(CE|PE|CALL|PUT)\b", str_clean) or re.search(r"(CE|PE)$", str_clean)
+        strike_match = re.search(r"(\d{4,6})", str_clean)
+
+        if und_match and type_match and strike_match:
+            und = und_match.group(1)
+            strike_val = float(strike_match.group(1))
+            raw_t = type_match.group(1) if type_match.lastindex else type_match.group(0)
+            opt_type = "CE" if "CE" in raw_t or "CALL" in raw_t else "PE"
+
+            resolved_key = self.resolve_option_instrument_key(und, expiry=exp_val, strike=strike_val, option_type=opt_type)
+            if resolved_key:
+                return resolved_key
+
+        return None
+
+    def get_option_contracts(self, underlying: str = "NIFTY", force: bool = False) -> List[Dict[str, Any]]:
+        """
+        Fetches official Upstox active option contracts for the specified underlying.
+        Maintains an in-memory TTL cache (300 seconds) to minimize redundant network roundtrips.
+        """
+        if not self.is_authenticated:
+            return []
+
+        und_clean = underlying.upper().strip()
+        reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
+        instrument_key = reg_entry.get("instrument_key")
+        if not instrument_key:
+            if und_clean in ["NIFTY", "NIFTY 50", "NIFTY50"]:
+                instrument_key = "NSE_INDEX|Nifty 50"
+            elif und_clean in ["BANKNIFTY", "NIFTY BANK"]:
+                instrument_key = "NSE_INDEX|Nifty Bank"
+            elif und_clean in ["FINNIFTY", "NIFTY FIN SERVICE"]:
+                instrument_key = "NSE_INDEX|Nifty Fin Service"
+            elif und_clean in ["MIDCPNIFTY", "NIFTY MID SELECT", "NIFTY MIDCAP SELECT"]:
+                instrument_key = "NSE_INDEX|NIFTY MID SELECT"
+            elif und_clean in ["SENSEX", "BSE SENSEX"]:
+                instrument_key = "BSE_INDEX|SENSEX"
+            elif und_clean in ["RELIANCE"]:
+                instrument_key = "NSE_EQ|INE002A01018"
+            elif und_clean in ["TCS"]:
+                instrument_key = "NSE_EQ|INE467B01029"
+            elif und_clean in ["HDFCBANK"]:
+                instrument_key = "NSE_EQ|INE040A01034"
+            else:
+                instrument_key = self.resolve_instrument_key(underlying)
+                if not instrument_key:
+                    return []
+
+        cache_key = instrument_key
+        now = time.time()
+        if not force and hasattr(self, "_option_contracts_cache"):
+            cached = self._option_contracts_cache.get(cache_key)
+            if cached and (now - cached[0] < 300.0):
+                return cached[1]
+
+        try:
+            res = self._make_request("option/contract", params={"instrument_key": instrument_key}, api_version="v2")
+            if res.get("status") == "success" and "data" in res:
+                contracts = res.get("data", [])
+                if not hasattr(self, "_option_contracts_cache"):
+                    self._option_contracts_cache = {}
+                self._option_contracts_cache[cache_key] = (now, contracts)
+                return contracts
+        except Exception as e:
+            logger.warning("Upstox get_option_contracts error: %s", e)
+
+        return []
+
+    def resolve_option_contract(
+        self,
+        underlying: str,
+        expiry: Optional[str] = None,
+        strike: Optional[Union[float, int, str]] = None,
+        option_type: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Resolves a single authoritative Upstox option contract dictionary by matching
+        underlying + valid expiry + strike + CE/PE.
+        """
+        contracts = self.get_option_contracts(underlying)
+        if not contracts:
+            return None
+
+        # Normalize parameters
+        target_opt = str(option_type or "").upper().strip()
+        if target_opt == "CALL":
+            target_opt = "CE"
+        elif target_opt == "PUT":
+            target_opt = "PE"
+
+        target_strike = None
+        if strike is not None:
+            try:
+                target_strike = float(strike)
+            except (ValueError, TypeError):
+                pass
+
+        target_expiry = str(expiry).strip() if expiry else None
+
+        for c in contracts:
+            c_exp = str(c.get("expiry") or "")
+            c_type = str(c.get("instrument_type") or "").upper()
+            c_strike = float(c.get("strike_price") or 0.0)
+
+            # Match criteria
+            if target_expiry and c_exp != target_expiry:
+                continue
+            if target_opt and c_type != target_opt:
+                continue
+            if target_strike is not None and abs(c_strike - target_strike) > 0.01:
+                continue
+
+            return c
+
+        return None
+
+    def resolve_option_instrument_key(
+        self,
+        underlying: str,
+        expiry: Optional[str] = None,
+        strike: Optional[Union[float, int, str]] = None,
+        option_type: Optional[str] = None,
+    ) -> Optional[str]:
+        """
+        Returns the exact authoritative Upstox instrument_key (e.g. 'NSE_FO|56985')
+        matching underlying, expiry, strike, and CE/PE.
+        Never synthesizes fake IDs.
+        """
+        contract = self.resolve_option_contract(underlying, expiry, strike, option_type)
+        if contract and contract.get("instrument_key"):
+            return str(contract["instrument_key"])
         return None
 
     def get_instrument_metadata(self, symbol: str) -> Optional[Dict[str, Any]]:
@@ -814,6 +952,13 @@ class UpstoxService:
                 "error_code": code,
                 "message": "Invalid or expired access token (UDAPI100050). Please re-authenticate." if code == "UDAPI100050" else err_str,
             }
+
+    def get_ws_feed_auth_url(self) -> Optional[str]:
+        """Returns authorized WebSocket URI for Upstox V3 Market Data Feed."""
+        res = self.authorize_market_data_feed()
+        if res.get("success") and res.get("authorized_redirect_uri"):
+            return str(res["authorized_redirect_uri"])
+        return None
 
     def resolve_canonical_symbol(self, input_str: str) -> str:
         """
@@ -1319,6 +1464,7 @@ class UpstoxService:
         """
         Produces an authoritative, sanitized diagnostic report for Upstox V3 Market Data.
         Strictly excludes tokens, client secrets, or sensitive credentials.
+        Reports true WebSocket connection status, subscribed count, tick freshness, and errors.
         """
         val = self.validate_token()
         is_conf = bool(self.access_token and len(self.access_token.strip()) > 10)
@@ -1329,6 +1475,21 @@ class UpstoxService:
         token_status = "ACTIVE" if status == "VALID" else ("EXPIRED" if auth_status == "TOKEN_EXPIRED" else ("NOT_SET" if not is_conf else "INVALID"))
         rest_status = "UP" if status == "VALID" else "DOWN"
 
+        # Query feed bridge diagnostics if available
+        bridge_diag = {}
+        try:
+            from src.data_core.subscriptions.upstox_feed_bridge import global_upstox_feed_bridge
+            bridge_diag = global_upstox_feed_bridge.get_diagnostics()
+        except Exception:
+            pass
+
+        ws_connected = bridge_diag.get("websocket_connected", False)
+        ws_status = bridge_diag.get("websocket_status", ("CONNECTED" if ws_connected else ("READY" if status == "VALID" else "DOWN")))
+        last_real_tick_at = bridge_diag.get("last_real_tick_at")
+        last_tick_age_ms = bridge_diag.get("last_tick_age_ms")
+        last_error = bridge_diag.get("last_error")
+        subscribed_count = bridge_diag.get("subscribed_instruments_count", 0)
+
         return {
             "configured": is_conf,
             "authentication_status": auth_status,
@@ -1336,13 +1497,16 @@ class UpstoxService:
             "token_expiry": None,
             "data_entitlement": "ACTIVE" if status == "VALID" else "UNKNOWN",
             "rest_status": rest_status,
-            "websocket_status": "LIVE" if status == "VALID" else "DOWN",
-            "subscription_status": "ACTIVE" if status == "VALID" else "INACTIVE",
+            "websocket_connected": ws_connected,
+            "websocket_status": ws_status,
+            "subscription_status": "ACTIVE" if subscribed_count > 0 else ("READY" if status == "VALID" else "INACTIVE"),
+            "subscribed_instruments_count": subscribed_count,
             "decoder_status": "PROTOBUF_OK" if status == "VALID" else "PROTOBUF_READY",
-            "last_real_tick_at": None,
-            "last_tick_age_ms": None,
+            "last_real_tick_at": last_real_tick_at,
+            "last_tick_age_ms": last_tick_age_ms,
+            "last_error": last_error,
             "error_code": err_code or ("UDAPI100050" if auth_status == "TOKEN_EXPIRED" else None),
-            "safe_error_message": val.get("message") if status != "VALID" else None,
+            "safe_error_message": val.get("message") if status != "VALID" else last_error,
             "status": "TOKEN_EXPIRED" if err_code == "UDAPI100050" else status,
         }
 

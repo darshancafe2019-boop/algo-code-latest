@@ -103,8 +103,8 @@ const OptionStrategyBuilder = dynamic(
   () => import("@/components/crypto/OptionStrategyBuilder").then((m) => m.OptionStrategyBuilder),
   { ssr: false, loading: () => null }
 );
-const FuturesUniverseView = dynamic(
-  () => import("@/src/features/markets/futures").then((m) => m.FuturesUniverseView),
+const FuturesWorkspace = dynamic(
+  () => import("@/src/features/markets/futures").then((m) => m.FuturesWorkspace),
   { ssr: false, loading: () => null }
 );
 const TaxIntelligenceTab = dynamic(
@@ -413,7 +413,9 @@ function MainApp() {
         {/* 18. Modular Futures Universe Terminal */}
         {(activeTab === "crypto-futures" || activeTab === "futures") && (
           <ErrorBoundary title="Futures & Derivatives Terminal Failed">
-            <FuturesUniverseView />
+            <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+              <FuturesWorkspace activeBoard="ALL" boardTitle="Universal Futures Workstation" />
+            </div>
           </ErrorBoundary>
         )}
 

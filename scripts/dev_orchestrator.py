@@ -507,6 +507,10 @@ class ServiceSupervisor:
         frontend_env = os.environ.copy()
         frontend_env["BACKEND_INTERNAL_URL"] = f"http://127.0.0.1:{BACKEND_PORT}"
         frontend_env["MARKET_GATEWAY_URL"] = f"http://127.0.0.1:{GATEWAY_PORT}"
+        frontend_env["NEXT_PUBLIC_MARKET_GATEWAY_WS"] = f"ws://127.0.0.1:{GATEWAY_PORT}/ws"
+        frontend_env["NEXT_PUBLIC_MARKET_GATEWAY_WS_URL"] = f"ws://127.0.0.1:{GATEWAY_PORT}/ws"
+        frontend_env["NEXT_PUBLIC_MARKET_WS_URL"] = f"ws://127.0.0.1:{GATEWAY_PORT}/ws"
+        frontend_env["NEXT_PUBLIC_MARKET_GATEWAY_PORT"] = str(GATEWAY_PORT)
         frontend_env["PORT"] = str(FRONTEND_PORT)
         
         next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"

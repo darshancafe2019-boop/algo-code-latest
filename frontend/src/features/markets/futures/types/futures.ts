@@ -66,65 +66,119 @@ export interface ProviderHealthReport {
   reconnect_count: number;
 }
 
+export type FuturesFeedState =
+  | "LIVE"
+  | "CONNECTING"
+  | "RECONNECTING"
+  | "STALE"
+  | "MARKET_CLOSED"
+  | "AUTH_REQUIRED"
+  | "DISCONNECTED"
+  | "ERROR";
+
 export interface CanonicalFuturesContract {
+  // Canonical Identity
+  id?: string;
   symbol: string;
-  underlying: string;
+  displaySymbol?: string;
   displayName: string;
-  contract_type: FuturesContractType;
-  venue: MarketVenue;
-
-  // Nullable telemetry to prevent falsifying missing data into zeros
-  mark_price?: number | null;
-  index_price?: number | null;
-  last_price?: number | null;
-  bid?: number | null;
-  ask?: number | null;
-  bid_qty?: number | null;
-  ask_qty?: number | null;
-  change_24h_pct?: number | null;
-  volume_24h_usd?: number | null;
-  open_interest_usd?: number | null;
-  open_interest_coins?: number | null;
-  open_interest_change?: number | null;
-
-  // Exact Source Identification & Decoupled Execution Broker
-  market_data_provider?: string;
-  provider?: string;
-  execution_broker?: string;
-  broker_account?: string;
-  broker_account_alias?: string;
-  environment?: string;
-  exchange?: string;
-  segment?: string;
-  asset_type?: string;
-  canonical_symbol?: string;
+  underlying: string;
+  rawInstrumentId?: string | null;
   provider_instrument_id?: string;
   instrument_key?: string;
-  feed_type?: string;
-  last_update?: string | null;
-  data_age_ms?: number | null;
-  latency_ms?: number | null;
-  freshness_status?: "LIVE" | "DELAYED" | "STALE" | "NO_DATA" | "MARKET_CLOSED" | "UNAVAILABLE" | string;
-  market_status?: "OPEN" | "CLOSED" | "PRE_OPEN" | "POST_CLOSE" | string;
-  status?: "CONNECTED" | "LIVE" | "AUTH_REQUIRED" | "TOKEN_EXPIRED" | "DATA_PLAN_INACTIVE" | "NOT_CONFIGURED" | "DISCONNECTED" | "STALE" | "UNAVAILABLE" | string;
+  canonical_symbol?: string;
+
+  // Taxonomy & Market
+  market?: "INDIA" | "CRYPTO" | "GLOBAL" | string;
+  exchange: string;
+  provider: string;
+  market_data_provider?: string;
+  contractType?: "PERPETUAL" | "FUTURE" | FuturesContractType;
+  contract_type: FuturesContractType;
+  venue: MarketVenue;
+  segment?: string;
+  asset_type?: string;
+
+  // Specifications
+  expiry?: string | null;
+  expiry_date?: string | null;
   currency?: string;
   quote_currency?: string;
   margin_currency?: string;
   settlement_type?: "CASH" | "PHYSICAL" | string;
   contract_multiplier?: number;
+  lotSize?: number;
   lot_size?: number;
-  error_details?: string | null;
-  funding_rate?: FundingRateData | null;
-  basis?: BasisData | null;
+  tickSize?: number;
+  tick_size: number;
+  leverageMax?: number;
   max_leverage: number;
   min_qty: number;
-  tick_size: number;
   maker_fee_pct?: number;
   taker_fee_pct?: number;
-  expiry_date?: string | null;
+
+  // Pricing & BBO (Nullable for Truth-In-Data)
+  lastPrice?: number | null;
+  last_price?: number | null;
+  markPrice?: number | null;
+  mark_price?: number | null;
+  indexPrice?: number | null;
+  index_price?: number | null;
+  bid?: number | null;
+  ask?: number | null;
+  bidSize?: number | null;
+  bid_qty?: number | null;
+  askSize?: number | null;
+  ask_qty?: number | null;
+  spread?: number | null;
+  spreadPct?: number | null;
+  change24hPct?: number | null;
+  change_24h_pct?: number | null;
+
+  // Open Interest & Volume
+  openInterest?: number | null;
+  openInterestValue?: number | null;
+  openInterestChange?: number | null;
+  open_interest_usd?: number | null;
+  open_interest_coins?: number | null;
+  open_interest_change?: number | null;
+  volume24h?: number | null;
+  volume_24h_usd?: number | null;
+  turnover24h?: number | null;
+
+  // Funding & Basis (Perpetuals only, null for NSE)
+  fundingRate?: number | null;
+  predictedFundingRate?: number | null;
+  nextFundingAt?: string | null;
+  funding_rate?: FundingRateData | null;
+  basis?: BasisData | null;
+  basisValue?: number | null;
+  basisPct?: number | null;
+
+  // Telemetry, Timestamps & Feed Health
+  exchangeTimestamp?: string | null;
+  receivedAt?: string | null;
+  last_update?: string | null;
+  feed_type?: string;
+  latencyMs?: number | null;
+  latency_ms?: number | null;
+  data_age_ms?: number | null;
+  feedState?: FuturesFeedState;
+  status?: string;
+  freshness_status?: string;
+  market_status?: "OPEN" | "CLOSED" | "PRE_OPEN" | "POST_CLOSE" | string;
+  stale?: boolean;
+  staleReason?: string | null;
+  error_details?: string | null;
   is_active: boolean;
   long_short_ratio?: number | null;
   timestamp: string;
+
+  // Decoupled Execution Broker Context
+  execution_broker?: string;
+  broker_account?: string;
+  broker_account_alias?: string;
+  environment?: string;
 }
 
 export interface FuturesUniverseResponse {

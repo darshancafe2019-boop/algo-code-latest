@@ -150,6 +150,7 @@ class ExplainableDecision:
     """Explainable decision snapshot: 'WHY DID THE BOT TRADE / NOT TRADE?'."""
     decision_id: str = field(default_factory=lambda: f"dec_{uuid.uuid4().hex[:8]}")
     bot_id: str = ""
+    bot_name: str = ""
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     market_snapshot_id: str = ""
     rules_evaluated: List[ExplainableDecisionRule] = field(default_factory=list)
@@ -157,19 +158,42 @@ class ExplainableDecision:
     risk_summary: str = "All Risk Gates Armed"
     final_decision: str = "NO_TRADE"  # 'BUY', 'SELL', 'NO_TRADE', 'HOLD', 'EXIT'
     summary: str = "Criteria not met"
+    # Extended telemetry fields
+    confidence_score: float = 0.0      # 0.0 – 100.0 %
+    regime: str = ""                   # 'TRENDING', 'RANGING', 'VOLATILE'
+    provider: str = ""                 # market data provider used
+    decision_reason: str = ""          # human-readable explanation
+
+    @property
+    def action(self) -> str:
+        """Backward-compat alias for final_decision."""
+        return self.final_decision
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "decisionId": self.decision_id,
             "botId": self.bot_id,
+            "botName": self.bot_name,
+            "bot_name": self.bot_name,
+            "bot_id": self.bot_id,
             "timestamp": self.timestamp,
             "marketSnapshotId": self.market_snapshot_id,
             "rulesEvaluated": [asdict(r) for r in self.rules_evaluated],
             "riskGatesPassed": self.risk_gates_passed,
             "riskSummary": self.risk_summary,
             "finalDecision": self.final_decision,
+            "final_decision": self.final_decision,
+            "decision": self.final_decision,
+            "action": self.final_decision,
             "summary": self.summary,
+            "confidence_score": round(self.confidence_score, 1),
+            "confidenceScore": round(self.confidence_score, 1),
+            "regime": self.regime,
+            "provider": self.provider,
+            "decision_reason": self.decision_reason,
+            "decisionReason": self.decision_reason,
         }
+
 
 
 @dataclass

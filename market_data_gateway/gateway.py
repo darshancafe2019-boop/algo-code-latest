@@ -1175,6 +1175,31 @@ class MarketDataGateway:
             "timestamp": datetime.now(timezone.utc).isoformat(),
         })
 
+    async def handle_futures(self, request: web.Request) -> web.Response:
+        """Returns normalized futures universe across all supported providers (600+ Upstox NSE Futures, Binance, Delta)."""
+        try:
+            from market_data.futures.service import FuturesMarketService
+            service = FuturesMarketService.get_instance()
+            contracts = service.get_all_contracts()
+            underlying = (request.rel_url.query.get("underlying") or "").strip().upper()
+            if underlying:
+                contracts = [c for c in contracts if underlying in c.underlying.upper() or underlying in c.symbol.upper() or underlying in c.displayName.upper()]
+            return web.json_response({
+                "status": "SUCCESS",
+                "count": len(contracts),
+                "contracts": [c.to_dict() for c in contracts],
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            })
+        except Exception as ex:
+            logger.error("Error in handle_futures: %s", ex, exc_info=True)
+            return web.json_response({
+                "status": "ERROR",
+                "count": 0,
+                "contracts": [],
+                "error": str(ex),
+            }, status=500)
+
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ENTRYPOINT
@@ -1211,8 +1236,10 @@ def create_app() -> tuple:
     app.router.add_get("/api/market/health", gateway.handle_market_data_health)
     app.router.add_get("/api/market-data/health", gateway.handle_market_data_health)
     app.router.add_get("/api/market/status", gateway.handle_market_data_health)
-    app.router.add_get("/api/market-data/status", gateway.handle_market_data_health)
     app.router.add_get("/providers/health", gateway.handle_health)
+    app.router.add_get("/market/providers/health", gateway.handle_health)
+    app.router.add_get("/api/market/providers/health", gateway.handle_health)
+    app.router.add_get("/api/providers/health", gateway.handle_health)
     app.router.add_get("/metrics", gateway.handle_metrics)
 
     # Snapshot & Quotes Endpoints (GET & POST)

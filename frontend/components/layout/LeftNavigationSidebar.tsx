@@ -12,7 +12,6 @@ import {
   Code,
   Zap,
   TrendingUp,
-  Coins,
   Landmark,
   FileText,
   Bell,
@@ -50,7 +49,6 @@ export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "indicators", label: "Indicators", path: "/indicators", icon: Activity },
   { id: "options", label: "Options", path: "/options", icon: Zap },
   { id: "futures", label: "Futures", path: "/futures", icon: TrendingUp },
-  { id: "crypto", label: "Crypto", path: "/crypto", icon: Coins },
   { id: "portfolio", label: "Portfolio", path: "/portfolio", icon: Landmark },
   { id: "reports", label: "Tax", path: "/tax-intelligence", icon: FileText },
   { id: "alerts", label: "Alerts", path: "/alerts", icon: Bell },
@@ -92,7 +90,6 @@ export function LeftNavigationSidebar({
     if (item.path !== "/" && pathname?.startsWith(item.path)) return true;
     if (item.id === "indicators" && (pathname?.startsWith("/indicators") || pathname === "/indicator-center" || activeTab === "indicators")) return true;
     if (item.id === "strategies" && (pathname?.startsWith("/strategy") || pathname === "/strategies" || pathname === "/strategy-builder" || activeTab === "strategies" || activeTab === "strategy-builder")) return true;
-    if (item.id === "crypto" && (pathname?.startsWith("/crypto") || activeTab === "crypto-derivatives" || activeTab === "crypto-futures" || activeTab === "crypto-options" || activeTab === "crypto-options-chain")) return true;
     if (item.id === "portfolio" && (pathname === "/positions" || pathname === "/orders" || pathname === "/capital" || pathname === "/capital-funds" || pathname === "/pnl" || pathname === "/journal" || activeTab === "positions" || activeTab === "orders" || activeTab === "portfolio" || activeTab === "pnl" || activeTab === "trade-journal")) return true;
     if (item.id === "reports" && (pathname === "/reports" || pathname === "/tax" || pathname === "/tax-intelligence" || activeTab === "reports" || activeTab === "tax" || activeTab === "research" || activeTab === "backtesting")) return true;
     if (item.id === "providers" && (pathname === "/providers" || pathname === "/api-integrations" || pathname === "/integrations" || activeTab === "providers")) return true;

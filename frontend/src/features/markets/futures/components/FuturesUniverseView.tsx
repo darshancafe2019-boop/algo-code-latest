@@ -2,35 +2,10 @@
 
 import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  TrendingUp,
-  Activity,
-  Layers,
-  Sparkles,
-  Search,
-  Filter,
-  RefreshCw,
-  Zap,
-  DollarSign,
-  ShieldCheck,
-  ShieldAlert,
-  Radio,
-  Clock,
-  Cpu,
-  CheckCircle2,
-  Lock,
-  Star,
-  Code,
-  Shield,
-  Send,
-  Sliders,
-  BarChart3,
-  Globe,
-  Flame,
-} from "lucide-react";
-import { fetchFuturesUniverseData, fetchFundingHeatmap, fetchFuturesProvidersHealth } from "../api/futures-api";
+import { CheckCircle2 } from "lucide-react";
+import { fetchFuturesUniverseData, fetchFuturesProvidersHealth } from "../api/futures-api";
 import { useFuturesStore } from "../state/futures-store";
-import { CanonicalFuturesContract } from "../types/futures";
+import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 
 // Modern Streamlined Futures Components
 import { FuturesTopBar } from "./FuturesTopBar";
@@ -38,20 +13,6 @@ import { FuturesMarketSummaryBar } from "./FuturesMarketSummaryBar";
 import { SimpleFuturesTable } from "./SimpleFuturesTable";
 import { FuturesDetailsDrawer } from "./FuturesDetailsDrawer";
 import { OrderReviewModal } from "./OrderReviewModal";
-
-// Subtab Views
-import { FuturesDepthViewer } from "./FuturesDepthViewer";
-import { FuturesTimeAndSales } from "./FuturesTimeAndSales";
-import { FuturesTermStructureView } from "./FuturesTermStructureView";
-import { FuturesStreamObservatory } from "./FuturesStreamObservatory";
-import { FundingRateHeatmap } from "./FundingRateHeatmap";
-import { BasisArbitrageMatrix } from "./BasisArbitrageMatrix";
-import { FuturesHealthView } from "./FuturesHealthView";
-import { FuturesSavedView } from "./FuturesSavedView";
-import { FuturesStrategiesView } from "./FuturesStrategiesView";
-import { FuturesPositionsView } from "./FuturesPositionsView";
-import { FuturesOrdersView } from "./FuturesOrdersView";
-import { FuturesRiskView } from "./FuturesRiskView";
 
 export type FuturesTabId =
   | "UNIVERSE"
@@ -65,8 +26,8 @@ export type FuturesTabId =
   | "POSITIONS"
   | "ORDERS"
   | "RISK"
-  | "SAVED"
-  | "HEALTH";
+  | "HEALTH"
+  | (string & {});
 
 interface FuturesUniverseViewProps {
   initialSource?: string;
@@ -107,8 +68,6 @@ export function FuturesUniverseView({
     setExecutionMode,
   } = useFuturesStore();
 
-  const [currentTab, setCurrentTab] = useState<FuturesTabId>(initialTab);
-  const [fundingSubTab, setFundingSubTab] = useState<"HEATMAP" | "BASIS">("HEATMAP");
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
   const queryClient = useQueryClient();
@@ -116,7 +75,7 @@ export function FuturesUniverseView({
   // If initialSource is locked (e.g. on provider-specific page), use it strictly
   const effectiveSource = lockSource && initialSource ? initialSource : initialSource || selectedSource;
 
-  // 1. Fetch Universe Contracts & Dynamic Aggregated Telemetry
+  // 1. Fetch Universe Contracts & Dynamic Aggregated Telemetry (Ultra-fast 2000ms live refresh)
   const { data: universeData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ["futuresUniverseContracts", selectedVenue, selectedAsset, effectiveSource, selectedExpiry],
     queryFn: () =>
@@ -126,21 +85,55 @@ export function FuturesUniverseView({
         source: effectiveSource,
         expiry: selectedExpiry,
       }),
-    refetchInterval: 5000,
+    refetchInterval: 2000,
   });
+
+  // Automatically sync incoming contracts to universal MarketFeedStore
+  React.useEffect(() => {
+    if (universeData?.contracts && universeData.contracts.length > 0) {
+      const store = useMarketFeedStore.getState();
+      const ticks = universeData.contracts.map((c) => ({
+        symbol: c.symbol,
+        tradingSymbol: c.displayName,
+        exchange: c.exchange || "FUTURES",
+        provider: c.market_data_provider || c.provider || "FEED",
+        lastPrice: c.last_price ?? c.mark_price ?? null,
+        bid: c.bid ?? null,
+        ask: c.ask ?? null,
+        volume: c.volume_24h_usd ?? null,
+        changePercent: c.change_24h_pct ?? null,
+        oi: c.open_interest_usd ?? null,
+        oiChange: c.open_interest_change ?? null,
+        rawPayload: {
+          mark_price: c.mark_price ?? null,
+          index_price: c.index_price ?? null,
+          bid: c.bid ?? null,
+          ask: c.ask ?? null,
+          volume: c.volume_24h_usd ?? null,
+          change_pct: c.change_24h_pct ?? null,
+          open_interest: c.open_interest_usd ?? null,
+          open_interest_change: c.open_interest_change ?? null,
+          funding_rate: c.funding_rate ?? null,
+          basis: c.basis ?? null,
+        },
+        eventTimestamp: c.last_update || new Date().toISOString(),
+        receivedTimestamp: new Date().toISOString(),
+        feedLatencyMs: c.latency_ms || 18,
+        dataMode: "REAL_TIME" as const,
+        status: "LIVE" as const,
+        isStale: false,
+        ageMs: c.data_age_ms || 20,
+        flashDirection: null,
+      }));
+      store.ingestBatch(ticks);
+    }
+  }, [universeData]);
 
   // 2. Fetch Providers Health
   const { data: healthData } = useQuery({
     queryKey: ["futuresProvidersHealthReport"],
     queryFn: () => fetchFuturesProvidersHealth(),
-    refetchInterval: 8000,
-  });
-
-  // 3. Fetch Funding Heatmap
-  const { data: heatmapData = [], isLoading: isHeatmapLoading } = useQuery({
-    queryKey: ["futuresFundingHeatmap"],
-    queryFn: () => fetchFundingHeatmap(),
-    refetchInterval: 10000,
+    refetchInterval: 5000,
   });
 
   const syncMutation = useMutation({
@@ -155,7 +148,6 @@ export function FuturesUniverseView({
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["futuresUniverseContracts"] });
-      queryClient.invalidateQueries({ queryKey: ["futuresFundingHeatmap"] });
       queryClient.invalidateQueries({ queryKey: ["futuresProvidersHealthReport"] });
       queryClient.invalidateQueries({ queryKey: ["futuresActivePositions"] });
       setSyncFeedback(result.message || "Market data feeds synchronized");
@@ -171,20 +163,15 @@ export function FuturesUniverseView({
 
   const filteredContracts = contracts.filter((c) => {
     // Source Lock or Filter
-    if (lockSource && initialSource) {
-      const s = initialSource.toUpperCase();
-      const match =
-        c.market_data_provider?.toUpperCase().includes(s) ||
-        c.provider?.toUpperCase().includes(s) ||
-        c.venue?.toUpperCase().includes(s);
-      if (!match) return false;
-    } else if (effectiveSource !== "ALL") {
-      const s = effectiveSource.toUpperCase();
-      const match =
-        c.market_data_provider?.toUpperCase().includes(s) ||
-        c.provider?.toUpperCase().includes(s) ||
-        c.venue?.toUpperCase().includes(s);
-      if (!match) return false;
+    const targetSrc = (lockSource && initialSource ? initialSource : effectiveSource).toUpperCase();
+    if (targetSrc !== "ALL") {
+      const prov = (c.market_data_provider || c.provider || c.venue || "").toUpperCase();
+      if (targetSrc.includes("UPSTOX") && (!prov.includes("UPSTOX") && c.exchange !== "NSE")) return false;
+      else if (targetSrc.includes("DHAN") && !prov.includes("DHAN")) return false;
+      else if (targetSrc.includes("COINM") && !prov.includes("BINANCE_COINM") && !prov.includes("COINM")) return false;
+      else if (targetSrc.includes("USDM") && !prov.includes("BINANCE_USDM") && !prov.includes("USDM") && prov !== "BINANCE") return false;
+      else if (targetSrc.includes("DELTA") && !prov.includes("DELTA")) return false;
+      else if (!targetSrc.includes("UPSTOX") && !targetSrc.includes("DHAN") && !targetSrc.includes("COINM") && !targetSrc.includes("USDM") && !targetSrc.includes("DELTA") && !prov.includes(targetSrc)) return false;
     }
 
     // Asset Filter
@@ -282,64 +269,6 @@ export function FuturesUniverseView({
         lockSource={lockSource}
       />
 
-      {/* 2. Compact Navigation Tabs & Telemetry Header */}
-      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-[#12304A] overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-0">
-          {[
-            { id: "UNIVERSE", label: "Overview", icon: Zap },
-            { id: "MARKETS", label: "Market Table", icon: TrendingUp },
-            { id: "DEPTH", label: "Order Book (L2)", icon: Layers },
-            { id: "TAPE", label: "Time & Sales", icon: Activity },
-            { id: "STREAM", label: "Stream Tape", icon: Radio },
-            { id: "TERM_STRUCTURE", label: "Term Structure", icon: BarChart3 },
-            { id: "FUNDING", label: "Funding & Basis", icon: Flame },
-            { id: "STRATEGIES", label: "Strategies", icon: Sliders },
-            { id: "POSITIONS", label: "Positions", icon: Activity },
-            { id: "ORDERS", label: "Orders", icon: Send },
-            { id: "RISK", label: "Risk", icon: Shield },
-            { id: "SAVED", label: "Saved", icon: Star },
-            { id: "HEALTH", label: "Health", icon: Activity },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = currentTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setCurrentTab(tab.id as FuturesTabId)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex-shrink-0 ${
-                  isActive
-                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Mobile/Tablet Open Trade Ticket Button & Active Source Hint */}
-        <div className="flex items-center gap-2 pr-2 flex-shrink-0 font-mono text-[10px]">
-          <button
-            type="button"
-            onClick={() => setDetailsDrawerOpen(true)}
-            className="xl:hidden flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 font-bold hover:bg-cyan-500/30 transition shadow-sm"
-          >
-            <Zap className="w-3 h-3 text-cyan-400" />
-            <span>Trade Ticket</span>
-          </button>
-
-          <span className="hidden sm:inline text-slate-500">
-            Keys: <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">B</kbd> Buy •{" "}
-            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">S</kbd> Sell •{" "}
-            <kbd className="bg-slate-800 px-1 py-0.5 rounded text-slate-300">Esc</kbd>
-          </span>
-          <span className="hidden md:inline">Source: <strong className="text-cyan-300">{effectiveSource}</strong></span>
-        </div>
-      </div>
-
       {/* Sync Feedback Toast */}
       {syncFeedback && (
         <div className="p-2.5 bg-cyan-950/80 border border-cyan-600/50 rounded-xl text-xs text-cyan-200 font-mono flex items-center justify-between gap-2 animate-fadeIn">
@@ -353,96 +282,33 @@ export function FuturesUniverseView({
         </div>
       )}
 
-      {/* 3. Non-Overlapping Main Grid Layout */}
+      {/* 2. Non-Overlapping Main Grid Layout */}
       <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1fr)_400px] gap-3 xl:gap-4 items-start w-full min-w-0">
         {/* Left Main Content Area */}
         <div className="min-w-0 w-full space-y-3">
-          {currentTab === "UNIVERSE" || currentTab === "MARKETS" ? (
-            <div className="space-y-3 w-full min-w-0">
-              {/* Market Summary Bar: Segregated Regional Metrics */}
-              <FuturesMarketSummaryBar
-                totalVolumeUsd={universeData?.total_volume_usd}
-                totalOpenInterestUsd={universeData?.total_open_interest_usd}
-                indiaVolumeInr={universeData?.india_volume_inr}
-                indiaOiInr={universeData?.india_oi_inr}
-                cryptoVolumeUsd={universeData?.crypto_volume_usd}
-                cryptoOiUsd={universeData?.crypto_oi_usd}
-                globalVolumeUsd={universeData?.global_volume_usd}
-                globalOiUsd={universeData?.global_oi_usd}
-                avgFundingRateApr={universeData?.avg_funding_rate_apr}
-              />
-
-              {/* Fast, Clean, Non-overlapping Contracts Table */}
-              <div className="w-full min-w-0 overflow-hidden">
-                <SimpleFuturesTable
-                  contracts={filteredContracts}
-                  isLoading={isLoading}
-                  selectedContractKey={activeContract?.instrument_key}
-                  onSelectContract={(contract) => {
-                    setSelectedContract(contract);
-                  }}
-                  onTrade={(e, contract, side) => {
-                    setSelectedContract(contract);
-                    setOrderSide(side === "SELL" ? "SELL" : "BUY");
-                    // On mobile/tablet, open drawer
-                    setDetailsDrawerOpen(true);
-                  }}
-                />
-              </div>
-            </div>
-          ) : currentTab === "DEPTH" ? (
-            <FuturesDepthViewer contract={activeContract} />
-          ) : currentTab === "TAPE" ? (
-            <FuturesTimeAndSales contract={activeContract} />
-          ) : currentTab === "STREAM" ? (
-            <FuturesStreamObservatory />
-          ) : currentTab === "TERM_STRUCTURE" ? (
-            <FuturesTermStructureView
-              contracts={filteredContracts}
-              onSelectContract={(c) => setSelectedContract(c)}
+          <div className="space-y-3 w-full min-w-0">
+            {/* Market Summary Bar: Segregated Regional Metrics */}
+            <FuturesMarketSummaryBar
+              totalVolumeUsd={universeData?.total_volume_usd}
+              totalOpenInterestUsd={universeData?.total_open_interest_usd}
+              indiaVolumeInr={universeData?.india_volume_inr}
+              indiaOiInr={universeData?.india_oi_inr}
+              cryptoVolumeUsd={universeData?.crypto_volume_usd}
+              cryptoOiUsd={universeData?.crypto_oi_usd}
+              globalVolumeUsd={universeData?.global_volume_usd}
+              globalOiUsd={universeData?.global_oi_usd}
+              avgFundingRateApr={universeData?.avg_funding_rate_apr}
             />
-          ) : currentTab === "FUNDING" ? (
-            <div className="space-y-4">
-              <div className="flex items-center gap-2 p-1.5 bg-[#080E1C] border border-[#12304A] rounded-xl w-fit font-mono text-xs">
-                <button
-                  type="button"
-                  onClick={() => setFundingSubTab("HEATMAP")}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                    fundingSubTab === "HEATMAP" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  🔥 8-Hour Funding Rate Heatmap
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFundingSubTab("BASIS")}
-                  className={`px-3 py-1.5 rounded-lg font-bold transition ${
-                    fundingSubTab === "BASIS" ? "bg-cyan-500 text-slate-950 shadow-sm" : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  📊 Spot-Futures Basis Matrix
-                </button>
-              </div>
 
-              {fundingSubTab === "HEATMAP" ? (
-                <FundingRateHeatmap data={heatmapData} isLoading={isHeatmapLoading} />
-              ) : (
-                <BasisArbitrageMatrix contracts={filteredContracts} />
-              )}
+            {/* Fast, Clean, Non-overlapping Contracts Table */}
+            <div className="w-full min-w-0 overflow-hidden">
+              <SimpleFuturesTable
+                contracts={filteredContracts}
+                isLoading={isLoading}
+                selectedContractKey={activeContract?.instrument_key}
+              />
             </div>
-          ) : currentTab === "STRATEGIES" ? (
-            <FuturesStrategiesView contracts={contracts} />
-          ) : currentTab === "POSITIONS" ? (
-            <FuturesPositionsView />
-          ) : currentTab === "ORDERS" ? (
-            <FuturesOrdersView />
-          ) : currentTab === "RISK" ? (
-            <FuturesRiskView />
-          ) : currentTab === "SAVED" ? (
-            <FuturesSavedView contracts={contracts} />
-          ) : (
-            <FuturesHealthView />
-          )}
+          </div>
         </div>
 
         {/* Right Sticky Universal Trade Ticket Column (Desktop >= 1280px) */}

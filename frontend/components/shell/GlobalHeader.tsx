@@ -73,7 +73,7 @@ export const GlobalHeader = memo(function GlobalHeader({
       </div>
 
       {/* ── CENTER SECTION: COMPACT SEARCH + LIVE MARKET TICKERS ── */}
-      <div className="hidden md:flex items-center justify-center flex-1 max-w-3xl min-w-0 mx-2">
+      <div className="hidden md:flex items-center justify-center flex-1 max-w-4xl min-w-0 mx-2">
         <TopMarketBar onOpenSearch={onOpenSearch} />
       </div>
 

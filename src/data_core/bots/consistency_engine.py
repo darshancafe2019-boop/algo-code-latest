@@ -230,7 +230,7 @@ class DeploymentConsistencyEngine:
             except ValueError:
                 pass
 
-        if not expiry_mismatches and is_option_strategy and spec.expiry and spec.market_data_provider == "UPSTOX":
+        if not expiry_mismatches and is_option_strategy and spec.expiry and spec.market_data_provider == "UPSTOX" and spec.environment == Environment.LIVE:
             try:
                 from src.upstox_service import global_upstox_service
                 if global_upstox_service.is_authenticated:

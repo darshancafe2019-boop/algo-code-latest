@@ -101,8 +101,6 @@ export const useFuturesStore = create<FuturesStoreState>()(
       name: "quantos_futures_store",
       partialize: (state) => ({
         savedContractKeys: state.savedContractKeys,
-        selectedSource: state.selectedSource,
-        selectedAsset: state.selectedAsset,
         executionMode: state.executionMode,
       }),
     }

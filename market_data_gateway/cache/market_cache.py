@@ -93,6 +93,11 @@ class MarketDataCache:
         self._quotes[quote.symbol] = quote
         self._quotes[quote.symbol.upper()] = quote
 
+    def set_quote(self, key: str, quote: NormalizedQuote) -> None:
+        k_clean = key.strip()
+        self._quotes[k_clean] = quote
+        self._quotes[k_clean.upper()] = quote
+
     def get_normalized_quote(self, key: str) -> Optional[NormalizedQuote]:
         return self.get_quote(key)
 

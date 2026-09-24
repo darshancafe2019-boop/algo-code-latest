@@ -61,7 +61,7 @@ import {
 interface CreateBotWizardModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (botName: string) => void;
+  onSuccess?: (botName: string) => void;
 }
 
 const ASSET_CLASSES: { id: WizardAssetClass; label: string; icon: any; desc: string }[] = [
@@ -170,22 +170,24 @@ const ALL_TIMEFRAMES = [
   { id: "1M", label: "1M", desc: "1 Month (Macro Cycle)" },
 ];
 
+import { indicatorRegistry } from "@/lib/indicators/registry";
+import { IndicatorCategory } from "@/lib/indicators/types";
+
 const AVAILABLE_INDICATORS = [
-  { id: "ema_fast", name: "EMA (Fast)", category: "Trend" as const, defaultParams: { period: 9, source: "close" } },
-  { id: "ema_slow", name: "EMA (Slow)", category: "Trend" as const, defaultParams: { period: 21, source: "close" } },
-  { id: "ema_trend", name: "EMA (Macro Trend 200)", category: "Trend" as const, defaultParams: { period: 200, source: "close" } },
-  { id: "sma_20", name: "SMA (Simple Moving Avg 20)", category: "Trend" as const, defaultParams: { period: 20, source: "close" } },
-  { id: "rsi_14", name: "RSI (Relative Strength 14)", category: "Momentum" as const, defaultParams: { period: 14, overbought: 70, oversold: 30 } },
-  { id: "macd", name: "MACD (12, 26, 9)", category: "Momentum" as const, defaultParams: { fast: 12, slow: 26, signal: 9 } },
-  { id: "vwap", name: "VWAP (Volume Weighted Avg Price)", category: "Volume" as const, defaultParams: { anchor: "session" } },
-  { id: "atr_14", name: "ATR (Average True Range)", category: "Volatility" as const, defaultParams: { period: 14, multiplier: 1.5 } },
-  { id: "adx_14", name: "ADX (Trend Strength)", category: "Trend" as const, defaultParams: { period: 14, threshold: 25 } },
-  { id: "bollinger", name: "Bollinger Bands (20, 2.0)", category: "Volatility" as const, defaultParams: { period: 20, stdDev: 2.0 } },
-  { id: "supertrend", name: "Supertrend (10, 3.0)", category: "Trend" as const, defaultParams: { period: 10, multiplier: 3.0 } },
-  { id: "volume_ma", name: "Volume (20-Period MA)", category: "Volume" as const, defaultParams: { period: 20 } },
-  { id: "vp_poc", name: "Volume Profile POC / VAH / VAL", category: "Volume" as const, defaultParams: { rows: 24 } },
-  { id: "pivot_points", name: "Pivot Points (Standard)", category: "Support/Resistance" as const, defaultParams: { method: "standard" } },
-  { id: "stochastic", name: "Stochastic Oscillator (14, 3, 3)", category: "Momentum" as const, defaultParams: { kPeriod: 14, dPeriod: 3 } },
+  ...indicatorRegistry.getAll().map((ind) => {
+    const defaultParams: Record<string, any> = {};
+    if (ind.parameters) {
+      Object.entries(ind.parameters).forEach(([k, p]) => {
+        defaultParams[k] = p.default;
+      });
+    }
+    return {
+      id: ind.id,
+      name: ind.shortName ? `${ind.shortName} (${ind.name})` : ind.name,
+      category: ind.category,
+      defaultParams,
+    };
+  }),
 ];
 
 export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWizardModalProps) {
@@ -242,6 +244,8 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
     { id: "vwap", name: "VWAP", category: "Volume", timeframe: "5m", params: { anchor: "session" } },
   ]);
   const [indicatorSearch, setIndicatorSearch] = useState("");
+  const [selectedIndicatorCategory, setSelectedIndicatorCategory] = useState<string>("ALL");
+  const [expandedIndicatorId, setExpandedIndicatorId] = useState<string | null>(null);
   const [ruleOperator, setRuleOperator] = useState<"AND" | "OR">("AND");
   const [strategyRules, setStrategyRules] = useState<StrategyRuleItem[]>([
     { id: "rule-1", leftIndicatorId: "ema_fast", operator: ">", rightType: "INDICATOR", rightIndicatorId: "ema_slow", isMandatory: true },
@@ -477,6 +481,11 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
           activation_pct: activationProfitPct,
         },
         indicators: selectedIndicators.map((i) => i.id),
+        indicator_configs: selectedIndicators,
+        indicator_settings: selectedIndicators.reduce((acc: Record<string, any>, i) => {
+          acc[i.id] = i.params;
+          return acc;
+        }, {}),
         indicator_combination: {
           operator: ruleOperator,
           rules: strategyRules,
@@ -532,7 +541,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
       localStorage.removeItem("quantos_bot_wizard_draft");
       queryClient.invalidateQueries({ queryKey: ["botsList"] });
       queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-      onSuccess(name);
+      onSuccess?.(name);
       onClose();
     },
     onError: (err: any) => {
@@ -562,7 +571,7 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
     const newInd: IndicatorConfigItem = {
       id: ind.id,
       name: ind.name,
-      category: ind.category,
+      category: ind.category as any,
       timeframe: primaryTimeframe,
       params: { ...ind.defaultParams },
     };
@@ -1588,10 +1597,34 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                     />
                   </div>
 
+                  {/* Category Pills */}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 no-scrollbar text-[9px] font-mono">
+                    {["ALL", "TREND", "MOMENTUM", "VOLATILITY", "VOLUME", "STRENGTH", "STRUCTURE", "OPTIONS"].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedIndicatorCategory(cat)}
+                        className={`px-2 py-0.5 rounded transition-all whitespace-nowrap ${
+                          selectedIndicatorCategory === cat
+                            ? "bg-[#22D3EE] text-black font-bold"
+                            : "bg-[#07101A] border border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="space-y-1.5 max-h-56 overflow-y-auto custom-scrollbar pr-1">
-                    {AVAILABLE_INDICATORS.filter((ind) =>
-                      ind.name.toLowerCase().includes(indicatorSearch.toLowerCase())
-                    ).map((ind) => {
+                    {AVAILABLE_INDICATORS.filter((ind) => {
+                      const matchCat =
+                        selectedIndicatorCategory === "ALL" ||
+                        ind.category.toUpperCase() === selectedIndicatorCategory.toUpperCase();
+                      const matchSearch =
+                        !indicatorSearch.trim() ||
+                        ind.name.toLowerCase().includes(indicatorSearch.toLowerCase());
+                      return matchCat && matchSearch;
+                    }).map((ind) => {
                       const isAdded = selectedIndicators.some((i) => i.id === ind.id);
                       return (
                         <div
@@ -1602,34 +1635,121 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
                               : "bg-[#07101A] border-[#1A2A3F] text-[#7C8CA3] hover:text-white"
                           }`}
                         >
-                          <div>
+                          <div className="flex items-center gap-1.5">
                             <span className="font-bold text-xs">{ind.name}</span>
-                            <span className="text-[9px] text-[#52627A] ml-2 px-1.5 py-0.5 rounded bg-[#101B2D]">
+                            <span className="text-[9px] text-[#52627A] px-1.5 py-0.5 rounded bg-[#101B2D]">
                               {ind.category}
                             </span>
                           </div>
 
-                          {isAdded ? (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveIndicator(ind.id)}
-                              className="p-1 text-red-400 hover:text-red-300 rounded hover:bg-red-950/40"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => handleAddIndicator(ind)}
-                              className="p-1 text-[#22D3EE] hover:text-white rounded hover:bg-[#101B2D]"
-                            >
-                              <Plus className="h-3.5 w-3.5" />
-                            </button>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {isAdded ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setExpandedIndicatorId(
+                                      expandedIndicatorId === ind.id ? null : ind.id
+                                    )
+                                  }
+                                  className="p-1 text-[#22D3EE] hover:bg-[#101B2D] rounded"
+                                  title="Configure Parameters"
+                                >
+                                  <Sliders className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveIndicator(ind.id)}
+                                  className="p-1 text-red-400 hover:text-red-300 rounded hover:bg-red-950/40"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleAddIndicator(ind)}
+                                className="p-1 text-[#22D3EE] hover:text-white rounded hover:bg-[#101B2D]"
+                                title="Add Indicator"
+                              >
+                                <Plus className="h-3.5 w-3.5" />
+                              </button>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
+
+                  {/* Selected Indicator Parameter Settings Editor */}
+                  {selectedIndicators.length > 0 && (
+                    <div className="pt-2 border-t border-[#1A2A3F] space-y-2">
+                      <span className="text-[10px] font-mono text-[#22D3EE] font-bold uppercase flex items-center gap-1">
+                        <Sliders className="h-3 w-3" />
+                        Selected Indicator Parameters ({selectedIndicators.length})
+                      </span>
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                        {selectedIndicators.map((ind) => {
+                          const isExpanded = expandedIndicatorId === ind.id;
+                          return (
+                            <div
+                              key={ind.id}
+                              className="bg-[#07101A] border border-[#1A2A3F] rounded-lg p-2 text-xs font-mono"
+                            >
+                              <div
+                                className="flex items-center justify-between cursor-pointer"
+                                onClick={() =>
+                                  setExpandedIndicatorId(isExpanded ? null : ind.id)
+                                }
+                              >
+                                <span className="font-bold text-white text-[11px]">{ind.name}</span>
+                                <span className="text-[9px] text-[#7C8CA3]">
+                                  {isExpanded ? "▲ Collapse" : "▼ Tune Settings"}
+                                </span>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="mt-2 pt-2 border-t border-[#1A2A3F] grid grid-cols-2 gap-2">
+                                  {Object.entries(ind.params || {}).map(([pk, pv]) => (
+                                    <div key={pk}>
+                                      <label className="block text-[9px] text-[#7C8CA3] mb-0.5 uppercase font-semibold">
+                                        {pk}
+                                      </label>
+                                      <input
+                                        type={typeof pv === "number" ? "number" : "text"}
+                                        value={typeof pv === "boolean" ? (pv ? "true" : "false") : (pv ?? "")}
+                                        onChange={(e) => {
+                                          const val =
+                                            typeof pv === "number"
+                                              ? Number(e.target.value)
+                                              : e.target.value;
+                                          setSelectedIndicators(
+                                            selectedIndicators.map((i) =>
+                                              i.id === ind.id
+                                                ? {
+                                                    ...i,
+                                                    params: {
+                                                      ...i.params,
+                                                      [pk]: val,
+                                                    },
+                                                  }
+                                                : i
+                                            )
+                                          );
+                                        }}
+                                        className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded px-1.5 py-0.5 text-[10px] text-white focus:outline-none focus:border-[#22D3EE]"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Visual Deterministic Rule Builder */}

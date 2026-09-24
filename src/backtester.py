@@ -5,27 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Tuple, Optional, Union, Callable
 
-try:
-    import numpy as np  # type: ignore
-except ImportError:
-    import math as _math
-    class _MockNP:
-        nan = float('nan')
-        inf = float('inf')
-        ndarray = list
-        def array(self, x, **kwargs): return list(x)
-        def sqrt(self, x): return _math.sqrt(x)
-        def isnan(self, x): return _math.isnan(x)
-    np = _MockNP()
+import numpy as np
+import pandas as pd
 
 try:
-    import pandas as pd  # type: ignore
-except ImportError:
-    pd = None
-
-try:
-    import backtrader as bt  # type: ignore
-except ImportError:
+    import backtrader as bt
+    _BT_PandasData = bt.feeds.PandasData
+    _BT_Strategy = bt.Strategy
+except Exception:
     class _MockBTFeeds:
         PandasData = object
     class _MockBTAnalyzers:
@@ -44,6 +31,8 @@ except ImportError:
         Cerebro = object
         analyzers = _MockBTAnalyzers()
     bt = _MockBT()
+    _BT_PandasData = object
+    _BT_Strategy = object
 
 from src import config, db
 from src.strategy import Strategy
@@ -52,7 +41,7 @@ from src.data_fetcher import DataFetcher
 
 logger = logging.getLogger("Backtester")
 
-class PandasDataPlus(bt.feeds.PandasData):
+class PandasDataPlus(_BT_PandasData):  # type: ignore
     """
     Custom Backtrader data feed class to map our precalculated technical indicators.
     """
@@ -73,7 +62,7 @@ class PandasDataPlus(bt.feeds.PandasData):
         ('vah', 'vah'),
     )
 
-class BTTradingStrategy(bt.Strategy):
+class BTTradingStrategy(_BT_Strategy):  # type: ignore
     """
     Backtrader Strategy adapter that wraps our rule-based strategy, indicator profiles, and risk manager.
     """
@@ -358,7 +347,7 @@ def run_single_backtest(df: pd.DataFrame, initial_cash: float = 10000.0, source_
     if source_df is None:
         source_df = df
 
-    cerebro = bt.Cerebro()
+    cerebro: Any = bt.Cerebro()
     
     # 0.1% transaction commission (taker fee)
     cerebro.broker.setcommission(commission=config.BACKTEST_FEE_PCT)
@@ -584,7 +573,11 @@ def run_backtest(
     initial_cash: float = 10000.0,
     allow_shorts: bool = True,
     config_dict: Optional[Dict[str, Any]] = None,
-    df: Optional[pd.DataFrame] = None
+    df: Optional[pd.DataFrame] = None,
+    strategy: Optional[str] = None,
+    initial_capital: Optional[float] = None,
+    commission: Optional[float] = None,
+    **kwargs: Any
 ) -> Dict[str, Any]:
     """Execute advanced on-demand backtest and return structured metrics payload."""
     try:
@@ -595,11 +588,18 @@ def run_backtest(
         cfg["timeframe"] = timeframe
         cfg["start_date"] = start_date
         cfg["end_date"] = end_date
-        cfg["initial_capital"] = initial_cash
+        cfg["initial_capital"] = initial_capital if initial_capital is not None else initial_cash
         cfg["allow_shorts"] = allow_shorts
+        if strategy:
+            cfg["strategy"] = strategy
+        if commission is not None:
+            cfg["commission"] = commission
+        cfg.update(kwargs)
 
         if df is None or len(df) < 30:
             df = generate_synthetic_candles(symbol=symbol, n_bars=150, start_date=start_date)
+        if df is None:
+            df = pd.DataFrame()
 
         engine = AdvancedBacktestEngine(cfg)
         result = engine.run(df)

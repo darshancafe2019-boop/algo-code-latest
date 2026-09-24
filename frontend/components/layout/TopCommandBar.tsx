@@ -13,7 +13,6 @@ import { HeaderSymbolSelector } from "./header/HeaderSymbolSelector";
 import { HeaderTimeframeSelector } from "./header/HeaderTimeframeSelector";
 import { HeaderConnectionStatus } from "./header/HeaderConnectionStatus";
 import { HeaderRiskStatus } from "./header/HeaderRiskStatus";
-import { HeaderGlobalSearch } from "./header/HeaderGlobalSearch";
 import { HeaderOrderButton } from "./header/HeaderOrderButton";
 import { HeaderBotControl } from "./header/HeaderBotControl";
 import { HeaderTradingMode } from "./header/HeaderTradingMode";
@@ -119,10 +118,7 @@ export const TopCommandBar = memo(function TopCommandBar({
           </div>
         </div>
 
-        {/* Center Section: Intelligent Global Search */}
-        <div className="hidden md:flex items-center justify-center gap-2 flex-1 max-w-sm mx-2">
-          <HeaderGlobalSearch onOpenSearch={onOpenSearch} />
-        </div>
+
 
         {/* Right Section: Order, Bot, Trading Mode, P&L, Safety Halt, User Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">

@@ -1768,9 +1768,9 @@ function ManageSessionsModal({
                 Other Active Devices ({others.length})
               </div>
 
-              {others.map((session) => (
+              {others.map((session, idx) => (
                 <div
-                  key={session.session_id}
+                  key={session.session_id || `session-${idx}`}
                   className="p-3.5 bg-slate-950/50 border border-slate-800/90 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div className="space-y-1 min-w-0">
@@ -2105,9 +2105,9 @@ function SecurityActivityModal({ onClose }: { onClose: () => void }) {
               No security events matching this filter.
             </div>
           ) : (
-            events.map((ev) => (
+            events.map((ev, idx) => (
               <div
-                key={ev.id}
+                key={ev.id || `event-${idx}`}
                 className="p-3 bg-slate-950/60 border border-slate-800/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2"
               >
                 <div className="space-y-1 min-w-0">
@@ -2294,9 +2294,9 @@ function PasskeyManagementModal({
           </div>
 
           <div className="space-y-2 max-h-48 overflow-y-auto">
-            {passkeys.map((pk) => (
+            {passkeys.map((pk, idx) => (
               <div
-                key={pk.id || pk.credential_id}
+                key={pk.id || pk.credential_id || `pk-${idx}`}
                 className="p-3 bg-slate-950/60 border border-slate-800 rounded-xl flex items-center justify-between gap-2"
               >
                 <div className="space-y-0.5">

@@ -823,6 +823,11 @@ export function CreateBotWizard({ botId, isEditMode = false }: Props) {
           activation_pct: activationProfitPct,
         },
         indicators: selectedIndicators,
+        indicator_configs: selectedIndicators,
+        indicator_settings: selectedIndicators.reduce((acc: Record<string, any>, i: any) => {
+          if (i && i.id && i.params) acc[i.id] = i.params;
+          return acc;
+        }, {}),
         indicator_combination: {
           operator: ruleConjunction,
           rules: strategyRules,

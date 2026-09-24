@@ -81,6 +81,9 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["botsList"] });
       queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["fleetSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
     },
   });
 

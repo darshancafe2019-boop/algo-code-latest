@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 import {
   NormalizedQuote,
   MarketTick,
@@ -132,12 +133,24 @@ export function useMarketData(symbols: string[] = ["NIFTY", "BANKNIFTY", "RELIAN
 
 /**
  * Hook: useLivePrice
- * Real-time LTP for a single symbol without high-frequency polling.
+ * Real-time LTP and quote for a single symbol from Zustand store, SSE multiplexer, and initial snapshot.
  */
 export function useLivePrice(symbol: string | null | undefined) {
   const sym = symbol ? symbol.toUpperCase() : null;
   const [price, setPrice] = useState<number | null>(null);
   const [quote, setQuote] = useState<NormalizedQuote | null>(null);
+
+  // Read directly from Zustand Market Feed Store for instantaneous real-time ticks
+  const storeQuote = useMarketFeedStore((state) => {
+    if (!sym) return null;
+    return (
+      state.quotesBySymbol[sym] ||
+      state.quotesBySymbol[`DHAN:${sym}`] ||
+      state.quotesBySymbol[`UPSTOX:${sym}`] ||
+      state.quotesBySymbol[`DELTA:${sym}`] ||
+      null
+    );
+  });
 
   // Seed with initial snapshot query (no periodic polling loop)
   const { data: initialQuote } = useQuery({
@@ -154,11 +167,20 @@ export function useLivePrice(symbol: string | null | undefined) {
   });
 
   useEffect(() => {
-    if (initialQuote && !quote) {
+    if (storeQuote) {
+      setQuote(storeQuote as any);
+      if (storeQuote.lastPrice !== null) {
+        setPrice(storeQuote.lastPrice);
+      }
+    }
+  }, [storeQuote]);
+
+  useEffect(() => {
+    if (initialQuote && !quote && !storeQuote) {
       setQuote(initialQuote);
       setPrice(initialQuote.last_price);
     }
-  }, [initialQuote]);
+  }, [initialQuote, storeQuote]);
 
   useEffect(() => {
     if (!multiplexer || !sym) return;
@@ -171,10 +193,13 @@ export function useLivePrice(symbol: string | null | undefined) {
     return unsub;
   }, [sym]);
 
+  const activeQuote = storeQuote || quote || initialQuote || null;
+  const activePrice = storeQuote?.lastPrice ?? price ?? (initialQuote as any)?.last_price ?? null;
+
   return {
-    price: price ?? initialQuote?.last_price ?? null,
-    quote: quote ?? initialQuote ?? null,
-    isLive: (quote || initialQuote)?.freshness_status === "LIVE" || (quote || initialQuote)?.freshness_status === "FRESH",
+    price: activePrice,
+    quote: activeQuote,
+    isLive: Boolean(activeQuote),
   };
 }
 

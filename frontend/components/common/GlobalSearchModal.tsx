@@ -138,18 +138,6 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
         },
       },
       {
-        id: "page-futures",
-        category: "PAGE",
-        title: "Crypto Futures Terminal",
-        subtitle: "Perpetual futures contracts, leverage, basis analysis",
-        icon: TrendingUp,
-        action: () => {
-          if (onNavigateTab) onNavigateTab("crypto-futures");
-          router.push("/crypto/futures");
-          onClose();
-        },
-      },
-      {
         id: "page-orders",
         category: "PAGE",
         title: "Orders & Execution History",
@@ -227,41 +215,7 @@ export function GlobalSearchModal({ isOpen, onClose, onNavigateTab }: GlobalSear
           onClose();
         },
       },
-
       // 2. Symbols
-      {
-        id: "sym-btc",
-        category: "SYMBOL",
-        title: "BTC/USDT",
-        subtitle: "Bitcoin Perpetual / Spot (Binance)",
-        icon: Zap,
-        action: () => {
-          setActiveSymbol("BTC/USDT");
-          onClose();
-        },
-      },
-      {
-        id: "sym-eth",
-        category: "SYMBOL",
-        title: "ETH/USDT",
-        subtitle: "Ethereum Perpetual / Spot (Binance)",
-        icon: Zap,
-        action: () => {
-          setActiveSymbol("ETH/USDT");
-          onClose();
-        },
-      },
-      {
-        id: "sym-sol",
-        category: "SYMBOL",
-        title: "SOL/USDT",
-        subtitle: "Solana Perpetual / Spot (Binance)",
-        icon: Zap,
-        action: () => {
-          setActiveSymbol("SOL/USDT");
-          onClose();
-        },
-      },
       {
         id: "sym-nifty",
         category: "SYMBOL",

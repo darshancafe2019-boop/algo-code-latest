@@ -13,6 +13,10 @@ export const CreateBotSchema = z.object({
   take_profit_pct: z.number().min(0.1).max(200),
   allow_shorts: z.boolean(),
   confluence_threshold: z.number().min(50).max(100),
+  indicators: z.array(z.string()).optional(),
+  indicator_configs: z.array(z.any()).optional(),
+  indicator_settings: z.record(z.string(), z.any()).optional(),
+  indicator_rules: z.array(z.any()).optional(),
 });
 
 export type CreateBotInput = z.infer<typeof CreateBotSchema>;

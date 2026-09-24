@@ -2,13 +2,13 @@
 
 import React from "react";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { FuturesUniverseView } from "@/src/features/markets/futures";
+import { FuturesWorkspace } from "@/src/features/markets/futures";
 
 export default function CryptoFuturesPage() {
   return (
     <DirectPageLayout activeTab="futures">
-      <div className="flex flex-col gap-6">
-        <FuturesUniverseView />
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+        <FuturesWorkspace activeBoard="ALL" boardTitle="All Futures Workstation" />
       </div>
     </DirectPageLayout>
   );

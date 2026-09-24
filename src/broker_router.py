@@ -372,7 +372,7 @@ class PaperOMS:
         self._lock = threading.Lock()
         self._recent_orders: List[Dict[str, Any]] = []
 
-    def execute_paper_order(self, intent: OptionOrderIntent) -> Dict[str, Any]:
+    def execute_paper_order(self, intent: "OptionOrderIntent", bot_id: Optional[str] = None) -> Dict[str, Any]:
         with self._lock:
             order_id = f"SIM_{intent.broker}_{int(time.time() * 1000)}_{uuid.uuid4().hex[:6]}"
             ts_now = datetime.now(timezone.utc).isoformat()
@@ -419,11 +419,12 @@ class PaperOMS:
                 "averagePrice": fill_price,
                 "filledQty": intent.quantity,
                 "remainingQty": 0.0,
-                "status": "TRADED",
+                "status": "OPEN",          # Use OPEN to match fleet P&L open_trades query
                 "executionStatus": "TRADED",
                 "mode": "PAPER",
                 "fees": fee,
                 "notional": notional,
+                "bot_id": bot_id or "direct-option-terminal",
                 "message": "PAPER ORDER: Simulated fill executed successfully.",
             }
 
@@ -469,17 +470,22 @@ class PaperOMS:
                     "currentPrice": fill_price,
                     "pnl": 0.0,
                     "mode": "PAPER",
+                    "bot_id": bot_id or "direct-option-terminal",
                     "createdAt": ts_now,
                     "updatedAt": ts_now,
                 }
 
             # Record in DB trade_ledger & audit log
+            # Use the bot_id passed by the caller (bot runtime) for correct P&L attribution.
+            # Direct terminal orders use "direct-option-terminal" as the fallback.
+            attribution_bot_id = bot_id or "direct-option-terminal"
+            attribution_strategy = "BOT_PAPER_EXECUTION" if bot_id and bot_id != "direct-option-terminal" else "DIRECT_OPTION_EXECUTION"
             try:
                 from src.trade_ledger import trade_ledger
                 trade_ledger.record_new_trade({
-                    "bot_id": "direct-option-terminal",
-                    "strategy": "DIRECT_OPTION_EXECUTION",
-                    "strategy_id": "DIRECT_OPTION_EXECUTION",
+                    "bot_id": attribution_bot_id,
+                    "strategy": attribution_strategy,
+                    "strategy_id": attribution_strategy,
                     "symbol": order_record["symbol"],
                     "direction": intent.side,
                     "entry_price": fill_price,
@@ -492,7 +498,7 @@ class PaperOMS:
                     "order_id": order_id,
                     "idempotency_key": intent.correlationId,
                     "fees": fee,
-                    "remarks": f"Direct Paper Option Order: {intent.side} {intent.quantity} {order_record['symbol']} @ {fill_price}",
+                    "remarks": f"Paper Order [{attribution_bot_id}]: {intent.side} {intent.quantity} {order_record['symbol']} @ {fill_price}",
                 })
             except Exception as e:
                 logger.debug("Failed recording trade into trade_ledger: %s", e)
@@ -648,8 +654,8 @@ class BrokerRouter:
                 "quantity": intent.quantity,
                 "price": intent.price if intent.price > 0 else (intent.ltp or 100.0),
                 "broker": intent.broker,
-                "mode": intent.mode,
-                "bot_id": "direct-options-order",
+                "mode": intent.mode or getattr(config, "TRADING_MODE", "PAPER"),
+                "bot_id": getattr(intent, "botId", None) or getattr(intent, "bot_id", None) or "direct-options-order",
                 "stop_loss": intent.stopLoss or 0.0,
                 "take_profit": intent.target or 0.0,
             },
@@ -738,7 +744,8 @@ class BrokerRouter:
 
         if is_paper:
             # High-fidelity Paper OMS Execution
-            res = self.paper_oms.execute_paper_order(intent)
+            _intent_bot_id = getattr(intent, "botId", None) or getattr(intent, "bot_id", None) or getattr(intent, "clientTag", None)
+            res = self.paper_oms.execute_paper_order(intent, bot_id=_intent_bot_id)
             latency_ms = round((time.perf_counter() - t_start) * 1000, 2)
 
             # Cache idempotency

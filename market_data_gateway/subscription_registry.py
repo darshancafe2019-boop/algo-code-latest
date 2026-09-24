@@ -25,6 +25,8 @@ VALID_REASONS = frozenset({
     "BENCHMARK",          # configured index benchmarks (default: ltpc)
     "OPTION_CHAIN",       # options chain & greeks view (default: option_greeks)
     "DEPTH_VIEW",         # deep orderbook level view (default: full_d30)
+    "DETAIL_VIEW",        # detail view on gateway
+    "COMMAND_CENTER",     # command center dashboard stream (default: full)
     "LIVE_MARKET_TEST",   # diagnostic test subscription
     "QUANTOS_DIAGNOSTIC", # Quant.OS diagnostic tooling
     "SYSTEM",             # system background subscription
@@ -32,6 +34,10 @@ VALID_REASONS = frozenset({
     "SSE_CLIENT_STREAM",  # Next.js BFF server-sent event stream
     "TEST_CLIENT",        # diagnostic and test client
     "RESTORE_SUBSCRIPTIONS", # frontend reconnection restoration
+    "DELTA_LIVE_TAB",     # Delta live tab stream
+    "DHAN_LIVE_TAB",      # Dhan live tab stream
+    "RESILIENCE_TEST",    # resilience e2e test
+    "VERIFICATION_TEST",  # verification test script
 })
 
 MODE_PRIORITY: Dict[str, int] = {

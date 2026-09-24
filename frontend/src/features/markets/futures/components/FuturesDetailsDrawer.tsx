@@ -36,6 +36,7 @@ import {
   OrderIntentPayload,
 } from "../types/futures";
 import { useFuturesStore } from "../state/futures-store";
+import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 import {
   calculateLiquidation,
   fetchFuturesOrderBook,
@@ -77,6 +78,12 @@ export function FuturesDetailsDrawer({
     setOrderReviewOpen,
   } = useFuturesStore();
 
+  const quotesBySymbol = useMarketFeedStore((s) => s.quotesBySymbol);
+  const liveQuote = contract
+    ? quotesBySymbol[contract.symbol] || quotesBySymbol[contract.underlying] || quotesBySymbol[contract.displayName || ""]
+    : null;
+  const currentLivePrice = liveQuote?.lastPrice ?? contract?.last_price ?? contract?.mark_price ?? 0;
+
   const [activeSubTab, setActiveSubTab] = useState<"TRADE" | "BOOK" | "METRICS" | "RISK">(initialTab);
   const [tradeSide, setTradeSide] = useState<"BUY" | "SELL">(
     initialSide === "SELL" || initialSide === "SHORT" ? "SELL" : "BUY"
@@ -102,7 +109,7 @@ export function FuturesDetailsDrawer({
 
   const tradeAnalysisInstrument = useMemo(() => {
     if (!contract) return null;
-    const ltp = contract.last_price || contract.mark_price || 0;
+    const ltp = currentLivePrice || 0;
     return {
       symbol: contract.displayName || contract.symbol,
       underlying: contract.underlying,
@@ -112,11 +119,11 @@ export function FuturesDetailsDrawer({
       expiry: (contract as any).expiry || "",
       intent: tradeSide,
       ltp: ltp,
-      bid: contract.bid,
-      ask: contract.ask,
-      spread: contract.bid && contract.ask ? (contract.ask - contract.bid) : undefined,
-      volume: contract.volume_24h_usd || (contract as any).volume_24h || 0,
-      openInterest: contract.open_interest_usd || (contract as any).open_interest || 0,
+      bid: liveQuote?.bid ?? contract.bid,
+      ask: liveQuote?.ask ?? contract.ask,
+      spread: (liveQuote?.bid && liveQuote?.ask) ? (liveQuote.ask - liveQuote.bid) : (contract.bid && contract.ask ? (contract.ask - contract.bid) : undefined),
+      volume: liveQuote?.volume ?? contract.volume_24h_usd ?? (contract as any).volume_24h ?? 0,
+      openInterest: liveQuote?.oi ?? contract.open_interest_usd ?? (contract as any).open_interest ?? 0,
       basis: typeof contract.basis === "number" ? contract.basis : contract.basis?.basis_absolute,
       dayHigh: (contract as any).high_24h,
       dayLow: (contract as any).low_24h,
@@ -125,13 +132,13 @@ export function FuturesDetailsDrawer({
       tickSize: contract.tick_size || 0.05,
       timestamp: new Date().toISOString(),
     };
-  }, [contract, tradeSide]);
+  }, [contract, tradeSide, currentLivePrice, liveQuote]);
 
   // Sync state when contract changes
   useEffect(() => {
     if (contract) {
       setQuantity(contract.min_qty || 1.0);
-      const ltp = contract.last_price || contract.mark_price || 0;
+      const ltp = currentLivePrice;
       setLimitPrice(ltp > 0 ? ltp.toString() : "");
 
       // Fetch Account Margins
@@ -145,7 +152,7 @@ export function FuturesDetailsDrawer({
         setCurrentPosition(found || null);
       });
     }
-  }, [contract]);
+  }, [contract, currentLivePrice]);
 
   // Sync initial side
   useEffect(() => {

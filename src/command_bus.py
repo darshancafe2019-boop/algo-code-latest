@@ -276,22 +276,26 @@ class CommandBus:
     def _handle_create_bot(cls, bot_id: Optional[str], payload: Dict[str, Any], user: str):
         bot_id_out = f"bot-{int(time.time()*1000)}-{uuid.uuid4().hex[:4]}"
         now_str = datetime.now(timezone.utc).isoformat()
+        strategy_val = payload.get("strategy") or payload.get("strategy_name") or "EMA_MACD_VP"
+        mode_val = payload.get("execution_mode") or payload.get("trading_mode") or "PAPER"
+        config_json_str = json.dumps(payload)
         db.safe_execute(
             """
             INSERT INTO bot_instances 
-            (id, name, symbol, timeframe, strategy, allocated_capital, execution_mode, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'STOPPED', ?, ?)
+            (id, name, symbol, timeframe, strategy, allocated_capital, execution_mode, status, created_at, updated_at, config_json)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'STOPPED', ?, ?, ?)
             """,
             (
                 bot_id_out,
                 payload.get("name", "New Bot"),
                 payload.get("symbol", "BTC/USDT"),
                 payload.get("timeframe", "15m"),
-                payload.get("strategy", "EMA_MACD_VP"),
+                strategy_val,
                 float(payload.get("allocated_capital", 10000.0)),
-                payload.get("execution_mode", "PAPER"),
+                mode_val,
                 now_str,
-                now_str
+                now_str,
+                config_json_str
             )
         )
         return CommandStatus.SUCCEEDED, True, f"Created bot instance {bot_id_out}", {"bot_id": bot_id_out}

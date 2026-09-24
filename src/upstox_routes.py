@@ -417,3 +417,34 @@ def get_upstox_diagnostics():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }), 200
 
+
+@upstox_blueprint.route("/smartlist/futures", methods=["GET"])
+def get_upstox_futures_smartlist():
+    """Queries official Upstox V2 Smartlist API for Futures."""
+    asset_type = request.args.get("asset_type", "INDEX")
+    category = request.args.get("category", "TOP_TRADED")
+    page_number = int(request.args.get("page_number", "1"))
+    page_size = int(request.args.get("page_size", "20"))
+
+    res = global_upstox_service.fetch_futures_smartlist(
+        asset_type=asset_type,
+        category=category,
+        page_number=page_number,
+        page_size=page_size,
+    )
+    status_code = 200 if res.get("status") == "success" else (401 if res.get("error") == "AUTH_REQUIRED" else 500)
+    return jsonify(res), status_code
+
+
+@upstox_blueprint.route("/smartlist/futures/ingest", methods=["POST"])
+def ingest_upstox_futures_smartlist():
+    """Directly ingests a Smartlist JSON payload into the live cache and MarketGateway."""
+    payload = request.get_json(silent=True) or {}
+    ingested_count = global_upstox_service.ingest_smartlist_data(payload)
+    return jsonify({
+        "status": "success",
+        "ingested_count": ingested_count,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }), 200
+
+

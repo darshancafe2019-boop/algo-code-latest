@@ -453,6 +453,109 @@ def _load_upstox_equity_master() -> None:
 _load_upstox_equity_master()
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# Upstox Futures Master (NSE F&O Futures Index & Stock Master)
+# ─────────────────────────────────────────────────────────────────────────────
+UPSTOX_FUTURES_MASTER_FILE = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "upstox_futures_master.json"
+)
+
+_UPSTOX_FUTURES_MASTER: List[Dict[str, Any]] = []
+_UPSTOX_FUTURES_BY_KEY: Dict[str, Dict[str, Any]] = {}
+_UPSTOX_FUTURES_BY_SYMBOL: Dict[str, Dict[str, Any]] = {}
+_UPSTOX_FUTURES_BY_UNDERLYING: Dict[str, List[Dict[str, Any]]] = {}
+
+
+def _load_upstox_futures_master() -> None:
+    global _UPSTOX_FUTURES_MASTER, _UPSTOX_FUTURES_BY_KEY, _UPSTOX_FUTURES_BY_SYMBOL, _UPSTOX_FUTURES_BY_UNDERLYING
+    if _UPSTOX_FUTURES_MASTER:
+        return
+    if not os.path.exists(UPSTOX_FUTURES_MASTER_FILE):
+        try:
+            import urllib.request, gzip, ssl
+            req = urllib.request.Request('https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz', headers={'User-Agent': 'Mozilla/5.0'})
+            try:
+                from src.ssl_util import get_ssl_context
+                ctx = get_ssl_context()
+            except Exception:
+                ctx = ssl.create_default_context()
+            with urllib.request.urlopen(req, context=ctx, timeout=25) as resp:
+                data = json.loads(gzip.decompress(resp.read()).decode('utf-8'))
+                futs = [x for x in data if x.get('segment') == 'NSE_FO' and 'FUT' in (x.get('instrument_type') or '')]
+                with open(UPSTOX_FUTURES_MASTER_FILE, 'w', encoding='utf-8') as f:
+                    json.dump(futs, f, indent=2)
+        except Exception as dl_err:
+            logger.warning("Failed to download Upstox futures master: %s", dl_err)
+
+    if os.path.exists(UPSTOX_FUTURES_MASTER_FILE):
+        try:
+            with open(UPSTOX_FUTURES_MASTER_FILE, "r", encoding="utf-8") as f:
+                items = json.load(f)
+                _UPSTOX_FUTURES_MASTER = items
+                for item in items:
+                    ik = item.get("instrument_key", "").strip()
+                    ts = item.get("trading_symbol", "").strip()
+                    und = (item.get("underlying_symbol") or item.get("asset_symbol") or item.get("name") or "").strip().upper()
+                    name = item.get("name") or und
+                    asset_type = item.get("asset_type", "EQUITY")
+
+                    expiry_val = item.get("expiry")
+                    expiry_str = None
+                    if expiry_val:
+                        if isinstance(expiry_val, (int, float)):
+                            sec = expiry_val / 1000.0 if expiry_val > 10000000000 else expiry_val
+                            expiry_str = datetime.fromtimestamp(sec, timezone.utc).strftime("%Y-%m-%d")
+                        elif isinstance(expiry_val, str):
+                            expiry_str = expiry_val[:10]
+
+                    lot_size = float(item.get("lot_size", 1.0) or 1.0)
+                    raw_tick = float(item.get("tick_size", 0.05) or 0.05)
+                    tick_size = raw_tick / 100.0 if raw_tick > 1.0 else raw_tick
+                    sym_clean = ts.replace(" ", "-").upper()
+
+                    meta = {
+                        "instrument_key": ik,
+                        "symbol": sym_clean,
+                        "trading_symbol": ts,
+                        "underlying_symbol": und,
+                        "name": name,
+                        "exchange": "NSE",
+                        "segment": "NSE_FO",
+                        "asset_class": "INDIAN_FUTURES",
+                        "asset_type": asset_type,
+                        "instrument_type": "INDEX_FUTURES" if asset_type == "INDEX" else "STOCK_FUTURES",
+                        "lot_size": lot_size,
+                        "tick_size": tick_size,
+                        "expiry": expiry_str,
+                        "expiry_timestamp": expiry_val,
+                        "exchange_token": str(item.get("exchange_token", "")),
+                        "currency": "INR",
+                        "is_tradable": True,
+                    }
+
+                    if ik:
+                        _UPSTOX_FUTURES_BY_KEY[ik] = meta
+                        _UPSTOX_FUTURES_BY_KEY[ik.replace("|", ":")] = meta
+                        _UPSTOX_FUTURES_BY_KEY[ik.upper()] = meta
+                    if ts:
+                        _UPSTOX_FUTURES_BY_SYMBOL[ts.upper()] = meta
+                        _UPSTOX_FUTURES_BY_SYMBOL[sym_clean] = meta
+                        _UPSTOX_FUTURES_BY_SYMBOL[f"NSE:{sym_clean}"] = meta
+                        _UPSTOX_FUTURES_BY_SYMBOL[f"UPSTOX:{sym_clean}"] = meta
+                        _UPSTOX_FUTURES_BY_SYMBOL[f"UPSTOX:{ts.upper()}"] = meta
+                    if und:
+                        if und not in _UPSTOX_FUTURES_BY_UNDERLYING:
+                            _UPSTOX_FUTURES_BY_UNDERLYING[und] = []
+                        _UPSTOX_FUTURES_BY_UNDERLYING[und].append(meta)
+
+            logger.info("Loaded and indexed %d Upstox Indian futures instruments.", len(items))
+        except Exception as e:
+            logger.warning("Failed to load Upstox futures master: %s", e)
+
+
+_load_upstox_futures_master()
+
+
 class UpstoxService:
     """
     Authoritative Upstox API V3 client providing market data quotes,
@@ -598,27 +701,44 @@ class UpstoxService:
         if sym_str in _UPSTOX_EQUITY_BY_KEY:
             return _UPSTOX_EQUITY_BY_KEY[sym_str]["instrument_key"]
 
-        # 3. Check normalized variations (strip .NS, .BO, -EQ, etc.)
+        # 3. Check 600+ Indian Futures In-Memory Indexes (O(1) lookups)
+        if clean_upper in _UPSTOX_FUTURES_BY_SYMBOL:
+            return _UPSTOX_FUTURES_BY_SYMBOL[clean_upper]["instrument_key"]
+        if sym_str in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[sym_str]["instrument_key"]
+
+        # 4. Check normalized variations (strip .NS, .BO, -EQ, etc.)
         if clean_upper.endswith(".NS") or clean_upper.endswith(".BO"):
             base_sym = clean_upper.rsplit(".", 1)[0]
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
+            if base_sym in _UPSTOX_FUTURES_BY_SYMBOL:
+                return _UPSTOX_FUTURES_BY_SYMBOL[base_sym]["instrument_key"]
 
         if clean_upper.endswith("-EQ"):
             base_sym = clean_upper.rsplit("-", 1)[0]
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
 
+        if clean_upper.endswith("-FUT") or clean_upper.endswith(" FUT") or clean_upper.endswith("FUT"):
+            if clean_upper in _UPSTOX_FUTURES_BY_SYMBOL:
+                return _UPSTOX_FUTURES_BY_SYMBOL[clean_upper]["instrument_key"]
+            base_und = clean_upper.replace("-FUT", "").replace(" FUT", "").replace("FUT", "").strip()
+            if base_und in _UPSTOX_FUTURES_BY_UNDERLYING and _UPSTOX_FUTURES_BY_UNDERLYING[base_und]:
+                return _UPSTOX_FUTURES_BY_UNDERLYING[base_und][0]["instrument_key"]
+
         if clean_upper.startswith("NSE:") or clean_upper.startswith("BSE:"):
             base_sym = clean_upper.split(":", 1)[1]
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
+            if base_sym in _UPSTOX_FUTURES_BY_SYMBOL:
+                return _UPSTOX_FUTURES_BY_SYMBOL[base_sym]["instrument_key"]
 
-        # 4. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|... or NSE_FO|...
+        # 5. If already in valid formatted syntax like NSE_EQ|... or NSE_INDEX|... or NSE_FO|...
         if "|" in sym_str and (sym_str.startswith("NSE_") or sym_str.startswith("BSE_")):
             return sym_str
 
-        # 5. Check if symbol is an Option contract description (e.g. NIFTY 23400 CE, NIFTY 2026-09-22 23400 CE, UPSTOX_NSE_NIFTY_23400_CE, etc.)
+        # 6. Check if symbol is an Option contract description (e.g. NIFTY 23400 CE, NIFTY 2026-09-22 23400 CE, UPSTOX_NSE_NIFTY_23400_CE, etc.)
         import re
         exp_match = re.search(r"(\d{4}-\d{2}-\d{2})", sym_str)
         exp_val = exp_match.group(1) if exp_match else None
@@ -638,6 +758,46 @@ class UpstoxService:
             if resolved_key:
                 return resolved_key
 
+        return None
+
+    def resolve_canonical_symbol(self, instrument_key: str) -> Optional[str]:
+        """Resolves canonical symbol for an Upstox instrument key (Equities, Indices, Futures)."""
+        if not instrument_key:
+            return None
+        ik_clean = instrument_key.strip()
+        if ik_clean in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[ik_clean]["trading_symbol"]
+        if ik_clean in _UPSTOX_EQUITY_BY_KEY:
+            return _UPSTOX_EQUITY_BY_KEY[ik_clean]["canonical_symbol"]
+        for sym, meta in OFFICIAL_UPSTOX_KEYS.items():
+            if meta["instrument_key"] == ik_clean or meta["instrument_key"].replace("|", ":") == ik_clean:
+                return meta.get("canonical_symbol") or sym
+        return None
+
+    def get_all_futures_instruments(self) -> List[Dict[str, Any]]:
+        """Returns all dynamically discovered Upstox NSE Futures instruments."""
+        _load_upstox_futures_master()
+        return list(_UPSTOX_FUTURES_BY_KEY.values())
+
+    def get_futures_instruments_count(self) -> int:
+        """Returns total number of registered Upstox NSE Futures instruments."""
+        _load_upstox_futures_master()
+        return len(_UPSTOX_FUTURES_BY_KEY)
+
+    def resolve_futures_instrument(self, key_or_sym: str) -> Optional[Dict[str, Any]]:
+        """Resolves futures metadata by instrument_key, trading_symbol, or underlying."""
+        if not key_or_sym:
+            return None
+        clean = key_or_sym.strip()
+        clean_u = clean.upper()
+        if clean in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[clean]
+        if clean_u in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[clean_u]
+        if clean_u in _UPSTOX_FUTURES_BY_SYMBOL:
+            return _UPSTOX_FUTURES_BY_SYMBOL[clean_u]
+        if clean_u in _UPSTOX_FUTURES_BY_UNDERLYING and _UPSTOX_FUTURES_BY_UNDERLYING[clean_u]:
+            return _UPSTOX_FUTURES_BY_UNDERLYING[clean_u][0]
         return None
 
     def get_option_contracts(self, underlying: str = "NIFTY", force: bool = False) -> List[Dict[str, Any]]:
@@ -1459,6 +1619,107 @@ class UpstoxService:
             logger.warning("Upstox option chain query error: %s", e)
             return {"status": "error", "message": str(e)}
 
+    def ingest_smartlist_data(self, smartlist_payload: Dict[str, Any]) -> int:
+        """
+        Ingests Upstox Market Insights / Smartlist payload into live cache.
+        Supports TOP_TRADED, MOST_ACTIVE, GAINERS, LOSERS for indices, equities, and F&O.
+        """
+        data = smartlist_payload.get("data", {}) if isinstance(smartlist_payload, dict) else {}
+        items = data.get("smartlist", []) if isinstance(data, dict) else []
+        now_iso = datetime.now(timezone.utc).isoformat()
+        ingested = 0
+
+        # Known F&O tokens map
+        fo_map = {
+            "NSE_FO|62329": {"symbol": "NIFTY-FUT", "underlying": "NIFTY", "name": "NIFTY 50 Futures"},
+            "NSE_FO|62326": {"symbol": "BANKNIFTY-FUT", "underlying": "BANKNIFTY", "name": "Bank NIFTY Futures"},
+            "NSE_FO|61093": {"symbol": "FINNIFTY-FUT", "underlying": "FINNIFTY", "name": "FINNIFTY Futures"},
+        }
+
+        for item in items:
+            ikey = item.get("instrument_key", "")
+            price_info = item.get("price", {})
+            metric_info = item.get("metric", {})
+
+            cur_price = price_info.get("current")
+            close_price = price_info.get("close_price")
+            chg_pct = price_info.get("change_pct")
+            chg_abs = price_info.get("change_abs")
+            traded_val = metric_info.get("current")
+
+            if cur_price is not None:
+                meta = fo_map.get(ikey)
+                sym = meta["symbol"] if meta else ikey
+                und = meta["underlying"] if meta else ikey
+
+                try:
+                    from market_data_gateway.adapters.base import NormalizedQuote
+                    quote = NormalizedQuote(
+                        symbol=sym,
+                        exchange="NSE",
+                        provider="UPSTOX",
+                        last_price=float(cur_price),
+                        bid=float(cur_price),
+                        ask=float(cur_price),
+                        close=float(close_price) if close_price else None,
+                        change_pct=float(chg_pct) if chg_pct is not None else None,
+                        volume=float(traded_val) if traded_val else 0.0,
+                        segment="EQUITY_DERIVATIVES",
+                        market="INDIAN_FUTURES"
+                    )
+                    quote.received_timestamp = now_iso
+                    quote.is_stale = False
+                    quote.feed_latency_ms = 15.0
+
+                    from market_data_gateway.cache.market_cache import global_market_cache
+                    global_market_cache.set_quote(sym, quote)
+                    global_market_cache.set_quote(ikey, quote)
+                    global_market_cache.set_quote(f"UPSTOX:{sym}", quote)
+                    global_market_cache.set_quote(f"NSE:{und}", quote)
+                    ingested += 1
+                except Exception as ex:
+                    logger.warning("Error ingesting smartlist item %s: %s", ikey, ex)
+
+        return ingested
+
+    def fetch_futures_smartlist(
+        self,
+        asset_type: str = "INDEX",
+        category: str = "TOP_TRADED",
+        page_number: int = 1,
+        page_size: int = 20,
+    ) -> Dict[str, Any]:
+        """
+        Queries official Upstox V2 Smartlist API for Futures.
+        Endpoint: GET https://api.upstox.com/v2/market/smartlist/futures
+        """
+        if not self.access_token:
+            return {
+                "status": "error",
+                "error": "AUTH_REQUIRED",
+                "message": "Upstox access token is not configured or active.",
+                "data": None,
+            }
+
+        try:
+            params = {
+                "asset_type": asset_type,
+                "category": category,
+                "page_number": page_number,
+                "page_size": page_size,
+            }
+            res = self._make_request("market/smartlist/futures", params=params, api_version="v2")
+            if res.get("status") == "success":
+                # Ingest into live market cache
+                self.ingest_smartlist_data(res)
+            return res
+        except Exception as e:
+            logger.warning("Upstox futures smartlist query error: %s", e)
+            return {
+                "status": "error",
+                "error": str(e),
+                "message": f"Failed to fetch futures smartlist: {e}",
+            }
 
     def get_safe_diagnostic(self) -> Dict[str, Any]:
         """

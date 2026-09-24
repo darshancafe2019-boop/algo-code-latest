@@ -119,6 +119,23 @@ def get_futures_providers_health():
     }), 200
 
 
+@futures_bp.route("/api/market/live/sync", methods=["POST", "GET"])
+@futures_bp.route("/api/futures/sync", methods=["POST", "GET"])
+def sync_live_futures_feeds():
+    """Triggers live synchronization of active futures market data feeds."""
+    service = FuturesMarketService.get_instance()
+    synced_count = service.quote_engine.sync_live_market_data()
+    # Force cache refresh
+    contracts = service.get_all_contracts(force_refresh=True)
+    return jsonify({
+        "status": "SUCCESS",
+        "message": f"Successfully synchronized {synced_count} live futures feeds.",
+        "synced_count": synced_count,
+        "total_contracts": len(contracts),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 200
+
+
 @futures_bp.route("/api/futures/funding-heatmap", methods=["GET"])
 def get_funding_heatmap():
     service = FuturesMarketService.get_instance()

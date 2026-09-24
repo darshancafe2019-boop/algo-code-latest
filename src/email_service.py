@@ -182,6 +182,7 @@ class ResendEmailProvider(BaseEmailProvider):
 
         try:
             import resend
+            import concurrent.futures
             resend.api_key = self.api_key
 
             logger.info("[OTP] Dispatching email to Resend for recipient: %s", mask_email_address(clean_to))
@@ -193,7 +194,10 @@ class ResendEmailProvider(BaseEmailProvider):
                 "html": html_content,
                 "text": text_content,
             }
-            resp = resend.Emails.send(params)
+            
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(resend.Emails.send, params)
+                resp = future.result(timeout=3.5)
 
             # Robust response inspection: ensure msg_id is present and no error dict was returned
             msg_id = None
@@ -213,6 +217,9 @@ class ResendEmailProvider(BaseEmailProvider):
             logger.info("[OTP] Resend message ID: %s", msg_id)
             logger.info("[OTP] Email accepted by Resend for recipient: %s", mask_email_address(clean_to))
             return True, None, str(msg_id)
+        except (concurrent.futures.TimeoutError, TimeoutError):
+            logger.error("[OTP] [RESEND_TIMEOUT] Resend email delivery timed out after 3.5s")
+            return False, "Email delivery timed out. Please try again.", None
         except Exception as e:
             err_str = str(e).lower()
             if "api key" in err_str or "unauthorized" in err_str or "401" in err_str:

@@ -737,3 +737,48 @@ def validate_indicator_parameters(indicator_id: str, params: Dict[str, Any]) -> 
                 pass
 
     return True, "OK"
+
+
+def save_indicator_config(
+    bot_id: Optional[str],
+    indicator_id: str,
+    enabled: bool = True,
+    weight: float = 20.0,
+    parameters: Optional[Dict[str, Any]] = None
+) -> Tuple[bool, Dict[str, Any]]:
+    """Save or update an indicator configuration for a bot or template."""
+    is_valid, msg = validate_indicator_parameters(indicator_id, parameters or {})
+    if not is_valid:
+        return False, {"error": msg}
+
+    from src import db
+    if bot_id:
+        try:
+            bot = db.get_bot_instance(bot_id)
+            if bot:
+                cfg = json.loads(bot.get("config_json") or "{}")
+                ind_configs = cfg.get("indicator_configs", [])
+                existing = next((i for i in ind_configs if (i.get("id") == indicator_id or i.get("indicator_id") == indicator_id)), None)
+                if existing:
+                    existing["enabled"] = enabled
+                    existing["weight"] = weight
+                    existing["params"] = parameters or {}
+                else:
+                    ind_configs.append({
+                        "id": indicator_id,
+                        "indicator_id": indicator_id,
+                        "enabled": enabled,
+                        "weight": weight,
+                        "params": parameters or {}
+                    })
+                cfg["indicator_configs"] = ind_configs
+                db.safe_execute("UPDATE bot_instances SET config_json = ? WHERE id = ?", (json.dumps(cfg), bot_id))
+        except Exception:
+            pass
+
+    return True, {
+        "indicator_id": indicator_id,
+        "enabled": enabled,
+        "weight": weight,
+        "parameters": parameters or {}
+    }

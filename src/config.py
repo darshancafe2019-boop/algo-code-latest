@@ -20,10 +20,9 @@ def _load_env_fallback(file_path: Path):
         pass
 
 try:
-    from dotenv import load_dotenv
-    _has_dotenv = True
+    from dotenv import load_dotenv as _load_dotenv
 except ImportError:
-    _has_dotenv = False
+    _load_dotenv = None
 
 # ==========================================
 # LOAD ENVIRONMENT VARIABLES
@@ -37,8 +36,8 @@ for _env_file in [
     BASE_DIR / "frontend" / ".env",
 ]:
     if _env_file.is_file():
-        if _has_dotenv:
-            load_dotenv(dotenv_path=_env_file, override=True)
+        if _load_dotenv is not None:
+            _load_dotenv(dotenv_path=_env_file, override=True)
         else:
             _load_env_fallback(_env_file)
 
@@ -170,10 +169,10 @@ LIVE_TRADING_ENABLED = os.getenv("LIVE_TRADING_ENABLED", "false").lower() == "tr
 MASTER_LIVE_TRADING = os.getenv("MASTER_LIVE_TRADING", "false").lower() == "true"
 
 # Server-side in-memory safety state (Resets to False on launch/restart)
-LIVE_TRADING_ARMED = False
-POSITION_MISMATCH_LOCKED = False
+LIVE_TRADING_ARMED: bool = False
+POSITION_MISMATCH_LOCKED: bool = False
 KILL_SWITCH_FILE = DATA_DIR / "KILL_SWITCH"
-GLOBAL_KILL_SWITCH = False
+GLOBAL_KILL_SWITCH: bool = False
 
 REQUIRE_SIGNAL_APPROVAL = os.getenv("REQUIRE_SIGNAL_APPROVAL", "true").lower() == "true"
 SIGNAL_THRESHOLD_PCT = float(os.getenv("SIGNAL_THRESHOLD_PCT", "75.0"))

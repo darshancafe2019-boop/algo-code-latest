@@ -1,7 +1,6 @@
 "use client";
 
 import React, { memo } from "react";
-import { TopSearchBar } from "./TopSearchBar";
 import { LiveTickerStrip } from "./LiveTickerStrip";
 
 export interface TopMarketBarProps {
@@ -20,11 +19,8 @@ export const TopMarketBar = memo(function TopMarketBar({
   instruments,
 }: TopMarketBarProps) {
   return (
-    <div className="flex items-center gap-2.5 sm:gap-3 flex-1 max-w-3xl min-w-0">
-      {/* ── Compact Search Box (Desktop: 300–360px, h: 38px) ────────── */}
-      <TopSearchBar onOpenSearch={onOpenSearch} />
-
-      {/* ── Live Market Tickers (NIFTY, BANKNIFTY, BTC) ────────────── */}
+    <div className="flex items-center gap-2.5 sm:gap-3 flex-1 max-w-4xl min-w-0 w-full">
+      {/* ── Live Market Tickers (NIFTY, BANKNIFTY, BTC, AAPL, NVDA) ── */}
       <LiveTickerStrip
         instruments={instruments}
         onSelectInstrument={onSelectInstrument}

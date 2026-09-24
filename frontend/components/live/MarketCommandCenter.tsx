@@ -95,10 +95,28 @@ export function MarketCommandCenter() {
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const subscribedSymbolsRef = useRef<Set<string>>(subscribedSymbols);
+
+  useEffect(() => {
+    subscribedSymbolsRef.current = subscribedSymbols;
+  }, [subscribedSymbols]);
 
   // 1. WebSocket Gateway Connection
   const connectGatewayWS = useCallback(() => {
     if (typeof window === "undefined") return;
+    if (
+      wsRef.current &&
+      (wsRef.current.readyState === WebSocket.OPEN ||
+        wsRef.current.readyState === WebSocket.CONNECTING)
+    ) {
+      return;
+    }
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+
     try {
       const wsUrl = process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL || "ws://127.0.0.1:5051/ws/market";
       console.log("[COMMAND CENTER] Connecting Market Gateway WS:", wsUrl);
@@ -106,11 +124,14 @@ export function MarketCommandCenter() {
       wsRef.current = ws;
 
       ws.onopen = () => {
+        if (wsRef.current !== ws) return;
         console.log("[COMMAND CENTER] Connected to Market Data Gateway.");
         setConnectionStatus("CONNECTED");
         // Subscribe to initial universe
-        const syms = Array.from(subscribedSymbols);
-        ws.send(JSON.stringify({ action: "subscribe", symbols: syms, reason: "COMMAND_CENTER" }));
+        const syms = Array.from(subscribedSymbolsRef.current);
+        if (syms.length > 0) {
+          ws.send(JSON.stringify({ action: "subscribe", symbols: syms, reason: "COMMAND_CENTER" }));
+        }
       };
 
       ws.onmessage = (event) => {
@@ -133,25 +154,50 @@ export function MarketCommandCenter() {
       };
 
       ws.onerror = (e) => {
+        if (wsRef.current !== ws) return;
         console.warn("[COMMAND CENTER] Gateway WS error note:", e);
         setConnectionStatus("ERROR");
       };
 
       ws.onclose = () => {
+        if (wsRef.current !== ws) return;
+        wsRef.current = null;
         console.log("[COMMAND CENTER] Gateway WS disconnected. Retrying in 4s...");
         setConnectionStatus("RECONNECTING");
-        reconnectTimeoutRef.current = setTimeout(connectGatewayWS, 4000);
+        reconnectTimeoutRef.current = setTimeout(() => {
+          connectGatewayWS();
+        }, 4000);
       };
     } catch (err) {
       console.warn("[COMMAND CENTER] Gateway WS connection setup note:", err);
     }
-  }, [subscribedSymbols, ingestBatch, setConnectionStatus, updateProviderStat]);
+  }, [ingestBatch, setConnectionStatus, updateProviderStat]);
 
   useEffect(() => {
     connectGatewayWS();
     return () => {
-      if (wsRef.current) wsRef.current.close();
-      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
+      const currentWs = wsRef.current;
+      wsRef.current = null;
+      if (currentWs) {
+        currentWs.onmessage = null;
+        currentWs.onerror = null;
+        currentWs.onclose = null;
+        if (currentWs.readyState === WebSocket.OPEN) {
+          try {
+            currentWs.close();
+          } catch {}
+        } else if (currentWs.readyState === WebSocket.CONNECTING) {
+          currentWs.onopen = () => {
+            try {
+              currentWs.close();
+            } catch {}
+          };
+        }
+      }
     };
   }, [connectGatewayWS]);
 

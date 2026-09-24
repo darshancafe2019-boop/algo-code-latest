@@ -459,13 +459,14 @@ class AuthoritativeTradeLedger:
                 bot_instance_name=trade_data.get("bot_name", "Alpha BTC Scalper"),
                 symbol=symbol,
                 strategy_name=strategy_id,
-                trade_id=trade_id,
+                trade_id=str(trade_id or ""),
                 severity="INFO"
             )
         except Exception:
             pass
 
-        return True, trade_id, "Trade recorded successfully."
+        trade_id_int = int(trade_id) if trade_id is not None else 0
+        return True, trade_id_int, "Trade recorded successfully."
 
     def record_partial_fill(
         self,
@@ -658,7 +659,7 @@ class AuthoritativeTradeLedger:
                 bot_instance_id=tr.get("bot_id", "bot-1"),
                 symbol=tr.get("symbol", "BTC/USDT"),
                 strategy_name=tr.get("strategy_id", "EMA_MACD_VP"),
-                trade_id=trade_id,
+                trade_id=str(trade_id),
                 severity="INFO"
             )
         except Exception:
@@ -688,4 +689,13 @@ class AuthoritativeTradeLedger:
 trade_ledger = AuthoritativeTradeLedger()
 global_trade_ledger = trade_ledger
 TradeLedger = AuthoritativeTradeLedger
+
+
+def get_trades_history(limit: int = 500) -> List[Dict[str, Any]]:
+    """Returns recent trades history from database."""
+    from src import db
+    try:
+        return db.safe_query("SELECT * FROM trades_log ORDER BY id DESC LIMIT ?", (limit,))
+    except Exception:
+        return []
 

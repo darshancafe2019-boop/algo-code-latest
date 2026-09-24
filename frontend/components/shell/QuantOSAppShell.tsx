@@ -7,7 +7,6 @@ import { GlobalHeader } from "./GlobalHeader";
 import { LeftNavigationSidebar } from "@/components/layout/LeftNavigationSidebar";
 import { DetailDrawer } from "./DetailDrawer";
 import { OrderReviewModal, OrderIntentData } from "./OrderReviewModal";
-import { GlobalSearchModal } from "@/components/common/GlobalSearchModal";
 import { AppearanceDrawer } from "@/components/settings/AppearanceDrawer";
 import { MobileCommandSheet } from "@/components/layout/MobileCommandSheet";
 import { QuickOrderModal } from "@/components/order-execution/QuickOrderModal";
@@ -204,13 +203,6 @@ export function QuantOSAppShell({
           target.tagName === "TEXTAREA" ||
           target.isContentEditable);
 
-      // ⌘/Ctrl + K (Search / Command Center)
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setIsSearchOpen(true);
-        return;
-      }
-
       // Navigation shortcuts (only outside inputs)
       if (!isInput && (e.ctrlKey || e.metaKey)) {
         if (e.key.toLowerCase() === "b") {
@@ -306,13 +298,6 @@ export function QuantOSAppShell({
               onConfirm={orderReviewState.onConfirm || (async () => {})}
             />
           )}
-
-          {/* 6. GLOBAL SEARCH MODAL (⌘K) */}
-          <GlobalSearchModal
-            isOpen={isSearchOpen}
-            onClose={() => setIsSearchOpen(false)}
-            onNavigateTab={onTabSelect}
-          />
 
           {/* 7. APPEARANCE & THEME EDITOR DRAWER */}
           <AppearanceDrawer />

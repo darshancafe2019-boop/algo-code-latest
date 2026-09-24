@@ -1145,8 +1145,11 @@ class UniversalRiskEngine:
             }
 
         # Broker-specific Fail-Closed Auth Validation
+        # IMPORTANT: Only reject for LIVE+DHAN. Paper bots must NEVER be blocked
+        # by Dhan auth state even if Dhan credentials are misconfigured.
         broker = str(order_intent.get("broker", "")).upper()
-        if broker == "DHAN":
+        _mode_for_auth = str(order_intent.get("mode", getattr(config, "TRADING_MODE", "PAPER"))).upper()
+        if broker == "DHAN" and _mode_for_auth == "LIVE":
             try:
                 from src.dhan_broker_adapter import dhan_broker_adapter
                 if dhan_broker_adapter.auth_status == "AUTH_FAILED":
@@ -1154,7 +1157,7 @@ class UniversalRiskEngine:
                         "allowed": False,
                         "status": "REJECTED",
                         "code": "DHAN_AUTH_FAILED",
-                        "message": "Order rejected: Dhan authentication required. Previous API call returned 401 Unauthorized. Trading is locked.",
+                        "message": "Order rejected: Dhan authentication required. Previous API call returned 401 Unauthorized. Live trading is locked.",
                         "stages": {"1_auth": "FAILED", "18_broker_status": "FAILED"},
                         "details": {"stage": "01_auth_broker", "broker": "DHAN"}
                     }

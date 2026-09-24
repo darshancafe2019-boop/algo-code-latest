@@ -80,7 +80,12 @@ export type SubscriptionReason =
   | "RUNNING_BOT"
   | "OPEN_POSITION"
   | "CHART_VIEW"
-  | "BENCHMARK";
+  | "BENCHMARK"
+  | "COMMAND_CENTER"
+  | "OPTION_CHAIN"
+  | "DEPTH_VIEW"
+  | "DETAIL_VIEW"
+  | "SSE_CLIENT_STREAM";
 
 export interface ProviderHealthEntry {
   provider_id: string;
@@ -297,26 +302,32 @@ export function MarketGatewayProvider({
 
   const getGatewayWsUrl =
     useCallback((): string => {
+      const envWsUrl =
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
+        process.env.NEXT_PUBLIC_MARKET_WS_URL;
+
+      if (envWsUrl) {
+        if (envWsUrl.startsWith("/")) {
+          if (typeof window !== "undefined") {
+            const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+            return `${proto}//${window.location.host}${envWsUrl}`;
+          }
+          return `ws://127.0.0.1:5051${envWsUrl}`;
+        }
+        if (envWsUrl.startsWith("http://")) {
+          return envWsUrl.replace("http://", "ws://");
+        }
+        if (envWsUrl.startsWith("https://")) {
+          return envWsUrl.replace("https://", "wss://");
+        }
+        return envWsUrl;
+      }
+
       if (
         typeof window === "undefined"
       ) {
         return "ws://127.0.0.1:5051/ws";
-      }
-
-      if (
-        process.env
-          .NEXT_PUBLIC_MARKET_GATEWAY_WS_URL
-      ) {
-        return process.env
-          .NEXT_PUBLIC_MARKET_GATEWAY_WS_URL;
-      }
-
-      if (
-        process.env
-          .NEXT_PUBLIC_MARKET_WS_URL
-      ) {
-        return process.env
-          .NEXT_PUBLIC_MARKET_WS_URL;
       }
 
       let host =
@@ -340,6 +351,47 @@ export function MarketGatewayProvider({
 
       return `${protocol}//${host}:${port}/ws`;
     }, []);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Safe WebSocket Teardown (Avoids "WebSocket closed before established" errors)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const safeCloseSocket = useCallback(
+    (
+      targetWs: WebSocket | null,
+      code: number = 1000,
+      reason: string = "Normal Closure"
+    ) => {
+      if (!targetWs) return;
+      const managedWs = targetWs as ManagedWebSocket;
+      managedWs._suppressReconnect = true;
+
+      // Detach message and error handlers to avoid zombie state updates
+      targetWs.onmessage = null;
+      targetWs.onerror = null;
+
+      if (targetWs.readyState === WebSocket.OPEN) {
+        try {
+          targetWs.close(code, reason);
+        } catch {
+          // ignore
+        }
+      } else if (targetWs.readyState === WebSocket.CONNECTING) {
+        // Calling close() while CONNECTING triggers browser warning:
+        // "WebSocket is closed before the connection is established"
+        // Wait for connection to open, then close quietly
+        targetWs.onopen = () => {
+          try {
+            targetWs.close(code, reason);
+          } catch {
+            // ignore
+          }
+        };
+        targetWs.onclose = null;
+      }
+    },
+    []
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
   // WebSocket Connection
@@ -406,34 +458,20 @@ export function MarketGatewayProvider({
             return;
           }
 
-          const managedWs =
-            ws as ManagedWebSocket;
-
-          /**
-           * We manually schedule reconnect below.
-           * Therefore onclose must not schedule
-           * another one.
-           */
-          managedWs._suppressReconnect =
-            true;
-
           if (
             wsRef.current === ws
           ) {
             wsRef.current = null;
           }
 
-          try {
-            ws.close(
-              4000,
-              "Connection timeout"
-            );
-          } catch {
-            // Socket may already be unusable.
-          }
+          safeCloseSocket(
+            ws,
+            4000,
+            "Connection timeout"
+          );
 
           scheduleReconnectRef.current();
-        }, 5000);
+        }, 8000);
 
       connectTimeoutRef.current =
         connectTimeout;
@@ -939,6 +977,89 @@ export function MarketGatewayProvider({
 
 
           }
+          // ───────────────────────────────────────────────────────────────
+          // Futures Tick (from MarketGateway)
+          // ───────────────────────────────────────────────────────────────
+          else if (
+            (msg.type === "FUTURES_TICK" || msg.type === "TICK") &&
+            msg.data
+          ) {
+            const rawTick = msg.data;
+            const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
+            const provider = (rawTick.provider || "UNKNOWN").toUpperCase();
+            const exchange = (rawTick.exchange || provider).toUpperCase();
+            const lastPrice = rawTick.last_price ?? rawTick.lastPrice ?? rawTick.price ?? null;
+
+            if (sym && lastPrice !== null) {
+              const quote: NormalizedQuote = {
+                symbol: sym,
+                exchange: exchange,
+                provider: provider,
+                last_price: Number(lastPrice),
+                bid: Number(rawTick.bid ?? lastPrice),
+                ask: Number(rawTick.ask ?? lastPrice),
+                volume: Number(rawTick.volume ?? rawTick.volume_24h ?? 0),
+                high: rawTick.high ? Number(rawTick.high) : null,
+                low: rawTick.low ? Number(rawTick.low) : null,
+                open: rawTick.open ? Number(rawTick.open) : null,
+                close: rawTick.close ? Number(rawTick.close) : null,
+                change_pct: rawTick.change_pct ?? rawTick.changePercent ?? rawTick.change_24h_pct ?? null,
+                vwap: rawTick.vwap ?? null,
+                event_timestamp: rawTick.timestamp || rawTick.event_timestamp || new Date().toISOString(),
+                received_timestamp: new Date().toISOString(),
+                feed_latency_ms: rawTick.latency_ms ?? 0,
+                data_mode: "REAL_TIME",
+                is_stale: false,
+                age_seconds: 0,
+              };
+
+              const existingKey = `${provider}:${sym}`;
+              quotesRef.current.set(existingKey, quote);
+              quotesRef.current.set(sym, quote);
+              pendingQuotesRef.current.set(existingKey, quote);
+              pendingQuotesRef.current.set(sym, quote);
+
+              useMarketFeedStore.getState().ingestTick({
+                symbol: sym,
+                exchange: exchange,
+                provider: provider,
+                lastPrice: quote.last_price,
+                bid: quote.bid,
+                ask: quote.ask,
+                volume: quote.volume,
+                open: quote.open,
+                high: quote.high,
+                low: quote.low,
+                close: quote.close,
+                changePercent: quote.change_pct ?? 0,
+                eventTimestamp: quote.event_timestamp,
+                feedLatencyMs: quote.feed_latency_ms,
+                dataMode: quote.data_mode,
+                isStale: false,
+                ageMs: 0,
+                rawPayload: rawTick,
+              });
+            }
+          }
+          // ───────────────────────────────────────────────────────────────
+          // Provider Health (from MarketGateway)
+          // ───────────────────────────────────────────────────────────────
+          else if (
+            msg.type === "PROVIDER_HEALTH" &&
+            msg.data
+          ) {
+            const h = msg.data;
+            const pName = (h.provider || "").toUpperCase();
+            if (pName) {
+              useMarketFeedStore.getState().updateProviderStat(pName, {
+                status: h.connected ? "CONNECTED" : "OFFLINE",
+                latencyMs: h.latency_ms ?? 0,
+                lastMessageAt: h.last_message_ms ? new Date(h.last_message_ms).toISOString() : new Date().toISOString(),
+                lastTickAgeMs: h.last_message_ms ? Math.max(0, Date.now() - h.last_message_ms) : 0,
+                errorCount: h.error ? 1 : 0,
+              });
+            }
+          }
 
           // ───────────────────────────────────────────────────────────────
           // Gateway ready / heartbeat
@@ -993,25 +1114,18 @@ export function MarketGatewayProvider({
           return;
         }
 
-        const managedWs =
-          ws as ManagedWebSocket;
-
-        /**
-         * We will manually reconnect,
-         * therefore onclose must not
-         * schedule a duplicate reconnect.
-         */
-        managedWs._suppressReconnect =
-          true;
-
-        wsRef.current =
-          null;
-
-        try {
-          ws.close();
-        } catch {
-          // Ignore.
+        if (
+          wsRef.current === ws
+        ) {
+          wsRef.current =
+            null;
         }
+
+        safeCloseSocket(
+          ws,
+          1000,
+          "Socket error"
+        );
 
         scheduleReconnectRef.current();
       };
@@ -1479,15 +1593,6 @@ export function MarketGatewayProvider({
           wsRef.current as ManagedWebSocket | null;
 
         if (staleWs) {
-          /**
-           * Reconnect is manually scheduled below.
-           */
-          staleWs._suppressReconnect =
-            true;
-
-          /**
-           * Detach stale socket BEFORE closing it.
-           */
           if (
             wsRef.current ===
             staleWs
@@ -1496,21 +1601,11 @@ export function MarketGatewayProvider({
               null;
           }
 
-          try {
-            if (
-              staleWs.readyState ===
-              WebSocket.OPEN ||
-              staleWs.readyState ===
-              WebSocket.CONNECTING
-            ) {
-              staleWs.close(
-                4001,
-                "Heartbeat stale"
-              );
-            }
-          } catch {
-            // Ignore stale-socket close failure.
-          }
+          safeCloseSocket(
+            staleWs,
+            4001,
+            "Heartbeat stale"
+          );
         }
 
         /**
@@ -1602,7 +1697,7 @@ export function MarketGatewayProvider({
     mountedRef.current =
       true;
 
-    connectWS();
+    connectWSRef.current();
 
     return () => {
       /**
@@ -1706,37 +1801,15 @@ export function MarketGatewayProvider({
         null;
 
       if (ws) {
-        /**
-         * Closing because component unmounted.
-         * Never reconnect from this close.
-         */
-        ws._suppressReconnect =
-          true;
-
-        try {
-          if (
-            ws.readyState ===
-            WebSocket.OPEN ||
-            ws.readyState ===
-            WebSocket.CONNECTING
-          ) {
-            ws.close(
-              1000,
-              "Component unmounted"
-            );
-          }
-        } catch (
-        error
-        ) {
-          console.warn(
-            "[MarketGateway] WebSocket cleanup failed:",
-            error
-          );
-        }
+        safeCloseSocket(
+          ws,
+          1000,
+          "Component unmounted"
+        );
       }
     };
   }, [
-    connectWS,
+    safeCloseSocket,
   ]);
 
   // ───────────────────────────────────────────────────────────────────────────

@@ -97,6 +97,10 @@ class TestSubscriptionRegistry(unittest.TestCase):
         self.registry.subscribe("BTC/USDT", "WATCHLIST")
         self.assertIn("BTC/USDT", self.added)
 
+    def test_command_center_subscription_accepted(self):
+        self.registry.subscribe("NIFTY", "COMMAND_CENTER")
+        self.assertIn("NIFTY", self.added)
+
     def test_second_reason_no_add_callback(self):
         self.registry.subscribe("BTC/USDT", "WATCHLIST")
         self.registry.subscribe("BTC/USDT", "RUNNING_BOT")

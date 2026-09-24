@@ -375,6 +375,10 @@ export function BotControlTab() {
       setActionSuccess(res.data?.message || `Bot permanently deleted. Trade history preserved.`);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+      queryClient.invalidateQueries({ queryKey: ["fleetSummary"] });
     } catch (err: any) {
       const msg = err.message || `Failed to delete bot ${botId}`;
       setActionError(msg);
@@ -423,6 +427,10 @@ export function BotControlTab() {
       setActionSuccess(`Successfully deleted ${count} bot(s). Trade history preserved.`);
       
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+      queryClient.invalidateQueries({ queryKey: ["fleetSummary"] });
       await refetch();
     } catch (err: any) {
       const msg = err.message || "Failed to bulk delete bots";

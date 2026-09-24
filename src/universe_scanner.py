@@ -56,9 +56,16 @@ class MultiAssetStagedScanner:
                     continue
 
                 # Step 3: Evaluate indicators & strategy confluence
-                confluence = evaluate_profile_confluence(symbol=symbol, df=None, profile="balanced")
-                confidence_score = confluence.get("confluence_score", 0.0)
-                signal_type = confluence.get("signal", "HOLD")
+                from src.candle_engine import global_candle_engine
+                df = global_candle_engine.get_candles(symbol, timeframe="5m", limit=100)
+                if df is not None and len(df) >= 15:
+                    confluence = evaluate_profile_confluence(df)
+                    confidence_score = float(confluence.get("confluence_pct", 0.0) or confluence.get("confluence_score", 0.0))
+                    signal_type = confluence.get("decision", "HOLD")
+                else:
+                    confluence = {"decision": "HOLD", "confluence_pct": 0.0}
+                    confidence_score = 0.0
+                    signal_type = "HOLD"
 
                 # Step 4: 75% Confidence Score Threshold Validation
                 meets_threshold = (confidence_score >= self.confidence_threshold) and (signal_type in ["BUY_LONG", "SELL_SHORT"])
@@ -94,3 +101,12 @@ class MultiAssetStagedScanner:
             logger.error(f"Error during staged multi-asset scan: {exc}")
 
         return candidates
+
+    def scan_universe(self, filters: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        """Alias to scan_active_universe with filters dict support."""
+        category = (filters or {}).get("category")
+        limit = int((filters or {}).get("limit", 50))
+        return self.scan_active_universe(limit=limit, category_filter=category)
+
+
+UniverseScanner = MultiAssetStagedScanner

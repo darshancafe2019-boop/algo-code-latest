@@ -546,3 +546,15 @@ class AuthoritativeAnalyticsEngine:
 
 
 analytics_engine = AuthoritativeAnalyticsEngine()
+
+
+def compute_complete_performance_metrics(
+    date_range: str = "ALL",
+    start_date: str = "",
+    end_date: str = "",
+    start_balance: float = 100000.0
+) -> Dict[str, Any]:
+    """Computes complete performance analytics suite from trades log."""
+    engine = AuthoritativeAnalyticsEngine()
+    trades = engine.get_raw_trades(date_range=date_range, start_date=start_date, end_date=end_date)
+    return engine.compute_kpis_and_metrics(trades, start_balance=start_balance)

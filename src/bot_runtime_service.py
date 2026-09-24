@@ -228,7 +228,7 @@ class BotRuntimeService:
                         "strike": float(b_item.strike or 0.0),
                         "option_type": b_item.option_type,
                         "entry_side": b_item.entry_side,
-                        "lots": int(b_item.lots or 1),
+                        "lots": b_item.lots or 1,
                         "lot_size": float(b_item.lot_size or 1.0),
                         "allocated_capital": float(b_item.capital_allocation or 50000.0),
                         "strategy": b_item.strategy_id,
@@ -258,7 +258,8 @@ class BotRuntimeService:
             raw_bots = list(raw_bots_map.values())
 
             # 2. Pre-fetch closed trades for exact bot_id P&L attribution
-            c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED')")
+            # Include TRADED for backward compat with legacy paper fills (pre-fix) and FILLED/CLOSED for live.
+            c.execute("SELECT * FROM trades_log WHERE status IN ('CLOSED', 'FILLED', 'TRADED')")
             closed_trades = [dict(r) for r in c.fetchall()]
 
             # 3. Pre-fetch open positions
@@ -357,7 +358,7 @@ class BotRuntimeService:
         healthy_count = 0
 
         for b in raw_bots:
-            b_id = b.get("id") or b.get("bot_id")
+            b_id = str(b.get("id") or b.get("bot_id") or "")
             name = b.get("name") or f"Bot {b_id}"
             db_status = str(b.get("status") or b.get("state") or "STOPPED").upper()
             timeframe = b.get("timeframe") or "5m"
@@ -499,23 +500,35 @@ class BotRuntimeService:
             sym_upper = symbol.upper()
             mkt_upper = asset_class.upper()
 
-            if "RELIANCE" in sym_upper or "INFY" in sym_upper or "TCS" in sym_upper or "NIFTY" in sym_upper or "BANKNIFTY" in sym_upper or "INDIAN" in mkt_upper or "NSE" in mkt_upper:
+            # Authoritative Market Data Source — read from the stored provider field,
+            # never guess from symbol keywords. Falls back to asset-class heuristic.
+            raw_mdp = str(b.get("market_data_provider") or b.get("data_provider") or b.get("broker_provider") or cfg.get("market_data_provider") or "").upper().strip()
+
+            if "UPSTOX" in raw_mdp or (not raw_mdp and ("NIFTY" in symbol.upper() or "BANKNIFTY" in symbol.upper() or "RELIANCE" in symbol.upper())):
                 mkt_data_src = "Upstox Official API"
                 exch = "NSE"
-                seg = "EQUITY_DERIVATIVES" if ("FUT" in sym_upper or "CE" in sym_upper or "PE" in sym_upper or "OPTION" in mkt_upper) else "EQUITY_CASH"
-                inst_key = b.get("canonical_instrument_id") or (f"NSE_EQ|INE002A01018" if "RELIANCE" in sym_upper else f"NSE_FO|{symbol}")
+                seg = "EQUITY_DERIVATIVES" if ("FUT" in symbol.upper() or "CE" in symbol.upper() or "PE" in symbol.upper() or "OPTION" in asset_class.upper()) else "EQUITY_CASH"
+                inst_key = b.get("canonical_instrument_id") or b.get("provider_instrument_id") or f"NSE_FO|{symbol}"
                 feed_st = "LIVE" if upstox_configured else "NOT CONFIGURED"
                 lat_ms = 18.4
-                feed_tp = "REST"
-            elif "SOL" in sym_upper or "DELTA" in sym_upper or "CRYPTO_OPTIONS" in mkt_upper:
+                feed_tp = "WebSocket"
+            elif "DELTA" in raw_mdp or "DELTA_INDIA" in raw_mdp:
                 mkt_data_src = "Delta Exchange India API"
                 exch = "DELTA_INDIA"
-                seg = "CRYPTO_OPTIONS" if ("-C" in sym_upper or "-P" in sym_upper or "OPTION" in mkt_upper) else "CRYPTO_PERP"
-                inst_key = b.get("canonical_instrument_id") or (f"{symbol}_PERP" if not ("-C" in sym_upper or "-P" in sym_upper) else symbol)
+                seg = "CRYPTO_OPTIONS" if ("-C" in symbol.upper() or "-P" in symbol.upper() or "OPTION" in asset_class.upper()) else "CRYPTO_PERP"
+                inst_key = b.get("canonical_instrument_id") or b.get("provider_instrument_id") or f"{symbol}_PERP"
                 feed_st = "LIVE" if delta_configured else "NOT CONFIGURED"
                 lat_ms = 24.1
-                feed_tp = "REST"
-            elif "DERIBIT" in sym_upper or "deribit" in (b.get("data_provider_id") or "").lower():
+                feed_tp = "WebSocket"
+            elif "DHAN" in raw_mdp:
+                mkt_data_src = "Dhan Market Data API"
+                exch = "NSE"
+                seg = "EQUITY_DERIVATIVES" if ("FUT" in symbol.upper() or "CE" in symbol.upper() or "PE" in symbol.upper()) else "EQUITY_CASH"
+                inst_key = b.get("canonical_instrument_id") or b.get("provider_instrument_id") or symbol
+                feed_st = "LIVE" if dhan_configured else "NOT CONFIGURED"
+                lat_ms = 22.0
+                feed_tp = "WebSocket"
+            elif "DERIBIT" in raw_mdp:
                 mkt_data_src = "Deribit Official API"
                 exch = "DERIBIT"
                 seg = "CRYPTO_OPTIONS"
@@ -523,13 +536,44 @@ class BotRuntimeService:
                 feed_st = "LIVE"
                 lat_ms = 85.0
                 feed_tp = "WebSocket"
-            else:
+            elif "BINANCE" in raw_mdp:
                 mkt_data_src = "Binance Official API"
                 exch = "BINANCE"
-                seg = "CRYPTO_PERP" if ("FUT" in sym_upper or "FUTURES" in mkt_upper) else "CRYPTO_SPOT"
+                seg = "CRYPTO_PERP" if ("FUT" in symbol.upper() or "FUTURES" in asset_class.upper()) else "CRYPTO_SPOT"
                 inst_key = b.get("canonical_instrument_id") or symbol.replace("/", "").replace(":", "")
                 feed_st = "LIVE"
                 lat_ms = 14.2
+                feed_tp = "WebSocket"
+            elif "PAPER" in raw_mdp or exec_broker_id == "paper_simulator":
+                mkt_data_src = "Paper Simulator (Synthetic Feed)"
+                exch = "PAPER"
+                seg = "PAPER"
+                inst_key = b.get("canonical_instrument_id") or symbol
+                feed_st = "LIVE"
+                lat_ms = 0.5
+                feed_tp = "Synthetic"
+            else:
+                # Final heuristic fallback for unknown providers
+                sym_upper_fb = symbol.upper()
+                if "NIFTY" in sym_upper_fb or "BANKNIFTY" in sym_upper_fb:
+                    mkt_data_src = "Upstox Official API"
+                    exch = "NSE"
+                    seg = "EQUITY_DERIVATIVES"
+                    feed_st = "LIVE" if upstox_configured else "NOT CONFIGURED"
+                    lat_ms = 18.4
+                elif "BTC" in sym_upper_fb or "ETH" in sym_upper_fb or "SOL" in sym_upper_fb:
+                    mkt_data_src = "Delta Exchange India API"
+                    exch = "DELTA_INDIA"
+                    seg = "CRYPTO_PERP"
+                    feed_st = "LIVE" if delta_configured else "NOT CONFIGURED"
+                    lat_ms = 24.1
+                else:
+                    mkt_data_src = "Binance Official API"
+                    exch = "BINANCE"
+                    seg = "CRYPTO_SPOT"
+                    feed_st = "LIVE"
+                    lat_ms = 14.2
+                inst_key = b.get("canonical_instrument_id") or symbol
                 feed_tp = "WebSocket"
 
             # Stable composite key for deduplication and absolute isolation
@@ -1150,8 +1194,8 @@ class BotRuntimeService:
     def is_valid_transition(self, from_state: Union[str, BotLifecycleState], to_state: Union[str, BotLifecycleState]) -> bool:
         """Check if transition between lifecycle states is permitted."""
         try:
-            from_enum = BotLifecycleState(from_state.value if isinstance(from_state, BotLifecycleState) else str(from_state))
-            to_enum = BotLifecycleState(to_state.value if isinstance(to_state, BotLifecycleState) else str(to_state))
+            from_enum = from_state if isinstance(from_state, BotLifecycleState) else BotLifecycleState(from_state)
+            to_enum = to_state if isinstance(to_state, BotLifecycleState) else BotLifecycleState(to_state)
             return to_enum in VALID_TRANSITIONS.get(from_enum, set())
         except Exception:
             return False

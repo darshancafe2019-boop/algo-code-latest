@@ -19,7 +19,15 @@ export function DecisionLogFeed() {
     placeholderData: (prev) => prev,
   });
 
-  const logs = data?.events || data?.decision_logs || data?.logs || [];
+  const rawLogs = data?.events || data?.decision_logs || data?.logs || [];
+
+  // Filter out auth-failure events — those belong on provider health badge, not decision feed
+  const logs = rawLogs.filter((log: any) => {
+    const evtType = (log.event_type || "").toUpperCase();
+    const decision = (log.decision || log.final_decision || log.action || "").toUpperCase();
+    return evtType !== "DHAN_AUTH_FAILED" && evtType !== "AUTH_FAILED" &&
+           decision !== "DHAN_AUTH_FAILED" && decision !== "AUTH_FAILED";
+  });
 
   return (
     <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 font-sans select-none">
@@ -27,7 +35,7 @@ export function DecisionLogFeed() {
         <div className="flex items-center gap-2">
           <Activity className="h-3.5 w-3.5 text-[#22D3EE]" />
           <h3 className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">
-            Live Bot Decision & Activity Feed
+            Live Bot Decision &amp; Activity Feed
           </h3>
         </div>
         <button
@@ -46,29 +54,53 @@ export function DecisionLogFeed() {
           </div>
         ) : (
           logs.map((log: any, index: number) => {
-            const decision = (log.decision || log.direction || log.event || log.action || "HOLD").toUpperCase();
-            const confidence = log.confidence_score !== undefined || log.bull_score !== undefined
-              ? Number(log.confidence_score ?? log.bull_score ?? 0).toFixed(1)
+            // Authoritative field priority: final_decision → decision → action → event → HOLD
+            const decision = (
+              log.final_decision || log.decision || log.direction || log.event || log.action || "HOLD"
+            ).toUpperCase();
+
+            // Confidence: prefer confidence_score (0-100), then bull_score
+            const rawConfidence = log.confidence_score !== undefined
+              ? log.confidence_score
+              : log.bull_score !== undefined
+              ? log.bull_score
               : null;
+            const confidence = rawConfidence !== null ? Number(rawConfidence).toFixed(1) : null;
+
             const isLong = decision === "BUY" || decision === "LONG" || decision === "ENTRY SIGNAL";
             const isShort = decision === "SELL" || decision === "SHORT" || decision === "EXIT SIGNAL";
-            const isRebalance = decision.includes("REBALANCE") || decision.includes("SCAN") || decision.includes("PAUSED") || decision.includes("STARTED");
+            const isRebalance = decision.includes("REBALANCE") || decision.includes("SCAN") ||
+                                decision.includes("PAUSED") || decision.includes("STARTED");
+
+            // Bot label: prefer bot_name, then name, then bot_id fields
             const botLabel = log.bot_name || log.name || log.bot_id || log.bot_instance_id || "System";
             const regime = log.regime || log.event_type || null;
+            const provider = log.provider || null;
+            const reason = log.decision_reason || log.summary || null;
 
             return (
               <div
                 key={log.id || index}
                 className="p-2 rounded-lg bg-[#05101A] border border-[#12304A] flex items-center justify-between text-[11px]"
+                title={reason || undefined}
               >
                 <div className="flex items-center gap-2 font-mono">
                   <span className="text-[10px] text-[#7D8EA5]">
-                    {log.timestamp ? (log.timestamp.includes("T") ? log.timestamp.split("T")[1]?.slice(0, 8) : log.timestamp.slice(11, 19)) : "Live"}
+                    {log.timestamp
+                      ? log.timestamp.includes("T")
+                        ? log.timestamp.split("T")[1]?.slice(0, 8)
+                        : log.timestamp.slice(11, 19)
+                      : "Live"}
                   </span>
-                  <span className="font-semibold text-[#F8FAFC] truncate max-w-[140px]" title={botLabel}>
+                  <span className="font-semibold text-[#F8FAFC] truncate max-w-[120px]" title={botLabel}>
                     {botLabel}
                   </span>
                   {regime && <span className="text-[#7D8EA5]">[{regime}]</span>}
+                  {provider && (
+                    <span className="text-[10px] text-[#22D3EE]/60 truncate max-w-[60px]" title={provider}>
+                      {provider}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2.5">

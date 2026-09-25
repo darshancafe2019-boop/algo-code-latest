@@ -435,6 +435,10 @@ class DhanService:
         self._last_auth_check = 0.0
         self._auth_cached_result: Optional[Dict[str, Any]] = None
 
+        self._circuit_broken_until: float = 0.0
+        self._circuit_breaker_failures: int = 0
+        self._auth_failed: bool = False
+
         # Dynamic Dhan Instrument Master indexes
         self._master_lock = threading.Lock()
         self._master_loaded = False
@@ -443,31 +447,69 @@ class DhanService:
         self._isin_index: Dict[str, Dict[str, Any]] = {}
         self._segment_symbol_index: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
+        if client_id is not None:
+            self.client_id = client_id.strip()
+        else:
+            try:
+                from src.dhan_credential_manager import global_dhan_credential_manager
+                mgr_cid, _, _ = global_dhan_credential_manager.get_credentials()
+                self.client_id = (mgr_cid or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+            except Exception:
+                self.client_id = (getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
+
+        if access_token is not None:
+            self.access_token = access_token.strip()
+        else:
+            try:
+                from src.dhan_credential_manager import global_dhan_credential_manager
+                _, mgr_tok, _ = global_dhan_credential_manager.get_credentials()
+                self.access_token = (mgr_tok or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
+            except Exception:
+                self.access_token = (getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
+
         try:
             from src.dhan_credential_manager import global_dhan_credential_manager
-            mgr_cid, mgr_tok, _ = global_dhan_credential_manager.get_credentials()
-            self.client_id = (client_id or mgr_cid or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
-            self.access_token = (access_token or mgr_tok or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
             global_dhan_credential_manager.register_callback(self._on_credential_update)
         except Exception:
-            self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
-            self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
+            pass
 
-        self._load_credentials_from_vault()
+        if client_id is None and access_token is None:
+            self._load_credentials_from_vault()
+
+        if not self.client_id or not self.access_token:
+            self._auth_status = "CREDENTIALS_MISSING"
+            self._auth_failed = True
 
     def _on_credential_update(self, client_id: str, access_token: str, generation: int) -> None:
         """Callback invoked whenever Dhan credentials change or renew."""
         self.reload_credentials(client_id, access_token)
 
+    def _trip_circuit_breaker(self, duration_sec: float = 120.0, reason: str = "") -> None:
+        """Trips the Dhan authentication circuit breaker to prevent repeated 401 request storms."""
+        self._circuit_breaker_failures += 1
+        backoff_mult = min(16, 2 ** (self._circuit_breaker_failures - 1))
+        actual_dur = min(600.0, duration_sec * backoff_mult)
+        self._circuit_broken_until = time.time() + actual_dur
+        self._auth_failed = True
+        self._auth_status = "AUTH_FAILED"
+        logger.warning(
+            "DHAN_AUTH_FAILED_CIRCUIT_BREAKER_TRIPPED: Bypassing Dhan API calls for %0.0fs (Reason: %s, Failure #%d)",
+            actual_dur, reason, self._circuit_breaker_failures
+        )
+
     def reload_credentials(self, client_id: Optional[str] = None, access_token: Optional[str] = None) -> None:
-        """Hot-reloads Dhan credentials in memory and invalidates cache."""
+        """Hot-reloads Dhan credentials in memory, resets circuit breaker, and invalidates cache."""
         if client_id is not None:
             self.client_id = client_id.strip()
         if access_token is not None:
             self.access_token = access_token.strip()
+        self._circuit_broken_until = 0.0
+        self._circuit_breaker_failures = 0
+        self._auth_failed = False
+        self._auth_status = "INITIAL"
         self._auth_cached_result = None
         self._last_auth_check = 0.0
-        logger.info("DhanService credentials hot-reloaded (ClientId=%s)", self.client_id[:4] + "****" if self.client_id else "")
+        logger.info("DhanService credentials hot-reloaded and circuit breaker reset (ClientId=%s)", self.client_id[:4] + "****" if self.client_id else "")
 
     def _load_credentials_from_vault(self) -> None:
         """Loads encrypted API credentials from SQLite broker_credentials if available."""
@@ -509,7 +551,11 @@ class DhanService:
 
     @property
     def is_authenticated(self) -> bool:
-        return bool(self.access_token)
+        if not self.access_token or not self.client_id:
+            return False
+        if getattr(self, "_auth_failed", False) and time.time() < getattr(self, "_circuit_broken_until", 0.0):
+            return False
+        return True
 
     def validate_token(self, force: bool = False) -> Dict[str, Any]:
         """
@@ -533,7 +579,7 @@ class DhanService:
             self._last_auth_check = now
             return res
 
-        if not self.is_authenticated:
+        if not self.access_token:
             self._auth_status = "CREDENTIALS_MISSING"
             res = {
                 "valid": False,
@@ -552,6 +598,7 @@ class DhanService:
             if isinstance(profile, list):
                 # /orders returned order list (sandbox / live success)
                 self._auth_status = "CONNECTED"
+                self._auth_failed = False
                 res = {
                     "valid": True,
                     "status": "CONNECTED",
@@ -591,7 +638,8 @@ class DhanService:
 
             if is_error:
                 if error_code in ("808", "807", "809", "810", "DH-901", "401", "Invalid_Authentication", "HTTP-401") or "expired" in error_msg.lower() or "invalid" in error_msg.lower():
-                    status_code = "AUTH_REQUIRED"
+                    status_code = "AUTH_FAILED"
+                    self._trip_circuit_breaker(120.0, f"{error_code}: {error_msg}")
                 elif error_code in ("805", "DH-902", "403", "HTTP-403"):
                     status_code = "DATA_API_UNAVAILABLE"
                 else:
@@ -622,6 +670,7 @@ class DhanService:
                     }
                 else:
                     self._auth_status = "CONNECTED"
+                    self._auth_failed = False
                     res = {
                         "valid": True,
                         "status": "CONNECTED",
@@ -649,9 +698,19 @@ class DhanService:
         path: str,
         data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Makes an authenticated HTTP request to Dhan HQ API v2 / Sandbox."""
-        if not self.is_authenticated:
-            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan access token not configured."}
+        """Makes an authenticated HTTP request to Dhan HQ API v2 / Sandbox with circuit breaker protection."""
+        if not self.access_token:
+            return {"status": "error", "error": "DHAN_CREDENTIALS_MISSING", "message": "Dhan access token not configured.", "_http_status": 401}
+
+        if getattr(self, "_auth_failed", False) and time.time() < getattr(self, "_circuit_broken_until", 0.0):
+            cooldown_left = round(self._circuit_broken_until - time.time(), 1)
+            return {
+                "status": "failed",
+                "_http_status": 401,
+                "error": "AUTH_FAILED",
+                "message": f"Dhan authentication failed previously. Circuit breaker active ({cooldown_left}s remaining cooldown).",
+                "auth_status": "AUTH_FAILED"
+            }
 
         url = f"{self.base_url}/{path.lstrip('/')}"
         headers = {
@@ -675,10 +734,14 @@ class DhanService:
                 res = json.loads(resp_text)
                 if isinstance(res, dict):
                     res["_http_status"] = resp.status
+                    if res.get("data") and isinstance(res["data"], dict) and "808" in res["data"]:
+                        self._trip_circuit_breaker(120.0, str(res["data"]["808"]))
                 return res
         except urllib.error.HTTPError as he:
             err_body = he.read().decode("utf-8") if he.fp else ""
             logger.error(f"Dhan API HTTP {he.code} for {url}: {err_body}")
+            if he.code in (401, 403):
+                self._trip_circuit_breaker(120.0, f"HTTP {he.code} from {url}")
             try:
                 res = json.loads(err_body)
                 if isinstance(res, dict):

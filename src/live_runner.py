@@ -398,10 +398,31 @@ class LiveRunner:
                         context.decision = "WAITING_APPROVAL"
                         return
                 else:
-                    logger.info("[%s] Active trade SL/TP not hit. Holding position.", self.bot_id)
+                    # Calculate live floating unrealized mark-to-market PnL
+                    unrealized_pnl = (entry_price - close_price) * size if direction == "SHORT" else (close_price - entry_price) * size
+                    logger.info("[%s] Active trade SL/TP not hit. Holding position (Live MTM PnL: %+.2f USDT, Last Price: %.2f).", self.bot_id, unrealized_pnl, close_price)
                     context.signal = "HOLD"
                     context.decision = "HOLD"
-                    db.log_signal(self.symbol, "HOLD", close_price, {}, False, "Holding open trade position")
+                    
+                    conn = db.get_connection()
+                    try:
+                        c = conn.cursor()
+                        c.execute("UPDATE trades_log SET unrealized_pnl = ? WHERE id = ?", (unrealized_pnl, trade_id))
+                        c.execute("UPDATE bot_instances SET unrealized_pnl = ?, last_checked_at = ? WHERE id = ?", (unrealized_pnl, datetime.now(timezone.utc).isoformat(), self.bot_id))
+                        try:
+                            c.execute("UPDATE positions SET unrealized_pnl = ?, current_price = ? WHERE bot_id = ? OR id = ?", (unrealized_pnl, close_price, self.bot_id, trade_id))
+                        except Exception:
+                            pass
+                        conn.commit()
+                    except Exception as exc:
+                        logger.warning("[%s] Failed to persist live MTM PnL: %s", self.bot_id, exc)
+                    finally:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                    
+                    db.log_signal(self.symbol, "HOLD", close_price, {"unrealized_pnl": unrealized_pnl}, False, f"Holding open trade position (PnL: {unrealized_pnl:+.2f})")
                     return
 
             if not active_trade:

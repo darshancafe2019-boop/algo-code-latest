@@ -332,6 +332,7 @@ class ProviderHealth:
     latency_ms: float = 0.0
     error_count: int = 0
     last_tick_time: Optional[str] = None
+    last_heartbeat: Optional[str] = None
     message: str = ""
     auth_status: str = "HEALTHY"
     rest_status: str = "HEALTHY"

@@ -58,10 +58,33 @@ class EventDomain(str, Enum):
     CAPITAL = "CAPITAL"
     RISK = "RISK"
     SYSTEM = "SYSTEM"
+    BOT = "BOT"
+    STRATEGY = "STRATEGY"
+    RECONCILIATION = "RECONCILIATION"
+    AUDIT = "AUDIT"
 
 
 class EventType(str, Enum):
-    # Market Data
+    # Bot Lifecycle
+    BOT_CREATED = "BOT_CREATED"
+    BOT_STARTING = "BOT_STARTING"
+    BOT_STARTED = "BOT_STARTED"
+    BOT_WAITING_SIGNAL = "BOT_WAITING_SIGNAL"
+    BOT_PAUSED = "BOT_PAUSED"
+    BOT_RESUMED = "BOT_RESUMED"
+    BOT_STOPPED = "BOT_STOPPED"
+    BOT_FAILED = "BOT_FAILED"
+    BOT_RECOVERED = "BOT_RECOVERED"
+
+    # Market Data & Feeds
+    FEED_CONNECTING = "FEED_CONNECTING"
+    FEED_CONNECTED = "FEED_CONNECTED"
+    FEED_DISCONNECTED = "FEED_DISCONNECTED"
+    FEED_RECONNECTING = "FEED_RECONNECTING"
+    DATA_STALE = "DATA_STALE"
+    DATA_RECOVERED = "DATA_RECOVERED"
+    TICK_RECEIVED = "TICK_RECEIVED"
+    CANDLE_CLOSED = "CANDLE_CLOSED"
     MARKET_TICK = "MARKET_TICK"
     QUOTE = "QUOTE"
     TRADE = "TRADE"
@@ -71,38 +94,87 @@ class EventType(str, Enum):
     FUNDING = "FUNDING"
     GREEKS = "GREEKS"
 
-    # Account & Margin
-    BALANCE_UPDATE = "BALANCE_UPDATE"
-    MARGIN_UPDATE = "MARGIN_UPDATE"
+    # Strategy & Signals
+    STRATEGY_EVALUATED = "STRATEGY_EVALUATED"
+    SIGNAL_LONG = "SIGNAL_LONG"
+    SIGNAL_SHORT = "SIGNAL_SHORT"
+    SIGNAL_HOLD = "SIGNAL_HOLD"
+    SIGNAL_REJECTED = "SIGNAL_REJECTED"
 
-    # Positions
-    POSITION_OPENED = "POSITION_OPENED"
-    POSITION_UPDATED = "POSITION_UPDATED"
-    POSITION_CLOSED = "POSITION_CLOSED"
+    # Risk Checks
+    RISK_CHECK_STARTED = "RISK_CHECK_STARTED"
+    RISK_APPROVED = "RISK_APPROVED"
+    RISK_REJECTED = "RISK_REJECTED"
+    POSITION_SIZE_CALCULATED = "POSITION_SIZE_CALCULATED"
 
     # Orders & Execution
     ORDER_CREATED = "ORDER_CREATED"
+    ORDER_PENDING = "ORDER_PENDING"
+    ORDER_SENT = "ORDER_SENT"
+    ORDER_ACKNOWLEDGED = "ORDER_ACKNOWLEDGED"
     ORDER_ACCEPTED = "ORDER_ACCEPTED"
-    ORDER_REJECTED = "ORDER_REJECTED"
-    ORDER_OPEN = "ORDER_OPEN"
+    ORDER_PARTIALLY_FILLED = "ORDER_PARTIALLY_FILLED"
     ORDER_PARTIAL_FILL = "ORDER_PARTIAL_FILL"
     ORDER_FILLED = "ORDER_FILLED"
+    ORDER_REJECTED = "ORDER_REJECTED"
     ORDER_CANCELLED = "ORDER_CANCELLED"
+    ORDER_OPEN = "ORDER_OPEN"
     TRADE_FILL = "TRADE_FILL"
 
-    # P&L & Capital
+    # Positions & Lifecycle
+    POSITION_OPENED = "POSITION_OPENED"
+    POSITION_UPDATED = "POSITION_UPDATED"
+    POSITION_REDUCED = "POSITION_REDUCED"
+    POSITION_CLOSED = "POSITION_CLOSED"
+
+    # P&L & Stops
     PNL_UPDATE = "PNL_UPDATE"
+    PNL_UPDATED = "PNL_UPDATED"
+    REALIZED_PNL_UPDATED = "REALIZED_PNL_UPDATED"
+    UNREALIZED_PNL_UPDATED = "UNREALIZED_PNL_UPDATED"
+    STOP_LOSS_TRIGGERED = "STOP_LOSS_TRIGGERED"
+    TAKE_PROFIT_TRIGGERED = "TAKE_PROFIT_TRIGGERED"
+    BREAK_EVEN_MOVED = "BREAK_EVEN_MOVED"
+    TRAILING_STOP_UPDATED = "TRAILING_STOP_UPDATED"
+
+    # Capital & Accounts
+    BALANCE_UPDATE = "BALANCE_UPDATE"
+    MARGIN_UPDATE = "MARGIN_UPDATE"
     CAPITAL_ALLOCATION = "CAPITAL_ALLOCATION"
     CAPITAL_RESERVATION = "CAPITAL_RESERVATION"
     CAPITAL_RELEASE = "CAPITAL_RELEASE"
 
-    # Reconciliation & Provider Health
-    RECONCILIATION_HEALTHY = "RECONCILIATION_HEALTHY"
-    RECONCILIATION_DRIFT = "RECONCILIATION_DRIFT"
+    # Provider Health & Auth
+    PROVIDER_AUTH_OK = "PROVIDER_AUTH_OK"
+    PROVIDER_AUTH_FAILED = "PROVIDER_AUTH_FAILED"
+    PROVIDER_RECONNECTED = "PROVIDER_RECONNECTED"
     PROVIDER_CONNECTED = "PROVIDER_CONNECTED"
     PROVIDER_DISCONNECTED = "PROVIDER_DISCONNECTED"
     PROVIDER_STALE = "PROVIDER_STALE"
     PROVIDER_ERROR = "PROVIDER_ERROR"
+
+    # OMS & Engine Health
+    OMS_HEALTHY = "OMS_HEALTHY"
+    OMS_DEGRADED = "OMS_DEGRADED"
+
+    # Reconciliation
+    RECONCILIATION_STARTED = "RECONCILIATION_STARTED"
+    RECONCILIATION_MATCHED = "RECONCILIATION_MATCHED"
+    RECONCILIATION_MISMATCH = "RECONCILIATION_MISMATCH"
+    RECONCILIATION_HEALTHY = "RECONCILIATION_HEALTHY"
+    RECONCILIATION_DRIFT = "RECONCILIATION_DRIFT"
+
+    # System & Runtime Failures
+    BOT_RUNTIME_ERROR = "BOT_RUNTIME_ERROR"
+    ORDER_TIMEOUT = "ORDER_TIMEOUT"
+    DATABASE_ERROR = "DATABASE_ERROR"
+    WEBSOCKET_ERROR = "WEBSOCKET_ERROR"
+    INVALID_MARKET_DATA = "INVALID_MARKET_DATA"
+
+    # Retries & Recovery
+    RETRY_STARTED = "RETRY_STARTED"
+    RETRY_FAILED = "RETRY_FAILED"
+    RETRY_SUCCESS = "RETRY_SUCCESS"
 
 
 class LedgerEntryType(str, Enum):
@@ -229,39 +301,182 @@ class ProviderInfo:
 
 @dataclass
 class NormalizedEvent:
+    # 1. Identity, Monotonic Sequence & Timestamps
     event_id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    event_type: EventType = EventType.MARKET_TICK
-    domain: EventDomain = EventDomain.MARKET_DATA
-    provider: str = "SYSTEM"
-    account_id: Optional[str] = None
+    sequence: int = 0
+    event_time: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    received_time: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     environment: Environment = Environment.PAPER
+    provider: str = "SYSTEM"
+    domain: EventDomain = EventDomain.SYSTEM
+    event_type: Union[EventType, str] = EventType.MARKET_TICK
+    severity: str = "INFO"  # "INFO" | "WARN" | "ERROR" | "CRITICAL"
+
+    # 2. Bot & Strategy Context
+    bot_id: Optional[str] = None
+    bot_name: Optional[str] = None
+    strategy_id: Optional[str] = None
+    strategy_name: Optional[str] = None
+
+    # 3. Market & Asset Taxonomy
+    symbol: Optional[str] = None
     exchange: Optional[str] = None
+    timeframe: Optional[str] = None
     instrument_id: Optional[str] = None
     canonical_instrument_id: Optional[str] = None
+
+    # 4. Account & Trading Entity IDs
+    account_id: Optional[str] = None
+    order_id: Optional[str] = None
+    trade_id: Optional[str] = None
+    position_id: Optional[str] = None
+
+    # 5. Order / Position Parameters & Pricing
+    side: Optional[str] = None  # "BUY" | "SELL" | "LONG" | "SHORT"
+    quantity: Optional[float] = None
+    market_price: Optional[float] = None
+    entry_price: Optional[float] = None
+    exit_price: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+
+    # 6. P&L & Execution Cost Accounting
+    realized_pnl: Optional[float] = None
+    unrealized_pnl: Optional[float] = None
+    commission: Optional[float] = None
+    fees: Optional[float] = None
+    slippage: Optional[float] = None
+
+    # 7. Intelligence & Decision Auditing
+    strategy_score: Optional[float] = None
+    confidence: Optional[float] = None
+    status: Optional[str] = None
+    decision_reason: Optional[str] = None
+
+    # 8. Diagnostics, Errors & Latency Metrics
+    error_code: Optional[str] = None
+    error_message: Optional[str] = None
+    latency_ms: float = 0.0
+    data_age_ms: float = 0.0
+
+    # 9. Correlation & Causation Tracing
+    correlation_id: Optional[str] = None
+    causation_id: Optional[str] = None
+    idempotency_key: Optional[str] = None
+
+    # 10. Reconciliation & Custom Metadata
+    reconciliation_status: Optional[str] = None  # "MATCHED" | "MISMATCH" | "PENDING"
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    raw_payload: Optional[Dict[str, Any]] = None
+
+    # Legacy compatibility fields
     provider_timestamp: Optional[str] = None
     exchange_timestamp: Optional[str] = None
-    received_timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    sequence: int = 0
-    latency_ms: float = 0.0
+    received_timestamp: Optional[str] = None
     payload: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
+        ev_type_str = self.event_type.value if hasattr(self.event_type, "value") else str(self.event_type)
+        domain_str = self.domain.value if hasattr(self.domain, "value") else str(self.domain)
+        env_str = self.environment.value if hasattr(self.environment, "value") else str(self.environment)
+
+        combined_payload = dict(self.payload or {})
+        if self.metadata:
+            combined_payload.update(self.metadata)
+
         return {
+            # Standard snake_case & camelCase for unified interoperability
+            "event_id": self.event_id,
             "eventId": self.event_id,
-            "eventType": self.event_type.value,
-            "domain": self.domain.value,
-            "provider": self.provider,
-            "accountId": self.account_id,
-            "environment": self.environment.value,
-            "exchange": self.exchange,
-            "instrumentId": self.instrument_id,
-            "canonicalInstrumentId": self.canonical_instrument_id,
-            "providerTimestamp": self.provider_timestamp,
-            "exchangeTimestamp": self.exchange_timestamp,
-            "receivedTimestamp": self.received_timestamp,
             "sequence": self.sequence,
+            "event_time": self.event_time or self.provider_timestamp or self.received_time,
+            "eventTime": self.event_time or self.provider_timestamp or self.received_time,
+            "received_time": self.received_time or self.received_timestamp,
+            "receivedTime": self.received_time or self.received_timestamp,
+            "receivedTimestamp": self.received_time or self.received_timestamp,
+            "environment": env_str,
+            "provider": self.provider,
+            "domain": domain_str,
+            "event_type": ev_type_str,
+            "eventType": ev_type_str,
+            "severity": self.severity,
+
+            "bot_id": self.bot_id,
+            "botId": self.bot_id,
+            "bot_name": self.bot_name,
+            "botName": self.bot_name,
+            "strategy_id": self.strategy_id,
+            "strategyId": self.strategy_id,
+            "strategy_name": self.strategy_name,
+            "strategyName": self.strategy_name,
+
+            "symbol": self.symbol,
+            "exchange": self.exchange,
+            "timeframe": self.timeframe,
+            "instrument_id": self.instrument_id or self.symbol,
+            "instrumentId": self.instrument_id or self.symbol,
+            "canonical_instrument_id": self.canonical_instrument_id or self.symbol,
+            "canonicalInstrumentId": self.canonical_instrument_id or self.symbol,
+
+            "account_id": self.account_id,
+            "accountId": self.account_id,
+            "order_id": self.order_id,
+            "orderId": self.order_id,
+            "trade_id": self.trade_id,
+            "tradeId": self.trade_id,
+            "position_id": self.position_id,
+            "positionId": self.position_id,
+
+            "side": self.side,
+            "quantity": self.quantity,
+            "market_price": self.market_price,
+            "marketPrice": self.market_price,
+            "entry_price": self.entry_price,
+            "entryPrice": self.entry_price,
+            "exit_price": self.exit_price,
+            "exitPrice": self.exit_price,
+            "stop_loss": self.stop_loss,
+            "stopLoss": self.stop_loss,
+            "take_profit": self.take_profit,
+            "takeProfit": self.take_profit,
+
+            "realized_pnl": self.realized_pnl,
+            "realizedPnL": self.realized_pnl,
+            "unrealized_pnl": self.unrealized_pnl,
+            "unrealizedPnL": self.unrealized_pnl,
+            "commission": self.commission,
+            "fees": self.fees,
+            "slippage": self.slippage,
+
+            "strategy_score": self.strategy_score,
+            "strategyScore": self.strategy_score,
+            "confidence": self.confidence,
+            "status": self.status,
+            "decision_reason": self.decision_reason,
+            "decisionReason": self.decision_reason,
+
+            "error_code": self.error_code,
+            "errorCode": self.error_code,
+            "error_message": self.error_message,
+            "errorMessage": self.error_message,
+            "latency_ms": self.latency_ms,
             "latencyMs": self.latency_ms,
-            "payload": self.payload,
+            "data_age_ms": self.data_age_ms,
+            "dataAgeMs": self.data_age_ms,
+
+            "correlation_id": self.correlation_id,
+            "correlationId": self.correlation_id,
+            "causation_id": self.causation_id,
+            "causationId": self.causation_id,
+            "idempotency_key": self.idempotency_key,
+            "idempotencyKey": self.idempotency_key,
+
+            "reconciliation_status": self.reconciliation_status,
+            "reconciliationStatus": self.reconciliation_status,
+            "metadata": self.metadata,
+            "raw_payload": self.raw_payload,
+            "rawPayload": self.raw_payload,
+            "payload": combined_payload,
         }
 
 

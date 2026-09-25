@@ -106,9 +106,22 @@ export interface BotCreationIntent {
   /** Risk & Leverage */
   maxLeverage?: number | null;
   timeframe?: string;
+  stopLossPct?: number | null;
+  takeProfitPct?: number | null;
+  riskPerTradePct?: number | null;
+  capitalAllocation?: number | null;
+
+  /** Strategy Integration */
+  strategyTemplateId?: string;
+  initialStrategyName?: string;
+  strategyDescription?: string;
+  strategyConfig?: any;
+  rawStrategyConfig?: any;
+  indicators?: any[];
+  rules?: any[];
 
   /** Metadata & Origin */
-  origin: "LIVE_FEED" | "OPTIONS" | "FUTURES" | "SCREENER" | "SCANNER" | "AI_ANALYSIS" | "MANUAL";
+  origin: "LIVE_FEED" | "OPTIONS" | "FUTURES" | "SCREENER" | "SCANNER" | "AI_ANALYSIS" | "STRATEGY_CENTER" | "MANUAL";
   sourcePage?: string;
   mode?: "new" | "addLeg" | "strategy";
   creationIntentId?: string;

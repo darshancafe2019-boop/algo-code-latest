@@ -22,6 +22,8 @@ interface FuturesTopBarProps {
   onChangeAsset: (asset: string) => void;
   selectedExpiry: string;
   onChangeExpiry: (expiry: string) => void;
+  quickFilter?: "ALL" | "HOT_VOL" | "HIGH_OI" | "GAINERS" | "LOSERS" | "CONTANGO" | "BACKWARDATION" | "HIGH_FUNDING" | "SAVED";
+  onChangeQuickFilter?: (filter: "ALL" | "HOT_VOL" | "HIGH_OI" | "GAINERS" | "LOSERS" | "CONTANGO" | "BACKWARDATION" | "HIGH_FUNDING" | "SAVED") => void;
   executionMode: "PAPER" | "SHADOW" | "LIVE";
   onChangeExecutionMode: (mode: "PAPER" | "SHADOW" | "LIVE") => void;
   liveProvidersCount?: number;
@@ -30,27 +32,51 @@ interface FuturesTopBarProps {
   isFetching?: boolean;
   onRefresh?: () => void;
   lockSource?: boolean;
+  totalContractsCount?: number;
+  filteredContractsCount?: number;
 }
 
 const SOURCES = [
   { id: "ALL", label: "All Sources" },
+  { id: "DHAN", label: "Dhan (NSE)" },
+  { id: "UPSTOX", label: "Upstox (NSE)" },
   { id: "BINANCE_USDM", label: "Binance USD-M" },
   { id: "BINANCE_COINM", label: "Binance COIN-M" },
   { id: "DELTA_INDIA", label: "Delta India" },
-  { id: "DHAN", label: "Dhan" },
-  { id: "UPSTOX", label: "Upstox" },
   { id: "CME", label: "CME" },
   { id: "PAPER_SIM", label: "Paper Sim" },
 ];
 
 const ASSET_TYPES = [
-  { id: "ALL", label: "All Assets" },
-  { id: "PERPETUALS", label: "Perpetuals" },
-  { id: "FUTURES", label: "Dated Futures" },
-  { id: "CRYPTO", label: "Crypto" },
-  { id: "INDIAN", label: "Indian (NSE)" },
-  { id: "COMMODITIES", label: "Commodities" },
+  { id: "ALL", label: "All Asset Types" },
+  { id: "INDIAN", label: "🇮🇳 Indian (NSE All)" },
+  { id: "INDEX_FUTURES", label: "📊 NSE Index Futures" },
+  { id: "STOCK_FUTURES", label: "📈 NSE Stock Futures" },
+  { id: "CRYPTO", label: "⚡ Crypto All" },
+  { id: "PERPETUALS", label: "🔄 Crypto Perpetuals" },
+  { id: "FUTURES", label: "📅 Dated Futures" },
+  { id: "COMMODITIES", label: "🛢️ Commodities" },
 ];
+
+const EXPIRIES = [
+  { id: "ALL", label: "All Expiries" },
+  { id: "2026-10-29", label: "29 OCT (Near Month)" },
+  { id: "2026-11-26", label: "26 NOV (Next Month)" },
+  { id: "2026-12", label: "DEC 2026 (Far Month)" },
+  { id: "PERP", label: "Perpetual Swaps" },
+];
+
+const QUICK_FILTERS = [
+  { id: "ALL", label: "All", icon: "🌐" },
+  { id: "HOT_VOL", label: "Top Volume", icon: "🔥" },
+  { id: "HIGH_OI", label: "High OI", icon: "⚡" },
+  { id: "GAINERS", label: "Gainers", icon: "📈" },
+  { id: "LOSERS", label: "Losers", icon: "📉" },
+  { id: "CONTANGO", label: "Contango (Basis > 0)", icon: "🟢" },
+  { id: "BACKWARDATION", label: "Backwardation (Basis < 0)", icon: "🔴" },
+  { id: "HIGH_FUNDING", label: "High Funding (>10% APR)", icon: "💰" },
+  { id: "SAVED", label: "Saved ★", icon: "⭐" },
+] as const;
 
 export function FuturesTopBar({
   selectedSource,
@@ -61,6 +87,8 @@ export function FuturesTopBar({
   onChangeAsset,
   selectedExpiry,
   onChangeExpiry,
+  quickFilter = "ALL",
+  onChangeQuickFilter,
   executionMode,
   onChangeExecutionMode,
   liveProvidersCount = 4,
@@ -69,15 +97,17 @@ export function FuturesTopBar({
   isFetching = false,
   onRefresh,
   lockSource = false,
+  totalContractsCount,
+  filteredContractsCount,
 }: FuturesTopBarProps) {
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isAssetFilterOpen, setIsAssetFilterOpen] = useState(false);
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
   // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       onSearchChange(localSearch);
-    }, 200);
+    }, 150);
     return () => clearTimeout(timer);
   }, [localSearch, onSearchChange]);
 
@@ -85,14 +115,14 @@ export function FuturesTopBar({
 
   return (
     <div className="w-full flex flex-col gap-2.5 p-3 bg-[#080E1C] border border-slate-800 rounded-2xl shadow-xl font-mono text-xs select-none">
-      {/* Top Row: Brand / Title + Live Feed Status + Source Dropdown + Search + Filter + Mode */}
+      {/* Top Row: Brand / Title + Live Feed Status + Source Dropdown + Expiry Dropdown + Search + Mode */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Left: Brand & Live Status */}
         <div className="flex items-center gap-3 flex-shrink-0">
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-cyan-400" />
             <span className="font-black tracking-wider text-slate-100 text-sm">
-              FUTURES
+              FUTURES WORKSTATION
             </span>
           </div>
 
@@ -129,6 +159,22 @@ export function FuturesTopBar({
             <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
 
+          {/* Expiry Selector Dropdown */}
+          <div className="relative">
+            <select
+              value={selectedExpiry}
+              onChange={(e) => onChangeExpiry(e.target.value)}
+              className="appearance-none bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 rounded-xl px-3 py-1.5 pr-8 text-xs font-mono font-bold focus:outline-none focus:border-cyan-500 cursor-pointer"
+            >
+              {EXPIRIES.map((exp) => (
+                <option key={exp.id} value={exp.id}>
+                  {exp.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+          </div>
+
           {/* Search Field */}
           <div className="relative min-w-[140px] sm:min-w-[180px] max-w-xs flex-1 sm:flex-initial">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
@@ -136,7 +182,7 @@ export function FuturesTopBar({
               type="text"
               value={localSearch}
               onChange={(e) => setLocalSearch(e.target.value)}
-              placeholder="Search contract..."
+              placeholder="Search symbol, underlying, index..."
               className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 placeholder-slate-500 text-xs focus:outline-none focus:border-cyan-500 font-mono"
             />
             {localSearch && (
@@ -150,33 +196,36 @@ export function FuturesTopBar({
             )}
           </div>
 
-          {/* Filter Popover Toggle */}
+          {/* Asset Type Popover */}
           <div className="relative">
             <button
               type="button"
-              onClick={() => setIsFilterOpen(!isFilterOpen)}
+              onClick={() => setIsAssetFilterOpen(!isAssetFilterOpen)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition ${
-                selectedAsset !== "ALL" || isFilterOpen
+                selectedAsset !== "ALL" || isAssetFilterOpen
                   ? "bg-cyan-500/20 border-cyan-500/50 text-cyan-300"
                   : "bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-white"
               }`}
             >
               <Filter className="w-3.5 h-3.5" />
-              <span>Filter</span>
+              <span>{selectedAsset === "ALL" ? "Asset Type" : ASSET_TYPES.find(a => a.id === selectedAsset)?.label || selectedAsset}</span>
               {selectedAsset !== "ALL" && (
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 ml-0.5" />
               )}
             </button>
 
             {/* Filter Dropdown Popover */}
-            {isFilterOpen && (
-              <div className="absolute right-0 mt-2 w-56 bg-[#0B132B] border border-slate-700 rounded-2xl shadow-2xl p-3 z-50 space-y-2.5 animate-in fade-in zoom-in-95 duration-100">
+            {isAssetFilterOpen && (
+              <div className="absolute right-0 mt-2 w-64 bg-[#0B132B] border border-slate-700 rounded-2xl shadow-2xl p-3 z-50 space-y-2 animate-in fade-in zoom-in-95 duration-100">
                 <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-                  <span className="text-[10px] text-slate-400 uppercase font-bold">Asset Type</span>
+                  <span className="text-[10px] text-slate-400 uppercase font-bold">Select Asset Category</span>
                   {selectedAsset !== "ALL" && (
                     <button
                       type="button"
-                      onClick={() => onChangeAsset("ALL")}
+                      onClick={() => {
+                        onChangeAsset("ALL");
+                        setIsAssetFilterOpen(false);
+                      }}
                       className="text-[10px] text-cyan-400 hover:underline"
                     >
                       Reset
@@ -184,14 +233,14 @@ export function FuturesTopBar({
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1 max-h-60 overflow-y-auto">
                   {ASSET_TYPES.map((a) => (
                     <button
                       key={a.id}
                       type="button"
                       onClick={() => {
                         onChangeAsset(a.id);
-                        setIsFilterOpen(false);
+                        setIsAssetFilterOpen(false);
                       }}
                       className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs transition flex items-center justify-between ${
                         selectedAsset === a.id
@@ -249,6 +298,41 @@ export function FuturesTopBar({
           )}
         </div>
       </div>
+
+      {/* Bottom Row: High-Density Real-World Filter Chips Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider mr-1">
+            QUICK FILTERS:
+          </span>
+          {QUICK_FILTERS.map((f) => {
+            const isActive = quickFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => onChangeQuickFilter?.(f.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition flex items-center gap-1 ${
+                  isActive
+                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                    : "bg-slate-900/90 text-slate-300 hover:bg-slate-800 border border-slate-700/60"
+                }`}
+              >
+                <span>{f.icon}</span>
+                <span>{f.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Contract Count Badge */}
+        {filteredContractsCount != null && (
+          <div className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
+            <span>Showing <strong className="text-cyan-300">{filteredContractsCount}</strong>{totalContractsCount != null ? ` of ${totalContractsCount}` : ""} contracts</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+

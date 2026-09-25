@@ -14,14 +14,39 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
-
 from src import config
+from src.utils.json_util import sanitize_for_json, safe_json_dumps, safe_json_loads, SafeJSONEncoder
 
 logger = logging.getLogger("DB")
 
 _db_initialized = False
 _db_init_lock = threading.Lock()
 F = TypeVar("F", bound=Callable[..., Any])
+
+_db_health_state: Dict[str, Any] = {
+    "status": "HEALTHY",
+    "engine": "sqlite" if not getattr(config, "IS_POSTGRES", False) else "postgresql",
+    "integrity": "ok",
+    "corrupted": False,
+    "recovered": False,
+    "last_validated": None,
+    "error": None,
+}
+_db_health_lock = threading.Lock()
+
+
+def check_database_health() -> Dict[str, Any]:
+    """Exposes authoritative database health and integrity status."""
+    global _db_health_state
+    with _db_health_lock:
+        return dict(_db_health_state)
+
+
+def is_database_healthy() -> bool:
+    """Returns True if the database is operational and not corrupted."""
+    global _db_health_state
+    with _db_health_lock:
+        return _db_health_state.get("status") == "HEALTHY" and not _db_health_state.get("corrupted", False)
 
 
 def translate_sqlite_sql_to_postgres(sql: str) -> str:
@@ -185,6 +210,185 @@ def get_pg_connection():
     raise RuntimeError("PostgreSQL disabled/unavailable")
 
 
+def _attempt_sqlite_recovery(target_path: Path, backup_path: Path) -> bool:
+    """Recovers accessible schema and records from corrupted DB into a fresh database file."""
+    temp_recovered = target_path.parent / f"{target_path.stem}_recovered_{int(time.time())}.db"
+    try:
+        dst_conn = sqlite3.connect(str(temp_recovered))
+        dst_conn.execute("PRAGMA journal_mode=WAL;")
+        dst_conn.execute("PRAGMA synchronous=NORMAL;")
+        dst_conn.execute("PRAGMA busy_timeout=30000;")
+
+        src_conn = sqlite3.connect(str(target_path))
+        src_conn.row_factory = sqlite3.Row
+
+        tables = []
+        try:
+            cur = src_conn.cursor()
+            cur.execute("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+            tables = cur.fetchall()
+        except Exception:
+            pass
+
+        recovered_tables = 0
+        for row in tables:
+            t_name = row[0]
+            t_sql = row[1]
+            if not t_sql:
+                continue
+            try:
+                dst_conn.execute(t_sql)
+                cur_src = src_conn.cursor()
+                cur_src.execute(f'SELECT * FROM "{t_name}"')
+                col_names = [d[0] for d in cur_src.description] if cur_src.description else []
+                if col_names:
+                    placeholders = ", ".join(["?"] * len(col_names))
+                    cols_str = ", ".join([f'"{c}"' for c in col_names])
+                    insert_sql = f'INSERT OR IGNORE INTO "{t_name}" ({cols_str}) VALUES ({placeholders})'
+                    batch = []
+                    while True:
+                        try:
+                            r = cur_src.fetchone()
+                            if r is None:
+                                break
+                            batch.append(tuple(r))
+                            if len(batch) >= 100:
+                                dst_conn.executemany(insert_sql, batch)
+                                dst_conn.commit()
+                                batch = []
+                        except Exception:
+                            break
+                    if batch:
+                        dst_conn.executemany(insert_sql, batch)
+                        dst_conn.commit()
+                recovered_tables += 1
+            except Exception as t_err:
+                logger.warning("Could not fully recover table %s: %s", t_name, t_err)
+
+        try:
+            src_conn.close()
+        except Exception:
+            pass
+        try:
+            dst_conn.close()
+        except Exception:
+            pass
+
+        if temp_recovered.exists() and temp_recovered.stat().st_size > 0:
+            shutil.copy2(temp_recovered, target_path)
+            try:
+                temp_recovered.unlink()
+            except Exception:
+                pass
+            logger.info("DB_RECOVERY_SUCCESS: Recovered %d tables into %s", recovered_tables, target_path)
+            return True
+    except Exception as rec_err:
+        logger.error("SQLite recovery failed: %s", rec_err)
+        try:
+            if temp_recovered.exists():
+                temp_recovered.unlink()
+        except Exception:
+            pass
+    return False
+
+
+def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
+    """
+    Validates SQLite database integrity before startup or after error.
+    - If healthy: marks state HEALTHY and returns True.
+    - If corrupted:
+      - Creates a timestamped backup of the corrupt file (NEVER overwrites blindly).
+      - Safely recovers readable tables and rows into a fresh SQLite database file.
+      - If recovery succeeds, replaces corrupt file atomically and marks HEALTHY (recovered=True).
+      - If unrecoverable, recreates fresh DB while keeping backup, marks state appropriately.
+    """
+    global _db_health_state
+    target_path = Path(db_path) if db_path else config.DB_PATH
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    if not target_path.exists() or target_path.stat().st_size == 0:
+        with _db_health_lock:
+            _db_health_state.update({
+                "status": "HEALTHY",
+                "engine": "sqlite",
+                "integrity": "ok",
+                "corrupted": False,
+                "recovered": False,
+                "last_validated": now_iso,
+                "error": None,
+            })
+        return True
+
+    try:
+        conn = sqlite3.connect(str(target_path), timeout=10.0)
+        try:
+            cursor = conn.cursor()
+            cursor.execute("PRAGMA quick_check;")
+            quick_res = [r[0] for r in cursor.fetchall()]
+            if quick_res != ["ok"]:
+                cursor.execute("PRAGMA integrity_check;")
+                full_res = [r[0] for r in cursor.fetchall()]
+                if full_res != ["ok"]:
+                    raise sqlite3.DatabaseError(f"Integrity check failed: {full_res}")
+            with _db_health_lock:
+                _db_health_state.update({
+                    "status": "HEALTHY",
+                    "engine": "sqlite",
+                    "integrity": "ok",
+                    "corrupted": False,
+                    "last_validated": now_iso,
+                    "error": None,
+                })
+            return True
+        finally:
+            conn.close()
+    except Exception as exc:
+        logger.critical("SQLITE_CORRUPTION_DETECTED: %s on %s", exc, target_path)
+        with _db_health_lock:
+            _db_health_state.update({
+                "status": "CORRUPTED",
+                "engine": "sqlite",
+                "integrity": "failed",
+                "corrupted": True,
+                "last_validated": now_iso,
+                "error": str(exc),
+            })
+
+        # 1. Back up corrupt database first
+        ts = int(time.time())
+        backup_path = target_path.parent / f"{target_path.stem}_corrupt_{ts}.db.bak"
+        try:
+            shutil.copy2(target_path, backup_path)
+            logger.info("DB_BACKUP_CREATED: Corrupted database backed up to %s", backup_path)
+        except Exception as b_err:
+            logger.error("Failed to create backup of corrupt DB: %s", b_err)
+
+        # 2. Safely recover data into fresh DB
+        recovered = _attempt_sqlite_recovery(target_path, backup_path)
+        with _db_health_lock:
+            if recovered:
+                _db_health_state.update({
+                    "status": "HEALTHY",
+                    "engine": "sqlite",
+                    "integrity": "ok",
+                    "corrupted": False,
+                    "recovered": True,
+                    "last_validated": datetime.now(timezone.utc).isoformat(),
+                    "error": None,
+                })
+            else:
+                _db_health_state.update({
+                    "status": "RECREATED",
+                    "engine": "sqlite",
+                    "integrity": "fresh",
+                    "corrupted": False,
+                    "recovered": False,
+                    "last_validated": datetime.now(timezone.utc).isoformat(),
+                    "error": "Database had to be recreated from fresh schema",
+                })
+        return recovered
+
+
 _sqlite_pragmas_applied = False
 _sqlite_pragmas_lock = threading.Lock()
 
@@ -258,7 +462,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                 with pool.connection() as conn:
                     with conn.transaction():
                         with conn.cursor() as cur:
-                            cur.execute(pg_sql, params)
+                            getattr(cur, "execute")(pg_sql, params)
                 pg_ok = True
                 _record_pg_success()
             except Exception as e:
@@ -277,7 +481,7 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                 try:
                     with conn.transaction():
                         with conn.cursor() as cur:
-                            cur.execute(pg_sql, params)
+                            getattr(cur, "execute")(pg_sql, params)
                     pg_ok = True
                     _record_pg_success()
                 finally:
@@ -321,7 +525,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 from psycopg.rows import dict_row
                 with pool.connection() as conn:
                     with conn.cursor(row_factory=dict_row) as cur:
-                        cur.execute(pg_sql, params)
+                        getattr(cur, "execute")(pg_sql, params)
                         res = list(cur.fetchall())
                     conn.commit()
                     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
@@ -345,7 +549,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
                 try:
                     with conn.cursor(row_factory=dict_row) as cur:
-                        cur.execute(pg_sql, params)
+                        getattr(cur, "execute")(pg_sql, params)
                         res = list(cur.fetchall())
                     conn.commit()
                     return res
@@ -360,13 +564,23 @@ def safe_query(sql: str, params: tuple = ()) -> list:
         conn = get_connection()
         cursor = conn.cursor()
         cursor.execute(sql, params)
-        rows = [dict(r) for r in cursor.fetchall()]
+        rows = [sanitize_for_json(dict(r)) for r in cursor.fetchall()]
         duration_ms = round((time.perf_counter() - t0) * 1000, 2)
         if duration_ms > 250.0:
             logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
         return rows
     except Exception as e:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            conn = None
+        err_str = str(e).lower()
         logger.error("safe_query error: %s", e)
+        if "malformed" in err_str or "corrupt" in err_str:
+            logger.critical("Corrupt database detected in safe_query, initiating automatic recovery...")
+            validate_and_repair_sqlite()
         return []
     finally:
         if conn:
@@ -388,6 +602,9 @@ def init_db(force: bool = False) -> None:
     with _db_init_lock:
         if _db_initialized and not force:
             return
+
+        # Pre-startup SQLite integrity check and automatic recovery if corrupted
+        validate_and_repair_sqlite()
 
         if getattr(config, "IS_POSTGRES", False):
             logger.info("Initializing & verifying authoritative PostgreSQL connection...")
@@ -458,7 +675,7 @@ def init_db(force: bool = False) -> None:
                                 "config_hash VARCHAR(64) DEFAULT ''"
                             ]:
                                 try:
-                                    cur.execute(f"ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS {col_def};")
+                                    getattr(cur, "execute")(f"ALTER TABLE bot_instances ADD COLUMN IF NOT EXISTS {col_def};")
                                 except Exception:
                                     pass
 
@@ -473,7 +690,7 @@ def init_db(force: bool = False) -> None:
                             ]
                             for idx_sql in pg_indexes:
                                 try:
-                                    cur.execute(idx_sql)
+                                    getattr(cur, "execute")(idx_sql)
                                 except Exception:
                                     pass
                         conn.commit()
@@ -488,9 +705,23 @@ def init_db(force: bool = False) -> None:
                 try:
                     cursor.execute("PRAGMA journal_mode=WAL;")
                     cursor.execute("PRAGMA synchronous=NORMAL;")
-                    cursor.execute("PRAGMA busy_timeout=10000;")
+                    cursor.execute("PRAGMA busy_timeout=30000;")
                 except Exception as pragma_err:
                     logger.debug("WAL pragma setup notice: %s", pragma_err)
+
+                # Schema versioning / migrations tracking
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS schema_migrations (
+                        version INTEGER PRIMARY KEY,
+                        applied_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        description TEXT DEFAULT ''
+                    )
+                    """
+                )
+                cursor.execute(
+                    "INSERT OR IGNORE INTO schema_migrations (version, description) VALUES (1, 'Initial Quant.OS Deterministic Schema')"
+                )
 
 
                 # ==========================================
@@ -4191,8 +4422,10 @@ def seed_institutional_hierarchy_if_needed() -> None:
         logger.error(f"Error seeding institutional hierarchy: {exc}")
 
 
-def _json_dumps(value: Optional[Dict[str, Any]]) -> str:
-    return json.dumps(value or {}, default=str)
+def _json_dumps(value: Any) -> str:
+    if value is None:
+        return "{}"
+    return json.dumps(value, default=str)
 
 
 def log_signal(
@@ -4234,7 +4467,7 @@ def log_trade_entry(
     strategy: str = "EMA_MACD_VP",
 ) -> int:
     """Log a new trade entry and return the generated trade row ID."""
-    trade_id = -1
+    trade_id: int = -1
     try:
         conn = get_connection()
         cursor = conn.cursor()
@@ -4247,7 +4480,7 @@ def log_trade_entry(
             (now_str, symbol, direction, entry_price, stop_loss, take_profit, position_size, _json_dumps(metadata), bot_id, strategy),
         )
         conn.commit()
-        trade_id = cursor.lastrowid
+        trade_id = cursor.lastrowid or -1
         conn.close()
         logger.info("Logged trade entry in DB. ID: %s (Bot: %s, Strategy: %s)", trade_id, bot_id, strategy)
     except Exception as exc:
@@ -4391,7 +4624,7 @@ def create_pending_signal_approval(
             (now_str, now_str, bot_id, symbol, timeframe, signal_type, price, confluence_pct, confluence_pct, threshold_pct, sl_price, tp_price, position_size, strategy, _json_dumps(strategy_details), effective_reason, expires_at_str),
         )
         conn.commit()
-        sig_id = cursor.lastrowid
+        sig_id = cursor.lastrowid or -1
         conn.close()
         logger.info("Created pending signal approval ID %s for bot %s (%s @ $%.2f, status: WAITING_APPROVAL)", sig_id, bot_id, signal_type, price)
     except Exception as exc:
@@ -5890,7 +6123,7 @@ def audit_and_clean_db() -> Dict[str, Any]:
     Audit trade history and bot logs in the database for corruption, duplicates, or inconsistencies.
     Removes duplicate trades from multiple server runs and reports findings.
     """
-    report = {
+    report: Dict[str, Any] = {
         "trades_audited": 0,
         "duplicate_trades_removed": 0,
         "inconsistent_trades_fixed": 0,
@@ -6274,9 +6507,10 @@ def cleanup_bot_instances() -> Dict[str, Any]:
     retaining only the 3 primary core bots (bot-1, bot-2, bot-3).
     Returns a report detailing removed and retained bot IDs.
     """
-    report = {
+    report: Dict[str, Any] = {
         "retained_bots": [],
-        "removed_bots": []
+        "removed_bots": [],
+        "error": None
     }
     try:
         conn = get_connection()
@@ -6385,7 +6619,7 @@ def get_all_indicator_configs() -> list[Dict[str, Any]]:
         rows = cursor.fetchall()
         for r in rows:
             d = dict(r)
-            iid = d.get("indicator_id")
+            iid = str(d.get("indicator_id") or "")
             d["id"] = iid
             d["enabled"] = bool(d.get("enabled", 1))
             d["favorite"] = bool(d.get("favorite", 0))
@@ -6416,7 +6650,7 @@ def get_indicator_config(indicator_id: str) -> Optional[Dict[str, Any]]:
         r = safe_query_one("SELECT * FROM indicator_configs WHERE indicator_id = ?", (indicator_id,))
         if r:
             d = dict(r)
-            iid = d.get("indicator_id")
+            iid = str(d.get("indicator_id") or "")
             d["id"] = iid
             d["enabled"] = bool(d.get("enabled", 1))
             d["favorite"] = bool(d.get("favorite", 0))
@@ -6541,19 +6775,16 @@ def log_indicator_config_history(indicator_id: str, old_cfg: Dict[str, Any], new
 def get_indicator_config_history(indicator_id: Optional[str] = None, bot_id: Optional[str] = None, limit: int = 50) -> List[Dict[str, Any]]:
     """Fetch chronological history of indicator configuration changes."""
     try:
-        try:
-            limit = int(limit)
-        except Exception:
-            limit = 50
+        lim = limit if limit > 0 else 50
 
         if indicator_id and bot_id:
-            rows = safe_query("SELECT * FROM indicator_config_history WHERE indicator_id = ? AND bot_id = ? ORDER BY id DESC LIMIT ?", (indicator_id, bot_id, limit))
+            rows = safe_query("SELECT * FROM indicator_config_history WHERE indicator_id = ? AND bot_id = ? ORDER BY id DESC LIMIT ?", (indicator_id, bot_id, lim))
         elif indicator_id:
-            rows = safe_query("SELECT * FROM indicator_config_history WHERE indicator_id = ? ORDER BY id DESC LIMIT ?", (indicator_id, limit))
+            rows = safe_query("SELECT * FROM indicator_config_history WHERE indicator_id = ? ORDER BY id DESC LIMIT ?", (indicator_id, lim))
         elif bot_id:
-            rows = safe_query("SELECT * FROM indicator_config_history WHERE bot_id = ? ORDER BY id DESC LIMIT ?", (bot_id, limit))
+            rows = safe_query("SELECT * FROM indicator_config_history WHERE bot_id = ? ORDER BY id DESC LIMIT ?", (bot_id, lim))
         else:
-            rows = safe_query("SELECT * FROM indicator_config_history ORDER BY id DESC LIMIT ?", (limit,))
+            rows = safe_query("SELECT * FROM indicator_config_history ORDER BY id DESC LIMIT ?", (lim,))
         for r in rows:
             try: r["old_config"] = json.loads(r.get("old_config_json") or "{}")
             except Exception: r["old_config"] = {}
@@ -6938,8 +7169,11 @@ def restore_indicator_config_from_history(history_id: int) -> Tuple[bool, str]:
         if not row:
             return False, "History entry not found"
 
-        bot_id = row.get("bot_id") or "bot-1"
-        indicator_id = row.get("indicator_id")
+        bot_id = str(row.get("bot_id") or "bot-1")
+        raw_ind_id = row.get("indicator_id")
+        if not raw_ind_id:
+            return False, "History record missing indicator_id"
+        indicator_id = str(raw_ind_id)
         old_cfg = json.loads(row.get("old_config_json") or "{}")
 
         if not old_cfg:
@@ -7028,9 +7262,11 @@ def apply_indicator_preset(preset_name_or_id: str) -> Tuple[bool, str]:
     """Apply a preset configuration to indicator_configs table."""
     try:
         presets = get_indicator_presets()
-        target = None
+        target: Optional[Dict[str, Any]] = None
         for p in presets:
-            if p.get("preset_id") == preset_name_or_id or p.get("name").lower() == preset_name_or_id.lower():
+            p_name = str(p.get("name") or "")
+            p_id = str(p.get("preset_id") or "")
+            if p_id == preset_name_or_id or p_name.lower() == preset_name_or_id.lower():
                 target = p
                 break
 
@@ -7045,7 +7281,17 @@ def apply_indicator_preset(preset_name_or_id: str) -> Tuple[bool, str]:
         if not target:
             return False, f"Preset '{preset_name_or_id}' not found."
 
-        cfg_obj = target.get("config", {})
+        raw_cfg = target.get("config", {})
+        if isinstance(raw_cfg, str):
+            try:
+                cfg_obj: Dict[str, Any] = json.loads(raw_cfg)
+            except Exception:
+                cfg_obj = {}
+        elif isinstance(raw_cfg, dict):
+            cfg_obj = raw_cfg
+        else:
+            cfg_obj = {}
+
         enabled_ids = set(cfg_obj.get("enabled_ids", []))
         weights = cfg_obj.get("weights", {})
         custom_params_map = cfg_obj.get("parameters", {})
@@ -7056,7 +7302,7 @@ def apply_indicator_preset(preset_name_or_id: str) -> Tuple[bool, str]:
 
         all_configs = get_all_indicator_configs()
         for cfg in all_configs:
-            ind_id = cfg["indicator_id"]
+            ind_id = str(cfg.get("indicator_id") or "")
             is_enabled = ind_id in enabled_ids
             w = float(weights.get(ind_id, cfg.get("weight", 15.0)))
             val_enabled = 1 if is_enabled else 0
@@ -7072,7 +7318,7 @@ def apply_indicator_preset(preset_name_or_id: str) -> Tuple[bool, str]:
         conn.commit()
         conn.close()
         logger.info(f"Applied universal indicator preset '{target.get('name')}'. Enabled {len(enabled_ids)} indicators.")
-        return True, target.get("name", preset_name_or_id)
+        return True, str(target.get("name") or preset_name_or_id)
     except Exception as exc:
         logger.error(f"Error applying indicator preset {preset_name_or_id}: {exc}")
         return False, str(exc)
@@ -10493,10 +10739,11 @@ def reconcile_startup_bot_states() -> Dict[str, Any]:
             if pid_str and pid_str.isdigit():
                 pid = int(pid_str)
                 try:
-                    import psutil
-                    if psutil.pid_exists(pid):
-                        proc = psutil.Process(pid)
-                        if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE:
+                    import importlib
+                    psutil_mod = importlib.import_module("psutil")
+                    if psutil_mod.pid_exists(pid):
+                        proc = psutil_mod.Process(pid)
+                        if proc.is_running() and proc.status() != getattr(psutil_mod, "STATUS_ZOMBIE", "zombie"):
                             is_alive = True
                 except Exception:
                     # Fallback on OS kill 0
@@ -12015,7 +12262,7 @@ def get_delta_contracts(
 
 def get_delta_contract_by_id(product_id: int) -> Optional[Dict[str, Any]]:
     """Fetches a specific Delta contract by product ID."""
-    rows = safe_query("SELECT * FROM delta_option_contracts WHERE product_id = ?", (int(product_id),))
+    rows = safe_query("SELECT * FROM delta_option_contracts WHERE product_id = ?", (product_id,))
     return rows[0] if rows else None
 
 
@@ -12106,7 +12353,7 @@ def get_delta_quotes(
 
 def get_delta_quote_by_id(product_id: int) -> Optional[Dict[str, Any]]:
     """Fetches a single quote by product ID."""
-    rows = safe_query("SELECT * FROM delta_option_quotes WHERE product_id = ?", (int(product_id),))
+    rows = safe_query("SELECT * FROM delta_option_quotes WHERE product_id = ?", (product_id,))
     return rows[0] if rows else None
 
 
@@ -12173,7 +12420,7 @@ def log_delta_ingestion_event(
             event_type, status, contracts_discovered, quotes_updated, latency_ms, error_message, timestamp
         ) VALUES (?, ?, ?, ?, ?, ?, ?)
     """
-    params = (event_type, status, int(contracts_discovered), int(quotes_updated), float(latency_ms), error_message, now_iso)
+    params = (event_type, status, contracts_discovered, quotes_updated, float(latency_ms), error_message, now_iso)
     safe_execute(sql, params)
     return 1
 

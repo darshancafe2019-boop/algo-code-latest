@@ -18,7 +18,7 @@ export function OptionChainTab({
 }: OptionChainTabProps) {
   return (
     <div className="space-y-4">
-      <OptionChainView />
+      <OptionChainView initialUnderlying={underlying} />
     </div>
   );
 }

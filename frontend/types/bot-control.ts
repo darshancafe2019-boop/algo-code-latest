@@ -161,6 +161,10 @@ export interface BotRowItem {
     unrealized: number;
     net: number;
   };
+  today_pnl?: number;
+  realized_pnl?: number;
+  unrealized_pnl?: number;
+  net_pnl?: number;
   live_pnl: number;
   next_action: string;
   last_heartbeat?: string;

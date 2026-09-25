@@ -77,11 +77,22 @@ class GlobalEventBus:
             event.sequence = self._sequence
             self._event_count += 1
 
-            # Sanitize payload
+            # Sanitize payload & metadata
             event.payload = sanitize_payload(event.payload)
+            if event.metadata:
+                event.metadata = sanitize_payload(event.metadata)
+            if event.raw_payload:
+                event.raw_payload = sanitize_payload(event.raw_payload)
 
             # Store in ring buffer
             self._buffer.append(event)
+
+            # Persist to append-only Audit Ledger asynchronously / safely
+            try:
+                from src.data_core.events.storage import global_audit_storage
+                global_audit_storage.append_event(event)
+            except Exception as e:
+                logger.error(f"Error persisting audit event {event.event_id}: {e}")
 
             # Fan out to global subscribers
             for cb in list(self._global_subscribers):
@@ -91,7 +102,8 @@ class GlobalEventBus:
                     logger.error(f"Error in global subscriber callback: {e}")
 
             # Fan out by domain
-            domain_key = f"domain:{event.domain.value}"
+            d_val = event.domain.value if hasattr(event.domain, "value") else str(event.domain)
+            domain_key = f"domain:{d_val}"
             for cb in list(self._subscribers.get(domain_key, set())):
                 try:
                     cb(event)
@@ -99,7 +111,8 @@ class GlobalEventBus:
                     logger.error(f"Error in domain subscriber callback: {e}")
 
             # Fan out by event type
-            type_key = f"type:{event.event_type.value}"
+            t_val = event.event_type.value if hasattr(event.event_type, "value") else str(event.event_type)
+            type_key = f"type:{t_val}"
             for cb in list(self._subscribers.get(type_key, set())):
                 try:
                     cb(event)

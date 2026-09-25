@@ -50,8 +50,26 @@ export const INITIAL_MARKET_UNIVERSE: MasterInstrument[] = [
   { symbol: "NIFTY", name: "NIFTY 50 Index", category: "INDEX", exchange: "NSE", provider: "DHAN", securityId: "13" },
   { symbol: "BANKNIFTY", name: "NIFTY Bank Index", category: "INDEX", exchange: "NSE", provider: "DHAN", securityId: "25" },
   { symbol: "FINNIFTY", name: "NIFTY Fin Service", category: "INDEX", exchange: "NSE", provider: "DHAN", securityId: "27" },
+  { symbol: "MIDCPNIFTY", name: "NIFTY Midcap Select", category: "INDEX", exchange: "NSE", provider: "DHAN", securityId: "33" },
   { symbol: "SENSEX", name: "BSE SENSEX 30", category: "INDEX", exchange: "BSE", provider: "DHAN", securityId: "51" },
   { symbol: "INDIA VIX", name: "India Volatility Index", category: "INDEX", exchange: "NSE", provider: "UPSTOX", instrumentKey: "NSE_INDEX|India VIX" },
+
+  // Indian Option Chain Contracts
+  { symbol: "NIFTY 25150 CE", name: "Nifty 50 25150 ATM Call", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "NIFTY 25150 PE", name: "Nifty 50 25150 ATM Put", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "NIFTY 25200 CE", name: "Nifty 50 25200 OTM Call", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "NIFTY 25100 PE", name: "Nifty 50 25100 OTM Put", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "NIFTY 25250 CE", name: "Nifty 50 25250 OTM Call", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "NIFTY 25050 PE", name: "Nifty 50 25050 OTM Put", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "BANKNIFTY 54500 CE", name: "Bank Nifty 54500 ATM Call", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "BANKNIFTY 54500 PE", name: "Bank Nifty 54500 ATM Put", category: "OPTIONS", exchange: "NSE", provider: "DHAN" },
+  { symbol: "BTC 65000 CALL", name: "Bitcoin 65000 ATM Call", category: "OPTIONS", exchange: "DELTA", provider: "DELTA" },
+  { symbol: "BTC 65000 PUT", name: "Bitcoin 65000 ATM Put", category: "OPTIONS", exchange: "DELTA", provider: "DELTA" },
+
+  // Futures
+  { symbol: "NIFTY-FUT", name: "Nifty 29 Oct Future", category: "FUTURES", exchange: "NSE", provider: "DHAN" },
+  { symbol: "BANKNIFTY-FUT", name: "Bank Nifty 29 Oct Future", category: "FUTURES", exchange: "NSE", provider: "DHAN" },
+  { symbol: "RELIANCE-FUT", name: "Reliance 29 Oct Future", category: "FUTURES", exchange: "NSE", provider: "DHAN" },
 
   // Indian Equities
   { symbol: "RELIANCE", name: "Reliance Industries Ltd", category: "STOCK", exchange: "NSE", provider: "DHAN", securityId: "2885" },
@@ -61,6 +79,7 @@ export const INITIAL_MARKET_UNIVERSE: MasterInstrument[] = [
   { symbol: "TCS", name: "Tata Consultancy Services", category: "STOCK", exchange: "NSE", provider: "DHAN", securityId: "11536" },
   { symbol: "SBIN", name: "State Bank of India", category: "STOCK", exchange: "NSE", provider: "DHAN", securityId: "3045" },
   { symbol: "BHARTIARTL", name: "Bharti Airtel Ltd", category: "STOCK", exchange: "NSE", provider: "DHAN", securityId: "10604" },
+  { symbol: "TATAMOTORS", name: "Tata Motors Ltd", category: "STOCK", exchange: "NSE", provider: "DHAN", securityId: "3456" },
 
   // Delta Exchange Crypto
   { symbol: "BTCUSD", name: "Bitcoin Perpetual Future", category: "CRYPTO", exchange: "DELTA", provider: "DELTA" },
@@ -201,7 +220,7 @@ export function MarketCommandCenter() {
     };
   }, [connectGatewayWS]);
 
-  // 2. Fetch Initial Snapshots via REST fallback
+  // 2. Fetch Initial Snapshots via REST fallback with continuous live interval
   useEffect(() => {
     const fetchSnapshot = async () => {
       try {
@@ -218,6 +237,8 @@ export function MarketCommandCenter() {
       }
     };
     fetchSnapshot();
+    const timer = setInterval(fetchSnapshot, 2500);
+    return () => clearInterval(timer);
   }, [subscribedSymbols, ingestBatch]);
 
   // 3. Dynamic search & subscription
@@ -239,6 +260,8 @@ export function MarketCommandCenter() {
       }
       if (categoryFilter === "INDICES" && inst.category !== "INDEX") return false;
       if (categoryFilter === "STOCKS" && inst.category !== "STOCK") return false;
+      if (categoryFilter === "OPTIONS" && inst.category !== "OPTIONS") return false;
+      if (categoryFilter === "FUTURES" && inst.category !== "FUTURES") return false;
       if (categoryFilter === "CRYPTO" && inst.category !== "CRYPTO") return false;
       if (categoryFilter === "GLOBAL" && inst.category !== "GLOBAL") return false;
 
@@ -577,8 +600,8 @@ export function MarketCommandCenter() {
         {/* Universal Search & Quick Filters */}
         <div className="flex items-center gap-2">
           {activeMainView === "BOARD" && (
-            <div className="flex items-center gap-1 bg-[#050A18] p-1 rounded-xl border border-[#16233B]">
-              {(["ALL", "INDICES", "STOCKS", "CRYPTO", "GLOBAL"] as const).map((cat) => (
+            <div className="flex items-center gap-1 bg-[#050A18] p-1 rounded-xl border border-[#16233B] flex-wrap">
+              {(["ALL", "INDICES", "STOCKS", "OPTIONS", "FUTURES", "CRYPTO", "GLOBAL"] as const).map((cat) => (
                 <button
                   key={cat}
                   type="button"

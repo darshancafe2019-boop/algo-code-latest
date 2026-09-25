@@ -334,6 +334,7 @@ class MarketDataGateway:
         self.subscription_registry = SubscriptionRegistry(
             add_callback=lambda sym: asyncio.ensure_future(self._on_new_subscription(sym)),
             remove_callback=lambda sym: asyncio.ensure_future(self._on_remove_subscription(sym)),
+            batch_remove_callback=lambda syms: asyncio.ensure_future(self._on_batch_remove_subscription(syms)),
         )
 
         for adapter in self.adapters.values():
@@ -377,6 +378,19 @@ class MarketDataGateway:
         for adapter in self.adapters.values():
             if symbol in adapter.get_subscribed_symbols():
                 await adapter.unsubscribe([symbol])
+
+    async def _on_batch_remove_subscription(self, symbols: List[str]) -> None:
+        """Unsubscribe a batch of symbols from active adapters in a single operation."""
+        if not symbols:
+            return
+        for adapter in self.adapters.values():
+            active_sub = adapter.get_subscribed_symbols()
+            matching = [s for s in symbols if s in active_sub]
+            if matching:
+                try:
+                    await adapter.unsubscribe(matching)
+                except Exception as ex:
+                    logger.error("Error batch unsubscribing from %s: %s", adapter.name, ex)
 
     # ─── WebSocket fan-out ────────────────────────────────────────────────────
 
@@ -943,9 +957,9 @@ class MarketDataGateway:
         finally:
             async with self._ws_lock:
                 self._ws_clients.pop(client_id, None)
-            # Clean up all subscriptions from this client source cleanly
-            self.subscription_registry.unsubscribe_all_for_source(client_id)
-            logger.info("WS client disconnected and cleaned up: %s", client_id)
+            # Clean up all subscriptions from this client source cleanly with debouncing (protects against rapid remounts)
+            self.subscription_registry.unsubscribe_all_for_source(client_id, debounce_sec=2.5)
+            logger.info("WS client disconnected (debounced unsubscribe queued): %s", client_id)
 
         return ws
 

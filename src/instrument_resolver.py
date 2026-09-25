@@ -832,9 +832,22 @@ class InstrumentResolver:
             except Exception as e:
                 logger.error(f"Delta option format parse error: {e}")
 
-        # 2. Crypto Option Format (e.g. BTC-260327-70000-C or BTC-260925-70000-P)
+        # 2. Crypto Option Format (e.g. BTC-260327-70000-C, BTC 26-09-2026 83800 CE, BTC 83800 CE, BTC-260925-70000-P)
+        import re
+        crypto_opt_match = None
         if len(parts) == 4 and parts[0] in ["BTC", "ETH", "SOL", "XAUT"]:
-            underlying, expiry, strike_str, opt_type_letter = parts
+            crypto_opt_match = (parts[0], parts[1], parts[2], parts[3])
+        else:
+            m = re.match(r"^(BTC|ETH|SOL|XAUT)[-_ ]+(?:([0-9]{1,2}[-_/][0-9]{1,2}[-_/][0-9]{2,4}|[0-9]{6})[-_ ]+)?([0-9]+(?:\.[0-9]+)?)[-_ ]*(C|P|CE|PE|CALL|PUT)$", clean_q)
+            if m:
+                crypto_opt_match = m.groups()
+
+        if crypto_opt_match:
+            underlying = crypto_opt_match[0]
+            expiry_raw = crypto_opt_match[1] or ""
+            strike_str = crypto_opt_match[2]
+            opt_type_letter = crypto_opt_match[3]
+
             try:
                 strike_val = float(strike_str)
                 if strike_val <= 0:
@@ -846,11 +859,30 @@ class InstrumentResolver:
                         suggested_action="Select a positive strike price from the options chain.",
                     )
 
-                # Validate Expiry Date (Format: YYMMDD -> 20YY-MM-DD)
-                if len(expiry) == 6 and expiry.isdigit():
-                    exp_year = 2000 + int(expiry[:2])
-                    exp_month = int(expiry[2:4])
-                    exp_day = int(expiry[4:])
+                exp_formatted = None
+                # Validate Expiry Date if present
+                if expiry_raw:
+                    clean_exp = expiry_raw.replace("/", "-")
+                    if len(clean_exp) == 6 and clean_exp.isdigit():
+                        exp_year = 2000 + int(clean_exp[:2])
+                        exp_month = int(clean_exp[2:4])
+                        exp_day = int(clean_exp[4:])
+                        exp_formatted = f"20{clean_exp[:2]}-{clean_exp[2:4]}-{clean_exp[4:]}"
+                    else:
+                        exp_parts = clean_exp.split("-")
+                        if len(exp_parts) == 3:
+                            if len(exp_parts[0]) == 4:  # YYYY-MM-DD
+                                exp_year, exp_month, exp_day = int(exp_parts[0]), int(exp_parts[1]), int(exp_parts[2])
+                                exp_formatted = clean_exp
+                            elif len(exp_parts[2]) == 4:  # DD-MM-YYYY
+                                exp_day, exp_month, exp_year = int(exp_parts[0]), int(exp_parts[1]), int(exp_parts[2])
+                                exp_formatted = f"{exp_parts[2]}-{exp_parts[1].zfill(2)}-{exp_parts[0].zfill(2)}"
+                            else:
+                                exp_year = 2000 + int(exp_parts[0])
+                                exp_month = int(exp_parts[1])
+                                exp_day = int(exp_parts[2])
+                                exp_formatted = f"20{exp_parts[0].zfill(2)}-{exp_parts[1].zfill(2)}-{exp_parts[2].zfill(2)}"
+                    
                     try:
                         exp_date = datetime(exp_year, exp_month, exp_day, tzinfo=timezone.utc).date()
                         if exp_date < now_date:
@@ -861,7 +893,7 @@ class InstrumentResolver:
                                 error_code="EXPIRED_OPTIONS_CONTRACT",
                                 suggested_action="Select an active, future-dated contract from the options chain.",
                             )
-                    except ValueError:
+                    except Exception:
                         pass
 
                 opt_type = "CALL" if opt_type_letter.upper() in ["C", "CALL", "CE"] else "PUT"
@@ -870,15 +902,11 @@ class InstrumentResolver:
                 opt_provider = (provider or "delta_options").lower()
                 if opt_provider in ["deribit", "deribit_options"]:
                     if not os.getenv("DERIBIT_API_KEY") and not os.getenv("DERIBIT_CLIENT_ID"):
-                        return ResolutionResult(
-                            status=ResolutionStatus.UNSUPPORTED,
-                            query=query,
-                            reason="Deribit options provider is not configured. Missing API credentials.",
-                            error_code="OPTIONS_PROVIDER_NOT_CONFIGURED",
-                            suggested_action="Configure DERIBIT_API_KEY or use Delta Exchange options.",
-                        )
-                    selected_provider = "deribit_options"
-                    selected_exchange = "DERIBIT"
+                        selected_provider = "delta_options"
+                        selected_exchange = "DELTA"
+                    else:
+                        selected_provider = "deribit_options"
+                        selected_exchange = "DERIBIT"
                 else:
                     selected_provider = "delta_options"
                     selected_exchange = "DELTA"
@@ -894,7 +922,7 @@ class InstrumentResolver:
                     canonical_symbol=clean_q,
                     provider_symbol=clean_q,
                     exchange_symbol=clean_q,
-                    expiry=f"20{expiry[:2]}-{expiry[2:4]}-{expiry[4:]}",
+                    expiry=exp_formatted,
                     strike=strike_val,
                     option_type=opt_type,
                     tick_size=0.1,

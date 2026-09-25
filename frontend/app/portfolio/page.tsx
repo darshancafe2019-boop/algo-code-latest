@@ -5,7 +5,6 @@ import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
 import { InstitutionalPortfolioDashboard } from "@/components/portfolio/InstitutionalPortfolioDashboard";
 import { InstitutionalCapitalSegregationTab } from "@/components/analytics/InstitutionalCapitalSegregationTab";
 import { EcoPositionsView } from "@/components/positions/EcoPositionsView";
-import { OrderExecutionCenter } from "@/components/order-execution/OrderExecutionCenter";
 import { WorkspaceHeader } from "@/components/shell/WorkspaceHeader";
 import { WorkspaceTabs } from "@/components/shell/WorkspaceTabs";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -16,13 +15,12 @@ import {
   Landmark,
   CheckCircle2,
   DollarSign,
-  Send,
   Activity,
 } from "lucide-react";
 
 export default function PortfolioPage() {
   const [activeTab, setActiveTab] = useState<
-    "overview" | "accounts" | "positions" | "capital" | "orders" | "stream"
+    "overview" | "accounts" | "positions" | "capital" | "stream"
   >("overview");
 
   const tabs = [
@@ -30,7 +28,6 @@ export default function PortfolioPage() {
     { id: "accounts", label: "Broker Accounts & Balances", icon: Landmark },
     { id: "positions", label: "Open Positions & Exposure", icon: CheckCircle2 },
     { id: "capital", label: "Fund Segregation & Limits", icon: DollarSign },
-    { id: "orders", label: "Orders & OMS Lifecycle", icon: Send },
     { id: "stream", label: "Live Event Stream", icon: Activity },
   ];
 
@@ -55,7 +52,6 @@ export default function PortfolioPage() {
           {activeTab === "accounts" && <QuantDataCorePortfolioView />}
           {activeTab === "positions" && <EcoPositionsView />}
           {activeTab === "capital" && <InstitutionalCapitalSegregationTab />}
-          {activeTab === "orders" && <OrderExecutionCenter />}
           {activeTab === "stream" && <LiveStreamObservatory />}
         </ErrorBoundary>
       </div>

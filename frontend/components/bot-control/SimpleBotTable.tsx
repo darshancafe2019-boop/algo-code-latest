@@ -124,6 +124,8 @@ export function SimpleBotTable({
     setLoadingActionBotId(botId);
     try {
       await onBotAction(botId, action);
+    } catch (err: any) {
+      console.warn(`[SimpleBotTable] Action ${action} failed for bot ${botId}:`, err?.message || err);
     } finally {
       setLoadingActionBotId(null);
     }
@@ -136,6 +138,8 @@ export function SimpleBotTable({
     setTogglingModeBotId(botId);
     try {
       await onToggleMode(botId, targetMode);
+    } catch (err: any) {
+      console.warn(`[SimpleBotTable] Toggle mode failed for bot ${botId}:`, err?.message || err);
     } finally {
       setTogglingModeBotId(null);
     }
@@ -145,7 +149,11 @@ export function SimpleBotTable({
     e.stopPropagation();
     setActiveBrokerDropdownBotId(null);
     if (onSetBroker) {
-      await onSetBroker(botId, brokerId, defAccount);
+      try {
+        await onSetBroker(botId, brokerId, defAccount);
+      } catch (err: any) {
+        console.warn(`[SimpleBotTable] Set broker failed for bot ${botId}:`, err?.message || err);
+      }
     }
   };
 
@@ -280,7 +288,11 @@ export function SimpleBotTable({
               const isTogglingMode = togglingModeBotId === bot.id;
 
               const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
-              const pnl = bot.pnl?.today ?? bot.live_pnl ?? 0.0;
+              const unrealizedPnl = Number(pos.unrealized_pnl ?? bot.unrealized_pnl ?? bot.pnl?.unrealized ?? 0);
+              const rawTodayPnl = bot.today_pnl ?? bot.pnl?.today ?? bot.live_pnl;
+              const pnl = rawTodayPnl !== undefined && Number(rawTodayPnl) !== 0 
+                ? Number(rawTodayPnl) 
+                : (Number(bot.pnl?.realized ?? bot.realized_pnl ?? 0) + unrealizedPnl);
               const isPnlPositive = pnl >= 0;
 
               const isActionLoading = loadingActionBotId === bot.id;
@@ -499,11 +511,16 @@ export function SimpleBotTable({
                   <td className="py-2 px-3 text-right font-mono">
                     <div
                       className={`font-bold text-[11px] tabular-nums ${
-                        isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
+                        pnl > 0 ? "text-[#00E89A]" : pnl < 0 ? "text-[#FF3B5C]" : "text-[#7D8EA5]"
                       }`}
                     >
-                      {isPnlPositive ? "+" : ""}{formatMoney(Math.abs(pnl), "$")}
+                      {pnl > 0 ? "+" : pnl < 0 ? "-" : "+"}{formatMoney(Math.abs(pnl), "$")}
                     </div>
+                    {pos.has_position && unrealizedPnl !== 0 && (
+                      <div className={`text-[9px] font-mono font-semibold ${unrealizedPnl > 0 ? "text-[#00E89A]" : "text-[#FF3B5C]"}`}>
+                        MTM: {unrealizedPnl > 0 ? "+" : "-"}{formatMoney(Math.abs(unrealizedPnl), "$")}
+                      </div>
+                    )}
                     <div className="text-[10px] text-[#7D8EA5] font-sans">
                       Cap: ${(bot.allocated_capital / 1000).toFixed(1)}K
                     </div>

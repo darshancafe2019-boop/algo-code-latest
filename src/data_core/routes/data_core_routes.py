@@ -477,10 +477,19 @@ def trigger_reconciliation():
 # 10. Live Event Stream & Diagnostics Domain
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# 10. Global Operations Stream, Trade Journal & Audit Ledger Domain
+# ---------------------------------------------------------------------------
+
+from src.data_core.events.storage import global_audit_storage
+from src.data_core.observatory.metrics import global_observatory_metrics
+from src.data_core.models import NormalizedEvent, EventType, EventDomain
+
+
 @data_core_bp.route("/stream/recent", methods=["GET"])
 def get_recent_stream():
-    """Returns recent events from the Global Live Stream buffer."""
-    limit = min(1000, int(request.args.get("limit", 100)))
+    """Returns recent events from the Global Live Stream buffer and live header metrics."""
+    limit = min(1000, int(request.args.get("limit", 200)))
     domain = request.args.get("domain")
     event_type = request.args.get("eventType")
     provider = request.args.get("provider")
@@ -493,10 +502,270 @@ def get_recent_stream():
         provider=provider,
         environment=env,
     )
+    metrics = global_observatory_metrics.get_live_metrics_header(_parse_env(env))
     return jsonify({
         "status": "success",
         "data": events,
-        "metrics": quant_data_core.events.get_stream_metrics(),
+        "metrics": metrics,
+    })
+
+
+@data_core_bp.route("/stream/events", methods=["GET"])
+def get_audit_stream_events():
+    """Returns historical indexed audit ledger events with multi-criteria filtering & search."""
+    limit = min(1000, int(request.args.get("limit", 100)))
+    offset = max(0, int(request.args.get("offset", 0)))
+    domain = request.args.get("domain")
+    event_type = request.args.get("eventType")
+    provider = request.args.get("provider")
+    env = request.args.get("environment")
+    bot_id = request.args.get("botId") or request.args.get("bot_id")
+    strategy_id = request.args.get("strategyId") or request.args.get("strategy_id")
+    symbol = request.args.get("symbol")
+    severity = request.args.get("severity")
+    correlation_id = request.args.get("correlationId") or request.args.get("correlation_id")
+    order_id = request.args.get("orderId") or request.args.get("order_id")
+    trade_id = request.args.get("tradeId") or request.args.get("trade_id")
+    search = request.args.get("search") or request.args.get("q")
+    start_time = request.args.get("startTime") or request.args.get("start_time")
+    end_time = request.args.get("endTime") or request.args.get("end_time")
+
+    events, total = global_audit_storage.query_events(
+        limit=limit,
+        offset=offset,
+        domain=domain,
+        event_type=event_type,
+        provider=provider,
+        environment=env,
+        bot_id=bot_id,
+        strategy_id=strategy_id,
+        symbol=symbol,
+        severity=severity,
+        correlation_id=correlation_id,
+        order_id=order_id,
+        trade_id=trade_id,
+        search=search,
+        start_time=start_time,
+        end_time=end_time,
+    )
+    return jsonify({
+        "status": "success",
+        "total": total,
+        "count": len(events),
+        "limit": limit,
+        "offset": offset,
+        "data": events,
+    })
+
+
+@data_core_bp.route("/stream/metrics", methods=["GET"])
+def get_observatory_header_metrics():
+    """Returns authoritative real-time header metrics strip."""
+    env = _parse_env(request.args.get("environment") or request.args.get("mode"))
+    metrics = global_observatory_metrics.get_live_metrics_header(env)
+    return jsonify({
+        "status": "success",
+        "data": metrics,
+    })
+
+
+@data_core_bp.route("/stream/top-entities", methods=["GET"])
+def get_top_entities():
+    """Returns dynamically computed top live entities (bots, strategies, symbols, providers)."""
+    env = _parse_env(request.args.get("environment") or request.args.get("mode"))
+    entities = global_observatory_metrics.get_top_live_entities(env)
+    return jsonify({
+        "status": "success",
+        "data": entities,
+    })
+
+
+@data_core_bp.route("/stream/correlation/<correlation_id>", methods=["GET"])
+def get_correlation_chain_route(correlation_id: str):
+    """Returns full lifecycle causation and correlation chain for a signal / trade."""
+    chain = global_audit_storage.get_correlation_chain(correlation_id)
+    return jsonify({
+        "status": "success",
+        "correlationId": correlation_id,
+        "count": len(chain),
+        "data": chain,
+    })
+
+
+@data_core_bp.route("/journal/trades", methods=["GET"])
+def get_trade_journal_route():
+    """Returns authoritative trade journal (open + closed) with MFE/MAE/R-multiples and timelines."""
+    env = request.args.get("environment")
+    provider = request.args.get("provider")
+    bot_id = request.args.get("botId") or request.args.get("bot_id")
+    status = request.args.get("status")
+    limit = min(500, int(request.args.get("limit", 100)))
+    offset = max(0, int(request.args.get("offset", 0)))
+
+    trades = global_audit_storage.get_trade_journal(
+        environment=env,
+        provider=provider,
+        bot_id=bot_id,
+        status=status,
+        limit=limit,
+        offset=offset,
+    )
+    return jsonify({
+        "status": "success",
+        "count": len(trades),
+        "data": trades,
+    })
+
+
+@data_core_bp.route("/journal/failures", methods=["GET"])
+def get_failure_journal_route():
+    """Returns permanent failure incidents across bots, providers, and system components."""
+    limit = min(500, int(request.args.get("limit", 100)))
+    offset = max(0, int(request.args.get("offset", 0)))
+
+    failures = global_audit_storage.get_failure_journal(limit=limit, offset=offset)
+    return jsonify({
+        "status": "success",
+        "count": len(failures),
+        "data": failures,
+    })
+
+
+@data_core_bp.route("/observatory/providers", methods=["GET"])
+def get_provider_observatory_route():
+    """Returns granular per-provider diagnostics, message velocities, and latency profiles."""
+    telemetry = global_observatory_metrics.get_provider_observatory_telemetry()
+    return jsonify({
+        "status": "success",
+        "count": len(telemetry),
+        "data": telemetry,
+    })
+
+
+@data_core_bp.route("/stream/publish", methods=["POST"])
+def publish_event_route():
+    """Normalizes, validates, sanitizes, and publishes an event to the global stream and ledger."""
+    body = request.get_json() or {}
+    env_str = body.get("environment") or "PAPER"
+    env = Environment.LIVE if str(env_str).upper() == "LIVE" else Environment.PAPER
+
+    ev_type_raw = body.get("eventType") or body.get("event_type") or "SYSTEM"
+    try:
+        ev_type = EventType(ev_type_raw)
+    except Exception:
+        ev_type = ev_type_raw
+
+    domain_raw = body.get("domain") or "SYSTEM"
+    try:
+        domain = EventDomain(domain_raw)
+    except Exception:
+        domain = EventDomain.SYSTEM
+
+    event = NormalizedEvent(
+        event_id=body.get("eventId") or body.get("event_id") or str(uuid.uuid4()),
+        event_time=body.get("eventTime") or body.get("event_time") or datetime.now(timezone.utc).isoformat(),
+        received_time=datetime.now(timezone.utc).isoformat(),
+        environment=env,
+        provider=body.get("provider", "SYSTEM"),
+        domain=domain,
+        event_type=ev_type,
+        severity=body.get("severity", "INFO"),
+        bot_id=body.get("botId") or body.get("bot_id"),
+        bot_name=body.get("botName") or body.get("bot_name"),
+        strategy_id=body.get("strategyId") or body.get("strategy_id"),
+        strategy_name=body.get("strategyName") or body.get("strategy_name"),
+        symbol=body.get("symbol"),
+        exchange=body.get("exchange"),
+        timeframe=body.get("timeframe"),
+        account_id=body.get("accountId") or body.get("account_id"),
+        order_id=body.get("orderId") or body.get("order_id"),
+        trade_id=body.get("tradeId") or body.get("trade_id"),
+        position_id=body.get("positionId") or body.get("position_id"),
+        side=body.get("side"),
+        quantity=float(body.get("quantity")) if body.get("quantity") is not None else None,
+        market_price=float(body.get("marketPrice") or body.get("market_price")) if (body.get("marketPrice") or body.get("market_price")) is not None else None,
+        entry_price=float(body.get("entryPrice") or body.get("entry_price")) if (body.get("entryPrice") or body.get("entry_price")) is not None else None,
+        exit_price=float(body.get("exitPrice") or body.get("exit_price")) if (body.get("exitPrice") or body.get("exit_price")) is not None else None,
+        stop_loss=float(body.get("stopLoss") or body.get("stop_loss")) if (body.get("stopLoss") or body.get("stop_loss")) is not None else None,
+        take_profit=float(body.get("takeProfit") or body.get("take_profit")) if (body.get("takeProfit") or body.get("take_profit")) is not None else None,
+        realized_pnl=float(body.get("realizedPnL") or body.get("realized_pnl")) if (body.get("realizedPnL") or body.get("realized_pnl")) is not None else None,
+        unrealized_pnl=float(body.get("unrealizedPnL") or body.get("unrealized_pnl")) if (body.get("unrealizedPnL") or body.get("unrealized_pnl")) is not None else None,
+        commission=float(body.get("commission")) if body.get("commission") is not None else None,
+        fees=float(body.get("fees")) if body.get("fees") is not None else None,
+        slippage=float(body.get("slippage")) if body.get("slippage") is not None else None,
+        strategy_score=float(body.get("strategyScore") or body.get("strategy_score")) if (body.get("strategyScore") or body.get("strategy_score")) is not None else None,
+        confidence=float(body.get("confidence")) if body.get("confidence") is not None else None,
+        status=body.get("status"),
+        decision_reason=body.get("decisionReason") or body.get("decision_reason"),
+        error_code=body.get("errorCode") or body.get("error_code"),
+        error_message=body.get("errorMessage") or body.get("error_message"),
+        latency_ms=float(body.get("latencyMs") or body.get("latency_ms") or 0.0),
+        data_age_ms=float(body.get("dataAgeMs") or body.get("data_age_ms") or 0.0),
+        correlation_id=body.get("correlationId") or body.get("correlation_id"),
+        causation_id=body.get("causationId") or body.get("causation_id"),
+        idempotency_key=body.get("idempotencyKey") or body.get("idempotency_key"),
+        reconciliation_status=body.get("reconciliationStatus") or body.get("reconciliation_status") or "MATCHED",
+        metadata=body.get("metadata") or body.get("payload") or {},
+        raw_payload=body.get("rawPayload") or body.get("raw_payload") or {},
+    )
+
+    quant_data_core.events.publish(event)
+    return jsonify({
+        "status": "success",
+        "eventId": event.event_id,
+        "sequence": event.sequence,
+    }), 201
+
+
+@data_core_bp.route("/stream/export", methods=["GET"])
+def export_stream_events():
+    """Exports filtered audit ledger events in CSV or JSON format."""
+    format_type = (request.args.get("format") or "json").lower()
+    limit = min(5000, int(request.args.get("limit", 1000)))
+    domain = request.args.get("domain")
+    event_type = request.args.get("eventType")
+    provider = request.args.get("provider")
+    env = request.args.get("environment")
+    search = request.args.get("search")
+
+    events, _ = global_audit_storage.query_events(
+        limit=limit,
+        domain=domain,
+        event_type=event_type,
+        provider=provider,
+        environment=env,
+        search=search,
+    )
+
+    if format_type == "csv":
+        import io
+        import csv
+        from flask import Response
+
+        output = io.StringIO()
+        fieldnames = [
+            "sequence", "event_id", "event_time", "received_time", "environment",
+            "provider", "domain", "event_type", "severity", "bot_id", "strategy_id",
+            "symbol", "side", "quantity", "market_price", "entry_price", "exit_price",
+            "realized_pnl", "unrealized_pnl", "status", "decision_reason",
+            "error_code", "latency_ms", "correlation_id", "reconciliation_status"
+        ]
+        writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+        writer.writeheader()
+        for ev in events:
+            writer.writerow(ev)
+
+        return Response(
+            output.getvalue(),
+            mimetype="text/csv",
+            headers={"Content-Disposition": f"attachment;filename=quantos_audit_ledger_{int(time.time())}.csv"}
+        )
+
+    return jsonify({
+        "status": "success",
+        "exportFormat": "JSON",
+        "count": len(events),
+        "data": events,
     })
 
 

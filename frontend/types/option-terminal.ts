@@ -68,6 +68,7 @@ export interface OptionContractQuote {
   timeValue: number;
   oiBuildup: OIBuildupType;
   volumeOiRatio: number;
+  thetaOi?: number | null;
   provider?: string;
   brokerAccountId?: string;
   instrumentId?: string;
@@ -283,6 +284,7 @@ export interface ColumnVisibilityConfig {
   delta: boolean;
   gamma: boolean;
   theta: boolean;
+  thetaOi?: boolean;
   vega: boolean;
   rho: boolean;
   buildupBadge: boolean;

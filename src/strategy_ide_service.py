@@ -33,6 +33,7 @@ from src.indicators import (
 )
 from src.data_fetcher import get_mainnet_fetcher
 from src.backtester_v2 import AdvancedBacktestEngine
+from src.crypto_strategies_registry import CRYPTO_30_STRATEGIES_BACKEND, get_all_crypto_strategies
 
 logger = logging.getLogger("StrategyIdeService")
 
@@ -49,6 +50,133 @@ SUPPORTED_OPERATORS = {
 }
 
 BUILTIN_STRATEGY_TEMPLATES = [
+    {
+        "strategy_id": "liquidity-rejection-structure-pro",
+        "version": "1.0.0",
+        "name": "Liquidity Rejection Structure Pro",
+        "description": "MARKET STATE → LIQUIDITY POOL → SWEEP → REJECTION → CHoCH/BOS → RETEST → RISK CHECK → EXECUTE. Observable deterministic institutional liquidity sweep and market structure transition.",
+        "status": "APPROVED",
+        "market_type": "crypto",
+        "symbol": "BTC/USDT",
+        "base_timeframe": "15m",
+        "direction": "LONG",
+        "category": "Price Action & SMC",
+        "entry": {
+            "setup": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-ms-valid",
+                        "timeframe": "15m",
+                        "left": "market_state",
+                        "leftLabel": "Market State",
+                        "op": "!=",
+                        "right": "UNCLEAR",
+                        "rightLabel": "Not Unclear",
+                        "category": "STRUCTURE",
+                        "enabled": True,
+                        "description": "Market State Classification (Trend/Range/Breakout/Reversal)"
+                    },
+                    {
+                        "id": "rule-liq-sweep",
+                        "timeframe": "15m",
+                        "left": "liquidity_sweep",
+                        "leftLabel": "Liquidity Pool Sweep",
+                        "op": "==",
+                        "right": "CONFIRMED",
+                        "rightLabel": "Confirmed (0.05-1.00 ATR)",
+                        "category": "STRUCTURE",
+                        "enabled": True,
+                        "description": "Sweep of Swing Low / Equal Lows / Range Low"
+                    }
+                ]
+            },
+            "confirmation": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-rejection-status",
+                        "timeframe": "15m",
+                        "left": "rejection_status",
+                        "leftLabel": "Rejection Acceptance Check",
+                        "op": "==",
+                        "right": "REJECTION",
+                        "rightLabel": "Wick Rejection (<2 Bars)",
+                        "category": "VOLATILITY",
+                        "enabled": True,
+                        "description": "Price Closes Back Above Swept Level Without Sustained Acceptance"
+                    },
+                    {
+                        "id": "rule-choch-confirm",
+                        "timeframe": "15m",
+                        "left": "structure_status",
+                        "leftLabel": "CHoCH Confirmation",
+                        "op": "==",
+                        "right": "BULLISH_CHOCH",
+                        "rightLabel": "Bullish CHoCH",
+                        "category": "STRUCTURE",
+                        "enabled": True,
+                        "description": "Completed Candle Close Above Swing Lower-High"
+                    }
+                ]
+            },
+            "trigger": {
+                "conjunction": "AND",
+                "rules": [
+                    {
+                        "id": "rule-strategy-score",
+                        "timeframe": "15m",
+                        "left": "strategy_score",
+                        "leftLabel": "Confluence Score",
+                        "op": ">=",
+                        "right": "70",
+                        "rightLabel": "70 / 100",
+                        "category": "MOMENTUM",
+                        "enabled": True,
+                        "description": "Confluence of Sweep + Rejection + CHoCH + Volume + VPVR"
+                    },
+                    {
+                        "id": "rule-retest-trigger",
+                        "timeframe": "15m",
+                        "left": "entry_mode",
+                        "leftLabel": "Entry Mode",
+                        "op": "==",
+                        "right": "RETEST",
+                        "rightLabel": "Retest Level",
+                        "category": "STRUCTURE",
+                        "enabled": True,
+                        "description": "Retest of Broken CHoCH Level or Swept Liquidity Pool"
+                    }
+                ]
+            }
+        },
+        "exit": {
+            "stop_loss_type": "SWEEP_EXTREME_ATR",
+            "stop_loss_value": 0.20,
+            "take_profit_type": "OPPOSING_LIQUIDITY",
+            "take_profit_value": 2.0,
+            "minimum_rr": 2.0,
+            "trailing_stop_enabled": False,
+            "trailing_stop_atr": 1.5,
+            "multi_target": [
+                {"ratio": 1.5, "pct": 50},
+                {"ratio": 2.5, "pct": 50}
+            ]
+        },
+        "risk": {
+            "capital": 10000.0,
+            "risk_per_trade_pct": 0.50,
+            "max_risk_per_trade_pct": 1.00,
+            "max_position_size_pct": 20.0,
+            "max_daily_loss": 500.0,
+            "max_drawdown_pct": 5.0,
+            "max_open_positions": 2,
+            "leverage": 1.0,
+            "cooldown_bars": 2
+        },
+        "author": "Quant.OS Core",
+        "created_at": "2026-09-25T00:00:00Z"
+    },
     {
         "strategy_id": "volume-star-v1",
         "version": "1.0.0",
@@ -322,20 +450,40 @@ class StrategyIdeService:
     def _ensure_templates_seeded(self):
         """Seed built-in templates into database if not present."""
         try:
-            for tmpl in BUILTIN_STRATEGY_TEMPLATES:
+            all_seeds = list(BUILTIN_STRATEGY_TEMPLATES)
+            for c_strat in CRYPTO_30_STRATEGIES_BACKEND:
+                all_seeds.append({
+                    "strategy_id": c_strat["strategy_id"],
+                    "strategy_number": c_strat.get("strategy_number"),
+                    "version": c_strat.get("version", "1.0.0"),
+                    "name": c_strat["name"],
+                    "description": c_strat.get("what_it_does", ""),
+                    "status": "APPROVED",
+                    "market_type": "crypto",
+                    "symbol": c_strat.get("market", "BTC/USDT").split(" / ")[0] if "/" in c_strat.get("market", "") else "BTC/USDT",
+                    "base_timeframe": c_strat.get("primary_timeframe", "4H"),
+                    "direction": "LONG",
+                    "category": c_strat.get("category", "Crypto Strategies"),
+                    "entry": {"setup": {"conjunction": "AND", "rules": []}, "confirmation": {"conjunction": "AND", "rules": []}, "trigger": {"conjunction": "AND", "rules": []}},
+                    "exit": {"stop_loss_type": "ATR_TRAILING", "stop_loss_value": 2.0, "take_profit_type": "RR_RATIO", "take_profit_value": 2.0},
+                    "risk": {"capital": 100000.0, "risk_per_trade_pct": 0.5, "max_daily_loss": 2000.0, "leverage": 1},
+                    "raw_definition": c_strat
+                })
+
+            for tmpl in all_seeds:
                 existing = db.get_strategy_by_id(tmpl["strategy_id"])
                 if not existing:
                     db.save_strategy_draft(tmpl)
                     hash_val = self.compute_config_hash(tmpl)
                     db.create_strategy_version_record({
                         "strategy_id": tmpl["strategy_id"],
-                        "version_semver": tmpl["version"],
+                        "version_semver": tmpl.get("version", "1.0.0"),
                         "parent_version": None,
                         "status": "APPROVED",
                         "strategy_json": tmpl,
                         "ast_json": tmpl.get("entry", {}),
                         "config_hash": hash_val,
-                        "change_summary": "Initial seed template",
+                        "change_summary": "Initial seed crypto strategy template",
                         "created_by": "System",
                         "is_deployed": 0
                     })

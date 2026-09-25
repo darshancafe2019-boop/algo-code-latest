@@ -17,6 +17,7 @@ interface FuturesStoreState {
   selectedAsset: string;
   selectedExpiry: string;
   searchQuery: string;
+  quickFilter: "ALL" | "HOT_VOL" | "HIGH_OI" | "GAINERS" | "LOSERS" | "CONTANGO" | "BACKWARDATION" | "HIGH_FUNDING" | "SAVED";
   leverage: number;
   marginMode: MarginMode;
   executionMode: "PAPER" | "SHADOW" | "LIVE";
@@ -35,6 +36,7 @@ interface FuturesStoreState {
   setSelectedAsset: (asset: string) => void;
   setSelectedExpiry: (expiry: string) => void;
   setSearchQuery: (query: string) => void;
+  setQuickFilter: (filter: FuturesStoreState["quickFilter"]) => void;
   setLeverage: (leverage: number) => void;
   setMarginMode: (mode: MarginMode) => void;
   setExecutionMode: (mode: "PAPER" | "SHADOW" | "LIVE") => void;
@@ -55,6 +57,7 @@ export const useFuturesStore = create<FuturesStoreState>()(
       selectedAsset: "ALL",
       selectedExpiry: "ALL",
       searchQuery: "",
+      quickFilter: "ALL",
       leverage: 10,
       marginMode: "ISOLATED",
       executionMode: "PAPER",
@@ -73,6 +76,7 @@ export const useFuturesStore = create<FuturesStoreState>()(
       setSelectedAsset: (selectedAsset) => set({ selectedAsset }),
       setSelectedExpiry: (selectedExpiry) => set({ selectedExpiry }),
       setSearchQuery: (searchQuery) => set({ searchQuery }),
+      setQuickFilter: (quickFilter) => set({ quickFilter }),
       setLeverage: (leverage) => set({ leverage }),
       setMarginMode: (marginMode) => set({ marginMode }),
       setExecutionMode: (executionMode) => set({ executionMode }),

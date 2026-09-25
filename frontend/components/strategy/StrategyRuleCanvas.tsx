@@ -43,7 +43,7 @@ import { QosStrategySection, QosRuleRow, QosButton, QosBadge } from "@/component
 
 interface StrategyRuleCanvasProps {
   strategy: StrategyIdeDefinition;
-  onUpdateStrategy: (fields: Partial<StrategyIdeDefinition>) => void;
+  onUpdateStrategy?: (fields: Partial<StrategyIdeDefinition>) => void;
   onOpenAddModalForStage?: (stage: RuleTargetStage) => void;
   interfaceMode?: "SIMPLE" | "ADVANCED";
 }
@@ -68,7 +68,7 @@ const TIMEFRAMES: RuleTimeframe[] = ["1m", "3m", "5m", "15m", "30m", "1h", "4h",
 
 export function StrategyRuleCanvas({
   strategy,
-  onUpdateStrategy,
+  onUpdateStrategy = () => {},
   interfaceMode = "SIMPLE",
 }: StrategyRuleCanvasProps) {
   // Editing Rule Drawer / Inline Modal State
@@ -243,6 +243,33 @@ export function StrategyRuleCanvas({
 
   return (
     <div className="space-y-4 font-sans select-none text-xs">
+      {/* Visual Rule Pipeline Line */}
+      <div className="p-3 rounded-xl bg-gradient-to-r from-[#0C1727] via-[#07111F] to-[#0C1727] border border-[#168BFF]/30 shadow-lg shadow-black/40">
+        <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-[11px] font-mono">
+          <div className="flex items-center gap-1 text-[#7D8EA5] shrink-0 font-bold uppercase tracking-wider text-[10px]">
+            <Activity className="h-3.5 w-3.5 text-[#168BFF]" />
+            <span>Execution Pipeline:</span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="px-2 py-0.5 rounded bg-[#168BFF]/20 text-[#22D3EE] border border-[#168BFF]/40 font-bold">1. MARKET STATE</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#00E89A]/15 text-[#00E89A] border border-[#00E89A]/30 font-bold">2. LIQUIDITY POOL</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#F59E0B]/15 text-[#F59E0B] border border-[#F59E0B]/30 font-bold">3. SWEEP</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#EC4899]/15 text-[#EC4899] border border-[#EC4899]/30 font-bold">4. REJECTION</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#A78BFA]/15 text-[#A78BFA] border border-[#A78BFA]/30 font-bold">5. CHoCH/BOS</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#22D3EE]/15 text-[#22D3EE] border border-[#22D3EE]/30 font-bold">6. RETEST</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2 py-0.5 rounded bg-[#10B981]/15 text-[#10B981] border border-[#10B981]/30 font-bold">7. RISK CHECK</span>
+            <span className="text-[#495B70]">→</span>
+            <span className="px-2.5 py-0.5 rounded bg-[#168BFF] text-white font-black shadow-sm">8. EXECUTE</span>
+          </div>
+        </div>
+      </div>
+
       {/* ------------------------------------------------------------------
        * 1. STAGE 1: SETUP CONDITIONS
        * ------------------------------------------------------------------ */}
@@ -1351,3 +1378,5 @@ export function StrategyRuleCanvas({
     </div>
   );
 }
+
+export default StrategyRuleCanvas;

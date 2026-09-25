@@ -29,6 +29,7 @@ import {
   BrainCircuit,
   Landmark,
   Database,
+  Compass,
 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { executeCommand } from "@/lib/commandClient";
@@ -38,7 +39,6 @@ import { useTheme } from "@/context/ThemeContext";
 import { useQuantDataCore } from "@/context/QuantDataCoreContext";
 import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-store";
 import { BotAssistantModal } from "@/components/bot-control/BotAssistantModal";
-import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
 import { ProviderFailoverBanner } from "@/components/providers/ProviderFailoverBanner";
 
 interface TickerData {
@@ -52,18 +52,19 @@ interface TickerData {
 }
 
 interface NavbarProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
   onOpenTutorial?: () => void;
   onOpenCommandPalette?: () => void;
 }
 
-export function Navbar({
-  activeTab,
-  setActiveTab,
-  onOpenTutorial,
-  onOpenCommandPalette,
-}: NavbarProps) {
+export function Navbar(props: NavbarProps = {}) {
+  const {
+    activeTab = "terminal",
+    setActiveTab,
+    onOpenTutorial,
+    onOpenCommandPalette,
+  } = props;
   const queryClient = useQueryClient();
   const { activeSymbol } = useActiveBot();
   const { openAppearanceDrawer, config: themeConfig } = useTheme();
@@ -84,6 +85,32 @@ export function Navbar({
 
   const [priceFlash, setPriceFlash] = useState<"up" | "down" | null>(null);
   const prevPriceRef = useRef<number>(0);
+
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      // Format: "Fri, Sep 25, 2026 22:51:51 IST"
+      const dateStr = now.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      setCurrentTime(`${dateStr} ${timeStr} IST`);
+    };
+
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Activate All Bots Mutation
   const activateAllMutation = useMutation({
@@ -170,6 +197,7 @@ export function Navbar({
     { id: "crypto-options-chain", label: "⚡ Crypto Options", icon: Layers },
     { id: "options", label: "📊 Index Options", icon: Layers },
     { id: "orderbook", label: "⚖️ Order Book", icon: Activity },
+    { id: "strategies", label: "🎯 Strategy Hub", icon: Compass },
     { id: "bot-control", label: "🤖 Bot Instances", icon: Bot },
     { id: "strategy-builder", label: "🛠️ Strategy Builder", icon: Code },
     { id: "indicators", label: "📊 Indicator Center", icon: Sliders },
@@ -263,11 +291,6 @@ export function Navbar({
               </span>
             </div>
 
-            {/* Global Provider Control Plane Selector */}
-            <div className="shrink-0">
-              <ProviderHeaderSelector />
-            </div>
-
             <div className="hidden xl:flex items-center gap-2 text-[11px] font-mono border-l border-slate-800 pl-2.5 shrink-0">
               <span className={`flex items-center gap-1 ${isLiveFeed ? "text-emerald-400" : "text-amber-400"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${isLiveFeed ? "bg-emerald-400 animate-pulse" : "bg-amber-400"}`} />
@@ -276,6 +299,14 @@ export function Navbar({
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">{latencyDisplay !== "—" ? `${latencyDisplay}ms` : "—"}</span>
             </div>
+
+            {/* Live IST Date & Time Clock */}
+            {currentTime && (
+              <div className="hidden lg:flex items-center h-[36px] text-[14px] sm:text-[15px] font-mono font-bold text-[#22D3EE] bg-[#071D2D]/90 border border-[#16C6F4]/40 px-3.5 py-1 rounded-lg tracking-normal whitespace-nowrap shadow-sm shadow-[#16C6F4]/15 shrink-0">
+                <span className="h-2 w-2 rounded-full bg-[#22D3EE] animate-pulse mr-2.5 shadow-xs shadow-[#22D3EE]" />
+                <span>{currentTime}</span>
+              </div>
+            )}
           </div>
 
           {/* Right Top Action Buttons */}

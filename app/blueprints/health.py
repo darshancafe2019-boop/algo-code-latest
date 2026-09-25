@@ -33,15 +33,25 @@ def get_system_health():
 
 @health_bp.route("/api/health/live", methods=["GET"])
 def get_liveness():
-    """Liveness probe: verifies process is active and event loop is responsive."""
-    return jsonify({
-        "success": True,
-        "status": "ok",
+    """Liveness probe: verifies process is active, database is healthy, and event loop is responsive."""
+    from src import db
+    now_iso = datetime.now(timezone.utc).isoformat()
+    db_health = db.check_database_health()
+    db_ok = db.is_database_healthy()
+
+    payload = {
+        "success": db_ok,
+        "status": "ok" if db_ok else "UNHEALTHY",
         "service": "alpha-algo-backend",
         "backend": True,
         "pid": os.getpid(),
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }), 200
+        "db": db_health,
+        "timestamp": now_iso
+    }
+    if not db_ok or db_health.get("corrupted", False):
+        return jsonify(payload), 503
+
+    return jsonify(payload), 200
 
 
 @health_bp.route("/api/health/ready", methods=["GET"])

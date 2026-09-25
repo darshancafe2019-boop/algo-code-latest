@@ -23,6 +23,10 @@ const StrategyBuilder = dynamic(
   () => import("@/components/strategy/StrategyBotCreationWorkspace").then((m) => m.StrategyBotCreationWorkspace),
   { ssr: false, loading: () => null }
 );
+const StrategyCenter = dynamic(
+  () => import("@/components/strategy/StrategyCenter").then((m) => m.StrategyCenter),
+  { ssr: false, loading: () => null }
+);
 const IndicatorCenter = dynamic(
   () => import("@/components/indicators/IndicatorCenter").then((m) => m.IndicatorCenter),
   { ssr: false, loading: () => null }
@@ -111,6 +115,10 @@ const TaxIntelligenceTab = dynamic(
   () => import("@/components/tax-intelligence/TaxIntelligenceTab").then((m) => m.TaxIntelligenceTab),
   { ssr: false, loading: () => null }
 );
+const MarketCommandCenter = dynamic(
+  () => import("@/components/live/MarketCommandCenter").then((m) => m.MarketCommandCenter),
+  { ssr: false, loading: () => null }
+);
 const DhanLiveMarketFeed = dynamic(
   () => import("@/components/live/DhanLiveMarketFeed").then((m) => m.DhanLiveMarketFeed),
   { ssr: false, loading: () => null }
@@ -176,66 +184,7 @@ function MainApp() {
         {/* 0.5 Real-Time Live Feed */}
         {(activeTab === "live" || activeTab === "live-feed" || activeTab === "live-data") && (
           <ErrorBoundary title="Live Market Feed Failed">
-            <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
-              {/* Feed Switcher */}
-              <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-[#080E20] border border-[#213047] w-fit shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => setLiveProvider("dhan")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                    liveProvider === "dhan"
-                      ? "bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md shadow-cyan-900/40 border border-cyan-400/40"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-[#142036]"
-                  }`}
-                >
-                  <span className="text-sm">🇮🇳</span>
-                  <span>DHAN HQ (NSE / BSE)</span>
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-cyan-300">EQUITY</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLiveProvider("upstox")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                    liveProvider === "upstox"
-                      ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-900/40 border border-purple-400/40"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-[#142036]"
-                  }`}
-                >
-                  <span className="text-purple-300 font-bold">⚡</span>
-                  <span>UPSTOX V3</span>
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-purple-300 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-                    LIVE FEED
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setLiveProvider("delta")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-bold transition-all ${
-                    liveProvider === "delta"
-                      ? "bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-900/40 border border-amber-400/40"
-                      : "text-slate-400 hover:text-slate-200 hover:bg-[#142036]"
-                  }`}
-                >
-                  <span className="text-amber-300 font-bold">₿</span>
-                  <span>DELTA EXCHANGE</span>
-                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-black/40 text-amber-300 flex items-center gap-1">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    24/7 LIVE
-                  </span>
-                </button>
-              </div>
-
-              {liveProvider === "dhan" ? (
-                <DhanLiveMarketFeed />
-              ) : liveProvider === "upstox" ? (
-                <UpstoxLiveMarketFeed />
-              ) : (
-                <DeltaLiveMarketFeed />
-              )}
-            </div>
+            <MarketCommandCenter />
           </ErrorBoundary>
         )}
 
@@ -281,8 +230,15 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 5. Visual Strategy Builder */}
-        {(activeTab === "strategy-builder" || activeTab === "strategies") && (
+        {/* 5. Quant.OS 30 Strategy Center */}
+        {(activeTab === "strategies" || activeTab === "strategy" || activeTab === "strategy-center") && (
+          <ErrorBoundary title="Strategy Center Failed">
+            <StrategyCenter />
+          </ErrorBoundary>
+        )}
+
+        {/* 5.5 Visual Strategy Builder & Bot Creation */}
+        {activeTab === "strategy-builder" && (
           <ErrorBoundary title="Visual Strategy Builder Failed">
             <StrategyBuilder />
           </ErrorBoundary>

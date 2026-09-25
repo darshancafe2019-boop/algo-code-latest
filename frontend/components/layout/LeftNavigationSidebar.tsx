@@ -45,7 +45,7 @@ export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "markets", label: "Markets", path: "/markets", icon: LineChart },
   { id: "live", label: "Live Feed", path: "/live", icon: Radio },
   { id: "bots", label: "Bots", path: "/bots", icon: Bot },
-  { id: "strategies", label: "Strategy", path: "/strategy/create", icon: Code },
+  { id: "strategies", label: "Strategy", path: "/strategies", icon: Code },
   { id: "indicators", label: "Indicators", path: "/indicators", icon: Activity },
   { id: "options", label: "Options", path: "/options", icon: Zap },
   { id: "futures", label: "Futures", path: "/futures", icon: TrendingUp },

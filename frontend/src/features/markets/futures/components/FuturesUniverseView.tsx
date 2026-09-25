@@ -56,6 +56,9 @@ export function FuturesUniverseView({
     setSelectedExpiry,
     searchQuery,
     setSearchQuery,
+    quickFilter,
+    setQuickFilter,
+    savedContractKeys,
     isDetailsDrawerOpen,
     setDetailsDrawerOpen,
     isOrderReviewOpen,
@@ -259,6 +262,8 @@ export function FuturesUniverseView({
         onChangeAsset={(a) => setSelectedAsset(a)}
         selectedExpiry={selectedExpiry}
         onChangeExpiry={(exp) => setSelectedExpiry(exp)}
+        quickFilter={quickFilter}
+        onChangeQuickFilter={(f) => setQuickFilter(f)}
         executionMode={executionMode}
         onChangeExecutionMode={(m) => setExecutionMode(m)}
         liveProvidersCount={liveCount}
@@ -267,6 +272,8 @@ export function FuturesUniverseView({
         isFetching={isFetching}
         onRefresh={() => refetch()}
         lockSource={lockSource}
+        totalContractsCount={contracts.length}
+        filteredContractsCount={filteredContracts.length}
       />
 
       {/* Sync Feedback Toast */}

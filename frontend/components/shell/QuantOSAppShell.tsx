@@ -7,7 +7,6 @@ import { GlobalHeader } from "./GlobalHeader";
 import { LeftNavigationSidebar } from "@/components/layout/LeftNavigationSidebar";
 import { DetailDrawer } from "./DetailDrawer";
 import { OrderReviewModal, OrderIntentData } from "./OrderReviewModal";
-import { AppearanceDrawer } from "@/components/settings/AppearanceDrawer";
 import { MobileCommandSheet } from "@/components/layout/MobileCommandSheet";
 import { QuickOrderModal } from "@/components/order-execution/QuickOrderModal";
 import { CreateBotModal } from "@/components/bot-control/CreateBotModal";
@@ -298,9 +297,6 @@ export function QuantOSAppShell({
               onConfirm={orderReviewState.onConfirm || (async () => {})}
             />
           )}
-
-          {/* 7. APPEARANCE & THEME EDITOR DRAWER */}
-          <AppearanceDrawer />
 
           {/* 8. MOBILE COMMAND DOCK & QUICK MODALS */}
           <MobileCommandSheet />

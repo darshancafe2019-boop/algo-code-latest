@@ -1,6 +1,6 @@
 "use client";
 
-import React, { memo, useState } from "react";
+import React, { memo, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +19,6 @@ import {
   Search,
 } from "lucide-react";
 import { TopMarketBar } from "@/components/layout/header/TopMarketBar";
-import { ProviderHeaderSelector } from "@/components/providers/ProviderHeaderSelector";
 
 interface GlobalHeaderProps {
   onOpenSearch?: () => void;
@@ -34,6 +33,31 @@ export const GlobalHeader = memo(function GlobalHeader({
   const { setMobileCommandSheetOpen } = useUIStore();
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState<string>("");
+
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      // Format: "Fri, Sep 25, 2026 22:51:51 IST"
+      const dateStr = now.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "2-digit",
+        year: "numeric",
+      });
+      const timeStr = now.toLocaleTimeString("en-US", {
+        hour12: false,
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      });
+      setCurrentTime(`${dateStr} ${timeStr} IST`);
+    };
+
+    updateTime();
+    const timer = setInterval(updateTime, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Fetch backend status
   const { data: statusData } = useQuery({
@@ -61,12 +85,9 @@ export const GlobalHeader = memo(function GlobalHeader({
           <div className="h-8 w-8 rounded-lg bg-[#22D3EE]/10 border border-[#22D3EE]/30 flex items-center justify-center text-[#22D3EE] font-mono font-bold text-sm shadow-sm">
             <Terminal className="h-4 w-4" />
           </div>
-          <div className="flex flex-col">
-            <span className="text-[19px] font-bold tracking-tight text-[#F8FAFC] leading-none">
-              QUANT<span className="text-[#22D3EE]">.OS</span>
-            </span>
-            <span className="text-[10px] font-medium tracking-widest text-[#7D8EA5] uppercase leading-tight mt-1">
-              ALGO TRADING TERMINAL
+          <div className="flex items-center">
+            <span className="text-[17px] sm:text-[18px] font-bold tracking-tight text-[#F8FAFC] whitespace-nowrap">
+              ASHISH PARADKAR <span className="text-[#22D3EE]">ALGO BOT</span>
             </span>
           </div>
         </Link>
@@ -77,12 +98,15 @@ export const GlobalHeader = memo(function GlobalHeader({
         <TopMarketBar onOpenSearch={onOpenSearch} />
       </div>
 
-      {/* ── RIGHT SECTION: PROVIDER SELECTOR + PAPER MODE + USER CONTROL ───────────── */}
+      {/* ── RIGHT SECTION: LIVE CLOCK + PAPER MODE + USER CONTROL ───────────── */}
       <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-        {/* Compact Multi-Broker / Provider Header Selector */}
-        <div className="hidden sm:block">
-          <ProviderHeaderSelector />
-        </div>
+        {/* Live IST Date & Time Clock */}
+        {currentTime && (
+          <div className="hidden lg:flex items-center h-[38px] text-[14px] sm:text-[15px] font-mono font-bold text-[#22D3EE] bg-[#071D2D]/90 border border-[#16C6F4]/40 px-3.5 py-1.5 rounded-lg tracking-normal whitespace-nowrap shadow-sm shadow-[#16C6F4]/15">
+            <span className="h-2 w-2 rounded-full bg-[#22D3EE] animate-pulse mr-2.5 shadow-xs shadow-[#22D3EE]" />
+            <span>{currentTime}</span>
+          </div>
+        )}
 
         {/* Paper Mode Control Badge */}
         <div className="h-[38px] px-2.5 sm:px-3.5 flex items-center gap-1.5 sm:gap-2 rounded-lg bg-[#168BFF]/15 border border-[#168BFF]/40 text-[#17C5FF] font-sans text-[11px] sm:text-[12px] font-bold shadow-xs whitespace-nowrap">

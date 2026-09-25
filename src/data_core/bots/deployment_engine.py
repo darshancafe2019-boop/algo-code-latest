@@ -19,6 +19,7 @@ import uuid
 from datetime import datetime, timezone
 
 import src.db as db
+from src.utils.json_util import safe_json_dumps, safe_json_loads, sanitize_for_json
 from src.data_core.models import (
     Environment,
     OrderSide,
@@ -336,7 +337,7 @@ class BotDeploymentEngine:
 
                 if spec_raw:
                     try:
-                        spec_dict = json.loads(spec_raw) if isinstance(spec_raw, str) else spec_raw
+                        spec_dict = safe_json_loads(spec_raw) if not isinstance(spec_raw, dict) else spec_raw
                         if spec_dict:
                             self._specs[bot_id] = _hydrate_spec_from_dict(spec_dict)
                     except Exception as exc:
@@ -344,7 +345,7 @@ class BotDeploymentEngine:
 
                 if bot_raw:
                     try:
-                        bot_dict = json.loads(bot_raw) if isinstance(bot_raw, str) else bot_raw
+                        bot_dict = safe_json_loads(bot_raw) if not isinstance(bot_raw, dict) else bot_raw
                         if bot_dict:
                             bot_item = _hydrate_bot_from_dict(bot_dict)
                             # Ensure Upstox option bots have authoritative real Upstox instrument key
@@ -379,8 +380,8 @@ class BotDeploymentEngine:
         if not bot:
             return
         spec = self._specs.get(bot_id)
-        spec_json = json.dumps(spec.to_dict()) if spec else ""
-        bot_json = json.dumps(bot.to_dict())
+        spec_json = safe_json_dumps(spec.to_dict()) if spec else ""
+        bot_json = safe_json_dumps(bot.to_dict())
 
         sql = """
         INSERT OR REPLACE INTO data_core_persisted_bots (

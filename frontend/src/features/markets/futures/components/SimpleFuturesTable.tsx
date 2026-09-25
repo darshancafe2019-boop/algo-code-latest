@@ -479,13 +479,16 @@ export function SimpleFuturesTable({
   selectedContractKey,
 }: SimpleFuturesTableProps) {
   const router = useRouter();
-  const { savedContractKeys, toggleSaveContract, setDetailsDrawerOpen, setSelectedContract, setOrderSide } =
-    useFuturesStore();
+  const {
+    savedContractKeys,
+    toggleSaveContract,
+    setDetailsDrawerOpen,
+    setSelectedContract,
+    setOrderSide,
+    quickFilter,
+    setQuickFilter,
+  } = useFuturesStore();
   const quotesBySymbol = useMarketFeedStore((s) => s.quotesBySymbol);
-
-  const [quickFilter, setQuickFilter] = useState<
-    "ALL" | "HOT_VOL" | "HIGH_OI" | "GAINERS" | "LOSERS" | "HIGH_FUNDING"
-  >("ALL");
 
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -581,22 +584,6 @@ export function SimpleFuturesTable({
   const processedContracts = useMemo(() => {
     let list = [...contracts];
 
-    if (quickFilter === "HOT_VOL") {
-      list = list.filter((c) => (c.volume24h || c.volume_24h_usd || 0) > 100_000_000);
-    } else if (quickFilter === "HIGH_OI") {
-      list = list.filter((c) => (c.openInterest || c.open_interest_usd || 0) > 50_000_000);
-    } else if (quickFilter === "GAINERS") {
-      list = list.filter((c) => (c.change24hPct ?? c.change_24h_pct ?? 0) > 0);
-    } else if (quickFilter === "LOSERS") {
-      list = list.filter((c) => (c.change24hPct ?? c.change_24h_pct ?? 0) < 0);
-    } else if (quickFilter === "HIGH_FUNDING") {
-      list = list.filter(
-        (c) =>
-          (c.fundingRate ?? c.funding_rate?.funding_rate_annualized ?? 0) > 10 ||
-          (c.funding_rate?.funding_rate_8h ?? 0) > 0.0001
-      );
-    }
-
     return list.sort((a, b) => {
       let valA: any = 0;
       let valB: any = 0;
@@ -645,9 +632,17 @@ export function SimpleFuturesTable({
           valA = qA?.ask ?? a.ask ?? 0;
           valB = qB?.ask ?? b.ask ?? 0;
           break;
+        case "spread":
+          valA = (qA?.ask && qA?.bid) ? qA.ask - qA.bid : (a.spread ?? 0);
+          valB = (qB?.ask && qB?.bid) ? qB.ask - qB.bid : (b.spread ?? 0);
+          break;
         case "change":
           valA = qA?.changePercent ?? a.change24hPct ?? a.change_24h_pct ?? 0;
           valB = qB?.changePercent ?? b.change24hPct ?? b.change_24h_pct ?? 0;
+          break;
+        case "basis":
+          valA = typeof a.basis === "number" ? a.basis : (a.basis?.basis_absolute ?? (a.lastPrice && a.indexPrice ? a.lastPrice - a.indexPrice : 0));
+          valB = typeof b.basis === "number" ? b.basis : (b.basis?.basis_absolute ?? (b.lastPrice && b.indexPrice ? b.lastPrice - b.indexPrice : 0));
           break;
         case "funding":
           valA = a.fundingRate ?? a.funding_rate?.funding_rate_annualized ?? 0;
@@ -667,7 +662,7 @@ export function SimpleFuturesTable({
 
       return sortOrder === "asc" ? valA - valB : valB - valA;
     });
-  }, [contracts, quickFilter, quotesBySymbol, sortField, sortOrder]);
+  }, [contracts, quotesBySymbol, sortField, sortOrder]);
 
   if (isLoading && contracts.length === 0) {
     return (
@@ -697,12 +692,15 @@ export function SimpleFuturesTable({
             FILTERS:
           </span>
           {[
-            { id: "ALL", label: `All (${contracts.length})` },
-            { id: "HOT_VOL", label: "🔥 Top Volume" },
-            { id: "HIGH_OI", label: "⚡ High Open Interest" },
-            { id: "GAINERS", label: "📈 Gainers" },
-            { id: "LOSERS", label: "📉 Losers" },
-            { id: "HIGH_FUNDING", label: "💰 High Funding" },
+            { id: "ALL", label: `All (${contracts.length})`, icon: "🌐" },
+            { id: "HOT_VOL", label: "Top Volume", icon: "🔥" },
+            { id: "HIGH_OI", label: "High OI", icon: "⚡" },
+            { id: "GAINERS", label: "Gainers", icon: "📈" },
+            { id: "LOSERS", label: "Losers", icon: "📉" },
+            { id: "CONTANGO", label: "Contango", icon: "🟢" },
+            { id: "BACKWARDATION", label: "Backwardation", icon: "🔴" },
+            { id: "HIGH_FUNDING", label: "High Funding", icon: "💰" },
+            { id: "SAVED", label: "Saved ★", icon: "⭐" },
           ].map((f) => (
             <button
               key={f.id}
@@ -714,7 +712,8 @@ export function SimpleFuturesTable({
                   : "bg-slate-900/80 text-slate-300 hover:bg-slate-800 border border-slate-700/50"
               }`}
             >
-              {f.label}
+              <span>{f.icon}</span>
+              <span>{f.label}</span>
             </button>
           ))}
         </div>
@@ -771,12 +770,18 @@ export function SimpleFuturesTable({
               <th onClick={() => handleSort("ask")} className="p-2.5 text-right cursor-pointer hover:text-white">
                 ASK
               </th>
-              <th className="p-2.5 text-right">SPREAD</th>
+              <th onClick={() => handleSort("spread")} className="p-2.5 text-right cursor-pointer hover:text-white">
+                SPREAD
+              </th>
               <th onClick={() => handleSort("change")} className="p-2.5 text-right cursor-pointer hover:text-white">
                 24H %
               </th>
-              <th className="p-2.5 text-right">BASIS</th>
-              <th className="p-2.5 text-right">BASIS %</th>
+              <th onClick={() => handleSort("basis")} className="p-2.5 text-right cursor-pointer hover:text-white">
+                BASIS
+              </th>
+              <th onClick={() => handleSort("basis")} className="p-2.5 text-right cursor-pointer hover:text-white">
+                BASIS %
+              </th>
               <th onClick={() => handleSort("funding")} className="p-2.5 text-right cursor-pointer hover:text-white">
                 FUNDING
               </th>
@@ -788,7 +793,9 @@ export function SimpleFuturesTable({
               <th onClick={() => handleSort("volume")} className="p-2.5 text-right cursor-pointer hover:text-white">
                 24H VOLUME
               </th>
-              <th className="p-2.5 text-right">LATENCY</th>
+              <th onClick={() => handleSort("latency")} className="p-2.5 text-right cursor-pointer hover:text-white">
+                LATENCY
+              </th>
               <th className="p-2.5 text-right">UPDATED</th>
               <th className="p-2.5 text-center">FEED STATUS</th>
               <th className="p-2.5 text-center min-w-[210px]">ACTIONS</th>

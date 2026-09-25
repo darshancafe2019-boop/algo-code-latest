@@ -277,47 +277,6 @@ export function OptionsUniverseView({
 
   return (
     <div className="flex flex-col gap-3 text-slate-100 font-sans w-full max-w-[1700px] mx-auto min-w-0">
-      {/* Top Navigation Tab Bar */}
-      <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-slate-800/80 overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-0">
-          {[
-            { id: "CHAIN", label: "Option Chain", icon: Layers },
-            { id: "ANALYTICS", label: "Analytics & Flow", icon: BarChart2 },
-            { id: "STRATEGIES", label: "Strategies", icon: Sliders },
-            { id: "TRADING", label: "Trading", icon: Send },
-            { id: "PORTFOLIO", label: "Positions & Orders", icon: Activity },
-            { id: "HEALTH", label: "Health", icon: Zap },
-            { id: "SAVED", label: `Saved (${savedChains.length})`, icon: Bookmark },
-            { id: "PROVIDERS", label: "Providers", icon: Globe },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as OptionsTab)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition flex-shrink-0 ${
-                  isActive
-                    ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
-                    : "text-slate-400 hover:text-white hover:bg-slate-850"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Source indicator */}
-        <div className="hidden sm:flex items-center pr-1 flex-shrink-0">
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-slate-400">
-            Active Provider: <strong className="text-cyan-300">{selectedSource}</strong>
-          </span>
-        </div>
-      </div>
-
       {/* Feedback Toast */}
       {feedback && (
         <div

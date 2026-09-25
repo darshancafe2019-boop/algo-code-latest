@@ -53,6 +53,7 @@ class SubscriptionRegistry:
     Reason-keyed and mode-managed subscription tracker with reference counting.
     Aggregates requested modes to the highest necessary mode.
     Supports per-source subscription keys to prevent cross-client clobbering.
+    Provides debounce grace periods for temporary frontend disconnects to prevent Upstox churn.
     """
 
     def __init__(
@@ -60,11 +61,15 @@ class SubscriptionRegistry:
         add_callback: Optional[Callable[[str, str], None]] = None,
         remove_callback: Optional[Callable[[str], None]] = None,
         mode_change_callback: Optional[Callable[[str, str], None]] = None,
+        batch_add_callback: Optional[Callable[[List[Tuple[str, str]]], None]] = None,
+        batch_remove_callback: Optional[Callable[[List[str]], None]] = None,
     ):
         """
         add_callback(symbol, mode) -> called when a new symbol is subscribed
         remove_callback(symbol)   -> called when no more reasons remain
         mode_change_callback(symbol, new_mode) -> called when highest mode changes
+        batch_add_callback([(symbol, mode), ...]) -> called for batch additions
+        batch_remove_callback([symbol, ...]) -> called for batch removals
         """
         self._lock = threading.RLock()
         # symbol -> {sub_key: (reason, source_label, mode)}
@@ -74,6 +79,9 @@ class SubscriptionRegistry:
         self._add_callback = add_callback
         self._remove_callback = remove_callback
         self._mode_change_callback = mode_change_callback
+        self._batch_add_callback = batch_add_callback
+        self._batch_remove_callback = batch_remove_callback
+        self._debounce_timers: Dict[str, threading.Timer] = {}
 
     def _calculate_highest_mode(self, reasons_dict: Dict[str, tuple[str, str, str]]) -> str:
         if not reasons_dict:
@@ -101,6 +109,14 @@ class SubscriptionRegistry:
         sub_key = self._make_key(reason, source)
 
         with self._lock:
+            # Cancel any pending debounced unsubscribe for this client source
+            if source and source in self._debounce_timers:
+                try:
+                    self._debounce_timers[source].cancel()
+                    del self._debounce_timers[source]
+                except Exception:
+                    pass
+
             is_new = sym not in self._subscriptions
             if is_new:
                 self._subscriptions[sym] = {}
@@ -160,11 +176,36 @@ class SubscriptionRegistry:
                     if self._mode_change_callback:
                         self._mode_change_callback(sym, new_mode)
 
-    def unsubscribe_all_for_source(self, source: str) -> None:
-        """Removes all subscriptions associated with a specific client source ID."""
+    def unsubscribe_all_for_source(self, source: str, debounce_sec: float = 2.5) -> None:
+        """
+        Removes all subscriptions associated with a specific client source ID.
+        If debounce_sec > 0, delays removal to withstand rapid React remounts/reconnects.
+        """
         if not source:
             return
+
         with self._lock:
+            if source in self._debounce_timers:
+                try:
+                    self._debounce_timers[source].cancel()
+                except Exception:
+                    pass
+
+            if debounce_sec > 0:
+                def _delayed():
+                    self._execute_unsubscribe_all_for_source(source)
+
+                t = threading.Timer(debounce_sec, _delayed)
+                self._debounce_timers[source] = t
+                t.daemon = True
+                t.start()
+            else:
+                self._execute_unsubscribe_all_for_source(source)
+
+    def _execute_unsubscribe_all_for_source(self, source: str) -> None:
+        """Executes actual unsubscription across symbols for a source."""
+        with self._lock:
+            self._debounce_timers.pop(source, None)
             to_remove_symbols = []
             for sym, sub_dict in list(self._subscriptions.items()):
                 keys_to_pop = [k for k, (_, s, _) in sub_dict.items() if s == source]
@@ -184,9 +225,20 @@ class SubscriptionRegistry:
             for sym in to_remove_symbols:
                 del self._subscriptions[sym]
                 self._active_modes.pop(sym, None)
-                logger.info("Last subscription removed for %s (source=%s closed) — unsubscribing", sym, source)
-                if self._remove_callback:
-                    self._remove_callback(sym)
+
+            if to_remove_symbols:
+                logger.info("Removed %d symbols for disconnected source=%s", len(to_remove_symbols), source)
+                if self._batch_remove_callback:
+                    try:
+                        self._batch_remove_callback(to_remove_symbols)
+                    except Exception as e:
+                        logger.error("batch_remove_callback error: %s", e)
+                elif self._remove_callback:
+                    for s in to_remove_symbols:
+                        try:
+                            self._remove_callback(s)
+                        except Exception:
+                            pass
 
     def clear_reason(self, reason: str) -> None:
         """Remove a reason from all subscribed symbols (e.g. when a bot stops)."""

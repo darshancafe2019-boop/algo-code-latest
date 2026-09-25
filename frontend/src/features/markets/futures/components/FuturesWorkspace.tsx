@@ -66,6 +66,9 @@ export function FuturesWorkspace({
     setSelectedExpiry,
     searchQuery,
     setSearchQuery,
+    quickFilter,
+    setQuickFilter,
+    savedContractKeys,
     isDetailsDrawerOpen,
     setDetailsDrawerOpen,
     isOrderReviewOpen,
@@ -160,7 +163,7 @@ export function FuturesWorkspace({
 
   const contracts = universeData?.contracts || [];
 
-  // Filter contracts strictly by active board / provider
+  // Filter contracts strictly by active board / provider, asset category, expiry, quick filter, and search
   const filteredContracts = useMemo(() => {
     return contracts.filter((c) => {
       // Board / Provider constraint
@@ -184,11 +187,52 @@ export function FuturesWorkspace({
 
       // Asset Filter
       if (selectedAsset !== "ALL") {
+        if (selectedAsset === "INDEX_FUTURES" && c.contract_type !== "INDEX_FUTURES") return false;
+        if (selectedAsset === "STOCK_FUTURES" && c.contract_type !== "STOCK_FUTURES") return false;
         if (selectedAsset === "PERPETUALS" && c.contract_type !== "PERPETUAL") return false;
         if (selectedAsset === "FUTURES" && c.contract_type === "PERPETUAL") return false;
-        if (selectedAsset === "INDIAN" && c.exchange !== "NSE" && c.exchange !== "MCX") return false;
-        if (selectedAsset === "CRYPTO" && !c.segment?.includes("CRYPTO")) return false;
+        if (selectedAsset === "INDIAN" && c.exchange !== "NSE" && c.currency !== "INR" && c.market !== "INDIA") return false;
+        if (selectedAsset === "CRYPTO" && !c.segment?.includes("CRYPTO") && c.market !== "CRYPTO") return false;
         if (selectedAsset === "COMMODITIES" && c.segment !== "COMMODITIES") return false;
+      }
+
+      // Expiry Filter
+      if (selectedExpiry !== "ALL") {
+        if (selectedExpiry === "PERP") {
+          if (c.contract_type !== "PERPETUAL" && c.expiry_date) return false;
+        } else {
+          const exp = c.expiry_date || c.expiry || "";
+          if (!exp.includes(selectedExpiry)) return false;
+        }
+      }
+
+      // Quick Filter presets
+      if (quickFilter !== "ALL") {
+        if (quickFilter === "HOT_VOL") {
+          const vol = c.volume24h ?? c.volume_24h_usd ?? 0;
+          if (vol < 5_000_000) return false;
+        } else if (quickFilter === "HIGH_OI") {
+          const oi = c.openInterest ?? c.open_interest_usd ?? 0;
+          if (oi < 1_000_000) return false;
+        } else if (quickFilter === "GAINERS") {
+          const chg = c.change24hPct ?? c.change_24h_pct ?? 0;
+          if (chg <= 0) return false;
+        } else if (quickFilter === "LOSERS") {
+          const chg = c.change24hPct ?? c.change_24h_pct ?? 0;
+          if (chg >= 0) return false;
+        } else if (quickFilter === "CONTANGO") {
+          const bVal = typeof c.basis === "number" ? c.basis : (c.basis?.basis_absolute ?? (c.lastPrice && c.indexPrice ? c.lastPrice - c.indexPrice : 0));
+          if (bVal <= 0) return false;
+        } else if (quickFilter === "BACKWARDATION") {
+          const bVal = typeof c.basis === "number" ? c.basis : (c.basis?.basis_absolute ?? (c.lastPrice && c.indexPrice ? c.lastPrice - c.indexPrice : 0));
+          if (bVal >= 0) return false;
+        } else if (quickFilter === "HIGH_FUNDING") {
+          const apr = c.funding_rate?.funding_rate_annualized ?? (typeof c.fundingRate === "number" ? c.fundingRate * 3 * 365 * 100 : 0);
+          if (apr < 10) return false;
+        } else if (quickFilter === "SAVED") {
+          const isSaved = savedContractKeys.includes(c.symbol) || savedContractKeys.includes(c.displayName || "");
+          if (!isSaved) return false;
+        }
       }
 
       // Search Query Filter
@@ -203,7 +247,7 @@ export function FuturesWorkspace({
         c.exchange.toLowerCase().includes(q)
       );
     });
-  }, [contracts, effectiveBoardId, effectiveSource, selectedAsset, searchQuery]);
+  }, [contracts, effectiveBoardId, effectiveSource, selectedAsset, selectedExpiry, quickFilter, savedContractKeys, searchQuery]);
 
   const activeContract = selectedContract || filteredContracts[0] || null;
 
@@ -270,6 +314,8 @@ export function FuturesWorkspace({
         onChangeAsset={(a) => setSelectedAsset(a)}
         selectedExpiry={selectedExpiry}
         onChangeExpiry={(exp) => setSelectedExpiry(exp)}
+        quickFilter={quickFilter}
+        onChangeQuickFilter={(f) => setQuickFilter(f)}
         executionMode={executionMode}
         onChangeExecutionMode={(m) => setExecutionMode(m)}
         liveProvidersCount={liveCount}
@@ -278,6 +324,8 @@ export function FuturesWorkspace({
         isFetching={isFetching}
         onRefresh={() => refetch()}
         lockSource={lockProvider}
+        totalContractsCount={contracts.length}
+        filteredContractsCount={filteredContracts.length}
       />
 
       {/* Sync Feedback Toast */}

@@ -425,13 +425,40 @@ def safe_query_one(sql: str, params: tuple = ()) -> Optional[Dict[str, Any]]:
 import threading
 import time
 
-# Initialize Background Price Fetcher Loop
+# Initialize Background Autonomous Fleet & Price Evaluation Loop
 def background_price_loop():
-    """Background daemon thread to log live ticks if needed."""
-    pass
+    """Background daemon thread to continuously evaluate all active RUNNING bots with real-time indicators and P&L."""
+    logger.info("Autonomous Fleet & Live Signal Evaluation Engine started.")
+    last_bot_run_times: Dict[str, float] = {}
+    
+    while True:
+        try:
+            from src.live_runner import LiveRunner
+            # Fetch all non-deleted bots currently in RUNNING state
+            active_bots = db.safe_query(
+                "SELECT id, name, symbol, timeframe, status FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0"
+            )
+            now = time.time()
+            for b in active_bots:
+                bot_id = b.get("id")
+                if not bot_id:
+                    continue
+                # Throttle evaluation to every 4.0 seconds per bot for responsive real-time updates without CPU saturation
+                last_run = last_bot_run_times.get(bot_id, 0.0)
+                if now - last_run >= 4.0:
+                    last_bot_run_times[bot_id] = now
+                    try:
+                        runner = LiveRunner(bot_id=bot_id)
+                        if not getattr(runner, "is_preflight_failed", False):
+                            runner.process_cycle()
+                    except Exception as bot_err:
+                        logger.debug("Fleet bot %s cycle error: %s", bot_id, bot_err)
+        except Exception as e:
+            logger.debug("Fleet evaluation loop notice: %s", e)
+        time.sleep(1.5)
 
 if not os.environ.get("PYTEST_CURRENT_TEST"):
-    bg_thread = threading.Thread(target=background_price_loop, daemon=True)
+    bg_thread = threading.Thread(target=background_price_loop, daemon=True, name="FleetEvaluationEngine")
     bg_thread.start()
 
 # Server Startup Reconciliation & Audit
@@ -4179,7 +4206,10 @@ def api_options_flow():
     return jsonify({
         "status": "success",
         "underlying": underlying,
-        "provider": provider,
+        "provider": snapshot.provider,
+        "provider_status": snapshot.status,
+        "freshness_status": snapshot.freshnessStatus,
+        "environment": snapshot.environment,
         "selected_expiry": snapshot.selected_expiry,
         "spot_price": spot,
         "total_call_oi": total_call_oi,
@@ -6445,23 +6475,27 @@ def api_bot_copilot_query():
 def health_live():
     """
     Lightweight, non-blocking liveness probe.
-    Returns HTTP 200 while Flask process is alive.
-    Requires NO login, NO CSRF, NO TOTP, NO RBAC, NO password change.
-    Performs NO external provider requests and NO expensive database queries.
+    Returns HTTP 200 while Flask and Database are operational.
+    If database is corrupted, reports degraded/unhealthy status with HTTP 503.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    if request.path == "/health/live":
-        return jsonify({
-            "status": "ALIVE",
-            "service": "alpha-algo-backend",
-            "timestamp": now_iso
-        }), 200
+    db_health = db.check_database_health()
+    db_ok = db.is_database_healthy()
 
-    return jsonify({
-        "status": "ok",
+    payload = {
+        "status": "ok" if db_ok else "UNHEALTHY",
         "service": "alpha-algo-backend",
+        "db": db_health,
         "timestamp": now_iso
-    }), 200
+    }
+    if not db_ok or db_health.get("corrupted", False):
+        return jsonify(payload), 503
+
+    if request.path == "/health/live":
+        payload["status"] = "ALIVE"
+        return jsonify(payload), 200
+
+    return jsonify(payload), 200
 
 
 @app.route("/health/ready", methods=["GET"])

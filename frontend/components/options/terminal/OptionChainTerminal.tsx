@@ -57,6 +57,7 @@ import {
   DirectOrderResult,
   getStandardOptionLotSize,
 } from "@/types/option-order-intent";
+import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 
 interface OptionChainTerminalProps {
   initialUnderlying?: string;
@@ -213,12 +214,12 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
 
   // 1. Fetch Terminal Snapshot & Option Flow Data with explicit LIVE market data mode
   const { data: snapshotData, isLoading, isFetching, refetch } = useQuery<{ success: boolean; data: OptionTerminalSnapshot }>({
-    queryKey: ["optionTerminalSnapshot", underlying, source, selectedExpiry, strikeRange, marketDataMode, tradingMode],
+    queryKey: ["optionTerminalSnapshot", underlying, source, selectedExpiry, marketDataMode, tradingMode],
     queryFn: async () => {
       const params = new URLSearchParams({
         underlying,
         provider: source,
-        strike_count: strikeRange.toString(),
+        strike_count: "100",
         market_data_mode: marketDataMode,
         execution_mode: tradingMode,
         mode: marketDataMode,
@@ -240,11 +241,117 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying);
   const currency = isCrypto ? "$" : "₹";
 
+  // Auto-synchronize selectedExpiry if it's currently empty or not in the available expiries list
+  useEffect(() => {
+    if (snapshot?.availableExpiries && snapshot.availableExpiries.length > 0) {
+      const validExpiries = snapshot.availableExpiries.map((e) => e.expiry);
+      if (!selectedExpiry || !validExpiries.includes(selectedExpiry)) {
+        setSelectedExpiry(snapshot.selectedExpiry || validExpiries[0]);
+      }
+    }
+  }, [snapshot, selectedExpiry]);
+
   const rawStrikes = useMemo(() => snapshot?.strikes || [], [snapshot?.strikes]);
+
+  // Synchronize option chain & underlying prices into shared market feed store
+  useEffect(() => {
+    if (!snapshot) return;
+    const ticks: any[] = [];
+    const now = new Date().toISOString();
+
+    if (snapshot.underlyingPrice) {
+      ticks.push({
+        symbol: underlying,
+        provider: source,
+        exchange: isCrypto ? "DELTA" : "NSE",
+        lastPrice: snapshot.underlyingPrice,
+        open: snapshot.underlyingPrice,
+        high: snapshot.underlyingPrice,
+        low: snapshot.underlyingPrice,
+        close: snapshot.underlyingPrice,
+        change: snapshot.underlyingChange || 0,
+        changePercent: snapshot.underlyingChangePercent || 0,
+        dataMode: "REAL_TIME",
+        status: "LIVE",
+        eventTimestamp: now,
+        receivedTimestamp: now,
+      });
+    }
+
+    if (snapshot.strikes && Array.isArray(snapshot.strikes)) {
+      for (const row of snapshot.strikes) {
+        if (row.call) {
+          ticks.push({
+            symbol: `${underlying} ${row.strike} CE`,
+            tradingSymbol: `${underlying}${selectedExpiry || ""}${row.strike}CE`,
+            provider: source,
+            exchange: isCrypto ? "DELTA" : "NSE",
+            lastPrice: row.call.ltp ?? 0,
+            bid: row.call.bid ?? null,
+            ask: row.call.ask ?? null,
+            volume: row.call.volume ?? 0,
+            oi: row.call.oi ?? 0,
+            oiChange: row.call.oiChange ?? 0,
+            change: row.call.change ?? 0,
+            changePercent: row.call.changePercent ?? 0,
+            dataMode: "REAL_TIME",
+            status: "LIVE",
+            eventTimestamp: now,
+            receivedTimestamp: now,
+          });
+        }
+        if (row.put) {
+          ticks.push({
+            symbol: `${underlying} ${row.strike} PE`,
+            tradingSymbol: `${underlying}${selectedExpiry || ""}${row.strike}PE`,
+            provider: source,
+            exchange: isCrypto ? "DELTA" : "NSE",
+            lastPrice: row.put.ltp ?? 0,
+            bid: row.put.bid ?? null,
+            ask: row.put.ask ?? null,
+            volume: row.put.volume ?? 0,
+            oi: row.put.oi ?? 0,
+            oiChange: row.put.oiChange ?? 0,
+            change: row.put.change ?? 0,
+            changePercent: row.put.changePercent ?? 0,
+            dataMode: "REAL_TIME",
+            status: "LIVE",
+            eventTimestamp: now,
+            receivedTimestamp: now,
+          });
+        }
+      }
+    }
+
+    if (ticks.length > 0) {
+      useMarketFeedStore.getState().ingestBatch(ticks);
+    }
+  }, [snapshot, underlying, source, isCrypto, selectedExpiry]);
 
   // Active filter chips and count
   const { activeFilterCount, activeFilterChips } = useMemo(() => {
     const chips: { id: string; label: string; onRemove: () => void }[] = [];
+
+    // Custom strike range chip
+    if (customStrikeFrom || customStrikeTo) {
+      chips.push({
+        id: "custom_range",
+        label: `Strikes: ${customStrikeFrom || "Min"} → ${customStrikeTo || "Max"}`,
+        onRemove: () => {
+          setCustomStrikeFrom("");
+          setCustomStrikeTo("");
+        },
+      });
+    }
+
+    // Search query chip
+    if (searchQuery) {
+      chips.push({
+        id: "search_q",
+        label: `Search: "${searchQuery}"`,
+        onRemove: () => setSearchQuery(""),
+      });
+    }
 
     // 1. Basic & Option Side
     if (filterConfig.side === "CALLS_ONLY") {
@@ -416,14 +523,54 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     }
 
     return { activeFilterCount: chips.length, activeFilterChips: chips };
-  }, [filterConfig]);
+  }, [filterConfig, customStrikeFrom, customStrikeTo, searchQuery]);
 
   // Filtered Strikes calculation with rigorous multi-dimensional criteria
   const displayedStrikes = useMemo(() => {
-    // Calculate percentiles for High/Low values
-    const oiValues = rawStrikes.map((r) => Math.max(r.call?.oi || 0, r.put?.oi || 0)).filter((v) => v > 0).sort((a, b) => a - b);
-    const volValues = rawStrikes.map((r) => Math.max(r.call?.volume || 0, r.put?.volume || 0)).filter((v) => v > 0).sort((a, b) => a - b);
-    const ivValues = rawStrikes.map((r) => Math.max(r.call?.iv || 0, r.put?.iv || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    if (!rawStrikes || rawStrikes.length === 0) return [];
+
+    // Sort strikes ascending by strike price
+    const sortedStrikes = [...rawStrikes].sort((a, b) => a.strike - b.strike);
+
+    // 1. Determine ATM reference strike
+    const targetAtm = snapshot?.atmStrike || (snapshot?.spotPrice ? snapshot.spotPrice : 0);
+    let atmIdx = sortedStrikes.findIndex((s) => s.isATM || (targetAtm > 0 && s.strike === targetAtm));
+    if (atmIdx === -1 && targetAtm > 0) {
+      let minDiff = Infinity;
+      sortedStrikes.forEach((s, idx) => {
+        const diff = Math.abs(s.strike - targetAtm);
+        if (diff < minDiff) {
+          minDiff = diff;
+          atmIdx = idx;
+        }
+      });
+    }
+    if (atmIdx === -1) {
+      atmIdx = Math.floor(sortedStrikes.length / 2);
+    }
+
+    // 2. Base strikes before contract-level condition filters:
+    let baseStrikes = sortedStrikes;
+
+    const hasCustomFrom = customStrikeFrom !== "" && !isNaN(parseFloat(customStrikeFrom));
+    const hasCustomTo = customStrikeTo !== "" && !isNaN(parseFloat(customStrikeTo));
+
+    if (hasCustomFrom || hasCustomTo) {
+      const fromVal = hasCustomFrom ? parseFloat(customStrikeFrom) : -Infinity;
+      const toVal = hasCustomTo ? parseFloat(customStrikeTo) : Infinity;
+      baseStrikes = sortedStrikes.filter((r) => r.strike >= fromVal && r.strike <= toVal);
+    } else if (strikeRange && strikeRange < 900 && sortedStrikes.length > 0) {
+      // Strike range preset (e.g., 10 = ±5 strikes, 20 = ±10 strikes, 30 = ±15 strikes, etc.)
+      const half = Math.max(1, Math.round(strikeRange / 2));
+      const startIdx = Math.max(0, atmIdx - half);
+      const endIdx = Math.min(sortedStrikes.length, atmIdx + half + 1);
+      baseStrikes = sortedStrikes.slice(startIdx, endIdx);
+    }
+
+    // 3. Percentiles for High/Low values computed over base strikes
+    const oiValues = baseStrikes.map((r) => Math.max(r.call?.oi || 0, r.put?.oi || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    const volValues = baseStrikes.map((r) => Math.max(r.call?.volume || 0, r.put?.volume || 0)).filter((v) => v > 0).sort((a, b) => a - b);
+    const ivValues = baseStrikes.map((r) => Math.max(r.call?.iv || 0, r.put?.iv || 0)).filter((v) => v > 0).sort((a, b) => a - b);
 
     const highOiThreshold = oiValues.length > 0 ? oiValues[Math.floor(oiValues.length * 0.7)] : 0;
     const lowOiThreshold = oiValues.length > 0 ? oiValues[Math.floor(oiValues.length * 0.3)] : 0;
@@ -432,7 +579,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     const highIvThreshold = ivValues.length > 0 ? ivValues[Math.floor(ivValues.length * 0.7)] : 0;
     const lowIvThreshold = ivValues.length > 0 ? ivValues[Math.floor(ivValues.length * 0.3)] : 0;
 
-    return rawStrikes.filter((row) => {
+    return baseStrikes.filter((row) => {
       const call = row.call;
       const put = row.put;
 
@@ -456,45 +603,61 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         }
       }
 
-      // 2. Custom Strike From/To filter
-      if (customStrikeFrom) {
-        const from = parseFloat(customStrikeFrom);
-        if (!isNaN(from) && row.strike < from) return false;
-      }
-      if (customStrikeTo) {
-        const to = parseFloat(customStrikeTo);
-        if (!isNaN(to) && row.strike > to) return false;
-      }
-
-      // 3. Moneyness filter
+      // 2. Moneyness filter with proper mapping
       if (filterConfig.moneyness !== "ALL") {
-        const matchCall = call?.moneyness === filterConfig.moneyness;
-        const matchPut = put?.moneyness === filterConfig.moneyness;
-        if (!matchCall && !matchPut) return false;
+        const targetM =
+          filterConfig.moneyness === "ATM_ONLY"
+            ? "ATM"
+            : filterConfig.moneyness === "ITM_ONLY"
+            ? "ITM"
+            : filterConfig.moneyness === "OTM_ONLY"
+            ? "OTM"
+            : null;
+
+        if (targetM) {
+          if (filterConfig.side === "CALLS_ONLY") {
+            const isMatch = targetM === "ATM" ? (row.isATM || call?.moneyness === "ATM") : call?.moneyness === targetM;
+            if (!isMatch) return false;
+          } else if (filterConfig.side === "PUTS_ONLY") {
+            const isMatch = targetM === "ATM" ? (row.isATM || put?.moneyness === "ATM") : put?.moneyness === targetM;
+            if (!isMatch) return false;
+          } else {
+            const matchCall = targetM === "ATM" ? (row.isATM || call?.moneyness === "ATM") : call?.moneyness === targetM;
+            const matchPut = targetM === "ATM" ? (row.isATM || put?.moneyness === "ATM") : put?.moneyness === targetM;
+            if (!matchCall && !matchPut) return false;
+          }
+        }
       }
 
-      // 4. Detailed single contract tester
-      const testContractCondition = (c?: ActionableOptionContract | null) => {
+      // 3. Detailed single contract tester
+      const testContractCondition = (c?: OptionContractQuote | null) => {
         if (!c) return false;
         // Price
-        if (filterConfig.minLtp !== undefined && c.ltp < filterConfig.minLtp) return false;
-        if (filterConfig.maxLtp !== undefined && c.ltp > filterConfig.maxLtp) return false;
+        if (filterConfig.minLtp !== undefined && c.ltp !== null && c.ltp < filterConfig.minLtp) return false;
+        if (filterConfig.maxLtp !== undefined && c.ltp !== null && c.ltp > filterConfig.maxLtp) return false;
         if (filterConfig.minChangePct !== undefined && c.changePercent < filterConfig.minChangePct) return false;
         if (filterConfig.maxChangePct !== undefined && c.changePercent > filterConfig.maxChangePct) return false;
+        if (filterConfig.minBid !== undefined && (c.bid ?? 0) < filterConfig.minBid) return false;
+        if (filterConfig.maxBid !== undefined && (c.bid ?? 0) > filterConfig.maxBid) return false;
+        if (filterConfig.minAsk !== undefined && (c.ask ?? 0) < filterConfig.minAsk) return false;
+        if (filterConfig.maxAsk !== undefined && (c.ask ?? 0) > filterConfig.maxAsk) return false;
 
         // OI
-        if (filterConfig.minOI > 0 && c.oi < filterConfig.minOI) return false;
-        if (filterConfig.maxOI !== undefined && c.oi > filterConfig.maxOI) return false;
-        if (filterConfig.minOIChange !== undefined && c.oiChange < filterConfig.minOIChange) return false;
-        if (filterConfig.maxOIChange !== undefined && c.oiChange > filterConfig.maxOIChange) return false;
+        if (filterConfig.minOI > 0 && (c.oi ?? 0) < filterConfig.minOI) return false;
+        if (filterConfig.maxOI !== undefined && (c.oi ?? 0) > filterConfig.maxOI) return false;
+        if (filterConfig.minOIChange !== undefined && (c.oiChange ?? 0) < filterConfig.minOIChange) return false;
+        if (filterConfig.maxOIChange !== undefined && (c.oiChange ?? 0) > filterConfig.maxOIChange) return false;
+        if (filterConfig.minOIChangePct !== undefined && (c.oiChangePercent ?? 0) < filterConfig.minOIChangePct) return false;
+        if (filterConfig.maxOIChangePct !== undefined && (c.oiChangePercent ?? 0) > filterConfig.maxOIChangePct) return false;
 
-        // Volume
-        if (filterConfig.minVolume > 0 && c.volume < filterConfig.minVolume) return false;
-        if (filterConfig.maxVolume !== undefined && c.volume > filterConfig.maxVolume) return false;
+        // Volume & Turnover
+        if (filterConfig.minVolume > 0 && (c.volume ?? 0) < filterConfig.minVolume) return false;
+        if (filterConfig.maxVolume !== undefined && (c.volume ?? 0) > filterConfig.maxVolume) return false;
+        if (filterConfig.minPremium > 0 && (c.premium ?? 0) < filterConfig.minPremium) return false;
 
         // IV
-        if (filterConfig.minIV !== undefined && c.iv < filterConfig.minIV) return false;
-        if (filterConfig.maxIV !== undefined && c.iv > filterConfig.maxIV) return false;
+        if (filterConfig.minIV !== undefined && (c.iv ?? 0) < filterConfig.minIV) return false;
+        if (filterConfig.maxIV !== undefined && (c.iv ?? 0) > filterConfig.maxIV) return false;
 
         // Greeks
         if (filterConfig.minDelta !== undefined && (c.greeks?.delta ?? 0) < filterConfig.minDelta) return false;
@@ -507,17 +670,35 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         if (filterConfig.maxVega !== undefined && (c.greeks?.vega ?? 0) > filterConfig.maxVega) return false;
 
         // Spreads
-        const spread = c.ask > 0 && c.bid > 0 ? c.ask - c.bid : 0;
+        const spread = c.ask && c.bid && c.ask > 0 && c.bid > 0 ? c.ask - c.bid : 0;
+        const spreadPct = spread > 0 && c.ltp && c.ltp > 0 ? (spread / c.ltp) * 100 : 0;
         if (filterConfig.minSpread !== undefined && spread < filterConfig.minSpread) return false;
         if (filterConfig.maxSpread !== undefined && spread > filterConfig.maxSpread) return false;
+        if (filterConfig.maxSpreadPct !== undefined && spreadPct > filterConfig.maxSpreadPct) return false;
 
         // Direction
-        if (filterConfig.marketDirection === "POSITIVE" && c.change <= 0) return false;
-        if (filterConfig.marketDirection === "NEGATIVE" && c.change >= 0) return false;
-        if (filterConfig.marketDirection === "UNCHANGED" && c.change !== 0) return false;
+        if (filterConfig.marketDirection === "POSITIVE" && (c.change ?? 0) <= 0) return false;
+        if (filterConfig.marketDirection === "NEGATIVE" && (c.change ?? 0) >= 0) return false;
+        if (filterConfig.marketDirection === "UNCHANGED" && (c.change ?? 0) !== 0) return false;
 
-        // Buildup
-        if (filterConfig.buildup !== "ALL" && c.oiBuildup !== filterConfig.buildup) return false;
+        // Sentiment filter
+        if (filterConfig.sentiment && filterConfig.sentiment !== "ALL") {
+          if (filterConfig.sentiment === "BULLISH") {
+            const isBull = c.optionType === "CE" ? (c.change ?? 0) >= 0 : (c.change ?? 0) <= 0;
+            if (!isBull) return false;
+          } else if (filterConfig.sentiment === "BEARISH") {
+            const isBear = c.optionType === "PE" ? (c.change ?? 0) >= 0 : (c.change ?? 0) <= 0;
+            if (!isBear) return false;
+          } else if (filterConfig.sentiment === "NEUTRAL") {
+            if (Math.abs(c.change ?? 0) > 0.5) return false;
+          }
+        }
+
+        // High OI Change Only
+        if (filterConfig.highOIChangeOnly && Math.abs(c.oiChange ?? 0) < 1000) return false;
+
+        // Unusual Activity
+        if (filterConfig.unusualOnly && (c.volumeOiRatio ?? 0) < 3.0) return false;
 
         return true;
       };
@@ -532,7 +713,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
         if (!callPass && !putPass) return false;
       }
 
-      // 5. Percentile Flags (High/Low OI, Volume, IV)
+      // 4. Percentile Flags (High/Low OI, Volume, IV)
       if (filterConfig.highOIOnly && Math.max(call?.oi || 0, put?.oi || 0) < highOiThreshold) return false;
       if (filterConfig.lowOIOnly && Math.max(call?.oi || 0, put?.oi || 0) > lowOiThreshold) return false;
       if (filterConfig.highVolumeOnly && Math.max(call?.volume || 0, put?.volume || 0) < highVolThreshold) return false;
@@ -542,7 +723,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
 
       return true;
     });
-  }, [rawStrikes, searchQuery, customStrikeFrom, customStrikeTo, filterConfig]);
+  }, [rawStrikes, strikeRange, customStrikeFrom, customStrikeTo, searchQuery, filterConfig, snapshot?.atmStrike, snapshot?.spotPrice]);
 
 
 

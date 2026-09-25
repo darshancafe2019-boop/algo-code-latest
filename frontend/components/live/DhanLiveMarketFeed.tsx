@@ -75,14 +75,22 @@ interface DhanStatusResponse {
 }
 
 const DEFAULT_DHAN_SYMBOLS = [
+  "NIFTY",
+  "BANKNIFTY",
+  "NIFTY 25150 CE",
+  "NIFTY 25150 PE",
+  "NIFTY 25200 CE",
+  "NIFTY 25100 PE",
+  "BANKNIFTY 54500 CE",
+  "BANKNIFTY 54500 PE",
+  "NIFTY-FUT",
+  "BANKNIFTY-FUT",
   "RELIANCE",
   "HDFCBANK",
   "INFY",
   "TCS",
   "ICICIBANK",
   "SBIN",
-  "NIFTY",
-  "BANKNIFTY",
 ];
 
 function normalizeDhanQuote(data: any): DhanQuoteTick | null {

@@ -1,15 +1,25 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React from "react";
+import dynamic from "next/dynamic";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { StrategyBotCreationWorkspace } from "@/components/strategy/StrategyBotCreationWorkspace";
+
+const StrategyCenter = dynamic(
+  () => import("@/components/strategy/StrategyCenter").then((mod) => mod.StrategyCenter),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 text-center text-xs text-[#7D8EA5] font-mono animate-pulse">
+        Loading Quant.OS Strategy Center...
+      </div>
+    ),
+  }
+);
 
 export default function StrategiesPage() {
   return (
     <DirectPageLayout activeTab="strategies">
-      <Suspense fallback={<div className="p-8 text-center text-xs text-[#7D8EA5] font-mono">Loading Strategy Workspace...</div>}>
-        <StrategyBotCreationWorkspace />
-      </Suspense>
+      <StrategyCenter />
     </DirectPageLayout>
   );
 }

@@ -88,8 +88,7 @@ class DhanBrokerAdapter(BrokerAdapter):
         self.client_id = (client_id or getattr(config, "DHAN_CLIENT_ID", "") or os.getenv("DHAN_CLIENT_ID", "") or "").strip()
         self.access_token = (access_token or getattr(config, "DHAN_ACCESS_TOKEN", "") or os.getenv("DHAN_ACCESS_TOKEN", "") or "").strip()
         self._load_credentials_from_vault()
-
-        self._auth_failed = False
+        self._auth_failed = not bool(self.client_id and self.access_token)
 
         self._capability = BrokerCapability(
             broker_id=self.broker_id,

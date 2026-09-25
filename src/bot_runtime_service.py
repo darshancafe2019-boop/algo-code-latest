@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from src import audit, config, db, pnl_engine
 from src.process_manager import multi_bot_manager
+from src.utils.json_util import safe_json_dumps, safe_json_loads, sanitize_for_json
 
 logger = logging.getLogger("BotRuntimeService")
 
@@ -147,20 +148,20 @@ class BotRuntimeService:
             try:
                 c.execute("SELECT * FROM data_core_persisted_bots ORDER BY created_at ASC")
                 for r in c.fetchall():
-                    rd = dict(r)
+                    rd = sanitize_for_json(dict(r))
                     b_id = rd.get("bot_id")
                     if b_id:
                         bot_dict = {}
                         if rd.get("bot_json"):
                             try:
-                                bot_dict = json.loads(rd["bot_json"]) if isinstance(rd["bot_json"], str) else rd["bot_json"]
+                                bot_dict = safe_json_loads(rd["bot_json"]) if not isinstance(rd["bot_json"], dict) else rd["bot_json"]
                             except Exception:
                                 bot_dict = {}
 
                         spec_dict = {}
                         if rd.get("spec_json"):
                             try:
-                                spec_dict = json.loads(rd["spec_json"]) if isinstance(rd["spec_json"], str) else rd["spec_json"]
+                                spec_dict = safe_json_loads(rd["spec_json"]) if not isinstance(rd["spec_json"], dict) else rd["spec_json"]
                             except Exception:
                                 spec_dict = {}
 
@@ -193,7 +194,7 @@ class BotRuntimeService:
                             "created_at": rd.get("created_at") or bot_dict.get("createdAt") or datetime.now(timezone.utc).isoformat(),
                             "updated_at": rd.get("updated_at") or bot_dict.get("updatedAt") or datetime.now(timezone.utc).isoformat(),
                             "timeframe": "5m",
-                            "config_json": json.dumps({
+                            "config_json": safe_json_dumps({
                                 "spec": spec_dict,
                                 "bot": bot_dict,
                                 "rules": bot_dict.get("rules", []),
@@ -429,9 +430,9 @@ class BotRuntimeService:
             })
             pnl_info = bot_pnl_map.get(b_id, {"realized": 0.0, "today": 0.0})
 
-            bot_today = pnl_info["today"]
-            bot_realized = pnl_info["realized"]
-            bot_unrealized = pos_info["unrealized_pnl"]
+            bot_unrealized = float(pos_info.get("unrealized_pnl") or b.get("unrealized_pnl") or 0.0)
+            bot_realized = float(pnl_info.get("realized") or b.get("realized_pnl") or 0.0)
+            bot_today = float(pnl_info.get("today") or 0.0) + bot_unrealized
             bot_net = bot_realized + bot_unrealized
 
             fleet_today_pnl += bot_today
@@ -678,6 +679,10 @@ class BotRuntimeService:
                     "unrealized": round(bot_unrealized, 2),
                     "net": round(bot_net, 2)
                 },
+                "today_pnl": round(bot_today, 2),
+                "realized_pnl": round(bot_realized, 2),
+                "unrealized_pnl": round(bot_unrealized, 2),
+                "net_pnl": round(bot_net, 2),
                 "live_pnl": round(bot_today, 2),
                 "roi": round((bot_net / max(1.0, cap)) * 100.0, 2),
                 "open_trades": 1 if pos_info["has_position"] else 0,

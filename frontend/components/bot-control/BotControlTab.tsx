@@ -15,10 +15,10 @@ import { DeleteBotModal } from "./DeleteBotModal";
 import { BulkDeleteBotsModal } from "./BulkDeleteBotsModal";
 import { MultiBotBulkActionBar } from "./MultiBotBulkActionBar";
 import { OrderDestinationModal } from "./OrderDestinationModal";
-import { DecisionLogFeed } from "./DecisionLogFeed";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 import {
   BotRowItem,
   FleetMetrics,
@@ -50,6 +50,17 @@ export function BotControlTab() {
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [isBulkStartModalOpen, setIsBulkStartModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+
+  // Intent Store & Deep Link Check
+  const activeIntent = useBotCreationIntentStore((state) => state.activeIntent);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const isCreateRequested = searchParams?.get("create") === "true";
+    if (isCreateRequested || activeIntent) {
+      setIsCreateModalOpen(true);
+    }
+  }, [searchParams, activeIntent]);
 
   // Order Destination Modal State
   const [orderDestinationBot, setOrderDestinationBot] = useState<BotRowItem | null>(null);
@@ -85,13 +96,35 @@ export function BotControlTab() {
       if (!res.ok) throw new Error(res.error?.message || "Failed to load bot fleet snapshot");
       return res.data;
     },
-    staleTime: 3000,
-    refetchInterval: 5000,
+    staleTime: 1000,
+    refetchInterval: 2500,
     placeholderData: (prev) => prev,
   });
 
-  const searchParams = useSearchParams();
-  const selectedBotIdFromUrl = searchParams.get("selectedBotId");
+  // Real-time EventSource listener for instantaneous sub-second bot telemetry updates
+  useEffect(() => {
+    const handle = apiClient.createResilientEventSource("/api/stream/events", {
+      key: "stream_bot_control_events",
+      onMessage: (evt) => {
+        if (
+          evt?.type === "BOT_EVENT" ||
+          evt?.type === "TRADE_EXECUTED" ||
+          evt?.type === "ORDER_FILLED" ||
+          evt?.type === "SIGNAL_GENERATED" ||
+          evt?.type === "POSITION_UPDATE" ||
+          evt?.type === "HEARTBEAT"
+        ) {
+          queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+        }
+      },
+    });
+
+    return () => {
+      handle.close();
+    };
+  }, [queryClient]);
+
+  const selectedBotIdFromUrl = searchParams?.get("selectedBotId");
 
   const rawBots: BotRowItem[] = useMemo(() => {
     return Array.isArray(fleetData?.bots) ? fleetData.bots : [];
@@ -279,11 +312,15 @@ export function BotControlTab() {
       if (!res.ok) {
         const msg = res.error?.message || `Failed to execute ${action} on bot ${botId}`;
         setActionError(msg);
-        throw new Error(msg);
+        return;
       }
 
+      setActionSuccess(res.data?.message || `Bot ${botId} ${action.toLowerCase()} executed.`);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+    } catch (err: any) {
+      const msg = err?.message || `Failed to execute ${action} on bot ${botId}`;
+      setActionError(msg);
     } finally {
       setInFlightActionKeys((prev) => {
         const next = new Set(prev);
@@ -765,21 +802,6 @@ export function BotControlTab() {
     } catch {}
   };
 
-  // Top performing bot
-  const topBot = useMemo(() => {
-    if (rawBots.length === 0) return null;
-    return [...rawBots].sort((a, b) => {
-      const pnlA = a.pnl?.today ?? a.live_pnl ?? 0;
-      const pnlB = b.pnl?.today ?? b.live_pnl ?? 0;
-      return pnlB - pnlA;
-    })[0];
-  }, [rawBots]);
-
-  // Active positions count
-  const activePositions = useMemo(() => {
-    return rawBots.filter((b) => b.position?.has_position).length;
-  }, [rawBots]);
-
   if (!isMounted) return null;
 
   return (
@@ -897,81 +919,6 @@ export function BotControlTab() {
           onSelectBot={handleSelectBot}
         />
       )}
-
-      {/* 4. Bottom Analytics & Activity Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
-        {/* Left: Live Decision Log Feed (Col-span 7) */}
-        <div className="lg:col-span-7">
-          <DecisionLogFeed />
-        </div>
-
-        {/* Right: Fleet Telemetry & Quick Operations (Col-span 5) */}
-        <div className="lg:col-span-5 rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3.5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-[#10263A]">
-              <span className="text-[12px] font-bold text-[#F8FAFC] uppercase tracking-wider">
-                Fleet Performance & Ops
-              </span>
-              <span className="text-[10px] font-semibold text-[#00E89A] flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#00E89A] animate-pulse" />
-                OMS Synchronized
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2 text-[11px] mb-3 font-mono">
-              <div className="p-2 rounded-lg bg-[#05101A] border border-[#12304A]">
-                <span className="text-[10px] text-[#7D8EA5] block">Top Performer</span>
-                <span className="font-bold text-[#F8FAFC] text-[11px] truncate block">
-                  {topBot?.name || "None Active"}
-                </span>
-                <span className="text-[10px] text-[#00E89A] font-semibold">
-                  {topBot ? `+$${Math.abs(topBot.pnl?.today ?? topBot.live_pnl ?? 0).toFixed(2)}` : "—"}
-                </span>
-              </div>
-
-              <div className="p-2 rounded-lg bg-[#05101A] border border-[#12304A]">
-                <span className="text-[10px] text-[#7D8EA5] block">Open Positions</span>
-                <span className="font-bold text-[#22D3EE] text-[14px] leading-tight block">
-                  {activePositions}
-                </span>
-                <span className="text-[10px] text-[#7D8EA5]">across active bots</span>
-              </div>
-            </div>
-
-            <div className="space-y-1 text-[11px] border-t border-[#10263A] pt-2">
-              <div className="flex items-center justify-between text-[#7D8EA5]">
-                <span>Total Capital Allocated</span>
-                <span className="font-semibold text-[#F8FAFC] font-mono">${(metrics.allocated_capital / 1000).toFixed(1)}K</span>
-              </div>
-              <div className="flex items-center justify-between text-[#7D8EA5]">
-                <span>Active Capital In-Flight</span>
-                <span className="font-semibold text-[#F59E0B] font-mono">${(metrics.capital_used / 1000).toFixed(1)}K</span>
-              </div>
-              <div className="flex items-center justify-between text-[#7D8EA5]">
-                <span>Emergency Halt Protocol</span>
-                <span className={cn("font-semibold font-mono", metrics.emergency_halt_active ? "text-[#FF3B5C]" : "text-[#00E89A]")}>
-                  {metrics.emergency_halt_active ? "ENGAGED" : "ARMED / READY"}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="pt-3 border-t border-[#10263A] mt-2 flex items-center gap-2">
-            <button
-              onClick={() => setIsCreateModalOpen(true)}
-              className="flex-1 h-7 rounded-md bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[10px] transition-colors flex items-center justify-center gap-1 cursor-pointer"
-            >
-              + New Bot
-            </button>
-            <button
-              onClick={() => setIsBulkStartModalOpen(true)}
-              className="flex-1 h-7 rounded-md bg-[#05101A] border border-[#12304A] hover:border-[#00E89A]/40 text-[#00E89A] font-semibold text-[10px] transition-colors flex items-center justify-center gap-1 cursor-pointer"
-            >
-              Start Eligible
-            </button>
-          </div>
-        </div>
-      </div>
 
       {/* 5. Multi-Bot Floating Bulk Action Bar */}
       <MultiBotBulkActionBar

@@ -29,6 +29,20 @@ SUPPORTED_OPERATORS = {
 
 DEFAULT_STRATEGY_TEMPLATES = [
     {
+        "id": "liquidity-rejection-structure-pro",
+        "name": "Liquidity Rejection Structure Pro",
+        "description": "MARKET STATE → LIQUIDITY POOL → SWEEP → REJECTION → CHoCH/BOS → RETEST → RISK CHECK → EXECUTE. Observable deterministic liquidity sweep & structure shift.",
+        "target_signal": "BUY",
+        "conjunction": "AND",
+        "rules": [
+            {"left": "market_state", "op": "!=", "right": "UNCLEAR"},
+            {"left": "liquidity_sweep", "op": "==", "right": "CONFIRMED"},
+            {"left": "rejection_status", "op": "==", "right": "REJECTION"},
+            {"left": "structure_status", "op": "==", "right": "BULLISH_CHOCH"},
+            {"left": "strategy_score", "op": ">=", "right": "70"}
+        ]
+    },
+    {
         "id": "volume-star-v1",
         "name": "Volume Star Strategy",
         "description": "5M Market Structure (HH/HL or LH/LL) + Fixed Range Volume Profile (50 rows, 70% VA) + Deterministic LVN Rejection Confirmation.",

@@ -201,11 +201,13 @@ class BinanceCoinMWSAdapter(BaseProviderAdapter):
     async def health_check(self) -> ProviderHealth:
         age_ms = (time.time() - self._last_msg_time) * 1000.0 if self._last_msg_time > 0 else 0.0
         is_live = self._running and self._last_msg_time > 0 and age_ms < 10000
+        now_iso = datetime.now(timezone.utc).isoformat()
         return ProviderHealth(
             provider_id="binance_coinm",
             provider_name="Binance COIN-M Futures",
             status="LIVE" if is_live else ("CONNECTING" if self._running else "DISCONNECTED"),
-            last_heartbeat=datetime.now(timezone.utc).isoformat(),
+            last_tick_time=datetime.fromtimestamp(self._last_msg_time, timezone.utc).isoformat() if self._last_msg_time > 0 else None,
+            last_heartbeat=now_iso,
             error_count=self._retry_count,
             latency_ms=round(age_ms, 1),
             subscribed_symbols=len(self._subscribed_symbols),

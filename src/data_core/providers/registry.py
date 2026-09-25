@@ -373,6 +373,11 @@ class ProviderRegistry:
 
             return None
 
+    def get_all(self) -> List[ProviderInfo]:
+        """Returns all registered canonical providers."""
+        with self._lock:
+            return list(self._providers.values())
+
     def get_all_providers(self) -> List[ProviderInfo]:
         """Returns all registered canonical providers."""
         with self._lock:

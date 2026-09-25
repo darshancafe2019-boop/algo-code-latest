@@ -26,12 +26,9 @@ import {
 
 import { IndicatorHeader } from "./IndicatorHeader";
 import { ActiveIndicatorsTable } from "./ActiveIndicatorsTable";
-import { MarketSummaryCard } from "./MarketSummaryCard";
-import { IndicatorHealthCard } from "./IndicatorHealthCard";
 import { AddIndicatorDrawer } from "./AddIndicatorDrawer";
 import { IndicatorPresetsModal } from "./IndicatorPresetsModal";
 import { IndicatorConfigDrawer } from "./IndicatorConfigDrawer";
-import { AdvancedAnalysisSection } from "./AdvancedAnalysisSection";
 import { IndicatorDiagnosticsPanel } from "./IndicatorDiagnosticsPanel";
 import { IndicatorBacktestModal } from "./IndicatorBacktestModal";
 import { IndicatorCompareModal } from "./IndicatorCompareModal";
@@ -928,142 +925,6 @@ export function IndicatorCenter() {
               }
               isLoading={
                 isIndsLoading
-              }
-            />
-
-          </div>
-
-        </section>
-
-        {/* ========================================================= */}
-        {/* MARKET CONFLUENCE + HEALTH */}
-        {/* ========================================================= */}
-
-        <section className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[1.65fr_0.85fr]">
-
-          {/* ======================================================= */}
-          {/* CONFLUENCE */}
-          {/* ======================================================= */}
-
-          <div className="premium-surface rounded-[24px] bg-[#090E16] p-4 sm:p-5">
-
-            <CleanSectionTitle
-              icon={Layers3}
-              title="Market Confluence"
-              description="Combined multi-indicator directional intelligence"
-              badge={
-                decision === "LONG"
-                  ? "LONG BIAS"
-                  : decision ===
-                    "SHORT"
-                    ? "SHORT BIAS"
-                    : "NEUTRAL"
-              }
-              badgeTone={
-                decision === "LONG"
-                  ? "green"
-                  : decision ===
-                    "SHORT"
-                    ? "red"
-                    : "neutral"
-              }
-            />
-
-            <div className="line-free mt-5 rounded-[19px] bg-[#0C121B] p-3 sm:p-4">
-
-              <MarketSummaryCard
-                summary={
-                  marketSummary
-                }
-              />
-
-            </div>
-
-          </div>
-
-          {/* ======================================================= */}
-          {/* ENGINE HEALTH */}
-          {/* ======================================================= */}
-
-          <div className="premium-surface rounded-[24px] bg-[#090E16] p-4 sm:p-5">
-
-            <CleanSectionTitle
-              icon={ShieldCheck}
-              title="Engine Health"
-              description="Calculation performance, freshness and reliability"
-              badge={
-                issueCount > 0
-                  ? `${issueCount} ISSUE${issueCount > 1
-                    ? "S"
-                    : ""
-                  }`
-                  : "HEALTHY"
-              }
-              badgeTone={
-                issueCount > 0
-                  ? "red"
-                  : "green"
-              }
-            />
-
-            <div className="line-free mt-5 rounded-[19px] bg-[#0C121B] p-3 sm:p-4">
-
-              <IndicatorHealthCard
-                activeCount={
-                  activeCount
-                }
-                healthyCount={
-                  healthyCount
-                }
-                errorCount={
-                  issueCount
-                }
-                dataAgeSeconds={
-                  dataAgeSeconds
-                }
-                latencyMs={
-                  latencyMs
-                }
-                onOpenDiagnostics={() =>
-                  setIsDiagnosticsModalOpen(
-                    true
-                  )
-                }
-              />
-
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* ========================================================= */}
-        {/* ADVANCED ANALYSIS */}
-        {/* ========================================================= */}
-
-        <section className="premium-surface mt-4 rounded-[24px] bg-[#090E16] p-4 sm:p-5">
-
-          <CleanSectionTitle
-            icon={Sparkles}
-            title="Advanced Intelligence"
-            description="Multi-timeframe analysis, indicator comparison and backtesting"
-            badge="QUANT LAB"
-            badgeTone="purple"
-          />
-
-          <div className="line-free mt-5 rounded-[19px] bg-[#0C121B] p-3 sm:p-4">
-
-            <AdvancedAnalysisSection
-              symbol={selectedSymbol}
-              onOpenBacktest={() =>
-                setIsBacktestOpen(
-                  true
-                )
-              }
-              onOpenCompare={() =>
-                setIsCompareOpen(
-                  true
-                )
               }
             />
 

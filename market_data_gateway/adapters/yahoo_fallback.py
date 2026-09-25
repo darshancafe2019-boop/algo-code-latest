@@ -51,6 +51,97 @@ YAHOO_SYMBOL_MAP: Dict[str, str] = {
 
 REVERSE_MAP: Dict[str, str] = {v: k for k, v in YAHOO_SYMBOL_MAP.items()}
 
+FOREX_CURRENCIES = {
+    "USD", "EUR", "GBP", "JPY", "INR", "AUD", "CAD", "CHF", "NZD", "SGD", "HKD", "CNY", "SEK", "NOK", "KRW", "MXN", "ZAR", "BRL", "RUB", "TRY"
+}
+
+KNOWN_US_STOCKS = {
+    "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "TSLA", "AMD", "INTC",
+    "NFLX", "JPM", "V", "MA", "WMT", "DIS", "UNH", "GS", "BAC", "SPY", "QQQ", "IWM", "DIA"
+}
+
+
+def normalize_to_yahoo_ticker(raw_symbol: str) -> Optional[str]:
+    """
+    Maps canonical instrument symbols to provider-specific Yahoo Finance tickers.
+    Strict separation across Forex, Crypto, US Stocks, Indices, Commodities, and Indian Equities.
+    Never blindly attaches .NS to Forex, Crypto, Commodities, or non-NSE instruments.
+    """
+    if not raw_symbol or not isinstance(raw_symbol, str):
+        return None
+    s = raw_symbol.strip()
+    if s.startswith("$"):
+        s = s[1:].strip()
+    s_upper = s.upper()
+
+    # Skip options and derivative tokens
+    if (
+        s_upper.startswith("C-") or s_upper.startswith("P-") or "-C-" in s_upper or "-P-" in s_upper
+        or s_upper.startswith("O:") or s_upper.startswith("NSE_FO|")
+        or "-CE" in s_upper or "-PE" in s_upper or " CE" in s_upper or " PE" in s_upper
+        or (len(s_upper) > 6 and s_upper[-2:] in ("CE", "PE") and any(c.isdigit() for c in s_upper[:-2]))
+    ):
+        return None
+
+    # Check direct dictionary map
+    if s_upper in YAHOO_SYMBOL_MAP:
+        return YAHOO_SYMBOL_MAP[s_upper]
+    if s in YAHOO_SYMBOL_MAP:
+        return YAHOO_SYMBOL_MAP[s]
+
+    # Forex with slash: EUR/USD, GBP/USD, USD/INR -> EURUSD=X, GBPUSD=X, INR=X
+    if "/" in s_upper and len(s_upper.replace("/", "")) == 6:
+        base, quote = s_upper.split("/", 1)
+        if base in FOREX_CURRENCIES and quote in FOREX_CURRENCIES:
+            if base == "USD":
+                return f"{quote}=X"
+            return f"{base}{quote}=X"
+
+    # Forex 6-letter without slash: EURUSD, GBPUSD, USDJPY, USDINR, AUDUSD, NZDUSD, USDCAD
+    if len(s_upper) == 6 and s_upper[:3] in FOREX_CURRENCIES and s_upper[3:] in FOREX_CURRENCIES:
+        if s_upper.startswith("USD"):
+            return f"{s_upper[3:]}=X"
+        return f"{s_upper}=X"
+
+    # Crypto: BTC/USDT, BTCUSDT, ETHUSDT, SOLUSDT, BTCUSD, ETHUSD
+    for base_crypto in ("BTC", "ETH", "SOL", "XRP", "BNB", "ADA", "DOGE", "AVAX", "DOT", "MATIC", "LINK"):
+        if s_upper in (f"{base_crypto}/USDT", f"{base_crypto}USDT", f"{base_crypto}/USD", f"{base_crypto}USD"):
+            return f"{base_crypto}-USD"
+
+    # Commodities
+    if s_upper in ("GOLD", "XAUUSD", "XAU/USD"):
+        return "GC=F"
+    if s_upper in ("SILVER", "XAGUSD", "XAG/USD"):
+        return "SI=F"
+    if s_upper in ("CRUDE_OIL", "CRUDEOIL", "CL", "WTI"):
+        return "CL=F"
+    if s_upper in ("BRENT", "BZ"):
+        return "BZ=F"
+    if s_upper in ("NATURAL_GAS", "NATGAS", "NG"):
+        return "NG=F"
+    if s_upper in ("COPPER", "HG"):
+        return "HG=F"
+
+    # US Stocks
+    if s_upper in KNOWN_US_STOCKS:
+        return s_upper
+
+    # Suffix/prefix handling
+    if s_upper.startswith("NSE:"):
+        clean_eq = s_upper.replace("NSE:", "").strip()
+        return f"{clean_eq}.NS"
+    if s_upper.startswith("BSE:"):
+        clean_eq = s_upper.replace("BSE:", "").strip()
+        return f"{clean_eq}.BO"
+    if s_upper.endswith(".NS") or s_upper.endswith(".BO") or s_upper.startswith("^"):
+        return s_upper
+
+    # Default Indian NSE equity only if standard ticker format without forex/crypto ambiguity
+    if s_upper.isalpha():
+        return f"{s_upper}.NS"
+
+    return s_upper
+
 
 class YahooFallbackAdapter(BaseProviderAdapter):
     """
@@ -151,16 +242,9 @@ class YahooFallbackAdapter(BaseProviderAdapter):
         
         valid_pairs: List[Tuple[str, str]] = []
         for s in symbols:
-            if s.startswith("C-") or s.startswith("P-") or "-C-" in s or "-P-" in s or s.startswith("O:"):
-                # Option derivatives are not hosted on Yahoo Finance
-                continue
-            if s in YAHOO_SYMBOL_MAP:
-                valid_pairs.append((s, YAHOO_SYMBOL_MAP[s]))
-            elif s.isalpha() and s.isupper():
-                # Standard NSE Indian equity default
-                valid_pairs.append((s, f"{s}.NS"))
-            else:
-                valid_pairs.append((s, s))
+            yahoo_t = normalize_to_yahoo_ticker(s)
+            if yahoo_t:
+                valid_pairs.append((s, yahoo_t))
 
         if not valid_pairs:
             return result

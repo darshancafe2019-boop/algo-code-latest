@@ -274,21 +274,53 @@ class BinanceFuturesAdapter(ProviderAdapter):
             raise e
 
 
-class OptionsPlaceholderAdapter(ProviderAdapter):
-    """Options adapter that cleanly signals support availability without crashing spot API."""
+class OptionsAdapter(ProviderAdapter):
+    """Options adapter that fetches underlying market candles (e.g. BTC/USDT or NIFTY) for options strategies."""
 
     def __init__(self):
-        super().__init__("options_gateway", "Options Gateway (Deribit/Binance Options)")
+        super().__init__("options_gateway", "Options Gateway & Underlying Feed")
 
     def supports_instrument(self, instrument: CanonicalInstrument) -> bool:
         return instrument.instrument_type == InstrumentType.OPTION
 
     def fetch_ohlcv(self, instrument: CanonicalInstrument, timeframe: str, limit: int = 500) -> pd.DataFrame:
-        # In current configuration, dedicated options broker is not connected
-        raise ccxt.NotSupported(
-            f"OPTIONS EXECUTION UNSUPPORTED: Dedicated Options Broker (Deribit API) is not connected for {instrument.canonical_symbol}. "
-            f"Trading options requires configuring options gateway credentials."
-        )
+        t0 = time.time()
+        self.request_count += 1
+        try:
+            # 1. For Indian options / NSE, route to Upstox adapter for underlying
+            if instrument.asset_class in [AssetClass.INDIAN_STOCKS, AssetClass.EQUITY] or instrument.exchange == "NSE":
+                from src.upstox_service import global_upstox_service
+                underlying = instrument.base_asset or "NIFTY"
+                df = global_upstox_service.fetch_historical_candles(underlying, timeframe=timeframe, limit=limit)
+                self.circuit.record_success()
+                return df
+
+            # 2. For Crypto options (Delta/Deribit), fetch underlying spot candles (e.g. BTC/USDT) from Binance spot
+            base_asset = instrument.base_asset or "BTC"
+            underlying_sym = f"{base_asset}/USDT"
+            
+            underlying_res = global_instrument_resolver.resolve(underlying_sym)
+            if underlying_res.is_valid and underlying_res.instrument:
+                spot_adapter = BinanceSpotAdapter()
+                df = spot_adapter.fetch_ohlcv(underlying_res.instrument, timeframe, limit=limit)
+                elapsed_ms = (time.time() - t0) * 1000.0
+                self.latencies.append(elapsed_ms)
+                if len(self.latencies) > 100:
+                    self.latencies.pop(0)
+                self.circuit.record_success()
+                self.last_success_time = datetime.now(timezone.utc).strftime("%H:%M:%S")
+                return df
+
+            raise ValueError(f"Could not resolve underlying spot instrument for {instrument.canonical_symbol}")
+        except Exception as e:
+            self.error_count += 1
+            self.circuit.record_failure()
+            logger.error("Options underlying candle fetch error for %s: %s", instrument.canonical_symbol, e)
+            raise e
+
+
+# Backwards compatibility alias
+OptionsPlaceholderAdapter = OptionsAdapter
 
 
 class UpstoxMarketAdapter(ProviderAdapter):
@@ -334,12 +366,13 @@ class ProviderManager:
     def __init__(self):
         self.spot_adapter = BinanceSpotAdapter()
         self.futures_adapter = BinanceFuturesAdapter()
-        self.options_adapter = OptionsPlaceholderAdapter()
+        self.options_adapter = OptionsAdapter()
         self.upstox_adapter = UpstoxMarketAdapter()
         self._adapters: Dict[str, ProviderAdapter] = {
             "binance_spot": self.spot_adapter,
             "binance_futures": self.futures_adapter,
             "deribit_options": self.options_adapter,
+            "delta_options": self.options_adapter,
             "options_gateway": self.options_adapter,
             "upstox": self.upstox_adapter,
             "upstox_ws": self.upstox_adapter,

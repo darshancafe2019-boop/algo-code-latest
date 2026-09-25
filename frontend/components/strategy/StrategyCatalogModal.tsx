@@ -21,6 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 import { QosButton, QosBadge } from "@/components/ui/QosComponents";
+import { ALL_QUANTOS_STRATEGIES } from "@/lib/strategies/crypto30Strategies";
 
 interface StrategyCatalogModalProps {
   isOpen: boolean;
@@ -31,7 +32,35 @@ interface StrategyCatalogModalProps {
   onAssignToBot: (stratName: string) => void;
 }
 
+const QUANTOS_DYNAMIC_TEMPLATES = ALL_QUANTOS_STRATEGIES.map((strat) => ({
+  strategy_id: strat.id,
+  name: `[${strat.number}] ${strat.name}`,
+  description: strat.whatItDoes,
+  market_type: strat.market.toLowerCase().includes("options") ? "options" : "crypto",
+  symbol: strat.exampleTrade?.instrument || "BTCUSDT",
+  base_timeframe: strat.primaryTimeframe || "15m",
+  direction: strat.direction === "SHORT" ? "SHORT" : "LONG",
+  category: strat.category,
+  win_rate: 65.0,
+  profit_factor: 2.10,
+  pipeline: strat.whatItDoes,
+  rawConfig: strat,
+}));
+
 const BUILTIN_TEMPLATES = [
+  {
+    strategy_id: "liquidity-rejection-structure-pro",
+    name: "Liquidity Rejection Structure Pro",
+    description: "MARKET STATE → LIQUIDITY → SWEEP → REJECTION → CHoCH/BOS → RETEST → RISK CHECK → EXECUTE. Observable deterministic institutional liquidity sweep and market structure transition.",
+    market_type: "crypto",
+    symbol: "BTC/USDT",
+    base_timeframe: "15m",
+    direction: "LONG",
+    category: "STRUCTURE",
+    win_rate: 68.2,
+    profit_factor: 2.35,
+    pipeline: "MARKET STATE → LIQUIDITY → SWEEP → REJECTION → CHoCH/BOS → RETEST → RISK CHECK → EXECUTE",
+  },
   {
     strategy_id: "strat-trend-momentum-btc",
     name: "BTC Quantitative Momentum Strategy",
@@ -120,6 +149,7 @@ export function StrategyCatalogModal({
   if (!isOpen) return null;
 
   const combinedCatalog = [
+    ...QUANTOS_DYNAMIC_TEMPLATES,
     ...BUILTIN_TEMPLATES,
     ...(Array.isArray(catalog) ? catalog : []),
   ];

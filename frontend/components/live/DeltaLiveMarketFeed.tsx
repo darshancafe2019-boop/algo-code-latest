@@ -88,16 +88,19 @@ export interface DeltaStatusResponse {
 }
 
 export const DEFAULT_DELTA_SYMBOLS = [
+  "BTCUSD",
+  "ETHUSD",
+  "SOLUSD",
+  "XRPUSD",
+  "DOGEUSD",
+  "BTC 65000 CALL",
+  "BTC 65000 PUT",
   "BTC",
   "ETH",
   "SOL",
   "XRP",
   "AVAX",
   "DOGE",
-  "BTCUSD",
-  "ETHUSD",
-  "SOLUSD",
-  "XRPUSD",
 ];
 
 function normalizeDeltaQuote(data: any): DeltaQuoteTick | null {

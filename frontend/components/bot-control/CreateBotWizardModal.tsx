@@ -46,6 +46,7 @@ import {
   Eye,
 } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
+import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 import {
   WizardAssetClass,
   BotExecutionMode,
@@ -331,24 +332,89 @@ export function CreateBotWizardModal({ isOpen, onClose, onSuccess }: CreateBotWi
     }
   }, [assetClass]);
 
-  // Load Saved Draft on open
+  // Active Intent & Draft Ingestion on open
+  const activeIntentFromStore = useBotCreationIntentStore((state) => state.activeIntent);
+  const loadStoredIntent = useBotCreationIntentStore((state) => state.loadStoredIntent);
+  const clearIntent = useBotCreationIntentStore((state) => state.clearIntent);
+
   useEffect(() => {
-    if (isOpen) {
-      const saved = localStorage.getItem("quantos_bot_wizard_draft");
-      if (saved) {
-        try {
-          const draft = JSON.parse(saved);
-          if (draft.name) setName(draft.name);
-          if (draft.totalCapital) setTotalCapital(draft.totalCapital);
-          if (draft.allocatedCapital) setAllocatedCapital(draft.allocatedCapital);
-          if (draft.assetClass) setAssetClass(draft.assetClass);
-          if (draft.symbol) setSymbol(draft.symbol);
-        } catch (e) {
-          // ignore corrupted draft
+    if (!isOpen) return;
+
+    const intent = activeIntentFromStore || loadStoredIntent();
+    if (intent) {
+      if (intent.initialStrategyName) setName(intent.initialStrategyName);
+      else if (intent.symbol) setName(`${intent.symbol} ${intent.side === "SELL" ? "Short" : "Long"} Alpha Bot`);
+
+      if (intent.strategyDescription) setDescription(intent.strategyDescription);
+      if (intent.symbol) setSymbol(intent.symbol);
+      if (intent.capitalAllocation) setAllocatedCapital(intent.capitalAllocation);
+      if (intent.stopLossPct) setStopLossPct(intent.stopLossPct);
+      if (intent.takeProfitPct) setTakeProfitPct(intent.takeProfitPct);
+      if (intent.riskPerTradePct) setRiskPerTradePct(intent.riskPerTradePct);
+      if (intent.timeframe) setPrimaryTimeframe(intent.timeframe);
+
+      if (intent.assetClass) {
+        const ac = String(intent.assetClass).toUpperCase();
+        if (ac.includes("OPTION")) {
+          setAssetClass(ac.includes("CRYPTO") ? "CRYPTO_OPTIONS" : "OPTIONS");
+          setGroupName(ac.includes("CRYPTO") ? "Crypto Options Bots" : "NSE Options Bots");
+        } else if (ac.includes("FUTUR") || ac.includes("PERP")) {
+          setAssetClass("FUTURES");
+          setGroupName("Futures Trend Bots");
+        } else if (ac.includes("STOCK") || ac.includes("EQUITY")) {
+          setAssetClass("STOCKS");
+          setGroupName("Equity Confluence Bots");
+        } else {
+          setAssetClass("CRYPTO");
+          setGroupName("Crypto Scalping Bots");
         }
       }
+
+      // Map strategy indicators
+      if (Array.isArray(intent.indicators) && intent.indicators.length > 0) {
+        const mappedIndicators: IndicatorConfigItem[] = intent.indicators.map((ind: any, idx: number) => ({
+          id: `ind_${String(ind.parameter || idx).toLowerCase().replace(/[^a-z0-9]/g, "_")}`,
+          name: ind.name || `Indicator ${idx + 1}`,
+          category: (ind.name?.toLowerCase().includes("rsi") || ind.name?.toLowerCase().includes("macd") ? "Momentum" : ind.name?.toLowerCase().includes("volume") || ind.name?.toLowerCase().includes("vwap") ? "Volume" : "Trend") as any,
+          timeframe: intent.timeframe || "15m",
+          params: { period: parseInt(ind.parameter, 10) || 14, defaultSetting: ind.defaultSetting || "" },
+        }));
+        setSelectedIndicators(mappedIndicators);
+      }
+
+      // Map strategy setup rules
+      if (Array.isArray(intent.rules) && intent.rules.length > 0) {
+        const mappedRules: StrategyRuleItem[] = intent.rules.map((rule: any, idx: number) => ({
+          id: `rule-${idx + 1}-${Date.now()}`,
+          leftIndicatorId: (rule.category?.toLowerCase() || "trend").slice(0, 8),
+          operator: ">",
+          rightType: "THRESHOLD",
+          rightValue: 50,
+          isMandatory: rule.required !== false,
+        }));
+        setStrategyRules(mappedRules);
+      }
+
+      // Clear intent once loaded so it doesn't overwrite subsequent manual changes
+      clearIntent();
+      return;
     }
-  }, [isOpen]);
+
+    // Fallback: Load Saved Draft on open if no active intent
+    const saved = localStorage.getItem("quantos_bot_wizard_draft");
+    if (saved) {
+      try {
+        const draft = JSON.parse(saved);
+        if (draft.name) setName(draft.name);
+        if (draft.totalCapital) setTotalCapital(draft.totalCapital);
+        if (draft.allocatedCapital) setAllocatedCapital(draft.allocatedCapital);
+        if (draft.assetClass) setAssetClass(draft.assetClass);
+        if (draft.symbol) setSymbol(draft.symbol);
+      } catch (e) {
+        // ignore corrupted draft
+      }
+    }
+  }, [isOpen, activeIntentFromStore, loadStoredIntent, clearIntent]);
 
   const handleSaveDraft = () => {
     const draft = {

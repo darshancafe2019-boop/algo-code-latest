@@ -49,6 +49,7 @@ type SortField =
   | "strike"
   | "call_oi"
   | "call_oiChange"
+  | "call_oiChangePercent"
   | "call_previousOi"
   | "call_volume"
   | "call_previousVolume"
@@ -57,7 +58,11 @@ type SortField =
   | "call_delta"
   | "call_gamma"
   | "call_theta"
+  | "call_thetaOi"
   | "call_vega"
+  | "call_rho"
+  | "call_intrinsicValue"
+  | "call_timeValue"
   | "call_volumeOiRatio"
   | "call_averagePrice"
   | "call_spread"
@@ -66,12 +71,17 @@ type SortField =
   | "put_volume"
   | "put_previousVolume"
   | "put_oiChange"
+  | "put_oiChangePercent"
   | "put_oi"
   | "put_previousOi"
   | "put_delta"
   | "put_gamma"
   | "put_theta"
+  | "put_thetaOi"
   | "put_vega"
+  | "put_rho"
+  | "put_intrinsicValue"
+  | "put_timeValue"
   | "put_volumeOiRatio"
   | "put_averagePrice"
   | "put_spread";
@@ -220,9 +230,13 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.call?.oiChange || 0;
           valB = b.call?.oiChange || 0;
           break;
+        case "call_oiChangePercent":
+          valA = a.call?.oiChangePercent || 0;
+          valB = b.call?.oiChangePercent || 0;
+          break;
         case "call_previousOi":
-          valA = (a.call?.oi || 0) - (a.call?.oiChange || 0);
-          valB = (b.call?.oi || 0) - (b.call?.oiChange || 0);
+          valA = a.call?.previousOi || ((a.call?.oi || 0) - (a.call?.oiChange || 0));
+          valB = b.call?.previousOi || ((b.call?.oi || 0) - (b.call?.oiChange || 0));
           break;
         case "call_volume":
           valA = a.call?.volume || 0;
@@ -252,9 +266,25 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.call?.greeks?.theta || 0;
           valB = b.call?.greeks?.theta || 0;
           break;
+        case "call_thetaOi":
+          valA = a.call?.thetaOi || ((a.call?.greeks?.theta || 0) * (a.call?.oi || 0));
+          valB = b.call?.thetaOi || ((b.call?.greeks?.theta || 0) * (b.call?.oi || 0));
+          break;
         case "call_vega":
           valA = a.call?.greeks?.vega || 0;
           valB = b.call?.greeks?.vega || 0;
+          break;
+        case "call_rho":
+          valA = a.call?.greeks?.rho || 0;
+          valB = b.call?.greeks?.rho || 0;
+          break;
+        case "call_intrinsicValue":
+          valA = a.call?.intrinsicValue || 0;
+          valB = b.call?.intrinsicValue || 0;
+          break;
+        case "call_timeValue":
+          valA = a.call?.timeValue || 0;
+          valB = b.call?.timeValue || 0;
           break;
         case "call_volumeOiRatio":
           valA = a.call?.volumeOiRatio || 0;
@@ -288,13 +318,17 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.put?.oiChange || 0;
           valB = b.put?.oiChange || 0;
           break;
+        case "put_oiChangePercent":
+          valA = a.put?.oiChangePercent || 0;
+          valB = b.put?.oiChangePercent || 0;
+          break;
         case "put_oi":
           valA = a.put?.oi || 0;
           valB = b.put?.oi || 0;
           break;
         case "put_previousOi":
-          valA = (a.put?.oi || 0) - (a.put?.oiChange || 0);
-          valB = (b.put?.oi || 0) - (b.put?.oiChange || 0);
+          valA = a.put?.previousOi || ((a.put?.oi || 0) - (a.put?.oiChange || 0));
+          valB = b.put?.previousOi || ((b.put?.oi || 0) - (b.put?.oiChange || 0));
           break;
         case "put_delta":
           valA = a.put?.greeks?.delta || 0;
@@ -308,9 +342,25 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
           valA = a.put?.greeks?.theta || 0;
           valB = b.put?.greeks?.theta || 0;
           break;
+        case "put_thetaOi":
+          valA = a.put?.thetaOi || ((a.put?.greeks?.theta || 0) * (a.put?.oi || 0));
+          valB = b.put?.thetaOi || ((b.put?.greeks?.theta || 0) * (b.put?.oi || 0));
+          break;
         case "put_vega":
           valA = a.put?.greeks?.vega || 0;
           valB = b.put?.greeks?.vega || 0;
+          break;
+        case "put_rho":
+          valA = a.put?.greeks?.rho || 0;
+          valB = b.put?.greeks?.rho || 0;
+          break;
+        case "put_intrinsicValue":
+          valA = a.put?.intrinsicValue || 0;
+          valB = b.put?.intrinsicValue || 0;
+          break;
+        case "put_timeValue":
+          valA = a.put?.timeValue || 0;
+          valB = b.put?.timeValue || 0;
           break;
         case "put_volumeOiRatio":
           valA = a.put?.volumeOiRatio || 0;
@@ -400,6 +450,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
     if (columnConfig.previousOi) count++;
     if (columnConfig.oi) count++;
     if (columnConfig.oiChange) count++;
+    if (columnConfig.oiChangePercent) count++;
     if (columnConfig.previousVolume) count++;
     if (columnConfig.volume) count++;
     if (columnConfig.volumeOiRatio) count++;
@@ -408,7 +459,11 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
     if (columnConfig.delta) count++;
     if (columnConfig.gamma) count++;
     if (columnConfig.theta) count++;
+    if (columnConfig.thetaOi) count++;
     if (columnConfig.vega) count++;
+    if (columnConfig.rho) count++;
+    if (columnConfig.intrinsicValue) count++;
+    if (columnConfig.timeValue) count++;
     if (columnConfig.bidQty) count++;
     if (columnConfig.bid) count++;
     if (columnConfig.ask) count++;
@@ -432,16 +487,21 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
     if (columnConfig.bid) count++;
     if (columnConfig.ask) count++;
     if (columnConfig.askQty) count++;
+    if (columnConfig.intrinsicValue) count++;
+    if (columnConfig.timeValue) count++;
     if (columnConfig.delta) count++;
     if (columnConfig.gamma) count++;
     if (columnConfig.theta) count++;
+    if (columnConfig.thetaOi) count++;
     if (columnConfig.vega) count++;
+    if (columnConfig.rho) count++;
     if (columnConfig.iv) count++;
     if (columnConfig.buildupBadge) count++;
     if (columnConfig.volumeOiRatio) count++;
     if (columnConfig.previousVolume) count++;
     if (columnConfig.volume) count++;
     if (columnConfig.oiChange) count++;
+    if (columnConfig.oiChangePercent) count++;
     if (columnConfig.previousOi) count++;
     if (columnConfig.oi) count++;
     return count;
@@ -509,6 +569,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   ΔOI {renderSortIndicator("call_oiChange")}
                 </th>
               )}
+              {columnConfig.oiChangePercent && (
+                <th
+                  onClick={() => handleHeaderSort("call_oiChangePercent")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white"
+                >
+                  ΔOI% {renderSortIndicator("call_oiChangePercent")}
+                </th>
+              )}
               {columnConfig.previousVolume && (
                 <th
                   onClick={() => handleHeaderSort("call_previousVolume")}
@@ -563,9 +631,17 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
               {columnConfig.theta && (
                 <th
                   onClick={() => handleHeaderSort("call_theta")}
-                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-purple-300"
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-rose-300"
                 >
                   Θ {renderSortIndicator("call_theta")}
+                </th>
+              )}
+              {columnConfig.thetaOi && (
+                <th
+                  onClick={() => handleHeaderSort("call_thetaOi")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-rose-300"
+                >
+                  θ·OI {renderSortIndicator("call_thetaOi")}
                 </th>
               )}
               {columnConfig.vega && (
@@ -574,6 +650,30 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-purple-300"
                 >
                   Vega {renderSortIndicator("call_vega")}
+                </th>
+              )}
+              {columnConfig.rho && (
+                <th
+                  onClick={() => handleHeaderSort("call_rho")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-purple-300"
+                >
+                  Rho {renderSortIndicator("call_rho")}
+                </th>
+              )}
+              {columnConfig.intrinsicValue && (
+                <th
+                  onClick={() => handleHeaderSort("call_intrinsicValue")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-cyan-300"
+                >
+                  Intrinsic {renderSortIndicator("call_intrinsicValue")}
+                </th>
+              )}
+              {columnConfig.timeValue && (
+                <th
+                  onClick={() => handleHeaderSort("call_timeValue")}
+                  className="py-2 px-1.5 text-right cursor-pointer hover:text-white text-cyan-300"
+                >
+                  Time Val {renderSortIndicator("call_timeValue")}
                 </th>
               )}
               {columnConfig.bidQty && <th className="py-2 px-1.5 text-right text-slate-400">B.Qty</th>}
@@ -657,6 +757,22 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
               {columnConfig.bid && <th className="py-2 px-2 text-left text-slate-400">Bid</th>}
               {columnConfig.ask && <th className="py-2 px-2 text-left text-slate-400">Ask</th>}
               {columnConfig.askQty && <th className="py-2 px-1.5 text-left text-slate-400">A.Qty</th>}
+              {columnConfig.intrinsicValue && (
+                <th
+                  onClick={() => handleHeaderSort("put_intrinsicValue")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-cyan-300"
+                >
+                  Intrinsic {renderSortIndicator("put_intrinsicValue")}
+                </th>
+              )}
+              {columnConfig.timeValue && (
+                <th
+                  onClick={() => handleHeaderSort("put_timeValue")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-cyan-300"
+                >
+                  Time Val {renderSortIndicator("put_timeValue")}
+                </th>
+              )}
               {columnConfig.delta && (
                 <th
                   onClick={() => handleHeaderSort("put_delta")}
@@ -676,9 +792,17 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
               {columnConfig.theta && (
                 <th
                   onClick={() => handleHeaderSort("put_theta")}
-                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-rose-300"
                 >
                   Θ {renderSortIndicator("put_theta")}
+                </th>
+              )}
+              {columnConfig.thetaOi && (
+                <th
+                  onClick={() => handleHeaderSort("put_thetaOi")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-rose-300"
+                >
+                  θ·OI {renderSortIndicator("put_thetaOi")}
                 </th>
               )}
               {columnConfig.vega && (
@@ -687,6 +811,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
                 >
                   Vega {renderSortIndicator("put_vega")}
+                </th>
+              )}
+              {columnConfig.rho && (
+                <th
+                  onClick={() => handleHeaderSort("put_rho")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white text-purple-300"
+                >
+                  Rho {renderSortIndicator("put_rho")}
                 </th>
               )}
               {columnConfig.iv && (
@@ -730,6 +862,14 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                   className="py-2 px-2 text-left cursor-pointer hover:text-white"
                 >
                   ΔOI {renderSortIndicator("put_oiChange")}
+                </th>
+              )}
+              {columnConfig.oiChangePercent && (
+                <th
+                  onClick={() => handleHeaderSort("put_oiChangePercent")}
+                  className="py-2 px-1.5 text-left cursor-pointer hover:text-white"
+                >
+                  ΔOI% {renderSortIndicator("put_oiChangePercent")}
                 </th>
               )}
               {columnConfig.previousOi && (
@@ -831,6 +971,21 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                           : "—"}
                       </td>
                     )}
+                    {columnConfig.oiChangePercent && (
+                      <td
+                        className={`py-2 px-1.5 text-right ${callBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
+                          call && call.oiChangePercent && call.oiChangePercent > 0
+                            ? "text-emerald-400"
+                            : call && call.oiChangePercent && call.oiChangePercent < 0
+                            ? "text-rose-400"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {call && call.oiChangePercent !== null && call.oiChangePercent !== undefined && call.oiChangePercent !== 0
+                          ? `${call.oiChangePercent > 0 ? "+" : ""}${call.oiChangePercent.toFixed(2)}%`
+                          : "—"}
+                      </td>
+                    )}
                     {columnConfig.previousVolume && (
                       <td className={`py-2 px-2 text-right ${callBgClass} text-slate-400 text-xs sm:text-[13px] md:text-sm lg:text-[14px]`}>
                         {call && call.previousVolume !== null && call.previousVolume !== undefined ? formatIndianQuantity(call.previousVolume) : "—"}
@@ -871,9 +1026,35 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         {call?.greeks?.theta !== undefined && call?.greeks?.theta !== null ? call.greeks.theta.toFixed(2) : "—"}
                       </td>
                     )}
+                    {columnConfig.thetaOi && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-rose-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.thetaOi !== undefined && call?.thetaOi !== null
+                          ? formatIndianCurrency(call.thetaOi, currency)
+                          : "—"}
+                      </td>
+                    )}
                     {columnConfig.vega && (
                       <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {call?.greeks?.vega !== undefined && call?.greeks?.vega !== null ? call.greeks.vega.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.rho && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.greeks?.rho !== undefined && call?.greeks?.rho !== null ? call.greeks.rho.toFixed(4) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.intrinsicValue && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-cyan-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.intrinsicValue !== undefined && call?.intrinsicValue !== null && call.intrinsicValue > 0
+                          ? formatIndianCurrency(call.intrinsicValue, currency)
+                          : "—"}
+                      </td>
+                    )}
+                    {columnConfig.timeValue && (
+                      <td className={`py-2 px-1.5 text-right ${callBgClass} text-cyan-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {call?.timeValue !== undefined && call?.timeValue !== null && call.timeValue > 0
+                          ? formatIndianCurrency(call.timeValue, currency)
+                          : "—"}
                       </td>
                     )}
                     {columnConfig.bidQty && (
@@ -1222,6 +1403,20 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         {put?.askQty ? formatIndianQuantity(put.askQty) : "—"}
                       </td>
                     )}
+                    {columnConfig.intrinsicValue && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-cyan-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.intrinsicValue !== undefined && put?.intrinsicValue !== null && put.intrinsicValue > 0
+                          ? formatIndianCurrency(put.intrinsicValue, currency)
+                          : "—"}
+                      </td>
+                    )}
+                    {columnConfig.timeValue && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-cyan-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.timeValue !== undefined && put?.timeValue !== null && put.timeValue > 0
+                          ? formatIndianCurrency(put.timeValue, currency)
+                          : "—"}
+                      </td>
+                    )}
                     {columnConfig.delta && (
                       <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.greeks?.delta !== undefined ? put.greeks.delta.toFixed(3) : "—"}
@@ -1237,9 +1432,21 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         {put?.greeks?.theta !== undefined ? put.greeks.theta.toFixed(2) : "—"}
                       </td>
                     )}
+                    {columnConfig.thetaOi && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-rose-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.thetaOi !== undefined && put?.thetaOi !== null
+                          ? formatIndianCurrency(put.thetaOi, currency)
+                          : "—"}
+                      </td>
+                    )}
                     {columnConfig.vega && (
                       <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
                         {put?.greeks?.vega !== undefined ? put.greeks.vega.toFixed(2) : "—"}
+                      </td>
+                    )}
+                    {columnConfig.rho && (
+                      <td className={`py-2 px-1.5 text-left ${putBgClass} text-purple-300 text-[11px] sm:text-xs md:text-[13px]`}>
+                        {put?.greeks?.rho !== undefined ? put.greeks.rho.toFixed(4) : "—"}
                       </td>
                     )}
                     {columnConfig.iv && (
@@ -1278,6 +1485,21 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                         }`}
                       >
                         {put && put.oiChange !== null && put.oiChange !== undefined && put.oiChange !== 0 ? `${put.oiChange > 0 ? "+" : ""}${formatIndianQuantity(put.oiChange)}` : "—"}
+                      </td>
+                    )}
+                    {columnConfig.oiChangePercent && (
+                      <td
+                        className={`py-2 px-1.5 text-left ${putBgClass} text-xs sm:text-[13px] md:text-sm lg:text-[14px] ${
+                          put && put.oiChangePercent && put.oiChangePercent > 0
+                            ? "text-emerald-400"
+                            : put && put.oiChangePercent && put.oiChangePercent < 0
+                            ? "text-rose-400"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        {put && put.oiChangePercent !== null && put.oiChangePercent !== undefined && put.oiChangePercent !== 0
+                          ? `${put.oiChangePercent > 0 ? "+" : ""}${put.oiChangePercent.toFixed(2)}%`
+                          : "—"}
                       </td>
                     )}
                     {columnConfig.previousOi && (

@@ -167,7 +167,7 @@ export const LiveTickerItem = memo(function LiveTickerItem({
 
     let rawChgPct =
       directStoreQuote?.changePercent ??
-      (directStoreQuote?.rawPayload?.change_pct != null ? Number(directStoreQuote.rawPayload.change_pct) : null) ??
+      ((directStoreQuote as any)?.rawPayload?.change_pct != null ? Number((directStoreQuote as any).rawPayload.change_pct) : null) ??
       activeQ?.change_pct ??
       (activeQ as any)?.changePercent ??
       (activeQ as any)?.change_percent ??

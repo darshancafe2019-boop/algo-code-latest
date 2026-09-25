@@ -50,6 +50,7 @@ const STRIKE_RANGE_PRESETS = [
   { label: "ATM ±15", value: 30 },
   { label: "ATM ±25", value: 50 },
   { label: "ATM ±50", value: 100 },
+  { label: "All", value: 999 },
 ];
 
 export const OptionTerminalControlBar: React.FC<OptionTerminalControlBarProps> = ({

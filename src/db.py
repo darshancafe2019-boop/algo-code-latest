@@ -2521,15 +2521,22 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_bot_inst_id ON trades_log(bot_instance_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_symbol ON trades_log(symbol)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_status ON trades_log(status)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_mode_status ON trades_log(execution_mode, status)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_mode_status_ts ON trades_log(execution_mode, status, timestamp DESC)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_cust_mode ON trades_log(customer_id, execution_mode)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_strategy ON trades_log(strategy)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_strategy_name ON trades_log(strategy_name)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_timestamp ON trades_log(timestamp)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_exit_ts ON trades_log(exit_timestamp)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_id_asc ON bot_event_audit(id ASC)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_bot_id ON bot_event_audit(bot_instance_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_symbol ON bot_event_audit(symbol)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_event_type ON bot_event_audit(event_type)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON bot_event_audit(timestamp_utc)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_correlation_id ON bot_event_audit(correlation_id)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_mode ON bot_instances(execution_mode, status)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_deleted_created ON bot_instances(is_deleted, created_at ASC)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_lookup ON user_sessions(token_hash, is_revoked, expires_at)")
 
                 # Check and alter indicator_configs for universal schema columns
                 try:

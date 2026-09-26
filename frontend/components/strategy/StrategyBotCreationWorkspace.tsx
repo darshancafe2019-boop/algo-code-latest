@@ -553,6 +553,42 @@ export function StrategyBotCreationWorkspace() {
       }
     } catch {}
 
+    // Handle incoming template intent from Strategy Center or Strategy IDE
+    if (storedIntent?.strategyTemplateId || storedIntent?.initialStrategyName) {
+      isInitializedRef.current = true;
+      if (storedIntent.initialStrategyName) setBotName(storedIntent.initialStrategyName);
+      if (storedIntent.symbol) {
+        const cleanSymbol = storedIntent.symbol.split("/")[0].split("-")[0].toUpperCase();
+        if (POPULAR_UNDERLYINGS.some((u) => u.symbol === cleanSymbol)) {
+          setUnderlying(cleanSymbol);
+        }
+      }
+
+      const templateMap: Record<string, string> = {
+        "options-strat-01": "IRON_CONDOR",
+        "options-strat-02": "LONG_STRANGLE",
+        "options-strat-03": "IRON_BUTTERFLY",
+        "options-strat-04": "IRON_BUTTERFLY",
+        "options-strat-05": "BULL_CALL_SPREAD",
+        "options-strat-06": "BEAR_PUT_SPREAD",
+        "options-strat-07": "BULL_PUT_SPREAD",
+        "options-strat-08": "BEAR_CALL_SPREAD",
+        "options-strat-09": "SHORT_STRADDLE",
+        "options-strat-10": "LONG_STRADDLE",
+        "options-strat-11": "SHORT_STRANGLE",
+        "options-strat-12": "LONG_STRANGLE",
+        "options-strat-18": "COVERED_CALL",
+        "options-strat-24": "IRON_CONDOR",
+      };
+
+      const mappedId = templateMap[storedIntent.strategyTemplateId || ""] || storedIntent.strategyTemplateId;
+      if (mappedId && STRATEGY_CATALOG.some((s) => s.id === mappedId)) {
+        setSelectedStrategyId(mappedId);
+      }
+      useBotCreationIntentStore.getState().clearIntent();
+      return;
+    }
+
     // Fallback template initialization
     if (qStrategy && STRATEGY_CATALOG.some((s) => s.id === qStrategy)) {
       setSelectedStrategyId(qStrategy);

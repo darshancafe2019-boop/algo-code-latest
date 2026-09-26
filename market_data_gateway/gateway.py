@@ -331,10 +331,20 @@ class MarketDataGateway:
         except Exception as bridge_err:
             logger.debug("DhanFeedManager direct bridge note: %s", bridge_err)
 
+        def _dispatch_async(coro):
+            try:
+                loop = getattr(self, "_loop", None)
+                if loop and loop.is_running():
+                    asyncio.run_coroutine_threadsafe(coro, loop)
+                else:
+                    asyncio.ensure_future(coro)
+            except Exception:
+                pass
+
         self.subscription_registry = SubscriptionRegistry(
-            add_callback=lambda sym: asyncio.ensure_future(self._on_new_subscription(sym)),
-            remove_callback=lambda sym: asyncio.ensure_future(self._on_remove_subscription(sym)),
-            batch_remove_callback=lambda syms: asyncio.ensure_future(self._on_batch_remove_subscription(syms)),
+            add_callback=lambda sym, mode="full": _dispatch_async(self._on_new_subscription(sym)),
+            remove_callback=lambda sym: _dispatch_async(self._on_remove_subscription(sym)),
+            batch_remove_callback=lambda syms: _dispatch_async(self._on_batch_remove_subscription(syms)),
         )
 
         for adapter in self.adapters.values():
@@ -342,6 +352,7 @@ class MarketDataGateway:
 
     async def startup(self) -> None:
         """Connect all adapters and initialize storage."""
+        self._loop = asyncio.get_running_loop()
         # Start Dhan background credential watcher
         global_dhan_credential_manager.start_background_watcher(interval_sec=300)
 
@@ -390,7 +401,7 @@ class MarketDataGateway:
                 try:
                     await adapter.unsubscribe(matching)
                 except Exception as ex:
-                    logger.error("Error batch unsubscribing from %s: %s", adapter.name, ex)
+                    logger.error("Error batch unsubscribing from %s: %s", getattr(adapter, "provider_name", getattr(adapter, "name", "adapter")), ex)
 
     # ─── WebSocket fan-out ────────────────────────────────────────────────────
 
@@ -469,7 +480,7 @@ class MarketDataGateway:
         valid_quotes = list(self._quote_cache.values())
         live_cnt = sum(1 for q in valid_quotes if not getattr(q, "is_stale", False) and (getattr(q, "last_price", 0) or 0) > 0)
         stale_cnt = sum(1 for q in valid_quotes if getattr(q, "is_stale", False) or (getattr(q, "last_price", 0) or 0) <= 0)
-        tick_timestamps = [str(q.received_timestamp) for q in valid_quotes if getattr(q, "received_timestamp", None)]
+        tick_timestamps = [q.received_timestamp if isinstance(q.received_timestamp, str) else str(q.received_timestamp) for q in valid_quotes if getattr(q, "received_timestamp", None)]
         latest_tick = max(tick_timestamps, default=None)
 
         return web.json_response({

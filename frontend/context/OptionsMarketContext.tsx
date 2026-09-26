@@ -148,7 +148,7 @@ export function OptionsMarketProvider({ children }: { children: React.ReactNode 
   const [executionMode, setExecutionMode] = useState<"PAPER" | "LIVE">("PAPER");
   const [accountStatus, setAccountStatus] = useState<BrokerAccountStatus>("CONNECTED");
 
-  const [availableExpiries] = useState<string[]>([
+  const [availableExpiries, setAvailableExpiries] = useState<string[]>([
     "28-SEP-2026",
     "05-OCT-2026",
     "12-OCT-2026",
@@ -156,6 +156,46 @@ export function OptionsMarketProvider({ children }: { children: React.ReactNode 
     "26-NOV-2026",
   ]);
   const [selectedExpiry, setSelectedExpiry] = useState<string>("28-SEP-2026");
+
+  // Live Market Quote and Expiry Synchronizer
+  useEffect(() => {
+    let isMounted = true;
+    const syncLiveMarketData = async () => {
+      try {
+        const cleanUnderlying = selectedUnderlying.symbol.split(" ")[0].replace(/-OPTIONS$/, "").toUpperCase();
+        const res = await fetch(`/api/options/chain?underlying=${encodeURIComponent(cleanUnderlying)}`, { cache: "no-store" });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          const liveSpot = data?.spot_price || data?.underlying_price;
+          if (liveSpot && liveSpot > 0) {
+            setSpotPrice(liveSpot);
+            setSelectedUnderlying((prev) => ({ ...prev, spotPrice: liveSpot }));
+          }
+          if (Array.isArray(data?.expiries) && data.expiries.length > 0) {
+            setAvailableExpiries(data.expiries);
+            if (!data.expiries.includes(selectedExpiry)) {
+              setSelectedExpiry(data.expiries[0]);
+            }
+          } else if (data?.expiry) {
+            setAvailableExpiries([data.expiry]);
+            setSelectedExpiry(data.expiry);
+          }
+          setQuoteTimestamp(new Date().toISOString());
+          setQuoteAgeSeconds(0);
+          setDataStatus("LIVE");
+        }
+      } catch (err) {
+        // Retain current quote
+      }
+    };
+
+    syncLiveMarketData();
+    const interval = setInterval(syncLiveMarketData, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [selectedUnderlying.symbol, selectedExpiry]);
 
   // Navigation & Builder State
   const [activeSection, setActiveSection] = useState<WorkstationPrimarySection>("build");

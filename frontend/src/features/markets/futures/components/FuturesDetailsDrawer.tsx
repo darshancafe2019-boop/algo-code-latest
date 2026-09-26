@@ -28,6 +28,8 @@ import {
   RotateCcw,
   Scale,
   RefreshCw,
+  BarChart2,
+  Move,
 } from "lucide-react";
 import {
   CanonicalFuturesContract,
@@ -46,13 +48,14 @@ import {
 } from "../api/futures-api";
 import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
 import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
+import { FuturesInteractiveChart } from "./FuturesInteractiveChart";
 
 interface FuturesDetailsDrawerProps {
   contract: CanonicalFuturesContract | null;
   isOpen?: boolean;
   onClose?: () => void;
   initialSide?: "BUY" | "SELL" | "LONG" | "SHORT";
-  initialTab?: "TRADE" | "BOOK" | "METRICS" | "RISK";
+  initialTab?: "TRADE" | "CHART" | "BOOK" | "METRICS" | "RISK";
   onOrderSuccess?: (result: any) => void;
   isInline?: boolean; // When true on desktop, renders as sticky column inside grid without overlay
 }
@@ -84,7 +87,7 @@ export function FuturesDetailsDrawer({
     : null;
   const currentLivePrice = liveQuote?.lastPrice ?? contract?.last_price ?? contract?.mark_price ?? 0;
 
-  const [activeSubTab, setActiveSubTab] = useState<"TRADE" | "BOOK" | "METRICS" | "RISK">(initialTab);
+  const [activeSubTab, setActiveSubTab] = useState<"TRADE" | "CHART" | "BOOK" | "METRICS" | "RISK">(initialTab);
   const [tradeSide, setTradeSide] = useState<"BUY" | "SELL">(
     initialSide === "SELL" || initialSide === "SHORT" ? "SELL" : "BUY"
   );
@@ -407,10 +410,11 @@ export function FuturesDetailsDrawer({
         {/* Trade Ticket Subtabs */}
         <div className="flex items-center gap-1 p-1 rounded-xl bg-[#06101B] border border-[#12304A] font-mono text-xs">
           {[
-            { id: "TRADE", label: "Trade Ticket", icon: Zap },
-            { id: "BOOK", label: "Order Book", icon: BookOpen },
+            { id: "TRADE", label: "Ticket", icon: Zap },
+            { id: "CHART", label: "Chart (Drag)", icon: BarChart2 },
+            { id: "BOOK", label: "Book", icon: BookOpen },
             { id: "METRICS", label: "Metrics", icon: Layers },
-            { id: "RISK", label: "Risk Guard", icon: Shield },
+            { id: "RISK", label: "Risk", icon: Shield },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeSubTab === tab.id;
@@ -419,7 +423,7 @@ export function FuturesDetailsDrawer({
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveSubTab(tab.id as any)}
-                className={`flex-1 py-1 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 text-[11px] ${
+                className={`flex-1 py-1 rounded-lg font-bold transition text-center flex items-center justify-center gap-1 text-[10px] ${
                   isActive
                     ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
                     : "text-slate-400 hover:text-white hover:bg-slate-800"
@@ -714,6 +718,18 @@ export function FuturesDetailsDrawer({
                 </div>
               </div>
             </div>
+          </div>
+        ) : activeSubTab === "CHART" ? (
+          /* Live Interactive Draggable Chart View */
+          <div className="h-[380px] w-full min-w-0">
+            <FuturesInteractiveChart
+              contract={contract}
+              livePrice={currentLivePrice}
+              initialStopLoss={stopLoss}
+              initialTakeProfit={takeProfit}
+              onSetStopLoss={(p) => setStopLoss(p)}
+              onSetTakeProfit={(p) => setTakeProfit(p)}
+            />
           </div>
         ) : activeSubTab === "BOOK" ? (
           /* Live Interactive Order Book View */

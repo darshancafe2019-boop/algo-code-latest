@@ -592,6 +592,10 @@ class BotProcessManager:
 
         return alive
 
+    def get_running_bot_ids(self) -> list:
+        """Returns list of running bot IDs for this manager instance."""
+        return [self.bot_id] if self.is_running() else []
+
     def get_status(self) -> Dict[str, Any]:
         """Return authoritative bot status and server-calculated uptime."""
         running = self.is_running()
@@ -955,6 +959,23 @@ class MultiBotManager:
         }
 
     control_group_bots = execute_group_action
+
+    def get_running_bot_ids(self) -> list:
+        """Returns list of currently running bot IDs across all managed instances and DB."""
+        with self._lock:
+            active_ids = [bid for bid, mgr in self.managers.items() if mgr.is_running()]
+        if not active_ids:
+            try:
+                from src.db import get_connection
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM bot_instances WHERE status = 'RUNNING' AND COALESCE(is_deleted, 0) = 0")
+                rows = cursor.fetchall()
+                conn.close()
+                active_ids = [r["id"] if isinstance(r, dict) else r[0] for r in rows]
+            except Exception:
+                pass
+        return active_ids
 
     def _update_db_status(self, bot_id: str, status: str, pid: Optional[int] = None, error: Optional[str] = None) -> None:
 

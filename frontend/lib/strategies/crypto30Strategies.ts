@@ -17,7 +17,8 @@ export type StrategyCategory =
   | "Pullback & Mean Reversion"
   | "Structure & Reversal"
   | "Momentum & Volume"
-  | "Crypto-Specific & Multi-Factor";
+  | "Crypto-Specific & Multi-Factor"
+  | "Multi-Leg Options & Income";
 
 export type StrategyPart =
   | "PART I — TREND & CONTINUATION"
@@ -25,7 +26,8 @@ export type StrategyPart =
   | "PART III — PULLBACK & MEAN REVERSION"
   | "PART IV — STRUCTURE & REVERSAL"
   | "PART V — MOMENTUM & VOLUME"
-  | "PART VI — CRYPTO-SPECIFIC & MULTI-FACTOR";
+  | "PART VI — CRYPTO-SPECIFIC & MULTI-FACTOR"
+  | "PART VII — MULTI-LEG OPTIONS & INCOME";
 
 export type StrategySignalState =
   | "NO_SETUP"
@@ -76,7 +78,7 @@ export interface TradeSimulationStep {
 
 export interface TradeSimulationExample {
   instrument: string;
-  direction: "LONG" | "SHORT";
+  direction: "LONG" | "SHORT" | "LONG / SHORT" | "NEUTRAL";
   entryPrice: number;
   stopPrice: number;
   targetPrice: number;
@@ -1938,9 +1940,13 @@ export const QUANTOS_PRO_STRATEGIES: CryptoStrategyDefinition[] = [
   },
 ];
 
+import { OPTIONS_24_STRATEGIES } from "./options24Strategies";
+export { OPTIONS_24_STRATEGIES };
+
 export const ALL_QUANTOS_STRATEGIES: CryptoStrategyDefinition[] = [
   ...CRYPTO_30_STRATEGIES,
   ...QUANTOS_PRO_STRATEGIES,
+  ...OPTIONS_24_STRATEGIES,
 ];
 
 export const STRATEGY_CATEGORIES: Array<{
@@ -1991,5 +1997,12 @@ export const STRATEGY_CATEGORIES: Array<{
     description: "Basis spread dislocations, Open Interest surges, liquidation cascade flush-and-reclaims, BTC.D filters, and 3-factor regimes.",
     count: 5,
     iconName: "Coins",
+  },
+  {
+    part: "PART VII — MULTI-LEG OPTIONS & INCOME",
+    name: "Multi-Leg Options & Income",
+    description: "Multi-leg options architectures (Iron Condors, Butterflies, Vertical Spreads, Straddles, Calendars) for defined-risk theta decay and volatility harvest.",
+    count: 24,
+    iconName: "Layers",
   },
 ];

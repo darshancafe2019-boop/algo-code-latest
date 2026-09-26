@@ -24,51 +24,120 @@ export function PremiumSelectorTab({
   const [targetDelta, setTargetDelta] = useState<number>(0.30);
   const [optionTypeFilter, setOptionTypeFilter] = useState<"ALL" | "CE" | "PE">("ALL");
   const [isContractLocked, setIsContractLocked] = useState<boolean>(true);
+  const [liveChain, setLiveChain] = useState<any>(null);
 
-  // Generate dynamic strike candidates with conservative bid/ask pricing
-  const step = spotPrice > 10000 ? 50 : 10;
-  const atm = Math.round(spotPrice / step) * step;
+  // Fetch Live Option Chain
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchChain = async () => {
+      try {
+        const cleanUnderlying = underlying.split(" ")[0].replace(/-OPTIONS$/, "").toUpperCase();
+        const res = await fetch(`/api/options/chain?underlying=${encodeURIComponent(cleanUnderlying)}`, { cache: "no-store" });
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setLiveChain(data);
+        }
+      } catch (e) {
+        // Fallback
+      }
+    };
+    fetchChain();
+    const timer = setInterval(fetchChain, 10000);
+    return () => {
+      isMounted = false;
+      clearInterval(timer);
+    };
+  }, [underlying]);
 
-  const candidateStrikes = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].flatMap((offset) => {
-    const k = atm + offset * step;
-    const isCallItm = k < spotPrice;
-    const isPutItm = k > spotPrice;
+  const effectiveSpot = liveChain?.spot_price && liveChain.spot_price > 0 ? liveChain.spot_price : (spotPrice || 24800);
+  const step = effectiveSpot > 10000 ? 50 : effectiveSpot > 1000 ? 10 : 2.5;
+  const atm = Math.round(effectiveSpot / step) * step;
 
-    // Approximated premiums
-    const callTheo = Math.max(10, (spotPrice - k > 0 ? spotPrice - k : 0) + spotPrice * 0.015 * Math.exp(-Math.abs(offset) * 0.25));
-    const putTheo = Math.max(10, (k - spotPrice > 0 ? k - spotPrice : 0) + spotPrice * 0.015 * Math.exp(-Math.abs(offset) * 0.25));
+  // Build candidate strikes from authentic live chain if available
+  const candidateStrikes = React.useMemo(() => {
+    const rawStrikes: any[] = liveChain?.strikes || [];
+    if (rawStrikes.length > 0) {
+      return rawStrikes.flatMap((s: any) => {
+        const k = s.strike_price || s.strike || 0;
+        const callQuote = s.call || {};
+        const putQuote = s.put || {};
+        const isCallItm = k < effectiveSpot;
+        const isPutItm = k > effectiveSpot;
 
-    return [
-      {
-        contract_id: `${underlying}-${k}-CE`,
-        underlying,
-        strike: k,
-        option_type: "CE",
-        moneyness: offset === 0 ? "ATM" : isCallItm ? "ITM" : "OTM",
-        theoretical_price: round2(callTheo),
-        bid_price: round2(callTheo * 0.98), // Conservative sell fill
-        ask_price: round2(callTheo * 1.02), // Conservative buy fill
-        delta: round2(0.50 - offset * 0.07),
-        iv: 14.5 + Math.abs(offset) * 0.3,
-        volume: 45000 - Math.abs(offset) * 3000,
-        oi: 120000 - Math.abs(offset) * 7000,
-      },
-      {
-        contract_id: `${underlying}-${k}-PE`,
-        underlying,
-        strike: k,
-        option_type: "PE",
-        moneyness: offset === 0 ? "ATM" : isPutItm ? "ITM" : "OTM",
-        theoretical_price: round2(putTheo),
-        bid_price: round2(putTheo * 0.98),
-        ask_price: round2(putTheo * 1.02),
-        delta: round2(-0.50 - offset * 0.07),
-        iv: 15.2 + Math.abs(offset) * 0.4,
-        volume: 52000 - Math.abs(offset) * 3200,
-        oi: 135000 - Math.abs(offset) * 8000,
-      },
-    ];
-  });
+        return [
+          {
+            contract_id: `${underlying}-${k}-CE`,
+            underlying,
+            strike: k,
+            option_type: "CE",
+            moneyness: Math.abs(k - atm) < step / 2 ? "ATM" : isCallItm ? "ITM" : "OTM",
+            theoretical_price: callQuote.ltp || callQuote.price || round2(effectiveSpot * 0.015),
+            bid_price: callQuote.bid || round2((callQuote.ltp || 100) * 0.98),
+            ask_price: callQuote.ask || round2((callQuote.ltp || 100) * 1.02),
+            delta: callQuote.delta ?? round2(0.50 - ((k - atm) / step) * 0.05),
+            iv: callQuote.iv ?? 14.5,
+            volume: callQuote.volume ?? 45000,
+            oi: callQuote.oi ?? 120000,
+          },
+          {
+            contract_id: `${underlying}-${k}-PE`,
+            underlying,
+            strike: k,
+            option_type: "PE",
+            moneyness: Math.abs(k - atm) < step / 2 ? "ATM" : isPutItm ? "ITM" : "OTM",
+            theoretical_price: putQuote.ltp || putQuote.price || round2(effectiveSpot * 0.015),
+            bid_price: putQuote.bid || round2((putQuote.ltp || 100) * 0.98),
+            ask_price: putQuote.ask || round2((putQuote.ltp || 100) * 1.02),
+            delta: putQuote.delta ?? round2(-0.50 - ((k - atm) / step) * 0.05),
+            iv: putQuote.iv ?? 15.2,
+            volume: putQuote.volume ?? 52000,
+            oi: putQuote.oi ?? 135000,
+          },
+        ];
+      });
+    }
+
+    // Default calculated fallback
+    return [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6].flatMap((offset) => {
+      const k = atm + offset * step;
+      const isCallItm = k < effectiveSpot;
+      const isPutItm = k > effectiveSpot;
+
+      const callTheo = Math.max(10, (effectiveSpot - k > 0 ? effectiveSpot - k : 0) + effectiveSpot * 0.015 * Math.exp(-Math.abs(offset) * 0.25));
+      const putTheo = Math.max(10, (k - effectiveSpot > 0 ? k - effectiveSpot : 0) + effectiveSpot * 0.015 * Math.exp(-Math.abs(offset) * 0.25));
+
+      return [
+        {
+          contract_id: `${underlying}-${k}-CE`,
+          underlying,
+          strike: k,
+          option_type: "CE",
+          moneyness: offset === 0 ? "ATM" : isCallItm ? "ITM" : "OTM",
+          theoretical_price: round2(callTheo),
+          bid_price: round2(callTheo * 0.98),
+          ask_price: round2(callTheo * 1.02),
+          delta: round2(0.50 - offset * 0.07),
+          iv: 14.5 + Math.abs(offset) * 0.3,
+          volume: 45000 - Math.abs(offset) * 3000,
+          oi: 120000 - Math.abs(offset) * 7000,
+        },
+        {
+          contract_id: `${underlying}-${k}-PE`,
+          underlying,
+          strike: k,
+          option_type: "PE",
+          moneyness: offset === 0 ? "ATM" : isPutItm ? "ITM" : "OTM",
+          theoretical_price: round2(putTheo),
+          bid_price: round2(putTheo * 0.98),
+          ask_price: round2(putTheo * 1.02),
+          delta: round2(-0.50 - offset * 0.07),
+          iv: 15.2 + Math.abs(offset) * 0.4,
+          volume: 52000 - Math.abs(offset) * 3200,
+          oi: 135000 - Math.abs(offset) * 8000,
+        },
+      ];
+    });
+  }, [liveChain, effectiveSpot, atm, step, underlying]);
 
   function round2(v: number) {
     return Math.round(v * 100) / 100;

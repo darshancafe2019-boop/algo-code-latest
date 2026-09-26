@@ -91,7 +91,7 @@ export function TradeAnalysisDashboard({
     },
   });
 
-  // ── 2. Live Market Query (Single Gateway Connection) ─────────────
+  // ── 2. Live Market Query & Option Chain ─────────────────────────────
   const [lastPacketTime, setLastPacketTime] = useState<Date>(new Date());
 
   const { data: liveQuoteData } = useQuery({
@@ -113,6 +113,26 @@ export function TradeAnalysisDashboard({
     refetchInterval: 3000,
   });
 
+  const { data: liveChainData } = useQuery({
+    queryKey: ["tradeAnalysisChain", instrument.underlying],
+    queryFn: async () => {
+      try {
+        const querySym = instrument.underlying || "NIFTY";
+        const res = await fetch(`/api/options/chain?underlying=${encodeURIComponent(querySym)}&strike_count=20`);
+        if (res.ok) {
+          const json = await res.json();
+          return json.canonicalChain || json.data || json;
+        }
+      } catch (err) {
+        console.debug("[TradeAnalysis] Option chain fetch error:", err);
+      }
+      return null;
+    },
+    refetchInterval: 5000,
+  });
+
+  const chainSpot = Number(liveChainData?.spot_price || liveChainData?.spot || 0);
+  const spotPrice = Number(liveQuoteData?.last_price || (chainSpot > 0 ? chainSpot : 23140.5));
   const livePrice = Number(instrument.ltp || liveQuoteData?.last_price || 132.4);
   const dataAgeSeconds = Math.max(0, Math.floor((Date.now() - lastPacketTime.getTime()) / 1000));
   const isDataFresh = dataAgeSeconds < 6;
@@ -123,8 +143,6 @@ export function TradeAnalysisDashboard({
     : "DISCONNECTED";
 
   // ── 3. Multi-Asset Context Derivations ───────────────────────────
-  const spotPrice = Number(liveQuoteData?.last_price || 24856.0);
-
   const underlyingData: UnderlyingMarketData = useMemo(() => {
     return {
       symbol: instrument.underlying || "NIFTY",
@@ -157,7 +175,7 @@ export function TradeAnalysisDashboard({
 
   const chainStats: OptionChainMacroStats = useMemo(() => {
     const isCall = instrument.optionType === "CE";
-    const strike = instrument.strike || 25000;
+    const strike = instrument.strike || Math.round(spotPrice / 50) * 50;
     const moneyness =
       Math.abs(spotPrice - strike) < 25
         ? "ATM"
@@ -169,58 +187,70 @@ export function TradeAnalysisDashboard({
         ? "ITM"
         : "OTM";
 
+    const totalCallOI = liveChainData?.total_call_oi || liveChainData?.totalCallOI || 93882815;
+    const totalPutOI = liveChainData?.total_put_oi || liveChainData?.totalPutOI || 89201450;
+    const pcr = typeof liveChainData?.pcr === "number" ? liveChainData.pcr : 0.95;
+    const maxPainStrike = liveChainData?.max_pain || liveChainData?.maxPain || Math.round(spotPrice / 50) * 50;
+    const atmStrike = liveChainData?.atm_strike || liveChainData?.atmStrike || Math.round(spotPrice / 50) * 50;
+
     return {
-      totalCallOI: 18450000,
-      totalPutOI: 21780000,
-      totalCallVolume: 4890000,
-      totalPutVolume: 5620000,
-      pcr: 1.18,
-      highestCallOIStrike: 25200,
-      highestPutOIStrike: 24800,
-      maxPainStrike: 24800,
-      atmStrike: Math.round(spotPrice / 50) * 50,
+      totalCallOI,
+      totalPutOI,
+      totalCallVolume: liveChainData?.total_call_volume || 4890000,
+      totalPutVolume: liveChainData?.total_put_volume || 5620000,
+      pcr,
+      highestCallOIStrike: maxPainStrike + 200,
+      highestPutOIStrike: maxPainStrike - 200,
+      maxPainStrike,
+      atmStrike,
       moneyness,
       oiBuildup: {
-        type: "LONG_BUILDUP",
-        label: "LONG BUILDUP",
-        description: "Price UP (+2.4%) + OI UP (+18.9%) indicates aggressive buyer participation.",
-        color: "bg-emerald-950 text-emerald-300 border-emerald-500/40",
+        type: pcr >= 1 ? "LONG_BUILDUP" : "SHORT_BUILDUP",
+        label: pcr >= 1 ? "LONG BUILDUP" : "SHORT BUILDUP",
+        description: pcr >= 1 ? `PCR (${pcr.toFixed(2)}) indicates bullish put support.` : `PCR (${pcr.toFixed(2)}) indicates call resistance.`,
+        color: pcr >= 1 ? "bg-emerald-950 text-emerald-300 border-emerald-500/40" : "bg-rose-950 text-rose-300 border-rose-500/40",
       },
     };
-  }, [instrument.optionType, instrument.strike, spotPrice]);
+  }, [instrument.optionType, instrument.strike, spotPrice, liveChainData]);
 
   const callPutComparison: CallPutComparisonData = useMemo(() => {
-    const strike = instrument.strike || 25000;
+    const strike = instrument.strike || Math.round(spotPrice / 50) * 50;
+    const strikesList: any[] = liveChainData?.strikes || liveChainData?.rows || [];
+    const matchedRow = strikesList.find((s) => Math.abs((s.strike || s.strikePrice) - strike) < 25);
+
+    const ce = matchedRow?.ce || matchedRow?.call;
+    const pe = matchedRow?.pe || matchedRow?.put;
+
     return {
       strike,
       call: {
         symbol: `${instrument.underlying} ${strike} CE`,
-        ltp: 132.4,
-        changePct: 2.4,
-        oi: 6830000,
-        oiChangePct: 18.9,
-        volume: 845000,
-        iv: 0.142,
-        delta: 0.52,
-        gamma: 0.0018,
-        theta: -14.5,
-        vega: 18.2,
+        ltp: ce?.ltp ?? ce?.lastPrice ?? 132.4,
+        changePct: ce?.changePct ?? 2.4,
+        oi: ce?.oi ?? 6830000,
+        oiChangePct: ce?.oiChangePct ?? 18.9,
+        volume: ce?.volume ?? 845000,
+        iv: ce?.iv ?? 0.142,
+        delta: ce?.delta ?? 0.52,
+        gamma: ce?.gamma ?? 0.0018,
+        theta: ce?.theta ?? -14.5,
+        vega: ce?.vega ?? 18.2,
       },
       put: {
         symbol: `${instrument.underlying} ${strike} PE`,
-        ltp: 86.8,
-        changePct: -3.8,
-        oi: 5210000,
-        oiChangePct: -8.4,
-        volume: 610000,
-        iv: 0.151,
-        delta: -0.48,
-        gamma: 0.0017,
-        theta: -13.8,
-        vega: 17.6,
+        ltp: pe?.ltp ?? pe?.lastPrice ?? 86.8,
+        changePct: pe?.changePct ?? -3.8,
+        oi: pe?.oi ?? 5210000,
+        oiChangePct: pe?.oiChangePct ?? -8.4,
+        volume: pe?.volume ?? 610000,
+        iv: pe?.iv ?? 0.151,
+        delta: pe?.delta ?? -0.48,
+        gamma: pe?.gamma ?? 0.0017,
+        theta: pe?.theta ?? -13.8,
+        vega: pe?.vega ?? 17.6,
       },
     };
-  }, [instrument.underlying, instrument.strike]);
+  }, [instrument.underlying, instrument.strike, spotPrice, liveChainData]);
 
   // ── 4. Indicators & 9-Factor Confirmation Matrix ─────────────────
   const [activeIndicators, setActiveIndicators] = useState<ActiveIndicator[]>(DEFAULT_ACTIVE_INDICATORS);

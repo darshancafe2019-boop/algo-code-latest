@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Modular Futures Universe Feature Module
  * =======================================
@@ -23,3 +25,4 @@ export * from "./components/FuturesUniverseView";
 export * from "./components/FuturesWorkspace";
 export * from "./components/ProviderHealthRail";
 export * from "./components/SimpleFuturesTable";
+export * from "./components/FuturesInteractiveChart";

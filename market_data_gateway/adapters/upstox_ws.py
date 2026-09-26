@@ -196,7 +196,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 self._subscribed_keys.discard(ik)
                 keys_to_unsub.append(ik)
 
-        if self.is_connected and keys_to_unsub:
+        if self._ws is not None and self.is_connected and keys_to_unsub:
             payload = {
                 "guid": f"quantos_unsub_{int(time.time() * 1000)}",
                 "method": "unsub",
@@ -219,7 +219,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
             if ik:
                 keys_to_change.append(ik)
 
-        if self.is_connected and keys_to_change:
+        if self._ws is not None and self.is_connected and keys_to_change:
             payload = {
                 "guid": f"quantos_mode_{int(time.time() * 1000)}",
                 "method": "change_mode",
@@ -235,7 +235,7 @@ class UpstoxWSAdapter(BaseProviderAdapter):
                 logger.warning("Failed to send Upstox change_mode: %s", e)
 
     async def _send_subscription(self, mode: str = "full") -> None:
-        if not self.is_connected or not self._subscribed_keys:
+        if self._ws is None or not self.is_connected or not self._subscribed_keys:
             return
         payload = {
             "guid": f"quantos_sub_{int(time.time() * 1000)}",

@@ -134,7 +134,7 @@ class FailoverManager:
     Records failover transitions with timestamps and reasons.
     """
 
-    def __init__(self, adapters: Dict[str, BaseProviderAdapter]):
+    def __init__(self, adapters: Dict[str, Any]):
         self._adapters = adapters
         # symbol -> currently-active provider_id
         self._active_provider: Dict[str, str] = {}

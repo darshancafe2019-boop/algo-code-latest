@@ -310,3 +310,26 @@ class PriceActionEngine:
             "fair_value_gaps": fvgs,
             "order_blocks": obs,
         }
+
+    @classmethod
+    def get_ltp(cls, symbol: str) -> Optional[float]:
+        """Resolves the last traded price for a symbol via ticker service or DB."""
+        try:
+            from src.ticker_service import resilient_ticker_service
+            t_data = resilient_ticker_service.get_ticker(symbol)
+            price = float(t_data.get("last") or t_data.get("price") or 0.0)
+            if price > 0:
+                return price
+        except Exception:
+            pass
+        try:
+            from src import db
+            inst = db.get_market_instrument(symbol)
+            if inst:
+                return float(inst.get("last_price") or 0.0)
+        except Exception:
+            pass
+        return None
+
+
+price_action_engine = PriceActionEngine()

@@ -408,33 +408,7 @@ export function BotControlCenterVNext({ botId = "bot_nifty_trend_v1" }: BotContr
         </div>
       </div>
 
-      {/* Sub-Tab Navigation Strip */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-2 text-xs">
-        {[
-          { key: "OVERVIEW", label: "Overview & Telemetry", icon: Layers },
-          { key: "CHART", label: "Interactive Strategy Chart", icon: BarChart3 },
-          { key: "ANALYTICS", label: isOption ? "Option Greeks & Analytics" : "Futures & Basis Analytics", icon: Activity },
-          { key: "DECISIONS", label: "Explainable Decisions", icon: Shield },
-          { key: "SIGNALS", label: "Signal Lifecycle", icon: Zap },
-          { key: "LOGS", label: "Bot Execution Logs", icon: FileText },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveSubTab(tab.key as any)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold transition ${
-                activeSubTab === tab.key
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                  : "text-slate-400 hover:text-slate-200 bg-slate-900/50 border border-slate-800/50"
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+
 
       {/* Sub-Tab 1: OVERVIEW */}
       {activeSubTab === "OVERVIEW" && (

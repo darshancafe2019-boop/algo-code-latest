@@ -491,19 +491,37 @@ export function SimpleBotTable({
                   <td className="py-2 px-3 font-mono">
                     {pos.has_position ? (
                       <div>
-                        <span
-                          className={`font-bold text-[11px] ${
-                            pos.direction === "LONG" ? "text-[#00E89A]" : "text-[#FF3B5C]"
-                          }`}
-                        >
-                          {pos.direction} {pos.size}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`font-bold text-[11px] ${
+                              pos.direction === "LONG" ? "text-[#00E89A]" : "text-[#FF3B5C]"
+                            }`}
+                          >
+                            {pos.direction} {pos.size}
+                          </span>
+                          <span className="text-[8px] font-sans font-semibold px-1 py-0.2 rounded bg-[#00E89A]/10 text-[#00E89A] border border-[#00E89A]/20">
+                            IN TRADE
+                          </span>
+                        </div>
                         <div className="text-[10px] text-[#7D8EA5]">
                           @ {formatMoney(pos.entry_price, "$")}
                         </div>
+                        <div className="text-[9px] text-[#168BFF] font-sans font-medium">
+                          Monitoring TP/SL
+                        </div>
                       </div>
                     ) : (
-                      <span className="text-[#7D8EA5] font-sans text-[11px]">FLAT</span>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[#7D8EA5] font-sans font-semibold text-[11px]">FLAT</span>
+                          <span className="text-[8px] font-sans font-semibold px-1 py-0.2 rounded bg-[#168BFF]/10 text-[#22D3EE] border border-[#168BFF]/20">
+                            IDLE
+                          </span>
+                        </div>
+                        <div className="text-[9px] text-[#7D8EA5] font-sans">
+                          Scanning Market
+                        </div>
+                      </div>
                     )}
                   </td>
 

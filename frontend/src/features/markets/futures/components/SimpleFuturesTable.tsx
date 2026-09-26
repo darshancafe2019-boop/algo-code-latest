@@ -209,9 +209,9 @@ const FuturesTableRow = React.memo(function FuturesTableRow({
         isSelected ? "bg-cyan-500/15 ring-1 ring-cyan-500/40" : "hover:bg-slate-800/50"
       }`}
     >
-      {/* 1. FAVORITE */}
+      {/* 1. FAVORITE (STICKY LEFT) */}
       <td
-        className="p-2.5 text-center w-8"
+        className="sticky left-0 z-10 bg-[#080E1C] group-hover:bg-[#0E1B33] p-2.5 text-center w-9 transition-colors"
         onClick={(e) => onToggleSave(e, c.symbol)}
       >
         <button type="button" className="text-slate-600 hover:text-amber-400 transition">
@@ -219,8 +219,8 @@ const FuturesTableRow = React.memo(function FuturesTableRow({
         </button>
       </td>
 
-      {/* 2. CONTRACT */}
-      <td className="p-2.5 text-left min-w-[170px]">
+      {/* 2. CONTRACT (STICKY LEFT) */}
+      <td className="sticky left-9 z-10 bg-[#080E1C] group-hover:bg-[#0E1B33] p-2.5 text-left min-w-[180px] border-r border-slate-800 shadow-[4px_0_8px_rgba(0,0,0,0.4)] transition-colors">
         <div>
           <div className="font-bold text-white text-xs group-hover:text-cyan-300 transition flex items-center gap-1.5">
             <span>{c.displaySymbol || c.displayName || c.symbol}</span>
@@ -430,23 +430,17 @@ const FuturesTableRow = React.memo(function FuturesTableRow({
         </span>
       </td>
 
-      {/* 24. ACTIONS */}
-      <td className="p-2.5 text-center min-w-[210px]" onClick={(e) => e.stopPropagation()}>
+      {/* 24. ACTIONS (STICKY RIGHT) */}
+      <td
+        className="sticky right-0 z-10 bg-[#080E1C] group-hover:bg-[#0E1B33] p-2 text-center min-w-[220px] border-l border-[#12304A] shadow-[-6px_0_12px_rgba(0,0,0,0.5)] transition-colors"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center justify-center gap-1.5">
           <button
             type="button"
-            onClick={(e) => onBotTrade(c, "BUY", e)}
-            className="flex items-center gap-1 px-2 py-1 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold transition shadow-sm"
-            title="Deploy Quantitative Trading Bot"
-          >
-            <Bot className="w-3 h-3 text-indigo-400" />
-            <span>BOT</span>
-          </button>
-
-          <button
-            type="button"
             onClick={(e) => onQuickTrade(c, "BUY", e)}
-            className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold transition shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-black text-xs shadow-md shadow-emerald-500/25 transition cursor-pointer"
+            title="Instant Buy / Long"
           >
             BUY
           </button>
@@ -454,18 +448,29 @@ const FuturesTableRow = React.memo(function FuturesTableRow({
           <button
             type="button"
             onClick={(e) => onQuickTrade(c, "SELL", e)}
-            className="px-2.5 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 text-[10px] font-bold transition shadow-sm"
+            className="px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-400 active:scale-95 text-slate-950 font-black text-xs shadow-md shadow-rose-500/25 transition cursor-pointer"
+            title="Instant Sell / Short"
           >
             SELL
           </button>
 
           <button
             type="button"
-            onClick={(e) => onMoreDetails(c, e)}
-            className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 text-[10px] transition"
-            title="Open Trade Ticket / Details"
+            onClick={(e) => onBotTrade(c, "BUY", e)}
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-500/40 text-[10px] font-bold transition shadow-sm cursor-pointer"
+            title="Deploy Quantitative Trading Bot"
           >
-            <SlidersHorizontal className="w-3 h-3" />
+            <Bot className="w-3.5 h-3.5 text-indigo-400" />
+            <span>BOT</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => onMoreDetails(c, e)}
+            className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[10px] transition cursor-pointer"
+            title="Open Trade Ticket & Chart"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5" />
           </button>
         </div>
       </td>
@@ -492,6 +497,7 @@ export function SimpleFuturesTable({
 
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [displayLimit, setDisplayLimit] = useState<number>(50);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -733,10 +739,10 @@ export function SimpleFuturesTable({
           {/* Sticky Table Header */}
           <thead className="sticky top-0 z-20 bg-[#0C1428] border-b border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-wider">
             <tr>
-              <th className="p-2.5 text-center w-8">★</th>
+              <th className="sticky left-0 top-0 z-30 bg-[#0C1428] p-2.5 text-center w-9">★</th>
               <th
                 onClick={() => handleSort("symbol")}
-                className="p-2.5 text-left cursor-pointer hover:text-white transition group min-w-[170px]"
+                className="sticky left-9 top-0 z-30 bg-[#0C1428] p-2.5 text-left cursor-pointer hover:text-white transition group min-w-[180px] border-r border-slate-700 shadow-[4px_0_8px_rgba(0,0,0,0.4)]"
               >
                 <div className="flex items-center gap-1">
                   <span>CONTRACT</span>
@@ -798,13 +804,13 @@ export function SimpleFuturesTable({
               </th>
               <th className="p-2.5 text-right">UPDATED</th>
               <th className="p-2.5 text-center">FEED STATUS</th>
-              <th className="p-2.5 text-center min-w-[210px]">ACTIONS</th>
+              <th className="sticky right-0 top-0 z-30 bg-[#0C1428] p-2.5 text-center min-w-[220px] border-l border-slate-700 shadow-[-6px_0_12px_rgba(0,0,0,0.5)]">ACTIONS</th>
             </tr>
           </thead>
 
           {/* Table Body */}
           <tbody className="divide-y divide-slate-800/60">
-            {processedContracts.map((c) => {
+            {processedContracts.slice(0, displayLimit).map((c) => {
               const contractKey = c.instrument_key || c.symbol;
               const isSelected = selectedContractKey === contractKey;
               const isSaved = savedContractKeys.includes(c.symbol) || savedContractKeys.includes(c.displayName);
@@ -827,6 +833,31 @@ export function SimpleFuturesTable({
           </tbody>
         </table>
       </div>
+
+      {/* Sliced Fast Progressive Loading Footer */}
+      {processedContracts.length > displayLimit && (
+        <div className="p-2.5 bg-[#080E1C] border-t border-[#12304A] rounded-b-xl flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+          <span className="text-slate-400">
+            Showing <strong className="text-white">{Math.min(displayLimit, processedContracts.length)}</strong> of <strong className="text-cyan-400">{processedContracts.length}</strong> contracts
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setDisplayLimit((prev) => Math.min(processedContracts.length, prev + 50))}
+              className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 font-bold transition cursor-pointer"
+            >
+              Load +50 More
+            </button>
+            <button
+              type="button"
+              onClick={() => setDisplayLimit(processedContracts.length)}
+              className="px-3 py-1 rounded-lg bg-cyan-950/70 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-300 font-bold transition cursor-pointer"
+            >
+              Show All ({processedContracts.length})
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

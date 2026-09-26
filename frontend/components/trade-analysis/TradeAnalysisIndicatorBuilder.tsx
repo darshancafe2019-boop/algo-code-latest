@@ -120,7 +120,7 @@ export function TradeAnalysisIndicatorBuilder({
         signal = "BULLISH";
         description = "PCR > 1.0 (Put writing dominance / Bullish)";
       } else if (ind.id === "max_pain") {
-        const mpStrike = 24800;
+        const mpStrike = underlyingLtp > 0 ? Math.round(underlyingLtp / 50) * 50 : 23150;
         calculatedValue = `₹${mpStrike}`;
         signal = "NEUTRAL";
         description = `Expiry Max Pain calculated at ${mpStrike}`;

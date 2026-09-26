@@ -8,8 +8,11 @@ broker connectivity, risk readiness, and OMS state.
 import time
 import os
 import sqlite3
+import logging
 from datetime import datetime, timezone
 from flask import Blueprint, jsonify, request
+
+logger = logging.getLogger(__name__)
 
 health_bp = Blueprint("health", __name__)
 _START_TIME = time.time()
@@ -310,8 +313,8 @@ def get_strategy_health():
     """Returns strategy engine status and active bot counts."""
     active_bots = 0
     try:
-        from src.process_manager import bot_manager
-        active_bots = len(bot_manager.get_running_bot_ids())
+        from src.process_manager import multi_bot_manager
+        active_bots = len(multi_bot_manager.get_running_bot_ids())
     except Exception:
         pass
 

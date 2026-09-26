@@ -5,13 +5,21 @@ const backendUrl =
   "http://127.0.0.1:5050";
 
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false,
   poweredByHeader: false,
+  compress: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error", "warn"] } : false,
+  },
   experimental: {
     serverComponentsExternalPackages: ["ws", "bufferutil", "utf-8-validate"],
+    optimizePackageImports: ["lucide-react", "@tanstack/react-query", "recharts", "date-fns"],
   },
   webpack(config, { isServer }) {
     if (!isServer) {

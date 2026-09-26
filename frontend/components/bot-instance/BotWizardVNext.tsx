@@ -9,6 +9,8 @@ import { Environment, ProviderInfo, BrokerAccount } from "@/types/data-core";
 import { formatMoney } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { DeploymentValidationCenter } from "./DeploymentValidationCenter";
+import { StrategyPremiumSelectionSection } from "./StrategyPremiumSelectionSection";
+import { StrategyExecutionMatrixSection, BotEnabledStrategySetting } from "./StrategyExecutionMatrixSection";
 
 const WIZARD_STEPS = [
   { id: 1, key: "IDENTITY", title: "Identity & Capital", desc: "Identity, environment & capital allocation" },
@@ -79,6 +81,9 @@ export function BotWizardVNext() {
   const [ruleLeft, setRuleLeft] = useState<string>("EMA9");
   const [ruleOp, setRuleOp] = useState<string>("CROSS_ABOVE");
   const [ruleRight, setRuleRight] = useState<string>("EMA21");
+
+  // Step 5: Dynamic Strategy & Premium Selection Registry
+  const [enabledStrategies, setEnabledStrategies] = useState<BotEnabledStrategySetting[]>([]);
 
   // Step 6: Risk
   const [riskPerTradePct, setRiskPerTradePct] = useState<number>(1.0);
@@ -360,6 +365,7 @@ export function BotWizardVNext() {
           isMandatory: true,
         },
       ],
+      enabled_strategies: enabledStrategies,
     };
   }, [
     botId,
@@ -369,6 +375,7 @@ export function BotWizardVNext() {
     tags,
     envMode,
     strategyId,
+    enabledStrategies,
     assetClass,
     creationOrigin,
     canonicalInstrumentId,
@@ -1007,6 +1014,17 @@ export function BotWizardVNext() {
                   </div>
                 </div>
               </div>
+
+              {/* Strategy Execution Matrix & Live Premium Resolution */}
+              <StrategyExecutionMatrixSection
+                enabledStrategies={enabledStrategies}
+                onChangeEnabledStrategies={setEnabledStrategies}
+                boardType={assetClass.includes("OPTIONS") ? "OPTIONS" : assetClass.includes("FUTURES") ? "FUTURES" : assetClass.includes("STOCK") || assetClass.includes("EQUITY") ? "STOCK" : "OPTIONS"}
+                marketDataProvider={marketDataProvider}
+                executionBroker={executionBroker}
+                defaultUnderlying={contractUnderlying}
+                maxTickAgeMs={maxTickAgeMs}
+              />
             </div>
           )}
 
@@ -1150,16 +1168,14 @@ export function BotWizardVNext() {
               <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide border-b border-slate-800 pb-2">
                 5. Signal Lifecycle & Explainable Decision Engine
               </h2>
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3 text-xs">
-                <div className="font-bold text-slate-200">Explainable Decision Audit Guarantee</div>
-                <p className="text-slate-400 text-[11px]">
-                  Every bot tick generates a deterministic audit entry: <code>{ruleLeft} {ruleOp} {ruleRight}</code>.
-                  Operators can inspect exact passing / failing conditions for every decision.
-                </p>
-                <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 font-mono text-[11px] text-emerald-400">
-                  ✓ Signal Lifecycle: NO_SIGNAL → CANDIDATE → CONFIRMED → EXECUTED
-                </div>
-              </div>
+
+              {/* Dynamic Strategy & Premium Selection Section */}
+              <StrategyPremiumSelectionSection
+                enabledStrategies={enabledStrategies}
+                onChangeEnabledStrategies={setEnabledStrategies}
+                defaultProvider={marketDataProvider}
+                defaultUnderlying={contractUnderlying}
+              />
             </div>
           )}
 

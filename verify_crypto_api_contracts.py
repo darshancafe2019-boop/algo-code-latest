@@ -106,8 +106,8 @@ def main():
     # 4. Options Chain
     chain = test_endpoint("Crypto Option Chain", f"{BASE_URL}/api/crypto/options/chain?underlying=BTC&strike_range=10")
     assert chain and chain.get("status") == "success"
-    assert chain.get("spot_price") > 0
-    assert chain.get("atm_strike") > 0
+    assert (chain.get("spot_price") or 0) > 0
+    assert (chain.get("atm_strike") or 0) > 0
     assert len(chain.get("strikes", [])) > 0
 
     # 5. Options Analytics

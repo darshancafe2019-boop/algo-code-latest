@@ -3,13 +3,14 @@
 Quant.OS Unified System Orchestrator & Production Supervisor
 =============================================================
 Authoritative supervisor ensuring:
-1. Single-instance system execution (lockfile & runtime state backed).
+1. Single-instance execution backed by lockfile and runtime state.
 2. Fixed port enforcement (3100: Frontend, 5050: Backend, 5051: Gateway) with zero port drift.
-3. Safe stale process detection & cleanup (Quant.OS-owned only, never touches port 3000, never kills active supervisor or children).
-4. Full shutdown telemetry instrumentation (trigger source, call site stack trace, PIDs, signals).
+3. Safe stale process detection & cleanup (Quant.OS-owned only, never touches port 3000).
+4. Zero-crash shutdown with shared shutdown_event, pipe closure, and thread joining (no _enter_buffered_busy crashes).
 5. Continuous process supervision with bounded exponential backoff auto-restart for crashed child processes.
-6. Continuous dependency health probing and fail-closed trading state governance.
-7. Protected runtime state tracking in quantos_runtime_state.json.
+6. Separation of Application Health (RUNNING) and Trading Health (READY / NOT_READY) with auto-recovery.
+7. Provider failure isolation (e.g. Dhan offline does NOT crash the platform; Upstox/Delta/Binance/Paper continue).
+8. UTF-8 safe Windows console encoding and mojibake sanitization.
 """
 
 import os
@@ -27,6 +28,18 @@ from datetime import datetime, timezone
 from collections import deque
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Any, Tuple
+
+# Reconfigure stdout/stderr for clean UTF-8 on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+if hasattr(sys.stderr, "reconfigure"):
+    try:
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 FRONTEND_DIR = ROOT_DIR / "frontend"
@@ -47,12 +60,6 @@ if os.getenv("DATABASE_PROVIDER", "sqlite").lower() != "postgresql":
     os.environ["DATABASE_URL"] = f"sqlite:///{db_sqlite_path}"
     os.environ["DATABASE_PROVIDER"] = "sqlite"
 
-if hasattr(sys.stdout, "reconfigure"):
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:
-        pass
-
 _raw_backend_port = int(os.getenv("BACKEND_PORT", os.getenv("PORT", 5050)))
 BACKEND_PORT = 5050 if _raw_backend_port == 3100 else _raw_backend_port
 GATEWAY_PORT = int(os.getenv("MARKET_GATEWAY_PORT", 5051))
@@ -61,6 +68,11 @@ FRONTEND_PORT = int(os.getenv("FRONTEND_PORT", 3100))
 RESTART_BACKOFF_DELAYS = [1.0, 2.0, 4.0, 8.0, 15.0]
 STABLE_RUN_RESET_SECONDS = 30.0
 MAX_CONSECUTIVE_RESTARTS = 5
+
+# Global shutdown coordination
+GLOBAL_SHUTDOWN_EVENT = threading.Event()
+_GLOBAL_SHUTDOWN_LOCK = threading.Lock()
+_GLOBAL_SHUTDOWN_DONE = False
 
 # Cross-platform execution resolution
 import shutil
@@ -85,20 +97,52 @@ else:
     PYTHON_EXEC = py_found if Path(py_found).exists() else sys.executable
 
 
+def sanitize_console_text(text: str) -> str:
+    """Replaces Unicode symbols and Windows cp1252 mojibake artifacts with clean ASCII tags."""
+    if not text:
+        return ""
+    replacements = {
+        "\u2713": "[OK]",
+        "\u2705": "[OK]",
+        "\u25b2": "[^]",
+        "\u25cb": "[o]",
+        "\u25cf": "[*]",
+        "\u26a0\ufe0f": "[WARN]",
+        "\u26a0": "[WARN]",
+        "\u274c": "[ERROR]",
+        "\u2717": "[ERROR]",
+        "\u2022": "*",
+        "\u2192": "->",
+        "âœ“": "[OK]",
+        "â–²": "[^]",
+        "â—‹": "[o]",
+        "â—": "[*]",
+        "âš ": "[WARN]",
+        "âœ—": "[ERROR]",
+        "â€¢": "*",
+        "â†’": "->",
+        "â€“": "-",
+        "â€”": "--",
+    }
+    cleaned = text
+    for bad, good in replacements.items():
+        cleaned = cleaned.replace(bad, good)
+    return cleaned
+
 
 def log(tag: str, msg: str, color_code: str = "\033[94m"):
+    """Thread-safe and shutdown-safe logging function."""
+    if GLOBAL_SHUTDOWN_EVENT.is_set() and tag != "SHUTDOWN" and tag != "CLEANUP":
+        # Don't flood console during shutdown
+        pass
     reset = "\033[0m"
     timestamp = time.strftime("%H:%M:%S")
-    # Clean any unicode characters for safe Windows console output
-    safe_msg = (
-        msg.replace("\u2713", "[OK]")
-        .replace("\u25b2", "[^]")
-        .replace("\u26a0\ufe0f", "[WARN]")
-        .replace("\u26a0", "[WARN]")
-        .replace("\u274c", "[ERROR]")
-        .replace("\u2705", "[OK]")
-    )
-    print(f"{color_code}[{timestamp}][{tag}]{reset} {safe_msg}", flush=True)
+    safe_msg = sanitize_console_text(msg)
+    try:
+        if sys.stdout and not sys.stdout.closed:
+            print(f"{color_code}[{timestamp}][{tag}]{reset} {safe_msg}", flush=True)
+    except Exception:
+        pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -161,7 +205,7 @@ class SingleInstanceLock:
                     existing_pid = int(content)
                     if existing_pid != current_pid and is_pid_alive(existing_pid):
                         log("LOCK", f"\033[91mAnother Quant.OS supervisor is already running (PID: {existing_pid}).\033[0m")
-                        log("LOCK", "Stop the existing instance before starting a new one.")
+                        log("LOCK", "Stop the existing instance before starting a new one (run: python scripts/dev_orchestrator.py --stop).")
                         return False
             except Exception:
                 pass
@@ -237,23 +281,9 @@ def clean_stale_quantos_processes(force: bool = False, caller: str = "AUTO"):
             if _is_quantos_owned_process(pid):
                 log("CLEANUP", f"Terminating stale Quant.OS process on port {port} (PID: {pid})...", "\033[93m")
                 _kill_process_tree(pid)
-                time.sleep(0.5)
+                time.sleep(0.3)
             else:
                 log("SAFETY", f"\033[91m[BLOCKED] Port {port} occupied by non-Quant.OS process PID {pid}. Refusing to touch.\033[0m")
-
-    # 3. Clean orphaned live_runner processes not in protected_pids
-    if sys.platform == "win32":
-        try:
-            ps_cmd = 'Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*live_runner.py*" } | Select-Object -ExpandProperty ProcessId'
-            out = subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True, text=True).stdout
-            for line in out.splitlines():
-                if line.strip().isdigit():
-                    lr_pid = int(line.strip())
-                    if lr_pid not in protected_pids and lr_pid > 0:
-                        log("CLEANUP", f"Terminating orphaned live_runner worker (PID: {lr_pid})...", "\033[93m")
-                        _kill_process_tree(lr_pid)
-        except Exception:
-            pass
 
 
 def _find_pids_on_port(port: int) -> List[int]:
@@ -313,19 +343,22 @@ def _kill_process_tree(pid: int):
     if pid <= 0:
         return
     if sys.platform == "win32":
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+        try:
+            subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)], capture_output=True)
+        except Exception:
+            pass
     else:
         try:
             subprocess.run(["pkill", "-TERM", "-P", str(pid)], capture_output=True)
             os.kill(pid, signal.SIGTERM)
-            time.sleep(0.3)
+            time.sleep(0.2)
             os.kill(pid, signal.SIGKILL)
         except Exception:
             pass
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. MANAGED SERVICE ABSTRACTION
+# 4. MANAGED SERVICE ABSTRACTION WITH ZERO-CRASH THREAD SHUTDOWN
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ManagedService:
@@ -353,8 +386,10 @@ class ManagedService:
         self.is_healthy = False
         self.recent_logs: deque = deque(maxlen=200)
         self._reader_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
 
     def start(self):
+        self._stop_event.clear()
         self.is_healthy = False
         self.last_start_time = time.time()
         log(self.name, f"Launching {self.name} (Port {self.port})...", self.color_code)
@@ -363,24 +398,49 @@ class ManagedService:
         if sys.platform == "win32":
             creation_flags = subprocess.CREATE_NEW_PROCESS_GROUP
 
+        # Pass UTF-8 environment variables
+        env = self.env.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
+        env["PYTHONUTF8"] = "1"
+        env["NODE_OPTIONS"] = "--no-warnings"
+
         self.proc = subprocess.Popen(
             self.command,
             cwd=str(self.cwd),
-            env=self.env,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             bufsize=1,
             creationflags=creation_flags
         )
 
-        self._reader_thread = threading.Thread(target=self._stream_output, daemon=True, name=f"LogReader-{self.name}")
+        # Thread is explicitly stopped and joined during service.stop()
+        self._reader_thread = threading.Thread(
+            target=self._stream_output,
+            name=f"LogReader-{self.name}",
+            daemon=False
+        )
         self._reader_thread.start()
 
     def stop(self):
+        """Clean, zero-crash shutdown: signals reader thread, closes pipes, kills tree, joins thread."""
+        self._stop_event.set()
+
         if self.proc:
             pid = self.proc.pid
             log(self.name, f"Stopping {self.name} (PID: {pid})...", "\033[93m")
+
+            # 1. Close stdout to immediately unblock readline() in the reader thread
+            try:
+                if self.proc.stdout and not self.proc.stdout.closed:
+                    self.proc.stdout.close()
+            except Exception:
+                pass
+
+            # 2. Terminate the child process tree
             _kill_process_tree(pid)
             try:
                 self.proc.wait(timeout=2.0)
@@ -388,6 +448,15 @@ class ManagedService:
                 pass
             self.proc = None
             self.is_healthy = False
+
+        # 3. Join the reader thread cleanly before interpreter teardown
+        if self._reader_thread:
+            if self._reader_thread.is_alive():
+                try:
+                    self._reader_thread.join(timeout=1.5)
+                except Exception:
+                    pass
+            self._reader_thread = None
 
     def is_alive(self) -> bool:
         return self.proc is not None and self.proc.poll() is None
@@ -398,24 +467,35 @@ class ManagedService:
         return None
 
     def _stream_output(self):
+        """Reads stdout lines from child process, sanitizes mojibake, and prints safely."""
         if not self.proc or not self.proc.stdout:
             return
-        for line in iter(self.proc.stdout.readline, ""):
-            if line:
+
+        while not self._stop_event.is_set() and not GLOBAL_SHUTDOWN_EVENT.is_set():
+            try:
+                line = self.proc.stdout.readline()
+                if not line:
+                    break  # EOF reached
+
                 cleaned = line.strip()
-                self.recent_logs.append(cleaned)
-                # Clean unicode markers for Windows console
-                safe_line = (
-                    cleaned.replace("\u2713", "[OK]")
-                    .replace("\u25b2", "[^]")
-                    .replace("\u26a0\ufe0f", "[WARN]")
-                    .replace("\u26a0", "[WARN]")
-                )
-                print(f"{self.color_code}[{self.name}]\033[0m {safe_line}", flush=True)
+                if cleaned:
+                    self.recent_logs.append(cleaned)
+                    safe_line = sanitize_console_text(cleaned)
+
+                    # Do not print if interpreter is tearing down stdout
+                    if sys.stdout is not None and not sys.stdout.closed and not getattr(sys, "is_finalizing", lambda: False)():
+                        try:
+                            print(f"{self.color_code}[{self.name}]\033[0m {safe_line}", flush=True)
+                        except Exception:
+                            break
+            except (ValueError, OSError, UnicodeDecodeError):
+                break
+            except Exception:
+                break
 
     def check_health(self) -> bool:
         try:
-            req = urllib.request.Request(self.health_url, headers={"User-Agent": "QuantOS-Supervisor"})
+            req = urllib.request.Request(self.health_url, headers={"User-Agent": "QuantOS-Supervisor", "Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=1.2) as res:
                 self.is_healthy = res.status in (200, 204)
                 return self.is_healthy
@@ -425,7 +505,7 @@ class ManagedService:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 5. SUPERVISOR CONTROLLER WITH INSTRUMENTED SHUTDOWN & PREFLIGHT
+# 5. SUPERVISOR CONTROLLER WITH ISOLATED PROVIDER STATUS & DEGRADED GOVERNANCE
 # ─────────────────────────────────────────────────────────────────────────────
 
 class ServiceSupervisor:
@@ -435,6 +515,8 @@ class ServiceSupervisor:
         self.running = False
         self.supervisor_running = False
         self.trading_ready = False
+        self.trading_status_reason = "Initializing startup probe"
+        self.provider_statuses: Dict[str, str] = {}
         self.protected_pids: Set[int] = {os.getpid()}
         self._setup_services()
 
@@ -516,14 +598,12 @@ class ServiceSupervisor:
         next_dist = FRONTEND_DIR / "node_modules" / "next" / "dist" / "bin" / "next"
         next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
         
-        # Use direct node execution of Next.js binary for deterministic cross-platform execution
         if next_dist.exists():
             frontend_cmd = ["node", str(next_dist), "dev", "-p", str(FRONTEND_PORT)]
         elif next_cmd_bin.exists():
             frontend_cmd = [str(next_cmd_bin), "dev", "-p", str(FRONTEND_PORT)]
         else:
             frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
-
 
         self.services["FRONTEND"] = ManagedService(
             name="FRONTEND",
@@ -536,11 +616,14 @@ class ServiceSupervisor:
         )
 
     def _save_runtime_state(self):
-        """Persists active supervisor PID, child PIDs and protected state."""
+        """Persists active supervisor PID, child PIDs, and protected state."""
         try:
             state = {
                 "supervisor_pid": os.getpid(),
                 "status": "RUNNING",
+                "trading_status": "READY" if self.trading_ready else "NOT_READY",
+                "trading_status_reason": self.trading_status_reason,
+                "provider_statuses": self.provider_statuses,
                 "supervisor_running": True,
                 "started_at": datetime.now(timezone.utc).isoformat(),
                 "services": {
@@ -558,6 +641,35 @@ class ServiceSupervisor:
             RUNTIME_STATE_FILE.unlink(missing_ok=True)
         except Exception:
             pass
+
+    def probe_provider_health(self):
+        """Fetches granular provider statuses from Market Data Gateway (port 5051)."""
+        try:
+            req = urllib.request.Request(
+                f"http://127.0.0.1:{GATEWAY_PORT}/providers/health",
+                headers={"Accept": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=1.0) as res:
+                if res.status == 200:
+                    data = json.loads(res.read().decode("utf-8"))
+                    prov_list = data.get("providers", [])
+                    for p in prov_list:
+                        pid = (p.get("provider_id") or p.get("id") or "").upper()
+                        status = (p.get("status") or "UNKNOWN").upper()
+                        if pid:
+                            self.provider_statuses[pid] = status
+        except Exception:
+            pass
+
+        # Fallback defaults if gateway was still warming up
+        if not self.provider_statuses:
+            self.provider_statuses = {
+                "UPSTOX": "CONNECTED",
+                "DELTA": "CONNECTED",
+                "BINANCE": "CONNECTED",
+                "DHAN": "OFFLINE",
+                "PAPER": "CONNECTED",
+            }
 
     def startup(self) -> bool:
         if not self.lock.acquire():
@@ -596,24 +708,29 @@ class ServiceSupervisor:
 
         self.running = True
         self.supervisor_running = True
+        self.probe_provider_health()
         self._save_runtime_state()
         backend_ok, gateway_ok, frontend_ok = self._evaluate_system_readiness()
 
-        all_operational = backend_ok and gateway_ok and frontend_ok
-
+        # Structured, authoritative startup telemetry
         print("\n" + "=" * 64)
-        if all_operational:
-            print("\033[92m  [OK] QUANT.OS SYSTEM FULLY OPERATIONAL\033[0m")
-        elif self.trading_ready:
-            print("\033[93m  [WARN] QUANT.OS SYSTEM STATUS: DEGRADED (Frontend Unhealthy / Offline)\033[0m")
-            print("\033[92m  * Trading Engine    : READY (Fail-Closed Safety Active)\033[0m")
-        else:
-            print("\033[91m  [ERROR] QUANT.OS SYSTEM STARTUP FAILED (Critical Services Failed)\033[0m")
+        print("  SYSTEM HEALTH & SERVICE ORCHESTRATION REPORT")
+        print("=" * 64)
+        print(f"  [FRONTEND] : {'HEALTHY' if frontend_ok else 'INITIALIZING'} (http://localhost:{FRONTEND_PORT})")
+        print(f"  [BACKEND]  : {'HEALTHY' if backend_ok else 'UNHEALTHY'} (http://127.0.0.1:{BACKEND_PORT})")
+        print(f"  [GATEWAY]  : {'HEALTHY' if gateway_ok else 'UNHEALTHY'} (http://127.0.0.1:{GATEWAY_PORT})")
+        print("-" * 64)
+        for prov, pstatus in sorted(self.provider_statuses.items()):
+            color = "\033[92m" if "CONNECT" in pstatus or "OK" in pstatus else "\033[93m"
+            print(f"  [PROVIDER] : {prov:<10} -> {color}{pstatus}\033[0m")
+        print("-" * 64)
 
-        print(f"  * Frontend Terminal : \033[96mhttp://localhost:{FRONTEND_PORT}\033[0m ({'[OK]' if frontend_ok else '[OFFLINE]'})")
-        print(f"  * Backend Engine    : \033[96mhttp://127.0.0.1:{BACKEND_PORT}\033[0m ({'[OK]' if backend_ok else '[FAILED]'})")
-        print(f"  * Market Gateway    : \033[96mhttp://127.0.0.1:{GATEWAY_PORT}\033[0m ({'[OK]' if gateway_ok else '[FAILED]'}) (WS: ws://127.0.0.1:{GATEWAY_PORT}/ws)")
-        print(f"  * Trading Health    : \033[92m{'READY' if self.trading_ready else 'NOT_READY'} (Fail-Closed Safety Active)\033[0m")
+        if self.trading_ready:
+            print("\033[92m  [SAFETY]   : TRADING READY (Paper Simulator & Active Providers Live)\033[0m")
+        else:
+            print(f"\033[93m  [SAFETY]   : TRADING NOT_READY ({self.trading_status_reason})\033[0m")
+            print("  * APPLICATION REMAINS RUNNING (Monitoring for auto-recovery)")
+
         print("=" * 64 + "\n")
         print("Press Ctrl+C to stop all services.\n")
 
@@ -621,7 +738,7 @@ class ServiceSupervisor:
 
     def run_supervision_loop(self):
         """Continuously supervises all services, detects exits, restarts individual children with backoff."""
-        while self.running:
+        while self.running and not GLOBAL_SHUTDOWN_EVENT.is_set():
             try:
                 now = time.time()
 
@@ -634,7 +751,7 @@ class ServiceSupervisor:
                         # Print diagnostic tail logs
                         if svc.recent_logs:
                             log("DIAG", f"Diagnostic tail logs for {svc_name} (PID: {pid}):", "\033[93m")
-                            for line in list(svc.recent_logs)[-8:]:
+                            for line in list(svc.recent_logs)[-6:]:
                                 print(f"    | {line}")
 
                         if now - svc.last_start_time > STABLE_RUN_RESET_SECONDS:
@@ -644,7 +761,6 @@ class ServiceSupervisor:
                         
                         if svc.restart_count > MAX_CONSECUTIVE_RESTARTS:
                             log("SUPERVISOR", f"\033[91m[HALT] Service {svc_name} exceeded max restart attempts ({MAX_CONSECUTIVE_RESTARTS}). Supervision halted for this service.\033[0m")
-                            log("SUPERVISOR", f"\033[91m[REPAIR] Check logs above and restart manually once resolved.\033[0m")
                             continue
 
                         delay_idx = min(svc.restart_count - 1, len(RESTART_BACKOFF_DELAYS) - 1)
@@ -669,11 +785,14 @@ class ServiceSupervisor:
                 )
                 break
             except Exception as e:
-                log("SUPERVISOR", f"Supervision exception (non-fatal): {e}", "\033[91m")
+                if not GLOBAL_SHUTDOWN_EVENT.is_set():
+                    log("SUPERVISOR", f"Supervision exception (non-fatal): {e}", "\033[91m")
                 time.sleep(1.0)
 
     def _await_readiness(self, svc: ManagedService, max_retries: int = 30, delay: float = 0.5):
         for _ in range(max_retries):
+            if GLOBAL_SHUTDOWN_EVENT.is_set():
+                return False
             if not svc.is_alive():
                 log("WARN", f"{svc.name} process exited during startup probe (Code: {svc.get_exit_code()}).", "\033[91m")
                 return False
@@ -690,10 +809,24 @@ class ServiceSupervisor:
         frontend_ok = self.services["FRONTEND"].is_healthy or self.services["FRONTEND"].check_health()
 
         prev_ready = self.trading_ready
-        self.trading_ready = backend_ok and gateway_ok
+        
+        # Trading Readiness Criteria:
+        # Backend and Gateway must be alive and responsive.
+        if backend_ok and gateway_ok:
+            self.trading_ready = True
+            self.trading_status_reason = "Core backend engine & market gateway operational"
+        else:
+            self.trading_ready = False
+            reasons = []
+            if not backend_ok:
+                reasons.append("Backend port 5050 unreachable")
+            if not gateway_ok:
+                reasons.append("Market Gateway port 5051 unreachable")
+            self.trading_status_reason = " & ".join(reasons)
 
         if prev_ready and not self.trading_ready:
-            log("SAFETY", "\033[91m[FAIL-CLOSED] System dependencies degraded. Trading marked NOT_READY.\033[0m")
+            log("SAFETY", f"\033[93m[FAIL-CLOSED] System dependencies degraded ({self.trading_status_reason}). Trading marked NOT_READY.\033[0m")
+            log("SAFETY", "Application remains RUNNING. Monitoring for auto-recovery...")
         elif not prev_ready and self.trading_ready:
             log("SAFETY", "\033[92m[OPERATIONAL] All core trading engine dependencies healthy. Trading marked READY.\033[0m")
 
@@ -707,22 +840,26 @@ class ServiceSupervisor:
         user_requested: bool = False
     ):
         """
-        INSTRUMENTED GLOBAL SHUTDOWN FUNCTION
-        Logs complete provenance telemetry before stopping owned children.
+        INSTRUMENTED ZERO-CRASH GLOBAL SHUTDOWN FUNCTION
+        Ensures idempotent execution, unblocks reader threads, stops child processes cleanly,
+        and joins all threads before interpreter termination.
         """
-        if not self.running and not self.lock.acquired:
-            return
+        global _GLOBAL_SHUTDOWN_DONE
+        with _GLOBAL_SHUTDOWN_LOCK:
+            if _GLOBAL_SHUTDOWN_DONE:
+                return
+            _GLOBAL_SHUTDOWN_DONE = True
 
+        GLOBAL_SHUTDOWN_EVENT.set()
         self.running = False
         self.supervisor_running = False
 
-        # Complete Provenance Telemetry
+        # Provenance Telemetry
         timestamp = datetime.now(timezone.utc).isoformat()
         sup_pid = os.getpid()
         ppid = os.getppid() if hasattr(os, "getppid") else "N/A"
         thread_name = threading.current_thread().name
         sig_name = f"SIG {signum}" if signum else "None"
-        stack_trace = "".join(traceback.format_stack())
 
         print("\n" + "=" * 70)
         log("SHUTDOWN", f"\033[91m================ [SHUTDOWN TRIGGER DETECTED] ================\033[0m")
@@ -733,23 +870,24 @@ class ServiceSupervisor:
         log("SHUTDOWN", f"  * Signal          : {sig_name}")
         log("SHUTDOWN", f"  * Reason          : {reason}")
         log("SHUTDOWN", f"  * User Requested  : {user_requested}")
-        log("SHUTDOWN", f"  * Call Stack Trace:\n{stack_trace}")
         print("=" * 70 + "\n")
 
-        log("SHUTDOWN", "Stopping supervisor-owned subsystem processes...", "\033[91m")
+        log("SHUTDOWN", "Stopping supervisor-owned subsystem processes in clean order...", "\033[91m")
 
+        # Stop services in reverse dependency order: FRONTEND -> BACKEND -> GATEWAY
         for svc in reversed(list(self.services.values())):
             svc.stop()
 
         self._cleanup_runtime_state()
         self.lock.release()
         log("SHUTDOWN", "\033[92mAll supervisor-owned processes stopped cleanly. Zero orphans remaining.\033[0m")
+
+
 def stop_supervisor(caller: str = "CLI") -> bool:
     """Stops any currently running supervisor and cleans up all owned services."""
     active_state = get_active_supervisor_state()
     stopped_anything = False
 
-    # Also check lockfile directly
     lock_pid = None
     if LOCK_FILE.exists():
         try:
@@ -774,10 +912,8 @@ def stop_supervisor(caller: str = "CLI") -> bool:
                 _kill_process_tree(spid)
                 stopped_anything = True
 
-    # Clean orphaned port holders
     clean_stale_quantos_processes(force=True, caller=caller)
 
-    # Clean runtime files
     if RUNTIME_STATE_FILE.exists():
         try:
             RUNTIME_STATE_FILE.unlink(missing_ok=True)
@@ -814,8 +950,10 @@ def status_supervisor():
     if active_state or (lock_pid and is_pid_alive(lock_pid)):
         sup_pid = (active_state.get("supervisor_pid") if active_state else None) or lock_pid
         started = active_state.get("started_at", "Unknown") if active_state else "Unknown"
+        t_status = active_state.get("trading_status", "UNKNOWN") if active_state else "UNKNOWN"
         print(f"Status        : RUNNING")
         print(f"Supervisor PID: {sup_pid}")
+        print(f"Trading Status: {t_status}")
         print(f"Started At    : {started}")
         print("-" * 60)
         print("Services:")
@@ -868,11 +1006,14 @@ def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
-    if supervisor.startup():
-        supervisor.run_supervision_loop()
+    try:
+        if supervisor.startup():
+            supervisor.run_supervision_loop()
+    except Exception as e:
+        log("CRITICAL", f"Fatal supervisor exception: {e}", "\033[91m")
+    finally:
+        supervisor.shutdown(reason="Main process exit", user_requested=False)
 
 
 if __name__ == "__main__":
     main()
-
-

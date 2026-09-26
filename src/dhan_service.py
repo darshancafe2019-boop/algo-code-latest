@@ -999,6 +999,8 @@ class DhanService:
 
         return None
 
+    get_security_metadata = resolve_symbol
+
     def get_security_id(self, symbol: str) -> Optional[str]:
         meta = self.resolve_symbol(symbol)
         return meta.get("security_id") if meta else None

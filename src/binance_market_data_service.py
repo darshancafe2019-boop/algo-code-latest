@@ -669,3 +669,4 @@ class BinanceMarketDataService:
 
 # Global singleton instance
 global_binance_market_data_service = BinanceMarketDataService()
+binance_market_data_service = global_binance_market_data_service

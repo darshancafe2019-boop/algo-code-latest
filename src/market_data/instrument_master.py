@@ -666,6 +666,8 @@ class InstrumentMaster:
         matches.sort(key=lambda x: x[0], reverse=True)
         return [inst.to_dict() for _, inst in matches[:limit]]
 
+    search_instruments = search
+
     def get_expiries_for_underlying(self, underlying: str) -> List[str]:
         """Dynamically calculates standard expiry dates for an underlying instrument."""
         und = underlying.upper().replace(" ", "").replace("/USDT", "")

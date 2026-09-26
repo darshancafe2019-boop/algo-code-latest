@@ -234,11 +234,17 @@ class LiveRunner:
             close_price = float(df.iloc[eval_idx]['close'])
             high_price = float(df.iloc[eval_idx]['high'])
             low_price = float(df.iloc[eval_idx]['low'])
-            context.close_price = close_price
-            logger.info("[%s] Evaluating strategy on completed candle: %s at Close price: %.2f", self.bot_id, candle_time, close_price)
+            
+            # Live current forming tick/candle price
+            live_close = float(df.iloc[-1]['close'])
+            live_high = float(df.iloc[-1]['high'])
+            live_low = float(df.iloc[-1]['low'])
+            
+            context.close_price = live_close
+            logger.info("[%s] Market check on %s | Live: %.2f (Bar: %.2f, H: %.2f, L: %.2f)", self.bot_id, candle_time, live_close, close_price, max(high_price, live_high), min(low_price, live_low))
 
             # Update last_checked_at in DB and log activity
-            db.log_bot_activity(self.bot_id, "EVALUATION", f"Evaluating {self.timeframe} candle close at ${close_price:,.2f}", {"close_price": close_price, "timeframe": self.timeframe})
+            db.log_bot_activity(self.bot_id, "EVALUATION", f"Evaluating {self.timeframe} market live at ${live_close:,.2f}", {"close_price": live_close, "timeframe": self.timeframe})
 
             active_trade = get_active_trade(self.bot_id)
             context.open_trade = active_trade
@@ -267,14 +273,19 @@ class LiveRunner:
                 sl_price = float(raw_sl) if raw_sl is not None and float(raw_sl) > 0 else None
                 tp_price = float(raw_tp) if raw_tp is not None and float(raw_tp) > 0 else None
 
+                # Calculate live unrealized P&L
+                current_unrealized = (live_close - entry_price) * size if direction == "LONG" else (entry_price - live_close) * size
+
                 logger.info(
-                    "[%s] Active trade found in DB (ID: %s, %s, Entry: %.2f, SL: %s, TP: %s)",
+                    "[%s] Active trade #%s (%s, Entry: %.2f, Live: %.2f, SL: %s, TP: %s, MTM: %+.2f)",
                     self.bot_id,
                     trade_id,
                     direction,
                     entry_price,
+                    live_close,
                     f"{sl_price:.2f}" if sl_price is not None else "None",
                     f"{tp_price:.2f}" if tp_price is not None else "None",
+                    current_unrealized,
                 )
 
                 exit_triggered = False
@@ -282,24 +293,28 @@ class LiveRunner:
                 exit_pnl = 0.0
                 exit_reason = ""
 
+                # Evaluate instant triggers on both historical and live forming candle
+                eff_low = min(low_price, live_low)
+                eff_high = max(high_price, live_high)
+
                 if direction == "LONG":
-                    if sl_price is not None and low_price <= sl_price:
+                    if sl_price is not None and eff_low <= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "STOP LOSS"
-                    elif tp_price is not None and high_price >= tp_price:
+                    elif tp_price is not None and eff_high >= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "TAKE PROFIT"
                 elif direction == "SHORT":
-                    if sl_price is not None and high_price >= sl_price:
+                    if sl_price is not None and eff_high >= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (entry_price - exit_price) * size
                         exit_reason = "STOP LOSS"
-                    elif tp_price is not None and low_price <= tp_price:
+                    elif tp_price is not None and eff_low <= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (entry_price - exit_price) * size
@@ -321,6 +336,7 @@ class LiveRunner:
                                     result_pnl = ?,
                                     net_pnl = ?,
                                     realized_pnl = ?,
+                                    unrealized_pnl = 0.0,
                                     status = 'CLOSED',
                                     exit_reason = ?,
                                     remarks = ?
@@ -366,7 +382,7 @@ class LiveRunner:
                                 bot_id=self.bot_id,
                                 symbol=self.symbol,
                                 signal_type="EXIT_SIGNAL",
-                                price=close_price,
+                                price=live_close,
                                 confluence_pct=81.0,
                                 threshold_pct=75.0,
                                 sl_price=sl_price,
@@ -514,6 +530,13 @@ class LiveRunner:
                                  self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
                             )
                             trade_id = c.lastrowid
+                            try:
+                                c.execute("""
+                                    INSERT OR REPLACE INTO positions (bot_id, symbol, direction, quantity, entry_price, current_price, unrealized_pnl, status, execution_mode)
+                                    VALUES (?, ?, ?, ?, ?, ?, 0.0, 'OPEN', ?)
+                                """, (self.bot_id, self.symbol, signal, size, exec_price, exec_price, getattr(self, "execution_mode", "PAPER")))
+                            except Exception:
+                                pass
                             conn.commit()
                         finally:
                             try:
@@ -822,19 +845,18 @@ def main():
     # Run once immediately on startup
     runner.process_cycle()
 
-    # Calculate check interval in minutes from timeframe accurately
-    mins = parse_timeframe_to_minutes(runner.timeframe)
-
-    # Schedule blocking loop
+    # Fast real-time market execution loop (every 5 seconds)
     scheduler = BlockingScheduler()
     scheduler.add_job(
         runner.process_cycle,
         'interval',
-        minutes=mins,
-        id=f'market_check_job_{args.bot_id}'
+        seconds=5,
+        id=f'market_check_job_{args.bot_id}',
+        max_instances=2,
+        coalesce=True
     )
     
-    logger.info(f"Bot {args.bot_id} scheduled to check every {mins} minutes.")
+    logger.info(f"Bot {args.bot_id} scheduled for fast real-time market tracking (5-second cycle).")
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):

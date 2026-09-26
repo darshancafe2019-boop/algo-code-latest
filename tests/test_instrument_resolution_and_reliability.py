@@ -70,17 +70,20 @@ class TestCanonicalInstrumentResolution:
         """Verify BTC-PERP and BTC/USDT:USDT resolve to Binance Futures."""
         res_perp = global_instrument_resolver.resolve("BTC-PERP")
         assert res_perp.is_valid is True
+        assert res_perp.instrument is not None
         assert res_perp.instrument.instrument_type == InstrumentType.PERPETUAL
         assert res_perp.instrument.provider == "binance_futures"
 
         res_direct = global_instrument_resolver.resolve("BTC/USDT:USDT")
         assert res_direct.is_valid is True
+        assert res_direct.instrument is not None
         assert res_direct.instrument.instrument_id == "BINANCE:BTCUSDT:PERPETUAL"
 
     def test_05_options_contract_resolution(self):
         """Verify formatted dated option contract resolves with strike and call/put."""
-        res = global_instrument_resolver.resolve("BTC-260925-70000-C")
+        res = global_instrument_resolver.resolve("BTC-281225-70000-C")
         assert res.is_valid is True
+        assert res.instrument is not None
         assert res.instrument.instrument_type == InstrumentType.OPTION
         assert res.instrument.strike == 70000.0
         assert res.instrument.option_type == "CALL"

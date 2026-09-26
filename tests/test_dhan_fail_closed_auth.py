@@ -11,6 +11,7 @@ Verifies:
 
 import pytest
 import urllib.error
+from email.message import Message
 from unittest.mock import patch, MagicMock
 
 from src.dhan_broker_adapter import dhan_broker_adapter
@@ -29,14 +30,14 @@ def test_dhan_401_triggers_auth_failed():
         url="https://api.dhan.co/v2/profile",
         code=401,
         msg="Unauthorized",
-        hdrs={},
+        hdrs=Message(),
         fp=None
     )
 
     with patch("urllib.request.urlopen", side_effect=http_401_err):
         resp = dhan_broker_adapter.get_profile()
 
-    assert dhan_broker_adapter._auth_failed is True
+    assert bool(dhan_broker_adapter._auth_failed) is True
     assert dhan_broker_adapter.auth_status == "AUTH_FAILED"
     assert resp.get("broker_status") == "AUTH_FAILED"
     assert resp.get("http_code") == 401
@@ -106,7 +107,7 @@ def test_reauthentication_clears_lock_and_unlocks_trading():
 
     assert reauth_res.get("success") is True
     assert reauth_res.get("status") == "AUTHENTICATED"
-    assert dhan_broker_adapter._auth_failed is False
+    assert bool(dhan_broker_adapter._auth_failed) is False
     assert dhan_broker_adapter.auth_status == "AUTHENTICATED"
 
     # Verify Risk Engine now allows Dhan orders

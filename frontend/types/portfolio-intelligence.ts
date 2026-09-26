@@ -7,7 +7,7 @@ export interface ChartSegment {
   amount?: number;
 }
 
-export type ConnectionStatus = "Connected" | "Connecting" | "Disconnected" | "Error" | "Data Delayed";
+export type ConnectionStatus = "Connected" | "Connecting" | "Disconnected" | "Error" | "Data Delayed" | "Not Configured";
 
 export interface BrokerPortfolio {
   id: string;
@@ -19,6 +19,10 @@ export interface BrokerPortfolio {
   positionsCount: number;
   openPositionsCount: number;
   pnl: number;
+  currency?: string;
+  providerId?: string;
+  statusMessage?: string;
+  isConfigured?: boolean;
   segments: ChartSegment[];
 }
 

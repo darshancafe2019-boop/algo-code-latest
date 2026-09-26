@@ -140,24 +140,28 @@ function MainApp() {
   // Idle-time chunk preloading: warms up heavy tab bundles during browser idle periods
   useEffect(() => {
     const preload = () => {
-      import("@/components/terminal/TradingTerminal");
-      import("@/components/bot-control/BotControlTab");
-      import("@/components/market-universe/MarketUniverse");
-      import("@/components/options/OptionChainView");
-      import("@/components/analytics/PerformanceAnalytics");
-      import("@/components/analytics/InstitutionalCapitalSegregationTab");
-      import("@/components/positions/EcoPositionsView");
-      import("@/components/order-execution/OrderExecutionCenter");
-      import("@/components/strategy/StrategyBuilder");
-      import("@/components/indicators/IndicatorCenter");
-      import("@/components/risk-management/RiskManagement");
-      import("@/components/trade-journal/TradeJournal");
-      import("@/components/logs/LogsDebugging");
-      import("@/src/features/markets/futures");
-      import("@/components/tax-intelligence/TaxIntelligenceTab");
-      import("@/components/live/DhanLiveMarketFeed");
-      import("@/components/live/UpstoxLiveMarketFeed");
-      import("@/components/live/DeltaLiveMarketFeed");
+      import("@/src/features/markets/futures").catch(() => {});
+      import("@/src/features/markets/options").catch(() => {});
+      import("@/components/terminal/TradingTerminal").catch(() => {});
+      import("@/components/bot-control/BotControlTab").catch(() => {});
+      import("@/components/market-universe/MarketUniverse").catch(() => {});
+      import("@/components/options/OptionChainView").catch(() => {});
+      import("@/components/analytics/PerformanceAnalytics").catch(() => {});
+      import("@/components/analytics/InstitutionalCapitalSegregationTab").catch(() => {});
+      import("@/components/positions/EcoPositionsView").catch(() => {});
+      import("@/components/order-execution/OrderExecutionCenter").catch(() => {});
+      import("@/components/strategy/StrategyBotCreationWorkspace").catch(() => {});
+      import("@/components/strategy/StrategyCenter").catch(() => {});
+      import("@/components/indicators/IndicatorCenter").catch(() => {});
+      import("@/components/risk-management/RiskManagement").catch(() => {});
+      import("@/components/trade-journal/TradeJournal").catch(() => {});
+      import("@/components/logs/LogsDebugging").catch(() => {});
+      import("@/components/tax-intelligence/TaxIntelligenceTab").catch(() => {});
+      import("@/components/settings/TerminalSettingsView").catch(() => {});
+      import("@/components/live/MarketCommandCenter").catch(() => {});
+      import("@/components/live/DhanLiveMarketFeed").catch(() => {});
+      import("@/components/live/UpstoxLiveMarketFeed").catch(() => {});
+      import("@/components/live/DeltaLiveMarketFeed").catch(() => {});
     };
 
     if (typeof window !== "undefined") {

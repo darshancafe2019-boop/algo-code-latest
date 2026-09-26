@@ -269,6 +269,11 @@ class SubscriptionRegistry:
         with self._lock:
             return set(self._subscriptions.keys())
 
+    def get_active_subscriptions(self) -> Set[str]:
+        """Returns set of all active subscribed symbols."""
+        with self._lock:
+            return set(self._subscriptions.keys())
+
     def get_effective_mode(self, symbol: str) -> str:
         with self._lock:
             return self._active_modes.get(symbol.upper(), "ltpc")

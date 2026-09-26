@@ -490,3 +490,6 @@ class ResilientTickerService:
 def get_ticker_service() -> ResilientTickerService:
     """Returns the shared singleton instance of ResilientTickerService."""
     return ResilientTickerService()
+
+
+resilient_ticker_service = get_ticker_service()

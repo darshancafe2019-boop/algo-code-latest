@@ -1,5 +1,3 @@
-"use client";
-
 import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";

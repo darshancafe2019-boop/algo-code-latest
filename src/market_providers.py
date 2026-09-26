@@ -4,7 +4,7 @@ import time
 import math
 import json
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, cast
 from datetime import datetime, timezone, timedelta
 import ccxt
 from src import db
@@ -717,7 +717,7 @@ class NSEMarketProvider(BaseMarketProvider):
     def get_historical(self, symbol: str, timeframe: str = "15m", limit: int = 100) -> List[Dict[str, Any]]:
         from src.upstox_service import global_upstox_service
         df = global_upstox_service.fetch_historical_candles(symbol, timeframe=timeframe, limit=limit)
-        return df.to_dict(orient="records")
+        return cast(List[Dict[str, Any]], df.to_dict(orient="records"))
 
 
 # =============================================================

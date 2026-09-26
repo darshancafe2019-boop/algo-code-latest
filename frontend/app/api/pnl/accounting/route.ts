@@ -17,7 +17,11 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
+const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
+
+// High-speed in-memory micro-cache (TTL 1500ms)
+const pnlMicroCache = new Map<string, { payload: PnlJournalDashboardPayload; timestamp: number }>();
+const PNL_CACHE_TTL_MS = 1500;
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,7 +35,18 @@ export async function GET(request: NextRequest) {
     const strategy = searchParams.get("strategy") || "ALL";
     const currency = searchParams.get("currency") || "INR";
 
+    const cacheKey = `${mode}:${broker}:${account}:${period}:${asset}:${market}:${strategy}:${currency}`;
+    const cached = pnlMicroCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < PNL_CACHE_TTL_MS) {
+      return NextResponse.json(cached.payload, {
+        headers: { "X-Cache-Hit": "true", "X-Response-Time-Ms": "0" },
+      });
+    }
+
     let rawBackendData: any = null;
+
+    let rawPortfolioData: any = null;
+    let rawLedgerData: any = null;
 
     try {
       const backendQuery = new URLSearchParams({
@@ -47,17 +62,37 @@ export async function GET(request: NextRequest) {
         offset: "0",
       });
 
-      const res = await fetch(`${BACKEND_URL}/api/portfolio/pnl/dashboard?${backendQuery.toString()}`, {
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        next: { revalidate: 0 },
-      });
+      const envParam = mode === "LIVE" ? "LIVE" : "PAPER";
 
-      if (res.ok) {
-        rawBackendData = await res.json();
+      const [pnlRes, portRes, ledgRes] = await Promise.all([
+        fetch(`${BACKEND_URL}/api/portfolio/pnl/dashboard?${backendQuery.toString()}`, {
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => null),
+        fetch(`${BACKEND_URL}/api/v2/portfolio?environment=${envParam}`, {
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => null),
+        fetch(`${BACKEND_URL}/api/v2/capital/ledger?environment=${envParam}&limit=50`, {
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        }).catch(() => null),
+      ]);
+
+      if (pnlRes && pnlRes.ok) {
+        rawBackendData = await pnlRes.json();
+      }
+      if (portRes && portRes.ok) {
+        rawPortfolioData = await portRes.json();
+      }
+      if (ledgRes && ledgRes.ok) {
+        rawLedgerData = await ledgRes.json();
       }
     } catch (backendErr) {
-      console.warn("Backend /api/portfolio/pnl/dashboard unreachable, using fallback calculations:", backendErr);
+      console.warn("Backend P&L data fetch error:", backendErr);
     }
 
     // Process backend trades or construct structured records
@@ -219,67 +254,93 @@ export async function GET(request: NextRequest) {
       }
     ];
 
-    const balances: AccountingBalance[] = [
-      {
-        broker: "DHAN",
-        currency: "INR",
-        totalBalance: 500000 + summary.realizedPnl,
-        availableMargin: 380000,
-        usedMargin: 120000,
-        collateralValue: 0,
-        unrealizedPnl: summary.unrealizedPnl,
-        realizedPnl: summary.realizedPnl,
-        pendingSettlement: 0,
-        lastUpdated: new Date().toISOString(),
-      },
-      {
-        broker: "DELTA",
-        currency: "USDT",
-        totalBalance: 10000,
-        availableMargin: 8200,
-        usedMargin: 1800,
-        collateralValue: 0,
-        unrealizedPnl: 0,
-        realizedPnl: 0,
-        pendingSettlement: 0,
-        lastUpdated: new Date().toISOString(),
-      },
-      {
-        broker: "PAPER",
-        currency: "INR",
-        totalBalance: 1000000 + summary.netPnl,
-        availableMargin: 950000,
-        usedMargin: 50000,
-        collateralValue: 0,
-        unrealizedPnl: summary.unrealizedPnl,
-        realizedPnl: summary.realizedPnl,
-        pendingSettlement: 0,
-        lastUpdated: new Date().toISOString(),
-      }
-    ];
+    const liveAccounts: any[] = rawPortfolioData?.data?.accounts || [];
+    const balances: AccountingBalance[] = liveAccounts.length > 0
+      ? liveAccounts.map((acc: any) => ({
+          broker: (acc.broker || acc.provider || "PAPER").toUpperCase(),
+          currency: acc.currency || "USD",
+          totalBalance: Number(acc.equity || acc.cashBalance || 0),
+          availableMargin: Number(acc.availableMargin || acc.availableCash || 0),
+          usedMargin: Math.max(0, Number(acc.equity || 0) - Number(acc.availableMargin || 0)),
+          collateralValue: Number(acc.collateral || 0),
+          unrealizedPnl: Number(acc.unrealizedPnl || 0),
+          realizedPnl: Number(acc.realizedPnl || 0),
+          pendingSettlement: 0,
+          lastUpdated: acc.lastUpdated || new Date().toISOString(),
+        }))
+      : [
+          {
+            broker: "DHAN",
+            currency: "INR",
+            totalBalance: 500000 + summary.realizedPnl,
+            availableMargin: 380000,
+            usedMargin: 120000,
+            collateralValue: 0,
+            unrealizedPnl: summary.unrealizedPnl,
+            realizedPnl: summary.realizedPnl,
+            pendingSettlement: 0,
+            lastUpdated: new Date().toISOString(),
+          },
+          {
+            broker: "DELTA",
+            currency: "USDT",
+            totalBalance: 10000,
+            availableMargin: 8200,
+            usedMargin: 1800,
+            collateralValue: 0,
+            unrealizedPnl: 0,
+            realizedPnl: 0,
+            pendingSettlement: 0,
+            lastUpdated: new Date().toISOString(),
+          },
+          {
+            broker: "PAPER",
+            currency: "INR",
+            totalBalance: 1000000 + summary.netPnl,
+            availableMargin: 950000,
+            usedMargin: 50000,
+            collateralValue: 0,
+            unrealizedPnl: summary.unrealizedPnl,
+            realizedPnl: summary.realizedPnl,
+            pendingSettlement: 0,
+            lastUpdated: new Date().toISOString(),
+          }
+        ];
 
-    const capitalEvents: CapitalEvent[] = [
-      {
-        id: "cap-001",
-        timestamp: new Date(Date.now() - 30 * 86400000).toISOString(),
-        broker: "DHAN",
-        type: "DEPOSIT",
-        amount: 500000,
-        currency: "INR",
-        reference: "UPI/NEFT/091283",
-        status: "SETTLED",
-      },
-      {
-        id: "cap-002",
-        timestamp: new Date(Date.now() - 30 * 86400000).toISOString(),
-        broker: "PAPER",
-        type: "DEPOSIT",
-        amount: 1000000,
-        currency: "INR",
-        reference: "SIM_INITIAL_ALLOCATION",
-        status: "SETTLED",
-      }
-    ];
+    const liveLedger: any[] = Array.isArray(rawLedgerData?.data) ? rawLedgerData.data : [];
+    const capitalEvents: CapitalEvent[] = liveLedger.length > 0
+      ? liveLedger.map((evt: any, i: number) => ({
+          id: String(evt.ledgerEntryId || evt.id || `cap-${i + 1}`),
+          timestamp: evt.timestamp || new Date().toISOString(),
+          broker: String(evt.provider || evt.accountId || "PAPER").toUpperCase(),
+          type: (evt.entryType || evt.direction || "DEPOSIT").toUpperCase() as any,
+          amount: Number(evt.amount || 0),
+          currency: evt.currency || "USD",
+          reference: evt.referenceId || evt.reason || "LEDGER_ENTRY",
+          status: "SETTLED",
+        }))
+      : [
+          {
+            id: "cap-001",
+            timestamp: new Date(Date.now() - 30 * 86400000).toISOString(),
+            broker: "DHAN",
+            type: "DEPOSIT",
+            amount: 500000,
+            currency: "INR",
+            reference: "UPI/NEFT/091283",
+            status: "SETTLED",
+          },
+          {
+            id: "cap-002",
+            timestamp: new Date(Date.now() - 30 * 86400000).toISOString(),
+            broker: "PAPER",
+            type: "DEPOSIT",
+            amount: 1000000,
+            currency: "INR",
+            reference: "SIM_INITIAL_ALLOCATION",
+            status: "SETTLED",
+          }
+        ];
 
     // Build Equity Curve
     let runningEquity = initialCapital;
@@ -382,7 +443,14 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    return NextResponse.json(payload);
+    if (pnlMicroCache.size > 50) {
+      pnlMicroCache.clear();
+    }
+    pnlMicroCache.set(cacheKey, { payload, timestamp: Date.now() });
+
+    return NextResponse.json(payload, {
+      headers: { "X-Cache-Hit": "false" },
+    });
   } catch (error: any) {
     console.error("Error in /api/pnl/accounting:", error);
     return NextResponse.json(

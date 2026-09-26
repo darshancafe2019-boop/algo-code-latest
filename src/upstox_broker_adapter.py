@@ -351,6 +351,11 @@ class UpstoxBrokerAdapter(BrokerAdapter):
                     return {"success": True, "order_id": order_id, "data": res["data"]}
             except Exception as e:
                 logger.error("Failed fetching Upstox order status: %s", e)
+                return {"success": False, "error": str(e), "order_id": order_id}
+
+        if order_id in self.orders:
+            return {"success": True, "order_id": order_id, "order": self.orders[order_id]}
+        return {"success": False, "error": "Order not found", "order_id": order_id}
 
     def place_multileg_order(self, order_payload: Dict[str, Any]) -> Dict[str, Any]:
         """Executes or simulates multi-leg options / futures spread orders."""

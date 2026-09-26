@@ -233,5 +233,10 @@ class SecretsManager:
             )
         return ok
 
+    def get_configured_brokers(self) -> List[str]:
+        """Returns list of uppercase provider IDs that have configured connected credentials."""
+        rows = db.safe_query("SELECT DISTINCT provider_id FROM broker_credentials WHERE status = 'CONNECTED'")
+        return [r["provider_id"].upper() for r in rows if r.get("provider_id")]
+
 
 global_secrets_manager = SecretsManager()

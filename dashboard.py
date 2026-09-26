@@ -117,6 +117,13 @@ from src.email_service import global_email_service
 # Initialize Flask App
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
+# Register Authoritative Strategy Instrument Resolver Routes
+try:
+    from src.strategy_resolver_routes import register_strategy_resolver_routes
+    register_strategy_resolver_routes(app)
+except Exception as _strat_route_err:
+    logger.warning(f"Strategy resolver routes registration warning: {_strat_route_err}")
+
 # Bootstrap administrative identity and verify database authorization
 try:
     global_auth_manager.initialize_bootstrap_admin()

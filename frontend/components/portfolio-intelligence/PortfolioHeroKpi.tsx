@@ -107,8 +107,12 @@ export const PortfolioHeroKpi = memo(function PortfolioHeroKpi({
             <div className="flex items-center justify-between text-[11px] font-medium text-[#7D8EA5]">
               <span>4. Realized P&L</span>
             </div>
-            <div className="text-[17px] sm:text-[19px] font-bold text-[#00E890] font-mono tabular-nums leading-tight">
-              ₹ {data.realizedPnl.toLocaleString("en-IN")}
+            <div
+              className={`text-[17px] sm:text-[19px] font-bold font-mono tabular-nums leading-tight ${
+                data.realizedPnl >= 0 ? "text-[#00E890]" : "text-[#FF3B5C]"
+              }`}
+            >
+              ₹ {data.realizedPnl >= 0 ? "+" : ""}{data.realizedPnl.toLocaleString("en-IN")}
             </div>
             <div className="text-[10px] text-[#8EA1B7] flex items-center justify-between">
               <span>Win Rate</span>
@@ -122,8 +126,12 @@ export const PortfolioHeroKpi = memo(function PortfolioHeroKpi({
             className="p-3 rounded-lg bg-[#061A2A] border border-[#0F2D48] hover:border-[#16C6F4]/40 transition-all flex flex-col justify-between cursor-pointer"
           >
             <div className="text-[11px] font-medium text-[#7D8EA5]">5. Unrealized P&L</div>
-            <div className="text-[17px] sm:text-[19px] font-bold text-[#00E890] font-mono tabular-nums leading-tight">
-              ₹ {data.unrealizedPnl.toLocaleString("en-IN")}
+            <div
+              className={`text-[17px] sm:text-[19px] font-bold font-mono tabular-nums leading-tight ${
+                data.unrealizedPnl >= 0 ? "text-[#00E890]" : "text-[#FF3B5C]"
+              }`}
+            >
+              ₹ {data.unrealizedPnl >= 0 ? "+" : ""}{data.unrealizedPnl.toLocaleString("en-IN")}
             </div>
             <div className="text-[10px] text-[#8EA1B7]">
               <span className="font-semibold text-slate-200">{data.openPositionsCount}</span> positions
@@ -136,11 +144,19 @@ export const PortfolioHeroKpi = memo(function PortfolioHeroKpi({
             className="p-3 rounded-lg bg-[#061A2A] border border-[#0F2D48] hover:border-[#16C6F4]/40 transition-all flex flex-col justify-between cursor-pointer"
           >
             <div className="text-[11px] font-medium text-[#7D8EA5]">6. Day P&L</div>
-            <div className="text-[17px] sm:text-[19px] font-bold text-[#00E890] font-mono tabular-nums leading-tight">
-              ₹ {data.dayPnl.toLocaleString("en-IN")}
+            <div
+              className={`text-[17px] sm:text-[19px] font-bold font-mono tabular-nums leading-tight ${
+                data.dayPnl >= 0 ? "text-[#00E890]" : "text-[#FF3B5C]"
+              }`}
+            >
+              ₹ {data.dayPnl >= 0 ? "+" : ""}{data.dayPnl.toLocaleString("en-IN")}
             </div>
-            <div className="text-[10px] text-[#00E890] font-mono font-semibold">
-              +{data.dayPnlPercent.toFixed(2)}%
+            <div
+              className={`text-[10px] font-mono font-semibold ${
+                data.dayPnl >= 0 ? "text-[#00E890]" : "text-[#FF3B5C]"
+              }`}
+            >
+              {data.dayPnl >= 0 ? "+" : ""}{data.dayPnlPercent.toFixed(2)}%
             </div>
           </div>
 

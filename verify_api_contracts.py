@@ -115,22 +115,23 @@ def test_api_contracts():
             all_passed = False
             continue
 
-        if expected_type == "dict" and not isinstance(data, dict):
-            print(f"❌ {path:<50} -> Expected dict, got {type(data)}")
-            all_passed = False
-            continue
-        elif expected_type == "list" and not isinstance(data, list):
-            print(f"❌ {path:<50} -> Expected list, got {type(data)}")
-            all_passed = False
-            continue
-
-        missing = [k for k in required_keys if k not in data]
-        if missing:
-            print(f"❌ {path:<50} -> Missing keys: {missing}")
-            all_passed = False
-            continue
-
-        print(f"✅ {path:<50} -> 200 OK (Keys: {list(data.keys())[:4]}...)")
+        if expected_type == "dict":
+            if not isinstance(data, dict):
+                print(f"❌ {path:<50} -> Expected dict, got {type(data)}")
+                all_passed = False
+                continue
+            missing = [k for k in required_keys if k not in data]
+            if missing:
+                print(f"❌ {path:<50} -> Missing keys: {missing}")
+                all_passed = False
+                continue
+            print(f"✅ {path:<50} -> 200 OK (Keys: {list(data.keys())[:4]}...)")
+        elif expected_type == "list":
+            if not isinstance(data, list):
+                print(f"❌ {path:<50} -> Expected list, got {type(data)}")
+                all_passed = False
+                continue
+            print(f"✅ {path:<50} -> 200 OK (Items: {len(data)})")
 
     print("=" * 80)
     print(f"OVERALL API CONTRACT INTEGRITY: {'PASS' if all_passed else 'FAIL'}")

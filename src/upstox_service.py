@@ -588,7 +588,7 @@ class UpstoxService:
 
     @access_token.setter
     def access_token(self, value: Optional[str]) -> None:
-        self._access_token = str(value).strip() if value else ""
+        self._access_token = value.strip() if value else ""
         if self._access_token:
             self._circuit_breaker_open = False
             self._auth_status = "INITIAL"
@@ -681,7 +681,7 @@ class UpstoxService:
         """Maps canonical symbol, trading symbol, ISIN, or alias to official Upstox instrument_key across 5000+ instruments."""
         if not symbol:
             return None
-        sym_str = str(symbol).strip()
+        sym_str = symbol.strip()
         clean_upper = sym_str.upper()
         clean_compact = clean_upper.replace(" ", "").replace("_", "")
 
@@ -869,7 +869,7 @@ class UpstoxService:
             return None
 
         # Normalize parameters
-        target_opt = str(option_type or "").upper().strip()
+        target_opt = (option_type or "").upper().strip()
         if target_opt == "CALL":
             target_opt = "CE"
         elif target_opt == "PUT":
@@ -882,7 +882,7 @@ class UpstoxService:
             except (ValueError, TypeError):
                 pass
 
-        target_expiry = str(expiry).strip() if expiry else None
+        target_expiry = expiry.strip() if expiry else None
 
         for c in contracts:
             c_exp = str(c.get("expiry") or "")
@@ -922,7 +922,7 @@ class UpstoxService:
         """Retrieves structured instrument metadata for any of 5000+ Indian stocks or indices."""
         if not symbol:
             return None
-        sym_str = str(symbol).strip()
+        sym_str = symbol.strip()
         clean_upper = sym_str.upper()
 
         # 1. Curated indices registry
@@ -1153,7 +1153,7 @@ class UpstoxService:
         """
         if not input_str:
             return ""
-        clean = str(input_str).strip()
+        clean = input_str.strip()
         clean_upper = clean.upper()
         clean_compact = clean_upper.replace(" ", "").replace("_", "").replace("|", ":")
 
@@ -1212,7 +1212,7 @@ class UpstoxService:
         if isinstance(symbol, str):
             symbols_list = [s.strip() for s in symbol.split(",") if s.strip()]
         else:
-            symbols_list = [str(s).strip() for s in symbol if str(s).strip()]
+            symbols_list = [str(s).strip() for s in symbol if s]
 
         if not symbols_list:
             return {"status": "error", "message": "No symbols or instrument keys provided."}
@@ -1252,7 +1252,7 @@ class UpstoxService:
                     if first_entry is None:
                         first_entry = item
 
-                res_dict = {
+                res_dict: Dict[str, Any] = {
                     "status": "success",
                     "data": normalized_map,
                     "quotes": normalized_map,
@@ -1341,7 +1341,7 @@ class UpstoxService:
         meta = self.get_instrument_metadata(symbol)
         if meta and meta.get("instrument_key"):
             return str(meta["instrument_key"])
-        clean_upper = str(symbol or "").strip().upper()
+        clean_upper = symbol.strip().upper() if symbol else ""
         if clean_upper in OFFICIAL_UPSTOX_KEYS:
             return OFFICIAL_UPSTOX_KEYS[clean_upper].get("instrument_key")
         for k, v in OFFICIAL_UPSTOX_KEYS.items():
@@ -1397,7 +1397,7 @@ class UpstoxService:
 
         # Realistic Fallback Generator for Paper Simulation & Strategy Backtesting
         base_price = 24000.0
-        sym_u = str(symbol or "").upper()
+        sym_u = symbol.upper() if symbol else ""
         if "BANK" in sym_u:
             base_price = 51500.0
         elif "FINNIFTY" in sym_u:
@@ -1846,3 +1846,4 @@ class UpstoxService:
 
 # Global Singleton Instance
 global_upstox_service = UpstoxService()
+upstox_service = global_upstox_service

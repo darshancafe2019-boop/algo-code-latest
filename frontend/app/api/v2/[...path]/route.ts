@@ -12,6 +12,16 @@ const BACKEND_URL =
  * Dedicated Next.js Route Handler for Quant.OS Data Core v2 API (/api/v2/*)
  * Forwards requests directly to the authoritative Flask backend on port 5050.
  */
+// High-speed in-memory micro-cache for idempotent GET queries (TTL 1000ms)
+interface CacheEntry {
+  status: number;
+  body: ArrayBuffer;
+  contentType: string;
+  timestamp: number;
+}
+const v2MicroCache = new Map<string, CacheEntry>();
+const CACHE_TTL_MS = 1000;
+
 async function handleV2Proxy(
   req: NextRequest,
   { params }: { params: { path: string[] } }
@@ -20,6 +30,29 @@ async function handleV2Proxy(
   const subPath = pathSegments.join("/");
   const url = new URL(req.url);
   const targetUrl = `${BACKEND_URL}/api/v2/${subPath}${url.search}`;
+  const cacheKey = `${req.method}:${subPath}${url.search}`;
+
+  // Invalidate cache on mutations
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    v2MicroCache.clear();
+  }
+
+  // Check micro-cache for idempotent GET
+  if (req.method === "GET") {
+    const cached = v2MicroCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      const responseHeaders = new Headers();
+      responseHeaders.set("X-Cache-Hit", "true");
+      responseHeaders.set("X-Response-Time-Ms", "0");
+      if (cached.contentType) {
+        responseHeaders.set("Content-Type", cached.contentType);
+      }
+      return new NextResponse(cached.body.slice(0), {
+        status: cached.status,
+        headers: responseHeaders,
+      });
+    }
+  }
 
   const requestId =
     req.headers.get("x-request-id") ||
@@ -89,6 +122,7 @@ async function handleV2Proxy(
     const responseHeaders = new Headers();
     responseHeaders.set("X-Request-Id", requestId);
     responseHeaders.set("X-Response-Time-Ms", latencyMs.toString());
+    responseHeaders.set("X-Cache-Hit", "false");
     if (contentType) {
       responseHeaders.set("Content-Type", contentType);
     }
@@ -106,6 +140,20 @@ async function handleV2Proxy(
     }
 
     const rawBody = await backendRes.arrayBuffer();
+
+    // Cache successful GET responses
+    if (req.method === "GET" && backendRes.ok) {
+      if (v2MicroCache.size > 200) {
+        v2MicroCache.clear();
+      }
+      v2MicroCache.set(cacheKey, {
+        status: backendRes.status,
+        body: rawBody,
+        contentType,
+        timestamp: Date.now(),
+      });
+    }
+
     return new NextResponse(rawBody, {
       status: backendRes.status,
       headers: responseHeaders,

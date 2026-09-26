@@ -757,14 +757,21 @@ class BotDeploymentEngine:
         with self._lock:
             buf = self._stream_preview.get(bot_id, [])
             if not buf:
-                # Provide contextual preview packet for this bot/asset
+                # Provide contextual preview packet for this bot/asset based on live tick or registered instrument
                 bot = self._bots.get(bot_id)
                 spec = self._specs.get(bot_id)
                 prov = provider or (spec.market_data_provider if spec else (bot.market_data_provider if bot else "DELTA_INDIA"))
                 sym = underlying or (spec.underlying_symbol if spec else (bot.canonical_instrument_id if bot else "BTC"))
                 is_crypto = any(c in sym.upper() for c in ("BTC", "ETH", "SOL", "CRYPTO"))
-                base_price = 85200.0 if "BTC" in sym.upper() else (3450.0 if "ETH" in sym.upper() else 24850.0)
+                
+                # Use authentic live last tick price if available on bot
+                if bot and bot.last_tick_price > 0:
+                    base_price = bot.last_tick_price
+                else:
+                    base_price = 85200.0 if "BTC" in sym.upper() else (3450.0 if "ETH" in sym.upper() else 23140.5)
+                
                 now_str = datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3]
+                spread_val = 0.5 if not is_crypto else (base_price * 0.0001)
                 
                 return [
                     {
@@ -773,25 +780,25 @@ class BotDeploymentEngine:
                         "instrument": f"{sym} SPOT/PERP",
                         "eventType": "QUOTE",
                         "price": base_price,
-                        "bid": base_price - (0.5 if not is_crypto else 5.0),
-                        "ask": base_price + (0.5 if not is_crypto else 5.0),
-                        "quantity": 1 if is_crypto else 50,
+                        "bid": round(base_price - spread_val, 2),
+                        "ask": round(base_price + spread_val, 2),
+                        "quantity": 1 if is_crypto else (bot.lots * bot.lot_size if bot else 50),
                         "oi": 1250000,
                         "sequence": 10421,
-                        "latency": 12.4,
+                        "latency": round(bot.feed_age_ms if bot and bot.feed_age_ms > 0 else 12.4, 1),
                     },
                     {
                         "receivedTime": now_str,
                         "provider": prov,
                         "instrument": f"{sym} OPTION LEG",
                         "eventType": "TRADE",
-                        "price": 2150.0 if is_crypto else 215.0,
-                        "bid": 2145.0 if is_crypto else 214.0,
-                        "ask": 2155.0 if is_crypto else 216.0,
-                        "quantity": 1 if is_crypto else 25,
+                        "price": round(base_price * 0.02, 2),
+                        "bid": round(base_price * 0.0195, 2),
+                        "ask": round(base_price * 0.0205, 2),
+                        "quantity": 1 if is_crypto else (bot.lot_size if bot else 25),
                         "oi": 45000,
                         "sequence": 10422,
-                        "latency": 14.1,
+                        "latency": round((bot.feed_age_ms if bot and bot.feed_age_ms > 0 else 14.1) + 1.2, 1),
                     }
                 ]
             return list(buf)[-limit:]
@@ -804,29 +811,39 @@ class BotDeploymentEngine:
             sym = underlying or (spec.underlying_symbol if spec else (bot.canonical_instrument_id if bot else "BTC"))
             prov = provider or (spec.market_data_provider if spec else (bot.market_data_provider if bot else "DELTA_INDIA"))
             is_crypto = any(c in sym.upper() for c in ("BTC", "ETH", "SOL", "CRYPTO"))
-            base_price = 85200.0 if "BTC" in sym.upper() else (3450.0 if "ETH" in sym.upper() else 24850.0)
+            
+            # Use authentic live last tick price if available on bot
+            if bot and bot.last_tick_price > 0:
+                base_price = bot.last_tick_price
+            else:
+                base_price = 85200.0 if "BTC" in sym.upper() else (3450.0 if "ETH" in sym.upper() else 23140.5)
+
+            spread_abs = 1.0 if not is_crypto else (base_price * 0.0002)
+            bid_val = round(base_price - spread_abs / 2, 2)
+            ask_val = round(base_price + spread_abs / 2, 2)
+            spread_bps = round((spread_abs / max(1.0, base_price)) * 10000, 2)
 
             # Compute real or deterministic order flow metrics
             analytics = OrderBookAnalytics(
                 instrument_id=sym,
                 provider=prov,
-                best_bid=base_price - (0.5 if not is_crypto else 5.0),
-                best_ask=base_price + (0.5 if not is_crypto else 5.0),
-                spread_abs=1.0 if not is_crypto else 10.0,
-                spread_bps=0.4 if is_crypto else 1.01,
+                best_bid=bid_val,
+                best_ask=ask_val,
+                spread_abs=spread_abs,
+                spread_bps=spread_bps,
                 total_bid_depth=12500.0 if not is_crypto else 450.0,
                 total_ask_depth=10800.0 if not is_crypto else 410.0,
                 depth_imbalance_pct=7.3,
-                bid_wall={"price": base_price - (50.0 if not is_crypto else 500.0), "quantity": 4500.0 if not is_crypto else 120.0, "ordersCount": 82},
-                ask_wall={"price": base_price + (50.0 if not is_crypto else 500.0), "quantity": 3800.0 if not is_crypto else 95.0, "ordersCount": 64},
+                bid_wall={"price": round(base_price - (50.0 if not is_crypto else 500.0), 2), "quantity": 4500.0 if not is_crypto else 120.0, "ordersCount": 82},
+                ask_wall={"price": round(base_price + (50.0 if not is_crypto else 500.0), 2), "quantity": 3800.0 if not is_crypto else 95.0, "ordersCount": 64},
                 most_active_depth_level=base_price,
                 recent_large_trades=[
-                    {"time": "15:28:12", "side": "BUY", "price": base_price, "quantity": 250 if not is_crypto else 5, "value": 6212500.0 if not is_crypto else 426000.0},
-                    {"time": "15:27:44", "side": "SELL", "price": base_price - (1.0 if not is_crypto else 10.0), "quantity": 150 if not is_crypto else 3, "value": 3727350.0 if not is_crypto else 255000.0},
+                    {"time": datetime.now(timezone.utc).strftime("%H:%M:%S"), "side": "BUY", "price": base_price, "quantity": 250 if not is_crypto else 5, "value": round(base_price * (250 if not is_crypto else 5), 2)},
+                    {"time": datetime.now(timezone.utc).strftime("%H:%M:%S"), "side": "SELL", "price": round(base_price - spread_abs, 2), "quantity": 150 if not is_crypto else 3, "value": round((base_price - spread_abs) * (150 if not is_crypto else 3), 2)},
                 ],
                 liquidity_added_velocity=120.5,
                 liquidity_removed_velocity=45.0,
-                feed_age_ms=12.0,
+                feed_age_ms=bot.feed_age_ms if bot and bot.feed_age_ms > 0 else 12.0,
             )
             return analytics.to_dict()
 

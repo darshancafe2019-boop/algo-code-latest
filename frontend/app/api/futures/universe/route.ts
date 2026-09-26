@@ -1233,8 +1233,22 @@ function generateRealWorldFuturesUniverse(): CanonicalFuturesContract[] {
   return rawList as CanonicalFuturesContract[];
 }
 
+// High-speed in-memory micro-cache (TTL 1000ms)
+const futuresMicroCache = new Map<string, { data: FuturesUniverseResponse; timestamp: number }>();
+const FUTURES_CACHE_TTL_MS = 1000;
+
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
+  const cacheKey = url.search || "ALL";
+
+  const cached = futuresMicroCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < FUTURES_CACHE_TTL_MS) {
+    return NextResponse.json(cached.data, {
+      status: 200,
+      headers: { "X-Cache-Hit": "true", "X-Response-Time-Ms": "0" },
+    });
+  }
+
   const targetUrl = `${BACKEND_URL}/api/futures/universe${url.search}`;
 
   try {
@@ -1251,7 +1265,12 @@ export async function GET(req: NextRequest) {
     if (backendRes.ok) {
       const data = await backendRes.json();
       if (Array.isArray(data?.contracts) && data.contracts.length > 0) {
-        return NextResponse.json(data, { status: 200 });
+        if (futuresMicroCache.size > 100) futuresMicroCache.clear();
+        futuresMicroCache.set(cacheKey, { data, timestamp: Date.now() });
+        return NextResponse.json(data, {
+          status: 200,
+          headers: { "X-Cache-Hit": "false" },
+        });
       }
     }
   } catch (err) {
@@ -1325,6 +1344,12 @@ export async function GET(req: NextRequest) {
     contracts: allContracts,
   };
 
-  return NextResponse.json(response, { status: 200 });
+  if (futuresMicroCache.size > 100) futuresMicroCache.clear();
+  futuresMicroCache.set(cacheKey, { data: response, timestamp: Date.now() });
+
+  return NextResponse.json(response, {
+    status: 200,
+    headers: { "X-Cache-Hit": "false" },
+  });
 }
 

@@ -17,10 +17,24 @@ const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "";
  * 4. Structured JSON responses preventing HTML 404 syntax errors in client JSON parsers.
  * 5. Correlation request ID propagation & latency telemetry.
  */
-async function handleProxy(req: NextRequest, { params }: { params: { path: string[] } }) {
-  const pathSegments = params.path || [];
+async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } | Promise<{ path: string[] }> }) {
+  let pathSegments: string[] = [];
+  try {
+    if (ctx?.params) {
+      const resolved = ctx.params instanceof Promise ? await ctx.params : ctx.params;
+      if (Array.isArray(resolved?.path)) {
+        pathSegments = resolved.path;
+      }
+    }
+  } catch {}
+
+  if (pathSegments.length === 0) {
+    const urlObj = new URL(req.url);
+    const cleanPath = urlObj.pathname.replace(/^\/api\/?/, "");
+    pathSegments = cleanPath.split("/").filter(Boolean);
+  }
+
   const rawSubPath = pathSegments.join("/");
-  // Normalize by stripping any redundant leading 'api/'
   const subPath = rawSubPath.replace(/^api\//, "");
   const url = new URL(req.url);
   const requestId = req.headers.get("x-request-id") || `bff_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
@@ -354,28 +368,57 @@ async function handleProxy(req: NextRequest, { params }: { params: { path: strin
   );
 }
 
-export async function GET(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function GET(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    console.error("[BFF_PROXY] GET error:", err);
+    return NextResponse.json({ status: "error", error: err?.message || "Internal Proxy Error" }, { status: 500 });
+  }
 }
 
-export async function POST(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function POST(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    console.error("[BFF_PROXY] POST error:", err);
+    return NextResponse.json({ status: "error", error: err?.message || "Internal Proxy Error" }, { status: 500 });
+  }
 }
 
-export async function PUT(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function PUT(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    console.error("[BFF_PROXY] PUT error:", err);
+    return NextResponse.json({ status: "error", error: err?.message || "Internal Proxy Error" }, { status: 500 });
+  }
 }
 
-export async function DELETE(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function DELETE(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    console.error("[BFF_PROXY] DELETE error:", err);
+    return NextResponse.json({ status: "error", error: err?.message || "Internal Proxy Error" }, { status: 500 });
+  }
 }
 
-export async function PATCH(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function PATCH(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    console.error("[BFF_PROXY] PATCH error:", err);
+    return NextResponse.json({ status: "error", error: err?.message || "Internal Proxy Error" }, { status: 500 });
+  }
 }
 
-export async function HEAD(req: NextRequest, ctx: { params: { path: string[] } }) {
-  return handleProxy(req, ctx);
+export async function HEAD(req: NextRequest, ctx: any) {
+  try {
+    return await handleProxy(req, ctx);
+  } catch (err: any) {
+    return new NextResponse(null, { status: 500 });
+  }
 }
 
 export async function OPTIONS() {

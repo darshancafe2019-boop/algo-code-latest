@@ -146,20 +146,25 @@ export function StrategyCenter() {
   const handleActivatePaper = (strategyNumber: string) => {
     const strat = strategies.find((s) => s.number === strategyNumber);
     if (strat) {
-      activatePaperStrategy(strategyNumber, "BTCUSDT", strat.primaryTimeframe, 0.5);
+      const isOptions = strat.part.includes("OPTIONS") || strat.category.includes("Options") || strat.market.toLowerCase().includes("options");
+      const isCrypto = strat.market.toLowerCase().includes("btc") || strat.market.toLowerCase().includes("eth");
+      const targetUnderlying = isOptions ? (isCrypto ? "BTC" : "NIFTY") : "BTC/USDT";
+      activatePaperStrategy(strategyNumber, targetUnderlying, strat.primaryTimeframe, 0.5);
+      setActiveViewTab("PAPER");
     }
   };
 
   const handleCreateBotFromStrategy = (strategy: CryptoStrategyDefinition) => {
     // Calculate realistic stop & profit targets from example trade or strategy category
-    const sym = strategy.exampleTrade?.instrument || "BTC/USDT";
-    const entry = strategy.exampleTrade?.entryPrice || 67000;
-    const stop = strategy.exampleTrade?.stopPrice || 65500;
-    const target = strategy.exampleTrade?.targetPrice || 70000;
+    const isOptions = strategy.part.includes("OPTIONS") || strategy.category.includes("Options") || strategy.market.toLowerCase().includes("options");
+    const isCrypto = strategy.market.toLowerCase().includes("btc") || strategy.market.toLowerCase().includes("eth");
+    const sym = isOptions ? (isCrypto ? "BTC" : "NIFTY") : (strategy.exampleTrade?.instrument || "BTC/USDT");
+    const entry = strategy.exampleTrade?.entryPrice || (isOptions ? 24850 : 67000);
+    const stop = strategy.exampleTrade?.stopPrice || (isOptions ? 24350 : 65500);
+    const target = strategy.exampleTrade?.targetPrice || (isOptions ? 25350 : 70000);
     const stopPct = Number((Math.abs(entry - stop) / (entry || 1) * 100).toFixed(2)) || 1.5;
     const targetPct = Number((Math.abs(target - entry) / (entry || 1) * 100).toFixed(2)) || 3.0;
 
-    const isOptions = strategy.market.toLowerCase().includes("options");
     const isFutures = strategy.market.toLowerCase().includes("perp") || strategy.market.toLowerCase().includes("futures");
     const resolvedAssetClass = isOptions ? "OPTIONS" : isFutures ? "CRYPTO_FUTURES" : "CRYPTO";
 
@@ -179,11 +184,11 @@ export function StrategyCenter() {
         capitalAllocation: 25000,
         indicators: strategy.indicators,
         rules: strategy.setupConditions,
-        origin: "STRATEGY_CENTER",
+        origin: isOptions ? "OPTIONS" : "STRATEGY_CENTER",
         rawStrategyConfig: strategy,
         timestamp: Date.now(),
       });
-      router.push(`/bots?create=true&strategyId=${encodeURIComponent(strategy.id)}`);
+      router.push(`/bots?create=true&strategyId=${encodeURIComponent(strategy.id)}&underlying=${encodeURIComponent(sym)}`);
     } catch {
       router.push(`/bots?create=true&strategyId=${encodeURIComponent(strategy.id)}`);
     }
@@ -222,14 +227,14 @@ export function StrategyCenter() {
                   Quant.OS Strategy Center
                 </h1>
                 <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-cyan-950/90 text-cyan-400 border border-cyan-700/60">
-                  30 AUTHORITATIVE STRATEGIES
+                  {strategies.length} AUTHORITATIVE STRATEGIES
                 </span>
                 <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800">
                   PAPER DEFAULT
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-400 font-mono mt-1">
-                Quantitative crypto strategy research, signal validation, centralized risk sizing, backtesting, and paper execution fleet.
+                Quantitative strategy research, multi-leg options architectures, signal validation, centralized risk sizing, backtesting, and execution fleet.
               </p>
             </div>
           </div>
@@ -281,7 +286,7 @@ export function StrategyCenter() {
       {/* 2. Top Navigation View Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-[#1A253A]">
         {[
-          { id: "LIBRARY", label: "Strategy Library (30)", icon: Compass },
+          { id: "LIBRARY", label: `Strategy Library (${strategies.length})`, icon: Compass },
           { id: "BACKTEST", label: "Backtest Lab", icon: FlaskConical },
           { id: "PAPER", label: "Paper Trading Fleet", icon: Radio },
           { id: "CLUSTERS", label: "Exposure Clusters", icon: Layers },
@@ -314,11 +319,11 @@ export function StrategyCenter() {
       {activeViewTab === "REGIME" && <StrategyRegimeView />}
       {activeViewTab === "JOURNAL" && <StrategyTradeJournalView />}
 
-      {/* Master 30 Strategy Library View */}
+      {/* Master Strategy Library View */}
       {activeViewTab === "LIBRARY" && (
         <div className="space-y-6 animate-fadeIn">
-          {/* Category Filter Pills (Part I to Part VI) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
+          {/* Category Filter Pills (Part I to Part VII) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
             <button
               onClick={() => setSelectedCategory("ALL")}
               className={`p-3 rounded-2xl border text-left transition-all ${
@@ -328,8 +333,8 @@ export function StrategyCenter() {
               }`}
             >
               <span className="text-[10px] font-mono text-cyan-400 font-bold block">ALL PARTS</span>
-              <span className="text-xs font-bold block">All 30 Strategies</span>
-              <span className="text-[10px] font-mono text-slate-500 block mt-0.5">30 Total</span>
+              <span className="text-xs font-bold block">All Strategies</span>
+              <span className="text-[10px] font-mono text-slate-500 block mt-0.5">{strategies.length} Total</span>
             </button>
 
             {STRATEGY_CATEGORIES.map((cat, idx) => {
@@ -363,7 +368,7 @@ export function StrategyCenter() {
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="text"
-                placeholder="Search 30 strategies by name, number, indicator, or setup..."
+                placeholder={`Search ${strategies.length} strategies by name, number, indicator, or setup...`}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-[#060A14] border border-[#1F2E47] text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"

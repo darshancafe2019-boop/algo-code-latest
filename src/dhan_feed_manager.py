@@ -652,3 +652,4 @@ class DhanFeedManager:
 
 # Global singleton instance
 global_dhan_feed_manager = DhanFeedManager.get_instance()
+dhan_feed_manager = global_dhan_feed_manager

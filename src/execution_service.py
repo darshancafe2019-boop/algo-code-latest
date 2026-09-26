@@ -385,7 +385,7 @@ class OrderExecutionService:
             latency_ctx = TradeLatencyContext(trade_id=0, order_id=idem_key)
             latency_ctx.mark_stage("risk_check")
             latency_ctx.mark_stage("order_creation")
-            if str(broker).upper() == "DHAN":
+            if (broker or "").upper() == "DHAN":
                 from src.dhan_broker_adapter import dhan_broker_adapter
                 result = dhan_broker_adapter.place_order(
                     symbol=symbol, side=side, quantity=effective_qty,

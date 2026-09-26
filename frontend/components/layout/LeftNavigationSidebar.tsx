@@ -116,6 +116,16 @@ export function LeftNavigationSidebar({
                 key={item.id}
                 href={item.path}
                 prefetch={true}
+                onMouseEnter={() => {
+                  try {
+                    router.prefetch(item.path);
+                  } catch {}
+                }}
+                onTouchStart={() => {
+                  try {
+                    router.prefetch(item.path);
+                  } catch {}
+                }}
                 onClick={() => handleNavClick(item)}
                 title={isCollapsed ? item.label : undefined}
                 className={cn(
@@ -202,6 +212,16 @@ export function LeftNavigationSidebar({
                     key={item.id}
                     href={item.path}
                     prefetch={true}
+                    onMouseEnter={() => {
+                      try {
+                        router.prefetch(item.path);
+                      } catch {}
+                    }}
+                    onTouchStart={() => {
+                      try {
+                        router.prefetch(item.path);
+                      } catch {}
+                    }}
                     onClick={() => handleNavClick(item)}
                     className={cn(
                       "w-full h-10 flex items-center gap-3 px-3 rounded-lg text-xs font-medium transition-colors text-left",

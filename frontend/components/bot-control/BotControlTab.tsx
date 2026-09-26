@@ -506,8 +506,13 @@ export function BotControlTab() {
         return;
       }
       setActionSuccess(res.data?.message || `Stopped ${res.data?.stopped_count || selectedBotIds.length} bot(s).`);
+      setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+    } catch (err: any) {
+      setActionError(err.message || "Failed to stop selected bots");
     } finally {
       setInFlightActionKeys((prev) => {
         const next = new Set(prev);
@@ -540,8 +545,13 @@ export function BotControlTab() {
         return;
       }
       setActionSuccess(res.data?.message || `Started ${res.data?.started_count || selectedBotIds.length} bot(s).`);
+      setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+    } catch (err: any) {
+      setActionError(err.message || "Failed to start selected bots");
     } finally {
       setInFlightActionKeys((prev) => {
         const next = new Set(prev);
@@ -574,8 +584,13 @@ export function BotControlTab() {
         return;
       }
       setActionSuccess(res.data?.message || `Paused ${res.data?.paused_count || selectedBotIds.length} bot(s).`);
+      setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+    } catch (err: any) {
+      setActionError(err.message || "Failed to pause selected bots");
     } finally {
       setInFlightActionKeys((prev) => {
         const next = new Set(prev);
@@ -608,8 +623,13 @@ export function BotControlTab() {
         return;
       }
       setActionSuccess(res.data?.message || `Resumed ${res.data?.resumed_count || selectedBotIds.length} bot(s).`);
+      setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
+      queryClient.invalidateQueries({ queryKey: ["botsList"] });
+      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
+    } catch (err: any) {
+      setActionError(err.message || "Failed to resume selected bots");
     } finally {
       setInFlightActionKeys((prev) => {
         const next = new Set(prev);
@@ -733,7 +753,19 @@ export function BotControlTab() {
 
   const selectedBotsList = useMemo(() => {
     const idSet = new Set(selectedBotIds);
-    return rawBots.filter((b) => idSet.has(b.id));
+    const matched = rawBots.filter(
+      (b) => idSet.has(b.id) || (b.bot_id && idSet.has(b.bot_id)) || (b.bot_uid && idSet.has(b.bot_uid))
+    );
+    if (matched.length === 0 && selectedBotIds.length > 0) {
+      return selectedBotIds.map((id) => ({
+        id,
+        bot_id: id,
+        name: `Bot ${id}`,
+        status: "STOPPED",
+        state: "STOPPED",
+      })) as BotRowItem[];
+    }
+    return matched;
   }, [rawBots, selectedBotIds]);
 
   // Export handlers
@@ -929,6 +961,8 @@ export function BotControlTab() {
         onBulkResume={handleBulkResume}
         onBulkStop={handleBulkStop}
         onBulkDelete={() => setIsBulkDeleteModalOpen(true)}
+        isProcessing={inFlightActionKeys.size > 0 || isDeleting}
+        activeAction={Array.from(inFlightActionKeys)[0] || (isDeleting ? "BULK_DELETE" : null)}
       />
 
       {/* 6. Slide-Out Details Drawer */}

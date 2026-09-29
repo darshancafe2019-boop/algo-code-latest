@@ -902,11 +902,15 @@ class InstrumentResolver:
                 opt_provider = (provider or "delta_options").lower()
                 if opt_provider in ["deribit", "deribit_options"]:
                     if not os.getenv("DERIBIT_API_KEY") and not os.getenv("DERIBIT_CLIENT_ID"):
-                        selected_provider = "delta_options"
-                        selected_exchange = "DELTA"
-                    else:
-                        selected_provider = "deribit_options"
-                        selected_exchange = "DERIBIT"
+                        return ResolutionResult(
+                            status=ResolutionStatus.UNSUPPORTED,
+                            query=query,
+                            reason=f"Options provider '{opt_provider}' is not configured. Missing API credentials.",
+                            error_code="OPTIONS_PROVIDER_NOT_CONFIGURED",
+                            suggested_action="Configure Deribit API keys or select an active supported provider.",
+                        )
+                    selected_provider = "deribit_options"
+                    selected_exchange = "DERIBIT"
                 else:
                     selected_provider = "delta_options"
                     selected_exchange = "DELTA"

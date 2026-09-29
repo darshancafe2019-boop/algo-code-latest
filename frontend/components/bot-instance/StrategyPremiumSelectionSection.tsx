@@ -32,6 +32,7 @@ import {
   ResolvedStrategyPosition,
   ResolvedStrategyLeg,
 } from "@/lib/strategies/strategyInstrumentResolver";
+import { CRYPTO_30_STRATEGIES } from "@/lib/strategies/crypto30Strategies";
 import { formatMoney } from "@/lib/formatters";
 
 export interface StrategyCatalogEntry {
@@ -144,9 +145,38 @@ export function StrategyPremiumSelectionSection({
         console.warn("Could not fetch /api/strategies, loading local registry fallback", err);
       }
 
-      // Fallback: Generate dynamic catalog from client-side StrategyInstrumentResolver
+      // Fallback: Generate dynamic catalog from Master 30 Strategies & Options Resolver
       if (isMounted) {
+        const cryptoMasterEntries: StrategyCatalogEntry[] = CRYPTO_30_STRATEGIES.map((strat) => {
+          let stratType: "TREND" | "BREAKOUT" | "MEAN_REVERSION" | "MOMENTUM" | "SWING" | "NEUTRAL" | "CREDIT" | "DEBIT" = "TREND";
+          if (strat.category.includes("Breakout")) stratType = "BREAKOUT";
+          else if (strat.category.includes("Mean Reversion") || strat.category.includes("Pullback")) stratType = "MEAN_REVERSION";
+          else if (strat.category.includes("Momentum") || strat.category.includes("Volume")) stratType = "MOMENTUM";
+          else if (strat.category.includes("Structure") || strat.category.includes("Reversal")) stratType = "SWING";
+
+          return {
+            strategy_id: strat.id,
+            name: `S${strat.number} — ${strat.name}`,
+            description: strat.whatItDoes,
+            category: "CRYPTO",
+            instrument_class: "FUTURE",
+            underlying_supported: ["BTC", "ETH", "SOL", "XRP", "BNB", "NIFTY", "BANKNIFTY"],
+            default_underlying: "BTC",
+            market_supported: "GLOBAL_CRYPTO",
+            provider: "DELTA_EXCHANGE",
+            expiry_mode: "PERPETUAL",
+            leg_count: 1,
+            leg_template: `STRATEGY_S${strat.number}`,
+            strategy_type: stratType,
+            strategy_bias: strat.direction === "LONG / SHORT" ? "NEUTRAL" : strat.direction === "LONG" ? "BULLISH" : "BEARISH",
+            premium_mode: "LIVE_PREMIUM",
+            default_enabled: strat.number === "01",
+            parameters: { ...strat.defaultParameters },
+          };
+        });
+
         const fallbackCatalog: StrategyCatalogEntry[] = [
+          ...cryptoMasterEntries,
           {
             strategy_id: "options-strat-01",
             name: "Short Iron Condor Range Income",
@@ -624,6 +654,95 @@ export function StrategyPremiumSelectionSection({
             default_enabled: false,
             parameters: { lots: 15, stop_loss_pct: 2.0, take_profit_pct: 5.0 },
           },
+          // Crypto & BTC Options/Futures
+          {
+            strategy_id: "crypto-strat-01",
+            name: "EMA + Supertrend Confluence (BTC Call)",
+            description: "Strict 5m EMA9/21 cross + Supertrend(10,3.0) bullish confirmation with 15m HTF filter on BTC Calls.",
+            category: "CRYPTO",
+            instrument_class: "OPTION_SINGLE",
+            underlying_supported: ["BTC", "ETH", "SOL"],
+            default_underlying: "BTC",
+            market_supported: "GLOBAL_CRYPTO",
+            provider: "DELTA",
+            expiry_mode: "WEEKLY_NEAR",
+            leg_count: 1,
+            leg_template: "SINGLE_CALL",
+            strategy_type: "TREND",
+            strategy_bias: "BULLISH",
+            premium_mode: "LIVE_PREMIUM",
+            default_enabled: true,
+            parameters: {
+              ema_fast: 9,
+              ema_slow: 21,
+              supertrend_atr: 10,
+              supertrend_mult: 3.0,
+              timeframe: "5m",
+              htf_timeframe: "15m",
+              target_delta_min: 0.45,
+              target_delta_max: 0.60,
+              lots: 1,
+              stop_loss_pct: 1.0,
+              take_profit_pct: 2.5,
+            },
+          },
+          {
+            strategy_id: "crypto-strat-02",
+            name: "BTC Call Option Trend Buyer",
+            description: "Momentum breakout single-call debit strategy selecting 0.50 ATM/ITM delta contracts.",
+            category: "CRYPTO",
+            instrument_class: "OPTION_SINGLE",
+            underlying_supported: ["BTC", "ETH"],
+            default_underlying: "BTC",
+            market_supported: "GLOBAL_CRYPTO",
+            provider: "DELTA",
+            expiry_mode: "WEEKLY_NEAR",
+            leg_count: 1,
+            leg_template: "SINGLE_CALL",
+            strategy_type: "DEBIT",
+            strategy_bias: "BULLISH",
+            premium_mode: "LIVE_PREMIUM",
+            default_enabled: false,
+            parameters: { target_delta: 0.50, lots: 1, stop_loss_pct: 1.5, take_profit_pct: 3.5 },
+          },
+          {
+            strategy_id: "crypto-strat-03",
+            name: "BTC Put Option Crash Hedge",
+            description: "Single-put defined-risk hedge targeting downside momentum expansions on Delta Exchange.",
+            category: "CRYPTO",
+            instrument_class: "OPTION_SINGLE",
+            underlying_supported: ["BTC", "ETH"],
+            default_underlying: "BTC",
+            market_supported: "GLOBAL_CRYPTO",
+            provider: "DELTA",
+            expiry_mode: "WEEKLY_NEAR",
+            leg_count: 1,
+            leg_template: "SINGLE_PUT",
+            strategy_type: "DEBIT",
+            strategy_bias: "BEARISH",
+            premium_mode: "LIVE_PREMIUM",
+            default_enabled: false,
+            parameters: { target_delta: 0.50, lots: 1, stop_loss_pct: 1.5, take_profit_pct: 3.5 },
+          },
+          {
+            strategy_id: "crypto-strat-04",
+            name: "BTC Perpetual Futures Momentum",
+            description: "High-speed directional futures trading with continuous funding rate and basis monitoring.",
+            category: "CRYPTO",
+            instrument_class: "FUTURE",
+            underlying_supported: ["BTC", "ETH", "SOL"],
+            default_underlying: "BTC",
+            market_supported: "GLOBAL_CRYPTO",
+            provider: "DELTA",
+            expiry_mode: "PERPETUAL",
+            leg_count: 1,
+            leg_template: "FUTURES_LONG",
+            strategy_type: "MOMENTUM",
+            strategy_bias: "BULLISH",
+            premium_mode: "FUTURES_PRICE",
+            default_enabled: false,
+            parameters: { leverage: 5, lots: 1, stop_loss_pct: 1.0, take_profit_pct: 2.5, trailing_stop_pct: 0.5 },
+          },
         ];
         setStrategies(fallbackCatalog);
         setIsLoadingCatalog(false);
@@ -933,7 +1052,7 @@ export function StrategyPremiumSelectionSection({
 
         {/* Category Filter */}
         <div className="flex items-center gap-1 overflow-x-auto">
-          {["ALL", "OPTIONS", "FUTURES", "EQUITY"].map((cat) => (
+          {["ALL", "CRYPTO", "OPTIONS", "FUTURES", "EQUITY"].map((cat) => (
             <button
               key={cat}
               type="button"

@@ -25,7 +25,7 @@ class Config:
     JSONIFY_PRETTYPRINT_REGULAR = False
     
     # Database Settings
-    DB_PATH = os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "quantos.db"))
+    DB_PATH = os.getenv("DB_PATH", str(PROJECT_ROOT / "data" / "trading_bot.db"))
     
     # Rate Limiting
     RATELIMIT_ENABLED = os.getenv("RATELIMIT_ENABLED", "true").lower() in ("true", "1")

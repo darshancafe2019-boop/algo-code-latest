@@ -39,9 +39,10 @@ class AccountManager:
         self._accounts: Dict[str, BrokerAccount] = {}
         self._bootstrap_accounts()
 
-    def _get_key(self, provider: str, account_id: str, environment: Environment) -> str:
+    def _get_key(self, provider: str, account_id: str, environment: Any) -> str:
         norm_prov = normalize_provider_id(provider)
-        return f"{norm_prov}:{account_id}:{environment.value}"
+        env_val = environment.value if hasattr(environment, "value") else str(environment)
+        return f"{norm_prov}:{account_id}:{env_val}"
 
     def _bootstrap_accounts(self) -> None:
         """Initializes canonical broker accounts."""

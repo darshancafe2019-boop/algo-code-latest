@@ -27,6 +27,7 @@ import { marketRegimeEngine, RegimeEvaluationResult } from "./regimeEngine";
 import { strategyRiskEngine, RiskEvaluationResult, ProposedTradeOrder } from "./strategyRiskEngine";
 
 export type StrategyViewTab =
+  | "CREATION"
   | "LIBRARY"
   | "DETAIL"
   | "BACKTEST"
@@ -172,7 +173,7 @@ export const useStrategyStore = create<StrategyStoreState>((set, get) => {
   return {
     strategies: ALL_QUANTOS_STRATEGIES,
     selectedStrategyId: "crypto-strat-01",
-    activeViewTab: "LIBRARY",
+    activeViewTab: "CREATION",
     searchQuery: "",
     selectedCategory: "ALL",
     selectedTimeframe: "ALL",

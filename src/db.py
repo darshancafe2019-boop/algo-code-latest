@@ -12476,6 +12476,44 @@ def archive_expired_delta_contracts(current_time_iso: Optional[str] = None) -> i
         return len(expired)
 
 
+def purge_all_expired_records(current_time_iso: Optional[str] = None) -> Dict[str, int]:
+    """Purges all expired option contracts, expiries, orphaned quotes, instruments, and expired auth tokens."""
+    if not current_time_iso:
+        current_time_iso = datetime.now(timezone.utc).isoformat()
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    results = {}
+    with get_db_transaction() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM delta_option_contracts WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        results["delta_option_contracts"] = cursor.rowcount
+        cursor.execute("DELETE FROM delta_option_expiries WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        results["delta_option_expiries"] = cursor.rowcount
+        cursor.execute("DELETE FROM delta_option_quotes WHERE settlement_time < ? OR product_id NOT IN (SELECT product_id FROM delta_option_contracts)", (current_time_iso,))
+        results["delta_option_quotes"] = cursor.rowcount
+        cursor.execute("DELETE FROM delta_option_chain_snapshots WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        results["delta_option_chain_snapshots"] = cursor.rowcount
+        cursor.execute("DELETE FROM instruments WHERE expiry IS NOT NULL AND expiry != '' AND expiry != 'PERPETUAL' AND expiry < ?", (today_str,))
+        results["instruments"] = cursor.rowcount
+        cursor.execute("DELETE FROM user_sessions WHERE expires_at < ?", (current_time_iso,))
+        results["user_sessions"] = cursor.rowcount
+        cursor.execute("DELETE FROM email_otp_challenges WHERE expires_at < ?", (current_time_iso,))
+        results["email_otp_challenges"] = cursor.rowcount
+        cursor.execute("DELETE FROM auth_otp_challenges WHERE expires_at < ?", (current_time_iso,))
+        results["auth_otp_challenges"] = cursor.rowcount
+        cursor.execute("DELETE FROM step_up_tokens WHERE expires_at < ?", (current_time_iso,))
+        results["step_up_tokens"] = cursor.rowcount
+        cursor.execute("DELETE FROM password_reset_tokens WHERE expires_at < ?", (current_time_iso,))
+        results["password_reset_tokens"] = cursor.rowcount
+        cursor.execute("DELETE FROM live_deployment_authorizations WHERE expires_at < ?", (current_time_iso,))
+        results["live_deployment_authorizations"] = cursor.rowcount
+        cursor.execute("DELETE FROM bot_worker_leases WHERE lease_expires_at < ?", (current_time_iso,))
+        results["bot_worker_leases"] = cursor.rowcount
+        cursor.execute("DELETE FROM pending_signal_approvals WHERE expires_at < ?", (current_time_iso,))
+        results["pending_signal_approvals"] = cursor.rowcount
+    return results
+
+
+
 
 
 

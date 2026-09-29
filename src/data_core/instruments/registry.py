@@ -52,101 +52,111 @@ class CanonicalInstrumentRegistry:
         self._bootstrap_universe()
 
     def _bootstrap_universe(self) -> None:
-        """Seeds canonical instrument specifications across all supported venues."""
+        """Seeds canonical instrument specifications across all supported venues using dynamic active cycles."""
+        from src.market_clock import MarketClock
+        today_nse = MarketClock.trading_date("NSE")
+        active_nifty_expiry = today_nse
+
         # 1. Indian Index Derivatives (NSE)
-        self.register(
-            CanonicalInstrument(
-                canonical_instrument_id="NSE:NIFTY26MARFUT",
-                symbol="NIFTY-27MAR26-FUT",
-                display_name="NIFTY 27-MAR-2026 Future",
+        nifty_fut = CanonicalInstrument(
+            canonical_instrument_id=f"NSE:NIFTY:{active_nifty_expiry}:FUT",
+            symbol=f"NIFTY-FUT-{active_nifty_expiry}",
+            display_name=f"NIFTY {active_nifty_expiry} Future",
+            exchange="NSE",
+            segment="FUTURES",
+            asset_class="EQUITY_INDEX",
+            underlying="NIFTY",
+            expiry=active_nifty_expiry,
+            currency="INR",
+            settlement_currency="INR",
+            lot_size=50.0,
+            contract_multiplier=50.0,
+            tick_size=0.05,
+            provider_mappings={
+                "UPSTOX": "NSE_FO|NIFTY_FUT",
+                "DHAN": "1001",
+            },
+        )
+        self.register(nifty_fut)
+        # Register standard aliases
+        self._instruments["NSE:NIFTY26MARFUT"] = nifty_fut
+        self._instruments["NSE:NIFTY:AUTO:FUT"] = nifty_fut
+        self._instruments["NIFTY26MARFUT"] = nifty_fut
+
+        banknifty_fut = CanonicalInstrument(
+            canonical_instrument_id=f"NSE:BANKNIFTY:{active_nifty_expiry}:FUT",
+            symbol=f"BANKNIFTY-FUT-{active_nifty_expiry}",
+            display_name=f"BANKNIFTY {active_nifty_expiry} Future",
+            exchange="NSE",
+            segment="FUTURES",
+            asset_class="EQUITY_INDEX",
+            underlying="BANKNIFTY",
+            expiry=active_nifty_expiry,
+            currency="INR",
+            settlement_currency="INR",
+            lot_size=15.0,
+            contract_multiplier=15.0,
+            tick_size=0.05,
+            provider_mappings={
+                "UPSTOX": "NSE_FO|BANKNIFTY_FUT",
+                "DHAN": "1002",
+            },
+        )
+        self.register(banknifty_fut)
+        self._instruments["NSE:BANKNIFTY26MARFUT"] = banknifty_fut
+        self._instruments["NSE:BANKNIFTY:AUTO:FUT"] = banknifty_fut
+
+        # 2. Indian Index Options (NSE NIFTY Options Chain)
+        for strike in [24500, 24600, 24700, 24800, 24900, 25000, 25100, 25200, 25300, 25400, 25500]:
+            # Call
+            c_inst = CanonicalInstrument(
+                canonical_instrument_id=f"NSE:NIFTY:{active_nifty_expiry}:{strike}:CE",
+                symbol=f"NIFTY-{active_nifty_expiry}-{strike}-CE",
+                display_name=f"NIFTY {active_nifty_expiry} {strike} CE",
                 exchange="NSE",
-                segment="FUTURES",
-                asset_class="EQUITY_INDEX",
+                segment="OPTIONS",
+                asset_class="EQUITY_OPTION",
                 underlying="NIFTY",
-                expiry="2026-03-27",
+                expiry=active_nifty_expiry,
+                strike=float(strike),
+                option_type="CE",
                 currency="INR",
                 settlement_currency="INR",
                 lot_size=50.0,
                 contract_multiplier=50.0,
                 tick_size=0.05,
                 provider_mappings={
-                    "UPSTOX": "NSE_FO|45821",
-                    "DHAN": "1001",
+                    "UPSTOX": f"NSE_FO|OPT_NIFTY_{strike}_CE",
+                    "DHAN": f"OPT_NIFTY_{strike}_CE",
                 },
             )
-        )
-        self.register(
-            CanonicalInstrument(
-                canonical_instrument_id="NSE:BANKNIFTY26MARFUT",
-                symbol="BANKNIFTY-27MAR26-FUT",
-                display_name="BANKNIFTY 27-MAR-2026 Future",
+            self.register(c_inst)
+            self._instruments[f"NSE:NIFTY26MAR{strike}CE"] = c_inst
+
+            # Put
+            p_inst = CanonicalInstrument(
+                canonical_instrument_id=f"NSE:NIFTY:{active_nifty_expiry}:{strike}:PE",
+                symbol=f"NIFTY-{active_nifty_expiry}-{strike}-PE",
+                display_name=f"NIFTY {active_nifty_expiry} {strike} PE",
                 exchange="NSE",
-                segment="FUTURES",
-                asset_class="EQUITY_INDEX",
-                underlying="BANKNIFTY",
-                expiry="2026-03-27",
+                segment="OPTIONS",
+                asset_class="EQUITY_OPTION",
+                underlying="NIFTY",
+                expiry=active_nifty_expiry,
+                strike=float(strike),
+                option_type="PE",
                 currency="INR",
                 settlement_currency="INR",
-                lot_size=15.0,
-                contract_multiplier=15.0,
+                lot_size=50.0,
+                contract_multiplier=50.0,
                 tick_size=0.05,
                 provider_mappings={
-                    "UPSTOX": "NSE_FO|45822",
-                    "DHAN": "1002",
+                    "UPSTOX": f"NSE_FO|OPT_NIFTY_{strike}_PE",
+                    "DHAN": f"OPT_NIFTY_{strike}_PE",
                 },
             )
-        )
-
-        # 2. Indian Index Options (NSE NIFTY Options Chain)
-        for strike in [24500, 24600, 24700, 24800, 24900, 25000, 25100, 25200, 25300, 25400, 25500]:
-            # Call
-            self.register(
-                CanonicalInstrument(
-                    canonical_instrument_id=f"NSE:NIFTY26MAR{strike}CE",
-                    symbol=f"NIFTY-27MAR26-{strike}-CE",
-                    display_name=f"NIFTY 27-MAR-2026 {strike} CE",
-                    exchange="NSE",
-                    segment="OPTIONS",
-                    asset_class="EQUITY_OPTION",
-                    underlying="NIFTY",
-                    expiry="2026-03-27",
-                    strike=float(strike),
-                    option_type="CE",
-                    currency="INR",
-                    settlement_currency="INR",
-                    lot_size=50.0,
-                    contract_multiplier=50.0,
-                    tick_size=0.05,
-                    provider_mappings={
-                        "UPSTOX": f"NSE_FO|OPT_NIFTY_{strike}_CE",
-                        "DHAN": f"OPT_NIFTY_{strike}_CE",
-                    },
-                )
-            )
-            # Put
-            self.register(
-                CanonicalInstrument(
-                    canonical_instrument_id=f"NSE:NIFTY26MAR{strike}PE",
-                    symbol=f"NIFTY-27MAR26-{strike}-PE",
-                    display_name=f"NIFTY 27-MAR-2026 {strike} PE",
-                    exchange="NSE",
-                    segment="OPTIONS",
-                    asset_class="EQUITY_OPTION",
-                    underlying="NIFTY",
-                    expiry="2026-03-27",
-                    strike=float(strike),
-                    option_type="PE",
-                    currency="INR",
-                    settlement_currency="INR",
-                    lot_size=50.0,
-                    contract_multiplier=50.0,
-                    tick_size=0.05,
-                    provider_mappings={
-                        "UPSTOX": f"NSE_FO|OPT_NIFTY_{strike}_PE",
-                        "DHAN": f"OPT_NIFTY_{strike}_PE",
-                    },
-                )
-            )
+            self.register(p_inst)
+            self._instruments[f"NSE:NIFTY26MAR{strike}PE"] = p_inst
 
         # 3. Binance Crypto USD-M & COIN-M Perpetuals
         self.register(

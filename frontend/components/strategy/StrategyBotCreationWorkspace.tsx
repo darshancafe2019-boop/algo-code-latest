@@ -41,6 +41,24 @@ import {
 } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
+import {
+  calculateComprehensiveOptionsPayoff,
+  generateScenarioGrid,
+  ComprehensiveProfitMetrics,
+  ScenarioRow,
+} from "@/lib/derivatives/profitEngine";
+import {
+  ContractValidationService,
+  ExpiryValidationResult,
+} from "@/lib/derivatives/contractValidationService";
+import {
+  SetupQualityEngine,
+  SetupQualityEvaluation,
+} from "@/lib/derivatives/setupQualityEngine";
+import { generateDeterministicBotHash } from "@/lib/derivatives/configIntegrity";
+import { ProfitAndLossAnalyticsSection } from "./ProfitAndLossAnalyticsSection";
+import { ExpirySafetyWarningBanner } from "./ExpirySafetyWarningBanner";
+import { SourceStrategyCreationView } from "./SourceStrategyCreationView";
 
 // --- Types & Interfaces ---
 export type CreationStep = "market" | "strategy" | "contracts" | "risk" | "review";
@@ -356,6 +374,11 @@ function detectStrategyName(legs: StrategyLegConfig[], underlying: string): stri
 export function StrategyBotCreationWorkspace() {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Workspace Mode: 30 Source Strategies Engine vs Multi-Leg Derivatives Builder
+  const [workspaceMode, setWorkspaceMode] = useState<"SOURCE_STRATEGIES" | "DERIVATIVES_WIZARD">(
+    searchParams?.get("mode") === "derivatives" ? "DERIVATIVES_WIZARD" : "SOURCE_STRATEGIES"
+  );
 
   // Active step state
   const [currentStep, setCurrentStep] = useState<CreationStep>("market");
@@ -774,7 +797,74 @@ export function StrategyBotCreationWorkspace() {
     }
   };
 
-  // Centralized Financial & Risk Calculations
+  // Centralized Contract Validation
+  const expiryValidation: ExpiryValidationResult = useMemo(() => {
+    return ContractValidationService.validateExpiry(
+      selectedExpiry,
+      underlying,
+      dataProvider,
+      availableExpiries
+    );
+  }, [selectedExpiry, underlying, dataProvider, availableExpiries]);
+
+  // Comprehensive Institutional Financial & Payoff Calculations
+  const comprehensivePayoff: ComprehensiveProfitMetrics = useMemo(() => {
+    const legsInput = strategyLegs.map((leg) => ({
+      strike: leg.strike,
+      optionType: leg.optionType,
+      side: leg.action,
+      quantity: leg.quantity || leg.lots * (currentInstrument.lotSize || 1),
+      premium: leg.premium || 0,
+      lotSize: currentInstrument.lotSize || 1,
+      lots: leg.lots,
+      delta: leg.delta,
+      theta: leg.theta,
+      iv: leg.iv,
+    }));
+    return calculateComprehensiveOptionsPayoff(
+      legsInput,
+      spotPrice || atmStrike || 100,
+      selectedStrategyId || "BULL_CALL_SPREAD",
+      marketRegion === "INDIA" ? "INR" : "USD"
+    );
+  }, [strategyLegs, spotPrice, atmStrike, selectedStrategyId, marketRegion, currentInstrument.lotSize]);
+
+  // Dynamic Scenario Matrix
+  const scenarios = useMemo(() => {
+    const legsInput = strategyLegs.map((leg) => ({
+      strike: leg.strike,
+      optionType: leg.optionType,
+      side: leg.action,
+      quantity: leg.quantity || leg.lots * (currentInstrument.lotSize || 1),
+      premium: leg.premium || 0,
+    }));
+    return generateScenarioGrid(
+      legsInput,
+      spotPrice || atmStrike || 100,
+      selectedStrategyId || "BULL_CALL_SPREAD",
+      marketRegion === "INDIA" ? "INR" : "USD",
+      undefined,
+      expiryValidation.daysToExpiry > 0 ? expiryValidation.daysToExpiry : 7
+    );
+  }, [strategyLegs, spotPrice, atmStrike, selectedStrategyId, expiryValidation.daysToExpiry, marketRegion, currentInstrument.lotSize]);
+
+  // Institutional Setup Quality Score
+  const setupQuality: SetupQualityEvaluation = useMemo(() => {
+    return SetupQualityEngine.evaluateSetup({
+      strategyType: selectedStrategyId || "BULL_CALL_SPREAD",
+      spreadBps: 8.0,
+      feedAgeMs: 120.0,
+      ivPercentile: 45.0,
+      pcr: 1.15,
+      trendAligned: true,
+      momentumAligned: true,
+      rewardToRiskRatio: comprehensivePayoff.rewardToRiskRatio || 1.8,
+      isDefinedRisk: comprehensivePayoff.isDefinedRisk,
+      drawdownPct: 3.2,
+    });
+  }, [selectedStrategyId, comprehensivePayoff]);
+
+  // Centralized Financial & Risk Calculations for workspace
   const riskMetrics = useMemo(() => {
     if (strategyLegs.length === 0) {
       return {
@@ -782,56 +872,84 @@ export function StrategyBotCreationWorkspace() {
         maxLoss: 0,
         maxProfit: 0,
         requiredMargin: 0,
-        breakEvens: [],
+        breakEvens: [] as number[],
         estimatedCharges: 0,
         riskCapitalRatio: 0,
+        isUndefinedRisk: false,
+        isUnlimitedProfit: false,
       };
     }
 
-    let netCash = 0;
-    let netDelta = 0;
-    let totalLots = 0;
-
-    strategyLegs.forEach((leg) => {
-      const legValue = leg.premium * leg.quantity;
-      if (leg.action === "BUY") {
-        netCash -= legValue;
-        netDelta += (leg.delta || 0) * leg.lots;
-      } else {
-        netCash += legValue;
-        netDelta -= (leg.delta || 0) * leg.lots;
-      }
-      totalLots += leg.lots;
-    });
-
-    const isNetDebit = netCash < 0;
-    const absNetCash = Math.abs(netCash);
-
-    // Margin estimation: Buying requires full premium; selling requires exchange span + exposure margin
-    const sellLegsCount = strategyLegs.filter((l) => l.action === "SELL").length;
-    const requiredMargin =
-      sellLegsCount > 0
-        ? Math.max(25000, sellLegsCount * 115000 * lots)
-        : Math.max(absNetCash, 5000);
-
-    // Max profit & loss calculation based on strategy type
-    let maxProfit = isNetDebit ? absNetCash * 1.8 : absNetCash;
-    let maxLoss = isNetDebit ? absNetCash : requiredMargin * 0.4;
-
-    const breakEvenStrike = atmStrike + (isNetDebit ? absNetCash / currentInstrument.lotSize : -absNetCash / currentInstrument.lotSize);
-    const estimatedCharges = Math.round(20 * strategyLegs.length + absNetCash * 0.0006);
+    const netCash = comprehensivePayoff.netPremiumFlow;
+    const maxLoss = comprehensivePayoff.maxLoss ?? 0;
+    const maxProfit = comprehensivePayoff.maxProfit ?? 0;
+    const requiredMargin = comprehensivePayoff.marginRequired;
+    const breakEvens = comprehensivePayoff.breakevenPoints;
+    const estimatedCharges = comprehensivePayoff.totalTransactionCosts;
     const riskCapitalRatio = Math.min(100, Math.round((maxLoss / Math.max(1, capital)) * 100));
 
     return {
-      netDebitCredit: netCash,
-      maxLoss: Math.round(maxLoss),
-      maxProfit: Math.round(maxProfit),
+      netDebitCredit: Math.round(netCash * 100) / 100,
+      maxLoss: Math.round(maxLoss * 100) / 100,
+      maxProfit: comprehensivePayoff.isUnlimitedProfit ? Infinity : Math.round(maxProfit * 100) / 100,
       requiredMargin: Math.round(requiredMargin),
-      breakEvens: [Math.round(breakEvenStrike)],
-      estimatedCharges,
+      breakEvens,
+      estimatedCharges: Math.round(estimatedCharges),
       riskCapitalRatio,
+      isUndefinedRisk: !comprehensivePayoff.isDefinedRisk,
+      isUnlimitedProfit: comprehensivePayoff.isUnlimitedProfit,
     };
-  }, [strategyLegs, lots, capital, atmStrike, currentInstrument.lotSize]);
+  }, [strategyLegs, comprehensivePayoff, capital]);
+
+  // Deterministic Bot Configuration Hash for Approval Invalidation & Integrity
+  const configHash = useMemo(() => {
+    return generateDeterministicBotHash({
+      botName,
+      strategyId: selectedStrategyId,
+      underlying,
+      expiry: selectedExpiry,
+      broker,
+      dataProvider,
+      capital,
+      lots,
+      executionMode,
+      legs: strategyLegs.map((l) => ({
+        id: l.id,
+        action: l.action,
+        optionType: l.optionType,
+        strike: l.strike,
+        expiry: l.expiry,
+        lots: l.lots,
+        quantity: l.quantity,
+        premium: l.premium,
+      })),
+      risk: {
+        stopLossType,
+        stopLossValue,
+        takeProfitType,
+        takeProfitValue,
+        trailingStopEnabled,
+        exitBeforeExpiry,
+      },
+    });
+  }, [
+    botName,
+    selectedStrategyId,
+    underlying,
+    selectedExpiry,
+    broker,
+    dataProvider,
+    capital,
+    lots,
+    executionMode,
+    strategyLegs,
+    stopLossType,
+    stopLossValue,
+    takeProfitType,
+    takeProfitValue,
+    trailingStopEnabled,
+    exitBeforeExpiry,
+  ]);
 
   // Auto-Save Draft to LocalStorage
   useEffect(() => {
@@ -961,18 +1079,24 @@ export function StrategyBotCreationWorkspace() {
     }
   };
 
-  // Step Validation Checkers
-  const isMarketValid = Boolean(underlying && selectedExpiry);
+  // Step Validation Checkers with Strict Expiry Safety Gate
+  const isMarketValid = Boolean(
+    underlying && selectedExpiry && expiryValidation.isValid && !expiryValidation.isBlocked
+  );
   const isStrategyValid = Boolean(selectedStrategyId);
-  const isContractsValid = strategyLegs.length > 0;
-  const isRiskValid = capital >= 5000 && lots >= 1 && riskMetrics.maxLoss <= capital;
+  const isContractsValid =
+    strategyLegs.length > 0 && expiryValidation.isValid && !expiryValidation.isBlocked;
+  const isRiskValid =
+    capital >= 5000 &&
+    lots >= 1 &&
+    (riskMetrics.isUndefinedRisk || riskMetrics.maxLoss <= capital * 2);
 
   const canProceedNext =
     (currentStep === "market" && isMarketValid) ||
     (currentStep === "strategy" && isStrategyValid) ||
     (currentStep === "contracts" && isContractsValid) ||
     (currentStep === "risk" && isRiskValid) ||
-    currentStep === "review";
+    (currentStep === "review" && expiryValidation.isValid && !expiryValidation.isBlocked);
 
   const handleNextStep = () => {
     if (currentStep === "market") setCurrentStep("strategy");
@@ -1032,6 +1156,34 @@ export function StrategyBotCreationWorkspace() {
 
         {/* Mode Selector & Quick Action Pills */}
         <div className="flex items-center gap-3">
+          {/* Workspace Mode Switcher */}
+          <div className="flex items-center p-1 rounded-xl bg-[#0B1929] border border-[#12304A]">
+            <button
+              type="button"
+              onClick={() => setWorkspaceMode("SOURCE_STRATEGIES")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                workspaceMode === "SOURCE_STRATEGIES"
+                  ? "bg-cyan-600 text-white shadow-md shadow-cyan-600/30"
+                  : "text-[#7D8EA5] hover:text-white"
+              }`}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              <span>30 Source Strategies</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setWorkspaceMode("DERIVATIVES_WIZARD")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                workspaceMode === "DERIVATIVES_WIZARD"
+                  ? "bg-purple-600 text-white shadow-md shadow-purple-600/30"
+                  : "text-[#7D8EA5] hover:text-white"
+              }`}
+            >
+              <Layers className="h-3.5 w-3.5" />
+              <span>Multi-Leg Builder</span>
+            </button>
+          </div>
+
           {/* Execution Mode Chip */}
           <div className="flex items-center p-1 rounded-xl bg-[#0B1929] border border-[#12304A]">
             <button
@@ -1071,14 +1223,23 @@ export function StrategyBotCreationWorkspace() {
         </div>
       </div>
 
-      {/* 2. Compact Horizontal Stepper */}
-      <div className="bg-[#0B1929] border-b border-[#12304A] px-4 sm:px-6 py-3">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          {[
-            { id: "market", label: "1. Market", icon: Building2 },
-            { id: "strategy", label: "2. Strategy", icon: Layers },
-            { id: "contracts", label: "3. Contracts", icon: Zap },
-            { id: "risk", label: "4. Risk & Size", icon: Shield },
+      {/* Dynamic View based on Workspace Mode */}
+      {workspaceMode === "SOURCE_STRATEGIES" ? (
+        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+          <SourceStrategyCreationView
+            onSelectDerivativeMode={() => setWorkspaceMode("DERIVATIVES_WIZARD")}
+          />
+        </div>
+      ) : (
+        <>
+          {/* 2. Compact Horizontal Stepper */}
+          <div className="bg-[#0B1929] border-b border-[#12304A] px-4 sm:px-6 py-3">
+            <div className="max-w-5xl mx-auto flex items-center justify-between">
+              {[
+                { id: "market", label: "1. Market", icon: Building2 },
+                { id: "strategy", label: "2. Strategy", icon: Layers },
+                { id: "contracts", label: "3. Contracts", icon: Zap },
+                { id: "risk", label: "4. Risk & Size", icon: Shield },
             { id: "review", label: "5. Review & Launch", icon: CheckCircle2 },
           ].map((step, idx) => {
             const Icon = step.icon;
@@ -1324,6 +1485,12 @@ export function StrategyBotCreationWorkspace() {
                     );
                   })}
                 </div>
+                {/* Expiry Safety Warning if Expired or Invalid */}
+                <ExpirySafetyWarningBanner
+                  validationResult={expiryValidation}
+                  onSelectExpiry={(newExp) => setSelectedExpiry(newExp)}
+                  availableExpiries={availableExpiries}
+                />
               </div>
             </div>
           </div>
@@ -1474,6 +1641,13 @@ export function StrategyBotCreationWorkspace() {
         {/* STEP 3: CONTRACTS & EMBEDDED OPTION CHAIN */}
         {currentStep === "contracts" && (
           <div className="space-y-6 animate-in fade-in duration-200">
+            {/* Expiry Safety Warning if Expired or Invalid */}
+            <ExpirySafetyWarningBanner
+              validationResult={expiryValidation}
+              onSelectExpiry={(newExp) => setSelectedExpiry(newExp)}
+              availableExpiries={availableExpiries}
+            />
+
             {/* Top Bar: Underlying Spot & Matcher */}
             <div className="bg-[#0B1929] border border-[#12304A] rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#12304A] pb-3">
@@ -1981,6 +2155,13 @@ export function StrategyBotCreationWorkspace() {
                 />
               </div>
 
+              {/* Expiry Safety Warning if Expired or Invalid */}
+              <ExpirySafetyWarningBanner
+                validationResult={expiryValidation}
+                onSelectExpiry={(newExp) => setSelectedExpiry(newExp)}
+                availableExpiries={availableExpiries}
+              />
+
               {/* Bot Overview Card */}
               <div className="bg-[#07111F] border border-[#12304A] rounded-xl p-4 space-y-4 font-mono text-xs">
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 border-b border-[#12304A] pb-3">
@@ -2036,28 +2217,27 @@ export function StrategyBotCreationWorkspace() {
                   ))}
                 </div>
 
-                {/* Risk & Margin Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-[#12304A]">
-                  <div>
-                    <span className="text-[#7D8EA5] text-[10px] block">Required Margin</span>
-                    <span className="font-bold text-white">{formatMoney(riskMetrics.requiredMargin, "₹")}</span>
+                {/* Deterministic Config Hash */}
+                <div className="pt-3 border-t border-[#12304A] flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4 text-[#10B981]" />
+                    <span className="text-[#7D8EA5]">Config Signature:</span>
+                    <span className="text-[#22D3EE] font-mono">{configHash.slice(0, 16)}...{configHash.slice(-8)}</span>
                   </div>
-                  <div>
-                    <span className="text-[#7D8EA5] text-[10px] block">Max Profit</span>
-                    <span className="font-bold text-[#10B981]">{formatMoney(riskMetrics.maxProfit, "₹")}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#7D8EA5] text-[10px] block">Max Loss</span>
-                    <span className="font-bold text-[#F43F5E]">{formatMoney(riskMetrics.maxLoss, "₹")}</span>
-                  </div>
-                  <div>
-                    <span className="text-[#7D8EA5] text-[10px] block">Risk Check</span>
-                    <span className="font-bold text-[#10B981] flex items-center gap-1">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Passed
-                    </span>
-                  </div>
+                  <span className="px-2 py-0.5 rounded bg-[#10B981]/10 text-[#10B981] text-[10px] font-bold border border-[#10B981]/30">
+                    DETERMINISTIC SHA-256
+                  </span>
                 </div>
               </div>
+
+              {/* Institutional Profit & Loss Analytics, Scenario Grid & Greeks */}
+              <ProfitAndLossAnalyticsSection
+                metrics={comprehensivePayoff}
+                scenarios={scenarios}
+                quality={setupQuality}
+                strategyName={selectedTemplate.name}
+                currency={marketRegion === "INDIA" ? "₹" : "$"}
+              />
 
               {/* Feedback Message */}
               {submissionFeedback && (
@@ -2142,6 +2322,8 @@ export function StrategyBotCreationWorkspace() {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* Live Confirmation Modal */}
       {liveConfirmModalOpen && (

@@ -80,7 +80,10 @@ class CanonicalQuote:
     is_tradeable: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+        d = asdict(self)
+        d["price"] = self.ltp
+        d["lastPrice"] = self.ltp
+        return d
 
 
 # ─── Central Symbol Alias Resolution ─────────────────────────────────────────

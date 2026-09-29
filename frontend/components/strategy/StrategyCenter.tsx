@@ -42,6 +42,7 @@ import { StrategyPaperTradingView } from "./StrategyPaperTradingView";
 import { StrategyClustersView } from "./StrategyClustersView";
 import { StrategyRegimeView } from "./StrategyRegimeView";
 import { StrategyTradeJournalView } from "./StrategyTradeJournalView";
+import { SourceStrategyCreationView } from "./SourceStrategyCreationView";
 import { formatMoney } from "@/lib/formatters";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 
@@ -286,7 +287,7 @@ export function StrategyCenter() {
       {/* 2. Top Navigation View Tabs */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 border-b border-[#1A253A]">
         {[
-          { id: "LIBRARY", label: `Strategy Library (${strategies.length})`, icon: Compass },
+          { id: "CREATION", label: "Strategy Creation & Validation", icon: Sparkles },
           { id: "BACKTEST", label: "Backtest Lab", icon: FlaskConical },
           { id: "PAPER", label: "Paper Trading Fleet", icon: Radio },
           { id: "CLUSTERS", label: "Exposure Clusters", icon: Layers },
@@ -313,6 +314,11 @@ export function StrategyCenter() {
       </div>
 
       {/* 3. Render View Sub-Component based on activeViewTab */}
+      {activeViewTab === "CREATION" && (
+        <div className="pt-4">
+          <SourceStrategyCreationView />
+        </div>
+      )}
       {activeViewTab === "BACKTEST" && <StrategyBacktestView />}
       {activeViewTab === "PAPER" && <StrategyPaperTradingView />}
       {activeViewTab === "CLUSTERS" && <StrategyClustersView />}

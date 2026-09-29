@@ -867,12 +867,14 @@ class UniversalOptionsEngine:
         freshness = "CONNECTED" if is_auth or environment == "PAPER" else "AUTHENTICATION_FAILED"
 
         raw_dhan_chain = None
+        dhan_query_failed = False
         if is_auth:
             try:
                 raw_dhan_chain = dhan_adapter.get_option_chain(und, expiry=expiry, strike_count=strike_count)
             except Exception as e:
                 logger.warning(f"Dhan option chain query warning: {e}")
                 freshness = "DEGRADED"
+                dhan_query_failed = True
 
         if raw_dhan_chain and isinstance(raw_dhan_chain, dict) and "strikes" in raw_dhan_chain and raw_dhan_chain["strikes"]:
             return self._normalize_broker_option_chain(
@@ -889,6 +891,33 @@ class UniversalOptionsEngine:
                 selected_expiry=expiry or raw_dhan_chain.get("selected_expiry", ""),
                 latency_ms=None,
                 freshness_status=freshness,
+            )
+
+        if dhan_query_failed:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            return OptionChainSnapshot(
+                underlying=und,
+                spot_price=spot_price,
+                selected_expiry=expiry or "",
+                available_expiries=[],
+                strikes=[],
+                max_pain=0.0,
+                pcr_oi=0.0,
+                pcr_volume=0.0,
+                total_call_oi=0.0,
+                total_put_oi=0.0,
+                total_call_volume=0.0,
+                total_put_volume=0.0,
+                status="NO_DATA",
+                provider="DHAN",
+                brokerAccountId="ba_dhan_primary",
+                brokerAccountAlias="Dhan Primary",
+                environment=environment,
+                exchange="NSE",
+                segment="OPTIONS",
+                currency="INR",
+                freshnessStatus="PROVIDER_UNAVAILABLE",
+                timestamp=now_iso,
             )
 
         return self._build_contract_universe_snapshot(
@@ -927,12 +956,14 @@ class UniversalOptionsEngine:
         freshness = "CONNECTED" if is_auth else "AUTHENTICATION_FAILED"
 
         raw_upstox_chain = None
+        upstox_query_failed = False
         if is_auth:
             try:
                 raw_upstox_chain = upstox_service.get_option_chain(und, expiry=expiry, strike_count=strike_count)
             except Exception as e:
                 logger.warning(f"Upstox option chain query warning: {e}")
                 freshness = "DEGRADED"
+                upstox_query_failed = True
 
         if raw_upstox_chain and isinstance(raw_upstox_chain, dict) and "strikes" in raw_upstox_chain and raw_upstox_chain["strikes"]:
             resolved_spot = float(raw_upstox_chain.get("spot_price") or raw_upstox_chain.get("underlying_ltp") or spot_price)
@@ -950,6 +981,33 @@ class UniversalOptionsEngine:
                 selected_expiry=expiry or raw_upstox_chain.get("selected_expiry", ""),
                 latency_ms=None,
                 freshness_status=freshness,
+            )
+
+        if upstox_query_failed:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            return OptionChainSnapshot(
+                underlying=und,
+                spot_price=spot_price,
+                selected_expiry=expiry or "",
+                available_expiries=[],
+                strikes=[],
+                max_pain=0.0,
+                pcr_oi=0.0,
+                pcr_volume=0.0,
+                total_call_oi=0.0,
+                total_put_oi=0.0,
+                total_call_volume=0.0,
+                total_put_volume=0.0,
+                status="NO_DATA",
+                provider="UPSTOX",
+                brokerAccountId="ba_upstox_primary",
+                brokerAccountAlias="Upstox Primary",
+                environment=environment,
+                exchange="NSE",
+                segment="OPTIONS",
+                currency="INR",
+                freshnessStatus="PROVIDER_UNAVAILABLE",
+                timestamp=now_iso,
             )
 
         return self._build_contract_universe_snapshot(

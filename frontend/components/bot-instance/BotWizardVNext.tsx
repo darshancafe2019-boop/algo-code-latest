@@ -9,8 +9,40 @@ import { Environment, ProviderInfo, BrokerAccount } from "@/types/data-core";
 import { formatMoney } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { DeploymentValidationCenter } from "./DeploymentValidationCenter";
-import { StrategyPremiumSelectionSection } from "./StrategyPremiumSelectionSection";
-import { StrategyExecutionMatrixSection, BotEnabledStrategySetting } from "./StrategyExecutionMatrixSection";
+import { StrategyPremiumSelectionSection, BotEnabledStrategySetting } from "./StrategyPremiumSelectionSection";
+import {
+  resolveContract,
+  getAvailableExpiries,
+  EXPIRY_PREFERENCE_OPTIONS,
+  ResolvedContract,
+} from "@/lib/contractResolver";
+import {
+  CRYPTO_30_STRATEGIES,
+  CryptoStrategyDefinition,
+  STRATEGY_CATEGORIES,
+  ALL_QUANTOS_STRATEGIES,
+  OPTIONS_24_STRATEGIES,
+} from "@/lib/strategies/crypto30Strategies";
+import {
+  OPTION_PURPOSE_GROUPS,
+  OPTION_STRATEGIES_VISUAL_META,
+  OptionStrategyVisualMeta,
+} from "@/lib/strategies/options24Strategies";
+import {
+  Sparkles,
+  SlidersHorizontal,
+  Layers,
+  ShieldCheck,
+  Activity,
+  Check,
+  Search,
+  Sliders,
+  Zap,
+  BookOpen,
+  Info,
+  TrendingUp,
+  CheckCircle2,
+} from "lucide-react";
 
 const WIZARD_STEPS = [
   { id: 1, key: "IDENTITY", title: "Identity & Capital", desc: "Identity, environment & capital allocation" },
@@ -50,12 +82,12 @@ export function BotWizardVNext() {
   const [capitalAllocation, setCapitalAllocation] = useState<number>(50000);
   const [currency, setCurrency] = useState<string>("INR");
 
-  // Step 2: Market & Instruments
+  // Step 2: Market & Instruments (Dynamic Contract Resolution)
   const [assetClass, setAssetClass] = useState<string>("INDIAN_FUTURES");
-  const [canonicalInstrumentId, setCanonicalInstrumentId] = useState<string>("NSE:NIFTY26MARFUT");
-  const [displaySymbol, setDisplaySymbol] = useState<string>("NIFTY 27-MAR-2026 Future");
+  const [canonicalInstrumentId, setCanonicalInstrumentId] = useState<string>("NSE:NIFTY:AUTO:FUT");
+  const [displaySymbol, setDisplaySymbol] = useState<string>("NIFTY Auto Dynamic Future");
   const [contractStrike, setContractStrike] = useState<number>(24600);
-  const [contractExpiry, setContractExpiry] = useState<string>("2026-03-27");
+  const [contractExpiry, setContractExpiry] = useState<string>("AUTO");
   const [contractOptionType, setContractOptionType] = useState<string>("CE");
   const [contractUnderlying, setContractUnderlying] = useState<string>("NIFTY");
   const [entrySide, setEntrySide] = useState<"BUY" | "SELL">("BUY");
@@ -65,6 +97,9 @@ export function BotWizardVNext() {
   const [contractAsk, setContractAsk] = useState<number>(0);
   const [creationOrigin, setCreationOrigin] = useState<string>("MANUAL");
   const [providerInstrumentId, setProviderInstrumentId] = useState<string>("");
+  const [resolvedContract, setResolvedContract] = useState<ResolvedContract | null>(null);
+  const [availableExpiriesList, setAvailableExpiriesList] = useState<string[]>([]);
+  const [isResolvingContract, setIsResolvingContract] = useState<boolean>(false);
 
   // Step 3: Data Sources
   const [marketDataProvider, setMarketDataProvider] = useState<string>("UPSTOX");
@@ -74,13 +109,71 @@ export function BotWizardVNext() {
   const [maxTickAgeMs, setMaxTickAgeMs] = useState<number>(2000);
   const [stalePolicy, setStalePolicy] = useState<string>("BLOCK_ENTRY");
 
-  // Step 4: Strategy
-  const [strategyId, setStrategyId] = useState<string>("EMA_SUPERTREND_CONFLUENCE");
+  // Step 4: Strategy Engine (Master 30 Directional + 24 Option Strategies)
+  const [strategyDomain, setStrategyDomain] = useState<"DIRECTIONAL" | "OPTIONS">("DIRECTIONAL");
+  const [strategyId, setStrategyId] = useState<string>("s01-trend-pullback-ema");
+  const [strategyCategoryFilter, setStrategyCategoryFilter] = useState<string>("ALL");
+  const [optionCategoryFilter, setOptionCategoryFilter] = useState<string>("ALL_OPTIONS");
+  const [optionMarketViewFilter, setOptionMarketViewFilter] = useState<string>("ALL");
+  const [strategySearch, setStrategySearch] = useState<string>("");
+  const [strategyPreset, setStrategyPreset] = useState<"DEFAULT" | "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE" | "CUSTOM">("DEFAULT");
+  const [strategyParams, setStrategyParams] = useState<Record<string, any>>({});
   const [primaryTimeframe, setPrimaryTimeframe] = useState<string>("5m");
   const [confirmationTimeframe, setConfirmationTimeframe] = useState<string>("15m");
   const [ruleLeft, setRuleLeft] = useState<string>("EMA9");
   const [ruleOp, setRuleOp] = useState<string>("CROSS_ABOVE");
   const [ruleRight, setRuleRight] = useState<string>("EMA21");
+
+  // Lookup active strategy definition from authoritative strategy catalog (Directional + Options)
+  const selectedStrategyDef = useMemo(() => {
+    return (
+      ALL_QUANTOS_STRATEGIES.find(
+        (s) =>
+          s.id === strategyId ||
+          s.number === strategyId ||
+          `s${s.number}` === strategyId.toLowerCase() ||
+          s.name.toLowerCase() === strategyId.toLowerCase()
+      ) || CRYPTO_30_STRATEGIES[0]
+    );
+  }, [strategyId]);
+
+  // Lookup rich visual metadata for option strategies
+  const selectedOptionMeta = useMemo(() => {
+    return OPTION_STRATEGIES_VISUAL_META[selectedStrategyDef?.number || ""];
+  }, [selectedStrategyDef?.number]);
+
+  // Synchronize parameter defaults whenever strategy changes
+  useEffect(() => {
+    if (selectedStrategyDef?.defaultParameters) {
+      setStrategyParams({ ...selectedStrategyDef.defaultParameters });
+      setStrategyPreset("DEFAULT");
+    }
+  }, [selectedStrategyDef?.id]);
+
+  const handleApplyPreset = (preset: "DEFAULT" | "CONSERVATIVE" | "BALANCED" | "AGGRESSIVE") => {
+    setStrategyPreset(preset);
+    if (!selectedStrategyDef?.defaultParameters) return;
+    const defaults = selectedStrategyDef.defaultParameters;
+    const updated: Record<string, any> = {};
+    Object.entries(defaults).forEach(([k, def]) => {
+      if (preset === "DEFAULT" || preset === "BALANCED") {
+        updated[k] = def;
+      } else if (preset === "CONSERVATIVE") {
+        if (typeof def === "number") {
+          updated[k] = k.includes("stop") || k.includes("loss") ? Number((def * 0.8).toFixed(2)) : Number((def * 1.2).toFixed(2));
+        } else {
+          updated[k] = def;
+        }
+      } else if (preset === "AGGRESSIVE") {
+        if (typeof def === "number") {
+          updated[k] = k.includes("stop") || k.includes("loss") ? Number((def * 1.3).toFixed(2)) : Number((def * 0.8).toFixed(2));
+        } else {
+          updated[k] = def;
+        }
+      }
+    });
+    setStrategyParams(updated);
+  };
 
   // Step 5: Dynamic Strategy & Premium Selection Registry
   const [enabledStrategies, setEnabledStrategies] = useState<BotEnabledStrategySetting[]>([]);
@@ -103,6 +196,7 @@ export function BotWizardVNext() {
   useEffect(() => {
     const stored = activeIntent || loadStoredIntent();
 
+    const queryStrategy = searchParams?.get("strategy") || searchParams?.get("strategyId");
     const querySymbol = searchParams?.get("symbol");
     const querySide = searchParams?.get("side");
     const queryStrike = searchParams?.get("strike");
@@ -124,7 +218,26 @@ export function BotWizardVNext() {
     const queryAsk = searchParams?.get("ask");
     const queryOrigin = searchParams?.get("origin");
 
-    if (!querySymbol && !stored) return;
+    if (queryStrategy) {
+      const match = CRYPTO_30_STRATEGIES.find(
+        (s) =>
+          s.id === queryStrategy ||
+          s.number === queryStrategy ||
+          `s${s.number}` === queryStrategy.toLowerCase() ||
+          s.id.toLowerCase().includes(queryStrategy.toLowerCase())
+      );
+      if (match) {
+        setStrategyId(match.id);
+        setPrimaryTimeframe(match.primaryTimeframe);
+        if (match.alternateTimeframes && match.alternateTimeframes.length > 0) {
+          setConfirmationTimeframe(match.alternateTimeframes[0]);
+        }
+        setBotName(`${match.name} [S${match.number}] Bot`);
+        setDescription(match.whatItDoes);
+      }
+    }
+
+    if (!querySymbol && !stored && !queryUnderlying && !queryStrategy) return;
 
     const symbol = querySymbol || stored?.symbol || "";
     const underlying = (queryUnderlying || stored?.underlying || "NIFTY").toUpperCase();
@@ -218,6 +331,54 @@ export function BotWizardVNext() {
       setCurrency(match.currency || (assetClass.includes("CRYPTO") ? "USD" : "INR"));
     }
   }, [accounts, envMode, selectedAccountId, assetClass]);
+
+  // Dynamic Contract Resolution Effect
+  useEffect(() => {
+    let isCancelled = false;
+    const isCrypto = assetClass === "CRYPTO_OPTIONS" || assetClass === "CRYPTO_FUTURES";
+    const exchange = isCrypto ? "DELTA" : "NSE";
+    const broker = isCrypto ? "DELTA" : (marketDataProvider || "UPSTOX");
+    const instrType = assetClass.includes("OPTION") ? "OPT" : "FUT";
+
+    setIsResolvingContract(true);
+    resolveContract({
+      broker,
+      exchange,
+      underlying: contractUnderlying,
+      instrumentType: instrType,
+      expiryPreference: contractExpiry || "AUTO",
+      strike: assetClass.includes("OPTION") ? contractStrike : undefined,
+      optionType: assetClass.includes("OPTION") ? contractOptionType : undefined,
+      mode: envMode,
+    }).then((res) => {
+      if (!isCancelled) {
+        setIsResolvingContract(false);
+        if (res) {
+          setResolvedContract(res);
+          if (res.lotSize) setContractLotSize(res.lotSize);
+          if (res.instrumentKey) setCanonicalInstrumentId(res.instrumentKey);
+          if (res.tradingSymbol) setDisplaySymbol(res.tradingSymbol);
+        }
+      }
+    }).catch(() => {
+      if (!isCancelled) setIsResolvingContract(false);
+    });
+
+    getAvailableExpiries({
+      broker,
+      exchange,
+      underlying: contractUnderlying,
+      mode: envMode,
+    }).then((exps) => {
+      if (!isCancelled) {
+        setAvailableExpiriesList(exps);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [contractUnderlying, assetClass, contractExpiry, contractStrike, contractOptionType, marketDataProvider, envMode]);
 
   // Selected Account details
   const activeAccount = useMemo(() => {
@@ -365,6 +526,8 @@ export function BotWizardVNext() {
           isMandatory: true,
         },
       ],
+      strategyParams,
+      strategyPreset,
       enabled_strategies: enabledStrategies,
     };
   }, [
@@ -375,6 +538,8 @@ export function BotWizardVNext() {
     tags,
     envMode,
     strategyId,
+    strategyParams,
+    strategyPreset,
     enabledStrategies,
     assetClass,
     creationOrigin,
@@ -778,22 +943,74 @@ export function BotWizardVNext() {
                 </div>
               </div>
 
-              {/* Options vs Futures Specific Controls */}
-              {assetClass.includes("OPTION") ? (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div>
-                    <label className="text-xs text-slate-400 font-semibold">EXPIRY</label>
-                    <input
-                      type="text"
-                      value={contractExpiry}
-                      onChange={(e) => setContractExpiry(e.target.value)}
-                      placeholder="YYYY-MM-DD"
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-mono"
-                    />
+              {/* Dynamic Derivative Contract & Expiry Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800">
+                <div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs text-slate-400 font-semibold">EXPIRY SELECTION</label>
+                    {resolvedContract && resolvedContract.status !== "EXPIRED" ? (
+                      <span className="text-[10px] font-bold text-emerald-400 font-mono flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Valid Contract
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-rose-400 font-mono">
+                        ✕ Expired / Unresolved
+                      </span>
+                    )}
                   </div>
+                  <select
+                    value={["AUTO", "CURRENT_WEEK", "NEXT_WEEK", "CURRENT_MONTH", "NEXT_MONTH", "FAR_MONTH"].includes(contractExpiry) ? contractExpiry : "MANUAL"}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "MANUAL") {
+                        setContractExpiry(availableExpiriesList[0] || "");
+                      } else {
+                        setContractExpiry(val);
+                      }
+                    }}
+                    className="w-full mt-1.5 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-semibold"
+                  >
+                    <option value="AUTO">Auto (Nearest Valid Unexpired)</option>
+                    <option value="CURRENT_WEEK">Current Week</option>
+                    <option value="NEXT_WEEK">Next Week</option>
+                    <option value="CURRENT_MONTH">Current Month</option>
+                    <option value="NEXT_MONTH">Next Month</option>
+                    <option value="FAR_MONTH">Far Month</option>
+                    <option value="MANUAL">Manual Date Selection...</option>
+                  </select>
+
+                  {!["AUTO", "CURRENT_WEEK", "NEXT_WEEK", "CURRENT_MONTH", "NEXT_MONTH", "FAR_MONTH"].includes(contractExpiry) && (
+                    <div className="mt-2">
+                      <label className="text-[10px] text-slate-500 font-semibold">AVAILABLE BROKER EXPIRIES</label>
+                      {availableExpiriesList.length > 0 ? (
+                        <select
+                          value={contractExpiry}
+                          onChange={(e) => setContractExpiry(e.target.value)}
+                          className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-emerald-300 text-xs font-mono font-bold"
+                        >
+                          {availableExpiriesList.map((exp) => (
+                            <option key={exp} value={exp}>
+                              {exp}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={contractExpiry}
+                          onChange={(e) => setContractExpiry(e.target.value)}
+                          placeholder="YYYY-MM-DD"
+                          className="w-full mt-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-mono"
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {assetClass.includes("OPTION") ? (
                   <div>
                     <label className="text-xs text-slate-400 font-semibold">OPTION TYPE</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
+                    <div className="grid grid-cols-2 gap-2 mt-1.5">
                       <button
                         type="button"
                         onClick={() => setContractOptionType("CE")}
@@ -818,57 +1035,10 @@ export function BotWizardVNext() {
                       </button>
                     </div>
                   </div>
+                ) : (
                   <div>
-                    <label className="text-xs text-slate-400 font-semibold">STRIKE PRICE</label>
-                    <input
-                      type="number"
-                      value={contractStrike}
-                      onChange={(e) => setContractStrike(Number(e.target.value))}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 font-semibold">STRATEGY DIRECTION</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
-                      <button
-                        type="button"
-                        onClick={() => setEntrySide("BUY")}
-                        className={`py-2 text-xs font-bold rounded-lg transition ${
-                          entrySide === "BUY"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-slate-900 text-slate-400 border border-slate-800"
-                        }`}
-                      >
-                        BUY {contractOptionType === "CE" ? "CALL" : "PUT"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEntrySide("SELL")}
-                        className={`py-2 text-xs font-bold rounded-lg transition ${
-                          entrySide === "SELL"
-                            ? "bg-rose-600 text-white"
-                            : "bg-slate-900 text-slate-400 border border-slate-800"
-                        }`}
-                      >
-                        SELL {contractOptionType === "CE" ? "CALL" : "PUT"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div>
-                    <label className="text-xs text-slate-400 font-semibold">FUTURES EXPIRY</label>
-                    <input
-                      type="text"
-                      value={contractExpiry || "PERPETUAL"}
-                      onChange={(e) => setContractExpiry(e.target.value)}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-100 text-xs font-mono"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-slate-400 font-semibold">DIRECTION</label>
-                    <div className="grid grid-cols-2 gap-2 mt-1">
+                    <label className="text-xs text-slate-400 font-semibold">FUTURES DIRECTION</label>
+                    <div className="grid grid-cols-2 gap-2 mt-1.5">
                       <button
                         type="button"
                         onClick={() => setEntrySide("BUY")}
@@ -893,17 +1063,72 @@ export function BotWizardVNext() {
                       </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-400 font-semibold">LOT SIZE / MULTIPLIER</label>
-                    <input
-                      type="number"
-                      value={contractLotSize}
-                      onChange={(e) => setContractLotSize(Number(e.target.value))}
-                      className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-900 border border-slate-800 text-white font-bold text-xs"
-                    />
+                )}
+              </div>
+
+              {/* Live Contract Preview Card */}
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 shadow-inner">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                    <span className="text-xs font-black tracking-wider text-slate-200 uppercase">
+                      CURRENT CONTRACT (RESOLVER)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {resolvedContract && resolvedContract.status !== "EXPIRED" ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                        ACTIVE ✓
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950 text-rose-400 border border-rose-800">
+                        UNRESOLVED / EXPIRED ✕
+                      </span>
+                    )}
                   </div>
                 </div>
-              )}
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Underlying</span>
+                    <span className="font-bold text-white">{contractUnderlying}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Expiry</span>
+                    <span className="font-mono font-bold text-emerald-300">
+                      {resolvedContract?.expiry || (contractExpiry === "AUTO" ? "Dynamic AUTO" : contractExpiry)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Trading Symbol</span>
+                    <span className="font-mono font-bold text-slate-200 truncate block" title={resolvedContract?.tradingSymbol || displaySymbol}>
+                      {resolvedContract?.tradingSymbol || displaySymbol}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Instrument Key</span>
+                    <span className="font-mono text-[11px] text-slate-400 truncate block" title={resolvedContract?.instrumentKey || canonicalInstrumentId}>
+                      {resolvedContract?.instrumentKey || canonicalInstrumentId}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Lot Size</span>
+                    <span className="font-bold text-white">{resolvedContract?.lotSize || contractLotSize}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Tick Size</span>
+                    <span className="font-mono text-slate-300">₹{resolvedContract?.tickSize ?? 0.05}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Status</span>
+                    <span className="font-mono font-bold text-emerald-400">{resolvedContract?.status || "ACTIVE"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 font-semibold block uppercase">Data & Environment</span>
+                    <span className="font-mono text-cyan-400">{marketDataProvider} ({envMode})</span>
+                  </div>
+                </div>
+              </div>
 
               {/* 5-Column Live Market Quote Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 p-3.5 bg-slate-950 rounded-xl border border-slate-800">
@@ -1014,107 +1239,610 @@ export function BotWizardVNext() {
                   </div>
                 </div>
               </div>
-
-              {/* Strategy Execution Matrix & Live Premium Resolution */}
-              <StrategyExecutionMatrixSection
-                enabledStrategies={enabledStrategies}
-                onChangeEnabledStrategies={setEnabledStrategies}
-                boardType={assetClass.includes("OPTIONS") ? "OPTIONS" : assetClass.includes("FUTURES") ? "FUTURES" : assetClass.includes("STOCK") || assetClass.includes("EQUITY") ? "STOCK" : "OPTIONS"}
-                marketDataProvider={marketDataProvider}
-                executionBroker={executionBroker}
-                defaultUnderlying={contractUnderlying}
-                maxTickAgeMs={maxTickAgeMs}
-              />
             </div>
           )}
 
-          {/* Step 4: Strategy Engine */}
+          {/* Step 4: Quantitative Strategy Engine (All 30 Master Strategies) */}
           {currentStep === 4 && (
-            <div className="flex flex-col gap-5">
-              <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide border-b border-slate-800 pb-2">
-                4. Multi-Indicator Strategy Confluence & Signal Engine
-              </h2>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="flex flex-col gap-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
                 <div>
-                  <label className="text-xs text-slate-400 font-semibold">PRIMARY TIMEFRAME</label>
-                  <select
-                    value={primaryTimeframe}
-                    onChange={(e) => setPrimaryTimeframe(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-bold"
-                  >
-                    {["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"].map((tf) => (
-                      <option key={tf} value={tf}>
-                        {tf}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold">CONFIRMATION TIMEFRAME</label>
-                  <select
-                    value={confirmationTimeframe}
-                    onChange={(e) => setConfirmationTimeframe(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-bold"
-                  >
-                    {["15m", "30m", "1h", "4h", "1d"].map((tf) => (
-                      <option key={tf} value={tf}>
-                        {tf}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-slate-400 font-semibold">STRATEGY TEMPLATE</label>
-                  <select
-                    value={strategyId}
-                    onChange={(e) => setStrategyId(e.target.value)}
-                    className="w-full mt-1 px-3 py-2 rounded-lg bg-slate-950 border border-slate-800 text-xs font-bold text-amber-400"
-                  >
-                    <option value="EMA_SUPERTREND_CONFLUENCE">EMA + Supertrend Confluence</option>
-                    <option value="ORDER_FLOW_IMBALANCE">Order Flow Depth Imbalance</option>
-                    <option value="VOLATILITY_BREAKOUT">ATR Volatility Breakout</option>
-                    <option value="MULTI_INDICATOR_CONFLUENCE">Multi-Indicator Confluence (EMA, RSI, VWAP)</option>
-                    <option value="CUSTOM_RULES">Custom Deterministic Rules</option>
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-cyan-400" />
+                    <h2 className="text-base font-black text-cyan-400 uppercase tracking-wide">
+                      4. Master Strategy Selection & Parameter Engine
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-950/80 text-cyan-300 border border-cyan-800/50">
+                      30 Canonical Models
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Select an institutional strategy model, configure dynamic parameters with automated presets, or customize multi-indicator confluence.
+                  </p>
                 </div>
               </div>
 
-              {/* 16 Supported Indicator Library Pills */}
-              <div>
-                <label className="text-xs text-slate-400 font-semibold uppercase">
-                  Indicator Confluence Library (Select Multiple)
-                </label>
-                <div className="flex flex-wrap gap-2 mt-2">
+              {/* Top-Level Strategy Domain Selector */}
+              <div className="flex items-center gap-2 p-1.5 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStrategyDomain("DIRECTIONAL");
+                    setStrategyCategoryFilter("ALL");
+                    if (Number(selectedStrategyDef.number) > 30) {
+                      setStrategyId("s01-trend-pullback-ema");
+                    }
+                  }}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-2 ${
+                    strategyDomain === "DIRECTIONAL"
+                      ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Zap className="w-4 h-4" />
+                  <span>⚡ Directional & Trend Systems (30 Models: S01–S30)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStrategyDomain("OPTIONS");
+                    setOptionCategoryFilter("ALL_OPTIONS");
+                    if (Number(selectedStrategyDef.number) <= 30) {
+                      setStrategyId("options-strat-01");
+                    }
+                  }}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-2 ${
+                    strategyDomain === "OPTIONS"
+                      ? "bg-gradient-to-r from-indigo-500 to-cyan-400 text-slate-950 shadow-md shadow-indigo-500/20"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>🎯 Master Option Strategies (24 Structures: O01–O24)</span>
+                </button>
+              </div>
+
+              {/* Sub-Tabs: Directional Categories */}
+              {strategyDomain === "DIRECTIONAL" && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
                   {[
-                    "EMA 9", "EMA 21", "SMA 50", "RSI 14", "MACD", "VWAP",
-                    "Volume", "ATR 14", "Bollinger Bands", "Open Interest", "Change in OI",
-                    "Implied Volatility", "Delta / Greeks", "Price Action", "Liquidity Levels", "Fair Value Gap (FVG)", "Momentum Score"
-                  ].map((ind) => (
+                    { id: "ALL", label: "All 30 Strategies" },
+                    { id: "Trend & Continuation", label: "Trend (S01-S05)" },
+                    { id: "Breakout & Expansion", label: "Breakout (S06-S10)" },
+                    { id: "Pullback & Mean Reversion", label: "Mean Reversion (S11-S15)" },
+                    { id: "Structure & Reversal", label: "Structure (S16-S20)" },
+                    { id: "Momentum & Volume", label: "Momentum (S21-S25)" },
+                    { id: "Crypto-Specific & Multi-Factor", label: "Crypto Multi-Factor (S26-S30)" },
+                  ].map((tab) => (
                     <button
-                      key={ind}
+                      key={tab.id}
                       type="button"
-                      onClick={() => {
-                        if (ruleLeft === ind) setRuleLeft("EMA 9");
-                        else setRuleLeft(ind);
-                      }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                        ruleLeft === ind || ruleRight === ind
-                          ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/30"
-                          : "bg-slate-950 text-slate-300 border border-slate-800 hover:text-white"
+                      onClick={() => setStrategyCategoryFilter(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                        strategyCategoryFilter === tab.id
+                          ? "bg-cyan-500 text-slate-950 shadow-md shadow-cyan-500/20"
+                          : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
                       }`}
                     >
-                      {ind}
+                      {tab.label}
                     </button>
                   ))}
                 </div>
+              )}
+
+              {/* Sub-Tabs: Option Strategy Purpose Groups & Market View Filters */}
+              {strategyDomain === "OPTIONS" && (
+                <div className="flex flex-col gap-2.5 p-3 rounded-xl bg-slate-950/80 border border-indigo-950/60">
+                  {/* Category Sub-Tabs */}
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                    {OPTION_PURPOSE_GROUPS.map((grp) => (
+                      <button
+                        key={grp.id}
+                        type="button"
+                        onClick={() => {
+                          setOptionCategoryFilter(grp.id);
+                          const firstNum = grp.strategyNumbers[0];
+                          const found = OPTIONS_24_STRATEGIES.find((s) => s.number === firstNum);
+                          if (found) setStrategyId(found.id);
+                        }}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition ${
+                          optionCategoryFilter === grp.id
+                            ? "bg-indigo-500 text-slate-950 shadow-md shadow-indigo-500/20"
+                            : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                        }`}
+                      >
+                        {grp.title}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Market View Quick Filter Pills */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80">
+                    <span className="text-[10px] text-slate-500 font-bold uppercase mr-1">Market View:</span>
+                    {[
+                      { id: "ALL", label: "All Views" },
+                      { id: "Bullish", label: "Bullish" },
+                      { id: "Bearish", label: "Bearish" },
+                      { id: "Range", label: "Range" },
+                      { id: "Big Move", label: "Big Move" },
+                      { id: "IV Expansion", label: "IV Expansion" },
+                      { id: "IV Contraction", label: "IV Contraction" },
+                      { id: "Direction Uncertain", label: "Direction Uncertain" },
+                    ].map((mv) => (
+                      <button
+                        key={mv.id}
+                        type="button"
+                        onClick={() => setOptionMarketViewFilter(mv.id)}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition ${
+                          optionMarketViewFilter === mv.id
+                            ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/50"
+                            : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800/80"
+                        }`}
+                      >
+                        {mv.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Strategy Selector & Search Bar */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs text-slate-400 font-semibold uppercase flex items-center justify-between">
+                    <span>Active Strategy Model</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">
+                      Selected: {selectedOptionMeta ? selectedOptionMeta.visualGuideNumber : `S${selectedStrategyDef.number}`} — {selectedStrategyDef.name}
+                    </span>
+                  </label>
+                  <select
+                    value={strategyId}
+                    onChange={(e) => {
+                      setStrategyId(e.target.value);
+                      const strat = ALL_QUANTOS_STRATEGIES.find((s) => s.id === e.target.value || s.number === e.target.value);
+                      if (strat) {
+                        setPrimaryTimeframe(strat.primaryTimeframe);
+                        if (strat.alternateTimeframes && strat.alternateTimeframes.length > 0) {
+                          setConfirmationTimeframe(strat.alternateTimeframes[0]);
+                        }
+                      }
+                    }}
+                    className="w-full mt-1.5 px-3 py-2.5 rounded-xl bg-slate-950 border border-cyan-500/30 text-xs font-bold text-slate-100 focus:outline-none focus:border-cyan-400"
+                  >
+                    {strategyDomain === "DIRECTIONAL" ? (
+                      <>
+                        <optgroup label="PART I — TREND & CONTINUATION (S01–S05)">
+                          {CRYPTO_30_STRATEGIES.slice(0, 5).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="PART II — BREAKOUT & EXPANSION (S06–S10)">
+                          {CRYPTO_30_STRATEGIES.slice(5, 10).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="PART III — PULLBACK & MEAN REVERSION (S11–S15)">
+                          {CRYPTO_30_STRATEGIES.slice(10, 15).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="PART IV — STRUCTURE & REVERSAL (S16–S20)">
+                          {CRYPTO_30_STRATEGIES.slice(15, 20).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="PART V — MOMENTUM & VOLUME (S21–S25)">
+                          {CRYPTO_30_STRATEGIES.slice(20, 25).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="PART VI — CRYPTO-SPECIFIC & MULTI-FACTOR (S26–S30)">
+                          {CRYPTO_30_STRATEGIES.slice(25, 30).map((s) => (
+                            <option key={s.id} value={s.id}>
+                              S{s.number} — {s.name} ({s.primaryTimeframe})
+                            </option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="CUSTOM CONFLUENCE & DETERMINISTIC RULES">
+                          <option value="EMA_SUPERTREND_CONFLUENCE">EMA + Supertrend Confluence</option>
+                          <option value="ORDER_FLOW_IMBALANCE">Order Flow Depth Imbalance</option>
+                          <option value="VOLATILITY_BREAKOUT">ATR Volatility Breakout</option>
+                          <option value="MULTI_INDICATOR_CONFLUENCE">Multi-Indicator Confluence (EMA, RSI, VWAP)</option>
+                          <option value="CUSTOM_RULES">Custom Deterministic Rules</option>
+                        </optgroup>
+                      </>
+                    ) : (
+                      <>
+                        <optgroup label="BULLISH STRATEGIES (CALLS & SPREADS)">
+                          {OPTIONS_24_STRATEGIES.filter((s) => ["35", "37", "48", "50", "51", "54"].includes(s.number)).map((s) => {
+                            const meta = OPTION_STRATEGIES_VISUAL_META[s.number];
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {meta?.visualGuideNumber || `O${s.number}`} — {s.name} ({meta?.riskType || "Defined"})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                        <optgroup label="BEARISH STRATEGIES (PUTS & SPREADS)">
+                          {OPTIONS_24_STRATEGIES.filter((s) => ["36", "38", "47", "49"].includes(s.number)).map((s) => {
+                            const meta = OPTION_STRATEGIES_VISUAL_META[s.number];
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {meta?.visualGuideNumber || `O${s.number}`} — {s.name} ({meta?.riskType || "Defined"})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                        <optgroup label="RANGE & INCOME (CONDORS & BUTTERFLIES)">
+                          {OPTIONS_24_STRATEGIES.filter((s) => ["31", "33", "34", "52", "53"].includes(s.number)).map((s) => {
+                            const meta = OPTION_STRATEGIES_VISUAL_META[s.number];
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {meta?.visualGuideNumber || `O${s.number}`} — {s.name} ({meta?.riskType || "Defined"})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                        <optgroup label="VOLATILITY & BIG MOVE (STRADDLES & STRANGLES)">
+                          {OPTIONS_24_STRATEGIES.filter((s) => ["32", "39", "40", "41", "42", "45", "46"].includes(s.number)).map((s) => {
+                            const meta = OPTION_STRATEGIES_VISUAL_META[s.number];
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {meta?.visualGuideNumber || `O${s.number}`} — {s.name} ({meta?.riskType || "Defined"})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                        <optgroup label="TIME & VOLATILITY (CALENDARS & DIAGONALS)">
+                          {OPTIONS_24_STRATEGIES.filter((s) => ["43", "44"].includes(s.number)).map((s) => {
+                            const meta = OPTION_STRATEGIES_VISUAL_META[s.number];
+                            return (
+                              <option key={s.id} value={s.id}>
+                                {meta?.visualGuideNumber || `O${s.number}`} — {s.name} ({meta?.riskType || "Defined"})
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">PRIMARY TF</label>
+                    <select
+                      value={primaryTimeframe}
+                      onChange={(e) => setPrimaryTimeframe(e.target.value)}
+                      className="w-full mt-1.5 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-slate-200"
+                    >
+                      {["1m", "3m", "5m", "15m", "30m", "1h", "4h", "1d"].map((tf) => (
+                        <option key={tf} value={tf}>
+                          {tf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-slate-400 font-semibold">CONFIRM TF</label>
+                    <select
+                      value={confirmationTimeframe}
+                      onChange={(e) => setConfirmationTimeframe(e.target.value)}
+                      className="w-full mt-1.5 px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-slate-200"
+                    >
+                      {["5m", "15m", "30m", "1h", "4h", "1d", "1w"].map((tf) => (
+                        <option key={tf} value={tf}>
+                          {tf}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
 
-              {/* Visual Entry Rule Builder */}
+              {/* Active Strategy Card Banner */}
+              {/* Active Strategy Card Banner */}
+              <div className="p-4 rounded-xl bg-gradient-to-r from-slate-900/90 to-slate-950 border border-slate-800 flex flex-col gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="px-2.5 py-1 rounded-lg text-xs font-black font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                      {selectedOptionMeta ? selectedOptionMeta.visualGuideNumber : `S${selectedStrategyDef.number}`}
+                    </span>
+                    <h3 className="text-sm font-bold text-white">
+                      {selectedStrategyDef.name}
+                    </h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">
+                      {selectedStrategyDef.category}
+                    </span>
+                    {selectedOptionMeta ? (
+                      <>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-800/40">
+                          {selectedOptionMeta.marketView}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          selectedOptionMeta.riskType.includes("Defined")
+                            ? "bg-emerald-950/80 text-emerald-300 border border-emerald-800/40"
+                            : "bg-amber-950/80 text-amber-300 border border-amber-800/40"
+                        }`}>
+                          {selectedOptionMeta.riskType}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-950/80 text-indigo-300 border border-indigo-800/40">
+                          {selectedStrategyDef.complexity}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-300 border border-emerald-800/40">
+                          {selectedStrategyDef.direction}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-slate-300 leading-relaxed bg-slate-950/60 p-3 rounded-lg border border-slate-800/60">
+                  {selectedStrategyDef.whatItDoes}
+                </p>
+
+                {/* Option Strategy Architecture Blueprint Card */}
+                {selectedOptionMeta && (
+                  <div className="p-3.5 rounded-xl bg-slate-950 border border-indigo-900/40 flex flex-col gap-3 animate-fadeIn">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-indigo-400 uppercase tracking-wide flex items-center gap-1.5">
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Option Strategy Structure & Payoff Blueprint</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        Guide Ref: {selectedOptionMeta.visualGuideNumber}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span className="text-[10px] text-slate-500 font-bold uppercase block">STRUCTURE</span>
+                        <span className="text-[11px] font-mono text-slate-200 font-bold mt-0.5 block">
+                          {selectedOptionMeta.structureSummary}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span className="text-[10px] text-emerald-400 font-bold uppercase block">MAX PROFIT</span>
+                        <span className="text-[11px] font-mono text-emerald-300 font-bold mt-0.5 block">
+                          {selectedOptionMeta.maxProfitFormula}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span className="text-[10px] text-rose-400 font-bold uppercase block">MAX LOSS</span>
+                        <span className="text-[11px] font-mono text-rose-300 font-bold mt-0.5 block">
+                          {selectedOptionMeta.maxLossFormula}
+                        </span>
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-900/80 border border-slate-800">
+                        <span className="text-[10px] text-cyan-400 font-bold uppercase block">BREAK-EVEN</span>
+                        <span className="text-[11px] font-mono text-cyan-300 font-bold mt-0.5 block">
+                          {selectedOptionMeta.breakEvenFormula}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Greeks & Sensitivities Matrix */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-slate-800/60 text-xs">
+                      <div className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-400 font-bold">DELTA:</span>
+                        <span className="font-mono text-cyan-300 text-[11px] font-bold">{selectedOptionMeta.greekProfile.delta}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-400 font-bold">GAMMA:</span>
+                        <span className="font-mono text-indigo-300 text-[11px] font-bold">{selectedOptionMeta.greekProfile.gamma}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-400 font-bold">THETA:</span>
+                        <span className="font-mono text-amber-300 text-[11px] font-bold">{selectedOptionMeta.greekProfile.theta}</span>
+                      </div>
+                      <div className="flex items-center justify-between p-2 rounded bg-slate-900/60 border border-slate-800/80">
+                        <span className="text-[10px] text-slate-400 font-bold">VEGA:</span>
+                        <span className="font-mono text-purple-300 text-[11px] font-bold">{selectedOptionMeta.greekProfile.vega}</span>
+                      </div>
+                    </div>
+
+                    {/* Live Data Streams & Telemetry Checklist */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1">
+                      <span className="text-[10px] text-slate-500 font-bold uppercase">LIVE DATA BUS:</span>
+                      {["Underlying", "Option Chain", "Greeks", "OI", "Volume", "Depth", "IV"].map((stream) => (
+                        <span key={stream} className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/60 text-emerald-300 border border-emerald-800/40 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          {stream} LIVE
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Required Indicators Pills */}
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Strategy Indicator Pipeline:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 mt-1.5">
+                    {selectedStrategyDef.indicators.map((ind, idx) => (
+                      <span
+                        key={idx}
+                        className="px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold bg-slate-900 text-cyan-300 border border-slate-800 flex items-center gap-1.5"
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+                        {ind.name}: {ind.parameter}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Dynamic Parameter Configuration & Presets */}
+              {selectedStrategyDef.defaultParameters && Object.keys(selectedStrategyDef.defaultParameters).length > 0 && (
+                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <Sliders className="w-4 h-4 text-cyan-400" />
+                      <span className="text-xs font-bold text-slate-200 uppercase tracking-wide">
+                        Strategy-Specific Parameter Tuning
+                      </span>
+                    </div>
+
+                    {/* Presets */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-slate-400 font-semibold mr-1">PRESETS:</span>
+                      {(["DEFAULT", "CONSERVATIVE", "BALANCED", "AGGRESSIVE"] as const).map((pst) => (
+                        <button
+                          key={pst}
+                          type="button"
+                          onClick={() => handleApplyPreset(pst)}
+                          className={`px-2 py-1 rounded text-[10px] font-bold uppercase transition ${
+                            strategyPreset === pst
+                              ? "bg-cyan-500 text-slate-950 shadow-sm"
+                              : "bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800"
+                          }`}
+                        >
+                          {pst}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Dynamic Parameter Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {Object.entries(selectedStrategyDef.defaultParameters).map(([key, defVal]: [string, any]) => {
+                      const val = strategyParams[key] ?? defVal;
+                      const isNumber = typeof defVal === "number";
+                      return (
+                        <div key={key} className="p-3 bg-slate-900/80 rounded-lg border border-slate-800 flex flex-col gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] text-slate-300 font-bold uppercase">
+                              {key.replace(/_/g, " ")}
+                            </label>
+                            <span className="text-xs font-mono font-bold text-cyan-400">
+                              {String(val)}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 leading-tight">
+                            Default: {String(defVal)}
+                          </p>
+                          {isNumber ? (
+                            <div className="flex items-center gap-2 mt-1">
+                              <input
+                                type="range"
+                                min={defVal > 10 ? 1 : 0.1}
+                                max={defVal > 10 ? Math.max(100, defVal * 3) : 5}
+                                step={defVal <= 1 ? 0.05 : defVal <= 10 ? 0.5 : 1}
+                                value={val}
+                                onChange={(e) => {
+                                  setStrategyPreset("CUSTOM");
+                                  setStrategyParams((prev) => ({ ...prev, [key]: Number(e.target.value) }));
+                                }}
+                                className="flex-1 accent-cyan-400 h-1.5 bg-slate-950 rounded-lg cursor-pointer"
+                              />
+                              <input
+                                type="number"
+                                value={val}
+                                onChange={(e) => {
+                                  setStrategyPreset("CUSTOM");
+                                  setStrategyParams((prev) => ({ ...prev, [key]: Number(e.target.value) }));
+                                }}
+                                className="w-16 px-1.5 py-1 bg-slate-950 border border-slate-800 rounded text-right text-xs font-mono font-bold text-slate-200"
+                              />
+                            </div>
+                          ) : (
+                            <input
+                              type="text"
+                              value={String(val)}
+                              onChange={(e) => {
+                                setStrategyPreset("CUSTOM");
+                                setStrategyParams((prev) => ({ ...prev, [key]: e.target.value }));
+                              }}
+                              className="w-full mt-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs font-bold text-slate-200"
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Strategy Rules & Guardrails Inspector */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Entry Rules */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold uppercase">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Setup & Entry Conditions</span>
+                  </div>
+                  <ul className="space-y-1.5 mt-1">
+                    {selectedStrategyDef.setupConditions.map((cond, i) => (
+                      <li key={i} className="text-[11px] text-slate-300 leading-snug flex items-start gap-1.5">
+                        <span className="text-emerald-500 font-bold">✓</span>
+                        <span>
+                          <strong className="text-slate-100">{cond.name}:</strong> {cond.description}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Stop Loss & Take Profit */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-rose-400 text-xs font-bold uppercase">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Risk Guard & Simulation</span>
+                  </div>
+                  <div className="space-y-2 mt-1">
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">TRADE TARGET MODEL:</span>
+                      <p className="text-[11px] text-slate-300 leading-snug mt-0.5">
+                        Entry: ${selectedStrategyDef.exampleTrade.entryPrice.toLocaleString()} | Stop: ${selectedStrategyDef.exampleTrade.stopPrice.toLocaleString()} | Target: ${selectedStrategyDef.exampleTrade.targetPrice.toLocaleString()}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase">RISK RATIO:</span>
+                      <p className="text-[11px] text-cyan-300 leading-snug mt-0.5">
+                        {selectedStrategyDef.exampleTrade.rrRatio} ({selectedStrategyDef.exampleTrade.positionSizingNote})
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* When NOT to Trade */}
+                <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-amber-400 text-xs font-bold uppercase">
+                    <Info className="w-3.5 h-3.5" />
+                    <span>When NOT to Trade</span>
+                  </div>
+                  <ul className="space-y-1.5 mt-1">
+                    {selectedStrategyDef.unfavorableConditions.map((r, i) => (
+                      <li key={i} className="text-[11px] text-slate-300 leading-snug flex items-start gap-1.5">
+                        <span className="text-amber-400 font-bold">✕</span>
+                        <span>{r}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+
+              {/* Confluence Visual Entry Rule Builder */}
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-300 uppercase">Visual Entry Rule Builder (IF / THEN)</span>
+                <span className="text-xs font-bold text-slate-300 uppercase">
+                  Multi-Indicator Confluence Trigger (IF / THEN)
+                </span>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="text-[10px] text-slate-500 font-bold">LEFT OPERAND</label>
@@ -1156,7 +1884,7 @@ export function BotWizardVNext() {
 
                 <div className="p-3 bg-slate-900 rounded-lg border border-slate-800 text-xs font-mono text-emerald-400 flex items-center justify-between">
                   <span>THEN: [GENERATE {entrySide} SIGNAL] with 0-Lookahead Enforced</span>
-                  <span className="text-[10px] text-slate-400">Timeframe: {primaryTimeframe}</span>
+                  <span className="text-[10px] text-slate-400">Primary: {primaryTimeframe} | Confirm: {confirmationTimeframe}</span>
                 </div>
               </div>
             </div>

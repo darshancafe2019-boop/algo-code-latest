@@ -21,7 +21,15 @@ logger = logging.getLogger("QuantDataCore.BotStrategyEngine")
 
 # Named strategy type → evaluation config map
 _NAMED_STRATEGY_CONFIG: Dict[str, Dict[str, Any]] = {
-    "EMA_SUPERTREND_CONFLUENCE": {"ema_fast": 9, "ema_slow": 21, "trend_weight": 0.6, "momentum_weight": 0.4},
+    "EMA_SUPERTREND_CONFLUENCE": {
+        "ema_fast": 9,
+        "ema_slow": 21,
+        "supertrend_atr": 10,
+        "supertrend_mult": 3.0,
+        "trend_weight": 0.5,
+        "supertrend_weight": 0.3,
+        "momentum_weight": 0.2,
+    },
     "MOMENTUM_CONFLUENCE": {"ema_fast": 12, "ema_slow": 26, "trend_weight": 0.5, "momentum_weight": 0.5},
     "OPTIONS_TREND": {"ema_fast": 9, "ema_slow": 21, "trend_weight": 0.7, "momentum_weight": 0.3},
     "BREAKOUT_MOMENTUM": {"ema_fast": 5, "ema_slow": 20, "trend_weight": 0.4, "momentum_weight": 0.6},
@@ -52,6 +60,7 @@ class BotStrategyEngine:
     def __init__(self):
         self._indicator_cache: Dict[str, float] = {}
         self._price_history: Dict[str, List[float]] = {}  # instrument_id -> recent LTPs
+        self._ohlc_history: Dict[str, List[Dict[str, float]]] = {}  # instrument_id -> list of candles
 
     def set_cached_indicator(self, instrument: str, timeframe: str, indicator_name: str, value: float):
         key = f"{instrument.upper()}:{timeframe.lower()}:{indicator_name.upper()}"
@@ -61,12 +70,19 @@ class BotStrategyEngine:
         key = f"{instrument.upper()}:{timeframe.lower()}:{indicator_name.upper()}"
         return self._indicator_cache.get(key)
 
-    def _update_price_history(self, instrument_id: str, ltp: float) -> List[float]:
-        """Maintains a rolling window of recent prices for EMA calculation."""
+    def _update_price_history(self, instrument_id: str, ltp: float, high: Optional[float] = None, low: Optional[float] = None) -> List[float]:
+        """Maintains a rolling window of recent prices and OHLC candles."""
         hist = self._price_history.setdefault(instrument_id, [])
         hist.append(ltp)
-        if len(hist) > 100:
+        if len(hist) > 150:
             hist.pop(0)
+
+        h_val = high if high is not None and high > 0 else ltp * 1.0005
+        l_val = low if low is not None and low > 0 else ltp * 0.9995
+        ohlc = self._ohlc_history.setdefault(instrument_id, [])
+        ohlc.append({"open": hist[-2] if len(hist) > 1 else ltp, "high": max(h_val, ltp), "low": min(l_val, ltp), "close": ltp})
+        if len(ohlc) > 150:
+            ohlc.pop(0)
         return hist
 
     def _calc_ema(self, prices: List[float], period: int) -> float:
@@ -78,6 +94,79 @@ class BotStrategyEngine:
         for p in prices[1:]:
             ema = p * k + ema * (1 - k)
         return ema
+
+    def _calc_supertrend(
+        self,
+        instrument_id: str,
+        period: int = 10,
+        multiplier: float = 3.0,
+        ltp: float = 0.0,
+    ) -> Tuple[float, str, bool, float]:
+        """
+        Calculates Supertrend:
+        Returns (value, direction ['BULLISH'|'BEARISH'], trend_changed, distance_from_price_pct)
+        """
+        candles = self._ohlc_history.get(instrument_id, [])
+        if len(candles) < 3:
+            # Synthetic initial band based on recent spread / ATR estimation
+            band_dist = (ltp * 0.005) if ltp > 0 else 1.0
+            st_val = ltp - band_dist
+            return st_val, "BULLISH", False, 0.5
+
+        # True Range calculation
+        tr_list: List[float] = []
+        for i in range(len(candles)):
+            c = candles[i]
+            if i == 0:
+                tr_list.append(c["high"] - c["low"])
+            else:
+                prev_close = candles[i - 1]["close"]
+                tr = max(c["high"] - c["low"], abs(c["high"] - prev_close), abs(c["low"] - prev_close))
+                tr_list.append(tr)
+
+        # ATR calculation
+        atr_window = tr_list[-period:] if len(tr_list) >= period else tr_list
+        atr = sum(atr_window) / max(len(atr_window), 1)
+        if atr <= 0:
+            atr = (ltp * 0.002) if ltp > 0 else 1.0
+
+        n = len(candles)
+        final_ub = 0.0
+        final_lb = 0.0
+        trend = 1
+        prev_trend = 1
+
+        for i in range(n):
+            hl2 = (candles[i]["high"] + candles[i]["low"]) / 2.0
+            basic_ub = hl2 + (multiplier * atr)
+            basic_lb = hl2 - (multiplier * atr)
+            close = candles[i]["close"]
+            prev_close = candles[i - 1]["close"] if i > 0 else close
+
+            if i == 0:
+                final_ub = basic_ub
+                final_lb = basic_lb
+                trend = 1
+                prev_trend = 1
+                continue
+
+            prev_trend = trend
+            if basic_ub < final_ub or prev_close > final_ub:
+                final_ub = basic_ub
+            if basic_lb > final_lb or prev_close < final_lb:
+                final_lb = basic_lb
+
+            if trend == 1 and close < final_lb:
+                trend = -1
+            elif trend == -1 and close > final_ub:
+                trend = 1
+
+        st_val = final_lb if trend == 1 else final_ub
+        direction = "BULLISH" if trend == 1 else "BEARISH"
+        trend_changed = (trend != prev_trend)
+        dist_pct = ((ltp - st_val) / max(ltp, 1e-5)) * 100.0 if ltp > 0 else 0.0
+
+        return st_val, direction, trend_changed, dist_pct
 
     def evaluate_named_strategy(
         self,
@@ -92,13 +181,15 @@ class BotStrategyEngine:
         Evaluates a named strategy (EMA_SUPERTREND_CONFLUENCE, MOMENTUM_CONFLUENCE etc.)
         directly from live tick data when bot.rules is empty. Uses EMA crossover +
         momentum scoring to produce HOLD/BUY/SELL decisions with structured explainability.
+        For EMA_SUPERTREND_CONFLUENCE: strictly requires both EMA 9/21 cross AND Supertrend direction match!
         """
         ltp = float(market_data.get("ltp", 0.0))
         instrument_id = str(market_data.get("instrumentId") or "UNKNOWN")
         canonical_id = str(market_data.get("canonicalInstrumentId") or instrument_id)
         side = "SELL" if str(entry_side).upper() == "SELL" else "BUY"
         feed_age_ms = float(market_data.get("feedAgeMs", 0.0))
-        cfg = _NAMED_STRATEGY_CONFIG.get(strategy_id.upper(), _DEFAULT_NAMED_CONFIG)
+        strat_key = strategy_id.upper()
+        cfg = _NAMED_STRATEGY_CONFIG.get(strat_key, _DEFAULT_NAMED_CONFIG)
 
         # Stale data protection
         if feed_age_ms > _STALE_THRESHOLD_MS:
@@ -116,14 +207,33 @@ class BotStrategyEngine:
             )
             return decision, None
 
-        # Update price history for EMA computation
-        history = self._update_price_history(instrument_id, ltp)
+        # Update price history and OHLC for indicators
+        high = float(market_data.get("high", market_data.get("dayHigh", 0.0)))
+        low = float(market_data.get("low", market_data.get("dayLow", 0.0)))
+        history = self._update_price_history(instrument_id, ltp, high=high, low=low)
 
         # EMA crossover
-        fast_period = int(cfg["ema_fast"])
-        slow_period = int(cfg["ema_slow"])
+        fast_period = int(cfg.get("ema_fast", 9))
+        slow_period = int(cfg.get("ema_slow", 21))
         ema_fast = self._calc_ema(history, fast_period)
         ema_slow = self._calc_ema(history, slow_period)
+
+        # Supertrend calculation
+        st_atr_period = int(cfg.get("supertrend_atr", 10))
+        st_multiplier = float(cfg.get("supertrend_mult", 3.0))
+        st_val, st_dir, st_changed, st_dist_pct = self._calc_supertrend(
+            instrument_id=instrument_id,
+            period=st_atr_period,
+            multiplier=st_multiplier,
+            ltp=ltp,
+        )
+
+        # Cache indicators for resolution
+        self.set_cached_indicator(instrument_id, "5m", "EMA_FAST", ema_fast)
+        self.set_cached_indicator(instrument_id, "5m", "EMA_SLOW", ema_slow)
+        self.set_cached_indicator(instrument_id, "5m", "SUPERTREND_VALUE", st_val)
+        self.set_cached_indicator(instrument_id, "5m", "SUPERTREND_DIR", 1.0 if st_dir == "BULLISH" else -1.0)
+        self.set_cached_indicator(instrument_id, "5m", "SUPERTREND_DISTANCE", st_dist_pct)
 
         # Momentum: bid/ask pressure
         bid = float(market_data.get("bid", ltp * 0.9995))
@@ -132,14 +242,25 @@ class BotStrategyEngine:
 
         trend_bullish = ema_fast > ema_slow and ltp >= ema_fast * 0.998
         trend_bearish = ema_fast < ema_slow and ltp <= ema_fast * 1.002
+        supertrend_bullish = (st_dir == "BULLISH")
+        supertrend_bearish = (st_dir == "BEARISH")
         momentum_bullish = (ltp - bid) < spread * 0.4
         momentum_bearish = (ask - ltp) < spread * 0.4
 
-        trend_weight = float(cfg["trend_weight"])
-        mom_weight = float(cfg["momentum_weight"])
+        trend_weight = float(cfg.get("trend_weight", 0.5))
+        st_weight = float(cfg.get("supertrend_weight", 0.3 if "SUPERTREND" in strat_key else 0.0))
+        mom_weight = float(cfg.get("momentum_weight", 0.3))
 
-        bull_score = (trend_weight if trend_bullish else 0.0) + (mom_weight if momentum_bullish else 0.0)
-        bear_score = (trend_weight if trend_bearish else 0.0) + (mom_weight if momentum_bearish else 0.0)
+        bull_score = (
+            (trend_weight if trend_bullish else 0.0)
+            + (st_weight if supertrend_bullish else 0.0)
+            + (mom_weight if momentum_bullish else 0.0)
+        )
+        bear_score = (
+            (trend_weight if trend_bearish else 0.0)
+            + (st_weight if supertrend_bearish else 0.0)
+            + (mom_weight if momentum_bearish else 0.0)
+        )
 
         # Dampen signals when history is too short for reliable EMA
         if len(history) < 3:
@@ -155,8 +276,7 @@ class BotStrategyEngine:
         else:
             regime = "FLAT"
 
-        THRESHOLD = 0.55
-        rules_evaluated = [
+        rules_evaluated: List[ExplainableDecisionRule] = [
             ExplainableDecisionRule(
                 rule_id="EMA_CROSSOVER",
                 description=f"EMA{fast_period} ({ema_fast:.4f}) vs EMA{slow_period} ({ema_slow:.4f})",
@@ -171,27 +291,59 @@ class BotStrategyEngine:
                 expected_value=f">= {ema_fast * 0.998:.4f}" if side == "BUY" else f"<= {ema_fast * 1.002:.4f}",
                 passed=trend_bullish if side == "BUY" else trend_bearish,
             ),
+        ]
+
+        if "SUPERTREND" in strat_key:
+            rules_evaluated.append(
+                ExplainableDecisionRule(
+                    rule_id="SUPERTREND_DIRECTION",
+                    description=f"Supertrend({st_atr_period},{st_multiplier:.1f}) Direction [{st_dir}] (value={st_val:.2f}, dist={st_dist_pct:+.2f}%)",
+                    input_value=st_dir,
+                    expected_value="BULLISH" if side == "BUY" else "BEARISH",
+                    passed=supertrend_bullish if side == "BUY" else supertrend_bearish,
+                )
+            )
+
+        rules_evaluated.append(
             ExplainableDecisionRule(
                 rule_id="MOMENTUM_PRESSURE",
                 description=f"Bid/Ask momentum (spread={spread:.4f})",
                 input_value=round(bid if side == "BUY" else ask, 4),
                 expected_value="bid-side pressure" if side == "BUY" else "ask-side pressure",
                 passed=momentum_bullish if side == "BUY" else momentum_bearish,
-            ),
-        ]
+            )
+        )
 
-        if side == "BUY":
-            final_score = bull_score
-            is_signal = bull_score >= THRESHOLD and trend_bullish
-            final_decision = "BUY" if is_signal else "NO_TRADE"
-            confidence = round(bull_score * 100, 1)
-            reason = f"Bull: EMA cross={'✓' if trend_bullish else '✗'}, momentum={'✓' if momentum_bullish else '✗'}"
+        THRESHOLD = 0.55
+        if strat_key == "EMA_SUPERTREND_CONFLUENCE":
+            # Strict confluence requirement: BOTH EMA crossover AND Supertrend direction must align
+            if side == "BUY":
+                confluence_pass = trend_bullish and supertrend_bullish
+                final_score = bull_score
+                is_signal = confluence_pass and bull_score >= THRESHOLD
+                final_decision = "BUY" if is_signal else "NO_TRADE"
+                confidence = round(bull_score * 100, 1)
+                reason = f"Bull Confluence: EMA={trend_bullish}, Supertrend={supertrend_bullish} [{st_dir}], Momentum={momentum_bullish}"
+            else:
+                confluence_pass = trend_bearish and supertrend_bearish
+                final_score = bear_score
+                is_signal = confluence_pass and bear_score >= THRESHOLD
+                final_decision = "SELL" if is_signal else "NO_TRADE"
+                confidence = round(bear_score * 100, 1)
+                reason = f"Bear Confluence: EMA={trend_bearish}, Supertrend={supertrend_bearish} [{st_dir}], Momentum={momentum_bearish}"
         else:
-            final_score = bear_score
-            is_signal = bear_score >= THRESHOLD and trend_bearish
-            final_decision = "SELL" if is_signal else "NO_TRADE"
-            confidence = round(bear_score * 100, 1)
-            reason = f"Bear: EMA cross={'✓' if trend_bearish else '✗'}, momentum={'✓' if momentum_bearish else '✗'}"
+            if side == "BUY":
+                final_score = bull_score
+                is_signal = bull_score >= THRESHOLD and trend_bullish
+                final_decision = "BUY" if is_signal else "NO_TRADE"
+                confidence = round(bull_score * 100, 1)
+                reason = f"Bull: EMA cross={'✓' if trend_bullish else '✗'}, momentum={'✓' if momentum_bullish else '✗'}"
+            else:
+                final_score = bear_score
+                is_signal = bear_score >= THRESHOLD and trend_bearish
+                final_decision = "SELL" if is_signal else "NO_TRADE"
+                confidence = round(bear_score * 100, 1)
+                reason = f"Bear: EMA cross={'✓' if trend_bearish else '✗'}, momentum={'✓' if momentum_bearish else '✗'}"
 
         summary = f"{strategy_id}: {reason} ({confidence:.0f}% confluence, regime={regime})"
 
@@ -361,10 +513,25 @@ class BotStrategyEngine:
             return float(market_data.get("bid", 0.0))
         if op in ("ASK", "BEST_ASK"):
             return float(market_data.get("ask", 0.0))
+        if op in ("HIGH", "DAY_HIGH"):
+            return float(market_data.get("high", market_data.get("dayHigh", 0.0)))
+        if op in ("LOW", "DAY_LOW"):
+            return float(market_data.get("low", market_data.get("dayLow", 0.0)))
         if op in ("VOLUME", "VOL"):
             return float(market_data.get("volume", 0.0))
         if op in ("OI", "OPEN_INTEREST"):
             return float(market_data.get("oi", 0.0))
+        if op in ("IV", "IMPLIED_VOLATILITY"):
+            return float(market_data.get("iv", 0.0))
+        if op in ("DELTA", "OPTION_DELTA"):
+            return float(market_data.get("delta", 0.0))
+        if op in ("GAMMA", "OPTION_GAMMA"):
+            return float(market_data.get("gamma", 0.0))
+        if op in ("THETA", "OPTION_THETA"):
+            return float(market_data.get("theta", 0.0))
+        if op in ("VEGA", "OPTION_VEGA"):
+            return float(market_data.get("vega", 0.0))
+
         if order_flow:
             if op in ("SPREAD", "SPREAD_BPS"):
                 return float(order_flow.get("spreadBps", 0.0))
@@ -374,10 +541,24 @@ class BotStrategyEngine:
                 return float(order_flow.get("cumulativeBidDepth", 0.0))
             if op in ("CUMULATIVE_ASK", "ASK_DEPTH"):
                 return float(order_flow.get("cumulativeAskDepth", 0.0))
+
         inst = str(market_data.get("instrumentId", ""))
         cached = self.get_cached_indicator(inst, timeframe, operand)
         if cached is not None:
             return cached
+
+        # Supertrend dynamic query
+        if "SUPERTREND" in op:
+            st_val, st_dir, _, st_dist = self._calc_supertrend(
+                instrument_id=inst,
+                ltp=float(market_data.get("ltp", 0.0)),
+            )
+            if "DIR" in op or "DIRECTION" in op:
+                return 1.0 if st_dir == "BULLISH" else -1.0
+            if "DIST" in op or "DISTANCE" in op:
+                return st_dist
+            return st_val
+
         # Compatibility fallback until the indicator pipeline populates the cache.
         if "EMA" in op or "SMA" in op:
             return float(market_data.get("ltp", 0.0)) * 0.998

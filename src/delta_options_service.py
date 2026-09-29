@@ -285,8 +285,9 @@ class DeltaOptionsService:
         # 3. Upsert Contracts
         saved_contracts = db.upsert_delta_contracts(normalized_contracts)
 
-        # 4. Clean up expired contracts
+        # 4. Clean up expired contracts and purge expired data
         db.archive_expired_delta_contracts()
+        db.purge_all_expired_records()
 
         elapsed_ms = (time.time() - start_ts) * 1000.0
         self._last_catalogue_sync_time = time.time()

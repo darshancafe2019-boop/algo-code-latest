@@ -1594,14 +1594,15 @@ class UpstoxService:
                     "message": f"Could not resolve Upstox instrument key for underlying '{underlying}'."
                 }
 
-        # Fetch available expiries if not provided
-        avail_exp = self.get_option_expiries(underlying)
-        target_expiry = expiry if (expiry and (not avail_exp or expiry in avail_exp)) else (avail_exp[0] if avail_exp else None)
-
+        target_expiry = expiry
         if not target_expiry:
-            return {"status": "error", "error": "NO_EXPIRIES", "message": f"No active expiries found for {underlying} on Upstox"}
+            avail_exp = self.get_option_expiries(underlying)
+            if avail_exp:
+                target_expiry = avail_exp[0]
 
-        params = {"instrument_key": instrument_key, "expiry_date": target_expiry}
+        params = {"instrument_key": instrument_key}
+        if target_expiry:
+            params["expiry_date"] = target_expiry
 
         try:
             res = self._make_request("option/chain", params=params, api_version="v2")

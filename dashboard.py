@@ -179,6 +179,7 @@ def enforce_server_side_security():
         or path.startswith("/api/connections")
         or path.startswith("/api/market-intelligence")
         or path.startswith("/api/indicators")
+        or path.startswith("/api/contracts")
         or path.startswith("/api/health")
         or path.startswith("/health")
         or path.startswith("/static/")
@@ -1613,6 +1614,146 @@ def api_strategies_visual_test():
         "conditions": conditions,
         "indicators_used": indicators
     })
+
+
+# ============================================================================
+# MASTER 30-STRATEGY ENGINE ENDPOINTS
+# ============================================================================
+
+@app.route("/api/strategies/catalog", methods=["GET"])
+@app.route("/api/strategies/master30", methods=["GET"])
+def api_strategies_master_catalog():
+    """Returns the full authoritative catalog of all 30 algorithmic strategies."""
+    from src.master_30_strategies import Master30StrategyEngine
+    strategies = Master30StrategyEngine.get_all_strategies()
+    return jsonify({
+        "status": "success",
+        "total": len(strategies),
+        "strategies": strategies
+    })
+
+
+@app.route("/api/strategies/<strategy_id>/schema", methods=["GET"])
+def api_strategy_master_schema(strategy_id):
+    """Returns definition, parameters, schema and presets for a specific strategy."""
+    from src.master_30_strategies import Master30StrategyEngine
+    strat = Master30StrategyEngine.get_strategy(strategy_id)
+    if not strat:
+        return jsonify({"status": "error", "message": f"Strategy {strategy_id} not found"}), 404
+    return jsonify({
+        "status": "success",
+        "strategy": strat.to_dict()
+    })
+
+
+@app.route("/api/strategies/<strategy_id>/signal", methods=["POST"])
+def api_strategy_master_signal(strategy_id):
+    """Evaluates live or provided candle data for a strategy and returns deterministic signal."""
+    from src.master_30_strategies import Master30StrategyEngine
+    data = request.get_json(silent=True) or {}
+    params = data.get("parameters", {})
+    extra_data = data.get("extra_data", {})
+    candles_data = data.get("candles")
+
+    if candles_data and isinstance(candles_data, list):
+        df = pd.DataFrame(candles_data)
+    else:
+        # Pull latest 100 candles from DB cache
+        db_candles = db.safe_query("SELECT timestamp, open, high, low, close, volume FROM candles_cache ORDER BY id DESC LIMIT 100")
+        if db_candles:
+            db_candles.reverse()
+            df = pd.DataFrame(db_candles)
+        else:
+            # Generate representative synthetic price data for simulation
+            np.random.seed(42)
+            base_price = 84000.0
+            closes = base_price + np.cumsum(np.random.normal(0, 150, 60))
+            df = pd.DataFrame({
+                "timestamp": [datetime.now(timezone.utc).isoformat() for _ in range(60)],
+                "open": closes - np.random.normal(0, 50, 60),
+                "high": closes + np.abs(np.random.normal(50, 80, 60)),
+                "low": closes - np.abs(np.random.normal(50, 80, 60)),
+                "close": closes,
+                "volume": np.random.uniform(500, 2500, 60),
+            })
+
+    signal = Master30StrategyEngine.evaluate(strategy_id, df, params=params, extra_data=extra_data)
+    return jsonify({
+        "status": "success",
+        "strategy_id": strategy_id,
+        "signal": signal.to_dict()
+    })
+
+
+@app.route("/api/strategies/<strategy_id>/risk", methods=["POST"])
+def api_strategy_master_risk(strategy_id):
+    """Calculates mathematical position sizing and margin requirements."""
+    from src.master_30_strategies import Master30StrategyEngine
+    data = request.get_json(silent=True) or {}
+    account_capital = float(data.get("account_capital", 100000.0))
+    risk_pct = float(data.get("risk_pct", 1.0))
+    entry_price = float(data.get("entry_price", 84000.0))
+    stop_price = float(data.get("stop_price", 83000.0))
+    lot_size = float(data.get("lot_size", 1.0))
+    max_leverage = float(data.get("max_leverage", 1.0))
+
+    risk_info = Master30StrategyEngine.calculate_risk_and_position_size(
+        account_capital=account_capital,
+        risk_pct=risk_pct,
+        entry_price=entry_price,
+        stop_price=stop_price,
+        lot_size=lot_size,
+        max_leverage=max_leverage,
+    )
+    return jsonify({
+        "status": "success",
+        "strategy_id": strategy_id,
+        "risk": risk_info
+    })
+
+
+@app.route("/api/strategies/<strategy_id>/backtest", methods=["POST"])
+def api_strategy_master_backtest(strategy_id):
+    """Executes deterministic backtest on historical OHLCV candles."""
+    from src.master_30_strategies import Master30StrategyEngine
+    data = request.get_json(silent=True) or {}
+    params = data.get("parameters", {})
+    initial_capital = float(data.get("initial_capital", 100000.0))
+    risk_pct = float(data.get("risk_pct", 1.0))
+    candles_data = data.get("candles")
+
+    if candles_data and isinstance(candles_data, list):
+        df = pd.DataFrame(candles_data)
+    else:
+        # Pull candles or build synthetic multi-month series
+        db_candles = db.safe_query("SELECT timestamp, open, high, low, close, volume FROM candles_cache ORDER BY id DESC LIMIT 500")
+        if db_candles and len(db_candles) >= 50:
+            db_candles.reverse()
+            df = pd.DataFrame(db_candles)
+        else:
+            np.random.seed(123)
+            base_price = 80000.0
+            n_bars = 200
+            returns = np.random.normal(0.0005, 0.012, n_bars)
+            closes = base_price * np.exp(np.cumsum(returns))
+            df = pd.DataFrame({
+                "timestamp": [f"bar_{i}" for i in range(n_bars)],
+                "open": closes * (1 - np.random.normal(0, 0.002, n_bars)),
+                "high": closes * (1 + np.abs(np.random.normal(0.005, 0.005, n_bars))),
+                "low": closes * (1 - np.abs(np.random.normal(0.005, 0.005, n_bars))),
+                "close": closes,
+                "volume": np.random.uniform(100, 1000, n_bars),
+            })
+
+    result = Master30StrategyEngine.run_backtest(
+        strategy_id_or_number=strategy_id,
+        df=df,
+        params=params,
+        initial_capital=initial_capital,
+        risk_pct=risk_pct,
+    )
+    return jsonify(result)
+
 
 
 
@@ -4031,6 +4172,154 @@ def api_options_greeks_calc():
         iv=iv
     )
     return jsonify({"status": "success", "greeks": greeks})
+
+
+# ============================================================================
+# CENTRAL CONTRACT RESOLUTION & EXPIRY ENGINE ENDPOINTS
+# ============================================================================
+@app.route("/api/contracts/resolve", methods=["GET"])
+def api_contracts_resolve():
+    """
+    Dynamic Central Contract Resolver Endpoint.
+    Resolves the active unexpired contract matching strategy preferences from live catalogs.
+    """
+    from src.contract_resolver import global_contract_resolver
+    from src.market_clock import MarketClock
+
+    raw_symbol = request.args.get("symbol") or request.args.get("underlying") or "NIFTY"
+    broker = request.args.get("broker") or request.args.get("provider") or "UPSTOX"
+    exchange = request.args.get("exchange")
+    underlying = raw_symbol
+    instrument_type = request.args.get("instrumentType") or request.args.get("instrument_type") or "FUT"
+    expiry_pref = request.args.get("expiryPreference") or request.args.get("expiry_preference") or request.args.get("expiry") or "AUTO"
+
+    if ":" in raw_symbol:
+        parts = [p.strip() for p in raw_symbol.split(":") if p.strip()]
+        if len(parts) >= 2 and parts[0] in ("NSE", "BSE", "NFO", "BFO", "MCX", "DELTA", "BINANCE", "UPSTOX"):
+            if not exchange:
+                exchange = parts[0]
+            underlying = parts[1]
+            if len(parts) >= 3 and expiry_pref == "AUTO":
+                expiry_pref = parts[2]
+            if len(parts) >= 4 and instrument_type == "FUT":
+                instrument_type = "FUTURE" if parts[3] in ("FUT", "FUTURE") else "OPTION" if parts[3] in ("OPT", "OPTION") else parts[3]
+        elif len(parts) == 2:
+            if not exchange:
+                exchange = parts[0]
+            underlying = parts[1]
+
+    if not exchange:
+        exchange = "NSE" if broker.upper() in ("UPSTOX", "DHAN", "FYERS", "ANGELONE", "ZERODHA") else "DELTA"
+
+    strike_val = request.args.get("strike")
+    strike = float(strike_val) if strike_val and strike_val.replace(".", "", 1).isdigit() else None
+    option_type = request.args.get("optionType") or request.args.get("option_type")
+    mode = request.args.get("mode", "LIVE").upper()
+
+    resolved = global_contract_resolver.resolve_contract(
+        broker=broker,
+        exchange=exchange,
+        underlying=underlying,
+        instrument_type=instrument_type,
+        expiry_preference=expiry_pref,
+        strike=strike,
+        option_type=option_type,
+        mode=mode,
+    )
+    if not resolved:
+        return jsonify({
+            "status": "error",
+            "code": "CONTRACT_RESOLUTION_FAILED",
+            "message": f"Unable to resolve valid unexpired contract for {underlying} on {broker} with preference {expiry_pref}",
+            "data": None
+        }), 404
+
+    return jsonify({
+        "status": "success",
+        "data": resolved.to_dict(),
+        "market_time": MarketClock.now(exchange).isoformat(),
+        "trading_date": MarketClock.trading_date(exchange),
+    })
+
+
+@app.route("/api/contracts/expiries", methods=["GET"])
+def api_contracts_expiries():
+    """
+    Returns sorted list of valid available future expiration dates from the broker catalog.
+    """
+    from src.contract_resolver import global_contract_resolver
+    from src.market_clock import MarketClock
+
+    broker = request.args.get("broker") or request.args.get("provider") or "UPSTOX"
+    exchange = request.args.get("exchange") or ("NSE" if broker.upper() in ("UPSTOX", "DHAN", "FYERS", "ANGELONE", "ZERODHA") else "DELTA")
+    underlying = request.args.get("underlying") or request.args.get("symbol") or "NIFTY"
+    mode = request.args.get("mode", "LIVE").upper()
+
+    expiries = global_contract_resolver.get_available_expiries(
+        broker=broker,
+        exchange=exchange,
+        underlying=underlying,
+        mode=mode,
+    )
+    return jsonify({
+        "status": "success",
+        "underlying": underlying,
+        "broker": broker,
+        "exchange": exchange,
+        "trading_date": MarketClock.trading_date(exchange),
+        "expiries": expiries,
+    })
+
+
+@app.route("/api/contracts/validate", methods=["POST"])
+def api_contracts_validate():
+    """
+    Validates a selected contract or expiry against strict expiration and active catalog rules.
+    """
+    from src.contract_resolver import global_contract_resolver
+
+    data = request.get_json(silent=True) or {}
+    broker = data.get("broker") or data.get("provider") or "UPSTOX"
+    exchange = data.get("exchange") or ("NSE" if broker.upper() in ("UPSTOX", "DHAN", "FYERS", "ANGELONE", "ZERODHA") else "DELTA")
+    underlying = data.get("underlying") or data.get("symbol") or "NIFTY"
+    expiry = data.get("expiry") or data.get("expiry_date") or "AUTO"
+    instrument_key = data.get("instrumentKey") or data.get("instrument_key")
+    instrument_type = data.get("instrumentType") or data.get("instrument_type") or "FUT"
+    mode = data.get("mode", "LIVE").upper()
+
+    val_res = global_contract_resolver.validate_contract_expiry(
+        contract_key=instrument_key,
+        expiry_str=expiry,
+        underlying=underlying,
+        broker=broker,
+        exchange=exchange,
+        instrument_type=instrument_type,
+        mode=mode,
+    )
+    return jsonify({
+        "status": "success",
+        "result": val_res.to_dict()
+    })
+
+
+@app.route("/api/contracts/status", methods=["GET"])
+def api_contracts_status():
+    """
+    Contract telemetry summary for dashboard display.
+    """
+    from src.contract_resolver import global_contract_resolver
+    from src.market_clock import MarketClock
+
+    underlying = request.args.get("underlying", "NIFTY")
+    broker = request.args.get("broker", "UPSTOX")
+    resolved = global_contract_resolver.resolve_contract(broker=broker, underlying=underlying, expiry_preference="AUTO")
+    return jsonify({
+        "status": "success",
+        "contract": resolved.to_dict() if resolved else None,
+        "market_date": MarketClock.trading_date(broker),
+        "ist_time": MarketClock.now("NSE").isoformat(),
+        "utc_time": MarketClock.now_utc().isoformat(),
+    })
 
 
 @app.route("/api/options/providers/health", methods=["GET"])

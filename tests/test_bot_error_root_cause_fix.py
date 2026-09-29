@@ -95,7 +95,7 @@ def test_04_bot_lifecycle_start_heartbeat_stop_restart():
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
-            bot_id, "Test ETH Options Lifecycle Bot", "ETH-260925-3500-C", "CRYPTO_OPTIONS",
+            bot_id, "Test ETH Options Lifecycle Bot", "ETH-261225-3500-C", "CRYPTO_OPTIONS",
             "5m", "OPTIONS", "PAPER", 10000.0, "STOPPED", "", now_str, now_str
         )
     )

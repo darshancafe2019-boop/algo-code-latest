@@ -72,14 +72,14 @@ class TestOptionsContractResolution:
         monkeypatch.delenv("UPSTOX_API_KEY", raising=False)
         monkeypatch.delenv("BINANCE_API_KEY", raising=False)
 
-        res = global_instrument_resolver.resolve("BTC-260925-70000-C", provider="deribit_options")
+        res = global_instrument_resolver.resolve("BTC-261030-70000-C", provider="deribit_options")
         assert not res.is_valid
         assert res.error_code == "OPTIONS_PROVIDER_NOT_CONFIGURED"
         assert "not configured" in res.reason.lower()
 
     def test_valid_binance_btc_option_resolution(self):
         """5. Verify resolution of a valid, future-dated BTC Call option."""
-        res = global_instrument_resolver.resolve("BTC-260925-70000-C")
+        res = global_instrument_resolver.resolve("BTC-261030-70000-C")
         assert res.is_valid
         assert res.status == ResolutionStatus.RESOLVED
         assert res.error_code == "SUCCESS"
@@ -88,7 +88,7 @@ class TestOptionsContractResolution:
         assert inst.base_asset == "BTC"
         assert inst.strike == 70000.0
         assert inst.option_type == "CALL"
-        assert inst.expiry == "2026-09-25"
+        assert inst.expiry == "2026-10-30"
         assert inst.tradable is True
 
     def test_valid_nse_nifty_option_resolution(self):
@@ -137,7 +137,7 @@ class TestOptionsContractResolution:
         """8. Verify BotProcessManager pre-flight passes with a real dated strike contract."""
         bot_id = "test-good-opt-bot-1"
         now_iso = datetime.now(timezone.utc).isoformat()
-        valid_contract = "BTC-260925-70000-C"
+        valid_contract = "BTC-261030-70000-C"
 
         db.safe_execute(
             """
@@ -156,3 +156,4 @@ class TestOptionsContractResolution:
 
         # Cleanup
         db.safe_execute("DELETE FROM bot_instances WHERE id = ?", (bot_id,))
+

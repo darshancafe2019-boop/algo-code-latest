@@ -51,6 +51,7 @@ class ExpiryMode(str, Enum):
     MONTHLY_NEXT = "MONTHLY_NEXT"
     CALENDAR_DUAL = "CALENDAR_DUAL"  # Near + Far
     SPECIFIC_DATE = "SPECIFIC_DATE"
+    PERPETUAL = "PERPETUAL"
 
 
 @dataclass
@@ -524,6 +525,54 @@ class StrategyInstrumentResolver:
             "default_provider": "UPSTOX",
             "short_delta": 0.15,
             "wing_width_steps": 2,
+        },
+        # 25. EMA + Supertrend Confluence (BTC Option)
+        "options-strat-25": {
+            "name": "EMA + Supertrend Confluence (BTC Call)",
+            "instrument_class": InstrumentClass.OPTION_SINGLE,
+            "leg_template": "SINGLE_CALL",
+            "expiry_mode": ExpiryMode.WEEKLY_NEAR,
+            "default_underlying": "BTC",
+            "default_provider": "DELTA",
+            "delta_target": 0.50,
+        },
+        "EMA_SUPERTREND_CONFLUENCE": {
+            "name": "EMA + Supertrend Confluence",
+            "instrument_class": InstrumentClass.OPTION_SINGLE,
+            "leg_template": "SINGLE_CALL",
+            "expiry_mode": ExpiryMode.WEEKLY_NEAR,
+            "default_underlying": "BTC",
+            "default_provider": "DELTA",
+            "delta_target": 0.50,
+        },
+        # 26. BTC Call Option Buy
+        "options-strat-26": {
+            "name": "BTC Call Option Trend Buyer",
+            "instrument_class": InstrumentClass.OPTION_SINGLE,
+            "leg_template": "SINGLE_CALL",
+            "expiry_mode": ExpiryMode.WEEKLY_NEAR,
+            "default_underlying": "BTC",
+            "default_provider": "DELTA",
+            "delta_target": 0.50,
+        },
+        # 27. BTC Put Option Buy
+        "options-strat-27": {
+            "name": "BTC Put Option Crash Hedge",
+            "instrument_class": InstrumentClass.OPTION_SINGLE,
+            "leg_template": "SINGLE_PUT",
+            "expiry_mode": ExpiryMode.WEEKLY_NEAR,
+            "default_underlying": "BTC",
+            "default_provider": "DELTA",
+            "delta_target": 0.50,
+        },
+        # 28. Futures Long Momentum
+        "futures-strat-01": {
+            "name": "BTC Perpetual Futures Momentum",
+            "instrument_class": InstrumentClass.FUTURE,
+            "leg_template": "FUTURES_LONG",
+            "expiry_mode": ExpiryMode.PERPETUAL,
+            "default_underlying": "BTC",
+            "default_provider": "DELTA",
         },
     }
 

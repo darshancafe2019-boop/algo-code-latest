@@ -296,12 +296,12 @@ class BotDeploymentItem:
     currency: str = "INR"
 
     # Universe
-    canonical_instrument_id: str = "NSE:NIFTY26MARFUT"
+    canonical_instrument_id: str = "NSE:NIFTY:AUTO:FUT"
     provider_instrument_id: str = ""
     display_symbol: str = "NIFTY FUT"
     asset_class: str = "FUTURES"
-    underlying_symbol: str = ""
-    expiry: str = ""
+    underlying_symbol: str = "NIFTY"
+    expiry: str = "AUTO"
     strike: float = 0.0
     option_type: str = ""
     entry_side: str = "BUY"
@@ -598,7 +598,7 @@ class BotDeploymentSpec:
     strategy_type: str = "BULL_CALL_SPREAD"  # 'BULL_CALL_SPREAD', 'BEAR_PUT_SPREAD', 'IRON_CONDOR', 'STRADDLE', etc.
     underlying_canonical_id: str = "NSE:NIFTY50"
     underlying_symbol: str = "NIFTY"
-    expiry: str = "2026-03-27"
+    expiry: str = "AUTO"
     legs: List[StrategyLegItem] = field(default_factory=list)
     market_data_provider: str = "UPSTOX"
     fallback_market_data_provider: Optional[str] = None
@@ -627,7 +627,7 @@ class BotDeploymentSpec:
             "botVersion": self.bot_version,
             "botName": self.bot_name,
             "description": self.description,
-            "environment": self.environment.value,
+            "environment": self.environment.value if hasattr(self.environment, "value") else str(self.environment),
             "strategyType": self.strategy_type,
             "underlyingCanonicalId": self.underlying_canonical_id,
             "underlyingSymbol": self.underlying_symbol,

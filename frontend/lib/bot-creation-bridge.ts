@@ -37,6 +37,24 @@ export function openBotCreator(
     broker: context.broker || "PAPER",
     marketDataSource: context.marketDataSource || context.broker || "UPSTOX",
 
+    // Preserve the user's original selection separately from mutable live market state.
+    selectedPremium: context.selectedPremium ?? ltp ?? null,
+    selectedBid: context.selectedBid ?? context.bid ?? null,
+    selectedAsk: context.selectedAsk ?? context.ask ?? null,
+    selectedMark: context.selectedMark ?? context.markPrice ?? null,
+    selectedAt: context.selectedAt ?? Date.now(),
+    selectionMode:
+      context.selectionMode ??
+      (context.canonicalContractId && context.expiry && context.strike != null && context.optionType
+        ? "EXACT_CONTRACT"
+        : "TARGET_PREMIUM"),
+    targetPremium: context.targetPremium ?? null,
+    premiumTolerance: context.premiumTolerance ?? null,
+    contractLocked:
+      context.contractLocked ??
+      Boolean(context.canonicalContractId && context.expiry && context.strike != null && context.optionType),
+
+    // Dispatch-time quote only. The wizard/runtime must refresh this from MarketGateway.
     currentPrice: ltp,
     ltp: ltp,
     bid: context.bid ?? null,
@@ -80,6 +98,8 @@ export function openBotCreator(
     mode: context.mode || "new",
     creationIntentId: context.creationIntentId || `intent_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     uiDispatchTimestamp: Date.now(),
+    quoteTimestamp: context.quoteTimestamp ?? context.timestamp ?? Date.now(),
+    underlyingCanonicalId: context.underlyingCanonicalId ?? null,
     timestamp: Date.now(),
   };
 
@@ -100,6 +120,9 @@ export function openBotCreator(
   if (fullIntent.optionType) queryParams.set("optionType", fullIntent.optionType);
   if (fullIntent.exchange) queryParams.set("exchange", fullIntent.exchange);
   if (fullIntent.securityId) queryParams.set("securityId", fullIntent.securityId);
+  if (fullIntent.selectedPremium != null) queryParams.set("selectedPremium", String(fullIntent.selectedPremium));
+  if (fullIntent.selectionMode) queryParams.set("selectionMode", fullIntent.selectionMode);
+  if (fullIntent.contractLocked != null) queryParams.set("contractLocked", String(fullIntent.contractLocked));
   if (fullIntent.ltp != null) queryParams.set("ltp", String(fullIntent.ltp));
   if (fullIntent.bid != null) queryParams.set("bid", String(fullIntent.bid));
   if (fullIntent.ask != null) queryParams.set("ask", String(fullIntent.ask));

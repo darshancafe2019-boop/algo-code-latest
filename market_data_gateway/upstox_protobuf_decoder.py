@@ -172,14 +172,15 @@ _f_ts = _msg_resp.field.add(); _f_ts.name = "currentTs"; _f_ts.number = 3; _f_ts
 
 _pool = descriptor_pool.DescriptorPool()
 _file_desc = _pool.Add(_file_proto)
+assert _file_desc is not None, "Failed to build Protobuf FileDescriptor"
 
 # Generated Message Classes
-FeedResponse = message_factory.GetMessageClass(_file_desc.message_types_by_name["FeedResponse"])
-Feed = message_factory.GetMessageClass(_file_desc.message_types_by_name["Feed"])
-LTPC = message_factory.GetMessageClass(_file_desc.message_types_by_name["LTPC"])
-FullFeed = message_factory.GetMessageClass(_file_desc.message_types_by_name["FullFeed"])
-MarketFullFeed = message_factory.GetMessageClass(_file_desc.message_types_by_name["MarketFullFeed"])
-IndexFullFeed = message_factory.GetMessageClass(_file_desc.message_types_by_name["IndexFullFeed"])
+FeedResponse: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["FeedResponse"])
+Feed: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["Feed"])
+LTPC: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["LTPC"])
+FullFeed: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["FullFeed"])
+MarketFullFeed: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["MarketFullFeed"])
+IndexFullFeed: Any = message_factory.GetMessageClass(_file_desc.message_types_by_name["IndexFullFeed"])
 
 
 def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
@@ -207,7 +208,7 @@ def decode_market_data_feed(binary_data: bytes) -> Optional[Dict[str, Any]]:
     }
     """
 # Decoder Metrics Tracking
-_decoder_metrics = {
+_decoder_metrics: Dict[str, Any] = {
     "decode_success": 0,
     "decode_errors": 0,
     "total_bytes_processed": 0,

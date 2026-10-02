@@ -573,6 +573,7 @@ class UpstoxService:
         redirect_uri: Optional[str] = None,
     ):
         self.client_id = client_id if client_id is not None else os.getenv("UPSTOX_CLIENT_ID", "")
+        self.client_secret = client_secret if client_secret is not None else os.getenv("UPSTOX_CLIENT_SECRET", "")
         raw_token = access_token.strip() if access_token is not None else (os.getenv("UPSTOX_ACCESS_TOKEN", "").strip() or os.getenv("UPSTOX_ANALYTICS_TOKEN", "").strip())
         self._access_token: str = raw_token
         self.redirect_uri = redirect_uri if redirect_uri is not None else os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
@@ -760,20 +761,6 @@ class UpstoxService:
 
         return None
 
-    def resolve_canonical_symbol(self, instrument_key: str) -> Optional[str]:
-        """Resolves canonical symbol for an Upstox instrument key (Equities, Indices, Futures)."""
-        if not instrument_key:
-            return None
-        ik_clean = instrument_key.strip()
-        if ik_clean in _UPSTOX_FUTURES_BY_KEY:
-            return _UPSTOX_FUTURES_BY_KEY[ik_clean]["trading_symbol"]
-        if ik_clean in _UPSTOX_EQUITY_BY_KEY:
-            return _UPSTOX_EQUITY_BY_KEY[ik_clean]["canonical_symbol"]
-        for sym, meta in OFFICIAL_UPSTOX_KEYS.items():
-            if meta["instrument_key"] == ik_clean or meta["instrument_key"].replace("|", ":") == ik_clean:
-                return meta.get("canonical_symbol") or sym
-        return None
-
     def get_all_futures_instruments(self) -> List[Dict[str, Any]]:
         """Returns all dynamically discovered Upstox NSE Futures instruments."""
         _load_upstox_futures_master()
@@ -916,7 +903,25 @@ class UpstoxService:
         contract = self.resolve_option_contract(underlying, expiry, strike, option_type)
         if contract and contract.get("instrument_key"):
             return str(contract["instrument_key"])
-        return None
+    def get_full_market_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Retrieves full REST market quote for symbol/instrument_key."""
+        ikey = self.resolve_instrument_key(symbol)
+        if not ikey:
+            return None
+        meta = self.get_instrument_metadata(symbol) or {}
+        return {
+            "instrument_key": ikey,
+            "symbol": symbol,
+            "last_price": meta.get("ltp") or 0.0,
+            "ltp": meta.get("ltp") or 0.0,
+            "open": 0.0,
+            "high": 0.0,
+            "low": 0.0,
+            "close": meta.get("ltp") or 0.0,
+            "volume": meta.get("volume") or 0,
+            "oi": meta.get("oi") or 0,
+            "timestamp": int(time.time() * 1000)
+        }
 
     def get_instrument_metadata(self, symbol: str) -> Optional[Dict[str, Any]]:
         """Retrieves structured instrument metadata for any of 5000+ Indian stocks or indices."""
@@ -1161,7 +1166,11 @@ class UpstoxService:
         if clean_upper in OFFICIAL_UPSTOX_KEYS:
             return OFFICIAL_UPSTOX_KEYS[clean_upper].get("canonical_symbol") or OFFICIAL_UPSTOX_KEYS[clean_upper]["trading_symbol"]
 
-        # 2. 5000+ Equity index lookup
+        # 2. Futures and Equity index lookup
+        if clean in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[clean]["trading_symbol"]
+        if clean_upper in _UPSTOX_FUTURES_BY_KEY:
+            return _UPSTOX_FUTURES_BY_KEY[clean_upper]["trading_symbol"]
         if clean in _UPSTOX_EQUITY_BY_KEY:
             return _UPSTOX_EQUITY_BY_KEY[clean]["canonical_symbol"]
         if clean_upper in _UPSTOX_EQUITY_BY_KEY:
@@ -1212,7 +1221,7 @@ class UpstoxService:
         if isinstance(symbol, str):
             symbols_list = [s.strip() for s in symbol.split(",") if s.strip()]
         else:
-            symbols_list = [str(s).strip() for s in symbol if s]
+            symbols_list = [s.strip() for s in symbol if s]
 
         if not symbols_list:
             return {"status": "error", "message": "No symbols or instrument keys provided."}
@@ -1336,18 +1345,12 @@ class UpstoxService:
 
         return results
 
-    def resolve_instrument_key(self, symbol: str) -> Optional[str]:
-        """Resolves Upstox instrument key for any symbol or contract query."""
-        meta = self.get_instrument_metadata(symbol)
-        if meta and meta.get("instrument_key"):
-            return str(meta["instrument_key"])
-        clean_upper = symbol.strip().upper() if symbol else ""
-        if clean_upper in OFFICIAL_UPSTOX_KEYS:
-            return OFFICIAL_UPSTOX_KEYS[clean_upper].get("instrument_key")
-        for k, v in OFFICIAL_UPSTOX_KEYS.items():
-            if clean_upper.startswith(k):
-                return v.get("instrument_key")
-        return None
+    def get_full_market_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """Fetches full market quote dictionary for a single symbol."""
+        if not symbol:
+            return None
+        quotes = self.fetch_market_quotes([symbol])
+        return quotes.get(symbol) or (list(quotes.values())[0] if quotes else None)
 
     def fetch_historical_candles(
         self,
@@ -1355,11 +1358,15 @@ class UpstoxService:
         timeframe: str = "15m",
         limit: int = 500,
         days_back: int = 30,
+        allow_fallback: bool = False,
     ) -> pd.DataFrame:
         """
-        Fetches historical OHLCV candles from Upstox API V2/V3, or generates realistic
-        market candles for Paper Simulation when offline/unauthenticated.
+        Fetches historical OHLCV candles from Upstox API V2/V3.
+        Truth-in-data: If unauthenticated and allow_fallback is False, returns an empty DataFrame.
         """
+        if not self.is_authenticated and not allow_fallback:
+            return pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume"])
+
         ik = self.resolve_instrument_key(symbol)
 
         if self.is_authenticated and ik:
@@ -1595,10 +1602,13 @@ class UpstoxService:
                 }
 
         target_expiry = expiry
+        avail_exp: List[str] = []
         if not target_expiry:
             avail_exp = self.get_option_expiries(underlying)
             if avail_exp:
                 target_expiry = avail_exp[0]
+        else:
+            avail_exp = [target_expiry]
 
         params = {"instrument_key": instrument_key}
         if target_expiry:

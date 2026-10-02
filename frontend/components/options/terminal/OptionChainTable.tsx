@@ -1122,7 +1122,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isCallTradable ? "Direct Order: BUY CALL" : "Quote unavailable for trading"}
+                            title={isCallTradable ? "Create BUY Bot for CALL" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
@@ -1143,7 +1143,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isCallTradable ? "Direct Order: SELL CALL" : "Quote unavailable for trading"}
+                            title={isCallTradable ? "Create SELL Bot for CALL" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>
@@ -1285,7 +1285,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-emerald-600 hover:bg-emerald-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-emerald-950/40 text-emerald-600/60 border border-emerald-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isPutTradable ? "Direct Order: BUY PUT" : "Quote unavailable for trading"}
+                            title={isPutTradable ? "Create BUY Bot for PUT" : "Quote unavailable for trading"}
                           >
                             BUY
                           </button>
@@ -1306,7 +1306,7 @@ export const OptionChainTable: React.FC<OptionChainTableProps> = ({
                                 ? "bg-rose-600 hover:bg-rose-500 text-white active:scale-95 cursor-pointer"
                                 : "bg-rose-950/40 text-rose-600/60 border border-rose-900/30 cursor-not-allowed opacity-50"
                             }`}
-                            title={isPutTradable ? "Direct Order: SELL PUT" : "Quote unavailable for trading"}
+                            title={isPutTradable ? "Create SELL Bot for PUT" : "Quote unavailable for trading"}
                           >
                             SELL
                           </button>

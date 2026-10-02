@@ -1,5 +1,3 @@
-"use client";
-
 import { formatNumber } from "@/lib/formatters";
 import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";

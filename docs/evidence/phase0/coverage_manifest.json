@@ -1,0 +1,93 @@
+[
+  {
+    "directory": ".",
+    "total_tracked_files": 70,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "app",
+    "total_tracked_files": 10,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "docs",
+    "total_tracked_files": 10,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "frontend",
+    "total_tracked_files": 1192,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "market_data",
+    "total_tracked_files": 50,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "market_data_gateway",
+    "total_tracked_files": 47,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "scratch",
+    "total_tracked_files": 5,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "scripts",
+    "total_tracked_files": 79,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "src",
+    "total_tracked_files": 188,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "static",
+    "total_tracked_files": 4,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "templates",
+    "total_tracked_files": 1,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "tests",
+    "total_tracked_files": 167,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  },
+  {
+    "directory": "trading_orchestrator",
+    "total_tracked_files": 22,
+    "inspected": "YES",
+    "skipped": "NO",
+    "reason": "Audited via full-repository grep & syntax parse"
+  }
+]

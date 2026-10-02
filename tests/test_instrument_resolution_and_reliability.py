@@ -81,7 +81,7 @@ class TestCanonicalInstrumentResolution:
 
     def test_05_options_contract_resolution(self):
         """Verify formatted dated option contract resolves with strike and call/put."""
-        res = global_instrument_resolver.resolve("BTC-281225-70000-C")
+        res = global_instrument_resolver.resolve("BTC-281226-70000-C")
         assert res.is_valid is True
         assert res.instrument is not None
         assert res.instrument.instrument_type == InstrumentType.OPTION

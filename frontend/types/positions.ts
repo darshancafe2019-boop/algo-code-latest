@@ -98,6 +98,12 @@ export interface PositionRecord {
   broker_status?: string;
   status?: PositionStatus;
   updated_at?: string;
+
+  // Expiry Lifecycle Tracking
+  expiry?: string;
+  auto_exit_on_expiry?: boolean;
+  time_to_auto_exit?: string;
+  lifecycle_status?: string;
 }
 
 export interface PositionsSummaryData {

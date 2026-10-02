@@ -221,8 +221,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     try {
-      const clonedReq = req.clone();
-      bodyData = await clonedReq.arrayBuffer();
+      bodyData = await req.text();
     } catch {
       bodyData = null;
     }

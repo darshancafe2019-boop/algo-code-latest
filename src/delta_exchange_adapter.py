@@ -287,16 +287,32 @@ class DeltaExchangeAdapter:
         order_type: str = "market_order",
         limit_price: Optional[float] = None,
         stop_price: Optional[float] = None,
-        time_in_force: str = "ioc"
+        time_in_force: str = "ioc",
+        mode: Optional[str] = None
     ) -> Dict[str, Any]:
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        trading_mode = (mode or getattr(config, "TRADING_MODE", "PAPER")).upper()
         from src.trading_authorization_service import global_trading_authorization_service
         is_locked = global_trading_authorization_service.is_live_trading_locked()
 
-        if is_locked and trading_mode == "LIVE":
-            raise PermissionError("LIVE Delta Exchange trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
+        if trading_mode == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
+                return {
+                    "success": False,
+                    "status": "FAILED",
+                    "error": "LIVE_TRADING_DISABLED",
+                    "message": "Live order execution blocked: LIVE_TRADING_ENABLED is False on server."
+                }
+            if is_locked:
+                raise PermissionError("LIVE Delta Exchange trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
+            if not self.api_key or not self.api_secret:
+                return {
+                    "success": False,
+                    "status": "FAILED",
+                    "error": "CREDENTIALS_MISSING",
+                    "message": "Delta Exchange live execution blocked: API credentials not configured."
+                }
 
-        if trading_mode != "LIVE" or is_locked or not self.api_key or not self.api_secret:
+        if trading_mode != "LIVE":
             # Safe paper fallback execution
             return {
                 "success": True,

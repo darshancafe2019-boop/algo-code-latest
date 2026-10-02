@@ -1,8 +1,9 @@
 "use client";
 
+import React, { Suspense } from "react";
 import { useParams } from "next/navigation";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { CreateBotWizard } from "@/components/bot-instance/CreateBotWizard";
+import { BotCreationControlPlane } from "@/components/bot-instance/BotCreationControlPlane";
 
 export default function EditBotPage() {
   const params = useParams();
@@ -10,7 +11,9 @@ export default function EditBotPage() {
 
   return (
     <DirectPageLayout activeTab="control">
-      <CreateBotWizard botId={botId} isEditMode={true} />
+      <Suspense fallback={<div className="p-8 text-center text-xs text-slate-400 font-mono">Loading Edit Bot Workspace...</div>}>
+        <BotCreationControlPlane botId={botId} isEditMode={true} />
+      </Suspense>
     </DirectPageLayout>
   );
 }

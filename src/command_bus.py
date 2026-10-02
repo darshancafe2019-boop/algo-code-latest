@@ -763,6 +763,8 @@ class CommandBus:
 
 
 command_bus = CommandBus()
+global_command_bus = command_bus
+execute = CommandBus.execute
 
 
 

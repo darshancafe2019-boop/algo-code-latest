@@ -561,6 +561,17 @@ class DhanBrokerAdapter(BrokerAdapter):
                 "raw_response": res
             }
 
+        # Fail closed if LIVE mode was explicitly requested but unauthorized
+        requested_mode = str(kwargs.get("mode") or kwargs.get("execution_mode") or ("LIVE" if kwargs.get("is_live") else getattr(config, "TRADING_MODE", "PAPER"))).upper()
+        if requested_mode == "LIVE":
+            return {
+                "success": False,
+                "status": "FAILED",
+                "error": "LIVE_TRADING_DISABLED",
+                "message": "Live order execution blocked: LIVE_TRADING_ENABLED is False or Dhan live trading is disarmed.",
+                "order_id": order_id
+            }
+
         # Simulated Paper Execution with Realistic Indian Brokerage (₹20 or 0.05%)
         fill_price = price or 1000.0
         notional = fill_price * quantity

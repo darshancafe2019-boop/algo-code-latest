@@ -1,7 +1,7 @@
 "use client";
 
+import React, { useState, memo } from "react";
 import { formatMoney } from "@/lib/formatters";
-import React, { useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Search, FileSpreadsheet, ShieldAlert, Layers } from "lucide-react";
 import { NormalizedTaxTransaction } from "@/lib/taxEngineService";
 
@@ -11,18 +11,19 @@ interface TaxTransactionsViewProps {
   selectedBroker?: string;
 }
 
-export function TaxTransactionsView({
+export const TaxTransactionsView = memo(function TaxTransactionsView({
   transactions,
   currency,
   selectedBroker = "ALL",
 }: TaxTransactionsViewProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterAsset, setFilterAsset] = useState("ALL");
+  const [filterSide, setFilterSide] = useState<"ALL" | "BUY" | "SELL">("ALL");
 
-  const formatCurrency = (val: number | null | undefined, placeholder = "N/A") => {
+  const formatCurrency = (val: number | null | undefined, placeholder = "₹0.00") => {
     if (val === null || val === undefined) return placeholder;
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return formatMoney(Math.abs(val), prefix);
+    return formatMoney(val, prefix);
   };
 
   const filtered = (transactions || []).filter((t: any) => {
@@ -30,6 +31,7 @@ export function TaxTransactionsView({
     const broker = t.broker || "";
     const id = t.id || t.transaction_id || "";
     const asset = (t.asset_class || "").toUpperCase();
+    const side = (t.side || t.transaction_type || "").toUpperCase();
 
     const matchesSearch =
       symbol.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,18 +41,48 @@ export function TaxTransactionsView({
     const matchesBroker =
       selectedBroker === "ALL" || broker.toLowerCase() === selectedBroker.toLowerCase();
 
-    const matchesAsset =
-      filterAsset === "ALL" || asset === filterAsset;
+    const matchesAsset = filterAsset === "ALL" || asset === filterAsset;
+    const matchesSide = filterSide === "ALL" || (filterSide === "BUY" && side.includes("BUY")) || (filterSide === "SELL" && side.includes("SELL"));
 
-    return matchesSearch && matchesBroker && matchesAsset;
+    return matchesSearch && matchesBroker && matchesAsset && matchesSide;
   });
+
+  const totalGrossValue = filtered.reduce((acc, t) => acc + (t.gross_value || 0), 0);
+  const totalFees = filtered.reduce((acc, t) => acc + (t.fees || t.commission || 0), 0);
+  const totalTaxes = filtered.reduce((acc, t) => acc + (t.taxes_paid || t.transaction_taxes || 0), 0);
+  const totalRealizedPnl = filtered.reduce((acc, t) => acc + (t.realized_pnl ?? t.realized_gain_loss ?? 0), 0);
 
   return (
     <div className="space-y-4">
-      {/* Search & Filters */}
+      {/* ── Summary Stats Bar ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 font-mono">
+          <span className="text-[11px] text-slate-400 block font-sans">Filtered Gross Turnover</span>
+          <span className="text-base font-bold text-slate-100">{formatCurrency(totalGrossValue)}</span>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 font-mono">
+          <span className="text-[11px] text-slate-400 block font-sans">Realized P&L from Sells</span>
+          <span className={`text-base font-bold ${totalRealizedPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+            {formatCurrency(totalRealizedPnl)}
+          </span>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 font-mono">
+          <span className="text-[11px] text-slate-400 block font-sans">STT / Turnover Tax Paid</span>
+          <span className="text-base font-bold text-indigo-400">{formatCurrency(totalTaxes)}</span>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-slate-800 font-mono">
+          <span className="text-[11px] text-slate-400 block font-sans">Brokerage & Exchange Fees</span>
+          <span className="text-base font-bold text-teal-400">{formatCurrency(totalFees)}</span>
+        </div>
+      </div>
+
+      {/* ── Search & Filter Controls ───────────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm backdrop-blur-md">
-        <div className="flex flex-wrap items-center gap-3 flex-1">
-          <div className="relative w-full sm:w-64">
+        <div className="flex flex-wrap items-center gap-2 flex-1">
+          <div className="relative w-full sm:w-60">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -76,6 +108,22 @@ export function TaxTransactionsView({
               </button>
             ))}
           </div>
+
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
+            {(["ALL", "BUY", "SELL"] as const).map((side) => (
+              <button
+                key={side}
+                onClick={() => setFilterSide(side)}
+                className={`px-2.5 py-1 rounded text-[10px] font-mono transition-colors ${
+                  filterSide === side
+                    ? "bg-indigo-600 text-white font-semibold"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {side}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="flex items-center gap-2 text-xs text-slate-400 font-mono shrink-0">
@@ -84,7 +132,7 @@ export function TaxTransactionsView({
         </div>
       </div>
 
-      {/* Transaction Table */}
+      {/* ── Transaction Table ──────────────────────────────────────────────────────── */}
       <div className="rounded-xl bg-slate-900/80 border border-slate-800 shadow-sm overflow-hidden backdrop-blur-md">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse font-mono">
@@ -99,104 +147,91 @@ export function TaxTransactionsView({
                 <th className="py-3 px-4 font-medium text-right">Realized Result</th>
                 <th className="py-3 px-4 font-medium">Tax Classification</th>
                 <th className="py-3 px-4 font-medium text-right">Est. Tax</th>
-                <th className="py-3 px-4 font-medium">Source</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={10} className="py-12 text-center text-slate-500 font-mono text-xs">
-                    No matching taxable transactions found. New executed orders will appear automatically.
+                  <td colSpan={9} className="py-8 text-center text-slate-500 font-mono text-xs">
+                    No transactions matching filter criteria. Buy/sell orders will be normalized here in real-time.
                   </td>
                 </tr>
               ) : (
-                filtered.map((tx: any) => {
-                  const isBuy = tx.side === "BUY" || tx.transaction_type === "BUY";
-                  const pnl = tx.realized_pnl ?? tx.realized_gain_loss ?? null;
-                  const isGain = pnl !== null && pnl >= 0;
+                filtered.map((t: any) => {
+                  const isSell = (t.side || t.transaction_type || "").toUpperCase().includes("SELL");
+                  const realized = t.realized_pnl ?? t.realized_gain_loss ?? null;
+                  const estTax = t.estimated_tax ?? (realized && realized > 0 ? realized * 0.20 : 0);
 
                   return (
-                    <tr
-                      key={tx.id || tx.transaction_id}
-                      className="hover:bg-slate-800/30 transition-colors duration-150"
-                    >
+                    <tr key={t.id || t.transaction_id} className="hover:bg-slate-800/30 transition-colors">
                       <td className="py-3 px-4">
-                        <div className="text-slate-100 font-semibold">
-                          {tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : tx.trade_date || "—"}
+                        <div className="text-slate-200">
+                          {t.timestamp ? new Date(t.timestamp).toLocaleDateString() : t.trade_date || "—"}
                         </div>
                         <div className="text-[10px] text-slate-500 truncate max-w-[120px]">
-                          {tx.id || tx.transaction_id}
+                          {t.id || t.transaction_id}
                         </div>
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="text-slate-200 font-semibold">{tx.broker}</span>
-                        <div className="text-[10px] text-slate-500">{tx.account_id || "MAIN"}</div>
+                        <span className="text-slate-200">{t.broker}</span>
+                        <div className="text-[10px] text-slate-500">{t.account_id}</div>
                       </td>
 
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-bold text-slate-100 font-sans">
-                            {tx.symbol}
-                          </span>
                           <span
-                            className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold ${
-                              isBuy
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                                : "bg-rose-500/10 text-rose-400 border border-rose-500/20"
+                            className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              isSell
+                                ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                                : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                             }`}
                           >
-                            {isBuy ? "BUY" : "SELL"}
+                            {isSell ? "SELL" : "BUY"}
                           </span>
+                          <span className="font-bold text-slate-100 font-sans">{t.symbol}</span>
                         </div>
-                        <div className="text-[10px] text-slate-400 uppercase">
-                          {tx.asset_class || "equity"}
+                        <div className="text-[10px] text-slate-500">
+                          Qty: {t.quantity} @ {formatCurrency(t.price)}
                         </div>
                       </td>
 
-                      <td className="py-3 px-4 text-right text-slate-200 font-semibold">
-                        {formatCurrency(tx.gross_value ?? tx.total_consideration)}
+                      <td className="py-3 px-4 text-right font-semibold text-slate-100">
+                        {formatCurrency(t.gross_value)}
                       </td>
 
                       <td className="py-3 px-4 text-right text-slate-400">
-                        {formatCurrency(tx.fees ?? tx.brokerage_fee, "₹0.00")}
+                        {formatCurrency(t.fees ?? t.commission)}
                       </td>
 
-                      <td className="py-3 px-4 text-right text-slate-400">
-                        {formatCurrency(tx.taxes_paid ?? tx.stt_paid, "₹0.00")}
+                      <td className="py-3 px-4 text-right text-indigo-300">
+                        {formatCurrency(t.taxes_paid ?? t.transaction_taxes)}
                       </td>
 
                       <td className="py-3 px-4 text-right">
-                        {pnl === null ? (
-                          <span className="text-slate-500 font-mono">Open Lot</span>
+                        {realized !== null ? (
+                          <span className={`font-bold ${realized >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                            {formatCurrency(realized)}
+                          </span>
                         ) : (
-                          <div className={`font-bold ${isGain ? "text-emerald-400" : "text-rose-400"}`}>
-                            {isGain ? "+" : "-"}
-                            {formatCurrency(Math.abs(pnl))}
-                          </div>
+                          <span className="text-slate-500 text-[10px]">Open Lot</span>
                         )}
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-indigo-300 border border-slate-700 whitespace-nowrap">
-                          {(tx.tax_classification || tx.classification || "UNCLASSIFIED").replace(/_/g, " ")}
+                        <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-indigo-400 border border-slate-800">
+                          {t.tax_classification === "SHORT_TERM_CAPITAL_GAIN"
+                            ? "STCG (20%)"
+                            : t.tax_classification === "LONG_TERM_CAPITAL_GAIN"
+                            ? "LTCG (12.5%)"
+                            : t.tax_classification === "CRYPTO_VDA_INCOME"
+                            ? "VDA (30%)"
+                            : "Derivatives (30%)"}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right">
-                        {tx.estimated_tax !== null && tx.estimated_tax !== undefined ? (
-                          <span className="text-amber-400 font-bold">
-                            {formatCurrency(tx.estimated_tax)}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500">N/A</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span className="text-[10px] text-slate-400 font-mono bg-slate-950 px-1.5 py-0.5 rounded border border-slate-800 whitespace-nowrap">
-                          {tx.source || `Source: ${tx.broker}`}
-                        </span>
+                      <td className="py-3 px-4 text-right text-amber-400 font-semibold">
+                        {estTax > 0 ? formatCurrency(estTax) : "₹0.00"}
                       </td>
                     </tr>
                   );
@@ -208,4 +243,4 @@ export function TaxTransactionsView({
       </div>
     </div>
   );
-}
+});

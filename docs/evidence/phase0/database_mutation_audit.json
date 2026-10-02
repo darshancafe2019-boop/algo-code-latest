@@ -1,0 +1,34 @@
+{
+  "quant_os.db": {
+    "exists": true,
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mtime_utc": "2026-09-25T16:54:34.190814+00:00",
+    "wal_exists": false,
+    "shm_exists": false
+  },
+  "trades.db": {
+    "exists": true,
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mtime_utc": "2026-09-27T13:39:50.814051+00:00",
+    "wal_exists": false,
+    "shm_exists": false
+  },
+  "trading_bot.db": {
+    "exists": true,
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mtime_utc": "2026-09-27T13:16:29.456488+00:00",
+    "wal_exists": false,
+    "shm_exists": false
+  },
+  "data/trading_bot.db": {
+    "exists": true,
+    "size_bytes": 23638016,
+    "sha256": "48e968098805cce07e38d1c17a3688d71790a4acfcafb3f70a6a60c2852d8d1d",
+    "mtime_utc": "2026-10-02T13:20:13.781647+00:00",
+    "wal_exists": false,
+    "shm_exists": false
+  }
+}

@@ -246,6 +246,14 @@ class ExnessBrokerAdapter(BrokerAdapter):
         return list(self.positions.values())
 
     def place_multileg_order(self, order_payload: Dict[str, Any]) -> Dict[str, Any]:
+        mode = str(order_payload.get("mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+        if mode == "LIVE" and not getattr(config, "LIVE_TRADING_ENABLED", False):
+            return {
+                "status": "FAILED",
+                "error": "LIVE_TRADING_DISABLED",
+                "message": "Live order rejected: Server-side LIVE_TRADING_ENABLED is False.",
+            }
+
         order_id = f"exness_{uuid.uuid4().hex[:10]}"
         now_iso = datetime.now(timezone.utc).isoformat()
         symbol = order_payload.get("symbol", "XAUUSD").upper()

@@ -99,13 +99,34 @@ class SubscriptionOrchestrator:
 
             entry = self._subscriptions[key]
 
-        # Trigger real-time provider feed subscription
-        if provider.upper() == "UPSTOX":
+        # Trigger real-time provider feed subscription across all supported providers
+        prov_upper = provider.upper()
+        if prov_upper == "UPSTOX":
             try:
                 from src.data_core.subscriptions.upstox_feed_bridge import global_upstox_feed_bridge
                 global_upstox_feed_bridge.subscribe(instrument_id, depth_level=depth_level)
             except Exception as exc:
                 logger.warning("Failed to trigger Upstox live feed subscription for %s: %s", instrument_id, exc)
+        elif prov_upper == "DHAN":
+            try:
+                from src.dhan_feed_manager import global_dhan_feed_manager
+                sec_id = int(instrument_id) if str(instrument_id).isdigit() else 0
+                if sec_id > 0:
+                    global_dhan_feed_manager.subscribe([sec_id])
+            except Exception as exc:
+                logger.warning("Failed to trigger Dhan live feed subscription for %s: %s", instrument_id, exc)
+        elif prov_upper in ("DELTA", "DELTA_INDIA"):
+            try:
+                from src.delta_options_service import global_delta_options_service
+                global_delta_options_service.subscribe_symbol(symbol or instrument_id)
+            except Exception as exc:
+                logger.warning("Failed to trigger Delta live feed subscription for %s: %s", instrument_id, exc)
+        elif prov_upper == "BINANCE":
+            try:
+                from src.binance_ws_manager import global_binance_ws_manager
+                global_binance_ws_manager.subscribe_symbol(symbol or instrument_id)
+            except Exception as exc:
+                logger.warning("Failed to trigger Binance live feed subscription for %s: %s", instrument_id, exc)
 
         return {
             "key": key,

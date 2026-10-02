@@ -377,6 +377,19 @@ def validate_and_repair_sqlite(db_path: Optional[Path] = None) -> bool:
                     "error": None,
                 })
             else:
+                try:
+                    for ext in ["", "-wal", "-shm"]:
+                        p = target_path.parent / f"{target_path.name}{ext}" if ext else target_path
+                        if p.exists():
+                            p.unlink()
+                except Exception as del_err:
+                    logger.error("Failed cleaning unreadable database file %s: %s", target_path, del_err)
+                
+                try:
+                    init_db(force=True)
+                except Exception as reinit_err:
+                    logger.error("Failed re-initializing fresh DB after unreadable format: %s", reinit_err)
+
                 _db_health_state.update({
                     "status": "RECREATED",
                     "engine": "sqlite",
@@ -400,9 +413,9 @@ def get_connection() -> sqlite3.Connection:
     """
     global _sqlite_pragmas_applied
     config.DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
-    conn.row_factory = sqlite3.Row
     try:
+        conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
+        conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA busy_timeout=30000;")
         conn.execute("PRAGMA foreign_keys=ON;")
         conn.execute("PRAGMA synchronous=NORMAL;")
@@ -414,9 +427,16 @@ def get_connection() -> sqlite3.Connection:
                 if not _sqlite_pragmas_applied:
                     conn.execute("PRAGMA journal_mode=WAL;")
                     _sqlite_pragmas_applied = True
-    except Exception:
-        pass
-    return conn
+        return conn
+    except (sqlite3.DatabaseError, sqlite3.OperationalError) as db_err:
+        err_msg = str(db_err).lower()
+        if any(w in err_msg for w in ["unsupported file format", "malformed", "file is not a database", "corrupt"]):
+            logger.critical("Corrupt database detected during get_connection(): %s. Running auto-recovery...", db_err)
+            validate_and_repair_sqlite()
+            conn = sqlite3.connect(str(config.DB_PATH), timeout=30.0)
+            conn.row_factory = sqlite3.Row
+            return conn
+        raise
 
 
 @contextmanager
@@ -578,7 +598,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
             conn = None
         err_str = str(e).lower()
         logger.error("safe_query error: %s", e)
-        if "malformed" in err_str or "corrupt" in err_str:
+        if any(w in err_str for w in ["malformed", "corrupt", "unsupported file format", "file is not a database"]):
             logger.critical("Corrupt database detected in safe_query, initiating automatic recovery...")
             validate_and_repair_sqlite()
         return []
@@ -2536,7 +2556,6 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_audit_correlation_id ON bot_event_audit(correlation_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_mode ON bot_instances(execution_mode, status)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_bot_instances_deleted_created ON bot_instances(is_deleted, created_at ASC)")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_lookup ON user_sessions(token_hash, is_revoked, expires_at)")
 
                 # Check and alter indicator_configs for universal schema columns
                 try:
@@ -2958,8 +2977,23 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_ba_cust ON broker_accounts(customer_id)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_status_id ON trades_log(status, id DESC)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_symbol ON trades_log(symbol)")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_sym_ts ON trades_log(symbol, timestamp DESC)")
-                cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_exec_mode_status ON trades_log(execution_mode, status)")
+                cursor.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS candles_cache (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        symbol TEXT NOT NULL,
+                        timeframe TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        open REAL NOT NULL,
+                        high REAL NOT NULL,
+                        low REAL NOT NULL,
+                        close REAL NOT NULL,
+                        volume REAL NOT NULL DEFAULT 0.0,
+                        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+                        UNIQUE(symbol, timeframe, timestamp)
+                    )
+                    """
+                )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_candles_cache_sym_id ON candles_cache(symbol, id DESC)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_candles_cache_sym_tf_ts ON candles_cache(symbol, timeframe, timestamp DESC)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_candles_cache_ts ON candles_cache(timestamp DESC)")
@@ -3509,6 +3543,7 @@ def init_db(force: bool = False) -> None:
                 )
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, is_revoked)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token_hash)")
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_lookup ON user_sessions(token_hash, is_revoked, expires_at)")
 
                 cursor.execute(
                     """
@@ -3929,7 +3964,6 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("UPDATE bot_instances SET group_name = 'Crypto Scalping Bots' WHERE group_name IS NULL OR group_name = ''")
 
                 conn.commit()
-                conn.close()
                 _db_initialized = True
                 try:
                     from src.trade_ledger import init_trade_ledger_schema
@@ -3946,6 +3980,12 @@ def init_db(force: bool = False) -> None:
                     _db_initialized = True
                     return
                 time.sleep(0.5)
+            finally:
+                if conn:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
 
 def seed_market_universe_if_needed() -> None:
@@ -5480,6 +5520,11 @@ def log_bot_activity(bot_id: str, event_type: str, message: str, details: Option
         conn.close()
     except Exception as exc:
         logger.error(f"Error logging bot activity for {bot_id}: {exc}")
+
+
+def log_event(event_type: str, message: str, level: str = "INFO", details: Optional[Dict[str, Any]] = None) -> None:
+    """Logs a general system event or activity."""
+    log_bot_activity("system", event_type, f"[{level}] {message}", details)
 
 
 def get_bot_activity_logs(bot_id: str, limit: int = 30) -> list[Dict[str, Any]]:
@@ -8238,6 +8283,9 @@ def save_active_risk_limits(limits_dict: Dict[str, Any]) -> bool:
         return False
 
 
+save_risk_limits = save_active_risk_limits
+
+
 def log_risk_event(
     event_type: str,
     message: str,
@@ -10658,9 +10706,27 @@ def acquire_bot_worker_lease(bot_id: str, worker_id: str, process_pid: Optional[
                     if exp_dt.tzinfo is None:
                         exp_dt = exp_dt.replace(tzinfo=timezone.utc)
                     if exp_dt > now_dt and existing.get("worker_id") != worker_id:
-                        # Another live worker holds the lease!
-                        logger.warning(f"Worker {worker_id} denied lease for bot {bot_id}: held by {existing.get('worker_id')}")
-                        return None
+                        # Check if old process PID is actually still alive
+                        old_pid = existing.get("process_pid")
+                        is_old_alive = False
+                        if old_pid and str(old_pid).isdigit():
+                            try:
+                                if os.name == 'nt':
+                                    import ctypes
+                                    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+                                    h = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(old_pid))
+                                    if h:
+                                        is_old_alive = True
+                                        ctypes.windll.kernel32.CloseHandle(h)
+                                else:
+                                    os.kill(int(old_pid), 0)
+                                    is_old_alive = True
+                            except Exception:
+                                is_old_alive = False
+
+                        if is_old_alive:
+                            logger.warning(f"Worker {worker_id} denied lease for bot {bot_id}: actively held by PID {old_pid}")
+                            return None
                 except Exception:
                     is_expired = True
 
@@ -12269,14 +12335,31 @@ def get_delta_contracts(
 
 def get_delta_contract_by_id(product_id: int) -> Optional[Dict[str, Any]]:
     """Fetches a specific Delta contract by product ID."""
-    rows = safe_query("SELECT * FROM delta_option_contracts WHERE product_id = ?", (product_id,))
+    rows = safe_query(
+        "SELECT product_id, symbol, underlying_symbol, contract_type, strike_price, settlement_time, expiry_date, contract_value, tick_size, trading_status, state, quoting_asset, settling_asset, is_active FROM delta_option_contracts WHERE product_id = ?",
+        (product_id,)
+    )
     return rows[0] if rows else None
 
 
 def get_delta_contract_by_symbol(symbol: str) -> Optional[Dict[str, Any]]:
     """Fetches a specific Delta contract by exact executable symbol."""
-    rows = safe_query("SELECT * FROM delta_option_contracts WHERE symbol = ?", (symbol.strip(),))
+    sym_clean = symbol.strip()
+    rows = safe_query(
+        "SELECT product_id, symbol, underlying_symbol, contract_type, strike_price, settlement_time, expiry_date, contract_value, tick_size, trading_status, state, quoting_asset, settling_asset, is_active FROM delta_option_contracts WHERE symbol = ?",
+        (sym_clean,)
+    )
     return rows[0] if rows else None
+
+
+def get_delta_active_contracts(underlying: str = "BTC") -> List[Dict[str, Any]]:
+    """Fetches all active non-expired contracts for an underlying."""
+    now_iso = datetime.now(timezone.utc).isoformat()
+    return safe_query(
+        "SELECT product_id, symbol, underlying_symbol, contract_type, strike_price, settlement_time, expiry_date, contract_value, tick_size, trading_status, state, quoting_asset, settling_asset, is_active FROM delta_option_contracts WHERE underlying_symbol = ? AND is_active = 1 AND state IN ('live', 'upcoming') AND settlement_time >= ? ORDER BY settlement_time ASC, strike_price ASC",
+        (underlying.upper().strip(), now_iso)
+    )
+
 
 
 def upsert_delta_quotes(quotes_list: List[Dict[str, Any]]) -> int:

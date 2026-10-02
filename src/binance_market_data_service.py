@@ -666,6 +666,18 @@ class BinanceMarketDataService:
             "assets": assets
         }
 
+    def get_health_status(self) -> Dict[str, Any]:
+        """Returns telemetry of Binance market data service."""
+        now = time.time()
+        age_s = round(now - self._last_successful_sync, 1) if self._last_successful_sync > 0 else None
+        return {
+            "status": "LIVE" if self._is_connected and self._consecutive_errors < 5 else "DEGRADED",
+            "connected": self._is_connected,
+            "last_sync_age_seconds": age_s,
+            "consecutive_errors": self._consecutive_errors,
+            "provider": "BINANCE_OFFICIAL"
+        }
+
 
 # Global singleton instance
 global_binance_market_data_service = BinanceMarketDataService()

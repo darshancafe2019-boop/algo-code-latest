@@ -5,6 +5,9 @@
 
 import { InstrumentMasterRecord, ExchangeSegment, BrokerProvider } from "./types";
 
+export type CanonicalInstrumentRecord = InstrumentMasterRecord;
+export type { InstrumentMasterRecord };
+
 export interface ResolvedInstrument {
   symbol: string;
   tradingSymbol: string;
@@ -39,13 +42,191 @@ class InstrumentMaster {
 
   private seedCanonicalInstruments() {
     const seeds: InstrumentMasterRecord[] = [
-      // ── NSE Indices ────────────────────────────────────────────────────────
+      // ── 1. NSE / BSE Active Option Contracts (INDIAN_OPTIONS) ─────────────
+      {
+        symbol: "NIFTY 25000 CE",
+        tradingSymbol: "NIFTY 26OCT 25000 CE",
+        securityId: "NSE_FO|NIFTY26OCT25000CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "NIFTY 25000 PE",
+        tradingSymbol: "NIFTY 26OCT 25000 PE",
+        securityId: "NSE_FO|NIFTY26OCT25000PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "NIFTY 25100 CE",
+        tradingSymbol: "NIFTY 26OCT 25100 CE",
+        securityId: "NSE_FO|NIFTY26OCT25100CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "NIFTY 25100 PE",
+        tradingSymbol: "NIFTY 26OCT 25100 PE",
+        securityId: "NSE_FO|NIFTY26OCT25100PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "NIFTY 25200 CE",
+        tradingSymbol: "NIFTY 26OCT 25200 CE",
+        securityId: "NSE_FO|NIFTY26OCT25200CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "NIFTY 25200 PE",
+        tradingSymbol: "NIFTY 26OCT 25200 PE",
+        securityId: "NSE_FO|NIFTY26OCT25200PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "BANKNIFTY 54000 CE",
+        tradingSymbol: "BANKNIFTY 26OCT 54000 CE",
+        securityId: "NSE_FO|BANKNIFTY26OCT54000CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 15,
+        tickSize: 0.05,
+        underlying: "BANKNIFTY",
+      },
+      {
+        symbol: "BANKNIFTY 54000 PE",
+        tradingSymbol: "BANKNIFTY 26OCT 54000 PE",
+        securityId: "NSE_FO|BANKNIFTY26OCT54000PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 15,
+        tickSize: 0.05,
+        underlying: "BANKNIFTY",
+      },
+      {
+        symbol: "BANKNIFTY 54500 CE",
+        tradingSymbol: "BANKNIFTY 26OCT 54500 CE",
+        securityId: "NSE_FO|BANKNIFTY26OCT54500CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 15,
+        tickSize: 0.05,
+        underlying: "BANKNIFTY",
+      },
+      {
+        symbol: "BANKNIFTY 54500 PE",
+        tradingSymbol: "BANKNIFTY 26OCT 54500 PE",
+        securityId: "NSE_FO|BANKNIFTY26OCT54500PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 15,
+        tickSize: 0.05,
+        underlying: "BANKNIFTY",
+      },
+      {
+        symbol: "FINNIFTY 24000 CE",
+        tradingSymbol: "FINNIFTY 26OCT 24000 CE",
+        securityId: "NSE_FO|FINNIFTY26OCT24000CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "FINNIFTY",
+      },
+      {
+        symbol: "FINNIFTY 24000 PE",
+        tradingSymbol: "FINNIFTY 26OCT 24000 PE",
+        securityId: "NSE_FO|FINNIFTY26OCT24000PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "FINNIFTY",
+      },
+      {
+        symbol: "SENSEX 82000 CE",
+        tradingSymbol: "SENSEX 26OCT 82000 CE",
+        securityId: "BSE_FO|SENSEX26OCT82000CE",
+        exchange: "BSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 10,
+        tickSize: 0.05,
+        underlying: "SENSEX",
+      },
+      {
+        symbol: "SENSEX 82000 PE",
+        tradingSymbol: "SENSEX 26OCT 82000 PE",
+        securityId: "BSE_FO|SENSEX26OCT82000PE",
+        exchange: "BSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 10,
+        tickSize: 0.05,
+        underlying: "SENSEX",
+      },
+      {
+        symbol: "RELIANCE 3000 CE",
+        tradingSymbol: "RELIANCE 26OCT 3000 CE",
+        securityId: "NSE_FO|RELIANCE26OCT3000CE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 250,
+        tickSize: 0.05,
+        underlying: "RELIANCE",
+      },
+      {
+        symbol: "RELIANCE 3000 PE",
+        tradingSymbol: "RELIANCE 26OCT 3000 PE",
+        securityId: "NSE_FO|RELIANCE26OCT3000PE",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "OPTION",
+        lotSize: 250,
+        tickSize: 0.05,
+        underlying: "RELIANCE",
+      },
+
+      // ── 2. NSE / BSE Indices (INDIAN_INDICES) ─────────────────────────────
       {
         symbol: "NIFTY",
         tradingSymbol: "NIFTY 50",
-        securityId: "13",
+        securityId: "NSE_INDEX|Nifty 50",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 25,
         tickSize: 0.05,
@@ -53,9 +234,9 @@ class InstrumentMaster {
       {
         symbol: "NIFTY 50",
         tradingSymbol: "NIFTY 50",
-        securityId: "13",
+        securityId: "NSE_INDEX|Nifty 50",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 25,
         tickSize: 0.05,
@@ -63,9 +244,9 @@ class InstrumentMaster {
       {
         symbol: "BANKNIFTY",
         tradingSymbol: "NIFTY BANK",
-        securityId: "25",
+        securityId: "NSE_INDEX|Nifty Bank",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 15,
         tickSize: 0.05,
@@ -73,9 +254,9 @@ class InstrumentMaster {
       {
         symbol: "NIFTY BANK",
         tradingSymbol: "NIFTY BANK",
-        securityId: "25",
+        securityId: "NSE_INDEX|Nifty Bank",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 15,
         tickSize: 0.05,
@@ -83,9 +264,9 @@ class InstrumentMaster {
       {
         symbol: "FINNIFTY",
         tradingSymbol: "NIFTY FIN SERVICE",
-        securityId: "27",
+        securityId: "NSE_INDEX|Nifty Fin Service",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 25,
         tickSize: 0.05,
@@ -93,9 +274,9 @@ class InstrumentMaster {
       {
         symbol: "MIDCPNIFTY",
         tradingSymbol: "NIFTY MID SELECT",
-        securityId: "28",
+        securityId: "NSE_INDEX|NIFTY MID SELECT",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 50,
         tickSize: 0.05,
@@ -103,9 +284,9 @@ class InstrumentMaster {
       {
         symbol: "SENSEX",
         tradingSymbol: "BSE SENSEX",
-        securityId: "51",
+        securityId: "BSE_INDEX|SENSEX",
         exchange: "BSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 10,
         tickSize: 0.05,
@@ -113,9 +294,9 @@ class InstrumentMaster {
       {
         symbol: "INDIA_VIX",
         tradingSymbol: "INDIA VIX",
-        securityId: "24",
+        securityId: "NSE_INDEX|INDIA VIX",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 1,
         tickSize: 0.01,
@@ -123,21 +304,182 @@ class InstrumentMaster {
       {
         symbol: "INDIAVIX",
         tradingSymbol: "INDIA VIX",
-        securityId: "24",
+        securityId: "NSE_INDEX|INDIA VIX",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "INDEX",
         lotSize: 1,
         tickSize: 0.01,
       },
+      {
+        symbol: "NIFTY IT",
+        tradingSymbol: "NIFTY IT",
+        securityId: "NSE_INDEX|NIFTY IT",
+        exchange: "NSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 25,
+        tickSize: 0.05,
+      },
+      {
+        symbol: "NIFTY AUTO",
+        tradingSymbol: "NIFTY AUTO",
+        securityId: "NSE_INDEX|NIFTY AUTO",
+        exchange: "NSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 25,
+        tickSize: 0.05,
+      },
+      {
+        symbol: "NIFTY PHARMA",
+        tradingSymbol: "NIFTY PHARMA",
+        securityId: "NSE_INDEX|NIFTY PHARMA",
+        exchange: "NSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 25,
+        tickSize: 0.05,
+      },
+      {
+        symbol: "NIFTY FMCG",
+        tradingSymbol: "NIFTY FMCG",
+        securityId: "NSE_INDEX|NIFTY FMCG",
+        exchange: "NSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 25,
+        tickSize: 0.05,
+      },
+      {
+        symbol: "NIFTY METAL",
+        tradingSymbol: "NIFTY METAL",
+        securityId: "NSE_INDEX|NIFTY METAL",
+        exchange: "NSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 25,
+        tickSize: 0.05,
+      },
+      {
+        symbol: "BANKEX",
+        tradingSymbol: "BSE BANKEX",
+        securityId: "BSE_INDEX|BANKEX",
+        exchange: "BSE_EQ",
+        provider: "upstox",
+        instrumentType: "INDEX",
+        lotSize: 15,
+        tickSize: 0.05,
+      },
 
-      // ── NSE Heavyweight Equities ───────────────────────────────────────────
+      // ── 3. Indian Futures (INDIAN_FUTURES) ─────────────────────────────────
+      {
+        symbol: "NIFTY-FUT",
+        tradingSymbol: "NIFTY 26OCT FUT",
+        securityId: "NSE_FO|NIFTY26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "NIFTY",
+      },
+      {
+        symbol: "BANKNIFTY-FUT",
+        tradingSymbol: "BANKNIFTY 26OCT FUT",
+        securityId: "NSE_FO|BANKNIFTY26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 15,
+        tickSize: 0.05,
+        underlying: "BANKNIFTY",
+      },
+      {
+        symbol: "FINNIFTY-FUT",
+        tradingSymbol: "FINNIFTY 26OCT FUT",
+        securityId: "NSE_FO|FINNIFTY26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 25,
+        tickSize: 0.05,
+        underlying: "FINNIFTY",
+      },
+      {
+        symbol: "MIDCPNIFTY-FUT",
+        tradingSymbol: "MIDCPNIFTY 26OCT FUT",
+        securityId: "NSE_FO|MIDCPNIFTY26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 50,
+        tickSize: 0.05,
+        underlying: "MIDCPNIFTY",
+      },
+      {
+        symbol: "RELIANCE-FUT",
+        tradingSymbol: "RELIANCE 26OCT FUT",
+        securityId: "NSE_FO|RELIANCE26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 250,
+        tickSize: 0.05,
+        underlying: "RELIANCE",
+      },
+      {
+        symbol: "TCS-FUT",
+        tradingSymbol: "TCS 26OCT FUT",
+        securityId: "NSE_FO|TCS26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 175,
+        tickSize: 0.05,
+        underlying: "TCS",
+      },
+      {
+        symbol: "HDFCBANK-FUT",
+        tradingSymbol: "HDFCBANK 26OCT FUT",
+        securityId: "NSE_FO|HDFCBANK26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 550,
+        tickSize: 0.05,
+        underlying: "HDFCBANK",
+      },
+      {
+        symbol: "INFY-FUT",
+        tradingSymbol: "INFY 26OCT FUT",
+        securityId: "NSE_FO|INFY26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 400,
+        tickSize: 0.05,
+        underlying: "INFY",
+      },
+      {
+        symbol: "SBIN-FUT",
+        tradingSymbol: "SBIN 26OCT FUT",
+        securityId: "NSE_FO|SBIN26OCTFUT",
+        exchange: "NSE_FNO",
+        provider: "upstox",
+        instrumentType: "FUTURES",
+        lotSize: 750,
+        tickSize: 0.05,
+        underlying: "SBIN",
+      },
+
+      // ── 4. NSE Heavyweight Equities (INDIAN_STOCKS) ────────────────────────
       {
         symbol: "RELIANCE",
         tradingSymbol: "RELIANCE-EQ",
-        securityId: "2885",
+        securityId: "NSE_EQ|INE002A01018",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -145,9 +487,9 @@ class InstrumentMaster {
       {
         symbol: "HDFCBANK",
         tradingSymbol: "HDFCBANK-EQ",
-        securityId: "1333",
+        securityId: "NSE_EQ|INE040A01034",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -155,9 +497,9 @@ class InstrumentMaster {
       {
         symbol: "ICICIBANK",
         tradingSymbol: "ICICIBANK-EQ",
-        securityId: "4963",
+        securityId: "NSE_EQ|INE090A01021",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -165,9 +507,9 @@ class InstrumentMaster {
       {
         symbol: "TCS",
         tradingSymbol: "TCS-EQ",
-        securityId: "11536",
+        securityId: "NSE_EQ|INE467B01029",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -175,9 +517,9 @@ class InstrumentMaster {
       {
         symbol: "INFY",
         tradingSymbol: "INFY-EQ",
-        securityId: "1594",
+        securityId: "NSE_EQ|INE009A01021",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -185,9 +527,9 @@ class InstrumentMaster {
       {
         symbol: "SBIN",
         tradingSymbol: "SBIN-EQ",
-        securityId: "3045",
+        securityId: "NSE_EQ|INE062A01020",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -195,9 +537,9 @@ class InstrumentMaster {
       {
         symbol: "BHARTIARTL",
         tradingSymbol: "BHARTIARTL-EQ",
-        securityId: "10604",
+        securityId: "NSE_EQ|INE397D01024",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -205,9 +547,9 @@ class InstrumentMaster {
       {
         symbol: "KOTAKBANK",
         tradingSymbol: "KOTAKBANK-EQ",
-        securityId: "1922",
+        securityId: "NSE_EQ|INE237A01028",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -215,9 +557,9 @@ class InstrumentMaster {
       {
         symbol: "LT",
         tradingSymbol: "LT-EQ",
-        securityId: "11483",
+        securityId: "NSE_EQ|INE018A01030",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -225,9 +567,9 @@ class InstrumentMaster {
       {
         symbol: "AXISBANK",
         tradingSymbol: "AXISBANK-EQ",
-        securityId: "5900",
+        securityId: "NSE_EQ|INE238A01034",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -235,9 +577,9 @@ class InstrumentMaster {
       {
         symbol: "TATAMOTORS",
         tradingSymbol: "TATAMOTORS-EQ",
-        securityId: "3456",
+        securityId: "NSE_EQ|INE155A01022",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -245,9 +587,9 @@ class InstrumentMaster {
       {
         symbol: "ITC",
         tradingSymbol: "ITC-EQ",
-        securityId: "1660",
+        securityId: "NSE_EQ|INE154A01025",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -255,9 +597,9 @@ class InstrumentMaster {
       {
         symbol: "HINDUNILVR",
         tradingSymbol: "HINDUNILVR-EQ",
-        securityId: "1394",
+        securityId: "NSE_EQ|INE030A01027",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -265,9 +607,9 @@ class InstrumentMaster {
       {
         symbol: "BAJFINANCE",
         tradingSymbol: "BAJFINANCE-EQ",
-        securityId: "317",
+        securityId: "NSE_EQ|INE296A01024",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -275,9 +617,9 @@ class InstrumentMaster {
       {
         symbol: "MARUTI",
         tradingSymbol: "MARUTI-EQ",
-        securityId: "10999",
+        securityId: "NSE_EQ|INE585B01010",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -285,9 +627,9 @@ class InstrumentMaster {
       {
         symbol: "SUNPHARMA",
         tradingSymbol: "SUNPHARMA-EQ",
-        securityId: "3351",
+        securityId: "NSE_EQ|INE044A01036",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -295,9 +637,9 @@ class InstrumentMaster {
       {
         symbol: "TITAN",
         tradingSymbol: "TITAN-EQ",
-        securityId: "3506",
+        securityId: "NSE_EQ|INE280A01028",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -305,9 +647,9 @@ class InstrumentMaster {
       {
         symbol: "TATASTEEL",
         tradingSymbol: "TATASTEEL-EQ",
-        securityId: "3499",
+        securityId: "NSE_EQ|INE081A01020",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
@@ -315,84 +657,504 @@ class InstrumentMaster {
       {
         symbol: "WIPRO",
         tradingSymbol: "WIPRO-EQ",
-        securityId: "3787",
+        securityId: "NSE_EQ|INE075A01022",
         exchange: "NSE_EQ",
-        provider: "dhan",
+        provider: "upstox",
         instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.05,
       },
 
-      // ── Delta Crypto Perps ──────────────────────────────────────────────────
+      // ── 5. Delta Crypto Perps (CRYPTO_FUTURES) ─────────────────────────────
       {
-        symbol: "BTC",
-        tradingSymbol: "BTCUSDT",
-        securityId: "BTC-USDT-PERP",
+        symbol: "BTC-PERP",
+        tradingSymbol: "BTCUSD-PERP",
+        securityId: "DELTA:BTCUSD:PERP",
         exchange: "DELTA_PERP",
         provider: "delta",
         instrumentType: "CRYPTO_PERP",
         lotSize: 1,
         tickSize: 0.1,
       },
+      {
+        symbol: "ETH-PERP",
+        tradingSymbol: "ETHUSD-PERP",
+        securityId: "DELTA:ETHUSD:PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "SOL-PERP",
+        tradingSymbol: "SOLUSD-PERP",
+        securityId: "DELTA:SOLUSD:PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "XRP-PERP",
+        tradingSymbol: "XRPUSD-PERP",
+        securityId: "DELTA:XRPUSD:PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 1,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "DOGE-PERP",
+        tradingSymbol: "DOGEUSD-PERP",
+        securityId: "DELTA:DOGEUSD:PERP",
+        exchange: "DELTA_PERP",
+        provider: "delta",
+        instrumentType: "CRYPTO_PERP",
+        lotSize: 10,
+        tickSize: 0.00001,
+      },
+
+      // ── 6. Binance Spot Crypto (CRYPTO_SPOT) ───────────────────────────────
       {
         symbol: "BTC/USDT",
         tradingSymbol: "BTCUSDT",
-        securityId: "BTC-USDT-PERP",
-        exchange: "DELTA_PERP",
-        provider: "delta",
-        instrumentType: "CRYPTO_PERP",
-        lotSize: 1,
-        tickSize: 0.1,
-      },
-      {
-        symbol: "BTCUSDT",
-        tradingSymbol: "BTCUSDT",
-        securityId: "BTC-USDT-PERP",
-        exchange: "DELTA_PERP",
-        provider: "delta",
-        instrumentType: "CRYPTO_PERP",
-        lotSize: 1,
-        tickSize: 0.1,
-      },
-      {
-        symbol: "ETH",
-        tradingSymbol: "ETHUSDT",
-        securityId: "ETH-USDT-PERP",
-        exchange: "DELTA_PERP",
-        provider: "delta",
-        instrumentType: "CRYPTO_PERP",
+        securityId: "BINANCE:BTC/USDT:SPOT",
+        exchange: "BINANCE_SPOT",
+        provider: "binance",
+        instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.01,
       },
       {
         symbol: "ETH/USDT",
         tradingSymbol: "ETHUSDT",
-        securityId: "ETH-USDT-PERP",
-        exchange: "DELTA_PERP",
-        provider: "delta",
-        instrumentType: "CRYPTO_PERP",
+        securityId: "BINANCE:ETH/USDT:SPOT",
+        exchange: "BINANCE_SPOT",
+        provider: "binance",
+        instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.01,
       },
       {
         symbol: "SOL/USDT",
         tradingSymbol: "SOLUSDT",
-        securityId: "SOL-USDT-PERP",
-        exchange: "DELTA_PERP",
-        provider: "delta",
-        instrumentType: "CRYPTO_PERP",
+        securityId: "BINANCE:SOL/USDT:SPOT",
+        exchange: "BINANCE_SPOT",
+        provider: "binance",
+        instrumentType: "EQUITY",
         lotSize: 1,
         tickSize: 0.01,
       },
       {
         symbol: "XRP/USDT",
         tradingSymbol: "XRPUSDT",
-        securityId: "XRP-USDT-PERP",
+        securityId: "BINANCE:XRP/USDT:SPOT",
+        exchange: "BINANCE_SPOT",
+        provider: "binance",
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "DOGE/USDT",
+        tradingSymbol: "DOGEUSDT",
+        securityId: "BINANCE:DOGE/USDT:SPOT",
+        exchange: "BINANCE_SPOT",
+        provider: "binance",
+        instrumentType: "EQUITY",
+        lotSize: 10,
+        tickSize: 0.00001,
+      },
+
+      // ── 7. MCX Commodities (MCX_COMMODITIES) ──────────────────────────────
+      {
+        symbol: "GOLD",
+        tradingSymbol: "GOLD M",
+        securityId: "MCX-GOLD",
+        exchange: "MCX_COMM",
+        provider: "dhan",
+        instrumentType: "FUTURES",
+        lotSize: 1,
+        tickSize: 1.0,
+      },
+      {
+        symbol: "SILVER",
+        tradingSymbol: "SILVER M",
+        securityId: "MCX-SILVER",
+        exchange: "MCX_COMM",
+        provider: "dhan",
+        instrumentType: "FUTURES",
+        lotSize: 5,
+        tickSize: 1.0,
+      },
+      {
+        symbol: "CRUDEOIL",
+        tradingSymbol: "CRUDEOIL",
+        securityId: "MCX-CRUDEOIL",
+        exchange: "MCX_COMM",
+        provider: "dhan",
+        instrumentType: "FUTURES",
+        lotSize: 100,
+        tickSize: 1.0,
+      },
+      {
+        symbol: "NATURALGAS",
+        tradingSymbol: "NATURALGAS",
+        securityId: "MCX-NATGAS",
+        exchange: "MCX_COMM",
+        provider: "dhan",
+        instrumentType: "FUTURES",
+        lotSize: 1250,
+        tickSize: 0.1,
+      },
+      {
+        symbol: "COPPER",
+        tradingSymbol: "COPPER",
+        securityId: "MCX-COPPER",
+        exchange: "MCX_COMM",
+        provider: "dhan",
+        instrumentType: "FUTURES",
+        lotSize: 2500,
+        tickSize: 0.05,
+      },
+
+      // ── 8. Forex FX Pairs (FOREX) ──────────────────────────────────────────
+      {
+        symbol: "EUR/USD",
+        tradingSymbol: "EUR / USD (Euro / US Dollar)",
+        securityId: "OANDA:EUR_USD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "GBP/USD",
+        tradingSymbol: "GBP / USD (British Pound / US Dollar)",
+        securityId: "OANDA:GBP_USD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "USD/JPY",
+        tradingSymbol: "USD / JPY (US Dollar / Japanese Yen)",
+        securityId: "OANDA:USD_JPY",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "USD/INR",
+        tradingSymbol: "USD / INR (US Dollar / Indian Rupee)",
+        securityId: "NSE_CURR|USDINR",
+        exchange: "NSE_CURR",
+        provider: "upstox",
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0025,
+      },
+      {
+        symbol: "GBP/INR",
+        tradingSymbol: "GBP / INR (British Pound / Indian Rupee)",
+        securityId: "NSE_CURR|GBPINR",
+        exchange: "NSE_CURR",
+        provider: "upstox",
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0025,
+      },
+      {
+        symbol: "EUR/INR",
+        tradingSymbol: "EUR / INR (Euro / Indian Rupee)",
+        securityId: "NSE_CURR|EURINR",
+        exchange: "NSE_CURR",
+        provider: "upstox",
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0025,
+      },
+      {
+        symbol: "JPY/INR",
+        tradingSymbol: "JPY / INR (100 Yen / Indian Rupee)",
+        securityId: "NSE_CURR|JPYINR",
+        exchange: "NSE_CURR",
+        provider: "upstox",
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0025,
+      },
+      {
+        symbol: "AUD/USD",
+        tradingSymbol: "AUD / USD (Aussie Dollar / US Dollar)",
+        securityId: "OANDA:AUD_USD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "USD/CAD",
+        tradingSymbol: "USD / CAD (US Dollar / Canadian Dollar)",
+        securityId: "OANDA:USD_CAD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "USD/CHF",
+        tradingSymbol: "USD / CHF (US Dollar / Swiss Franc)",
+        securityId: "OANDA:USD_CHF",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "NZD/USD",
+        tradingSymbol: "NZD / USD (Kiwi Dollar / US Dollar)",
+        securityId: "OANDA:NZD_USD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "EUR/GBP",
+        tradingSymbol: "EUR / GBP (Euro / British Pound)",
+        securityId: "OANDA:EUR_GBP",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "EUR/JPY",
+        tradingSymbol: "EUR / JPY (Euro / Japanese Yen)",
+        securityId: "OANDA:EUR_JPY",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "GBP/JPY",
+        tradingSymbol: "GBP / JPY (British Pound / Japanese Yen)",
+        securityId: "OANDA:GBP_JPY",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "EUR/CHF",
+        tradingSymbol: "EUR / CHF (Euro / Swiss Franc)",
+        securityId: "OANDA:EUR_CHF",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "AUD/JPY",
+        tradingSymbol: "AUD / JPY (Aussie Dollar / Japanese Yen)",
+        securityId: "OANDA:AUD_JPY",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "NZD/JPY",
+        tradingSymbol: "NZD / JPY (Kiwi Dollar / Japanese Yen)",
+        securityId: "OANDA:NZD_JPY",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "USD/SGD",
+        tradingSymbol: "USD / SGD (US Dollar / Singapore Dollar)",
+        securityId: "OANDA:USD_SGD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+      {
+        symbol: "EUR/AUD",
+        tradingSymbol: "EUR / AUD (Euro / Aussie Dollar)",
+        securityId: "OANDA:EUR_AUD",
+        exchange: "FX",
+        provider: "oanda" as any,
+        instrumentType: "FOREX",
+        lotSize: 1000,
+        tickSize: 0.0001,
+      },
+
+      // ── 9. US Stocks & Indices (US_STOCKS & US_INDICES) ───────────────────
+      {
+        symbol: "AAPL",
+        tradingSymbol: "AAPL",
+        securityId: "ALPACA:AAPL",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "MSFT",
+        tradingSymbol: "MSFT",
+        securityId: "ALPACA:MSFT",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "NVDA",
+        tradingSymbol: "NVDA",
+        securityId: "ALPACA:NVDA",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "TSLA",
+        tradingSymbol: "TSLA",
+        securityId: "ALPACA:TSLA",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "AMZN",
+        tradingSymbol: "AMZN",
+        securityId: "ALPACA:AMZN",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "EQUITY",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "SPX",
+        tradingSymbol: "S&P 500",
+        securityId: "ALPACA:SPX",
+        exchange: "NYSE",
+        provider: "alpaca" as any,
+        instrumentType: "INDEX",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+      {
+        symbol: "NDX",
+        tradingSymbol: "NASDAQ 100",
+        securityId: "ALPACA:NDX",
+        exchange: "NASDAQ",
+        provider: "alpaca" as any,
+        instrumentType: "INDEX",
+        lotSize: 1,
+        tickSize: 0.01,
+      },
+
+      // ── 10. Delta Crypto Options (CRYPTO_OPTIONS) ──────────────────────────
+      {
+        symbol: "BTC 65000 CALL",
+        tradingSymbol: "BTC 65000 CE (26OCT)",
+        securityId: "DELTA:BTC-65000-CALL",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
+        lotSize: 1,
+        tickSize: 1.0,
+      },
+      {
+        symbol: "BTC 65000 PUT",
+        tradingSymbol: "BTC 65000 PE (26OCT)",
+        securityId: "DELTA:BTC-65000-PUT",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
+        lotSize: 1,
+        tickSize: 1.0,
+      },
+      {
+        symbol: "ETH 2700 CALL",
+        tradingSymbol: "ETH 2700 CE (26OCT)",
+        securityId: "DELTA:ETH-2700-CALL",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
+        lotSize: 1,
+        tickSize: 0.1,
+      },
+      {
+        symbol: "ETH 2700 PUT",
+        tradingSymbol: "ETH 2700 PE (26OCT)",
+        securityId: "DELTA:ETH-2700-PUT",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
+        lotSize: 1,
+        tickSize: 0.1,
+      },
+      {
+        symbol: "DOGE-PERP",
+        tradingSymbol: "DOGE/USDT Perpetual",
+        securityId: "DOGE-USDT-PERP",
         exchange: "DELTA_PERP",
         provider: "delta",
         instrumentType: "CRYPTO_PERP",
+        lotSize: 10,
+        tickSize: 0.00001,
+      },
+      {
+        symbol: "BTC-OPT",
+        tradingSymbol: "BTC Options Hub",
+        securityId: "BTC-OPTIONS-DELTA",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
         lotSize: 1,
-        tickSize: 0.0001,
+        tickSize: 0.1,
+      },
+      {
+        symbol: "ETH-OPT",
+        tradingSymbol: "ETH Options Hub",
+        securityId: "ETH-OPTIONS-DELTA",
+        exchange: "DELTA_OPT",
+        provider: "delta",
+        instrumentType: "OPTION",
+        lotSize: 1,
+        tickSize: 0.01,
       },
     ];
 
@@ -450,6 +1212,17 @@ class InstrumentMaster {
     return Array.from(this.bySymbol.values()).filter((r) => r.provider === provider);
   }
 
+  public getExpiriesForUnderlying(underlying: string): string[] {
+    const u = underlying?.toUpperCase() || "NIFTY";
+    if (u === "NIFTY" || u === "BANKNIFTY" || u === "FINNIFTY") {
+      return ["2026-10-09", "2026-10-16", "2026-10-23", "2026-10-30", "2026-11-27"];
+    }
+    if (u.includes("BTC") || u.includes("ETH") || u.includes("SOL")) {
+      return ["2026-10-09", "2026-10-16", "2026-10-23", "2026-10-30", "2026-12-25"];
+    }
+    return ["2026-10-09", "2026-10-30", "2026-11-27"];
+  }
+
   /**
    * Fast indexed search supporting tokenized queries, options (e.g. "NIFTY 25000 CE"),
    * futures, stocks, indices, crypto, forex, and commodities.
@@ -489,13 +1262,96 @@ class InstrumentMaster {
     // Filter by category
     const categoryFiltered = allRecords.filter((rec) => {
       if (cat === "ALL") return true;
-      if (cat === "STOCKS" || cat === "EQUITIES") return rec.instrumentType === "EQUITY";
-      if (cat === "INDICES") return rec.instrumentType === "INDEX";
-      if (cat === "FUTURES") return rec.instrumentType === "FUTURES" || rec.symbol.includes("FUT");
-      if (cat === "OPTIONS") return rec.instrumentType === "OPTION" || rec.optionType !== undefined;
-      if (cat === "CRYPTO") return rec.instrumentType === "CRYPTO_PERP" || rec.exchange === "DELTA_PERP";
-      if (cat === "COMMODITIES") return rec.exchange === "MCX_COMM" || rec.symbol.includes("GOLD") || rec.symbol.includes("SILVER") || rec.symbol.includes("CRUDE");
-      if (cat === "FOREX") return rec.exchange === "NSE_CURR" || rec.exchange === "BSE_CURR" || rec.symbol.includes("INR") || rec.symbol.includes("USD");
+      if (cat === "INDIAN_OPTIONS" || cat === "OPTIONS") {
+        return (
+          rec.instrumentType === "OPTION" &&
+          (rec.exchange === "NSE_FNO" || rec.exchange === "BSE_FNO" || rec.exchange === "NSE_FO" || rec.symbol.includes("CE") || rec.symbol.includes("PE")) &&
+          !rec.exchange?.includes("DELTA")
+        );
+      }
+      if (cat === "INDIAN_INDICES" || cat === "INDICES") {
+        return (
+          rec.instrumentType === "INDEX" &&
+          !["SPX", "NDX", "DJI", "VIX"].includes(rec.symbol) &&
+          !rec.exchange?.includes("NASDAQ") &&
+          !rec.exchange?.includes("NYSE")
+        );
+      }
+      if (cat === "INDIAN_FUTURES" || cat === "FUTURES") {
+        return (
+          rec.instrumentType === "FUTURES" &&
+          (rec.exchange === "NSE_FNO" || rec.exchange === "BSE_FNO" || rec.exchange === "NSE_FO" || rec.symbol.endsWith("-FUT")) &&
+          !rec.exchange?.includes("MCX")
+        );
+      }
+      if (cat === "INDIAN_STOCKS" || cat === "STOCKS" || cat === "EQUITIES") {
+        return (
+          rec.instrumentType === "EQUITY" &&
+          (rec.exchange === "NSE_EQ" || rec.exchange === "BSE_EQ" || rec.exchange === "NSE" || rec.exchange === "BSE") &&
+          !rec.symbol.includes("/") &&
+          !rec.exchange?.includes("NASDAQ") &&
+          !rec.exchange?.includes("NYSE")
+        );
+      }
+      if (cat === "MCX_COMMODITIES" || cat === "COMMODITIES") {
+        return (
+          rec.exchange === "MCX_COMM" ||
+          rec.exchange === "MCX" ||
+          ["GOLD", "SILVER", "CRUDEOIL", "NATURALGAS", "COPPER"].includes(rec.symbol)
+        );
+      }
+      if (cat === "US_STOCKS") {
+        return (
+          (rec.exchange === "NASDAQ" || rec.exchange === "NYSE") &&
+          rec.instrumentType === "EQUITY" &&
+          !["SPX", "NDX", "DJI"].includes(rec.symbol)
+        );
+      }
+      if (cat === "US_INDICES") {
+        return ["SPX", "NDX", "DJI"].includes(rec.symbol) || (rec.exchange === "NYSE" && rec.instrumentType === "INDEX");
+      }
+      if (cat === "FOREX") {
+        return (
+          rec.instrumentType === "FOREX" ||
+          rec.exchange === "FX" ||
+          (rec.exchange === "NSE_CURR" && !rec.symbol.includes("USDT")) ||
+          rec.symbol.includes("/USD") ||
+          rec.symbol.includes("/INR") ||
+          rec.symbol.includes("/JPY") ||
+          rec.symbol.includes("/EUR") ||
+          rec.symbol.includes("/GBP") ||
+          rec.symbol.includes("/CHF") ||
+          rec.symbol.includes("/CAD") ||
+          rec.symbol.includes("/AUD") ||
+          rec.symbol.includes("/NZD") ||
+          rec.symbol.includes("/SGD")
+        ) && !rec.exchange?.includes("BINANCE") && !rec.exchange?.includes("DELTA") && !rec.symbol.includes("USDT");
+      }
+      if (cat === "CRYPTO_SPOT") {
+        return (
+          (rec.exchange === "BINANCE_SPOT" ||
+            rec.exchange === "BINANCE" ||
+            (rec.symbol.includes("/USDT") && rec.instrumentType !== "CRYPTO_PERP" && rec.instrumentType !== "OPTION")) &&
+          rec.exchange !== "NSE_CURR"
+        );
+      }
+      if (cat === "CRYPTO_FUTURES" || cat === "CRYPTO_PERP") {
+        return (
+          rec.instrumentType === "CRYPTO_PERP" ||
+          rec.exchange === "DELTA_PERP" ||
+          rec.exchange === "BINANCE_FUTURES" ||
+          rec.symbol.endsWith("-PERP")
+        );
+      }
+      if (cat === "CRYPTO_OPTIONS") {
+        return (
+          rec.exchange === "DELTA_OPT" ||
+          rec.exchange === "DELTA_INDIA" ||
+          rec.symbol.includes("CALL") ||
+          rec.symbol.includes("PUT") ||
+          rec.symbol.includes("-OPT")
+        );
+      }
       return true;
     });
 
@@ -504,22 +1360,25 @@ class InstrumentMaster {
     }
 
     const queryTokens = q.split(/[\s\-_/]+/).filter(Boolean);
+    const cleanQ = q.replace(/[/_\-\s]/g, "");
 
     // Score matches
     const scored = categoryFiltered.map((rec) => {
       const sym = rec.symbol.toUpperCase();
       const ts = rec.tradingSymbol.toUpperCase();
       const name = (rec.underlying || "").toUpperCase();
+      const cleanSym = sym.replace(/[/_\-\s]/g, "");
+      const cleanTs = ts.replace(/[/_\-\s]/g, "");
 
       let score = 0;
-      if (sym === q || ts === q) score += 100;
-      else if (sym.startsWith(q) || ts.startsWith(q)) score += 50;
-      else if (sym.includes(q) || ts.includes(q)) score += 25;
+      if (sym === q || ts === q || cleanSym === cleanQ || cleanTs === cleanQ) score += 100;
+      else if (sym.startsWith(q) || ts.startsWith(q) || cleanSym.startsWith(cleanQ)) score += 60;
+      else if (sym.includes(q) || ts.includes(q) || cleanSym.includes(cleanQ)) score += 35;
 
       for (const token of queryTokens) {
-        if (sym.includes(token)) score += 10;
-        if (ts.includes(token)) score += 10;
-        if (name.includes(token)) score += 5;
+        if (sym.includes(token)) score += 15;
+        if (ts.includes(token)) score += 15;
+        if (name.includes(token)) score += 10;
       }
 
       return { rec, score };

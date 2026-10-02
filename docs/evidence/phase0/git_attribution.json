@@ -1,0 +1,263 @@
+[
+  {
+    "file": "dashboard.py",
+    "git_status": "M",
+    "lines_added": "478",
+    "lines_deleted": "56",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/api/[...path]/route.ts",
+    "git_status": "M",
+    "lines_added": "1",
+    "lines_deleted": "2",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/api/futures/contracts/route.ts",
+    "git_status": "M",
+    "lines_added": "73",
+    "lines_deleted": "5",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/api/market-data/quote/route.ts",
+    "git_status": "M",
+    "lines_added": "54",
+    "lines_deleted": "1",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/api/market/snapshot/route.ts",
+    "git_status": "M",
+    "lines_added": "368",
+    "lines_deleted": "137",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/api/options/chain/route.ts",
+    "git_status": "M",
+    "lines_added": "168",
+    "lines_deleted": "24",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/app/bots/create/page.tsx",
+    "git_status": "M",
+    "lines_added": "1",
+    "lines_deleted": "1",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/Navbar.tsx",
+    "git_status": "M",
+    "lines_added": "5",
+    "lines_deleted": "2",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/BotCardGrid.tsx",
+    "git_status": "M",
+    "lines_added": "137",
+    "lines_deleted": "92",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/BotControlTab.tsx",
+    "git_status": "M",
+    "lines_added": "214",
+    "lines_deleted": "136",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/SimpleBotDetailsDrawer.tsx",
+    "git_status": "M",
+    "lines_added": "167",
+    "lines_deleted": "549",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/SimpleBotFilterBar.tsx",
+    "git_status": "M",
+    "lines_added": "164",
+    "lines_deleted": "249",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/SimpleBotTable.tsx",
+    "git_status": "M",
+    "lines_added": "288",
+    "lines_deleted": "749",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/bot-control/SimpleFleetSummaryHeader.tsx",
+    "git_status": "M",
+    "lines_added": "210",
+    "lines_deleted": "148",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/components/layout/header/LiveTickerItem.tsx",
+    "git_status": "M",
+    "lines_added": "2",
+    "lines_deleted": "2",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/context/MarketGatewayContext.tsx",
+    "git_status": "M",
+    "lines_added": "629",
+    "lines_deleted": "1959",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/lib/bot-creation-bridge.ts",
+    "git_status": "M",
+    "lines_added": "2",
+    "lines_deleted": "1",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/lib/market-data/instrument-master.ts",
+    "git_status": "M",
+    "lines_added": "955",
+    "lines_deleted": "96",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/lib/market-data/types.ts",
+    "git_status": "M",
+    "lines_added": "89",
+    "lines_deleted": "21",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/src/features/markets/futures/components/FuturesDetailsDrawer.tsx",
+    "git_status": "M",
+    "lines_added": "2",
+    "lines_deleted": "1",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/types/bot-control.ts",
+    "git_status": "M",
+    "lines_added": "66",
+    "lines_deleted": "0",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "frontend/types/bot-creation-intent.ts",
+    "git_status": "M",
+    "lines_added": "5",
+    "lines_deleted": "0",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "scripts/dev_orchestrator.py",
+    "git_status": "M",
+    "lines_added": "1",
+    "lines_deleted": "1",
+    "classification": "UNPROVEN",
+    "evidence": "Working tree change with indeterminate historical timestamp",
+    "confidence": "MEDIUM"
+  },
+  {
+    "file": "src/canonical_bot_config.py",
+    "git_status": "M",
+    "lines_added": "44",
+    "lines_deleted": "13",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "src/capital_service.py",
+    "git_status": "M",
+    "lines_added": "0",
+    "lines_deleted": "1",
+    "classification": "PRE-EXISTING",
+    "evidence": "Uncommitted working tree changes present prior to Phase 0 prompt",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "src/live_runner.py",
+    "git_status": "M",
+    "lines_added": "1",
+    "lines_deleted": "1",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "src/process_manager.py",
+    "git_status": "M",
+    "lines_added": "0",
+    "lines_deleted": "11",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "src/universal_risk_engine.py",
+    "git_status": "M",
+    "lines_added": "2",
+    "lines_deleted": "2",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  },
+  {
+    "file": "src/upstox_service.py",
+    "git_status": "M",
+    "lines_added": "10",
+    "lines_deleted": "0",
+    "classification": "PHASE-0",
+    "evidence": "Modified during Phase 0 diagnostic/typing & documentation audit",
+    "confidence": "HIGH"
+  }
+]

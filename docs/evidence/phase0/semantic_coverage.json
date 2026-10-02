@@ -1,0 +1,163 @@
+[
+  {
+    "file": "src/execution_service.py",
+    "exists": true,
+    "lines": 717,
+    "responsibility": "Order execution & order intent state machine",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/execution.py",
+    "exists": true,
+    "lines": 90,
+    "responsibility": "CCXT legacy execution wrapper",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/live_runner.py",
+    "exists": true,
+    "lines": 710,
+    "responsibility": "Live bot runner cycle, signal evaluation, direct DB writes",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/process_manager.py",
+    "exists": true,
+    "lines": 1131,
+    "responsibility": "Process supervisor, worker lifecycle, lease management",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/universal_risk_engine.py",
+    "exists": true,
+    "lines": 1337,
+    "responsibility": "4-tier risk validation & sizing checks",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/canonical_bot_config.py",
+    "exists": true,
+    "lines": 668,
+    "responsibility": "Canonical schema definition, migration & hashing",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/instrument_resolver.py",
+    "exists": true,
+    "lines": 1646,
+    "responsibility": "Canonical symbology resolution",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/contract_resolver.py",
+    "exists": true,
+    "lines": 633,
+    "responsibility": "Options contract & expiry symbology resolution",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/premium_resolver.py",
+    "exists": true,
+    "lines": 693,
+    "responsibility": "Options premium calculation & pricing resolution",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/upstox_service.py",
+    "exists": true,
+    "lines": 1842,
+    "responsibility": "Upstox V3 market data & broker adapter",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/dhan_broker_adapter.py",
+    "exists": true,
+    "lines": 867,
+    "responsibility": "Dhan HQ REST broker adapter",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/delta_broker_adapter.py",
+    "exists": false,
+    "lines": 0,
+    "responsibility": "Delta Exchange REST & options adapter",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/binance_broker_adapter.py",
+    "exists": false,
+    "lines": 0,
+    "responsibility": "Binance Spot/Futures REST adapter",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/broker_router.py",
+    "exists": true,
+    "lines": 948,
+    "responsibility": "Multi-broker order router & manual endpoints",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/trade_ledger.py",
+    "exists": true,
+    "lines": 710,
+    "responsibility": "Position & trade ledger persistence",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/capital_service.py",
+    "exists": true,
+    "lines": 702,
+    "responsibility": "Capital allocation & movement accounting",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/db.py",
+    "exists": true,
+    "lines": 12612,
+    "responsibility": "SQLite database connection & low-level helpers",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/strategy.py",
+    "exists": true,
+    "lines": 674,
+    "responsibility": "Technical indicator calculation & strategy rules",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "src/resilient_ticker_service.py",
+    "exists": false,
+    "lines": 0,
+    "responsibility": "Market ticker caching & failover",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "dashboard.py",
+    "exists": true,
+    "lines": 21368,
+    "responsibility": "Backend Flask API routes & supervisor control endpoints",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "market_data_gateway/gateway.py",
+    "exists": true,
+    "lines": 1565,
+    "responsibility": "WebSocket streaming market data hub (port 5051)",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "frontend/components/bot-instance/BotCreationControlPlane.tsx",
+    "exists": true,
+    "lines": 431,
+    "responsibility": "Wizard 7-step control plane",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  },
+  {
+    "file": "frontend/lib/store/useBotCreationStore.ts",
+    "exists": true,
+    "lines": 1992,
+    "responsibility": "Wizard client-side Zustand store",
+    "review_status": "SEMANTICALLY_REVIEWED"
+  }
+]

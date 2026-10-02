@@ -152,12 +152,13 @@ class UpstoxBrokerAdapter(BrokerAdapter):
         order_type: str = "MARKET",
         product: str = "I",  # I = Intraday, D = Delivery
         tag: str = "QUANTOS_BOT",
+        mode: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Executes or simulates order for an Indian instrument.
         Guarantees paper simulation by default.
         """
-        trading_mode = getattr(config, "TRADING_MODE", "PAPER").upper()
+        trading_mode = (mode or getattr(config, "TRADING_MODE", "PAPER")).upper()
         clean_sym = symbol.strip().upper()
         order_side = side.strip().upper()
         if order_side in ["LONG"]:
@@ -172,8 +173,16 @@ class UpstoxBrokerAdapter(BrokerAdapter):
         from src.trading_authorization_service import global_trading_authorization_service
         is_locked = global_trading_authorization_service.is_live_trading_locked()
 
-        if is_locked and trading_mode == "LIVE":
-            raise PermissionError("LIVE Indian trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
+        if trading_mode == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
+                return {
+                    "success": False,
+                    "status": "FAILED",
+                    "error": "LIVE_TRADING_DISABLED",
+                    "message": "Live order execution blocked: LIVE_TRADING_ENABLED is False on server."
+                }
+            if is_locked:
+                raise PermissionError("LIVE Indian trading is strictly BLOCKED by authoritative Global Live Trading Lock.")
 
         # --- LIVE ORDER ROUTING ---
         if trading_mode == "LIVE" and not is_locked:

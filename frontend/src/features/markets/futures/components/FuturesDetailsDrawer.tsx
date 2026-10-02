@@ -46,11 +46,11 @@ import {
   fetchFuturesAccountMargins,
   fetchFuturesPositions,
 } from "../api/futures-api";
-import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
+import { TradeAnalysisModal } from "@/components/trade_analysis/TradeAnalysisModal";
 import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import { FuturesInteractiveChart } from "./FuturesInteractiveChart";
 
-interface FuturesDetailsDrawerProps {
+export interface FuturesDetailsDrawerProps {
   contract: CanonicalFuturesContract | null;
   isOpen?: boolean;
   onClose?: () => void;
@@ -974,3 +974,4 @@ export function FuturesDetailsDrawer({
     </>
   );
 }
+

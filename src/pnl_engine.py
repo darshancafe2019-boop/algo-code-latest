@@ -165,11 +165,15 @@ def compute_unrealized_pnl(
     entry_price: float,
     live_price: float,
     quantity: float,
+    contract_multiplier: float = 1.0,
     estimated_fees: float = 0.0,
     fees: float = 0.0,
+    currency: str = "USDT",
 ) -> Dict[str, Any]:
     """
-    Computes real-time mark-to-market unrealized P&L for open positions.
+    Authoritative real-time mark-to-market unrealized P&L calculation.
+    For LONG:  (live_price - entry_price) * quantity * contract_multiplier - fees
+    For SHORT: (entry_price - live_price) * quantity * contract_multiplier - fees
     """
     import math
     is_long = str(direction or "LONG").upper() in ["LONG", "BUY"]
@@ -188,6 +192,9 @@ def compute_unrealized_pnl(
     qty = abs(_safe_float(quantity, 0.0))
     entry_p = _safe_float(entry_price, 0.0)
     live_p = _safe_float(live_price, 0.0)
+    mult = _safe_float(contract_multiplier, 1.0)
+    if mult <= 0.0:
+        mult = 1.0
     fee_total = max(0.0, _safe_float(fees or estimated_fees, 0.0))
 
     if qty <= 0.0 or entry_p <= 0.0 or live_p <= 0.0:
@@ -196,15 +203,18 @@ def compute_unrealized_pnl(
             "unrealized_gross_pnl": 0.0,
             "unrealized_net_pnl": 0.0,
             "unrealized_pnl_pct": 0.0,
+            "current_price": live_p,
+            "entry_price": entry_p,
+            "currency": currency,
         }
 
     if is_long:
-        gross_upnl = (live_p - entry_p) * qty
+        gross_upnl = (live_p - entry_p) * qty * mult
     else:
-        gross_upnl = (entry_p - live_p) * qty
+        gross_upnl = (entry_p - live_p) * qty * mult
 
     net_upnl = gross_upnl - fee_total
-    notional = entry_p * qty
+    notional = entry_p * qty * mult
     upnl_pct = (net_upnl / notional * 100.0) if notional > 0 else 0.0
 
     return {
@@ -212,4 +222,8 @@ def compute_unrealized_pnl(
         "unrealized_gross_pnl": round(gross_upnl, 2),
         "unrealized_net_pnl": round(net_upnl, 2),
         "unrealized_pnl_pct": round(upnl_pct, 2),
+        "current_price": round(live_p, 4),
+        "entry_price": round(entry_p, 4),
+        "currency": currency,
     }
+

@@ -189,7 +189,60 @@ export async function GET(req: NextRequest) {
       }, { status: 200 });
 
     } catch (fetchErr: any) {
-      // In case Gateway is temporarily unreachable, respond with UNAVAILABLE instead of 404
+      // In case Gateway is unreachable, fallback to Quantitative Backend Ticker API
+      try {
+        const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
+        const bRes = await fetch(`${BACKEND_URL}/api/ticker?symbol=${encodeURIComponent(cleanSym)}`, {
+          cache: "no-store",
+          signal: AbortSignal.timeout(2500),
+        });
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          const t = bData.ticker || bData.data || bData;
+          if (t && (t.last || t.price)) {
+            const lastPrice = Number(t.last || t.price);
+            const closePrice = t.close != null ? Number(t.close) : (t.previous_close != null ? Number(t.previous_close) : null);
+            const changeVal = t.change_val != null ? Number(t.change_val) : (t.change != null ? Number(t.change) : (closePrice ? (lastPrice - closePrice) : 0));
+            const changePct = t.change_pct != null ? Number(t.change_pct) : (t.percentage != null ? Number(t.percentage) : 0);
+            const isLive = !t.is_stale;
+            return NextResponse.json({
+              status: "success",
+              symbol: cleanSym,
+              quote: {
+                symbol: cleanSym,
+                exchange: safeInst?.exchange || "BINANCE",
+                provider: (t.provider || "binance") as BrokerProvider,
+                last_price: lastPrice,
+                bid: Number(t.bid ?? lastPrice),
+                ask: Number(t.ask ?? lastPrice),
+                volume: Number(t.volume ?? 0),
+                high: t.high != null ? Number(t.high) : null,
+                low: t.low != null ? Number(t.low) : null,
+                open: t.open != null ? Number(t.open) : null,
+                close: closePrice,
+                change_pct: changePct,
+                event_timestamp: t.timestamp || new Date().toISOString(),
+                received_timestamp: new Date().toISOString(),
+                feed_latency_ms: Number(t.latency_ms ?? 5),
+                data_mode: "REAL_TIME",
+                is_stale: Boolean(t.is_stale),
+                age_seconds: 0,
+                freshness_status: isLive ? "LIVE" : "STALE",
+                ltp: lastPrice,
+                previousClose: closePrice,
+                change: changeVal,
+                changePercent: changePct,
+                isLive,
+              },
+              instrument: safeInst,
+              source: String(t.provider || "BINANCE").toUpperCase(),
+              timestamp: new Date().toISOString(),
+            }, { status: 200 });
+          }
+        }
+      } catch {}
+
+      // If backend is also unreachable, respond with UNAVAILABLE instead of 404
       return NextResponse.json(
         {
           status: "UNAVAILABLE",

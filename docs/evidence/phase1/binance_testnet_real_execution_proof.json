@@ -1,0 +1,72 @@
+{
+  "proof_id": "PROOF-TESTNET-BINANCE-1790949887",
+  "timestamp": "2026-10-02T14:04:47.851197+00:00",
+  "exchange": "Binance Spot Testnet (testnet.binance.vision)",
+  "stages": {
+    "1_market_data": {
+      "exchange": "Binance Spot Testnet",
+      "symbol": "BTC/USDT",
+      "live_price": 86829.99,
+      "bid": 86829.99,
+      "ask": 86830.0,
+      "available_balance_usdt": 85297.5105667,
+      "bars_count": 50,
+      "status": "VERIFIED"
+    },
+    "2_strategy_signal": {
+      "strategy": "EMA_MACD_VP_CONFLUENCE",
+      "signal": "BUY",
+      "confidence_score": 90.0,
+      "reason": "Trend & momentum alignment confirmed",
+      "status": "VERIFIED"
+    },
+    "3_risk_check": {
+      "passed": true,
+      "message": "ALL_14_SAFETY_CHECKS_PASSED",
+      "order_amount": 0.0005,
+      "planned_cost": 43.41,
+      "stop_loss": 85093.39,
+      "take_profit": 89434.89,
+      "status": "VERIFIED"
+    },
+    "4_broker_entry": {
+      "binance_order_id": "8790473",
+      "binance_status": "closed",
+      "filled_quantity": 0.0005,
+      "average_fill_price": 86830.0,
+      "fees": 0.0,
+      "trade_id": 100072,
+      "status": "REAL_BROKER_CONFIRMED"
+    },
+    "5_position_ledger": {
+      "trade_id": 100072,
+      "db_status": "OPEN",
+      "execution_mode": "LIVE",
+      "position_size": 0.0005,
+      "entry_price": 86830.0,
+      "broker_order_id": "8790473",
+      "status": "VERIFIED"
+    },
+    "6_broker_exit": {
+      "binance_exit_order_id": "8790481",
+      "binance_exit_status": "closed",
+      "exit_filled_quantity": 0.0005,
+      "exit_fill_price": 86829.99,
+      "exit_fees": 0.0,
+      "status": "REAL_BROKER_CONFIRMED"
+    },
+    "7_realized_pnl": {
+      "trade_id": 100072,
+      "trade_status": "CLOSED",
+      "trade_result": "LOSS",
+      "entry_price": 86830.0,
+      "exit_price": 86829.99,
+      "position_size": 0.0005,
+      "gross_pnl": 0.0,
+      "net_pnl": -3.0,
+      "pnl_percentage": -6.91,
+      "total_fees": 3.0,
+      "status": "VERIFIED"
+    }
+  }
+}

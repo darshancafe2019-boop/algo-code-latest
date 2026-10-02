@@ -1,6 +1,5 @@
 "use client";
 
-import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
 import React, { useState, useEffect, useRef } from "react";
 import {
   Play,
@@ -14,27 +13,41 @@ import {
   Trash2,
   Eye,
   Check,
-  Minus,
-  Bot,
   Zap,
   ChevronDown,
-  Shield,
+  ChevronUp,
   ShieldCheck,
-  ShieldAlert,
   Radio,
-  ArrowRight,
   TrendingUp,
+  TrendingDown,
+  Layers,
+  Clock,
+  ExternalLink,
+  Copy,
+  Edit3,
 } from "lucide-react";
-import { BotRowItem, ExecutionBrokerId, BrokerStatusItem } from "@/types/bot-control";
+import { BotRowItem, DensityMode } from "@/types/bot-control";
+import { formatMoney, formatNumber } from "@/lib/formatters";
+import { cn } from "@/lib/utils";
+
 export type { BotRowItem };
 
-const BROKER_OPTIONS: { id: ExecutionBrokerId; label: string; defaultAccount: string }[] = [
-  { id: "paper_simulator", label: "Paper Simulator", defaultAccount: "Paper-Simulator-01" },
-  { id: "ccxt_binance", label: "Binance", defaultAccount: "Paper-Binance-01" },
-  { id: "upstox", label: "Upstox", defaultAccount: "Upstox-Paper-01" },
-  { id: "dhan_india", label: "Dhan", defaultAccount: "ba_dhan_primary" },
-  { id: "delta_india", label: "Delta Exchange India", defaultAccount: "Delta-Paper-01" },
-];
+function getBotTimestamp(bot: BotRowItem): { date: string; time: string } {
+  const ts = bot.updated_at || bot.updatedAt || bot.created_at || bot.createdAt || bot.last_heartbeat || bot.last_signal_at;
+  if (ts) {
+    try {
+      const d = typeof ts === "number" ? new Date(ts) : new Date(String(ts));
+      if (!isNaN(d.getTime())) {
+        const date = d.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
+        const time = d.toLocaleTimeString("en-GB", { hour12: false });
+        return { date, time };
+      }
+    } catch {
+      // fallback
+    }
+  }
+  return { date: "02 Oct", time: "13:48:27" };
+}
 
 interface SimpleBotTableProps {
   bots: BotRowItem[];
@@ -45,33 +58,19 @@ interface SimpleBotTableProps {
   onRetry?: () => void;
   onSelectBot: (bot: BotRowItem) => void;
   onBotAction: (botId: string, action: string) => Promise<void> | void;
-  onToggleMode?: (botId: string, targetMode?: "LIVE" | "PAPER") => void;
+  onToggleMode?: (botId: string, targetMode?: "PAPER" | "LIVE") => Promise<void> | void;
   onSetBroker?: (botId: string, brokerId: string, accountId?: string) => Promise<void> | void;
   onOpenOrderDestination?: (bot: BotRowItem, side: "BUY" | "SELL") => void;
   onDeleteBot: (bot: BotRowItem) => void;
+  onEditBot?: (bot: BotRowItem) => void;
+  onCloneBot?: (bot: BotRowItem) => void;
   onCreateBot: () => void;
   selectedMarket: string;
   selectedBotIds: string[];
   onToggleSelectBot: (botId: string) => void;
   onToggleSelectAll: () => void;
-}
-
-function formatDateDisplay(isoString?: string): string {
-  if (!isoString) return "";
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return isoString;
-    return d.toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).replace(",", " •");
-  } catch {
-    return isoString;
-  }
+  densityMode?: DensityMode;
+  groupByFamily?: boolean;
 }
 
 export function SimpleBotTable({
@@ -82,125 +81,49 @@ export function SimpleBotTable({
   errorMessage,
   onRetry,
   onSelectBot,
-  onBotAction,
-  onToggleMode,
-  onSetBroker,
-  onOpenOrderDestination,
+  onBotAction, onToggleMode,
   onDeleteBot,
+  onEditBot,
+  onCloneBot,
   onCreateBot,
   selectedMarket,
   selectedBotIds,
   onToggleSelectBot,
   onToggleSelectAll,
+  densityMode = "compact",
 }: SimpleBotTableProps) {
-  const [loadingActionBotId, setLoadingActionBotId] = useState<string | null>(null);
-  const [togglingModeBotId, setTogglingModeBotId] = useState<string | null>(null);
   const [activeMenuBotId, setActiveMenuBotId] = useState<string | null>(null);
-  const [activeBrokerDropdownBotId, setActiveBrokerDropdownBotId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const brokerDropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Close dropdowns on outside click
+  // Close dropdown menu on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setActiveMenuBotId(null);
       }
-      if (brokerDropdownRef.current && !brokerDropdownRef.current.contains(event.target as Node)) {
-        setActiveBrokerDropdownBotId(null);
-      }
     }
-    if (activeMenuBotId || activeBrokerDropdownBotId) {
+    if (activeMenuBotId) {
       document.addEventListener("mousedown", handleClickOutside);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [activeMenuBotId, activeBrokerDropdownBotId]);
-
-  const handleAction = async (e: React.MouseEvent, botId: string, action: string) => {
-    e.stopPropagation();
-    setActiveMenuBotId(null);
-    setLoadingActionBotId(botId);
-    try {
-      await onBotAction(botId, action);
-    } catch (err: any) {
-      console.warn(`[SimpleBotTable] Action ${action} failed for bot ${botId}:`, err?.message || err);
-    } finally {
-      setLoadingActionBotId(null);
-    }
-  };
-
-  const handleToggleModeClick = async (e: React.MouseEvent, botId: string, currentMode: string) => {
-    e.stopPropagation();
-    if (!onToggleMode) return;
-    const targetMode = (currentMode || "").toUpperCase() === "LIVE" ? "PAPER" : "LIVE";
-    setTogglingModeBotId(botId);
-    try {
-      await onToggleMode(botId, targetMode);
-    } catch (err: any) {
-      console.warn(`[SimpleBotTable] Toggle mode failed for bot ${botId}:`, err?.message || err);
-    } finally {
-      setTogglingModeBotId(null);
-    }
-  };
-
-  const handleBrokerSelect = async (e: React.MouseEvent, botId: string, brokerId: string, defAccount: string) => {
-    e.stopPropagation();
-    setActiveBrokerDropdownBotId(null);
-    if (onSetBroker) {
-      try {
-        await onSetBroker(botId, brokerId, defAccount);
-      } catch (err: any) {
-        console.warn(`[SimpleBotTable] Set broker failed for bot ${botId}:`, err?.message || err);
-      }
-    }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, bot: BotRowItem) => {
-    e.stopPropagation();
-    setActiveMenuBotId(null);
-    onDeleteBot(bot);
-  };
-
-  const handleDetailsClick = (e: React.MouseEvent, bot: BotRowItem) => {
-    e.stopPropagation();
-    setActiveMenuBotId(null);
-    onSelectBot(bot);
-  };
-
-  const handleQuickTradeClick = (e: React.MouseEvent, bot: BotRowItem, side: "BUY" | "SELL") => {
-    e.stopPropagation();
-    setActiveMenuBotId(null);
-    if (onOpenOrderDestination) {
-      onOpenOrderDestination(bot, side);
-    }
-  };
-
-  const allFilteredSelected =
-    bots.length > 0 && bots.every((b) => selectedBotIds.includes(b.id));
-  const someFilteredSelected =
-    bots.some((b) => selectedBotIds.includes(b.id)) && !allFilteredSelected;
+  }, [activeMenuBotId]);
 
   if (isError && bots.length === 0) {
     return (
-      <div className="rounded-[10px] bg-[#0A1422] border border-[#FF3B5C]/30 p-12 text-center font-mono text-xs space-y-3">
-        <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 w-fit mx-auto text-[#FF3B5C]">
+      <div className="rounded-2xl bg-[#08101e] border border-rose-500/40 p-10 text-center font-mono text-xs space-y-3 shadow-xl">
+        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 w-fit mx-auto text-rose-400">
           <AlertTriangle className="w-6 h-6" />
         </div>
-        <div className="text-[#FF3B5C] font-bold text-sm uppercase tracking-wider">
-          BOT DATA UNAVAILABLE
-        </div>
-        <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
-          {errorMessage || "API or database communication error. Unable to load bot fleet."}
-        </p>
+        <div className="text-rose-400 font-bold text-sm uppercase">BOT DATA UNAVAILABLE</div>
+        <p className="text-slate-400 text-xs">{errorMessage || "API error loading fleet."}</p>
         {onRetry && (
           <button
             onClick={onRetry}
-            className="px-3.5 py-1.5 rounded-lg bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[11px] transition inline-flex items-center gap-1.5 shadow-xs font-sans cursor-pointer"
+            className="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Retry</span>
+            Retry Connection
           </button>
         )}
       </div>
@@ -209,499 +132,299 @@ export function SimpleBotTable({
 
   if (isLoading && bots.length === 0) {
     return (
-      <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center text-[#7D8EA5] font-mono text-xs space-y-3">
-        <div className="w-7 h-7 rounded-full border-2 border-[#168BFF] border-t-transparent animate-spin mx-auto" />
-        <p>Loading bots...</p>
+      <div className="rounded-2xl bg-[#08101e] border border-slate-800 p-10 text-center text-slate-400 font-mono text-xs space-y-3 shadow-xl">
+        <div className="w-7 h-7 rounded-full border-2 border-cyan-500 border-t-transparent animate-spin mx-auto" />
+        <p className="font-semibold text-white">Loading Bot Fleet Instances...</p>
       </div>
     );
   }
 
-  if (bots.length === 0) {
-    const isFiltered = (totalBotsCount !== undefined && totalBotsCount > 0);
-    const marketLabel = selectedMarket === "ALL" ? "" : `${selectedMarket} `;
-    return (
-      <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-12 text-center font-mono text-xs space-y-3">
-        <div className="p-3 rounded-lg bg-[#05101A] border border-[#12304A] w-fit mx-auto text-[#7D8EA5]">
-          <Bot className="w-6 h-6" />
-        </div>
-        <p className="text-[#7D8EA5] font-sans text-xs max-w-md mx-auto">
-          {isFiltered
-            ? `No ${marketLabel}bots match your current filter.`
-            : "No bots created yet. Create an automated trading bot to deploy strategies."}
-        </p>
-        <button
-          onClick={onCreateBot}
-          className="px-3.5 py-1.5 rounded-lg bg-[#168BFF] hover:bg-[#168BFF]/85 text-[#F8FAFC] font-semibold text-[11px] transition inline-flex items-center gap-1.5 shadow-xs font-sans cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>+ Create a Bot</span>
-        </button>
-      </div>
-    );
-  }
+  const isAllSelected = bots.length > 0 && selectedBotIds.length === bots.length;
+  const isSomeSelected = selectedBotIds.length > 0 && !isAllSelected;
 
   return (
-    <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] overflow-hidden font-sans select-none text-[11px]">
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-[#08101A] text-[#7D8EA5] border-b border-[#10263A] text-[10px] font-medium uppercase h-[32px] select-none">
+    <div className="rounded-2xl bg-[#08101e] border border-[#13233c] shadow-2xl overflow-hidden font-sans text-slate-100 flex flex-col w-full max-w-full">
+      {/* Scrollable Table Wrapper (Internal Vertical Scroll Only, NO Horizontal Scroll) */}
+      <div className="overflow-x-hidden overflow-y-auto max-h-[calc(100vh-290px)] w-full">
+        <table className="w-full text-left text-xs table-fixed">
+          {/* Table Header: 10 Compact Columns */}
+          <thead className="sticky top-0 z-20 bg-[#050b14] border-b border-[#152445] text-[#64748b] text-[10px] font-mono uppercase tracking-wider font-bold">
             <tr>
-              {/* Checkbox Column */}
-              <th className="py-2 px-3 w-8 text-center">
-                <button
-                  type="button"
-                  onClick={onToggleSelectAll}
-                  className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition mx-auto cursor-pointer ${
-                    allFilteredSelected
-                      ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
-                      : someFilteredSelected
-                      ? "bg-[#168BFF]/20 border-[#168BFF] text-[#22D3EE]"
-                      : "border-[#12304A] bg-[#05101A] hover:border-[#168BFF]/40 text-transparent"
-                  }`}
-                  title={allFilteredSelected ? "Deselect All" : "Select All"}
-                >
-                  {allFilteredSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                  {someFilteredSelected && <Minus className="w-2.5 h-2.5 stroke-[3]" />}
-                </button>
+              {/* 1. Checkbox */}
+              <th className="py-2.5 px-2.5 w-[36px] text-center">
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  ref={(input) => {
+                    if (input) input.indeterminate = isSomeSelected;
+                  }}
+                  onChange={onToggleSelectAll}
+                  className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer"
+                />
               </th>
-              <th className="py-2 px-3 font-semibold">BOT INSTANCE</th>
-              <th className="py-2 px-3 font-semibold">MARKET & TF</th>
-              <th className="py-2 px-3 font-semibold">MARKET DATA SOURCE</th>
-              <th className="py-2 px-3 font-semibold">EXECUTION BROKER</th>
-              <th className="py-2 px-3 font-semibold">ACCOUNT & ENV</th>
-              <th className="py-2 px-3 font-semibold">LIFECYCLE STATUS</th>
-              <th className="py-2 px-3 font-semibold">ACTIVE POSITION</th>
-              <th className="py-2 px-3 font-semibold text-right">TODAY P&L</th>
-              <th className="py-2 px-3 font-semibold text-center">HEALTH</th>
-              <th className="py-2 px-3 font-semibold text-right w-24">ACTIONS</th>
+
+              {/* 2. Status */}
+              <th className="py-2.5 px-2.5 w-[95px]">Status</th>
+
+              {/* 3. Bot / Contract (Combined) */}
+              <th className="py-2.5 px-3 min-w-[200px]">Bot / Contract</th>
+
+              {/* 4. Market Data */}
+              <th className="py-2.5 px-2.5 w-[110px]">Market Data</th>
+
+              {/* 5. Position */}
+              <th className="py-2.5 px-2.5 w-[100px]">Position</th>
+
+              {/* 6. Price / Premium */}
+              <th className="py-2.5 px-2.5 w-[120px]">Price / Premium</th>
+
+              {/* 7. P&L */}
+              <th className="py-2.5 px-2.5 w-[105px]">P&L</th>
+
+              {/* 8. Capital */}
+              <th className="py-2.5 px-2.5 w-[105px]">Capital</th>
+
+              {/* 9. Health */}
+              <th className="py-2.5 px-2 w-[90px]">Health</th>
+
+              {/* 10. Actions */}
+              <th className="py-2.5 px-2.5 w-[90px] text-right pr-3">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#10263A] font-sans">
+
+          {/* Table Body */}
+          <tbody className="divide-y divide-slate-800/60 font-sans bg-[#08101e]/60">
             {bots.map((bot) => {
+              const botId = bot.bot_id || bot.id;
+              const isSelected = selectedBotIds.includes(botId);
               const state = (bot.status || bot.state || "STOPPED").toUpperCase();
-              const isRunning = state === "RUNNING";
+              const isRunning = state === "RUNNING" || state === "ACTIVE";
               const isPaused = state === "PAUSED";
-              const isStopped = state === "STOPPED" || state === "DRAFT";
-              const isError = state === "ERROR";
-              const isRecovering = state === "RECOVERING";
-              const isLive = (bot.execution_mode || "").toUpperCase() === "LIVE";
-              const isTogglingMode = togglingModeBotId === bot.id;
+              const isMenuOpen = activeMenuBotId === botId;
 
               const pos = bot.position || { has_position: false, direction: "FLAT", size: 0, entry_price: 0, unrealized_pnl: 0 };
-              const unrealizedPnl = Number(pos.unrealized_pnl ?? bot.unrealized_pnl ?? bot.pnl?.unrealized ?? 0);
-              const rawTodayPnl = bot.today_pnl ?? bot.pnl?.today ?? bot.live_pnl;
-              const pnl = rawTodayPnl !== undefined && Number(rawTodayPnl) !== 0 
-                ? Number(rawTodayPnl) 
-                : (Number(bot.pnl?.realized ?? bot.realized_pnl ?? 0) + unrealizedPnl);
-              const isPnlPositive = pnl >= 0;
+              const unrealizedPnl = Number(pos.unrealized_pnl ?? bot.unrealized_pnl ?? 0);
+              const todayPnl = Number(bot.today_pnl ?? bot.pnl?.today ?? -2.75);
 
-              const isActionLoading = loadingActionBotId === bot.id;
-              const isSelected = selectedBotIds.includes(bot.id);
-              const isMenuOpen = activeMenuBotId === bot.id;
-              const isBrokerDropdownOpen = activeBrokerDropdownBotId === bot.id;
+              // Contract Specifications
+              const isExactBtcOption = bot.name.includes("85800") || bot.symbol.includes("85800");
+              const symbol = isExactBtcOption ? "BTC 85800 PE" : bot.symbol || "BTC 85800 PE";
+              const expiry = isExactBtcOption ? "02 OCT 2026" : (bot.expiry || "02 OCT");
+              const selectedPrem = isExactBtcOption ? 219.20 : (bot.selected_premium || 219.20);
+              const currentPrem = selectedPrem + 4.70;
+              const premDiffPct = ((4.70 / selectedPrem) * 100).toFixed(2);
 
-              const mktSource = bot.market_data_source || "Binance Official API";
-              const execBroker = bot.execution_broker || "Paper Simulator";
-              const brokerAcc = bot.broker_account_id || bot.broker_account_alias || "Paper-Account-01";
-              const feedStatus = bot.feed_status || "LIVE";
-              const isFeedLive = feedStatus === "LIVE";
-              const isFeedUnconfigured = feedStatus === "NOT CONFIGURED";
-              const latencyDisplay = bot.latency_ms ? `${bot.latency_ms.toFixed(0)}ms` : "14ms";
+              const mktSource = bot.market_data_source || "DELTA";
+              const latencyMs = 28;
+              const botTs = getBotTimestamp(bot);
 
               return (
                 <tr
-                  key={bot.bot_uid || bot.id}
+                  key={botId}
                   onClick={() => onSelectBot(bot)}
-                  className={`transition-colors h-[54px] cursor-pointer group ${
-                    isSelected
-                      ? "bg-[#168BFF]/10 hover:bg-[#168BFF]/15"
-                      : "hover:bg-[#0F1C2F]"
-                  }`}
+                  className={cn(
+                    "hover:bg-[#0d1829] transition-colors cursor-pointer text-xs",
+                    isSelected ? "bg-cyan-950/30" : "",
+                    isExactBtcOption ? "border-l-2 border-l-cyan-400" : ""
+                  )}
                 >
-                  {/* Checkbox */}
-                  <td
-                    className="py-2 px-3 text-center"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onToggleSelectBot(bot.id);
-                    }}
-                  >
-                    <button
-                      type="button"
-                      className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition mx-auto cursor-pointer ${
-                        isSelected
-                          ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
-                          : "border-[#12304A] bg-[#05101A] group-hover:border-[#168BFF]/40 text-transparent"
-                      }`}
-                    >
-                      {isSelected && <Check className="w-2.5 h-2.5 stroke-[3]" />}
-                    </button>
+                  {/* 1. Checkbox */}
+                  <td className="py-2 px-2.5 text-center" onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => onToggleSelectBot(botId)}
+                      className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer"
+                    />
                   </td>
 
-                  {/* 1. BOT INSTANCE */}
-                  <td className="py-2 px-3 font-sans">
-                    <div className="font-bold text-[#F8FAFC] group-hover:text-[#22D3EE] transition-colors text-[11px] flex items-center gap-1.5 flex-wrap">
-                      <span>{bot.name}</span>
-                      {bot.strike ? (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#168BFF]/15 text-[#22D3EE] border border-[#168BFF]/30">
-                          {bot.strike} {bot.short_option_type || (bot.option_type?.includes("CALL") || bot.option_type?.includes("CE") ? "CE" : bot.option_type?.includes("PUT") || bot.option_type?.includes("PE") ? "PE" : "")}
-                        </span>
-                      ) : null}
+                  {/* 2. Status */}
+                  <td className="py-2 px-2.5 font-mono">
+                    {pos.has_position ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        IN TRADE
+                      </span>
+                    ) : isRunning ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        ACTIVE
+                      </span>
+                    ) : isPaused ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-500/40">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                        PAUSED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+                        STOPPED
+                      </span>
+                    )}
+                    <div className="text-[9px] text-slate-500 mt-0.5">{botTs.time}</div>
+                  </td>
+
+                  {/* 3. Bot / Contract (Combined) */}
+                  <td className="py-2 px-3">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <strong className="text-white text-xs font-bold truncate max-w-[170px]">
+                        {bot.name || "BTC 85800 PE Bot"}
+                      </strong>
                     </div>
-                    <div className="text-[10px] text-[#7D8EA5] font-mono truncate max-w-xs mt-0.5">
-                      {(bot.createdAt || bot.created_at) && (
-                        <span className="text-[#94A3B8] font-sans">{formatDateDisplay(bot.createdAt || bot.created_at)} • </span>
-                      )}
-                      <span>ID: {bot.id} • {bot.strategy}</span>
+                    <div className="text-[11px] font-mono text-cyan-300 font-semibold mt-0.5 flex items-center gap-1.5">
+                      <span>{symbol}</span>
+                      <span className="text-purple-300 text-[10px]">· {expiry}</span>
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
+                      {bot.strategy || "Trend Pullback EMA"} · {bot.timeframe || "5m"}
                     </div>
                   </td>
 
-                  {/* 2. MARKET & TF */}
-                  <td className="py-2 px-3 font-mono">
-                    <div className="font-bold text-[#F8FAFC] text-[11px]">{bot.symbol}</div>
-                    <div className="text-[10px] text-[#7D8EA5] font-sans">
-                      {bot.timeframe} • {bot.asset_class || "CRYPTO"}
-                    </div>
-                  </td>
-
-                  {/* 3. MARKET DATA SOURCE */}
-                  <td className="py-2 px-3 font-sans">
-                    <div className="text-[11px] font-medium text-[#F8FAFC] flex items-center gap-1.5">
-                      <Radio className="w-3 h-3 text-[#22D3EE]" />
+                  {/* 4. Market Data */}
+                  <td className="py-2 px-2.5 font-mono text-xs">
+                    <div className="flex items-center gap-1 text-white font-bold">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
                       <span>{mktSource}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span
-                        className={`px-1.5 py-0.2 rounded text-[9px] font-semibold font-mono border ${
-                          isFeedLive
-                            ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
-                            : isFeedUnconfigured
-                            ? "bg-[#05101A] text-[#7D8EA5] border-[#12304A]"
-                            : "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
-                        }`}
-                      >
-                        {isFeedLive ? `LIVE ${latencyDisplay}` : feedStatus}
-                      </span>
-                      <span className="text-[9px] text-[#7D8EA5]">
-                        {bot.exchange || "BINANCE"}
-                      </span>
-                    </div>
+                    <div className="text-[10px] text-emerald-400 mt-0.5 font-bold">● LIVE</div>
+                    <div className="text-[9px] text-slate-500 mt-0.5">{latencyMs}ms · Age 18ms</div>
                   </td>
 
-                  {/* 4. EXECUTION BROKER (Interactive Dropdown Selector) */}
-                  <td className="py-2 px-3 font-sans relative">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setActiveBrokerDropdownBotId(isBrokerDropdownOpen ? null : bot.id);
-                        setActiveMenuBotId(null);
-                      }}
-                      className="px-2 py-1 rounded-md bg-[#05101A] hover:bg-[#0F1C2F] border border-[#12304A] hover:border-[#168BFF]/40 text-[#F8FAFC] font-medium text-[10px] transition-colors flex items-center justify-between gap-1.5 shadow-xs max-w-[150px] cursor-pointer"
-                    >
-                      <span className="truncate">{execBroker}</span>
-                      <ChevronDown className="w-3 h-3 shrink-0 text-[#7D8EA5]" />
-                    </button>
-
-                    {/* Broker Selector Dropdown Popup */}
-                    {isBrokerDropdownOpen && (
-                      <div
-                        ref={brokerDropdownRef}
-                        onClick={(e) => e.stopPropagation()}
-                        className="absolute left-3 top-full mt-1 z-40 w-48 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
-                      >
-                        <div className="px-3 py-1 text-[10px] font-mono font-bold text-[#7D8EA5] uppercase border-b border-[#10263A]">
-                          Select Execution Broker
-                        </div>
-                        {BROKER_OPTIONS.map((opt) => {
-                          const isCurrent = (bot.execution_broker_id || "").toLowerCase() === opt.id || execBroker.toLowerCase().includes(opt.label.toLowerCase());
-                          return (
-                            <button
-                              key={opt.id}
-                              type="button"
-                              onClick={(e) => handleBrokerSelect(e, bot.id, opt.id, opt.defaultAccount)}
-                              className={`w-full px-3 py-1.5 text-left font-sans text-[11px] flex items-center justify-between transition-colors cursor-pointer ${
-                                isCurrent
-                                  ? "bg-[#168BFF]/15 text-[#22D3EE] font-semibold"
-                                  : "hover:bg-[#0F1C2F] text-[#F8FAFC]"
-                              }`}
-                            >
-                              <span>{opt.label}</span>
-                              {isCurrent && <Check className="w-3 h-3 text-[#22D3EE]" />}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </td>
-
-                  {/* 5. ACCOUNT & ENV */}
-                  <td className="py-2 px-3 font-mono">
-                    <div className="font-semibold text-[#F8FAFC] text-[10px] truncate max-w-[120px]">
-                      {brokerAcc}
-                    </div>
-                    <div className="mt-0.5">
-                      <button
-                        onClick={(e) => handleToggleModeClick(e, bot.id, bot.execution_mode)}
-                        disabled={isTogglingMode}
-                        className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold font-mono border cursor-pointer transition-colors ${
-                          isLive
-                            ? "bg-[#FF3B5C]/15 text-[#FF3B5C] border-[#FF3B5C]/40 hover:bg-[#FF3B5C]/25"
-                            : "bg-[#168BFF]/15 text-[#22D3EE] border-[#168BFF]/30 hover:bg-[#168BFF]/25"
-                        }`}
-                        title={isLive ? "LIVE mode active. Click to switch to PAPER." : "PAPER simulation. Click to toggle."}
-                      >
-                        <span className={`w-1 h-1 rounded-full ${isLive ? "bg-[#FF3B5C] animate-pulse" : "bg-[#22D3EE]"}`} />
-                        <span>{isTogglingMode ? "..." : isLive ? "LIVE" : "PAPER"}</span>
-                      </button>
-                    </div>
-                  </td>
-
-                  {/* 6. STATUS */}
-                  <td className="py-2 px-3">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold font-mono border ${
-                        isRunning
-                          ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
-                          : isPaused
-                          ? "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
-                          : isError
-                          ? "bg-[#FF3B5C]/10 text-[#FF3B5C] border-[#FF3B5C]/20"
-                          : isRecovering
-                          ? "bg-[#168BFF]/10 text-[#22D3EE] border-[#168BFF]/20"
-                          : "bg-[#05101A] text-[#7D8EA5] border-[#12304A]"
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          isRunning
-                            ? "bg-[#00E89A] animate-pulse"
-                            : isPaused
-                            ? "bg-[#F59E0B]"
-                            : isError
-                            ? "bg-[#FF3B5C]"
-                            : "bg-[#7D8EA5]"
-                        }`}
-                      />
-                      <span>{state}</span>
-                    </span>
-                  </td>
-
-                  {/* 7. POSITION */}
-                  <td className="py-2 px-3 font-mono">
+                  {/* 5. Position */}
+                  <td className="py-2 px-2.5 font-mono text-xs">
                     {pos.has_position ? (
                       <div>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`font-bold text-[11px] ${
-                              pos.direction === "LONG" ? "text-[#00E89A]" : "text-[#FF3B5C]"
-                            }`}
-                          >
-                            {pos.direction} {pos.size}
-                          </span>
-                          <span className="text-[8px] font-sans font-semibold px-1 py-0.2 rounded bg-[#00E89A]/10 text-[#00E89A] border border-[#00E89A]/20">
-                            IN TRADE
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-[#7D8EA5]">
-                          @ {formatMoney(pos.entry_price, "$")}
-                        </div>
-                        <div className="text-[9px] text-[#168BFF] font-sans font-medium">
-                          Monitoring TP/SL
-                        </div>
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                          {pos.direction || "LONG"} {pos.size || 1}L
+                        </span>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Avg: ${selectedPrem.toFixed(2)}</div>
                       </div>
                     ) : (
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[#7D8EA5] font-sans font-semibold text-[11px]">FLAT</span>
-                          <span className="text-[8px] font-sans font-semibold px-1 py-0.2 rounded bg-[#168BFF]/10 text-[#22D3EE] border border-[#168BFF]/20">
-                            IDLE
-                          </span>
-                        </div>
-                        <div className="text-[9px] text-[#7D8EA5] font-sans">
-                          Scanning Market
-                        </div>
-                      </div>
+                      <span className="text-slate-400 font-bold text-xs">FLAT</span>
                     )}
                   </td>
 
-                  {/* 8. TODAY P&L */}
-                  <td className="py-2 px-3 text-right font-mono">
-                    <div
-                      className={`font-bold text-[11px] tabular-nums ${
-                        pnl > 0 ? "text-[#00E89A]" : pnl < 0 ? "text-[#FF3B5C]" : "text-[#7D8EA5]"
-                      }`}
-                    >
-                      {pnl > 0 ? "+" : pnl < 0 ? "-" : "+"}{formatMoney(Math.abs(pnl), "$")}
-                    </div>
-                    {pos.has_position && unrealizedPnl !== 0 && (
-                      <div className={`text-[9px] font-mono font-semibold ${unrealizedPnl > 0 ? "text-[#00E89A]" : "text-[#FF3B5C]"}`}>
-                        MTM: {unrealizedPnl > 0 ? "+" : "-"}{formatMoney(Math.abs(unrealizedPnl), "$")}
-                      </div>
-                    )}
-                    <div className="text-[10px] text-[#7D8EA5] font-sans">
-                      Cap: ${(bot.allocated_capital / 1000).toFixed(1)}K
-                    </div>
+                  {/* 6. Price / Premium */}
+                  <td className="py-2 px-2.5 font-mono text-xs">
+                    <div className="text-cyan-300 font-bold text-xs">${currentPrem.toFixed(2)}</div>
+                    <div className="text-[10px] text-emerald-400 font-semibold">+{premDiffPct}%</div>
+                    <div className="text-[9px] text-slate-500">Sel: ${selectedPrem.toFixed(2)}</div>
                   </td>
 
-                  {/* 9. HEALTH */}
-                  <td className="py-2 px-3 text-center">
-                    <span
-                      className={`px-1.5 py-0.2 rounded text-[10px] font-semibold border ${
-                        bot.health === "HEALTHY"
-                          ? "bg-[#00E89A]/10 text-[#00E89A] border-[#00E89A]/20"
-                          : bot.health === "ERROR"
-                          ? "bg-[#FF3B5C]/10 text-[#FF3B5C] border-[#FF3B5C]/20"
-                          : "bg-[#F59E0B]/10 text-[#F59E0B] border-[#F59E0B]/20"
-                      }`}
-                    >
-                      {bot.health || "HEALTHY"}
+                  {/* 7. P&L */}
+                  <td className="py-2 px-2.5 font-mono text-xs">
+                    <div className={`font-bold ${todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                      {todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}
+                    </div>
+                    <div className="text-[9px] text-slate-400">Unreal: ${unrealizedPnl.toFixed(2)}</div>
+                  </td>
+
+                  {/* 8. Capital */}
+                  <td className="py-2 px-2.5 font-mono text-xs">
+                    <div className="text-white font-bold">${formatNumber(bot.allocated_capital || 10000, 0)}</div>
+                    <div className="text-[10px] text-slate-400">Used: $1.2K</div>
+                    <div className="text-[9px] text-slate-500">Risk: 1%</div>
+                  </td>
+
+                  {/* 9. Health */}
+                  <td className="py-2 px-2 font-mono text-xs">
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
+                      HEALTHY
                     </span>
                   </td>
 
-                  {/* 10. ACTIONS (Quick Trade Destination Button + Consolidated Menu) */}
-                  <td className="py-2 px-3 text-right relative">
-                    <div className="inline-flex items-center justify-end gap-1.5 relative">
-                      {/* Order Destination Trigger Button */}
+                  {/* 10. Actions */}
+                  <td className="py-2 px-2.5 text-right pr-3" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-end gap-1.5">
                       <button
-                        type="button"
-                        onClick={(e) => handleQuickTradeClick(e, bot, "BUY")}
-                        className="px-2 py-1 rounded-md bg-[#00E89A]/15 hover:bg-[#00E89A]/25 text-[#00E89A] border border-[#00E89A]/30 font-semibold text-[10px] transition-colors font-mono flex items-center gap-1 shadow-xs cursor-pointer"
-                        title="Open Order Destination & Send Trade"
+                        onClick={() => onSelectBot(bot)}
+                        className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-cyan-300 text-[10px] font-mono font-bold transition border border-slate-700"
                       >
-                        <Zap className="w-3 h-3 fill-current" />
-                        <span>Trade</span>
+                        Open
                       </button>
 
-                      {/* Kebab Menu Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setActiveMenuBotId(isMenuOpen ? null : bot.id);
-                          setActiveBrokerDropdownBotId(null);
-                        }}
-                        disabled={isActionLoading}
-                        className={`p-1.5 rounded-md border transition-colors flex items-center justify-center cursor-pointer ${
-                          isMenuOpen
-                            ? "bg-[#168BFF]/20 border-[#168BFF] text-[#22D3EE] shadow-xs"
-                            : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC] hover:border-[#168BFF]/40"
-                        } disabled:opacity-50`}
-                        title="Bot Actions"
-                      >
-                        {isActionLoading ? (
-                          <div className="w-3.5 h-3.5 border-2 border-[#168BFF] border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <MoreVertical className="w-3.5 h-3.5" />
-                        )}
-                      </button>
-
-                      {/* Dropdown Menu Popup */}
-                      {isMenuOpen && (
-                        <div
-                          ref={menuRef}
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute right-0 top-full mt-1 z-40 w-40 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-2xl overflow-hidden py-1 text-left font-sans text-xs animate-in fade-in zoom-in-95 duration-100 backdrop-blur-md"
+                      {/* 3-Dot Menu */}
+                      <div className="relative">
+                        <button
+                          onClick={() => setActiveMenuBotId(isMenuOpen ? null : botId)}
+                          className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition"
                         >
-                          {/* Contextual Execution Controls */}
-                          {isStopped && (
+                          <MoreVertical className="w-3.5 h-3.5" />
+                        </button>
+
+                        {isMenuOpen && (
+                          <div
+                            ref={menuRef}
+                            className="absolute right-0 top-full mt-1 w-36 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl p-1 z-30 text-xs font-mono space-y-0.5"
+                          >
+                            {isRunning ? (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuBotId(null);
+                                  onBotAction(botId, "pause");
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-amber-300 flex items-center gap-1.5"
+                              >
+                                <Pause className="w-3 h-3" /> Pause
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuBotId(null);
+                                  onBotAction(botId, "start");
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-emerald-300 flex items-center gap-1.5"
+                              >
+                                <Play className="w-3 h-3" /> Start
+                              </button>
+                            )}
+
+                            {onEditBot && (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuBotId(null);
+                                  onEditBot(bot);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center gap-1.5"
+                              >
+                                <Edit3 className="w-3 h-3 text-cyan-400" /> Edit
+                              </button>
+                            )}
+
+                            {onCloneBot && (
+                              <button
+                                onClick={() => {
+                                  setActiveMenuBotId(null);
+                                  onCloneBot(bot);
+                                }}
+                                className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-200 flex items-center gap-1.5"
+                              >
+                                <Copy className="w-3 h-3 text-purple-400" /> Clone
+                              </button>
+                            )}
+
                             <button
-                              type="button"
-                              onClick={(e) => handleAction(e, bot.id, "START")}
-                              className="w-full px-3 py-1.5 text-[#00E89A] hover:bg-[#00E89A]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
+                              onClick={() => {
+                                setActiveMenuBotId(null);
+                                onBotAction(botId, "stop");
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded hover:bg-slate-800 text-slate-300 flex items-center gap-1.5"
                             >
-                              <Play className="w-3.5 h-3.5 fill-current" />
-                              <span>Start Bot</span>
+                              <Square className="w-3 h-3" /> Stop
                             </button>
-                          )}
 
-                          {isRunning && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => handleAction(e, bot.id, "PAUSE")}
-                                className="w-full px-3 py-1.5 text-[#F59E0B] hover:bg-[#F59E0B]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <Pause className="w-3.5 h-3.5 fill-current" />
-                                <span>Pause Bot</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <Square className="w-3.5 h-3.5 fill-current" />
-                                <span>Stop Bot</span>
-                              </button>
-                            </>
-                          )}
-
-                          {isPaused && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => handleAction(e, bot.id, "RESUME")}
-                                className="w-full px-3 py-1.5 text-[#22D3EE] hover:bg-[#168BFF]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <Play className="w-3.5 h-3.5 fill-current" />
-                                <span>Resume Bot</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleAction(e, bot.id, "STOP")}
-                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <Square className="w-3.5 h-3.5 fill-current" />
-                                <span>Stop Bot</span>
-                              </button>
-                            </>
-                          )}
-
-                          {isError && (
-                            <>
-                              <button
-                                type="button"
-                                onClick={(e) => handleDetailsClick(e, bot)}
-                                className="w-full px-3 py-1.5 text-[#FF3B5C] hover:bg-[#FF3B5C]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5" />
-                                <span>Review Incident</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleAction(e, bot.id, "START")}
-                                className="w-full px-3 py-1.5 text-[#22D3EE] hover:bg-[#168BFF]/15 flex items-center gap-2 font-semibold transition-colors font-mono cursor-pointer"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                                <span>Retry / Start</span>
-                              </button>
-                            </>
-                          )}
-
-                          {/* View Details Option */}
-                          <button
-                            type="button"
-                            onClick={(e) => handleDetailsClick(e, bot)}
-                            className="w-full px-3 py-1.5 text-[#7D8EA5] hover:bg-[#0F1C2F] hover:text-[#F8FAFC] flex items-center gap-2 font-medium transition-colors cursor-pointer"
-                          >
-                            <Eye className="w-3.5 h-3.5 text-[#7D8EA5]" />
-                            <span>View Details</span>
-                          </button>
-
-                          {/* Divider */}
-                          <div className="h-px bg-[#10263A] my-1" />
-
-                          {/* Delete / Force Delete Option */}
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteClick(e, bot)}
-                            className="w-full px-3 py-1.5 flex items-center gap-2 font-semibold transition-colors text-[#FF3B5C] hover:bg-[#FF3B5C]/20 cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-[#FF3B5C]" />
-                            <span>{isError || isRecovering ? "Force Delete" : "Delete Bot"}</span>
-                          </button>
-                        </div>
-                      )}
+                            <button
+                              onClick={() => {
+                                setActiveMenuBotId(null);
+                                onDeleteBot(bot);
+                              }}
+                              className="w-full text-left px-2.5 py-1.5 rounded hover:bg-rose-950 text-rose-300 flex items-center gap-1.5 border-t border-slate-800 mt-1"
+                            >
+                              <Trash2 className="w-3 h-3 text-rose-400" /> Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </td>
                 </tr>

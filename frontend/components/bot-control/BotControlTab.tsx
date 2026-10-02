@@ -13,16 +13,22 @@ import { BulkStartConfirmationModal } from "./BulkStartConfirmationModal";
 import { CreateBotWizardModal } from "./CreateBotWizardModal";
 import { DeleteBotModal } from "./DeleteBotModal";
 import { BulkDeleteBotsModal } from "./BulkDeleteBotsModal";
+import { DeleteAllBotsModal } from "./DeleteAllBotsModal";
+import { DuplicateBotsReviewModal } from "./DuplicateBotsReviewModal";
 import { MultiBotBulkActionBar } from "./MultiBotBulkActionBar";
 import { OrderDestinationModal } from "./OrderDestinationModal";
+import { LiveStreamInspector } from "@/components/stream/LiveStreamInspector";
+import { LiveOrderFlowMonitor } from "@/components/orderbook/LiveOrderFlowMonitor";
 import { AlertTriangle, CheckCircle2, X } from "lucide-react";
 import { apiClient } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
+import { BotCreationIntent } from "@/types/bot-creation-intent";
 import {
   BotRowItem,
   FleetMetrics,
   BotViewMode,
+  DensityMode,
 } from "@/types/bot-control";
 
 export function BotControlTab() {
@@ -33,11 +39,18 @@ export function BotControlTab() {
     setIsMounted(true);
   }, []);
 
-  // UI State: View Mode & Filters
+  // UI State: Command Center Tabs & Views
+  const [commandCenterTab, setCommandCenterTab] = useState<"BOTS" | "STREAMS" | "ORDER_FLOW">("BOTS");
   const [viewMode, setViewMode] = useState<BotViewMode>("table");
+  const [densityMode, setDensityMode] = useState<DensityMode>("compact");
+  const [groupByFamily, setGroupByFamily] = useState<boolean>(false);
+
+  // Filters State
   const [search, setSearch] = useState("");
   const [selectedMarket, setSelectedMarket] = useState("ALL");
   const [selectedBroker, setSelectedBroker] = useState("ALL");
+  const [selectedStrategy, setSelectedStrategy] = useState("ALL");
+  const [selectedHealth, setSelectedHealth] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [envFilter, setEnvFilter] = useState("ALL");
   const [environment, setEnvironment] = useState<"PAPER" | "LIVE">("PAPER");
@@ -50,6 +63,8 @@ export function BotControlTab() {
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [isBulkStartModalOpen, setIsBulkStartModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isDeleteAllModalOpen, setIsDeleteAllModalOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
 
   // Intent Store & Deep Link Check
   const activeIntent = useBotCreationIntentStore((state) => state.activeIntent);
@@ -143,6 +158,23 @@ export function BotControlTab() {
     }
   }, [selectedBotIdFromUrl, rawBots]);
 
+  // Duplicate bots group detection
+  const duplicateGroups = useMemo(() => {
+    const groups: Record<string, BotRowItem[]> = {};
+    rawBots.forEach((bot) => {
+      const canonId = bot.canonical_instrument_id || bot.symbol;
+      const strat = bot.strategy_id || bot.strategy;
+      const tf = bot.timeframe || "5m";
+      const env = bot.environment || bot.execution_mode || "PAPER";
+      const key = `${canonId} | ${strat} | ${tf} | ${env}`;
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(bot);
+    });
+    return Object.entries(groups)
+      .filter(([_, list]) => list.length > 1)
+      .map(([key, bots]) => ({ key, bots }));
+  }, [rawBots]);
+
   const metrics: FleetMetrics = useMemo(() => {
     return (
       fleetData?.metrics || {
@@ -204,7 +236,7 @@ export function BotControlTab() {
         }
       }
 
-      // Broker Source Filter
+      // Broker / Provider Source Filter
       if (selectedBroker !== "ALL") {
         const brk = (bot.execution_broker_id || bot.execution_broker || bot.broker || bot.market_data_source || "").toUpperCase();
         if (selectedBroker === "PAPER" && !brk.includes("PAPER") && !brk.includes("SIM")) return false;
@@ -212,6 +244,17 @@ export function BotControlTab() {
         if (selectedBroker === "UPSTOX" && !brk.includes("UPSTOX")) return false;
         if (selectedBroker === "DHAN" && !brk.includes("DHAN")) return false;
         if (selectedBroker === "DELTA_INDIA" && !brk.includes("DELTA")) return false;
+      }
+
+      // Strategy Filter
+      if (selectedStrategy !== "ALL") {
+        if (bot.strategy !== selectedStrategy && bot.strategy_id !== selectedStrategy) return false;
+      }
+
+      // Health Filter
+      if (selectedHealth !== "ALL") {
+        const h = (bot.health || "HEALTHY").toUpperCase();
+        if (h !== selectedHealth.toUpperCase()) return false;
       }
 
       // Status filter
@@ -256,7 +299,7 @@ export function BotControlTab() {
 
       return true;
     });
-  }, [rawBots, selectedMarket, selectedBroker, statusFilter, envFilter, search]);
+  }, [rawBots, selectedMarket, selectedBroker, selectedStrategy, selectedHealth, statusFilter, envFilter, search]);
 
   // Clean up selectedBotIds if bots were deleted
   useEffect(() => {
@@ -381,6 +424,72 @@ export function BotControlTab() {
     setIsDeleteModalOpen(true);
   };
 
+  // Edit bot: load configuration into intent store and open BotCreationControlPlane
+  const handleEditBot = (bot: BotRowItem) => {
+    const isPE = bot.symbol.includes(" PE") || (bot.option_type || "").toUpperCase() === "PE";
+    const isCE = bot.symbol.includes(" CE") || (bot.option_type || "").toUpperCase() === "CE";
+    const optType: "CE" | "PE" | undefined = isPE ? "PE" : isCE ? "CE" : undefined;
+
+    const intent: BotCreationIntent = {
+      creationIntentId: `edit_${bot.id}_${Date.now()}`,
+      timestamp: Date.now(),
+      origin: "MANUAL",
+      symbol: bot.symbol,
+      canonicalSymbol: bot.canonical_symbol || bot.symbol,
+      canonicalContractId: bot.canonical_instrument_id || bot.id,
+      underlying: bot.underlying || bot.symbol.split(" ")[0],
+      expiry: bot.expiry,
+      strike: bot.strike,
+      optionType: optType,
+      side: (bot.side || "BUY") as any,
+      selectedPremium: bot.selected_premium || bot.entry_price || bot.current_price,
+      selectedBid: bot.selected_bid || bot.bid,
+      selectedAsk: bot.selected_ask || bot.ask,
+      assetClass: (bot.asset_class || "OPTIONS") as any,
+      marketDataSource: bot.market_data_source || bot.market_data_provider || "DELTA",
+      broker: bot.execution_broker || bot.broker || "PAPER",
+      strategyId: bot.strategy_id || bot.strategy,
+      timeframe: bot.timeframe || "5m",
+      allocatedCapital: bot.allocated_capital || 10000,
+      lotSize: bot.lot_size || 1,
+    };
+    useBotCreationIntentStore.getState().setIntent(intent);
+    setIsCreateModalOpen(true);
+  };
+
+  // Clone bot: load configuration with new draft intent
+  const handleCloneBot = (bot: BotRowItem) => {
+    const isPE = bot.symbol.includes(" PE") || (bot.option_type || "").toUpperCase() === "PE";
+    const isCE = bot.symbol.includes(" CE") || (bot.option_type || "").toUpperCase() === "CE";
+    const optType: "CE" | "PE" | undefined = isPE ? "PE" : isCE ? "CE" : undefined;
+
+    const intent: BotCreationIntent = {
+      creationIntentId: `clone_${bot.id}_${Date.now()}`,
+      timestamp: Date.now(),
+      origin: "MANUAL",
+      symbol: bot.symbol,
+      canonicalSymbol: bot.canonical_symbol || bot.symbol,
+      canonicalContractId: bot.canonical_instrument_id || bot.id,
+      underlying: bot.underlying || bot.symbol.split(" ")[0],
+      expiry: bot.expiry,
+      strike: bot.strike,
+      optionType: optType,
+      side: (bot.side || "BUY") as any,
+      selectedPremium: bot.selected_premium || bot.entry_price || bot.current_price,
+      selectedBid: bot.selected_bid || bot.bid,
+      selectedAsk: bot.selected_ask || bot.ask,
+      assetClass: (bot.asset_class || "OPTIONS") as any,
+      marketDataSource: bot.market_data_source || bot.market_data_provider || "DELTA",
+      broker: bot.execution_broker || bot.broker || "PAPER",
+      strategyId: bot.strategy_id || bot.strategy,
+      timeframe: bot.timeframe || "5m",
+      allocatedCapital: bot.allocated_capital || 10000,
+      lotSize: bot.lot_size || 1,
+    };
+    useBotCreationIntentStore.getState().setIntent(intent);
+    setIsCreateModalOpen(true);
+  };
+
   // Confirm Single Delete with in-flight lock
   const handleConfirmSingleDelete = async (botId: string, force: boolean = false) => {
     const lockKey = `DELETE:${botId}`;
@@ -412,10 +521,6 @@ export function BotControlTab() {
       setActionSuccess(res.data?.message || `Bot permanently deleted. Trade history preserved.`);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
-      queryClient.invalidateQueries({ queryKey: ["fleetSummary"] });
     } catch (err: any) {
       const msg = err.message || `Failed to delete bot ${botId}`;
       setActionError(msg);
@@ -449,28 +554,15 @@ export function BotControlTab() {
       );
 
       if (!res.ok) {
-        throw new Error(res.error?.message || "Failed to bulk delete bots");
+        throw new Error(res.error?.message || "Failed bulk delete");
       }
 
       setSelectedBotIds([]);
-      setIsBulkDeleteModalOpen(false);
-
-      if (selectedBot && botIds.includes(selectedBot.id)) {
-        setIsDetailsDrawerOpen(false);
-        setSelectedBot(null);
-      }
-
-      const count = res.data?.deleted_count || botIds.length;
-      setActionSuccess(`Successfully deleted ${count} bot(s). Trade history preserved.`);
-      
-      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["botsSummary"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
-      queryClient.invalidateQueries({ queryKey: ["fleetSummary"] });
+      setActionSuccess(res.data?.message || `Successfully deleted ${botIds.length} bot(s).`);
       await refetch();
+      queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
     } catch (err: any) {
-      const msg = err.message || "Failed to bulk delete bots";
+      const msg = err.message || "Failed to delete selected bots";
       setActionError(msg);
       throw err;
     } finally {
@@ -481,6 +573,13 @@ export function BotControlTab() {
         return next;
       });
     }
+  };
+
+  // Confirm Delete All Bots
+  const handleConfirmDeleteAll = async () => {
+    const allIds = rawBots.map((b) => b.id);
+    if (allIds.length === 0) return;
+    await handleConfirmBulkDelete(allIds);
   };
 
   // Bulk Stop Selected
@@ -509,8 +608,6 @@ export function BotControlTab() {
       setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
     } catch (err: any) {
       setActionError(err.message || "Failed to stop selected bots");
     } finally {
@@ -548,8 +645,6 @@ export function BotControlTab() {
       setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
     } catch (err: any) {
       setActionError(err.message || "Failed to start selected bots");
     } finally {
@@ -587,8 +682,6 @@ export function BotControlTab() {
       setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
     } catch (err: any) {
       setActionError(err.message || "Failed to pause selected bots");
     } finally {
@@ -626,8 +719,6 @@ export function BotControlTab() {
       setSelectedBotIds([]);
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
-      queryClient.invalidateQueries({ queryKey: ["botsList"] });
-      queryClient.invalidateQueries({ queryKey: ["activeBots"] });
     } catch (err: any) {
       setActionError(err.message || "Failed to resume selected bots");
     } finally {
@@ -639,7 +730,7 @@ export function BotControlTab() {
     }
   };
 
-  // Bulk Start Eligible (Header button)
+  // Bulk Start Eligible
   const handleConfirmBulkStart = async () => {
     const lockKey = "START_ALL";
     if (inFlightActionKeys.has(lockKey)) return;
@@ -664,7 +755,7 @@ export function BotControlTab() {
         setActionError(msg);
         throw new Error(msg);
       }
-      setActionSuccess("Bulk start triggered for eligible bots.");
+      setActionSuccess("Bulk start triggered for all eligible bots.");
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
     } finally {
@@ -692,7 +783,7 @@ export function BotControlTab() {
         "/api/bots/emergency-halt",
         {
           active: targetState,
-          reason: targetState ? "Emergency Halt Triggered by User" : "Emergency Halt Released",
+          reason: targetState ? "Emergency Halt Triggered by Operator" : "Emergency Halt Released",
         },
         { idempotencyKey, timeoutMs: 15000 }
       );
@@ -702,7 +793,7 @@ export function BotControlTab() {
         setActionError(msg);
         throw new Error(msg);
       }
-      setActionSuccess(targetState ? "🔴 Emergency Halt Activated across fleet." : "🟢 Emergency Halt Released.");
+      setActionSuccess(targetState ? "🔴 Emergency Halt Activated across bot fleet." : "🟢 Emergency Halt Released.");
       await refetch();
       queryClient.invalidateQueries({ queryKey: ["authoritativeFleetBots"] });
     } finally {
@@ -772,10 +863,11 @@ export function BotControlTab() {
   const handleExportCsv = () => {
     try {
       const headers = [
-        "UID",
-        "ID",
+        "Bot ID",
         "Name",
         "Symbol",
+        "Signal Instrument",
+        "Execution Instrument",
         "Asset Class",
         "Timeframe",
         "Strategy",
@@ -783,33 +875,32 @@ export function BotControlTab() {
         "Market Data Source",
         "Execution Broker",
         "Broker Account",
-        "Exchange",
-        "Segment",
-        "Instrument Key",
-        "Feed Status",
         "Status",
+        "Health",
         "Allocated Capital",
+        "Position Direction",
+        "Position Qty",
         "Today PnL",
       ];
       const rows = filteredBots.map((b) => [
-        b.bot_uid || b.id,
-        b.id,
+        b.bot_id || b.id,
         `"${b.name}"`,
         b.symbol,
+        b.signal_instrument || b.symbol,
+        b.execution_instrument || b.symbol,
         b.asset_class,
         b.timeframe,
         b.strategy,
         b.execution_mode,
-        b.market_data_source || "Binance Official API",
+        b.market_data_source || "DELTA",
         b.execution_broker || "Paper Simulator",
         b.broker_account_id || "Paper-Account-01",
-        b.exchange || "BINANCE",
-        b.segment || "CRYPTO_SPOT",
-        b.instrument_key || b.symbol,
-        b.feed_status || "LIVE",
         b.status,
+        b.health || "HEALTHY",
         b.allocated_capital,
-        b.pnl?.today ?? b.live_pnl ?? 0,
+        b.position?.direction || "FLAT",
+        b.position?.size || 0,
+        b.today_pnl ?? b.pnl?.today ?? b.live_pnl ?? 0,
       ]);
       const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((e) => e.join(","))].join("\n");
       const encodedUri = encodeURI(csvContent);
@@ -837,24 +928,28 @@ export function BotControlTab() {
   if (!isMounted) return null;
 
   return (
-    <div className="w-full space-y-3.5 font-sans max-w-[1600px] mx-auto px-4 pt-4 pb-12 bg-[#05101A] select-none text-[#F8FAFC]">
-      {/* 1. Top Summary Header & Essential Metric Cards */}
+    <div className="w-full space-y-3 font-sans max-w-[1680px] mx-auto px-3 pt-3 pb-16 bg-[#05101A] select-none text-[#F8FAFC] overflow-x-hidden">
+      {/* 1. Top Summary Header & Compact 6-Card Grid */}
       <SimpleFleetSummaryHeader
         metrics={metrics}
         environment={environment}
         onEnvironmentChange={setEnvironment}
         onCreateBot={() => setIsCreateModalOpen(true)}
         onStartEligible={() => setIsBulkStartModalOpen(true)}
+        onPauseAll={handleBulkPause}
         onToggleEmergencyHalt={handleToggleEmergencyHalt}
+        onOpenDeleteAllModal={() => setIsDeleteAllModalOpen(true)}
+        onOpenDuplicateReviewModal={() => setIsDuplicateModalOpen(true)}
+        duplicateCount={duplicateGroups.length}
       />
 
       {/* Feedback Alert Banners */}
       {actionError && (
-        <div className="p-3 rounded-lg bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 text-[#FF3B5C] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+        <div className="p-3 rounded-xl bg-[#FF3B5C]/10 border border-[#FF3B5C]/30 text-[#FF3B5C] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">
             <AlertTriangle className="w-4 h-4 text-[#FF3B5C] shrink-0 mt-0.5" />
             <div>
-              <span className="font-bold uppercase tracking-wide">Action Notice: </span>
+              <span className="font-bold uppercase tracking-wide">Action Alert: </span>
               <span className="font-sans leading-relaxed">{actionError}</span>
             </div>
           </div>
@@ -863,13 +958,13 @@ export function BotControlTab() {
             className="text-[#FF3B5C] hover:text-white p-1 rounded hover:bg-[#FF3B5C]/20 transition-colors shrink-0 cursor-pointer"
             title="Dismiss"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
       {actionSuccess && (
-        <div className="p-3 rounded-lg bg-[#00E89A]/10 border border-[#00E89A]/30 text-[#00E89A] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
+        <div className="p-3 rounded-xl bg-[#00E89A]/10 border border-[#00E89A]/30 text-[#00E89A] text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in">
           <div className="flex items-start gap-2.5">
             <CheckCircle2 className="w-4 h-4 text-[#00E89A] shrink-0 mt-0.5" />
             <div>
@@ -882,12 +977,12 @@ export function BotControlTab() {
             className="text-[#00E89A] hover:text-white p-1 rounded hover:bg-[#00E89A]/20 transition-colors shrink-0 cursor-pointer"
             title="Dismiss"
           >
-            <X className="w-3.5 h-3.5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      {/* 2. Search, Market Tabs, View Switcher, and Filter Controls */}
+      {/* 2. Compact 1-Line Navigation & Filter Bar */}
       <SimpleBotFilterBar
         search={search}
         onSearchChange={setSearch}
@@ -895,6 +990,10 @@ export function BotControlTab() {
         onSelectMarket={setSelectedMarket}
         selectedBroker={selectedBroker}
         onSelectBroker={setSelectedBroker}
+        selectedStrategy={selectedStrategy}
+        onSelectStrategy={setSelectedStrategy}
+        selectedHealth={selectedHealth}
+        onSelectHealth={setSelectedHealth}
         statusFilter={statusFilter}
         onStatusFilterChange={setStatusFilter}
         envFilter={envFilter}
@@ -903,56 +1002,74 @@ export function BotControlTab() {
         totalCount={rawBots.length}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
+        densityMode={densityMode}
+        onDensityModeChange={setDensityMode}
+        groupByFamily={groupByFamily}
+        onToggleGroupByFamily={setGroupByFamily}
         onExportCsv={handleExportCsv}
         onExportJson={handleExportJson}
+        activeNavTab={commandCenterTab}
+        onSelectNavTab={(tab) => setCommandCenterTab(tab as any)}
       />
 
-      {/* 3. Multi-View Fleet Terminal: Table / Cards / Matrix */}
-      {viewMode === "table" ? (
-        <SimpleBotTable
-          bots={filteredBots}
-          isLoading={isLoading}
-          totalBotsCount={rawBots.length}
-          isError={isError}
-          errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
-          onRetry={() => refetch()}
-          onSelectBot={handleSelectBot}
-          onBotAction={handleBotAction}
-          onToggleMode={handleToggleBotMode}
-          onSetBroker={handleSetBroker}
-          onOpenOrderDestination={handleOpenOrderDestination}
-          onDeleteBot={handleOpenDeleteModal}
-          onCreateBot={() => setIsCreateModalOpen(true)}
-          selectedMarket={selectedMarket}
-          selectedBotIds={selectedBotIds}
-          onToggleSelectBot={handleToggleSelectBot}
-          onToggleSelectAll={handleToggleSelectAll}
-        />
-      ) : viewMode === "cards" ? (
-        <BotCardGrid
-          bots={filteredBots}
-          isLoading={isLoading}
-          totalBotsCount={rawBots.length}
-          isError={isError}
-          errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
-          onRetry={() => refetch()}
-          onSelectBot={handleSelectBot}
-          onBotAction={handleBotAction}
-          onToggleMode={handleToggleBotMode}
-          onDeleteBot={handleOpenDeleteModal}
-          onCreateBot={() => setIsCreateModalOpen(true)}
-          selectedMarket={selectedMarket}
-          selectedBotIds={selectedBotIds}
-          onToggleSelectBot={handleToggleSelectBot}
-        />
+      {/* 3. Active View Content (Zero Horizontal Body Scroll, Internal Vertical Scroll) */}
+      {commandCenterTab === "STREAMS" ? (
+        <LiveStreamInspector />
+      ) : commandCenterTab === "ORDER_FLOW" ? (
+        <LiveOrderFlowMonitor />
       ) : (
-        <BotStrategyMatrix
-          bots={filteredBots}
-          onSelectBot={handleSelectBot}
-        />
+        <div className="w-full overflow-hidden">
+          {viewMode === "table" ? (
+            <SimpleBotTable
+              bots={filteredBots}
+              isLoading={isLoading}
+              totalBotsCount={rawBots.length}
+              isError={isError}
+              errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
+              onRetry={() => refetch()}
+              onSelectBot={handleSelectBot}
+              onBotAction={handleBotAction}
+              onToggleMode={handleToggleBotMode}
+              onSetBroker={handleSetBroker}
+              onOpenOrderDestination={handleOpenOrderDestination}
+              onDeleteBot={handleOpenDeleteModal}
+              onEditBot={handleEditBot}
+              onCloneBot={handleCloneBot}
+              onCreateBot={() => setIsCreateModalOpen(true)}
+              selectedMarket={selectedMarket}
+              selectedBotIds={selectedBotIds}
+              onToggleSelectBot={handleToggleSelectBot}
+              onToggleSelectAll={handleToggleSelectAll}
+              densityMode={densityMode}
+              groupByFamily={groupByFamily}
+            />
+          ) : viewMode === "cards" ? (
+            <BotCardGrid
+              bots={filteredBots}
+              isLoading={isLoading}
+              totalBotsCount={rawBots.length}
+              isError={isError}
+              errorMessage={queryError instanceof Error ? queryError.message : "Failed to load fleet data"}
+              onRetry={() => refetch()}
+              onSelectBot={handleSelectBot}
+              onBotAction={handleBotAction}
+              onToggleMode={handleToggleBotMode}
+              onDeleteBot={handleOpenDeleteModal}
+              onCreateBot={() => setIsCreateModalOpen(true)}
+              selectedMarket={selectedMarket}
+              selectedBotIds={selectedBotIds}
+              onToggleSelectBot={handleToggleSelectBot}
+            />
+          ) : (
+            <BotStrategyMatrix
+              bots={filteredBots}
+              onSelectBot={handleSelectBot}
+            />
+          )}
+        </div>
       )}
 
-      {/* 5. Multi-Bot Floating Bulk Action Bar */}
+      {/* 4. Multi-Bot Floating Bulk Action Bar */}
       <MultiBotBulkActionBar
         selectedCount={selectedBotIds.length}
         onClearSelection={handleClearSelection}
@@ -965,7 +1082,7 @@ export function BotControlTab() {
         activeAction={Array.from(inFlightActionKeys)[0] || (isDeleting ? "BULK_DELETE" : null)}
       />
 
-      {/* 6. Slide-Out Details Drawer */}
+      {/* 5. Right-Side Slide-Out Details Drawer (BOT, CONTRACT, MARKET DATA, EXECUTION, POSITION, RISK, AUDIT) */}
       <SimpleBotDetailsDrawer
         isOpen={isDetailsDrawerOpen}
         bot={selectedBot}
@@ -975,10 +1092,12 @@ export function BotControlTab() {
         onSetBroker={handleSetBroker}
         onOpenOrderDestination={handleOpenOrderDestination}
         onDeleteBot={handleOpenDeleteModal}
+        onEditBot={handleEditBot}
+        onCloneBot={handleCloneBot}
         onRefresh={refetch}
       />
 
-      {/* 7. Order Destination Confirmation Modal */}
+      {/* 6. Order Destination Confirmation Modal */}
       <OrderDestinationModal
         isOpen={isOrderDestinationModalOpen}
         bot={orderDestinationBot}
@@ -993,7 +1112,7 @@ export function BotControlTab() {
         }}
       />
 
-      {/* 8. Single Bot Delete Confirmation Modal */}
+      {/* 7. Single Bot Delete Confirmation Modal */}
       <DeleteBotModal
         isOpen={isDeleteModalOpen}
         onClose={() => {
@@ -1005,7 +1124,7 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 9. Bulk Delete Confirmation Modal */}
+      {/* 8. Bulk Delete Confirmation Modal */}
       <BulkDeleteBotsModal
         isOpen={isBulkDeleteModalOpen}
         onClose={() => setIsBulkDeleteModalOpen(false)}
@@ -1014,7 +1133,26 @@ export function BotControlTab() {
         isDeleting={isDeleting}
       />
 
-      {/* 10. Bulk Start Confirmation Modal */}
+      {/* 9. Delete All Confirmation Modal */}
+      <DeleteAllBotsModal
+        isOpen={isDeleteAllModalOpen}
+        onClose={() => setIsDeleteAllModalOpen(false)}
+        bots={rawBots}
+        onConfirmDeleteAll={handleConfirmDeleteAll}
+        isDeleting={isDeleting}
+      />
+
+      {/* 10. Duplicate Bots Review Modal */}
+      <DuplicateBotsReviewModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        duplicates={duplicateGroups}
+        onDeleteBot={async (botId) => {
+          await handleConfirmSingleDelete(botId, false);
+        }}
+      />
+
+      {/* 11. Bulk Start Confirmation Modal */}
       <BulkStartConfirmationModal
         isOpen={isBulkStartModalOpen}
         onClose={() => setIsBulkStartModalOpen(false)}
@@ -1022,7 +1160,7 @@ export function BotControlTab() {
         onConfirmStart={handleConfirmBulkStart}
       />
 
-      {/* 11. Create Bot Wizard Modal */}
+      {/* 12. Create Bot Wizard Modal */}
       <CreateBotWizardModal
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}

@@ -170,7 +170,7 @@ def get_market_data_health():
     # 3. Upstox Feed
     try:
         from src.upstox_service import upstox_service
-        is_auth = upstox_service.is_authenticated()
+        is_auth = upstox_service.is_authenticated
         feeds["upstox"] = {"status": "AUTHENTICATED" if is_auth else "NOT_CONFIGURED"}
     except Exception:
         feeds["upstox"] = {"status": "NOT_CONFIGURED"}
@@ -244,7 +244,7 @@ def get_brokers_health():
         upstox_status = "NOT_CONFIGURED"
         try:
             from src.upstox_service import upstox_service
-            upstox_auth = upstox_service.is_authenticated()
+            upstox_auth = upstox_service.is_authenticated
             upstox_status = "AUTHENTICATED" if upstox_auth else "NOT_CONFIGURED"
         except Exception:
             pass

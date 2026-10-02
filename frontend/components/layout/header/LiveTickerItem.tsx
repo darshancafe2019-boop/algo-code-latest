@@ -4,7 +4,7 @@ import { formatMoney } from "@/lib/formatters";
 import React, { memo, useRef, useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useLivePrice } from "@/hooks/useMarketData";
-import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
+import { useMarketFeedStore, useSymbolQuote } from "@/lib/market-data/market-feed-store";
 import { cn } from "@/lib/utils";
 import { Radio, AlertTriangle, ShieldAlert } from "lucide-react";
 
@@ -65,29 +65,12 @@ export const LiveTickerItem = memo(function LiveTickerItem({
   const label = displayName || (cleanSym === "BTC/USDT" || cleanSym === "BTCUSDT" ? "BTC" : cleanSym);
 
   // Auto-detect currency if not provided
-  const resolvedCurrency = currency || (cleanSym.includes("BTC") || cleanSym.includes("ETH") || cleanSym.includes("USDT") || ["AAPL", "NVDA", "TSLA"].includes(cleanSym) ? "USD" : "INR");
-  const currencySymbol = resolvedCurrency === "USD" ? "$" : "";
+  const resolvedCurrency = currency || (cleanSym.includes("BTC") || cleanSym.includes("ETH") || cleanSym.includes("SOL") || cleanSym.includes("USDT") || ["AAPL", "NVDA", "TSLA"].includes(cleanSym) ? "USD" : "INR");
+  const currencySymbol = resolvedCurrency === "USD" ? "$" : "₹";
 
   // Subscribe to live price stream for this single instrument with alias resolution
   const { price, quote } = useLivePrice(cleanSym);
-  const storeQuotes = useMarketFeedStore((s) => s.quotesBySymbol);
-
-  const directStoreQuote = useMemo(() => {
-    return (
-      storeQuotes[cleanSym] ||
-      storeQuotes[label] ||
-      storeQuotes[symbol] ||
-      storeQuotes[`BINANCE:${cleanSym}`] ||
-      storeQuotes[`DELTA:${cleanSym}`] ||
-      storeQuotes[`UPSTOX:${cleanSym}`] ||
-      storeQuotes[`DHAN:${cleanSym}`] ||
-      storeQuotes[`${cleanSym}/USDT:USDT`] ||
-      storeQuotes[`${cleanSym}/USDT`] ||
-      storeQuotes[`${cleanSym}:USDT`] ||
-      storeQuotes[cleanSym.replace(/USDT$/, "/USDT")] ||
-      null
-    );
-  }, [storeQuotes, cleanSym, label, symbol]);
+  const directStoreQuote = useSymbolQuote(cleanSym, exchangeSegment, source);
 
   // Micro-animation flash state on price ticks
   const prevPriceRef = useRef<number | null>(null);

@@ -112,7 +112,6 @@ class CapitalAccountingService:
 
     def _init_service(self) -> None:
         logger.info("Initializing CapitalAccountingService singleton...")
-        db.init_db()
 
     # =========================================================================
     # HIERARCHY TREE RETRIEVAL

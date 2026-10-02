@@ -216,6 +216,14 @@ class FyersBrokerAdapter(BrokerAdapter):
 
     def place_multileg_order(self, order_payload: Dict[str, Any]) -> Dict[str, Any]:
         """Places a multileg / multi-order basket on Fyers or paper simulator."""
+        mode = str(order_payload.get("mode") or getattr(config, "TRADING_MODE", "PAPER")).upper()
+        if mode == "LIVE" and not getattr(config, "LIVE_TRADING_ENABLED", False):
+            return {
+                "status": "FAILED",
+                "error": "LIVE_TRADING_DISABLED",
+                "message": "Live order rejected: Server-side LIVE_TRADING_ENABLED is False.",
+            }
+
         order_id = f"fyers-ord-{uuid.uuid4().hex[:10]}"
         record = {
             "order_id": order_id,

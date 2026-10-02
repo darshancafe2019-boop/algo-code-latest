@@ -13,6 +13,7 @@ Tests:
 
 import sys
 import unittest
+from typing import Any
 import pandas as pd
 from pathlib import Path
 
@@ -64,15 +65,17 @@ class TestIndianMarketIntegration(unittest.TestCase):
         for sym in ["RELIANCE", "TCS", "INFY", "HDFCBANK", "SBIN", "NIFTY", "BANKNIFTY"]:
             res = self.resolver.resolve(sym)
             self.assertTrue(res.is_valid, f"Canonical resolution failed for {sym}: {res.reason}")
+            self.assertIsNotNone(res.instrument)
+            assert res.instrument is not None
             self.assertEqual(res.instrument.asset_class, AssetClass.INDIAN_STOCKS)
             self.assertEqual(res.instrument.quote_asset, "INR")
 
     def test_03_protobuf_binary_frame_decoding(self):
         """Verify Upstox V3 Protobuf binary frames are correctly decoded into LTP and OHLC."""
-        resp = FeedResponse()
+        resp: Any = FeedResponse()
         resp.type = 1  # live_feed
         resp.currentTs = 1724938123456
-        f = Feed()
+        f: Any = Feed()
         f.ltpc.ltp = 24520.75
         f.ltpc.ltt = 1724938120000
         f.ltpc.cp = 24450.0
@@ -134,11 +137,15 @@ class TestIndianMarketIntegration(unittest.TestCase):
         """Verify Provider Manager routes Indian instruments to Upstox and Crypto to Binance."""
         res_ind = self.resolver.resolve("RELIANCE")
         self.assertTrue(res_ind.is_valid)
+        self.assertIsNotNone(res_ind.instrument)
+        assert res_ind.instrument is not None
         adapter_ind = self.provider_mgr.route_instrument(res_ind.instrument)
         self.assertEqual(adapter_ind.provider_id, "upstox")
 
         res_crypto = self.resolver.resolve("BTC/USDT")
         self.assertTrue(res_crypto.is_valid)
+        self.assertIsNotNone(res_crypto.instrument)
+        assert res_crypto.instrument is not None
         adapter_crypto = self.provider_mgr.route_instrument(res_crypto.instrument)
         self.assertEqual(adapter_crypto.provider_id, "binance_spot")
 

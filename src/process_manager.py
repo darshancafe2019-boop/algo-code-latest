@@ -45,6 +45,19 @@ def _is_live_runner_process(pid: int, bot_id: Optional[str] = None) -> bool:
     """Verifies that the target PID is actually a python live_runner bot process."""
     if pid <= 0:
         return False
+    if _is_protected_pid(pid):
+        return False
+
+    # 1. Direct PID file correlation
+    if bot_id:
+        try:
+            pid_file = get_bot_pid_file(bot_id)
+            if pid_file.exists() and pid_file.read_text().strip() == str(pid):
+                return True
+        except Exception:
+            pass
+
+    # 2. Process inspection
     if sys.platform == "win32":
         try:
             wmic_out = subprocess.check_output(
@@ -52,13 +65,25 @@ def _is_live_runner_process(pid: int, bot_id: Optional[str] = None) -> bool:
                 text=True,
                 stderr=subprocess.DEVNULL
             ).lower()
-            if "live_runner.py" not in wmic_out:
-                return False
-            if bot_id and bot_id.lower() not in wmic_out:
-                return False
-            return True
+            if "live_runner.py" in wmic_out:
+                if not bot_id or bot_id.lower() in wmic_out:
+                    return True
         except Exception:
-            return False
+            pass
+
+        try:
+            ps_cmd = f"(Get-CimInstance Win32_Process -Filter 'ProcessId = {pid}').CommandLine"
+            ps_out = subprocess.check_output(
+                ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps_cmd],
+                text=True,
+                stderr=subprocess.DEVNULL
+            ).lower()
+            if "live_runner" in ps_out:
+                if not bot_id or bot_id.lower() in ps_out:
+                    return True
+        except Exception:
+            pass
+        return False
     return True
 
 
@@ -150,17 +175,6 @@ class BotProcessManager:
         self.is_paused: bool = False
         self.status_state: str = BOT_STATE_STOPPED
         self.last_error: str = ""
-
-    def start_bot(self) -> Dict[str, Any]:
-        """Start the live runner process cleanly with state-machine & idempotency validation."""
-        # Fast live check
-        if self.is_running():
-            self.status_state = BOT_STATE_RUNNING
-            return {
-                "status": "already_running",
-                "message": f"Bot '{self.bot_id}' is already running.",
-                "pid": self.process.pid if self.process else None
-            }
 
     def validate_pre_flight_start(self) -> Dict[str, Any]:
         """Validates all pre-start conditions before spawning bot process."""

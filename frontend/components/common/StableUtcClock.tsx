@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 
-const utcTimeFormatter = new Intl.DateTimeFormat("en-GB", {
+const utcTimeFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
   hour: "2-digit",
   minute: "2-digit",
   second: "2-digit",
-  hour12: false,
+  hour12: true,
 });
 
 export function StableUtcClock() {

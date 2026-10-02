@@ -666,10 +666,13 @@ class BrokerRouter:
             return False, risk_res.get("code", "RISK_LIMIT_EXCEEDED"), risk_res.get("message", "Order rejected by Central Risk Engine.")
 
         # 7. LIVE Safety Authorization Gate (Section 9)
-        if intent.mode == "LIVE":
-            live_enabled = getattr(config, "LIVE_TRADING_ENABLED", False)
-            if not live_enabled:
+        if str(intent.mode or "").upper() == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
                 return False, "LIVE_TRADING_DISABLED", "Live order rejected: Server-side LIVE_TRADING_ENABLED is False. Quant.OS is locked in PAPER mode."
+            if not getattr(config, "LIVE_TRADING_ARMED", False):
+                return False, "LIVE_TRADING_DISARMED", "Live order rejected: LIVE_TRADING_ARMED is False. Live execution not armed."
+            if not getattr(config, "MASTER_LIVE_TRADING", False):
+                return False, "MASTER_LIVE_TRADING_OFF", "Live order rejected: MASTER_LIVE_TRADING flag is False."
 
             adapter = self.get_adapter(intent.broker)
             if not adapter:
@@ -739,8 +742,8 @@ class BrokerRouter:
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             }
 
-        # 2. Routing: Paper vs Live
-        is_paper = (intent.mode == "PAPER") or (getattr(config, "TRADING_MODE", "PAPER").upper() == "PAPER")
+        # 2. Routing: Paper vs Live (Never silently convert LIVE to PAPER)
+        is_paper = (str(intent.mode or "").upper() != "LIVE")
 
         if is_paper:
             # High-fidelity Paper OMS Execution

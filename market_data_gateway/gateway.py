@@ -19,6 +19,7 @@ import logging
 import os
 import time
 import uuid
+from collections import deque
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Set
 
@@ -45,6 +46,10 @@ from market_data_gateway.failover_manager import FailoverManager
 from market_data_gateway.cache.market_cache import global_market_cache
 from market_data_gateway.core.feed_manager import global_feed_manager
 from market_data_gateway.core.subscription_manager import global_subscription_manager
+from market_data_gateway.core.provider_registry import global_provider_registry
+from market_data_gateway.core.order_flow_engine import global_order_flow_engine
+from market_data_gateway.core.data_quality import global_data_quality_engine
+from market_data_gateway.core.symbol_master import global_symbol_master
 from market_data_gateway.models.feed_status import FeedState
 from src.dhan_credential_manager import global_dhan_credential_manager
 
@@ -282,12 +287,64 @@ class MarketDataGateway:
         self.failover = FailoverManager(self.adapters)
         # Quote cache: symbol -> NormalizedQuote (latest from any active provider)
         self._quote_cache: Dict[str, NormalizedQuote] = {}
+        # Event History ring buffer for Live Stream Inspector (Section 8)
+        self._event_history: deque = deque(maxlen=2000)
+        self._sequence_counter: int = 0
         # WebSocket clients: client_id -> (ws, subscribed_symbols)
         self._ws_clients: Dict[str, tuple] = {}
         self._ws_lock = asyncio.Lock()
 
         def _on_quote(quote: NormalizedQuote) -> None:
-            """Called by any adapter when a new quote arrives."""
+            """Called by any adapter when a new normalized market event arrives."""
+            self._sequence_counter += 1
+            quote.sequence = self._sequence_counter
+            q_dict = quote.to_dict()
+
+            # 1. Update Provider Registry Telemetry & Data Quality Engine
+            global_provider_registry.record_tick(quote.provider, quote.feed_latency_ms)
+            global_data_quality_engine.validate_quote(q_dict)
+
+            # 2. Update Order Flow & Depth Engine if depth or prices present
+            if quote.depth and isinstance(quote.depth, dict):
+                bids = quote.depth.get("bids", [])
+                asks = quote.depth.get("asks", [])
+                global_order_flow_engine.update_from_depth(
+                    symbol=quote.symbol,
+                    provider=quote.provider,
+                    exchange=quote.exchange,
+                    bids=bids,
+                    asks=asks,
+                    ltp=quote.last_price,
+                    oi=quote.oi,
+                    volume=quote.volume,
+                    expiry=quote.expiry,
+                    strike=quote.strike,
+                    option_type=quote.option_type,
+                    instrument_type=quote.instrument_type or "SPOT"
+                )
+
+            # 3. Store in Event Stream Ring Buffer for Live Stream Inspector
+            event_entry = {
+                "timestamp": quote.received_timestamp or datetime.now(timezone.utc).isoformat(),
+                "provider": quote.provider,
+                "stream": f"{quote.provider.upper()}_FEED",
+                "exchange": quote.exchange,
+                "instrument": quote.instrument_type or "SPOT",
+                "symbol": quote.symbol,
+                "eventType": quote.event_type or "QUOTE",
+                "price": quote.last_price,
+                "quantity": quote.last_quantity or quote.volume or 1.0,
+                "latency": quote.feed_latency_ms,
+                "sequence": quote.sequence,
+                "status": quote.status or "LIVE",
+                "bid": quote.bid,
+                "ask": quote.ask,
+                "volume": quote.volume,
+                "oi": quote.oi,
+                "data": q_dict
+            }
+            self._event_history.append(event_entry)
+
             aliases = get_quote_aliases(quote.symbol, quote.exchange, quote.provider)
             for a in aliases:
                 self._quote_cache[a] = quote
@@ -303,6 +360,7 @@ class MarketDataGateway:
                 last_p = float(tick.get("last_price", 0.0))
                 if last_p <= 0:
                     return
+                self._sequence_counter += 1
                 quote = NormalizedQuote(
                     symbol=sym,
                     exchange=tick.get("exchange_segment", "NSE_EQ"),
@@ -320,7 +378,33 @@ class MarketDataGateway:
                     received_timestamp=tick.get("received_at") or datetime.now(timezone.utc).isoformat(),
                     feed_latency_ms=float(tick.get("freshness_ms") or 0.0),
                     data_mode="REAL_TIME",
+                    sequence=self._sequence_counter
                 )
+                q_dict = quote.to_dict()
+                global_provider_registry.record_tick("dhan", quote.feed_latency_ms)
+                global_data_quality_engine.validate_quote(q_dict)
+
+                event_entry = {
+                    "timestamp": quote.received_timestamp,
+                    "provider": "dhan",
+                    "stream": "DHAN_FEED",
+                    "exchange": quote.exchange,
+                    "instrument": "SPOT",
+                    "symbol": quote.symbol,
+                    "eventType": "QUOTE",
+                    "price": quote.last_price,
+                    "quantity": quote.volume or 1.0,
+                    "latency": quote.feed_latency_ms,
+                    "sequence": quote.sequence,
+                    "status": "LIVE",
+                    "bid": quote.bid,
+                    "ask": quote.ask,
+                    "volume": quote.volume,
+                    "oi": quote.oi,
+                    "data": q_dict
+                }
+                self._event_history.append(event_entry)
+
                 aliases = get_quote_aliases(quote.symbol, quote.exchange, quote.provider)
                 for a in aliases:
                     self._quote_cache[a] = quote
@@ -573,6 +657,94 @@ class MarketDataGateway:
             "failover_transitions": self.failover.get_transitions(limit=10),
             "subscriptions": self.subscription_registry.dump(),
             "feed_manager_health": global_feed_manager.get_health_report(),
+        })
+
+    async def handle_provider_registry(self, request: web.Request) -> web.Response:
+        """Return authoritative Provider Registry telemetry and metrics summary."""
+        providers = global_provider_registry.get_all_providers()
+        summary = global_provider_registry.get_summary_metrics()
+        return web.json_response({
+            "status": "success",
+            "summary": summary,
+            "providers": providers,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+    async def handle_order_flow(self, request: web.Request) -> web.Response:
+        """Return real-time Level 2 Order Flow metrics, bid/ask imbalance, spread, and microprice."""
+        symbol = request.query.get("symbol")
+        flow = global_order_flow_engine.get_order_flow_metrics(symbol)
+        return web.json_response({
+            "status": "success",
+            "count": len(flow),
+            "order_flow": flow,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+    async def handle_top_orders(self, request: web.Request) -> web.Response:
+        """Return real-time Top Order Monitor table with granular institutional filters."""
+        provider = request.query.get("provider")
+        exchange = request.query.get("exchange")
+        symbol = request.query.get("symbol")
+        instrument = request.query.get("instrument")
+        side = request.query.get("side")
+        try: min_notional = float(request.query.get("min_notional", 0))
+        except Exception: min_notional = 0.0
+        try: min_qty = float(request.query.get("min_qty", 0))
+        except Exception: min_qty = 0.0
+        try: limit = int(request.query.get("limit", 50))
+        except Exception: limit = 50
+
+        top = global_order_flow_engine.get_top_orders(
+            provider=provider,
+            exchange=exchange,
+            symbol=symbol,
+            instrument=instrument,
+            side=side,
+            min_notional=min_notional,
+            min_qty=min_qty,
+            limit=limit
+        )
+        return web.json_response({
+            "status": "success",
+            "count": len(top),
+            "top_orders": top,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+    async def handle_event_history(self, request: web.Request) -> web.Response:
+        """Return ring buffer of normalized stream events for Live Stream Inspector."""
+        provider = request.query.get("provider")
+        symbol = request.query.get("symbol")
+        event_type = request.query.get("event_type")
+        try: limit = int(request.query.get("limit", 100))
+        except Exception: limit = 100
+
+        events = list(self._event_history)
+        if provider:
+            events = [e for e in events if provider.lower() in e.get("provider", "").lower()]
+        if symbol:
+            events = [e for e in events if symbol.upper() in e.get("symbol", "").upper()]
+        if event_type:
+            events = [e for e in events if event_type.upper() == e.get("eventType", "").upper()]
+
+        return web.json_response({
+            "status": "success",
+            "count": len(events[-limit:]),
+            "events": events[-limit:],
+            "total_buffered": len(self._event_history),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+    async def handle_data_quality(self, request: web.Request) -> web.Response:
+        """Return Data Quality summary, integrity score, and recent anomaly detections."""
+        summary = global_data_quality_engine.get_quality_summary()
+        anomalies = global_data_quality_engine.get_recent_anomalies(limit=50)
+        return web.json_response({
+            "status": "success",
+            "summary": summary,
+            "anomalies": anomalies,
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
 
     async def handle_snapshot(self, request: web.Request) -> web.Response:
@@ -1325,6 +1497,23 @@ def create_app() -> tuple:
     app.router.add_post("/api/market/subscriptions", gateway.handle_subscribe_api)
     app.router.add_post("/api/market-data/subscriptions", gateway.handle_subscribe_api)
     app.router.add_post("/api/market-data/feed/control", gateway.handle_feed_control)
+
+    # Provider Registry & Institutional Telemetry
+    app.router.add_get("/api/market/providers/registry", gateway.handle_provider_registry)
+    app.router.add_get("/api/market-data/providers/registry", gateway.handle_provider_registry)
+    app.router.add_get("/providers/registry", gateway.handle_provider_registry)
+
+    # Order Flow & Top Orders Engine
+    app.router.add_get("/api/market/order-flow", gateway.handle_order_flow)
+    app.router.add_get("/api/market-data/order-flow", gateway.handle_order_flow)
+    app.router.add_get("/api/market/top-orders", gateway.handle_top_orders)
+    app.router.add_get("/api/market-data/top-orders", gateway.handle_top_orders)
+
+    # Live Stream Event Inspector
+    app.router.add_get("/api/market/events/history", gateway.handle_event_history)
+    app.router.add_get("/api/market-data/events/history", gateway.handle_event_history)
+    app.router.add_get("/api/market/data-quality", gateway.handle_data_quality)
+    app.router.add_get("/api/market-data/data-quality", gateway.handle_data_quality)
 
     # WebSockets (Universal port 5051 real-time stream)
     app.router.add_get("/ws", gateway.handle_ws)

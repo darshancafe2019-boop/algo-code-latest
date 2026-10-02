@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useRef } from "react";
 import {
   Search,
-  ChevronDown,
-  Check,
-  Table,
-  LayoutGrid,
-  PieChart,
-  Download,
-  FileSpreadsheet,
-  FileCode,
-  Radio,
+  X,
   SlidersHorizontal,
+  Bot,
+  Radio,
+  Briefcase,
+  ClipboardList,
+  Server,
+  Bell,
+  Layers,
 } from "lucide-react";
-import { BotViewMode } from "@/types/bot-control";
+import { BotViewMode, DensityMode } from "@/types/bot-control";
 import { cn } from "@/lib/utils";
 
 interface SimpleBotFilterBarProps {
@@ -24,6 +23,10 @@ interface SimpleBotFilterBarProps {
   onSelectMarket: (market: string) => void;
   selectedBroker?: string;
   onSelectBroker?: (broker: string) => void;
+  selectedStrategy?: string;
+  onSelectStrategy?: (strategy: string) => void;
+  selectedHealth?: string;
+  onSelectHealth?: (health: string) => void;
   statusFilter: string;
   onStatusFilterChange: (status: string) => void;
   envFilter: string;
@@ -32,41 +35,15 @@ interface SimpleBotFilterBarProps {
   totalCount: number;
   viewMode: BotViewMode;
   onViewModeChange: (mode: BotViewMode) => void;
+  densityMode?: DensityMode;
+  onDensityModeChange?: (mode: DensityMode) => void;
+  groupByFamily: boolean;
+  onToggleGroupByFamily: (val: boolean) => void;
   onExportCsv?: () => void;
   onExportJson?: () => void;
+  activeNavTab: string;
+  onSelectNavTab: (tab: string) => void;
 }
-
-const PRIMARY_MARKETS = [
-  { id: "ALL", label: "All Markets" },
-  { id: "OPTIONS", label: "Options" },
-  { id: "CALL", label: "Calls (CE)" },
-  { id: "PUT", label: "Puts (PE)" },
-  { id: "FUTURES", label: "Futures" },
-  { id: "CRYPTO", label: "Crypto" },
-  { id: "INDIAN_STOCKS", label: "India NSE" },
-];
-
-const MORE_MARKETS = [
-  { id: "FOREX", label: "Forex" },
-  { id: "COMMODITIES", label: "Commodities" },
-  { id: "US_EQUITY", label: "US Stocks" },
-];
-
-const BROKER_FILTERS = [
-  { id: "ALL", label: "ALL SOURCES" },
-  { id: "PAPER", label: "PAPER SIM" },
-  { id: "BINANCE", label: "BINANCE" },
-  { id: "UPSTOX", label: "UPSTOX" },
-  { id: "DHAN", label: "DHAN" },
-  { id: "DELTA_INDIA", label: "DELTA INDIA" },
-];
-
-const BOT_TABS = [
-  { id: "ALL", label: "All Bots" },
-  { id: "RUNNING", label: "Active" },
-  { id: "PAUSED", label: "Paused" },
-  { id: "STOPPED", label: "Stopped" },
-];
 
 export function SimpleBotFilterBar({
   search,
@@ -75,6 +52,8 @@ export function SimpleBotFilterBar({
   onSelectMarket,
   selectedBroker = "ALL",
   onSelectBroker,
+  selectedStrategy = "ALL",
+  onSelectStrategy,
   statusFilter,
   onStatusFilterChange,
   envFilter,
@@ -83,238 +62,174 @@ export function SimpleBotFilterBar({
   totalCount,
   viewMode,
   onViewModeChange,
-  onExportCsv,
-  onExportJson,
+  densityMode = "compact",
+  onDensityModeChange,
+  activeNavTab = "BOTS",
+  onSelectNavTab,
 }: SimpleBotFilterBarProps) {
-  const [showMoreDropdown, setShowMoreDropdown] = useState(false);
-  const [showExportDropdown, setShowExportDropdown] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const handleClearAll = () => {
+    onSearchChange("");
+    onSelectMarket("ALL");
+    if (onSelectBroker) onSelectBroker("ALL");
+    if (onSelectStrategy) onSelectStrategy("ALL");
+    onStatusFilterChange("ALL");
+    onEnvFilterChange("ALL");
+  };
 
-  const isMoreSelected = MORE_MARKETS.some((m) => m.id === selectedMarket);
-  const activeMoreLabel = MORE_MARKETS.find((m) => m.id === selectedMarket)?.label;
-
-  // Keyboard shortcut '/' to focus search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "/" && document.activeElement !== searchInputRef.current) {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  const navTabs = [
+    { id: "BOTS", label: "Bots", icon: Bot, count: totalCount },
+    { id: "STREAMS", label: "Live Streams", icon: Radio, count: 4 },
+    { id: "ORDERS", label: "Orders", icon: ClipboardList, count: 0 },
+    { id: "POSITIONS", label: "Positions", icon: Briefcase, count: 1 },
+    { id: "PROVIDERS", label: "Providers", icon: Server, count: 7 },
+    { id: "ALERTS", label: "Alerts", icon: Bell, count: 0 },
+  ];
 
   return (
-    <div className="rounded-[10px] bg-[#0A1422] border border-[#12304A] p-3 sm:p-3.5 font-sans select-none space-y-2.5">
-      {/* ── Row 1: Search, Bot Lifecycle Tabs, Export & View Modes ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        {/* Search Bar */}
-        <div className="flex items-center gap-2 px-3 py-1.5 bg-[#05101A] border border-[#12304A] hover:border-[#168BFF]/40 focus-within:border-[#22D3EE] rounded-lg max-w-sm w-full transition-colors">
-          <Search className="h-3.5 w-3.5 text-[#7D8EA5] shrink-0" />
+    <div className="space-y-2.5 font-sans select-none text-[#F8FAFC]">
+      {/* ── Navigation Tabs Strip ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {navTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeNavTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => onSelectNavTab(tab.id)}
+                className={cn(
+                  "px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer",
+                  isActive
+                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-950 font-black"
+                    : "bg-slate-900/90 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.2 rounded-full text-[10px] font-mono",
+                      isActive ? "bg-cyan-950 text-cyan-200" : "bg-slate-800 text-slate-400"
+                    )}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Right: Density Selector */}
+        {onDensityModeChange && (
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-mono">
+            <button
+              onClick={() => onDensityModeChange("compact")}
+              className={cn(
+                "px-2 py-0.5 rounded text-[11px] font-bold transition",
+                densityMode === "compact" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-white"
+              )}
+            >
+              Compact
+            </button>
+            <button
+              onClick={() => onDensityModeChange("comfortable")}
+              className={cn(
+                "px-2 py-0.5 rounded text-[11px] font-bold transition",
+                densityMode === "comfortable" ? "bg-cyan-600 text-white" : "text-slate-400 hover:text-white"
+              )}
+            >
+              Comfortable
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Compact Single-Line Filter Controls ── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[#08101e] border border-[#13233c] text-xs font-mono">
+        {/* Left: Search input */}
+        <div className="relative flex-1 min-w-[200px] max-w-xs">
+          <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
-            ref={searchInputRef}
             type="text"
-            placeholder="Search bot, symbol, strategy..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="w-full bg-transparent text-[#F8FAFC] text-[11px] focus:outline-none placeholder:text-[#7D8EA5] font-sans"
+            placeholder="Search bot, contract, or strategy..."
+            className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
           />
           {search && (
             <button
               onClick={() => onSearchChange("")}
-              className="text-[10px] text-[#7D8EA5] hover:text-[#F8FAFC] px-1 rounded cursor-pointer font-mono"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
             >
-              Clear
+              <X className="w-3 h-3" />
             </button>
           )}
         </div>
 
-        {/* Bot Lifecycle Tabs (All Bots, Active, Paused, Stopped) */}
-        <div className="flex items-center gap-1 bg-[#05101A] p-0.5 rounded-md border border-[#12304A]">
-          {BOT_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => onStatusFilterChange(tab.id)}
-              className={cn(
-                "px-2.5 py-1 rounded text-[10px] font-semibold transition-colors cursor-pointer flex items-center gap-1",
-                statusFilter === tab.id
-                  ? "bg-[#168BFF] text-[#F8FAFC]"
-                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-            >
-              <span>{tab.label}</span>
-            </button>
-          ))}
-        </div>
+        {/* Dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={(e) => onStatusFilterChange(e.target.value)}
+            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+          >
+            <option value="ALL">Status: All</option>
+            <option value="RUNNING">Running / Active</option>
+            <option value="PAUSED">Paused</option>
+            <option value="STOPPED">Stopped / Draft</option>
+            <option value="ERROR">Error</option>
+          </select>
 
-        {/* Right Utility: View Switcher & Export */}
-        <div className="flex items-center gap-1.5">
-          {/* Export Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowExportDropdown(!showExportDropdown)}
-              className="p-1.5 rounded-md bg-[#05101A] border border-[#12304A] hover:border-[#168BFF]/40 text-[#7D8EA5] hover:text-[#F8FAFC] transition-colors cursor-pointer flex items-center gap-1 text-[10px] font-medium"
-              title="Export Bot Fleet"
-            >
-              <Download className="h-3 w-3" />
-              <span>Export</span>
-            </button>
+          {/* Market */}
+          <select
+            value={selectedMarket}
+            onChange={(e) => onSelectMarket(e.target.value)}
+            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+          >
+            <option value="ALL">Market: All</option>
+            <option value="CRYPTO_OPTIONS">Crypto Options</option>
+            <option value="CRYPTO_FUTURES">Crypto Futures</option>
+            <option value="OPTIONS">NSE Options</option>
+            <option value="FUTURES">NSE Futures</option>
+          </select>
 
-            {showExportDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-36 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-xl z-30 py-1 font-mono text-[11px]">
-                {onExportCsv && (
-                  <button
-                    onClick={() => {
-                      setShowExportDropdown(false);
-                      onExportCsv();
-                    }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
-                  >
-                    <FileSpreadsheet className="h-3 w-3 text-[#00E89A]" />
-                    <span>CSV Format</span>
-                  </button>
-                )}
-                {onExportJson && (
-                  <button
-                    onClick={() => {
-                      setShowExportDropdown(false);
-                      onExportJson();
-                    }}
-                    className="w-full px-3 py-1.5 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center gap-2 cursor-pointer"
-                  >
-                    <FileCode className="h-3 w-3 text-[#22D3EE]" />
-                    <span>JSON Format</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Provider */}
+          {onSelectBroker && (
+            <select
+              value={selectedBroker}
+              onChange={(e) => onSelectBroker(e.target.value)}
+              className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+            >
+              <option value="ALL">Provider: All</option>
+              <option value="DELTA">DELTA</option>
+              <option value="DHAN">DHAN</option>
+              <option value="UPSTOX">UPSTOX</option>
+              <option value="BINANCE">BINANCE</option>
+            </select>
+          )}
 
-          {/* View Mode Switcher */}
-          <div className="flex items-center gap-0.5 p-0.5 bg-[#05101A] border border-[#12304A] rounded-md">
-            <button
-              onClick={() => onViewModeChange("table")}
-              className={cn(
-                "p-1 rounded transition-colors cursor-pointer",
-                viewMode === "table"
-                  ? "bg-[#168BFF] text-[#F8FAFC]"
-                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-              title="Table View"
-            >
-              <Table className="h-3 w-3" />
-            </button>
-            <button
-              onClick={() => onViewModeChange("cards")}
-              className={cn(
-                "p-1 rounded transition-colors cursor-pointer",
-                viewMode === "cards"
-                  ? "bg-[#168BFF] text-[#F8FAFC]"
-                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-              title="Card Grid View"
-            >
-              <LayoutGrid className="h-3 w-3" />
-            </button>
-            <button
-              onClick={() => onViewModeChange("matrix")}
-              className={cn(
-                "p-1 rounded transition-colors cursor-pointer",
-                viewMode === "matrix"
-                  ? "bg-[#168BFF] text-[#F8FAFC]"
-                  : "text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-              title="Strategy Matrix View"
-            >
-              <PieChart className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-      </div>
+          {/* Environment */}
+          <select
+            value={envFilter}
+            onChange={(e) => onEnvFilterChange(e.target.value)}
+            className="bg-slate-950 border border-slate-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-cyan-400"
+          >
+            <option value="ALL">Env: All</option>
+            <option value="PAPER">Paper</option>
+            <option value="LIVE">Live</option>
+          </select>
 
-      {/* ── Row 2: Market Filter Pills & Sources Bar ── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-[#10263A] text-xs">
-        {/* Market Filter Pills */}
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[10px] text-[#7D8EA5] uppercase font-semibold mr-1">Markets:</span>
-          {PRIMARY_MARKETS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => {
-                onSelectMarket(m.id);
-                setShowMoreDropdown(false);
-              }}
-              className={cn(
-                "px-2.5 py-0.5 rounded text-[10px] font-semibold transition-colors border cursor-pointer",
-                selectedMarket === m.id && !isMoreSelected
-                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
-                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC] hover:border-[#168BFF]/30"
-              )}
-            >
-              {m.label}
-            </button>
-          ))}
-
-          {/* More Markets Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowMoreDropdown(!showMoreDropdown)}
-              className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors border flex items-center gap-1 cursor-pointer",
-                isMoreSelected
-                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
-                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-            >
-              <span>{isMoreSelected ? activeMoreLabel : "More"}</span>
-              <ChevronDown className="h-2.5 w-2.5" />
-            </button>
-
-            {showMoreDropdown && (
-              <div className="absolute left-0 top-full mt-1 w-36 bg-[#0A1422] border border-[#12304A] rounded-lg shadow-xl z-30 py-1 font-sans text-[11px]">
-                {MORE_MARKETS.map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => {
-                      onSelectMarket(m.id);
-                      setShowMoreDropdown(false);
-                    }}
-                    className="w-full px-3 py-1 text-left hover:bg-[#0F1C2F] text-[#F8FAFC] flex items-center justify-between cursor-pointer"
-                  >
-                    <span>{m.label}</span>
-                    {selectedMarket === m.id && <Check className="h-3 w-3 text-[#22D3EE]" />}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Broker Source Filter Pills */}
-        <div className="flex items-center gap-1 flex-wrap">
-          <span className="text-[10px] text-[#7D8EA5] uppercase font-semibold mr-1 flex items-center gap-1">
-            <Radio className="h-2.5 w-2.5 text-[#22D3EE]" />
-            <span>Sources:</span>
-          </span>
-          {BROKER_FILTERS.map((b) => (
-            <button
-              key={b.id}
-              onClick={() => onSelectBroker && onSelectBroker(b.id)}
-              className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors border cursor-pointer",
-                selectedBroker === b.id
-                  ? "bg-[#168BFF] border-[#168BFF] text-[#F8FAFC]"
-                  : "bg-[#05101A] border-[#12304A] text-[#7D8EA5] hover:text-[#F8FAFC]"
-              )}
-            >
-              {b.label}
-            </button>
-          ))}
-          <div className="text-[10px] text-[#7D8EA5] ml-2 font-mono">
-            (<span className="text-[#F8FAFC] font-semibold">{showingCount}</span>/{totalCount})
-          </div>
+          {/* Reset */}
+          <button
+            onClick={handleClearAll}
+            className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs transition"
+          >
+            Reset
+          </button>
         </div>
       </div>
     </div>

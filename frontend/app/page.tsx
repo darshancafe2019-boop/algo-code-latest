@@ -135,7 +135,35 @@ const DeltaLiveMarketFeed = dynamic(
 
 function MainApp() {
   const [activeTab, setActiveTab] = useState<string>("home");
-  const [liveProvider, setLiveProvider] = useState<"dhan" | "upstox" | "delta">("dhan");
+
+  // Read URL query parameter ?tab=... on initial mount & listen to browser back/forward buttons
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get("tab");
+      if (tabParam) {
+        setActiveTab(tabParam);
+      }
+
+      const handlePopState = (e: PopStateEvent) => {
+        const currentParams = new URLSearchParams(window.location.search);
+        const t = currentParams.get("tab") || (e.state && e.state.tab) || "home";
+        setActiveTab(t);
+      };
+
+      window.addEventListener("popstate", handlePopState);
+      return () => window.removeEventListener("popstate", handlePopState);
+    } catch {}
+  }, []);
+
+  const handleTabSelect = (tabId: string) => {
+    setActiveTab(tabId);
+    if (typeof window !== "undefined") {
+      const targetUrl = tabId === "home" || tabId === "dashboard" ? "/" : `/?tab=${tabId}`;
+      window.history.pushState({ tab: tabId }, "", targetUrl);
+    }
+  };
 
   // Idle-time chunk preloading: warms up heavy tab bundles during browser idle periods
   useEffect(() => {
@@ -166,132 +194,129 @@ function MainApp() {
 
     if (typeof window !== "undefined") {
       if ("requestIdleCallback" in window) {
-        const id = (window as any).requestIdleCallback(preload, { timeout: 2000 });
+        const id = (window as any).requestIdleCallback(preload, { timeout: 1000 });
         return () => (window as any).cancelIdleCallback(id);
       } else {
-        const id = setTimeout(preload, 1200);
+        const id = setTimeout(preload, 400);
         return () => clearTimeout(id);
       }
     }
   }, []);
 
+  const isTabActive = (tabKey: string, aliases: string[] = []) => {
+    return activeTab === tabKey || aliases.includes(activeTab);
+  };
+
   return (
-    <CommandCenterShell activeTab={activeTab} onTabSelect={setActiveTab}>
+    <CommandCenterShell activeTab={activeTab} onTabSelect={handleTabSelect}>
       <div className="w-full h-full">
         {/* 0. Executive Home Overview */}
-        {(activeTab === "home" || activeTab === "dashboard") && (
+        {isTabActive("home", ["dashboard"]) && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
           </ErrorBoundary>
         )}
 
         {/* 0.5 Real-Time Live Feed */}
-        {(activeTab === "live" || activeTab === "live-feed" || activeTab === "live-data") && (
+        {isTabActive("live", ["live-feed", "live-data"]) && (
           <ErrorBoundary title="Live Market Feed Failed">
             <MarketCommandCenter />
           </ErrorBoundary>
         )}
 
         {/* 1. Markets Discovery & Analysis */}
-        {(activeTab === "markets" || activeTab === "market-universe" || activeTab === "universe") && (
+        {isTabActive("markets", ["market-universe", "universe"]) && (
           <ErrorBoundary title="Market Discovery Failed">
             <MarketUniverse />
           </ErrorBoundary>
         )}
 
         {/* 2. Runtime Operations & Command Center */}
-        {activeTab === "command-center" && (
+        {isTabActive("command-center") && (
           <ErrorBoundary title="Command Center Operations Failed">
             <RuntimeCommandCenter />
           </ErrorBoundary>
         )}
 
         {/* 3. Flagship Trading Terminal */}
-        {activeTab === "terminal" && (
+        {isTabActive("terminal") && (
           <ErrorBoundary title="Trading Terminal Failed">
             <TradingTerminal />
           </ErrorBoundary>
         )}
 
         {/* 4. Option Chain & Greeks Engine */}
-        {activeTab === "options" && (
+        {isTabActive("options") && (
           <ErrorBoundary title="Option Chain & Greeks Engine Failed">
             <OptionChainView />
           </ErrorBoundary>
         )}
 
-        {/* 3. Order Book Depth & Pressure Gauge */}
-        {activeTab === "orderbook" && (
+        {/* 4.5 Order Book Depth */}
+        {isTabActive("orderbook") && (
           <ErrorBoundary title="Order Book Depth Failed">
             <OrderBookDepthView />
           </ErrorBoundary>
         )}
 
-        {/* 4. Bot Control & Instances */}
-        {(activeTab === "bot-control" || activeTab === "bots") && (
+        {/* 5. Bot Control & Instances */}
+        {isTabActive("bot-control", ["bots"]) && (
           <ErrorBoundary title="Bot Control & Instances Tab Failed">
             <BotControlTab />
           </ErrorBoundary>
         )}
 
-        {/* 5. Quant.OS 30 Strategy Center */}
-        {(activeTab === "strategies" || activeTab === "strategy" || activeTab === "strategy-center") && (
+        {/* 6. Strategy Center */}
+        {isTabActive("strategies", ["strategy", "strategy-center"]) && (
           <ErrorBoundary title="Strategy Center Failed">
             <StrategyCenter />
           </ErrorBoundary>
         )}
 
-        {/* 5.5 Visual Strategy Builder & Bot Creation */}
-        {activeTab === "strategy-builder" && (
+        {/* 6.5 Strategy Builder */}
+        {isTabActive("strategy-builder") && (
           <ErrorBoundary title="Visual Strategy Builder Failed">
             <StrategyBuilder />
           </ErrorBoundary>
         )}
 
-        {/* 6. Indicator Center / Scanner */}
-        {(activeTab === "indicators" || activeTab === "scanner") && (
+        {/* 7. Indicator Center / Scanner */}
+        {isTabActive("indicators", ["scanner"]) && (
           <ErrorBoundary title="Indicator Center Failed">
             <IndicatorCenter />
           </ErrorBoundary>
         )}
 
-        {/* 7. Risk Management */}
-        {(activeTab === "risk-management" || activeTab === "risk") && (
+        {/* 8. Risk Management */}
+        {isTabActive("risk-management", ["risk"]) && (
           <ErrorBoundary title="Risk Management Tab Failed">
             <RiskManagement />
           </ErrorBoundary>
         )}
 
-        {/* 8. Market Universe / Watchlist */}
-        {(activeTab === "market-universe" || activeTab === "watchlist") && (
-          <ErrorBoundary title="Market Universe Tab Failed">
-            <MarketUniverse />
-          </ErrorBoundary>
-        )}
-
         {/* 9. Provider Capability Matrix */}
-        {activeTab === "providers" && (
+        {isTabActive("providers") && (
           <ErrorBoundary title="Provider Capability Matrix Failed">
             <ProviderMatrixView />
           </ErrorBoundary>
         )}
 
         {/* 10. Backtesting Lab */}
-        {activeTab === "backtesting" && (
+        {isTabActive("backtesting", ["backtest", "research"]) && (
           <ErrorBoundary title="Backtesting Lab Tab Failed">
             <BacktestingLab />
           </ErrorBoundary>
         )}
 
         {/* 11. Performance Analytics & P&L */}
-        {(activeTab === "performance" || activeTab === "pnl") && (
+        {isTabActive("performance", ["pnl"]) && (
           <ErrorBoundary title="Performance Analytics Tab Failed">
             <PerformanceAnalytics />
           </ErrorBoundary>
         )}
 
         {/* 11.5 Portfolio & Capital Management */}
-        {(activeTab === "portfolio" || activeTab === "capital-funds" || activeTab === "capital" || activeTab === "funds") && (
+        {isTabActive("portfolio", ["capital-funds", "capital", "funds"]) && (
           <ErrorBoundary title="Portfolio & Capital Tab Failed">
             <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
               <InstitutionalCapitalSegregationTab />
@@ -299,79 +324,71 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 11.6 Quantitative Research & Backtesting Lab */}
-        {(activeTab === "research" || activeTab === "backtest" || activeTab === "backtesting") && (
-          <ErrorBoundary title="Research Lab Tab Failed">
-            <BacktestingLab />
-          </ErrorBoundary>
-        )}
-
         {/* 11.8 Tax Intelligence */}
-        {(activeTab === "tax" || activeTab === "tax-intelligence" || activeTab === "reports") && (
+        {isTabActive("tax", ["tax-intelligence", "reports"]) && (
           <ErrorBoundary title="Tax Intelligence Tab Failed">
             <TaxIntelligenceTab />
           </ErrorBoundary>
         )}
 
-
         {/* 12. Canonical Orders Execution & Lifecycle */}
-        {activeTab === "orders" && (
+        {isTabActive("orders") && (
           <ErrorBoundary title="Orders Execution Center Failed">
             <OrderExecutionCenter />
           </ErrorBoundary>
         )}
 
         {/* 13. Open Positions Exposure & Risk */}
-        {activeTab === "positions" && (
+        {isTabActive("positions") && (
           <ErrorBoundary title="Positions Exposure Center Failed">
             <EcoPositionsView />
           </ErrorBoundary>
         )}
 
         {/* 14. Human Trade Review Journal */}
-        {(activeTab === "trade-journal" || activeTab === "journal") && (
+        {isTabActive("trade-journal", ["journal"]) && (
           <ErrorBoundary title="Trade Journal Tab Failed">
             <TradeJournal />
           </ErrorBoundary>
         )}
 
-        {/* 13. Alerts & Monitoring */}
-        {activeTab === "alerts" && (
+        {/* 15. Alerts & Monitoring */}
+        {isTabActive("alerts") && (
           <ErrorBoundary title="Alerts & Monitoring Tab Failed">
             <AlertsMonitoring />
           </ErrorBoundary>
         )}
 
-        {/* 14. Logs & Debugging */}
-        {activeTab === "logs" && (
+        {/* 16. Logs & Debugging */}
+        {isTabActive("logs") && (
           <ErrorBoundary title="Logs & Debugging Tab Failed">
             <LogsDebugging />
           </ErrorBoundary>
         )}
 
-        {/* 15. Settings & Timezone */}
-        {activeTab === "settings" && (
+        {/* 17. Settings & Timezone */}
+        {isTabActive("settings") && (
           <ErrorBoundary title="Settings Tab Failed">
             <TerminalSettingsView />
           </ErrorBoundary>
         )}
 
-        {/* 16. Account & Security */}
-        {(activeTab === "account-security" || activeTab === "security") && (
+        {/* 18. Account & Security */}
+        {isTabActive("account-security", ["security"]) && (
           <ErrorBoundary title="Account & Security Tab Failed">
             <AccountSecurity />
           </ErrorBoundary>
         )}
 
-        {/* 17. Crypto Derivatives Overview */}
-        {(activeTab === "crypto-derivatives" || activeTab === "crypto") && (
+        {/* 19. Crypto Derivatives Overview */}
+        {isTabActive("crypto-derivatives", ["crypto"]) && (
           <ErrorBoundary title="Crypto Derivatives Hub Failed">
             <CryptoOverviewView />
           </ErrorBoundary>
         )}
 
-        {/* 18. Modular Futures Universe Terminal */}
-        {(activeTab === "crypto-futures" || activeTab === "futures") && (
+        {/* 20. Modular Futures Universe Terminal */}
+        {isTabActive("crypto-futures", ["futures"]) && (
           <ErrorBoundary title="Futures & Derivatives Terminal Failed">
             <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
               <FuturesWorkspace activeBoard="ALL" boardTitle="Universal Futures Workstation" />
@@ -379,33 +396,17 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 19. Crypto Option Chain */}
-        {activeTab === "crypto-options-chain" && (
+        {/* 21. Crypto Option Chain */}
+        {isTabActive("crypto-options-chain") && (
           <ErrorBoundary title="Crypto Option Chain Failed">
             <CryptoOptionChainTerminal />
           </ErrorBoundary>
         )}
 
-        {/* 20. Crypto Options Studio */}
-        {activeTab === "crypto-options" && (
+        {/* 22. Crypto Options Studio */}
+        {isTabActive("crypto-options") && (
           <ErrorBoundary title="Crypto Options Studio Failed">
             <OptionStrategyBuilder />
-          </ErrorBoundary>
-        )}
-
-        {/* Fallback for unhandled or unexpected tab IDs to prevent blank/black screen */}
-        {![
-          "home", "dashboard", "live", "live-feed", "live-data", "markets", "market-universe", "watchlist",
-          "command-center", "terminal", "options", "orderbook", "bot-control", "bots",
-          "strategy-builder", "strategies", "indicators", "scanner", "risk-management", "risk",
-          "providers", "backtesting", "backtest", "research", "performance", "pnl",
-          "portfolio", "capital-funds", "capital", "funds", "tax", "tax-intelligence", "reports",
-          "orders", "positions", "trade-journal", "journal", "alerts", "logs", "settings",
-          "account-security", "security", "crypto", "crypto-derivatives", "crypto-futures", "futures",
-          "crypto-options-chain", "crypto-options"
-        ].includes(activeTab) && (
-          <ErrorBoundary title="Executive Home Overview Failed">
-            <HomeExecutiveOverview />
           </ErrorBoundary>
         )}
       </div>

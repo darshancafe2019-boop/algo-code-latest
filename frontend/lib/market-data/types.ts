@@ -44,9 +44,14 @@ export type ExchangeSegment =
   | "BSE_CURR"
   | "MCX_COMM"
   | "DELTA_PERP"
-  | "BINANCE_FUTURES";
+  | "DELTA_OPT"
+  | "BINANCE_FUTURES"
+  | "BINANCE_SPOT"
+  | "NASDAQ"
+  | "NYSE"
+  | string;
 
-export type InstrumentType = "EQUITY" | "INDEX" | "FUTURES" | "OPTION" | "CRYPTO_PERP";
+export type InstrumentType = "EQUITY" | "INDEX" | "FUTURES" | "OPTION" | "CRYPTO_PERP" | "FOREX" | "CRYPTO_SPOT";
 
 export type FreshnessStatus = "LIVE" | "RECENT" | "FRESH" | "STALE" | "EXPIRED" | "MISSING" | "INVALID";
 
@@ -94,6 +99,7 @@ export interface MarketTick {
   ltp: number;
   lastTradedQuantity?: number;
   averagePrice?: number;
+  vwap?: number;
 
   open?: number;
   high?: number;
@@ -125,28 +131,86 @@ export interface MarketTick {
   status?: "VALID" | "ANOMALY" | "DROPPED";
 }
 
+export type MarketSessionState =
+  | "PRE_OPEN"
+  | "OPEN"
+  | "CLOSED"
+  | "AUCTION"
+  | "MAINTENANCE"
+  | "UNKNOWN";
+
+export type MarketDataQualityFlag =
+  | "HEALTHY"
+  | "LIVE"
+  | "STALE"
+  | "GAP"
+  | "CONFLICT"
+  | "DATA_CONFLICT"
+  | "MAPPING_ERROR"
+  | "OUT_OF_ORDER"
+  | "DISCONNECTED"
+  | "FEED_DISCONNECTED"
+  | "SNAPSHOT_PENDING"
+  | "NO_DEPTH"
+  | "NO_OI"
+  | "NO_GREEKS"
+  | "MARKET_CLOSED"
+  | "SYNTHETIC_PAPER"
+  | "ANOMALY";
+
 export interface NormalizedQuote {
-  symbol: string;
+  canonicalInstrumentId?: string;
+  provider: string;
+  sourceProvider?: string;
+  fallbackProvider?: string;
+  fallbackReason?: string;
   exchange: string;
-  provider: BrokerProvider;
-  last_price: number;
-  bid: number;
-  ask: number;
-  volume: number;
-  high: number | null;
-  low: number | null;
-  open: number | null;
-  close: number | null;
-  change_pct: number | null;
-  vwap: number | null;
+  segment?: string;
+  assetClass?: string;
+  symbol: string;
+  tradingSymbol?: string;
+  instrumentType?: string;
+  providerInstrumentId?: string;
+  exchangeTimestamp?: number | null;
+  providerTimestamp?: number | null;
+  serverReceivedTimestamp?: number;
+  sequenceNumber?: number;
+  ltp?: number;
+  last_price?: number;
+  bid?: number;
+  ask?: number;
+  bidQty?: number;
+  askQty?: number;
+  open?: number | null;
+  high?: number | null;
+  low?: number | null;
+  close?: number | null;
+  previousClose?: number;
+  vwap?: number;
+  change_pct?: number | null;
+  volume?: number;
+  openInterest?: number;
   open_interest?: number;
-  event_timestamp: string;
-  received_timestamp: string;
-  feed_latency_ms: number;
-  data_mode: "REAL_TIME" | "DELAYED" | "EOD" | "CACHED";
-  is_stale: boolean;
-  age_seconds: number;
-  freshness_status: FreshnessStatus;
+  changeOpenInterest?: number;
+  markPrice?: number;
+  indexPrice?: number;
+  fundingRate?: number;
+  iv?: number;
+  delta?: number;
+  gamma?: number;
+  theta?: number;
+  vega?: number;
+  dataAgeMs?: number;
+  latencyMs?: number;
+  sessionState?: MarketSessionState;
+  qualityFlags?: MarketDataQualityFlag[];
+  event_timestamp?: string;
+  received_timestamp?: string;
+  feed_latency_ms?: number;
+  data_mode?: "REAL_TIME" | "DELAYED" | "EOD" | "CACHED" | "LAST_KNOWN_PRICE";
+  is_stale?: boolean;
+  age_seconds?: number;
+  freshness_status?: FreshnessStatus;
 }
 
 export interface OHLCVCandle {
@@ -235,6 +299,10 @@ export interface InstrumentMasterRecord {
   expiryDate?: string;
   optionType?: "CE" | "PE";
   feedMode?: number;
+  strike?: number;
+  expiry?: string;
+  assetClass?: string;
+  active?: boolean;
 }
 
 export type FeedMode = "ltpc" | "option_greeks" | "full" | "full_d30";

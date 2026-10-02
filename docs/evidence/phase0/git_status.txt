@@ -1,0 +1,147 @@
+M  app/blueprints/health.py
+MM dashboard.py
+M  docs/architecture/current-system.md
+ M frontend/app/api/[...path]/route.ts
+ M frontend/app/api/futures/contracts/route.ts
+ M frontend/app/api/market-data/quote/route.ts
+ M frontend/app/api/market/snapshot/route.ts
+ M frontend/app/api/options/chain/route.ts
+M  frontend/app/bots/[id]/edit/page.tsx
+MM frontend/app/bots/create/page.tsx
+M  frontend/app/page.tsx
+M  frontend/app/strategy/create/page.tsx
+M  frontend/app/trade-analysis/page.tsx
+M  frontend/app/what-if/page.tsx
+MM frontend/components/Navbar.tsx
+M  frontend/components/QueryProvider.tsx
+ M frontend/components/bot-control/BotCardGrid.tsx
+MM frontend/components/bot-control/BotControlTab.tsx
+M  frontend/components/bot-control/CreateBotModal.tsx
+M  frontend/components/bot-control/CreateBotWizardModal.tsx
+ M frontend/components/bot-control/SimpleBotDetailsDrawer.tsx
+ M frontend/components/bot-control/SimpleBotFilterBar.tsx
+MM frontend/components/bot-control/SimpleBotTable.tsx
+ M frontend/components/bot-control/SimpleFleetSummaryHeader.tsx
+M  frontend/components/bot-instance/BotWizardVNext.tsx
+M  frontend/components/bot-instance/CreateBotWizard.tsx
+M  frontend/components/common/CommandPalette.tsx
+M  frontend/components/common/GlobalSearchModal.tsx
+M  frontend/components/common/LiveClock.tsx
+M  frontend/components/common/StableUtcClock.tsx
+M  frontend/components/layout/DirectPageLayout.tsx
+M  frontend/components/layout/LeftNavigationSidebar.tsx
+MM frontend/components/layout/header/LiveTickerItem.tsx
+M  frontend/components/options/OptionsContractSelectorModal.tsx
+M  frontend/components/options/SelectedOptionInspectionDrawer.tsx
+M  frontend/components/options/terminal/OptionChainTable.tsx
+M  frontend/components/options/terminal/OptionChainTerminal.tsx
+M  frontend/components/positions/PositionsCompactTable.tsx
+M  frontend/components/positions/PositionsKpiStrip.tsx
+M  frontend/components/shell/GlobalHeader.tsx
+M  frontend/components/strategy/StrategyCenter.tsx
+M  frontend/components/tax-intelligence/TaxCommandCenter.tsx
+M  frontend/components/tax-intelligence/TaxIntelligenceTab.tsx
+M  frontend/components/tax-intelligence/TaxLotsView.tsx
+M  frontend/components/tax-intelligence/TaxPlannerView.tsx
+M  frontend/components/tax-intelligence/TaxPositionsView.tsx
+M  frontend/components/tax-intelligence/TaxTransactionsView.tsx
+M  frontend/components/tax-intelligence/TaxWhatIfSimulator.tsx
+M  frontend/components/terminal/TerminalStatusBar.tsx
+D  frontend/components/trade-analysis/TradeAnalysisConfirmationMatrix.tsx
+D  frontend/components/trade-analysis/TradeAnalysisDashboard.tsx
+D  frontend/components/trade-analysis/TradeAnalysisIndicatorBuilder.tsx
+D  frontend/components/trade-analysis/TradeAnalysisModal.tsx
+D  frontend/components/trade-analysis/TradeAnalysisOrderExecutor.tsx
+D  frontend/components/trade-analysis/TradeAnalysisRiskReward.tsx
+D  frontend/components/trade-analysis/TradeAnalysisTypes.ts
+D  frontend/components/trade-analysis/TradeAnalysisUnderlyingFuturesPanel.tsx
+M  frontend/components/ui/terminal/PageHeader.tsx
+MM frontend/context/MarketGatewayContext.tsx
+M  frontend/lib/apiClient.ts
+ M frontend/lib/bot-creation-bridge.ts
+ M frontend/lib/market-data/instrument-master.ts
+ M frontend/lib/market-data/types.ts
+M  frontend/lib/store/useBotCreationIntentStore.ts
+M  frontend/lib/taxEngineService.ts
+M  frontend/package-lock.json
+MM frontend/src/features/markets/futures/components/FuturesDetailsDrawer.tsx
+M  frontend/src/features/markets/futures/components/FuturesInteractiveChart.tsx
+M  frontend/tailwind.config.js
+MM frontend/types/bot-control.ts
+ M frontend/types/bot-creation-intent.ts
+M  frontend/types/positions.ts
+M  market_data_gateway/adapters/delta_options_ws.py
+M  market_data_gateway/gateway.py
+M  market_data_gateway/models/tick.py
+M  market_data_gateway/upstox_protobuf_decoder.py
+ M scripts/dev_orchestrator.py
+M  scripts/sync.ps1
+M  src/binance_market_data_service.py
+MM src/canonical_bot_config.py
+ M src/capital_service.py
+M  src/command_bus.py
+M  src/data_fetcher.py
+M  src/db.py
+M  src/dhan_feed_manager.py
+M  src/execution_service.py
+M  src/instrument_resolver.py
+MM src/live_runner.py
+M  src/pnl_engine.py
+MM src/process_manager.py
+M  src/strategy.py
+M  src/trade_ledger.py
+ M src/universal_risk_engine.py
+MM src/upstox_service.py
+M  tests/test_indian_market_integration.py
+M  tests/test_instrument_resolution_and_reliability.py
+?? .corrupted_archive/
+?? docs/AUDIT.md
+?? docs/FUNCTIONALITY_MATRIX.md
+?? docs/PLAN.md
+?? docs/evidence/
+?? frontend/app/api/bots/
+?? frontend/app/api/market/providers/health/
+?? frontend/app/api/market/providers/registry/
+?? frontend/app/api/stream/alerts/
+?? frontend/app/api/stream/events/
+?? frontend/app/api/stream/ticker/
+?? frontend/components/bot-control/DeleteAllBotsModal.tsx
+?? frontend/components/bot-control/DuplicateBotsReviewModal.tsx
+?? frontend/components/bot-instance/BotCreationControlPlane.tsx
+?? frontend/components/bot-instance/LiveMarketControlBoard.tsx
+?? frontend/components/bot-instance/SelectedContractAnalysis.tsx
+?? frontend/components/bot-instance/steps/
+?? frontend/components/live/LiveDataCommandCenter.tsx
+?? frontend/components/orderbook/LiveOrderFlowMonitor.tsx
+?? frontend/components/stream/LiveStreamInspector.tsx
+?? frontend/components/tax-intelligence/TaxVisualAnalyticsCharts.tsx
+?? frontend/components/trade_analysis/
+?? frontend/lib/api.ts
+?? frontend/lib/indicators/indicatorsCatalog.ts
+?? frontend/lib/store/botCreationStateMachine.ts
+?? frontend/lib/store/useBotCreationStore.ts
+?? frontend/lib/strategies/compatibilityEngine.ts
+?? frontend/lib/strategies/options21Catalog.ts
+?? frontend/lib/strategies/premiumResolver.ts
+?? frontend/tests/test_bot_creation_state_machine.ts
+?? frontend/types/premium-intent.ts
+?? market_data_gateway/core/data_quality.py
+?? market_data_gateway/core/interfaces.py
+?? market_data_gateway/core/order_flow_engine.py
+?? market_data_gateway/core/provider_registry.py
+?? market_data_gateway/core/symbol_master.py
+?? scripts/deploy_complete_bitcoin_bot_fleet.py
+?? src/expiry_lifecycle_manager.py
+?? src/market_data/historical_downloader.py
+?? src/premium_intent.py
+?? src/premium_resolver.py
+?? src/premium_resolver_routes.py
+?? test_live_server_bot_creation.py
+?? test_premium_resolver_full.py
+?? test_unified_bot_creation.py
+?? tests/run_suite.py
+?? tests/test_authoritative_bot_creation_pipeline.py
+?? tests/test_canonical_instruments_and_lifecycle.py
+?? tests/test_e2e_paper_execution.py
+?? tests/test_expiry_lifecycle_manager.py
+?? tests/test_gateway_core.py

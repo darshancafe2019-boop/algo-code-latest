@@ -99,7 +99,7 @@ export function Navbar(props: NavbarProps = {}) {
         year: "numeric",
       });
       const timeStr = now.toLocaleTimeString("en-US", {
-        hour12: false,
+        hour12: true,
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
@@ -158,11 +158,14 @@ export function Navbar(props: NavbarProps = {}) {
         }, 1000);
       }
 
+      const changePct = data.change_pct !== undefined ? Number(data.change_pct) : (data.changePercent !== undefined ? Number(data.changePercent) : (data.percentage !== undefined ? Number(data.percentage) : 0));
+      const changeVal = data.change_val !== undefined ? Number(data.change_val) : (data.change !== undefined ? Number(data.change) : 0);
+
       setTicker({
         symbol: data.symbol || activeSymbol || "BTC/USDT",
         last: newPrice,
-        change_pct: data.change_pct !== undefined ? Number(data.change_pct) : 0,
-        change_val: data.change_val !== undefined ? Number(data.change_val) : 0,
+        change_pct: isNaN(changePct) ? 0 : changePct,
+        change_val: isNaN(changeVal) ? 0 : changeVal,
         high: data.high || newPrice,
         low: data.low || newPrice,
         volume: data.volume || 0,

@@ -38,34 +38,25 @@ export interface NormalizedQuote {
   symbol: string;
   exchange: string;
   provider: string;
-
   last_price: number;
   bid: number;
   ask: number;
   volume: number;
-
   high: number | null;
   low: number | null;
   open: number | null;
   close: number | null;
-
   change_pct: number | null;
   vwap: number | null;
-
   event_timestamp: string;
   received_timestamp: string;
-
   feed_latency_ms: number;
-
-  data_mode:
-  | "REAL_TIME"
-  | "DELAYED"
-  | "EOD"
-  | "CACHED";
-
+  data_mode: "REAL_TIME" | "DELAYED" | "EOD" | "CACHED";
   is_stale: boolean;
   age_seconds: number;
 }
+
+export type NormalizedMarketEvent = NormalizedQuote;
 
 export type ConnectionStatus =
   | "CONNECTING"
@@ -98,68 +89,62 @@ export interface ProviderHealthEntry {
 
 interface MarketGatewayContextValue {
   quotes: Map<string, NormalizedQuote>;
-
-  subscribe: (
-    symbol: string,
-    reason: SubscriptionReason
-  ) => void;
-
-  unsubscribe: (
-    symbol: string,
-    reason: SubscriptionReason
-  ) => void;
-
+  subscribe: (symbol: string, reason: SubscriptionReason) => void;
+  unsubscribe: (symbol: string, reason: SubscriptionReason) => void;
   connectionStatus: ConnectionStatus;
-
   providerHealth: ProviderHealthEntry[];
-
   hasProviderWarning: boolean;
-
-  getQuote: (
-    symbol: string,
-    exchange?: string,
-    provider?: string
-  ) => NormalizedQuote | null;
-
-  subscribeSymbolQuote: (
-    symbol: string,
-    callback: (quote: NormalizedQuote) => void
-  ) => () => void;
+  getQuote: (symbol: string, exchange?: string, provider?: string) => NormalizedQuote | null;
+  subscribeSymbolQuote: (symbol: string, callback: (quote: NormalizedQuote) => void) => () => void;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Context
+// Context & Hooks
 // ─────────────────────────────────────────────────────────────────────────────
 
-const MarketGatewayContext =
-  createContext<MarketGatewayContextValue | null>(null);
+const MarketGatewayContext = createContext<MarketGatewayContextValue | null>(null);
 
-export function useMarketGatewayContext():
-  MarketGatewayContextValue {
+export function useMarketGatewayContext(): MarketGatewayContextValue {
   const ctx = useContext(MarketGatewayContext);
-
   if (!ctx) {
-    throw new Error(
-      "useMarketGatewayContext must be used inside <MarketGatewayProvider>"
-    );
+    throw new Error("useMarketGatewayContext must be used inside <MarketGatewayProvider>");
   }
-
   return ctx;
+}
+
+export function useMarketGateway() {
+  const ctx = useContext(MarketGatewayContext);
+  if (!ctx) {
+    return {
+      isConnected: false,
+      connectionStatus: "DISCONNECTED" as ConnectionStatus,
+      activeFeedsCount: 0,
+      subscriptionsCount: 0,
+      quotes: new Map<string, NormalizedQuote>(),
+      providerHealth: [] as ProviderHealthEntry[],
+      hasProviderWarning: false,
+      getQuote: () => null,
+      subscribe: () => {},
+      unsubscribe: () => {},
+      subscribeSymbolQuote: () => () => {},
+      lastQuote: null as any,
+    };
+  }
+  const quotesList = Array.from(ctx.quotes.values());
+  return {
+    ...ctx,
+    isConnected: ctx.connectionStatus === "CONNECTED" || ctx.connectionStatus === "LIVE",
+    activeFeedsCount: (Array.isArray(ctx.providerHealth) ? ctx.providerHealth : []).filter((p) => p.status === "LIVE" || p.status === "OK").length,
+    subscriptionsCount: ctx.quotes.size,
+    lastQuote: quotesList.length > 0 ? quotesList[quotesList.length - 1] : null,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const RECONNECT_DELAYS = [
-  1000,
-  2000,
-  4000,
-  8000,
-  16000,
-  30000,
-];
-
+const RECONNECT_DELAYS = [1000, 2000, 4000, 8000, 16000, 30000];
 const HEARTBEAT_STALE_MS = 20_000;
 const HEALTH_POLL_MS = 30_000;
 const FALLBACK_SNAPSHOT_POLL_MS = 10_000;
@@ -168,205 +153,83 @@ type SubRef = {
   reasons: Map<SubscriptionReason, number>;
 };
 
-/**
- * Local metadata placed on each browser WebSocket.
- *
- * _suppressReconnect = true means:
- * this socket is being closed intentionally and its
- * onclose handler must NOT create another reconnect.
- */
 type ManagedWebSocket = WebSocket & {
   _suppressReconnect?: boolean;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Provider
+// Provider Component
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function MarketGatewayProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function MarketGatewayProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
+  void isAuthenticated;
 
-
-
-  const [
-    connectionStatus,
-    setConnectionStatus,
-  ] = useState<ConnectionStatus>(
-    "CONNECTING"
-  );
-
-  const [
-    providerHealth,
-    setProviderHealth,
-  ] = useState<ProviderHealthEntry[]>([]);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("CONNECTING");
+  const [providerHealth, setProviderHealth] = useState<ProviderHealthEntry[]>([]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Refs
   // ───────────────────────────────────────────────────────────────────────────
 
-  const wsRef =
-    useRef<WebSocket | null>(null);
-
-  const mountedRef =
-    useRef(true);
-
-  const reconnectAttemptRef =
-    useRef(0);
-
-  const reconnectTimerRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null
-    );
-
-  /**
-   * IMPORTANT:
-   * Connection timeout must also be tracked globally
-   * so component cleanup can cancel it.
-   */
-  const connectTimeoutRef =
-    useRef<ReturnType<typeof setTimeout> | null>(
-      null
-    );
-
-  const fallbackPollTimerRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
-
-  const lastHeartbeatRef =
-    useRef<number>(
-      Date.now()
-    );
-
-  const heartbeatWatchdogRef =
-    useRef<ReturnType<typeof setInterval> | null>(
-      null
-    );
-
-  const subRefsRef =
-    useRef<Map<string, SubRef>>(
-      new Map()
-    );
-
-  const quotesRef =
-    useRef<Map<string, NormalizedQuote>>(
-      new Map()
-    );
-
-  const symbolListenersRef =
-    useRef<
-      Map<
-        string,
-        Set<(quote: NormalizedQuote) => void>
-      >
-    >(
-      new Map()
-    );
-
-  const pendingQuotesRef =
-    useRef<Map<string, NormalizedQuote>>(
-      new Map()
-    );
-
-  const batchFrameRef =
-    useRef<number | null>(
-      null
-    );
-
-  const lastQuotesStateUpdateRef =
-    useRef<number>(
-      0
-    );
-
-  const scheduleReconnectRef =
-    useRef<() => void>(
-      () => { }
-    );
-
-  const connectWSRef =
-    useRef<() => void>(
-      () => { }
-    );
-
-  // Avoid TS/noUnusedLocals issue if auth is currently
-  // intentionally not used to gate the gateway.
-  void isAuthenticated;
+  const wsRef = useRef<WebSocket | null>(null);
+  const mountedRef = useRef(true);
+  const reconnectAttemptRef = useRef(0);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const connectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fallbackPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastHeartbeatRef = useRef<number>(Date.now());
+  const heartbeatWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const subRefsRef = useRef<Map<string, SubRef>>(new Map());
+  const quotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
+  const symbolListenersRef = useRef<Map<string, Set<(quote: NormalizedQuote) => void>>>(new Map());
+  const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
+  const batchFrameRef = useRef<number | null>(null);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // WebSocket URL
+  // WebSocket URL Generator
   // ───────────────────────────────────────────────────────────────────────────
 
-  const getGatewayWsUrl =
-    useCallback((): string => {
-      const envWsUrl =
-        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
-        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
-        process.env.NEXT_PUBLIC_MARKET_WS_URL;
+  const getGatewayWsUrl = useCallback((): string => {
+    const envWsUrl =
+      process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
+      process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
+      process.env.NEXT_PUBLIC_MARKET_WS_URL;
 
-      if (envWsUrl) {
-        if (envWsUrl.startsWith("/")) {
-          if (typeof window !== "undefined") {
-            const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-            return `${proto}//${window.location.host}${envWsUrl}`;
-          }
-          return `ws://127.0.0.1:5051${envWsUrl}`;
+    if (envWsUrl) {
+      if (envWsUrl.startsWith("/")) {
+        if (typeof window !== "undefined") {
+          const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+          return `${proto}//${window.location.host}${envWsUrl}`;
         }
-        if (envWsUrl.startsWith("http://")) {
-          return envWsUrl.replace("http://", "ws://");
-        }
-        if (envWsUrl.startsWith("https://")) {
-          return envWsUrl.replace("https://", "wss://");
-        }
-        return envWsUrl;
+        return `ws://127.0.0.1:5051${envWsUrl}`;
       }
+      if (envWsUrl.startsWith("http://")) return envWsUrl.replace("http://", "ws://");
+      if (envWsUrl.startsWith("https://")) return envWsUrl.replace("https://", "wss://");
+      return envWsUrl;
+    }
 
-      if (
-        typeof window === "undefined"
-      ) {
-        return "ws://127.0.0.1:5051/ws";
-      }
+    if (typeof window === "undefined") {
+      return "ws://127.0.0.1:5051/ws";
+    }
 
-      let host =
-        window.location.hostname ||
-        "127.0.0.1";
+    const host = window.location.hostname || "127.0.0.1";
+    const port = process.env.NEXT_PUBLIC_MARKET_GATEWAY_PORT || "5051";
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
-      if (host === "localhost") {
-        host = "127.0.0.1";
-      }
-
-      const port =
-        process.env
-          .NEXT_PUBLIC_MARKET_GATEWAY_PORT ||
-        "5051";
-
-      const protocol =
-        window.location.protocol ===
-          "https:"
-          ? "wss:"
-          : "ws:";
-
-      return `${protocol}//${host}:${port}/ws`;
-    }, []);
+    return `${protocol}//${host}:${port}/ws`;
+  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Safe WebSocket Teardown (Avoids "WebSocket closed before established" errors)
+  // Safe WebSocket Teardown
   // ───────────────────────────────────────────────────────────────────────────
 
   const safeCloseSocket = useCallback(
-    (
-      targetWs: WebSocket | null,
-      code: number = 1000,
-      reason: string = "Normal Closure"
-    ) => {
+    (targetWs: WebSocket | null, code: number = 1000, reason: string = "Normal Closure") => {
       if (!targetWs) return;
       const managedWs = targetWs as ManagedWebSocket;
       managedWs._suppressReconnect = true;
 
-      // Detach message and error handlers to avoid zombie state updates
       targetWs.onmessage = null;
       targetWs.onerror = null;
 
@@ -377,9 +240,6 @@ export function MarketGatewayProvider({
           // ignore
         }
       } else if (targetWs.readyState === WebSocket.CONNECTING) {
-        // Calling close() while CONNECTING triggers browser warning:
-        // "WebSocket is closed before the connection is established"
-        // Wait for connection to open, then close quietly
         targetWs.onopen = () => {
           try {
             targetWs.close(code, reason);
@@ -394,1856 +254,696 @@ export function MarketGatewayProvider({
   );
 
   // ───────────────────────────────────────────────────────────────────────────
+  // Reconnect Scheduler
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const scheduleReconnect = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    setConnectionStatus("RECONNECTING");
+    useMarketFeedStore.getState().setConnectionStatus("RECONNECTING");
+
+    const attempt = reconnectAttemptRef.current;
+    const delayIndex = Math.min(attempt, RECONNECT_DELAYS.length - 1);
+    const baseDelay = RECONNECT_DELAYS[delayIndex];
+    const jitter = Math.floor(Math.random() * 300);
+    const delay = baseDelay + jitter;
+
+    reconnectAttemptRef.current = Math.min(attempt + 1, RECONNECT_DELAYS.length);
+
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+    }
+
+    reconnectTimerRef.current = setTimeout(() => {
+      reconnectTimerRef.current = null;
+      if (mountedRef.current) {
+        connectWS();
+      }
+    }, delay);
+  }, []);
+
+  // ───────────────────────────────────────────────────────────────────────────
   // WebSocket Connection
   // ───────────────────────────────────────────────────────────────────────────
 
-  const connectWS =
-    useCallback(() => {
-      if (!mountedRef.current) {
+  const connectWS = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    if (wsRef.current) {
+      if (
+        wsRef.current.readyState === WebSocket.OPEN ||
+        wsRef.current.readyState === WebSocket.CONNECTING
+      ) {
+        return;
+      }
+    }
+
+    const nextStatus = reconnectAttemptRef.current > 0 ? "RECONNECTING" : "CONNECTING";
+    setConnectionStatus(nextStatus);
+    useMarketFeedStore.getState().setConnectionStatus(nextStatus);
+
+    const wsUrl = getGatewayWsUrl();
+    let ws: WebSocket;
+
+    try {
+      ws = new WebSocket(wsUrl);
+      wsRef.current = ws;
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+
+    const connectTimeout = setTimeout(() => {
+      if (ws.readyState !== WebSocket.CONNECTING) return;
+      if (wsRef.current === ws) wsRef.current = null;
+      safeCloseSocket(ws, 4000, "Connection timeout");
+      scheduleReconnect();
+    }, 8000);
+
+    connectTimeoutRef.current = connectTimeout;
+
+    ws.onopen = () => {
+      clearTimeout(connectTimeout);
+      if (connectTimeoutRef.current === connectTimeout) {
+        connectTimeoutRef.current = null;
+      }
+
+      if (!mountedRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
         return;
       }
 
-      /**
-       * Don't create duplicate connections.
-       */
-      if (wsRef.current) {
-        if (
-          wsRef.current.readyState ===
-          WebSocket.OPEN ||
-          wsRef.current.readyState ===
-          WebSocket.CONNECTING
-        ) {
-          return;
+      reconnectAttemptRef.current = 0;
+      lastHeartbeatRef.current = Date.now();
+
+      setConnectionStatus("CONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
+
+      // Restore active subscriptions
+      const allSubs: string[] = [];
+      subRefsRef.current.forEach((ref, sym) => {
+        const hasActive = Array.from(ref.reasons.values()).some((count) => count > 0);
+        if (hasActive) allSubs.push(sym);
+      });
+
+      if (allSubs.length > 0 && ws.readyState === WebSocket.OPEN) {
+        try {
+          ws.send(
+            JSON.stringify({
+              action: "subscribe",
+              symbols: allSubs,
+              reason: "RESTORE_SUBSCRIPTIONS",
+            })
+          );
+        } catch {
+          // ignore
         }
       }
+    };
 
-      if (
-        reconnectAttemptRef.current > 0
-      ) {
-        setConnectionStatus(
-          "RECONNECTING"
-        );
-      } else {
-        setConnectionStatus(
-          "CONNECTING"
-        );
+    ws.onmessage = (event) => {
+      if (!mountedRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
+        return;
       }
 
-      const wsUrl =
-        getGatewayWsUrl();
-
-      let ws: WebSocket;
+      lastHeartbeatRef.current = Date.now();
 
       try {
-        ws = new WebSocket(
-          wsUrl
-        );
+        const msg = JSON.parse(event.data);
 
-        wsRef.current = ws;
+        if (msg.type === "QUOTE" && msg.data) {
+          const quote = msg.data as NormalizedQuote;
+          const sym = quote.symbol.toUpperCase();
+          const provider = (quote.provider || "UNKNOWN").toUpperCase();
+          const exchange = (quote.exchange || "").toUpperCase();
+
+          const incomingTs = new Date(quote.event_timestamp || quote.received_timestamp).getTime();
+          const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
+          if (existing) {
+            const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
+            if (existingTs > 0 && incomingTs < existingTs) return;
+          }
+
+          const aliases = getQuoteAliases(sym, exchange, provider);
+          aliases.forEach((alias) => {
+            quotesRef.current.set(alias, quote);
+            pendingQuotesRef.current.set(alias, quote);
+          });
+
+          useMarketFeedStore.getState().ingestTick({
+            symbol: sym,
+            exchange: quote.exchange,
+            provider: quote.provider,
+            lastPrice: quote.last_price,
+            bid: quote.bid,
+            ask: quote.ask,
+            volume: quote.volume,
+            open: quote.open,
+            high: quote.high,
+            low: quote.low,
+            close: quote.close,
+            changePercent: quote.change_pct ?? 0,
+            eventTimestamp: quote.event_timestamp,
+            feedLatencyMs: quote.feed_latency_ms,
+            dataMode: quote.data_mode,
+            isStale: quote.is_stale,
+            ageMs: (quote.age_seconds || 0) * 1000,
+          });
+
+          aliases.forEach((alias) => {
+            const listeners = symbolListenersRef.current.get(alias);
+            if (listeners && listeners.size > 0) {
+              listeners.forEach((fn) => {
+                try {
+                  fn(quote);
+                } catch {
+                  // ignore
+                }
+              });
+            }
+          });
+        } else if (msg.type === "SNAPSHOT" && msg.data) {
+          const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
+          snapshotEntries.forEach(([rawSym, q]) => {
+            const sym = rawSym.toUpperCase();
+            const provider = (q.provider || "UNKNOWN").toUpperCase();
+            const provKey = `${provider}:${sym}`;
+
+            quotesRef.current.set(provKey, q);
+            quotesRef.current.set(sym, q);
+            pendingQuotesRef.current.set(provKey, q);
+            pendingQuotesRef.current.set(sym, q);
+
+            useMarketFeedStore.getState().ingestTick({
+              symbol: sym,
+              exchange: q.exchange,
+              provider: q.provider,
+              lastPrice: q.last_price,
+              bid: q.bid,
+              ask: q.ask,
+              volume: q.volume,
+              open: q.open,
+              high: q.high,
+              low: q.low,
+              close: q.close,
+              changePercent: q.change_pct ?? 0,
+              eventTimestamp: q.event_timestamp,
+              feedLatencyMs: q.feed_latency_ms,
+              dataMode: q.data_mode,
+              isStale: q.is_stale,
+              ageMs: (q.age_seconds || 0) * 1000,
+            });
+
+            const listeners = symbolListenersRef.current.get(sym);
+            if (listeners && listeners.size > 0) {
+              listeners.forEach((fn) => {
+                try {
+                  fn(q);
+                } catch {
+                  // ignore
+                }
+              });
+            }
+          });
+        } else if ((msg.type === "FUTURES_TICK" || msg.type === "TICK") && msg.data) {
+          const rawTick = msg.data;
+          const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
+          const provider = (rawTick.provider || "UNKNOWN").toUpperCase();
+          const exchange = (rawTick.exchange || provider).toUpperCase();
+          const lastPrice = rawTick.last_price ?? rawTick.lastPrice ?? rawTick.price ?? null;
+
+          if (sym && lastPrice !== null) {
+            const quote: NormalizedQuote = {
+              symbol: sym,
+              exchange: exchange,
+              provider: provider,
+              last_price: Number(lastPrice),
+              bid: Number(rawTick.bid ?? lastPrice),
+              ask: Number(rawTick.ask ?? lastPrice),
+              volume: Number(rawTick.volume ?? rawTick.volume_24h ?? 0),
+              high: rawTick.high ? Number(rawTick.high) : null,
+              low: rawTick.low ? Number(rawTick.low) : null,
+              open: rawTick.open ? Number(rawTick.open) : null,
+              close: rawTick.close ? Number(rawTick.close) : null,
+              change_pct: rawTick.change_pct ?? rawTick.changePercent ?? rawTick.change_24h_pct ?? null,
+              vwap: rawTick.vwap ?? null,
+              event_timestamp: rawTick.timestamp || rawTick.event_timestamp || new Date().toISOString(),
+              received_timestamp: new Date().toISOString(),
+              feed_latency_ms: rawTick.latency_ms ?? 0,
+              data_mode: "REAL_TIME",
+              is_stale: false,
+              age_seconds: 0,
+            };
+
+            const existingKey = `${provider}:${sym}`;
+            quotesRef.current.set(existingKey, quote);
+            quotesRef.current.set(sym, quote);
+            pendingQuotesRef.current.set(existingKey, quote);
+            pendingQuotesRef.current.set(sym, quote);
+
+            useMarketFeedStore.getState().ingestTick({
+              symbol: sym,
+              exchange: exchange,
+              provider: provider,
+              lastPrice: quote.last_price,
+              bid: quote.bid,
+              ask: quote.ask,
+              volume: quote.volume,
+              open: quote.open,
+              high: quote.high,
+              low: quote.low,
+              close: quote.close,
+              changePercent: quote.change_pct ?? 0,
+              eventTimestamp: quote.event_timestamp,
+              feedLatencyMs: quote.feed_latency_ms,
+              dataMode: quote.data_mode,
+              isStale: false,
+              ageMs: 0,
+              rawPayload: rawTick,
+            });
+          }
+        } else if (msg.type === "PROVIDER_HEALTH" && msg.data) {
+          const h = msg.data;
+          const pName = (h.provider || "").toUpperCase();
+          if (pName) {
+            useMarketFeedStore.getState().updateProviderStat(pName, {
+              status: h.connected ? "CONNECTED" : "OFFLINE",
+              latencyMs: h.latency_ms ?? 0,
+              lastMessageAt: h.last_message_ms ? new Date(h.last_message_ms).toISOString() : new Date().toISOString(),
+              lastTickAgeMs: h.last_message_ms ? Math.max(0, Date.now() - h.last_message_ms) : 0,
+              errorCount: h.error ? 1 : 0,
+            });
+          }
+        } else if (msg.type === "GATEWAY_READY" || msg.type === "READY" || msg.type === "HEARTBEAT") {
+          setConnectionStatus("CONNECTED");
+          useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
+        }
       } catch {
-        scheduleReconnectRef.current();
-        return;
+        // ignore frame parse errors
       }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // Connection timeout
-      // ─────────────────────────────────────────────────────────────────────
-
-      const connectTimeout =
-        setTimeout(() => {
-          if (
-            ws.readyState !==
-            WebSocket.CONNECTING
-          ) {
-            return;
-          }
-
-          if (
-            wsRef.current === ws
-          ) {
-            wsRef.current = null;
-          }
-
-          safeCloseSocket(
-            ws,
-            4000,
-            "Connection timeout"
-          );
-
-          scheduleReconnectRef.current();
-        }, 8000);
-
-      connectTimeoutRef.current =
-        connectTimeout;
-
-      // ─────────────────────────────────────────────────────────────────────
-      // OPEN
-      // ─────────────────────────────────────────────────────────────────────
-
-      ws.onopen = () => {
-        clearTimeout(
-          connectTimeout
-        );
-
-        if (
-          connectTimeoutRef.current ===
-          connectTimeout
-        ) {
-          connectTimeoutRef.current =
-            null;
-        }
-
-        if (
-          !mountedRef.current ||
-          wsRef.current !== ws ||
-          (
-            ws as ManagedWebSocket
-          )._suppressReconnect
-        ) {
-          return;
-        }
-
-        reconnectAttemptRef.current =
-          0;
-
-        lastHeartbeatRef.current =
-          Date.now();
-
-        setConnectionStatus(
-          "CONNECTED"
-        );
-
-        useMarketFeedStore
-          .getState()
-          .setConnectionStatus(
-            "CONNECTED"
-          );
-
-        // ─────────────────────────────────────────────────────────────────
-        // Restore active subscriptions
-        // ─────────────────────────────────────────────────────────────────
-
-        const allSubs: string[] =
-          [];
-
-        subRefsRef.current.forEach(
-          (
-            ref,
-            sym
-          ) => {
-            const hasActive =
-              Array.from(
-                ref.reasons.values()
-              ).some(
-                (count) =>
-                  count > 0
-              );
-
-            if (hasActive) {
-              allSubs.push(sym);
-            }
-          }
-        );
-
-        if (
-          allSubs.length > 0 &&
-          ws.readyState ===
-          WebSocket.OPEN
-        ) {
-          try {
-            ws.send(
-              JSON.stringify({
-                action:
-                  "subscribe",
-                symbols:
-                  allSubs,
-                reason:
-                  "RESTORE_SUBSCRIPTIONS",
-              })
-            );
-          } catch {
-            // Ignore send failure.
-          }
-        }
-      };
-
-      // ─────────────────────────────────────────────────────────────────────
-      // MESSAGE
-      // ─────────────────────────────────────────────────────────────────────
-
-      ws.onmessage = (
-        event
-      ) => {
-        if (
-          !mountedRef.current ||
-          wsRef.current !== ws ||
-          (
-            ws as ManagedWebSocket
-          )._suppressReconnect
-        ) {
-          return;
-        }
-
-        /**
-         * Any valid incoming WS frame
-         * proves that the socket is alive.
-         */
-        lastHeartbeatRef.current =
-          Date.now();
-
-        try {
-          const msg =
-            JSON.parse(
-              event.data
-            );
-
-          // ───────────────────────────────────────────────────────────────
-          // Quote
-          // ───────────────────────────────────────────────────────────────
-
-          if (
-            msg.type ===
-            "QUOTE" &&
-            msg.data
-          ) {
-            const quote =
-              msg.data as NormalizedQuote;
-
-            const sym =
-              quote.symbol.toUpperCase();
-
-            const provider =
-              (
-                quote.provider ||
-                "UNKNOWN"
-              ).toUpperCase();
-
-            const incomingTs =
-              new Date(
-                quote.event_timestamp ||
-                quote.received_timestamp
-              ).getTime();
-
-            const existingKey =
-              `${provider}:${sym}`;
-
-            const existing =
-              quotesRef.current.get(
-                existingKey
-              ) ||
-              quotesRef.current.get(
-                sym
-              );
-
-            /**
-             * Reject old/out-of-order ticks.
-             */
-            if (existing) {
-              const existingTs =
-                new Date(
-                  existing.event_timestamp ||
-                  existing.received_timestamp
-                ).getTime();
-
-              if (
-                existingTs > 0 &&
-                incomingTs <
-                existingTs
-              ) {
-                return;
-              }
-            }
-
-            // ─────────────────────────────────────────────────────────────
-            // Provider scoped storage
-            // ─────────────────────────────────────────────────────────────
-
-            quotesRef.current.set(
-              existingKey,
-              quote
-            );
-
-            pendingQuotesRef.current.set(
-              existingKey,
-              quote
-            );
-
-            const aliases =
-              getQuoteAliases(
-                quote.symbol,
-                quote.exchange,
-                quote.provider
-              );
-
-            aliases.forEach(
-              (alias) => {
-                if (
-                  alias.startsWith(
-                    "BINANCE:"
-                  ) &&
-                  provider !==
-                  "BINANCE"
-                ) {
-                  return;
-                }
-
-                if (
-                  alias.startsWith(
-                    "DELTA:"
-                  ) &&
-                  provider !==
-                  "DELTA"
-                ) {
-                  return;
-                }
-
-                if (
-                  alias.startsWith(
-                    "DHAN:"
-                  ) &&
-                  provider !==
-                  "DHAN"
-                ) {
-                  return;
-                }
-
-                if (
-                  alias.startsWith(
-                    "UPSTOX:"
-                  ) &&
-                  provider !==
-                  "UPSTOX"
-                ) {
-                  return;
-                }
-
-                if (
-                  alias.startsWith(
-                    "OANDA:"
-                  ) &&
-                  provider !==
-                  "OANDA"
-                ) {
-                  return;
-                }
-
-                quotesRef.current.set(
-                  alias,
-                  quote
-                );
-
-                pendingQuotesRef.current.set(
-                  alias,
-                  quote
-                );
-              }
-            );
-
-            // ─────────────────────────────────────────────────────────────
-            // Zustand ingestion
-            // ─────────────────────────────────────────────────────────────
-
-            useMarketFeedStore
-              .getState()
-              .ingestTick({
-                symbol:
-                  sym,
-
-                exchange:
-                  quote.exchange,
-
-                provider:
-                  quote.provider,
-
-                lastPrice:
-                  quote.last_price,
-
-                bid:
-                  quote.bid,
-
-                ask:
-                  quote.ask,
-
-                volume:
-                  quote.volume,
-
-                open:
-                  quote.open,
-
-                high:
-                  quote.high,
-
-                low:
-                  quote.low,
-
-                close:
-                  quote.close,
-
-                changePercent:
-                  quote.change_pct ??
-                  0,
-
-                eventTimestamp:
-                  quote.event_timestamp,
-
-                feedLatencyMs:
-                  quote.feed_latency_ms,
-
-                dataMode:
-                  quote.data_mode,
-
-                isStale:
-                  quote.is_stale,
-
-                ageMs:
-                  (
-                    quote.age_seconds ||
-                    0
-                  ) *
-                  1000,
-              });
-
-            // ─────────────────────────────────────────────────────────────
-            // Symbol listeners
-            // ─────────────────────────────────────────────────────────────
-
-            aliases.forEach(
-              (alias) => {
-                const listeners =
-                  symbolListenersRef.current.get(
-                    alias
-                  );
-
-                if (
-                  listeners &&
-                  listeners.size >
-                  0
-                ) {
-                  listeners.forEach(
-                    (fn) => {
-                      try {
-                        fn(
-                          quote
-                        );
-                      } catch {
-                        // Listener failure should not break stream.
-                      }
-                    }
-                  );
-                }
-              }
-            );
-
-
-          }
-
-          // ───────────────────────────────────────────────────────────────
-          // Snapshot
-          // ───────────────────────────────────────────────────────────────
-          else if (
-            msg.type ===
-            "SNAPSHOT" &&
-            msg.data
-          ) {
-            const snapshotEntries =
-              Object.entries(
-                msg.data as Record<
-                  string,
-                  NormalizedQuote
-                >
-              );
-
-            snapshotEntries.forEach(
-              (
-                [
-                  rawSym,
-                  q,
-                ]
-              ) => {
-                const sym =
-                  rawSym.toUpperCase();
-
-                const provider =
-                  (
-                    q.provider ||
-                    "UNKNOWN"
-                  ).toUpperCase();
-
-                const provKey =
-                  `${provider}:${sym}`;
-
-                quotesRef.current.set(
-                  provKey,
-                  q
-                );
-
-                quotesRef.current.set(
-                  sym,
-                  q
-                );
-
-                pendingQuotesRef.current.set(
-                  provKey,
-                  q
-                );
-
-                pendingQuotesRef.current.set(
-                  sym,
-                  q
-                );
-
-                useMarketFeedStore
-                  .getState()
-                  .ingestTick({
-                    symbol:
-                      sym,
-
-                    exchange:
-                      q.exchange,
-
-                    provider:
-                      q.provider,
-
-                    lastPrice:
-                      q.last_price,
-
-                    bid:
-                      q.bid,
-
-                    ask:
-                      q.ask,
-
-                    volume:
-                      q.volume,
-
-                    open:
-                      q.open,
-
-                    high:
-                      q.high,
-
-                    low:
-                      q.low,
-
-                    close:
-                      q.close,
-
-                    changePercent:
-                      q.change_pct ??
-                      0,
-
-                    eventTimestamp:
-                      q.event_timestamp,
-
-                    feedLatencyMs:
-                      q.feed_latency_ms,
-
-                    dataMode:
-                      q.data_mode,
-
-                    isStale:
-                      q.is_stale,
-
-                    ageMs:
-                      (
-                        q.age_seconds ||
-                        0
-                      ) *
-                      1000,
-                  });
-
-                const listeners =
-                  symbolListenersRef.current.get(
-                    sym
-                  );
-
-                if (
-                  listeners &&
-                  listeners.size >
-                  0
-                ) {
-                  listeners.forEach(
-                    (fn) => {
-                      try {
-                        fn(q);
-                      } catch {
-                        // Ignore listener failure.
-                      }
-                    }
-                  );
-                }
-              }
-            );
-
-
-          }
-          // ───────────────────────────────────────────────────────────────
-          // Futures Tick (from MarketGateway)
-          // ───────────────────────────────────────────────────────────────
-          else if (
-            (msg.type === "FUTURES_TICK" || msg.type === "TICK") &&
-            msg.data
-          ) {
-            const rawTick = msg.data;
-            const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
-            const provider = (rawTick.provider || "UNKNOWN").toUpperCase();
-            const exchange = (rawTick.exchange || provider).toUpperCase();
-            const lastPrice = rawTick.last_price ?? rawTick.lastPrice ?? rawTick.price ?? null;
-
-            if (sym && lastPrice !== null) {
-              const quote: NormalizedQuote = {
-                symbol: sym,
-                exchange: exchange,
-                provider: provider,
-                last_price: Number(lastPrice),
-                bid: Number(rawTick.bid ?? lastPrice),
-                ask: Number(rawTick.ask ?? lastPrice),
-                volume: Number(rawTick.volume ?? rawTick.volume_24h ?? 0),
-                high: rawTick.high ? Number(rawTick.high) : null,
-                low: rawTick.low ? Number(rawTick.low) : null,
-                open: rawTick.open ? Number(rawTick.open) : null,
-                close: rawTick.close ? Number(rawTick.close) : null,
-                change_pct: rawTick.change_pct ?? rawTick.changePercent ?? rawTick.change_24h_pct ?? null,
-                vwap: rawTick.vwap ?? null,
-                event_timestamp: rawTick.timestamp || rawTick.event_timestamp || new Date().toISOString(),
-                received_timestamp: new Date().toISOString(),
-                feed_latency_ms: rawTick.latency_ms ?? 0,
-                data_mode: "REAL_TIME",
-                is_stale: false,
-                age_seconds: 0,
-              };
-
-              const existingKey = `${provider}:${sym}`;
-              quotesRef.current.set(existingKey, quote);
-              quotesRef.current.set(sym, quote);
-              pendingQuotesRef.current.set(existingKey, quote);
-              pendingQuotesRef.current.set(sym, quote);
-
-              useMarketFeedStore.getState().ingestTick({
-                symbol: sym,
-                exchange: exchange,
-                provider: provider,
-                lastPrice: quote.last_price,
-                bid: quote.bid,
-                ask: quote.ask,
-                volume: quote.volume,
-                open: quote.open,
-                high: quote.high,
-                low: quote.low,
-                close: quote.close,
-                changePercent: quote.change_pct ?? 0,
-                eventTimestamp: quote.event_timestamp,
-                feedLatencyMs: quote.feed_latency_ms,
-                dataMode: quote.data_mode,
-                isStale: false,
-                ageMs: 0,
-                rawPayload: rawTick,
-              });
-            }
-          }
-          // ───────────────────────────────────────────────────────────────
-          // Provider Health (from MarketGateway)
-          // ───────────────────────────────────────────────────────────────
-          else if (
-            msg.type === "PROVIDER_HEALTH" &&
-            msg.data
-          ) {
-            const h = msg.data;
-            const pName = (h.provider || "").toUpperCase();
-            if (pName) {
-              useMarketFeedStore.getState().updateProviderStat(pName, {
-                status: h.connected ? "CONNECTED" : "OFFLINE",
-                latencyMs: h.latency_ms ?? 0,
-                lastMessageAt: h.last_message_ms ? new Date(h.last_message_ms).toISOString() : new Date().toISOString(),
-                lastTickAgeMs: h.last_message_ms ? Math.max(0, Date.now() - h.last_message_ms) : 0,
-                errorCount: h.error ? 1 : 0,
-              });
-            }
-          }
-
-          // ───────────────────────────────────────────────────────────────
-          // Gateway ready / heartbeat
-          // ───────────────────────────────────────────────────────────────
-          else if (
-            msg.type ===
-            "GATEWAY_READY" ||
-            msg.type ===
-            "READY" ||
-            msg.type ===
-            "HEARTBEAT"
-          ) {
-            setConnectionStatus(
-              "CONNECTED"
-            );
-
-            useMarketFeedStore
-              .getState()
-              .setConnectionStatus(
-                "CONNECTED"
-              );
-          }
-        } catch {
-          /**
-           * Malformed individual frames should
-           * never destroy the whole WebSocket.
-           */
-        }
-      };
-
-      // ─────────────────────────────────────────────────────────────────────
-      // ERROR
-      // ─────────────────────────────────────────────────────────────────────
-
-      ws.onerror = () => {
-        clearTimeout(
-          connectTimeout
-        );
-
-        if (
-          connectTimeoutRef.current ===
-          connectTimeout
-        ) {
-          connectTimeoutRef.current =
-            null;
-        }
-
-        if (
-          !mountedRef.current ||
-          wsRef.current !== ws
-        ) {
-          return;
-        }
-
-        if (
-          wsRef.current === ws
-        ) {
-          wsRef.current =
-            null;
-        }
-
-        safeCloseSocket(
-          ws,
-          1000,
-          "Socket error"
-        );
-
-        scheduleReconnectRef.current();
-      };
-
-      // ─────────────────────────────────────────────────────────────────────
-      // CLOSE
-      // ─────────────────────────────────────────────────────────────────────
-
-      ws.onclose = () => {
-        clearTimeout(
-          connectTimeout
-        );
-
-        if (
-          connectTimeoutRef.current ===
-          connectTimeout
-        ) {
-          connectTimeoutRef.current =
-            null;
-        }
-
-        if (
-          !mountedRef.current
-        ) {
-          return;
-        }
-
-        const managedWs =
-          ws as ManagedWebSocket;
-
-        /**
-         * Timeout/error/stale/unmount already
-         * handled the reconnect decision.
-         */
-        if (
-          managedWs._suppressReconnect
-        ) {
-          return;
-        }
-
-        /**
-         * Ignore close events from an OLD socket.
-         *
-         * This prevents an old socket from
-         * killing/restarting a newly connected socket.
-         */
-        if (
-          wsRef.current !== ws
-        ) {
-          return;
-        }
-
-        wsRef.current =
-          null;
-
-        scheduleReconnectRef.current();
-      };
-    }, [
-      getGatewayWsUrl,
-    ]);
-
-  /**
-   * Always expose the latest connectWS
-   * function to reconnect timers.
-   */
-  connectWSRef.current =
-    connectWS;
+    };
+
+    ws.onerror = () => {
+      clearTimeout(connectTimeout);
+      if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
+      if (!mountedRef.current || wsRef.current !== ws) return;
+
+      if (wsRef.current === ws) wsRef.current = null;
+      safeCloseSocket(ws, 1000, "Socket error");
+      scheduleReconnect();
+    };
+
+    ws.onclose = () => {
+      clearTimeout(connectTimeout);
+      if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
+      if (!mountedRef.current) return;
+
+      const managedWs = ws as ManagedWebSocket;
+      if (managedWs._suppressReconnect) return;
+      if (wsRef.current !== ws) return;
+
+      wsRef.current = null;
+      scheduleReconnect();
+    };
+  }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect]);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Reconnect scheduler
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const scheduleReconnect =
-    useCallback(() => {
-      if (
-        !mountedRef.current
-      ) {
-        return;
-      }
-
-      setConnectionStatus(
-        "RECONNECTING"
-      );
-
-      const attempt =
-        reconnectAttemptRef.current;
-
-      const delayIndex =
-        Math.min(
-          attempt,
-          RECONNECT_DELAYS.length -
-          1
-        );
-
-      const baseDelay =
-        RECONNECT_DELAYS[
-        delayIndex
-        ];
-
-      const jitter =
-        Math.floor(
-          Math.random() *
-          300
-        );
-
-      const delay =
-        baseDelay +
-        jitter;
-
-      reconnectAttemptRef.current =
-        Math.min(
-          attempt + 1,
-          RECONNECT_DELAYS.length
-        );
-
-      /**
-       * Only ONE reconnect timer is allowed.
-       */
-      if (
-        reconnectTimerRef.current
-      ) {
-        clearTimeout(
-          reconnectTimerRef.current
-        );
-      }
-
-      reconnectTimerRef.current =
-        setTimeout(() => {
-          reconnectTimerRef.current =
-            null;
-
-          if (
-            mountedRef.current
-          ) {
-            connectWSRef.current();
-          }
-        }, delay);
-    }, []);
-
-  scheduleReconnectRef.current =
-    scheduleReconnect;
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // HTTP fallback polling
+  // Initial Connection Lifecycle
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    const pollFallbackSnapshots =
-      async () => {
-        if (
-          !mountedRef.current
-        ) {
-          return;
-        }
-
-        /**
-         * Don't use REST fallback while WS
-         * is healthy/open.
-         */
-        if (
-          wsRef.current
-            ?.readyState ===
-          WebSocket.OPEN
-        ) {
-          return;
-        }
-
-        const activeSymbols: string[] =
-          [];
-
-        subRefsRef.current.forEach(
-          (
-            ref,
-            sym
-          ) => {
-            const hasActive =
-              Array.from(
-                ref.reasons.values()
-              ).some(
-                (count) =>
-                  count > 0
-              );
-
-            if (hasActive) {
-              activeSymbols.push(
-                sym
-              );
-            }
-          }
-        );
-
-        if (
-          activeSymbols.length ===
-          0
-        ) {
-          return;
-        }
-
-        const batchSize =
-          50;
-
-        for (
-          let i = 0;
-          i <
-          activeSymbols.length;
-          i += batchSize
-        ) {
-          const batch =
-            activeSymbols.slice(
-              i,
-              i + batchSize
-            );
-
-          try {
-            const symbolsParam =
-              encodeURIComponent(
-                batch.join(",")
-              );
-
-            const res =
-              await apiClient.get<any>(
-                `/api/market/snapshot?symbols=${symbolsParam}`,
-                {
-                  timeoutMs:
-                    4000,
-
-                  deduplicate:
-                    true,
-                }
-              );
-
-            if (
-              res.ok &&
-              res.data?.quotes
-            ) {
-              const incoming =
-                res.data
-                  .quotes as Record<
-                    string,
-                    NormalizedQuote
-                  >;
-
-              Object.entries(
-                incoming
-              ).forEach(
-                (
-                  [
-                    rawSym,
-                    q,
-                  ]
-                ) => {
-                  const sym =
-                    rawSym.toUpperCase();
-
-                  const provider =
-                    (
-                      q.provider ||
-                      "UNKNOWN"
-                    ).toUpperCase();
-
-                  const incomingTs =
-                    new Date(
-                      q.event_timestamp ||
-                      q.received_timestamp
-                    ).getTime();
-
-                  const existing =
-                    quotesRef.current.get(
-                      `${provider}:${sym}`
-                    ) ||
-                    quotesRef.current.get(
-                      sym
-                    );
-
-                  if (
-                    existing
-                  ) {
-                    const existingTs =
-                      new Date(
-                        existing.event_timestamp ||
-                        existing.received_timestamp
-                      ).getTime();
-
-                    if (
-                      existingTs >
-                      0 &&
-                      incomingTs <
-                      existingTs
-                    ) {
-                      return;
-                    }
-                  }
-
-                  quotesRef.current.set(
-                    `${provider}:${sym}`,
-                    q
-                  );
-
-                  quotesRef.current.set(
-                    sym,
-                    q
-                  );
-
-                  useMarketFeedStore
-                    .getState()
-                    .ingestTick({
-                      symbol:
-                        sym,
-
-                      exchange:
-                        q.exchange,
-
-                      provider:
-                        q.provider,
-
-                      lastPrice:
-                        q.last_price,
-
-                      bid:
-                        q.bid,
-
-                      ask:
-                        q.ask,
-
-                      volume:
-                        q.volume,
-
-                      open:
-                        q.open,
-
-                      high:
-                        q.high,
-
-                      low:
-                        q.low,
-
-                      close:
-                        q.close,
-
-                      changePercent:
-                        q.change_pct ??
-                        0,
-
-                      eventTimestamp:
-                        q.event_timestamp,
-
-                      feedLatencyMs:
-                        q.feed_latency_ms,
-
-                      dataMode:
-                        q.data_mode,
-
-                      isStale:
-                        q.is_stale,
-
-                      ageMs:
-                        (
-                          q.age_seconds ||
-                          0
-                        ) *
-                        1000,
-                    });
-
-                  const listeners =
-                    symbolListenersRef.current.get(
-                      sym
-                    );
-
-                  if (
-                    listeners &&
-                    listeners.size >
-                    0
-                  ) {
-                    listeners.forEach(
-                      (fn) => {
-                        try {
-                          fn(q);
-                        } catch {
-                          // Ignore listener failure.
-                        }
-                      }
-                    );
-                  }
-                }
-              );
-            }
-          } catch {
-            /**
-             * Failure of one REST batch should
-             * not break remaining batches.
-             */
-          }
-        }
-      };
-
-    fallbackPollTimerRef.current =
-      setInterval(
-        pollFallbackSnapshots,
-        FALLBACK_SNAPSHOT_POLL_MS
-      );
+    mountedRef.current = true;
+    connectWS();
 
     return () => {
-      if (
-        fallbackPollTimerRef.current
-      ) {
-        clearInterval(
-          fallbackPollTimerRef.current
-        );
+      mountedRef.current = false;
 
-        fallbackPollTimerRef.current =
-          null;
+      if (batchFrameRef.current !== null) {
+        cancelAnimationFrame(batchFrameRef.current);
+        batchFrameRef.current = null;
       }
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (connectTimeoutRef.current) {
+        clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+      if (fallbackPollTimerRef.current) {
+        clearInterval(fallbackPollTimerRef.current);
+        fallbackPollTimerRef.current = null;
+      }
+      if (heartbeatWatchdogRef.current) {
+        clearInterval(heartbeatWatchdogRef.current);
+        heartbeatWatchdogRef.current = null;
+      }
+
+      const ws = wsRef.current as ManagedWebSocket | null;
+      wsRef.current = null;
+      if (ws) safeCloseSocket(ws, 1000, "Component unmounted");
     };
-  }, [
-    connectionStatus,
-  ]);
+  }, [connectWS, safeCloseSocket]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Heartbeat Watchdog
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    heartbeatWatchdogRef.current =
-      setInterval(() => {
-        if (
-          !mountedRef.current
-        ) {
-          return;
-        }
+    heartbeatWatchdogRef.current = setInterval(() => {
+      if (!mountedRef.current) return;
+      const age = Date.now() - lastHeartbeatRef.current;
+      if (age <= HEARTBEAT_STALE_MS) return;
+      if (connectionStatus !== "CONNECTED" && connectionStatus !== "LIVE") return;
 
-        const age =
-          Date.now() -
-          lastHeartbeatRef.current;
+      setConnectionStatus("STALE");
+      useMarketFeedStore.getState().setConnectionStatus("STALE");
 
-        if (
-          age <=
-          HEARTBEAT_STALE_MS
-        ) {
-          return;
-        }
-
-        if (
-          connectionStatus !==
-          "CONNECTED" &&
-          connectionStatus !==
-          "LIVE"
-        ) {
-          return;
-        }
-
-        /**
-         * Socket has stopped producing messages.
-         */
-        setConnectionStatus(
-          "STALE"
-        );
-
-        useMarketFeedStore
-          .getState()
-          .setConnectionStatus(
-            "STALE"
-          );
-
-        const staleWs =
-          wsRef.current as ManagedWebSocket | null;
-
-        if (staleWs) {
-          if (
-            wsRef.current ===
-            staleWs
-          ) {
-            wsRef.current =
-              null;
-          }
-
-          safeCloseSocket(
-            staleWs,
-            4001,
-            "Heartbeat stale"
-          );
-        }
-
-        /**
-         * This was missing in the old behavior.
-         *
-         * STALE now actually causes a new connection.
-         */
-        scheduleReconnectRef.current();
-      }, 5000);
+      const staleWs = wsRef.current as ManagedWebSocket | null;
+      if (staleWs) {
+        if (wsRef.current === staleWs) wsRef.current = null;
+        safeCloseSocket(staleWs, 4001, "Heartbeat stale");
+      }
+      scheduleReconnect();
+    }, 5000);
 
     return () => {
-      if (
-        heartbeatWatchdogRef.current
-      ) {
-        clearInterval(
-          heartbeatWatchdogRef.current
-        );
-
-        heartbeatWatchdogRef.current =
-          null;
+      if (heartbeatWatchdogRef.current) {
+        clearInterval(heartbeatWatchdogRef.current);
+        heartbeatWatchdogRef.current = null;
       }
     };
-  }, [
-    connectionStatus,
-  ]);
+  }, [connectionStatus, safeCloseSocket, scheduleReconnect]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // HTTP Fallback Polling (When Disconnected / Reconnecting)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const pollFallbackSnapshots = async () => {
+      if (!mountedRef.current) return;
+      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+
+      const activeSymbols: string[] = [];
+      subRefsRef.current.forEach((ref, sym) => {
+        const hasActive = Array.from(ref.reasons.values()).some((count) => count > 0);
+        if (hasActive) activeSymbols.push(sym);
+      });
+
+      if (activeSymbols.length === 0) return;
+
+      const batchSize = 50;
+      for (let i = 0; i < activeSymbols.length; i += batchSize) {
+        const batch = activeSymbols.slice(i, i + batchSize);
+        try {
+          const symbolsParam = encodeURIComponent(batch.join(","));
+          const res = await apiClient.get<any>(`/api/market/snapshot?symbols=${symbolsParam}`, {
+            timeoutMs: 4000,
+            deduplicate: true,
+          });
+
+          if (res.ok && res.data?.quotes) {
+            const incoming = res.data.quotes as Record<string, NormalizedQuote>;
+            Object.entries(incoming).forEach(([rawSym, q]) => {
+              const sym = rawSym.toUpperCase();
+              const provider = (q.provider || "UNKNOWN").toUpperCase();
+              const incomingTs = new Date(q.event_timestamp || q.received_timestamp).getTime();
+
+              const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
+              if (existing) {
+                const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
+                if (existingTs > 0 && incomingTs < existingTs) return;
+              }
+
+              quotesRef.current.set(`${provider}:${sym}`, q);
+              quotesRef.current.set(sym, q);
+
+              useMarketFeedStore.getState().ingestTick({
+                symbol: sym,
+                exchange: q.exchange,
+                provider: q.provider,
+                lastPrice: q.last_price,
+                bid: q.bid,
+                ask: q.ask,
+                volume: q.volume,
+                open: q.open,
+                high: q.high,
+                low: q.low,
+                close: q.close,
+                changePercent: q.change_pct ?? 0,
+                eventTimestamp: q.event_timestamp,
+                feedLatencyMs: q.feed_latency_ms,
+                dataMode: q.data_mode,
+                isStale: q.is_stale,
+                ageMs: (q.age_seconds || 0) * 1000,
+              });
+
+              const listeners = symbolListenersRef.current.get(sym);
+              if (listeners && listeners.size > 0) {
+                listeners.forEach((fn) => {
+                  try {
+                    fn(q);
+                  } catch {
+                    // ignore
+                  }
+                });
+              }
+            });
+          }
+        } catch {
+          // ignore fallback batch failure
+        }
+      }
+    };
+
+    fallbackPollTimerRef.current = setInterval(pollFallbackSnapshots, FALLBACK_SNAPSHOT_POLL_MS);
+    return () => {
+      if (fallbackPollTimerRef.current) {
+        clearInterval(fallbackPollTimerRef.current);
+        fallbackPollTimerRef.current = null;
+      }
+    };
+  }, [connectionStatus]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Provider Health Polling
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
-    let isCancelled =
-      false;
-
-    const fetchHealth =
-      async () => {
-        try {
-          const res =
-            await apiClient.get<any>(
-              "/api/market/providers/health",
-              {
-                timeoutMs:
-                  4000,
-
-                deduplicate:
-                  true,
-              }
-            );
-
-          if (
-            res.ok &&
-            res.data &&
-            !isCancelled
-          ) {
-            setProviderHealth(
-              res.data
-                .providers ??
-              []
-            );
+    let isCancelled = false;
+    const fetchHealth = async () => {
+      try {
+        const res = await apiClient.get<any>("/api/market/providers/health", {
+          timeoutMs: 4000,
+          deduplicate: true,
+        });
+        if (res.ok && res.data && !isCancelled) {
+          const raw = res.data.providerList || res.data.providers;
+          if (Array.isArray(raw)) {
+            const list: ProviderHealthEntry[] = raw.map((item: any) => ({
+              provider_id: item.provider_id || item.provider?.toLowerCase() || item.name?.toLowerCase() || "unknown",
+              provider_name: item.provider_name || item.name || item.provider || "Unknown",
+              status: item.status || "OK",
+              subscribed_symbols: item.subscribed_symbols ?? item.activeSubscriptions ?? item.subscriptions ?? 0,
+              asset_classes: Array.isArray(item.asset_classes) ? item.asset_classes : (typeof item.feeds === "string" ? item.feeds.split(",").map((s: string) => s.trim()) : ["EQUITY"]),
+              message: item.message,
+            }));
+            setProviderHealth(list);
+          } else if (raw && typeof raw === "object") {
+            const list: ProviderHealthEntry[] = Object.entries(raw).map(([k, v]: [string, any]) => ({
+              provider_id: k.toLowerCase(),
+              provider_name: k,
+              status: v.status === "CONNECTED" || v.status === "LIVE" ? "LIVE" : v.status === "NOT CONFIGURED" || v.status === "NOT_CONFIGURED" ? "NOT_CONFIGURED" : "OK",
+              subscribed_symbols: v.subscriptions || 0,
+              asset_classes: typeof v.feeds === "string" ? v.feeds.split(",").map((s: string) => s.trim()) : ["EQUITY"],
+              message: v.lastMessage,
+            }));
+            setProviderHealth(list);
+          } else {
+            setProviderHealth([]);
           }
-        } catch {
-          // Health endpoint failure is non-fatal.
         }
-      };
+      } catch {
+        // non-fatal
+      }
+    };
 
     fetchHealth();
-
-    const timer =
-      setInterval(
-        fetchHealth,
-        HEALTH_POLL_MS
-      );
-
+    const timer = setInterval(fetchHealth, HEALTH_POLL_MS);
     return () => {
-      isCancelled =
-        true;
-
-      clearInterval(
-        timer
-      );
+      isCancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Initial Connection + FULL cleanup
+  // Subscribe & Unsubscribe Actions
   // ───────────────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    mountedRef.current =
-      true;
+  const subscribe = useCallback((symbol: string, reason: SubscriptionReason) => {
+    if (!symbol) return;
+    const sym = symbol.toUpperCase().trim();
+    let ref = subRefsRef.current.get(sym);
 
-    connectWSRef.current();
+    if (!ref) {
+      ref = { reasons: new Map() };
+      subRefsRef.current.set(sym, ref);
+    }
 
-    return () => {
-      /**
-       * FIRST:
-       * mark provider as unmounted.
-       *
-       * All asynchronous callbacks now refuse
-       * to reconnect.
-       */
-      mountedRef.current =
-        false;
+    const currentCount = ref.reasons.get(reason) ?? 0;
+    ref.reasons.set(reason, currentCount + 1);
 
-      // ─────────────────────────────────────────────────────────────────────
-      // Animation frame
-      // ─────────────────────────────────────────────────────────────────────
-
-      if (
-        batchFrameRef.current !==
-        null
-      ) {
-        cancelAnimationFrame(
-          batchFrameRef.current
-        );
-
-        batchFrameRef.current =
-          null;
-      }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // Reconnect timer
-      // ─────────────────────────────────────────────────────────────────────
-
-      if (
-        reconnectTimerRef.current
-      ) {
-        clearTimeout(
-          reconnectTimerRef.current
-        );
-
-        reconnectTimerRef.current =
-          null;
-      }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // Connection timeout
-      // ─────────────────────────────────────────────────────────────────────
-
-      if (
-        connectTimeoutRef.current
-      ) {
-        clearTimeout(
-          connectTimeoutRef.current
-        );
-
-        connectTimeoutRef.current =
-          null;
-      }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // REST fallback timer
-      // ─────────────────────────────────────────────────────────────────────
-
-      if (
-        fallbackPollTimerRef.current
-      ) {
-        clearInterval(
-          fallbackPollTimerRef.current
-        );
-
-        fallbackPollTimerRef.current =
-          null;
-      }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // Heartbeat timer
-      // ─────────────────────────────────────────────────────────────────────
-
-      if (
-        heartbeatWatchdogRef.current
-      ) {
-        clearInterval(
-          heartbeatWatchdogRef.current
-        );
-
-        heartbeatWatchdogRef.current =
-          null;
-      }
-
-      // ─────────────────────────────────────────────────────────────────────
-      // WebSocket
-      // ─────────────────────────────────────────────────────────────────────
-
-      const ws =
-        wsRef.current as ManagedWebSocket | null;
-
-      /**
-       * Important:
-       * remove it from wsRef BEFORE close().
-       */
-      wsRef.current =
-        null;
-
-      if (ws) {
-        safeCloseSocket(
-          ws,
-          1000,
-          "Component unmounted"
-        );
-      }
-    };
-  }, [
-    safeCloseSocket,
-  ]);
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Subscribe
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const subscribe =
-    useCallback(
-      (
-        symbol: string,
-        reason: SubscriptionReason
-      ) => {
-        if (!symbol) {
-          return;
-        }
-
-        const sym =
-          symbol
-            .toUpperCase()
-            .trim();
-
-        let ref =
-          subRefsRef.current.get(
-            sym
-          );
-
-        if (!ref) {
-          ref = {
-            reasons:
-              new Map(),
-          };
-
-          subRefsRef.current.set(
-            sym,
-            ref
-          );
-        }
-
-        const currentCount =
-          ref.reasons.get(
-            reason
-          ) ??
-          0;
-
-        ref.reasons.set(
-          reason,
-          currentCount + 1
-        );
-
-        /**
-         * Only send subscription the first time
-         * this reason becomes active.
-         */
-        if (
-          currentCount === 0 &&
-          wsRef.current
-            ?.readyState ===
-          WebSocket.OPEN
-        ) {
-          try {
-            wsRef.current.send(
-              JSON.stringify({
-                action:
-                  "subscribe",
-
-                symbols: [
-                  sym,
-                ],
-
-                reason,
-              })
-            );
-          } catch {
-            // Reconnect restore will retry later.
-          }
-        }
-      },
-      []
-    );
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Unsubscribe
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const unsubscribe =
-    useCallback(
-      (
-        symbol: string,
-        reason: SubscriptionReason
-      ) => {
-        if (!symbol) {
-          return;
-        }
-
-        const sym =
-          symbol
-            .toUpperCase()
-            .trim();
-
-        const ref =
-          subRefsRef.current.get(
-            sym
-          );
-
-        if (!ref) {
-          return;
-        }
-
-        const currentCount =
-          ref.reasons.get(
-            reason
-          ) ??
-          0;
-
-        if (
-          currentCount <= 1
-        ) {
-          ref.reasons.delete(
-            reason
-          );
-        } else {
-          ref.reasons.set(
+    if (currentCount === 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+      try {
+        wsRef.current.send(
+          JSON.stringify({
+            action: "subscribe",
+            symbols: [sym],
             reason,
-            currentCount - 1
+          })
+        );
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  const unsubscribe = useCallback((symbol: string, reason: SubscriptionReason) => {
+    if (!symbol) return;
+    const sym = symbol.toUpperCase().trim();
+    const ref = subRefsRef.current.get(sym);
+    if (!ref) return;
+
+    const currentCount = ref.reasons.get(reason) ?? 0;
+    if (currentCount <= 1) {
+      ref.reasons.delete(reason);
+    } else {
+      ref.reasons.set(reason, currentCount - 1);
+    }
+
+    const anyRemaining = Array.from(ref.reasons.values()).some((count) => count > 0);
+    if (!anyRemaining) {
+      subRefsRef.current.delete(sym);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              action: "unsubscribe",
+              symbols: [sym],
+              reason,
+            })
           );
+        } catch {
+          // ignore
         }
-
-        const anyRemaining =
-          Array.from(
-            ref.reasons.values()
-          ).some(
-            (count) =>
-              count > 0
-          );
-
-        if (
-          !anyRemaining
-        ) {
-          subRefsRef.current.delete(
-            sym
-          );
-
-          if (
-            wsRef.current
-              ?.readyState ===
-            WebSocket.OPEN
-          ) {
-            try {
-              wsRef.current.send(
-                JSON.stringify({
-                  action:
-                    "unsubscribe",
-
-                  symbols: [
-                    sym,
-                  ],
-
-                  reason,
-                })
-              );
-            } catch {
-              // Ignore unsubscribe network failure.
-            }
-          }
-        }
-      },
-      []
-    );
+      }
+    }
+  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Quote Getter
   // ───────────────────────────────────────────────────────────────────────────
 
-  const getQuote =
-    useCallback(
-      (
-        symbol: string,
-        exchange?: string,
-        provider?: string
-      ):
-        | NormalizedQuote
-        | null => {
-        if (!symbol) {
-          return null;
+  const getQuote = useCallback((symbol: string, exchange?: string, provider?: string): NormalizedQuote | null => {
+    if (!symbol) return null;
+    const sym = symbol.toUpperCase().trim();
+    const prov = (provider || "").toUpperCase();
+    const ex = (exchange || "").toUpperCase();
+
+    if (prov) {
+      const provKey = `${prov}:${sym}`;
+      if (quotesRef.current.has(provKey)) return quotesRef.current.get(provKey)!;
+      if (ex) {
+        const provExKey = `${prov}:${ex}:${sym}`;
+        if (quotesRef.current.has(provExKey)) return quotesRef.current.get(provExKey)!;
+      }
+    }
+
+    if (ex) {
+      const exKey = `${ex}:${sym}`;
+      if (quotesRef.current.has(exKey)) return quotesRef.current.get(exKey)!;
+    }
+
+    const direct = quotesRef.current.get(sym);
+    if (direct) {
+      if (prov && direct.provider && direct.provider.toUpperCase() !== prov) {
+        const providerDirect = quotesRef.current.get(`${prov}:${sym}`);
+        if (providerDirect) return providerDirect;
+      }
+      return direct;
+    }
+
+    const aliases = getQuoteAliases(symbol, exchange, provider);
+    for (const alias of aliases) {
+      const quote = quotesRef.current.get(alias);
+      if (quote) return quote;
+    }
+
+    return null;
+  }, []);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Direct Symbol Listener
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const subscribeSymbolQuote = useCallback(
+    (symbol: string, callback: (quote: NormalizedQuote) => void) => {
+      if (!symbol) return () => {};
+      const sym = symbol.toUpperCase().trim();
+
+      if (!symbolListenersRef.current.has(sym)) {
+        symbolListenersRef.current.set(sym, new Set());
+      }
+
+      const listeners = symbolListenersRef.current.get(sym)!;
+      listeners.add(callback);
+
+      return () => {
+        listeners.delete(callback);
+        if (listeners.size === 0) {
+          symbolListenersRef.current.delete(sym);
         }
-
-        const sym =
-          symbol
-            .toUpperCase()
-            .trim();
-
-        const prov =
-          (
-            provider ||
-            ""
-          ).toUpperCase();
-
-        const ex =
-          (
-            exchange ||
-            ""
-          ).toUpperCase();
-
-        // ─────────────────────────────────────────────────────────────────
-        // Provider scoped
-        // ─────────────────────────────────────────────────────────────────
-
-        if (prov) {
-          const provKey =
-            `${prov}:${sym}`;
-
-          if (
-            quotesRef.current.has(
-              provKey
-            )
-          ) {
-            return quotesRef.current.get(
-              provKey
-            )!;
-          }
-
-          if (ex) {
-            const provExKey =
-              `${prov}:${ex}:${sym}`;
-
-            if (
-              quotesRef.current.has(
-                provExKey
-              )
-            ) {
-              return quotesRef.current.get(
-                provExKey
-              )!;
-            }
-          }
-        }
-
-        // ─────────────────────────────────────────────────────────────────
-        // Exchange scoped
-        // ─────────────────────────────────────────────────────────────────
-
-        if (ex) {
-          const exKey =
-            `${ex}:${sym}`;
-
-          if (
-            quotesRef.current.has(
-              exKey
-            )
-          ) {
-            return quotesRef.current.get(
-              exKey
-            )!;
-          }
-        }
-
-        // ─────────────────────────────────────────────────────────────────
-        // Direct symbol
-        // ─────────────────────────────────────────────────────────────────
-
-        const direct =
-          quotesRef.current.get(
-            sym
-          );
-
-        if (direct) {
-          if (
-            prov &&
-            direct.provider &&
-            direct.provider.toUpperCase() !==
-            prov
-          ) {
-            const providerDirect =
-              quotesRef.current.get(
-                `${prov}:${sym}`
-              );
-
-            if (
-              providerDirect
-            ) {
-              return providerDirect;
-            }
-          }
-
-          return direct;
-        }
-
-        // ─────────────────────────────────────────────────────────────────
-        // Aliases
-        // ─────────────────────────────────────────────────────────────────
-
-        const aliases =
-          getQuoteAliases(
-            symbol,
-            exchange,
-            provider
-          );
-
-        for (
-          const alias of
-          aliases
-        ) {
-          const quote =
-            quotesRef.current.get(
-              alias
-            );
-
-          if (quote) {
-            return quote;
-          }
-        }
-
-        return null;
-      },
-      []
-    );
+      };
+    },
+    []
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Direct symbol listener
+  // Computed State & Context Value
   // ───────────────────────────────────────────────────────────────────────────
 
-  const subscribeSymbolQuote =
-    useCallback(
-      (
-        symbol: string,
-        callback: (
-          quote: NormalizedQuote
-        ) => void
-      ) => {
-        if (!symbol) {
-          return () => { };
-        }
+  const healthList = Array.isArray(providerHealth) ? providerHealth : [];
+  const hasProviderWarning = healthList.some(
+    (provider) =>
+      provider.status !== "LIVE" &&
+      provider.status !== "OK" &&
+      provider.status !== "NOT_CONFIGURED"
+  );
 
-        const sym =
-          symbol
-            .toUpperCase()
-            .trim();
-
-        if (
-          !symbolListenersRef.current.has(
-            sym
-          )
-        ) {
-          symbolListenersRef.current.set(
-            sym,
-            new Set()
-          );
-        }
-
-        const listeners =
-          symbolListenersRef.current.get(
-            sym
-          )!;
-
-        listeners.add(
-          callback
-        );
-
-        return () => {
-          listeners.delete(
-            callback
-          );
-
-          if (
-            listeners.size ===
-            0
-          ) {
-            symbolListenersRef.current.delete(
-              sym
-            );
-          }
-        };
-      },
-      []
-    );
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Provider warning
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const hasProviderWarning =
-    providerHealth.some(
-      (provider) =>
-        provider.status !==
-        "LIVE" &&
-        provider.status !==
-        "OK" &&
-        provider.status !==
-        "NOT_CONFIGURED"
-    );
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Context value
-  // ───────────────────────────────────────────────────────────────────────────
-
-  const value:
-    MarketGatewayContextValue =
-    useMemo(
-      () => ({
-        quotes: quotesRef.current,
-
-        subscribe,
-
-        unsubscribe,
-
-        connectionStatus,
-
-        providerHealth,
-
-        hasProviderWarning,
-
-        getQuote,
-
-        subscribeSymbolQuote,
-      }),
-      [
-        subscribe,
-        unsubscribe,
-        connectionStatus,
-        providerHealth,
-        hasProviderWarning,
-        getQuote,
-        subscribeSymbolQuote,
-      ]
-    );
-
-  // ───────────────────────────────────────────────────────────────────────────
-  // Provider
-  // ───────────────────────────────────────────────────────────────────────────
+  const value: MarketGatewayContextValue = useMemo(
+    () => ({
+      quotes: quotesRef.current,
+      subscribe,
+      unsubscribe,
+      connectionStatus,
+      providerHealth,
+      hasProviderWarning,
+      getQuote,
+      subscribeSymbolQuote,
+    }),
+    [
+      subscribe,
+      unsubscribe,
+      connectionStatus,
+      providerHealth,
+      hasProviderWarning,
+      getQuote,
+      subscribeSymbolQuote,
+    ]
+  );
 
   return (
-    <MarketGatewayContext.Provider
-      value={value}
-    >
+    <MarketGatewayContext.Provider value={value}>
       {children}
     </MarketGatewayContext.Provider>
   );

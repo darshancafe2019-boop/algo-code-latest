@@ -1,7 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/formatters";
-import React, { useState } from "react";
+import React, { memo } from "react";
 import {
   DollarSign,
   TrendingUp,
@@ -12,13 +11,15 @@ import {
   Receipt,
   PiggyBank,
   CheckCircle2,
-  HelpCircle,
-  Radio,
   Layers,
   Sparkles,
+  Percent,
+  RefreshCw,
 } from "lucide-react";
+import { formatMoney } from "@/lib/formatters";
 import { TaxConfidenceLevel } from "@/types/tax";
 import { CalculatedTaxMetrics } from "@/lib/taxEngineService";
+import { TaxVisualAnalyticsCharts } from "./TaxVisualAnalyticsCharts";
 
 interface TaxCommandCenterProps {
   metrics: CalculatedTaxMetrics;
@@ -26,7 +27,7 @@ interface TaxCommandCenterProps {
   onSelectBroker: (broker: string) => void;
 }
 
-export function TaxCommandCenter({
+export const TaxCommandCenter = memo(function TaxCommandCenter({
   metrics,
   selectedBroker,
   onSelectBroker,
@@ -36,17 +37,17 @@ export function TaxCommandCenter({
   const formatCurrency = (val: number | null | undefined, placeholder = "N/A") => {
     if (val === null || val === undefined) return placeholder;
     const prefix = currency === "INR" ? "₹" : currency === "USD" ? "$" : currency === "GBP" ? "£" : currency === "EUR" ? "€" : `${currency} `;
-    return formatMoney(Math.abs(val), prefix);
+    return formatMoney(val, prefix);
   };
 
   const getConfidenceBadge = (confidence: TaxConfidenceLevel) => {
     switch (confidence) {
       case "CONFIRMED INPUTS":
-        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">CONFIRMED</span>;
+        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold">CONFIRMED INPUTS</span>;
       case "HIGH-CONFIDENCE ESTIMATE":
-        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">HIGH-CONFIDENCE ESTIMATE</span>;
+        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">HIGH-CONFIDENCE ESTIMATE</span>;
       case "ESTIMATE":
-        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">ESTIMATE</span>;
+        return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 font-bold">ESTIMATE</span>;
       default:
         return <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-500/10 text-slate-400 border border-slate-500/20">{confidence}</span>;
     }
@@ -68,53 +69,53 @@ export function TaxCommandCenter({
   const cards = [
     {
       title: "Estimated Tax Liability",
-      value: formatCurrency(displayedEstimatedTax, "Waiting for live trades"),
+      value: formatCurrency(displayedEstimatedTax, "₹0.00"),
       subtext: selectedBroker === "ALL" ? "Combined statutory estimate" : `Filtered: ${selectedBroker}`,
       icon: DollarSign,
       iconColor: "text-amber-400",
-      accent: "border-amber-500/20 bg-amber-500/5",
+      accent: "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40",
       type: "ESTIMATED",
-      source: "Derived from tax rules",
+      source: "Statutory Tax Rules",
     },
     {
       title: "Taxable Realized P&L",
-      value: formatCurrency(displayedTaxablePnl, "Waiting for closed trades"),
+      value: formatCurrency(displayedTaxablePnl, "₹0.00"),
       subtext: "Gross taxable gains subject to rules",
       icon: TrendingUp,
       iconColor: "text-emerald-400",
-      accent: "border-emerald-500/20 bg-emerald-500/5",
+      accent: "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40",
       type: "REAL-TIME",
-      source: "Calculated by Tax Engine",
+      source: "Live Tax Engine",
     },
     {
       title: "Total Realized P&L",
-      value: displayedRealizedPnl !== null ? (displayedRealizedPnl < 0 ? `-${formatCurrency(Math.abs(displayedRealizedPnl))}` : formatCurrency(displayedRealizedPnl)) : "N/A",
+      value: displayedRealizedPnl !== null ? (displayedRealizedPnl < 0 ? `-${formatCurrency(Math.abs(displayedRealizedPnl))}` : formatCurrency(displayedRealizedPnl)) : "₹0.00",
       subtext: "Executed closed trade profit/loss",
       icon: TrendingDown,
       iconColor: displayedRealizedPnl !== null && displayedRealizedPnl >= 0 ? "text-emerald-400" : "text-rose-400",
-      accent: displayedRealizedPnl !== null && displayedRealizedPnl >= 0 ? "border-emerald-500/20 bg-emerald-500/5" : "border-rose-500/20 bg-rose-500/5",
+      accent: displayedRealizedPnl !== null && displayedRealizedPnl >= 0 ? "border-emerald-500/20 bg-emerald-500/5 hover:border-emerald-500/40" : "border-rose-500/20 bg-rose-500/5 hover:border-rose-500/40",
       type: "CONFIRMED",
-      source: selectedBroker === "ALL" ? "Aggregated Brokers" : `Source: ${selectedBroker}`,
+      source: selectedBroker === "ALL" ? "Central Portfolio Ledger" : `Source: ${selectedBroker}`,
     },
     {
       title: "Net After Estimated Tax",
-      value: formatCurrency(displayedNet, "N/A"),
+      value: formatCurrency(displayedNet, "₹0.00"),
       subtext: "Realized P&L minus estimated tax & fees",
       icon: PiggyBank,
       iconColor: "text-cyan-400",
-      accent: "border-cyan-500/20 bg-cyan-500/5",
-      type: "ESTIMATED",
-      source: "Calculated by Tax Engine",
+      accent: "border-cyan-500/20 bg-cyan-500/5 hover:border-cyan-500/40",
+      type: "LIVE NET",
+      source: "Post-Tax Capital Yield",
     },
     {
       title: "Unrealized Tax Exposure",
-      value: formatCurrency(displayedUnrealizedPnl, "N/A"),
-      subtext: "Open positions unrealized P&L",
+      value: formatCurrency(displayedUnrealizedPnl, "₹0.00"),
+      subtext: "Open positions unrealized mark-to-market",
       icon: Clock,
       iconColor: "text-blue-400",
-      accent: "border-blue-500/20 bg-blue-500/5",
-      type: "LIVE",
-      source: "Live Position Stream",
+      accent: "border-blue-500/20 bg-blue-500/5 hover:border-blue-500/40",
+      type: "LIVE MTM",
+      source: "Position Stream",
     },
     {
       title: "Fees & Brokerage",
@@ -122,58 +123,58 @@ export function TaxCommandCenter({
       subtext: "Broker commissions separated",
       icon: Receipt,
       iconColor: "text-teal-400",
-      accent: "border-teal-500/20 bg-teal-500/5",
+      accent: "border-teal-500/20 bg-teal-500/5 hover:border-teal-500/40",
       type: "CONFIRMED",
-      source: "Source: Execution Gateway",
+      source: "Execution Gateway",
     },
     {
-      title: "STT / Withholding Paid",
+      title: "STT / TDS Paid",
       value: formatCurrency(displayedTaxesPaid, "₹0.00"),
       subtext: "Transaction taxes & TDS deducted",
       icon: CheckCircle2,
       iconColor: "text-indigo-400",
-      accent: "border-indigo-500/20 bg-indigo-500/5",
+      accent: "border-indigo-500/20 bg-indigo-500/5 hover:border-indigo-500/40",
       type: "CONFIRMED",
-      source: "Exchange Statutory Ledger",
+      source: "Statutory Exchange Ledger",
     },
     {
       title: "Remaining Payable Estimate",
-      value: formatCurrency(metrics.remaining_estimated_payable, "N/A"),
+      value: formatCurrency(metrics.remaining_estimated_payable, "₹0.00"),
       subtext: "Estimated liability minus taxes paid",
       icon: AlertTriangle,
       iconColor: "text-amber-400",
-      accent: "border-amber-500/20 bg-amber-500/5",
+      accent: "border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40",
       type: "ESTIMATED",
       source: "Calculated by Tax Engine",
     },
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Top Controls Strip: Jurisdiction / Year / Status / Broker Filter */}
+    <div className="space-y-5">
+      {/* ── Top Controls Strip: Jurisdiction / Year / Status / Broker Filter ───────── */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 p-4 rounded-xl bg-slate-900/90 border border-slate-800 shadow-sm backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-inner">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-slate-100 font-sans tracking-wide">
-                TAX COMMAND CENTER
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-sm font-bold text-slate-100 font-sans tracking-wide">
+                TAX INTELLIGENCE COMMAND CENTER
               </h2>
               {getConfidenceBadge(metrics.confidence)}
             </div>
             <p className="text-xs text-slate-400 font-mono">
-              Statutory Jurisdiction: <span className="text-slate-200 font-semibold">{metrics.jurisdiction}</span> ({metrics.current_tax_year})
+              Statutory Jurisdiction: <span className="text-slate-200 font-semibold">{metrics.jurisdiction}</span> ({metrics.current_tax_year}) • Live Order & Fund Synchronized
             </p>
           </div>
         </div>
 
         {/* Broker Segregation Selector */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-xs text-slate-400 font-mono mr-1 flex items-center gap-1">
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
-            Broker:
+            Broker Filter:
           </span>
           {["ALL", "Dhan", "Upstox", "Delta Exchange", "Paper Simulator"].map((b) => (
             <button
@@ -191,20 +192,20 @@ export function TaxCommandCenter({
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* ── KPI Cards Grid ────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {cards.map((card, idx) => {
           const Icon = card.icon;
           return (
             <div
               key={idx}
-              className={`p-4 rounded-xl border transition-all duration-200 hover:border-slate-700 bg-slate-900/80 backdrop-blur-sm ${card.accent}`}
+              className={`p-4 rounded-xl border transition-all duration-200 bg-slate-900/80 backdrop-blur-sm ${card.accent}`}
             >
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium text-slate-400 font-sans">
                   {card.title}
                 </span>
-                <div className={`p-1.5 rounded-md bg-slate-950/60 ${card.iconColor}`}>
+                <div className={`p-1.5 rounded-lg bg-slate-950/70 border border-slate-800/80 ${card.iconColor}`}>
                   <Icon className="w-4 h-4" />
                 </div>
               </div>
@@ -226,6 +227,9 @@ export function TaxCommandCenter({
           );
         })}
       </div>
+
+      {/* ── Rich Visual Charts & Interactive Progress Bars ───────────────────────── */}
+      <TaxVisualAnalyticsCharts metrics={metrics} currency={currency} />
     </div>
   );
-}
+});

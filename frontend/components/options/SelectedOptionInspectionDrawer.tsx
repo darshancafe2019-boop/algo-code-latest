@@ -6,7 +6,7 @@ import { X, Shield, Activity, Radio, AlertTriangle } from "lucide-react";
 import { OptionContractQuote } from "@/types/option-chain";
 import { getExpiryDisplay } from "@/lib/expiry-utils";
 import { SimpleOptionOrderTicket } from "./SimpleOptionOrderTicket";
-import { TradeAnalysisModal } from "@/components/trade-analysis/TradeAnalysisModal";
+import { TradeAnalysisModal } from "@/components/trade_analysis/TradeAnalysisModal";
 
 interface SelectedOptionInspectionDrawerProps {
   isOpen: boolean;

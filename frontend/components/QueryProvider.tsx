@@ -10,8 +10,10 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
         defaultOptions: {
           queries: {
             staleTime: 60000, // 60 seconds instant data freshness
-            gcTime: 30 * 60 * 1000, // 30 minutes in-memory retention
+            gcTime: 60 * 60 * 1000, // 60 minutes in-memory retention
             placeholderData: (prev: any) => prev, // Instant rendering from memory without layout shift
+            refetchIntervalInBackground: false, // Do not spam requests in background tabs
+            refetchOnMount: false, // If data is fresh, render immediately without network request
             retry: (failureCount, error: any) => {
               if (failureCount >= 1) return false;
               const msg = (error?.message || "").toLowerCase();
@@ -38,6 +40,11 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
     const prefetchKeyEndpoints = async () => {
       try {
         const warmupEndpoints = [
+          "/api/dashboard/snapshot?mode=PAPER",
+          "/api/universe/instruments?limit=500",
+          "/api/bots",
+          "/api/risk/summary?mode=PAPER",
+          "/api/brokers/health",
           "/api/futures/universe",
           "/api/pnl/accounting",
           "/api/v2/portfolio?environment=PAPER",
@@ -49,16 +56,16 @@ export default function QueryProvider({ children }: { children: React.ReactNode 
         ];
 
         for (const ep of warmupEndpoints) {
-          fetch(ep, { cache: "no-store" }).catch(() => {});
+          fetch(ep, { cache: "default" }).catch(() => {});
         }
       } catch {}
     };
 
     if ("requestIdleCallback" in window) {
-      const id = (window as any).requestIdleCallback(prefetchKeyEndpoints, { timeout: 1500 });
+      const id = (window as any).requestIdleCallback(prefetchKeyEndpoints, { timeout: 800 });
       return () => (window as any).cancelIdleCallback(id);
     } else {
-      const id = setTimeout(prefetchKeyEndpoints, 800);
+      const id = setTimeout(prefetchKeyEndpoints, 400);
       return () => clearTimeout(id);
     }
   }, []);

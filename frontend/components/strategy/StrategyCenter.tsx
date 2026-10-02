@@ -189,9 +189,9 @@ export function StrategyCenter() {
         rawStrategyConfig: strategy,
         timestamp: Date.now(),
       });
-      router.push(`/bots?create=true&strategyId=${encodeURIComponent(strategy.id)}&underlying=${encodeURIComponent(sym)}`);
+      router.push(`/bots/create?strategyId=${encodeURIComponent(strategy.id)}&underlying=${encodeURIComponent(sym)}`);
     } catch {
-      router.push(`/bots?create=true&strategyId=${encodeURIComponent(strategy.id)}`);
+      router.push(`/bots/create?strategyId=${encodeURIComponent(strategy.id)}`);
     }
   };
 

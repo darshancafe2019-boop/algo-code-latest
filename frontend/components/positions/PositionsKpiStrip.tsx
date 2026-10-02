@@ -68,7 +68,7 @@ export function PositionsKpiStrip({ summary, isLoading }: PositionsKpiStripProps
   const scopeText = summary?.scope || "ALL SOURCES (PAPER)";
   const currency = summary?.currency || "INR";
   const asOfTime = summary?.as_of_timestamp
-    ? new Date(summary.as_of_timestamp).toLocaleTimeString("en-US", { hour12: false }) + " UTC"
+    ? new Date(summary.as_of_timestamp).toLocaleTimeString("en-US", { hour12: true }) + " UTC"
     : "Live Streaming";
 
   return (

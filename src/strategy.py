@@ -30,8 +30,18 @@ class Strategy:
     - USE_DAILY_BIAS_FILTER: current daily open bias
     """
 
-    def __init__(self, allow_shorts: bool = config.ALLOW_SHORTS):
+    signal_asset: str = "UNDERLYING"
+    execution_asset: str = "AUTO"  # UNDERLYING, OPTION, FUTURE, EQUITY
+
+    def __init__(
+        self,
+        allow_shorts: bool = config.ALLOW_SHORTS,
+        signal_asset: str = "UNDERLYING",
+        execution_asset: str = "AUTO"
+    ):
         self.allow_shorts = allow_shorts
+        self.signal_asset = signal_asset
+        self.execution_asset = execution_asset
         self._data_fetcher: Optional[DataFetcher] = None
 
     @property

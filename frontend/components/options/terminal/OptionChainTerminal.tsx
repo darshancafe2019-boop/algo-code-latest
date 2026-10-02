@@ -797,72 +797,62 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     setIsDirectOrderPanelOpen(true);
   }, []);
 
-  // Action Dispatchers -> Direct Option Order Panel with Canonical Intent
+  // Action Dispatchers -> Direct Bot Creation & Preload
   const handleActionBuy = useCallback((contract: ActionableOptionContract) => {
-    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PUT" : "CALL";
+    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PE" : "CE";
     const lotSize = contract.lotSize || getStandardOptionLotSize(contract.underlying);
-    const quoteFreshness = (contract as any).quoteStatus || snapshot?.freshnessStatus || "LIVE";
-    const intent: OptionOrderIntent = {
-      broker: contract.broker || source || "DHAN",
-      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+    const canonicalContractId = `${contract.broker || source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${optType}:${contract.securityId || contract.instrumentId || contract.symbol}`;
+
+    dispatchBotCreation(router, {
+      symbol: contract.symbol || `${contract.underlying} ${contract.strike} ${optType}`,
+      canonicalSymbol: canonicalContractId,
+      canonicalContractId,
+      side: "BUY",
+      assetClass: (contract.broker === "DELTA" || source?.includes("DELTA")) ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS",
       underlying: contract.underlying,
+      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+      broker: contract.broker || source || "PAPER",
       securityId: String(contract.securityId || contract.instrumentId || ""),
       tradingSymbol: contract.symbol,
-      expiry: contract.expiry,
-      strike: contract.strike,
-      optionType: optType,
-      side: "BUY",
-      quantity: lotSize,
-      lots: 1,
       lotSize,
-      orderType: "LIMIT",
-      price: contract.ask > 0 ? contract.ask : contract.ltp,
-      productType: "INTRADAY",
-      mode: (tradingMode === "LIVE" ? "LIVE" : "PAPER"),
-      timestamp: new Date().toISOString(),
-      ltp: contract.ltp,
+      currentPrice: contract.ltp,
       bid: contract.bid,
       ask: contract.ask,
-      iv: contract.iv,
-      oi: contract.oi,
-      quoteStatus: quoteFreshness === "LIVE" || quoteFreshness === "VALIDATED" ? "LIVE" : (quoteFreshness as any),
-    };
-    setSelectedDirectIntent(intent);
-    setIsDirectOrderPanelOpen(true);
-  }, [source, tradingMode, snapshot?.freshnessStatus]);
+      strike: contract.strike,
+      expiry: contract.expiry,
+      optionType: optType,
+      timestamp: Date.now(),
+      origin: "OPTIONS",
+    });
+  }, [router, source]);
 
   const handleActionSell = useCallback((contract: ActionableOptionContract) => {
-    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PUT" : "CALL";
+    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PE" : "CE";
     const lotSize = contract.lotSize || getStandardOptionLotSize(contract.underlying);
-    const quoteFreshness = (contract as any).quoteStatus || snapshot?.freshnessStatus || "LIVE";
-    const intent: OptionOrderIntent = {
-      broker: contract.broker || source || "DHAN",
-      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+    const canonicalContractId = `${contract.broker || source || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${optType}:${contract.securityId || contract.instrumentId || contract.symbol}`;
+
+    dispatchBotCreation(router, {
+      symbol: contract.symbol || `${contract.underlying} ${contract.strike} ${optType}`,
+      canonicalSymbol: canonicalContractId,
+      canonicalContractId,
+      side: "SELL",
+      assetClass: (contract.broker === "DELTA" || source?.includes("DELTA")) ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS",
       underlying: contract.underlying,
+      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+      broker: contract.broker || source || "PAPER",
       securityId: String(contract.securityId || contract.instrumentId || ""),
       tradingSymbol: contract.symbol,
-      expiry: contract.expiry,
-      strike: contract.strike,
-      optionType: optType,
-      side: "SELL",
-      quantity: lotSize,
-      lots: 1,
       lotSize,
-      orderType: "LIMIT",
-      price: contract.bid > 0 ? contract.bid : contract.ltp,
-      productType: "INTRADAY",
-      mode: (tradingMode === "LIVE" ? "LIVE" : "PAPER"),
-      timestamp: new Date().toISOString(),
-      ltp: contract.ltp,
+      currentPrice: contract.ltp,
       bid: contract.bid,
       ask: contract.ask,
-      iv: contract.iv,
-      oi: contract.oi,
-      quoteStatus: quoteFreshness === "LIVE" || quoteFreshness === "VALIDATED" ? "LIVE" : (quoteFreshness as any),
-    };
-    setSelectedDirectIntent(intent);
-    setIsDirectOrderPanelOpen(true);
-  }, [source, tradingMode, snapshot?.freshnessStatus]);
+      strike: contract.strike,
+      expiry: contract.expiry,
+      optionType: optType,
+      timestamp: Date.now(),
+      origin: "OPTIONS",
+    });
+  }, [router, source]);
 
   const handleReviewOrder = useCallback((preview: OptionOrderPreview, updatedIntent: OptionOrderIntent) => {
     setSelectedOrderPreview(preview);

@@ -63,12 +63,32 @@ const PositionTableRow = React.memo(function PositionTableRow({
       className="hover:bg-[#101B2D] transition-colors group cursor-pointer border-b border-[#122033]"
       onClick={() => onSelectPosition(pos)}
     >
-      {/* 1. Instrument & Bot Origin */}
+      {/* 1. Instrument & Bot Origin with Expiry Lifecycle */}
       <td className="py-3 px-3.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-xs text-[#F7FAFC] group-hover:text-[#19C5FF] transition-colors">
             {pos.symbol}
           </span>
+          {pos.expiry && (
+            <span className="text-[10px] bg-[#1E293B] text-[#38BDF8] px-1.5 py-0.2 rounded border border-[#0284C7]/30 font-medium">
+              EXP: {pos.expiry}
+            </span>
+          )}
+          {pos.auto_exit_on_expiry && (
+            <span className="text-[9px] bg-[#059669]/20 text-[#34D399] px-1 rounded border border-[#059669]/40 font-semibold" title={`Auto Exit: ON (${pos.time_to_auto_exit || 'Active'})`}>
+              AUTO EXIT {pos.time_to_auto_exit ? `· ${pos.time_to_auto_exit}` : "ON"}
+            </span>
+          )}
+          {pos.lifecycle_status === "AUTO_SQUARE_OFF" && (
+            <span className="text-[9px] bg-[#EF4444]/20 text-[#F87171] px-1 rounded border border-[#EF4444]/40 font-bold animate-pulse">
+              AUTO SQUARE-OFF
+            </span>
+          )}
+          {pos.lifecycle_status === "CLOSED_EXPIRED" && (
+            <span className="text-[9px] bg-[#64748B]/20 text-[#94A3B8] px-1 rounded border border-[#64748B]/40 font-medium">
+              CLOSED · EXPIRY
+            </span>
+          )}
           {hasWarnings && (
             <span title={pos.risk_warnings?.join(", ")}>
               <AlertTriangle className="h-3.5 w-3.5 text-[#F59E0B] shrink-0" />

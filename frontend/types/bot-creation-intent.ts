@@ -65,6 +65,9 @@ export interface BotCreationIntent {
 
   /** Core Pricing & Depth */
   currentPrice?: number | null;
+  selectedPremium?: number | null;
+  selectedBid?: number | null;
+  selectedAsk?: number | null;
   ltp?: number | null;
   bid?: number | null;
   ask?: number | null;
@@ -110,9 +113,11 @@ export interface BotCreationIntent {
   takeProfitPct?: number | null;
   riskPerTradePct?: number | null;
   capitalAllocation?: number | null;
+  allocatedCapital?: number | null;
 
   /** Strategy Integration */
   strategyTemplateId?: string;
+  strategyId?: string;
   initialStrategyName?: string;
   strategyDescription?: string;
   strategyConfig?: any;

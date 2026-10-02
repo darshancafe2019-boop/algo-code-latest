@@ -1051,12 +1051,12 @@ def apply_risk_profile(profile_name: str, bot_id: Optional[str] = None) -> Dict[
         "AGGRESSIVE": {"risk_per_trade_pct": 3.5, "max_drawdown_pct": 15.0, "max_leverage": 10.0},
         "INSTITUTIONAL": {"risk_per_trade_pct": 1.5, "max_drawdown_pct": 8.0, "max_leverage": 3.0}
     }
-    prof = profiles.get(str(profile_name).upper(), profiles["BALANCED"])
+    prof = profiles.get(profile_name.upper(), profiles["BALANCED"])
     if bot_id:
         db.safe_execute("UPDATE bot_instances SET updated_at = ? WHERE id = ?", (datetime.now(timezone.utc).isoformat(), bot_id))
     return {
         "bot_id": bot_id,
-        "profile_name": str(profile_name).upper(),
+        "profile_name": profile_name.upper(),
         "settings": prof,
         "status": "APPLIED",
         "timestamp": datetime.now(timezone.utc).isoformat()

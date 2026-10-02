@@ -20,200 +20,209 @@ def init_trade_ledger_schema() -> None:
     Ensures all tables, columns, views, and indexes for authoritative trade recording,
     partial fills, position lifecycle, and latency profiling are initialized.
     """
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
 
-    # 1. Trade Fills Table for recording individual partial and full executions
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS trade_fills (
-            fill_id TEXT PRIMARY KEY,
-            trade_id INTEGER NOT NULL,
-            order_id TEXT NOT NULL,
-            broker_order_id TEXT DEFAULT '',
-            execution_id TEXT DEFAULT '',
-            fill_timestamp TEXT NOT NULL,
-            fill_price REAL NOT NULL,
-            fill_quantity REAL NOT NULL,
-            fee REAL DEFAULT 0.0,
-            fee_currency TEXT DEFAULT 'USDT',
-            slippage REAL DEFAULT 0.0,
-            fill_side TEXT NOT NULL,
-            fill_type TEXT DEFAULT 'NORMAL',
-            status TEXT DEFAULT 'FILLED',
-            created_at TEXT NOT NULL
+        # 1. Trade Fills Table for recording individual partial and full executions
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trade_fills (
+                fill_id TEXT PRIMARY KEY,
+                trade_id INTEGER NOT NULL,
+                order_id TEXT NOT NULL,
+                broker_order_id TEXT DEFAULT '',
+                execution_id TEXT DEFAULT '',
+                fill_timestamp TEXT NOT NULL,
+                fill_price REAL NOT NULL,
+                fill_quantity REAL NOT NULL,
+                fee REAL DEFAULT 0.0,
+                fee_currency TEXT DEFAULT 'USDT',
+                slippage REAL DEFAULT 0.0,
+                fill_side TEXT NOT NULL,
+                fill_type TEXT DEFAULT 'NORMAL',
+                status TEXT DEFAULT 'FILLED',
+                created_at TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_fills_trade_id ON trade_fills(trade_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_fills_order_id ON trade_fills(order_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_fills_trade_id ON trade_fills(trade_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_fills_order_id ON trade_fills(order_id)")
 
-    # 2. Position Lifecycle Transitions Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS position_transitions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            trade_id INTEGER NOT NULL,
-            position_id TEXT NOT NULL,
-            symbol TEXT NOT NULL,
-            from_state TEXT NOT NULL,
-            to_state TEXT NOT NULL,
-            timestamp TEXT NOT NULL,
-            price REAL NOT NULL,
-            quantity REAL NOT NULL,
-            reason TEXT NOT NULL,
-            event_id TEXT DEFAULT '',
-            metadata_json TEXT DEFAULT '{}'
+        # 2. Position Lifecycle Transitions Table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS position_transitions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id INTEGER NOT NULL,
+                position_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                from_state TEXT NOT NULL,
+                to_state TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                price REAL NOT NULL,
+                quantity REAL NOT NULL,
+                reason TEXT NOT NULL,
+                event_id TEXT DEFAULT '',
+                metadata_json TEXT DEFAULT '{}'
+            )
+            """
         )
-        """
-    )
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_pos_trans_trade_id ON position_transitions(trade_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_pos_trans_trade_id ON position_transitions(trade_id)")
 
-    # 3. Execution Latencies Table
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS trade_latencies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            trade_id INTEGER NOT NULL,
-            order_id TEXT NOT NULL,
-            signal_time TEXT,
-            risk_check_time TEXT,
-            order_creation_time TEXT,
-            broker_submit_time TEXT,
-            broker_ack_time TEXT,
-            fill_time TEXT,
-            db_write_time TEXT,
-            broadcast_time TEXT,
-            signal_latency_ms REAL DEFAULT 0.0,
-            risk_latency_ms REAL DEFAULT 0.0,
-            order_creation_latency_ms REAL DEFAULT 0.0,
-            broker_submit_latency_ms REAL DEFAULT 0.0,
-            broker_ack_latency_ms REAL DEFAULT 0.0,
-            fill_latency_ms REAL DEFAULT 0.0,
-            db_write_latency_ms REAL DEFAULT 0.0,
-            total_execution_latency_ms REAL DEFAULT 0.0,
-            created_at TEXT NOT NULL
+        # 3. Execution Latencies Table
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trade_latencies (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_id INTEGER NOT NULL,
+                order_id TEXT NOT NULL,
+                signal_time TEXT,
+                risk_check_time TEXT,
+                order_creation_time TEXT,
+                broker_submit_time TEXT,
+                broker_ack_time TEXT,
+                fill_time TEXT,
+                db_write_time TEXT,
+                broadcast_time TEXT,
+                signal_latency_ms REAL DEFAULT 0.0,
+                risk_latency_ms REAL DEFAULT 0.0,
+                order_creation_latency_ms REAL DEFAULT 0.0,
+                broker_submit_latency_ms REAL DEFAULT 0.0,
+                broker_ack_latency_ms REAL DEFAULT 0.0,
+                fill_latency_ms REAL DEFAULT 0.0,
+                db_write_latency_ms REAL DEFAULT 0.0,
+                total_execution_latency_ms REAL DEFAULT 0.0,
+                created_at TEXT NOT NULL
+            )
+            """
         )
-        """
-    )
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_latencies_trade_id ON trade_latencies(trade_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trade_latencies_trade_id ON trade_latencies(trade_id)")
 
-    # 4. Ensure trades_log base table exists
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS trades_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            trade_id TEXT UNIQUE,
-            symbol TEXT NOT NULL,
-            direction TEXT NOT NULL,
-            entry_price REAL NOT NULL,
-            exit_price REAL,
-            position_size REAL NOT NULL,
-            stop_loss REAL,
-            take_profit REAL,
-            status TEXT NOT NULL DEFAULT 'OPEN',
-            gross_pnl REAL,
-            net_pnl REAL,
-            fees REAL DEFAULT 0.0,
-            slippage REAL DEFAULT 0.0,
-            result_pnl REAL DEFAULT 0.0,
-            pnl_percentage REAL DEFAULT 0.0,
-            trade_duration_seconds INTEGER DEFAULT 0,
-            trade_result TEXT DEFAULT 'OPEN',
-            execution_mode TEXT DEFAULT 'PAPER'
+        # 4. Ensure trades_log base table exists
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS trades_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT NOT NULL,
+                trade_id TEXT UNIQUE,
+                symbol TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                exit_price REAL,
+                position_size REAL NOT NULL,
+                stop_loss REAL,
+                take_profit REAL,
+                status TEXT NOT NULL DEFAULT 'OPEN',
+                gross_pnl REAL,
+                net_pnl REAL,
+                fees REAL DEFAULT 0.0,
+                slippage REAL DEFAULT 0.0,
+                result_pnl REAL DEFAULT 0.0,
+                pnl_percentage REAL DEFAULT 0.0,
+                trade_duration_seconds INTEGER DEFAULT 0,
+                trade_result TEXT DEFAULT 'OPEN',
+                execution_mode TEXT DEFAULT 'PAPER'
+            )
+            """
         )
-        """
-    )
 
-    # 5. Migrate trades_log columns for complete 40-field coverage
-    cursor.execute("PRAGMA table_info(trades_log)")
-    cols = [row["name"] for row in cursor.fetchall()]
-    schema_map = {
-        "parent_order_id": "TEXT DEFAULT ''",
-        "broker_order_id": "TEXT DEFAULT ''",
-        "execution_id": "TEXT DEFAULT ''",
-        "bot_id": "TEXT DEFAULT 'bot-1'",
-        "bot_instance_id": "TEXT DEFAULT 'bot-1'",
-        "bot_instance_name": "TEXT DEFAULT 'Alpha BTC Scalper'",
-        "strategy_id": "TEXT DEFAULT 'EMA_MACD_VP'",
-        "strategy_name": "TEXT DEFAULT 'EMA_MACD_VP'",
-        "strategy_version": "TEXT DEFAULT 'v1.4.2'",
-        "symbol": "TEXT NOT NULL DEFAULT 'BTC/USDT'",
-        "canonical_symbol": "TEXT DEFAULT 'BTC/USDT'",
-        "asset_class": "TEXT DEFAULT 'Crypto'",
-        "exchange": "TEXT DEFAULT 'Binance'",
-        "market": "TEXT DEFAULT 'Spot'",
-        "timeframe": "TEXT DEFAULT '15m'",
-        "side": "TEXT DEFAULT 'BUY'",
-        "position_side": "TEXT DEFAULT 'LONG'",
-        "entry_timestamp": "TEXT",
-        "entry_price": "REAL DEFAULT 0.0",
-        "entry_quantity": "REAL DEFAULT 0.0",
-        "exit_timestamp": "TEXT",
-        "exit_price": "REAL DEFAULT 0.0",
-        "exit_quantity": "REAL DEFAULT 0.0",
-        "remaining_quantity": "REAL DEFAULT 0.0",
-        "stop_loss": "REAL DEFAULT 0.0",
-        "take_profit": "REAL DEFAULT 0.0",
-        "planned_risk": "REAL DEFAULT 0.0",
-        "actual_risk": "REAL DEFAULT 0.0",
-        "risk_percentage": "REAL DEFAULT 2.0",
-        "notional_value": "REAL DEFAULT 0.0",
-        "margin_used": "REAL DEFAULT 0.0",
-        "leverage": "REAL DEFAULT 1.0",
-        "currency": "TEXT DEFAULT 'USDT'",
-        "normalized_currency": "TEXT DEFAULT 'USD'",
-        "currency_rate": "REAL DEFAULT 1.0",
-        "fees": "REAL DEFAULT 0.0",
-        "taxes": "REAL DEFAULT 0.0",
-        "funding": "REAL DEFAULT 0.0",
-        "slippage": "REAL DEFAULT 0.0",
-        "gross_pnl": "REAL DEFAULT 0.0",
-        "net_pnl": "REAL DEFAULT 0.0",
-        "result_pnl": "REAL DEFAULT 0.0",
-        "unrealized_pnl": "REAL DEFAULT 0.0",
-        "pnl_percentage": "REAL DEFAULT 0.0",
-        "risk_reward": "REAL DEFAULT 2.5",
-        "r_multiple": "REAL DEFAULT 0.0",
-        "mae": "REAL DEFAULT 0.0",
-        "mfe": "REAL DEFAULT 0.0",
-        "entry_signal": "TEXT DEFAULT 'LONG'",
-        "exit_signal": "TEXT DEFAULT ''",
-        "signal_confidence": "REAL DEFAULT 75.0",
-        "indicator_snapshot_json": "TEXT DEFAULT '{}'",
-        "signal_snapshot_json": "TEXT DEFAULT '{}'",
-        "market_snapshot_json": "TEXT DEFAULT '{}'",
-        "risk_snapshot_json": "TEXT DEFAULT '{}'",
-        "exit_snapshot_json": "TEXT DEFAULT '{}'",
-        "market_regime": "TEXT DEFAULT 'TRENDING'",
-        "trade_quality_score": "REAL DEFAULT 85.0",
-        "execution_mode": "TEXT DEFAULT 'PAPER'",
-        "trade_status": "TEXT DEFAULT 'OPEN'",
-        "trade_result": "TEXT DEFAULT 'OPEN'",
-        "entry_reason": "TEXT DEFAULT 'EMA_CROSS'",
-        "exit_reason": "TEXT DEFAULT ''",
-        "idempotency_key": "TEXT DEFAULT ''",
-        "created_at": "TEXT",
-        "updated_at": "TEXT"
-    }
+        # 5. Migrate trades_log columns for complete 40-field coverage
+        cursor.execute("PRAGMA table_info(trades_log)")
+        cols = [row["name"] for row in cursor.fetchall()]
+        schema_map = {
+            "parent_order_id": "TEXT DEFAULT ''",
+            "broker_order_id": "TEXT DEFAULT ''",
+            "execution_id": "TEXT DEFAULT ''",
+            "bot_id": "TEXT DEFAULT 'bot-1'",
+            "bot_instance_id": "TEXT DEFAULT 'bot-1'",
+            "bot_instance_name": "TEXT DEFAULT 'Alpha BTC Scalper'",
+            "strategy_id": "TEXT DEFAULT 'EMA_MACD_VP'",
+            "strategy_name": "TEXT DEFAULT 'EMA_MACD_VP'",
+            "strategy_version": "TEXT DEFAULT 'v1.4.2'",
+            "symbol": "TEXT NOT NULL DEFAULT 'BTC/USDT'",
+            "canonical_symbol": "TEXT DEFAULT 'BTC/USDT'",
+            "asset_class": "TEXT DEFAULT 'Crypto'",
+            "exchange": "TEXT DEFAULT 'Binance'",
+            "market": "TEXT DEFAULT 'Spot'",
+            "timeframe": "TEXT DEFAULT '15m'",
+            "side": "TEXT DEFAULT 'BUY'",
+            "position_side": "TEXT DEFAULT 'LONG'",
+            "entry_timestamp": "TEXT",
+            "entry_price": "REAL DEFAULT 0.0",
+            "entry_quantity": "REAL DEFAULT 0.0",
+            "exit_timestamp": "TEXT",
+            "exit_price": "REAL DEFAULT 0.0",
+            "exit_quantity": "REAL DEFAULT 0.0",
+            "remaining_quantity": "REAL DEFAULT 0.0",
+            "stop_loss": "REAL DEFAULT 0.0",
+            "take_profit": "REAL DEFAULT 0.0",
+            "planned_risk": "REAL DEFAULT 0.0",
+            "actual_risk": "REAL DEFAULT 0.0",
+            "risk_percentage": "REAL DEFAULT 2.0",
+            "notional_value": "REAL DEFAULT 0.0",
+            "margin_used": "REAL DEFAULT 0.0",
+            "leverage": "REAL DEFAULT 1.0",
+            "currency": "TEXT DEFAULT 'USDT'",
+            "normalized_currency": "TEXT DEFAULT 'USD'",
+            "currency_rate": "REAL DEFAULT 1.0",
+            "fees": "REAL DEFAULT 0.0",
+            "taxes": "REAL DEFAULT 0.0",
+            "funding": "REAL DEFAULT 0.0",
+            "slippage": "REAL DEFAULT 0.0",
+            "gross_pnl": "REAL DEFAULT 0.0",
+            "net_pnl": "REAL DEFAULT 0.0",
+            "result_pnl": "REAL DEFAULT 0.0",
+            "unrealized_pnl": "REAL DEFAULT 0.0",
+            "pnl_percentage": "REAL DEFAULT 0.0",
+            "risk_reward": "REAL DEFAULT 2.5",
+            "r_multiple": "REAL DEFAULT 0.0",
+            "mae": "REAL DEFAULT 0.0",
+            "mfe": "REAL DEFAULT 0.0",
+            "entry_signal": "TEXT DEFAULT 'LONG'",
+            "exit_signal": "TEXT DEFAULT ''",
+            "signal_confidence": "REAL DEFAULT 75.0",
+            "indicator_snapshot_json": "TEXT DEFAULT '{}'",
+            "signal_snapshot_json": "TEXT DEFAULT '{}'",
+            "market_snapshot_json": "TEXT DEFAULT '{}'",
+            "risk_snapshot_json": "TEXT DEFAULT '{}'",
+            "exit_snapshot_json": "TEXT DEFAULT '{}'",
+            "market_regime": "TEXT DEFAULT 'TRENDING'",
+            "trade_quality_score": "REAL DEFAULT 85.0",
+            "execution_mode": "TEXT DEFAULT 'PAPER'",
+            "trade_status": "TEXT DEFAULT 'OPEN'",
+            "trade_result": "TEXT DEFAULT 'OPEN'",
+            "entry_reason": "TEXT DEFAULT 'EMA_CROSS'",
+            "exit_reason": "TEXT DEFAULT ''",
+            "idempotency_key": "TEXT DEFAULT ''",
+            "created_at": "TEXT",
+            "updated_at": "TEXT"
+        }
 
-    for col_name, col_def in schema_map.items():
-        if col_name not in cols:
+        for col_name, col_def in schema_map.items():
+            if col_name not in cols:
+                try:
+                    cursor.execute(f"ALTER TABLE trades_log ADD COLUMN {col_name} {col_def}")
+                except Exception as e:
+                    logger.debug(f"Notice adding column {col_name}: {e}")
+
+        # Create optimized query indexes
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_status_id ON trades_log(status, id DESC)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_bot_strat ON trades_log(bot_id, strategy_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_sym_mode ON trades_log(symbol, execution_mode)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_time_exit ON trades_log(exit_timestamp)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_idempotency ON trades_log(idempotency_key)")
+
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error initializing trade ledger schema: {e}")
+    finally:
+        if conn:
             try:
-                cursor.execute(f"ALTER TABLE trades_log ADD COLUMN {col_name} {col_def}")
-            except Exception as e:
-                logger.debug(f"Notice adding column {col_name}: {e}")
-
-    # Create optimized query indexes
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_status_id ON trades_log(status, id DESC)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_bot_strat ON trades_log(bot_id, strategy_id)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_sym_mode ON trades_log(symbol, execution_mode)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_time_exit ON trades_log(exit_timestamp)")
-    cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_log_idempotency ON trades_log(idempotency_key)")
-
-    conn.commit()
-    conn.close()
+                conn.close()
+            except Exception:
+                pass
 
 
 def generate_idempotency_key(bot_id: str, strategy: str, symbol: str, signal_time_str: str) -> str:

@@ -1605,6 +1605,10 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
     def get_funding_rate(self, symbol: str) -> Optional[float]:
         return self._funding_rate_cache.get(symbol.upper().strip())
 
+    def get_candles(self, symbol: str, resolution: str = "1m") -> List[DeltaCandle]:
+        sym_clean = symbol.upper().strip()
+        return list(self._candles_cache.get(sym_clean, {}).get(resolution, []))
+
     async def get_instruments(self) -> List[CanonicalInstrument]:
         try:
             prods = await asyncio.to_thread(global_delta_client.get_products)

@@ -1,0 +1,138 @@
+{
+  "proof_id": "PROOF-EXEC-1790949243",
+  "timestamp": "2026-10-02T13:54:03.422878+00:00",
+  "stages": {
+    "1_market_data": {
+      "symbol": "BTC/USDT",
+      "bars_count": 50,
+      "live_price": 86748.01,
+      "ticker_timestamp": "2026-10-02T13:54:24.013Z",
+      "status": "VERIFIED"
+    },
+    "2_strategy_signal": {
+      "strategy": "EMA_MACD_VP_CONFLUENCE",
+      "signal": "BUY",
+      "confidence_score": 85.0,
+      "eval_reason": "Confluence threshold satisfied",
+      "status": "VERIFIED"
+    },
+    "3_risk_check": {
+      "passed": true,
+      "validation_message": "ALL_14_SAFETY_CHECKS_PASSED",
+      "planned_stop_loss": 85013.05,
+      "planned_take_profit": 90217.93,
+      "status": "VERIFIED"
+    },
+    "4_entry_execution": {
+      "broker_order_id": "PAPER_ORD_79ba158977",
+      "client_order_id": "proof_entry_1790949245609",
+      "filled_quantity": 0.001,
+      "average_price": 86748.01,
+      "fees": 0.09,
+      "trade_id": 100071,
+      "status": "CONFIRMED_FILL"
+    },
+    "5_position_ledger": {
+      "trade_id": 100071,
+      "db_status": "OPEN",
+      "position_size": 0.001,
+      "entry_price": 86748.01,
+      "status": "VERIFIED"
+    },
+    "6_exit_execution": {
+      "exit_broker_order_id": "PAPER_ORD_509d29018f",
+      "exit_client_order_id": "proof_exit_1790949245796",
+      "exit_fill_price": 88049.23,
+      "exit_fill_quantity": 0.001,
+      "exit_fees": 0.09,
+      "status": "CONFIRMED_EXIT_FILL"
+    },
+    "7_realized_pnl": {
+      "trade_id": 100071,
+      "trade_status": "CLOSED",
+      "trade_result": "WIN",
+      "gross_pnl": 1.3,
+      "net_pnl": 1.12,
+      "pnl_percentage": 1.29,
+      "status": "VERIFIED"
+    },
+    "8_audit_trail": {
+      "events_count": 12,
+      "events": [
+        {
+          "event_type": "ORDER_REQUESTED",
+          "status": "PENDING",
+          "message": "Submitting PAPER order for BTC/USDT (BUY) amount=0.001 @ $86,802.00",
+          "timestamp_utc": "2026-10-02T13:53:30.588448+00:00"
+        },
+        {
+          "event_type": "ORDER_FILLED",
+          "status": "SUCCESS",
+          "message": "Order FILLED: #PAPER_ORD_4db0542335 BTC/USDT (BUY) avg_price=$86,802.00",
+          "timestamp_utc": "2026-10-02T13:53:30.626600+00:00"
+        },
+        {
+          "event_type": "TRADE_OPENED",
+          "status": "SUCCESS",
+          "message": "Opened BUY position (Trade #100070) for BTC/USDT @ $86,802.00 (Size: 0.001).",
+          "timestamp_utc": "2026-10-02T13:53:30.649956+00:00"
+        },
+        {
+          "event_type": "EXIT_ORDER_REQUESTED",
+          "status": "PENDING",
+          "message": "Submitting PAPER exit order for Trade #100070 BTC/USDT (SELL) amount=0.001 @ $88,104.03 (TAKE_PROFIT_TARGET_HIT)",
+          "timestamp_utc": "2026-10-02T13:53:30.721696+00:00"
+        },
+        {
+          "event_type": "EXIT_ORDER_FILLED",
+          "status": "SUCCESS",
+          "message": "Exit Order FILLED: #PAPER_ORD_42f7825fce BTC/USDT (SELL) avg_price=$88,104.03 (TAKE_PROFIT_TARGET_HIT)",
+          "timestamp_utc": "2026-10-02T13:53:30.721773+00:00"
+        },
+        {
+          "event_type": "TRADE_CLOSED",
+          "status": "SUCCESS",
+          "message": "Closed Trade #100070 (BUY on BTC/USDT) @ $88,104.03 with Net PnL: $1.12 (1.29%). Reason: TAKE_PROFIT_TARGET_HIT.",
+          "timestamp_utc": "2026-10-02T13:53:30.742512+00:00"
+        },
+        {
+          "event_type": "ORDER_REQUESTED",
+          "status": "PENDING",
+          "message": "Submitting PAPER order for BTC/USDT (BUY) amount=0.001 @ $86,748.01",
+          "timestamp_utc": "2026-10-02T13:54:05.644218+00:00"
+        },
+        {
+          "event_type": "ORDER_FILLED",
+          "status": "SUCCESS",
+          "message": "Order FILLED: #PAPER_ORD_79ba158977 BTC/USDT (BUY) avg_price=$86,748.01",
+          "timestamp_utc": "2026-10-02T13:54:05.688765+00:00"
+        },
+        {
+          "event_type": "TRADE_OPENED",
+          "status": "SUCCESS",
+          "message": "Opened BUY position (Trade #100071) for BTC/USDT @ $86,748.01 (Size: 0.001).",
+          "timestamp_utc": "2026-10-02T13:54:05.735615+00:00"
+        },
+        {
+          "event_type": "EXIT_ORDER_REQUESTED",
+          "status": "PENDING",
+          "message": "Submitting PAPER exit order for Trade #100071 BTC/USDT (SELL) amount=0.001 @ $88,049.23 (TAKE_PROFIT_TARGET_HIT)",
+          "timestamp_utc": "2026-10-02T13:54:05.796330+00:00"
+        },
+        {
+          "event_type": "EXIT_ORDER_FILLED",
+          "status": "SUCCESS",
+          "message": "Exit Order FILLED: #PAPER_ORD_509d29018f BTC/USDT (SELL) avg_price=$88,049.23 (TAKE_PROFIT_TARGET_HIT)",
+          "timestamp_utc": "2026-10-02T13:54:05.796521+00:00"
+        },
+        {
+          "event_type": "TRADE_CLOSED",
+          "status": "SUCCESS",
+          "message": "Closed Trade #100071 (BUY on BTC/USDT) @ $88,049.23 with Net PnL: $1.12 (1.29%). Reason: TAKE_PROFIT_TARGET_HIT.",
+          "timestamp_utc": "2026-10-02T13:54:05.844637+00:00"
+        }
+      ],
+      "status": "VERIFIED"
+    }
+  }
+}

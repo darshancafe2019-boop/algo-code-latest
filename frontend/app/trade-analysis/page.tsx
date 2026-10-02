@@ -3,8 +3,8 @@
 import React, { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { TradeAnalysisDashboard } from "@/components/trade-analysis/TradeAnalysisDashboard";
-import { TradeAnalysisInstrument } from "@/components/trade-analysis/TradeAnalysisTypes";
+import { TradeAnalysisDashboard } from "@/components/trade_analysis/TradeAnalysisDashboard";
+import { TradeAnalysisInstrument } from "@/components/trade_analysis/TradeAnalysisTypes";
 
 function TradeAnalysisContent() {
   const searchParams = useSearchParams();

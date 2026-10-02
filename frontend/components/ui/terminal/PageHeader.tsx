@@ -33,7 +33,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
       const now = new Date();
       setTimeStr(
         now.toLocaleTimeString("en-IN", {
-          hour12: false,
+          hour12: true,
           hour: "2-digit",
           minute: "2-digit",
           second: "2-digit",

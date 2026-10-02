@@ -41,13 +41,14 @@ for _env_file in [
         else:
             _load_env_fallback(_env_file)
 
-# ==========================================
-# EXCHANGE & TELEGRAM KEYS
-# ==========================================
 BINANCE_TESTNET_API_KEY = os.getenv("BINANCE_TESTNET_API_KEY", "")
 BINANCE_TESTNET_SECRET_KEY = os.getenv("BINANCE_TESTNET_SECRET_KEY", "")
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "") or BINANCE_TESTNET_API_KEY
-BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "") or BINANCE_TESTNET_SECRET_KEY
+BINANCE_LIVE_API_KEY = os.getenv("BINANCE_LIVE_API_KEY", "")
+BINANCE_LIVE_SECRET_KEY = os.getenv("BINANCE_LIVE_SECRET_KEY", "")
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+BINANCE_LIVE_ENDPOINT = os.getenv("BINANCE_LIVE_ENDPOINT", "https://api.binance.com")
+BINANCE_TESTNET_ENDPOINT = os.getenv("BINANCE_TESTNET_ENDPOINT", "https://testnet.binance.vision")
 
 # Indian Market & Broker Integration (Upstox / Dhan)
 UPSTOX_CLIENT_ID = os.getenv("UPSTOX_CLIENT_ID", "")

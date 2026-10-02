@@ -1,11 +1,12 @@
 import json
+import os
 import sys
 import logging
 import time
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple, List
 import traceback
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 # Add project root to path
@@ -14,7 +15,10 @@ if str(project_root) not in sys.path:
     sys.path.append(str(project_root))
 
 if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8")
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 from src import config
 from src.data_fetcher import DataFetcher, get_mainnet_fetcher, get_testnet_fetcher
@@ -23,12 +27,23 @@ from src.strategy import Strategy
 from src.risk_manager import RiskManager
 from src.telegram_alert import TelegramAlert
 from src.monitoring import MonitoringService
-from src import db
+from src import db, pnl_engine
 from src.execution import ExecutionEngine
 from src.audit import log_bot_event
+from src.instrument_resolver import (
+    global_instrument_resolver,
+    ResolutionStatus,
+    CanonicalInstrument,
+    InstrumentType,
+    validate_contract_expiry,
+    resolve_contract_rollover,
+    resolve_signal_and_execution_instruments,
+)
+from src.provider_manager import global_provider_manager
+from src.error_ledger import global_error_ledger
 
 # Setup Logging
-_handlers = [logging.StreamHandler(sys.stdout)]
+_handlers: List[logging.Handler] = [logging.StreamHandler(sys.stdout)]
 try:
     _log_file = config.BASE_DIR / "data" / "live_runner.log"
     _log_file.parent.mkdir(parents=True, exist_ok=True)
@@ -44,7 +59,6 @@ logging.basicConfig(
 logger = logging.getLogger("LiveRunner")
 
 
-
 class CycleContext:
     """Simple container for the current evaluation context."""
 
@@ -58,10 +72,11 @@ class CycleContext:
         self.status = "OK"
         self.details = {}
 
+
 class LiveRunner:
     """
     Orchestrates the scheduled execution cycle of a specific Bot Instance.
-    Runs in alert-only paper trading mode connected to Binance Testnet.
+    Enforces strict separation of Signal Market Data from Execution Premium Data.
     """
 
     def __init__(self, bot_id: str = "bot-1"):
@@ -72,23 +87,27 @@ class LiveRunner:
         self.telegram = TelegramAlert()
         self.monitoring = MonitoringService()
         self.retry_count = 0
+        self._last_logged_state: Optional[str] = None
 
         # Load bot instance config from DB
         conn = db.get_connection()
+        row = None
         try:
             c = conn.cursor()
             c.execute("SELECT * FROM bot_instances WHERE id = ?", (self.bot_id,))
             row = c.fetchone()
         finally:
-            try:
-                conn.close()
-            except Exception:
-                pass
+            if conn:
+                try: conn.close()
+                except Exception: pass
+
         if row:
             b = dict(row)
+            self.bot_config = b
             self.symbol = b.get("symbol") or config.SYMBOL
             self.timeframe = b.get("timeframe") or config.TIMEFRAME
             self.bot_name = b.get("name") or f"Bot {self.bot_id}"
+            self.rollover_policy = b.get("rollover_policy") or "STRATEGY_RESOLVE"
             cfg = b.get("config_json") or {}
             if isinstance(cfg, str):
                 try:
@@ -103,41 +122,29 @@ class LiveRunner:
             self.risk_pct = float(cfg.get("risk_pct") or 0.02)
             self.auto_execute = cfg.get("auto_execute", True)
             self.require_manual_approval = cfg.get("require_manual_approval", False)
+            self.execution_mode = b.get("execution_mode") or "PAPER"
+            self.asset_class = b.get("asset_class") or "CRYPTO"
         else:
+            self.bot_config = {}
             self.symbol = config.SYMBOL
             self.timeframe = config.TIMEFRAME
             self.bot_name = f"Bot {self.bot_id}"
+            self.rollover_policy = "STRATEGY_RESOLVE"
             self.indicators = ["ema", "macd", "vp"]
             self.risk_pct = 0.02
             self.auto_execute = True
             self.require_manual_approval = False
+            self.execution_mode = "PAPER"
+            self.asset_class = "CRYPTO"
 
-        # Testnet data fetcher for balance checks and order simulation
         self.testnet_fetcher = get_testnet_fetcher()
-        # Execution engine for real orders on Binance Testnet (spot)
         self.executor = ExecutionEngine(self.testnet_fetcher.exchange)
-        # Canonical Instrument Pre-Flight Resolution
-        from src.instrument_resolver import global_instrument_resolver, ResolutionStatus
-        from src.provider_manager import global_provider_manager
-        from src.error_ledger import global_error_ledger
-
         self.instrument_resolver = global_instrument_resolver
         self.provider_manager = global_provider_manager
         self.error_ledger = global_error_ledger
 
-        exec_mode = b.get("execution_mode") or "PAPER" if row else "PAPER"
-        asset_class = b.get("asset_class") or "CRYPTO" if row else "CRYPTO"
-        res = self.instrument_resolver.resolve_for_bot(self.symbol, execution_mode=exec_mode, asset_class=asset_class)
-        if not res.is_valid:
-            self.is_preflight_failed = True
-            self.preflight_error = f"INSTRUMENT_PREFLIGHT_FAILED: {res.reason} (Code: {res.error_code}). Suggested: {res.suggested_action}"
-            logger.error("[%s] %s", self.bot_id, self.preflight_error)
-        else:
-            self.is_preflight_failed = False
-            self.preflight_error = ""
-            self.canonical_instrument = res.instrument
-            self.feed_symbol = res.instrument.canonical_symbol
-            logger.info("[%s] Pre-flight instrument resolved: %s (feed: %s, %s via %s)", self.bot_id, self.symbol, self.feed_symbol, res.instrument.instrument_type.value, res.instrument.provider)
+        # Resolve Signal Instrument and Execution Instrument
+        self._init_instruments()
 
         log_bot_event(
             event_type="BOT_START",
@@ -149,79 +156,170 @@ class LiveRunner:
             severity="INFO"
         )
 
-    def process_cycle(self):
-        """Execute one bot evaluation cycle with diagnostics and safety checks."""
-        # Pre-flight validation gate: Block execution if instrument is a generic category or invalid
-        if getattr(self, "is_preflight_failed", False):
-            logger.error("[%s] Halting runner cycle: Bot is configured with unexecutable instrument '%s'. Error: %s", self.bot_id, self.symbol, self.preflight_error)
-            exc = ValueError(self.preflight_error)
-            self.error_ledger.record_incident(exc, bot_id=self.bot_id, symbol=self.symbol, stack_trace="")
-            db.log_bot_activity(self.bot_id, "ERROR", f"PRE-FLIGHT BLOCKED: {self.preflight_error}", {"error": self.preflight_error})
-            conn = None
+    def _init_instruments(self):
+        """Resolves signal vs execution instruments and enforces expiry & rollover policies."""
+        sig_inst, exec_inst = resolve_signal_and_execution_instruments(self.symbol)
+        self.signal_instrument = sig_inst
+        self.execution_instrument = exec_inst
+        self.currency = exec_inst.quote_asset or ("INR" if exec_inst.exchange == "NSE" else "USDT")
+
+        # Expiry Validation
+        is_valid_exp, exp_code, exp_d = validate_contract_expiry(exec_inst)
+        if not is_valid_exp:
+            logger.warning("[%s] CONTRACT_EXPIRED: Contract '%s' expired on %s.", self.bot_id, self.symbol, exp_d.isoformat() if exp_d else "N/A")
+            # Apply Rollover Policy
+            roll_res = resolve_contract_rollover(self.bot_config, self.symbol, rollover_policy=self.rollover_policy)
+            if roll_res.is_valid and roll_res.instrument:
+                logger.info("[%s] CONTRACT_RESOLVED: Rolled over from '%s' to '%s' (Expiry: %s).", self.bot_id, self.symbol, roll_res.instrument.canonical_symbol, roll_res.instrument.expiry)
+                self.symbol = roll_res.instrument.canonical_symbol
+                self.execution_instrument = roll_res.instrument
+                self._persist_symbol_update(self.symbol)
+                self.is_preflight_failed = False
+                self.preflight_error = ""
+            else:
+                self.is_preflight_failed = True
+                self.preflight_error = f"CONTRACT_EXPIRED: {roll_res.reason or 'Contract is expired and rollover was unable to resolve a replacement.'}"
+                logger.error("[%s] WAITING_INSTRUMENT: %s", self.bot_id, self.preflight_error)
+                return
+        else:
+            self.is_preflight_failed = False
+            self.preflight_error = ""
+
+        logger.info(
+            "[%s] Instruments Resolved -> Signal Asset: %s (%s) | Execution Asset: %s (%s, Currency: %s)",
+            self.bot_id,
+            self.signal_instrument.canonical_symbol,
+            self.signal_instrument.instrument_type.value,
+            self.execution_instrument.canonical_symbol,
+            self.execution_instrument.instrument_type.value,
+            self.currency
+        )
+
+    def _persist_symbol_update(self, new_symbol: str):
+        """Updates bot symbol in bot_instances and data_core_persisted_bots."""
+        conn = None
+        try:
+            conn = db.get_connection()
+            c = conn.cursor()
+            c.execute("UPDATE bot_instances SET symbol = ?, updated_at = ? WHERE id = ?", (new_symbol, datetime.now(timezone.utc).isoformat(), self.bot_id))
             try:
-                conn = db.get_connection()
-                c = conn.cursor()
-                c.execute("UPDATE bot_instances SET status = 'CONFIG_ERROR' WHERE id = ?", (self.bot_id,))
-                conn.commit()
+                c.execute("UPDATE data_core_persisted_bots SET canonical_instrument_id = ? WHERE bot_id = ?", (new_symbol, self.bot_id))
             except Exception:
                 pass
-            finally:
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+            conn.commit()
+        except Exception as e:
+            logger.debug("Failed to persist rolled-over symbol update: %s", e)
+        finally:
+            if conn:
+                try: conn.close()
+                except Exception: pass
+
+    def get_execution_live_quote(self, inst: CanonicalInstrument, fallback_price: float) -> float:
+        """
+        Fetches the live option premium or futures market price for the execution instrument.
+        Never confuses underlying spot prices with option premiums.
+        """
+        # If spot or equity, return fallback underlying price
+        if inst.instrument_type not in (InstrumentType.OPTION, InstrumentType.DATED_FUTURE):
+            return fallback_price
+
+        # 1. Delta Exchange Options Quotes
+        if inst.provider in ("delta_options", "delta") or inst.exchange == "DELTA":
+            try:
+                rows = db.safe_query(
+                    "SELECT mark_price, spot_price, best_bid, best_ask FROM delta_option_quotes WHERE symbol = ?",
+                    (inst.canonical_symbol.strip(),)
+                )
+                if rows:
+                    q = rows[0]
+                    mark = float(q.get("mark_price") or 0.0)
+                    bid = float(q.get("best_bid") or 0.0)
+                    ask = float(q.get("best_ask") or 0.0)
+                    if mark > 0:
+                        return mark
+                    if bid > 0 and ask > 0:
+                        return (bid + ask) / 2.0
+                    if bid > 0:
+                        return bid
+            except Exception as e:
+                logger.debug("Delta quotes query error: %s", e)
+
+        # 2. Upstox Indian Options / Futures Quotes
+        if inst.exchange == "NSE" or inst.provider in ("upstox", "upstox_options"):
+            try:
+                from src.upstox_service import global_upstox_service
+                quote = global_upstox_service.get_full_market_quote(inst.provider_symbol or inst.canonical_symbol)
+                if quote:
+                    ltp = float(quote.get("last_price") or quote.get("ltp") or 0.0)
+                    if ltp > 0:
+                        return ltp
+            except Exception as e:
+                logger.debug("Upstox quote fetch error: %s", e)
+
+        # Realistic estimation if market closed/paper mode
+        if inst.instrument_type == InstrumentType.OPTION and inst.strike:
+            strike = float(inst.strike)
+            opt_type = (inst.option_type or "CALL").upper()
+            spot = fallback_price
+            # Intrinsic value approximation
+            intrinsic = max(0.0, (spot - strike) if opt_type in ("CALL", "CE") else (strike - spot))
+            time_val = max(10.0, spot * 0.005)
+            return round(intrinsic + time_val, 2)
+
+        return fallback_price
+
+    def process_cycle(self):
+        """Execute one bot evaluation cycle with diagnostics and safety checks."""
+        # Pre-flight validation gate: Block execution if instrument is expired or invalid
+        if getattr(self, "is_preflight_failed", False):
+            # Log state change only once to avoid 5-second spam
+            if self._last_logged_state != "PREFLIGHT_BLOCKED":
+                logger.error("[%s] [STATE CHANGE] WAITING_INSTRUMENT: Bot execution halted. Reason: %s", self.bot_id, self.preflight_error)
+                self._last_logged_state = "PREFLIGHT_BLOCKED"
+                db.log_bot_activity(self.bot_id, "WAITING_INSTRUMENT", f"WAITING_INSTRUMENT: {self.preflight_error}", {"error": self.preflight_error})
+                conn = None
+                try:
+                    conn = db.get_connection()
+                    c = conn.cursor()
+                    c.execute("UPDATE bot_instances SET status = 'CONTRACT_EXPIRED' WHERE id = ?", (self.bot_id,))
+                    conn.commit()
+                except Exception:
+                    pass
+                finally:
+                    if conn:
+                        try: conn.close()
+                        except Exception: pass
             return
 
-        # Reload latest bot instance config dynamically from DB
-        if getattr(self, "bot_id", None):
-            conn = None
-            try:
-                conn = db.get_connection()
-                c = conn.cursor()
-                c.execute("SELECT config_json, allocated_capital, timeframe, symbol FROM bot_instances WHERE id = ?", (self.bot_id,))
-                row = c.fetchone()
-                if row and row["config_json"]:
-                    cfg = json.loads(row["config_json"])
-                    if isinstance(cfg, str):
-                        cfg = json.loads(cfg)
-                    if isinstance(cfg, dict) and "indicators" in cfg:
-                        self.indicators = cfg["indicators"]
-                    if row and "allocated_capital" in row.keys() and row["allocated_capital"]:
-                        self.allocated_capital = float(row["allocated_capital"])
-            except Exception as exc:
-                logger.warning("[%s] Failed to dynamically reload config from DB: %s", self.bot_id, exc)
-            finally:
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
+        # Periodically check expiry on every cycle
+        is_valid_exp, exp_code, exp_d = validate_contract_expiry(self.execution_instrument)
+        if not is_valid_exp:
+            roll_res = resolve_contract_rollover(self.bot_config, self.symbol, rollover_policy=self.rollover_policy)
+            if roll_res.is_valid and roll_res.instrument:
+                logger.info("[%s] CONTRACT_RESOLVED: Rolled over from '%s' to '%s'.", self.bot_id, self.symbol, roll_res.instrument.canonical_symbol)
+                self.symbol = roll_res.instrument.canonical_symbol
+                self.execution_instrument = roll_res.instrument
+                self._persist_symbol_update(self.symbol)
+            else:
+                self.is_preflight_failed = True
+                self.preflight_error = f"CONTRACT_EXPIRED: Contract '{self.symbol}' expired on {exp_d.isoformat() if exp_d else 'N/A'}."
+                return
 
-        logger.info("[%s] Starting signal check cycle for %s (%s)...", self.bot_id, self.symbol, self.timeframe)
-        db.log_bot_activity(self.bot_id, "EVALUATION_START", f"Starting {self.timeframe} candle evaluation cycle for {self.symbol}", {"symbol": self.symbol, "timeframe": self.timeframe})
         context = CycleContext()
         status = "OK"
 
         try:
             if self.risk_manager.is_kill_switch_active():
                 logger.warning("Kill switch file active. Skipping cycle.")
-                self.telegram.send_message("⚠️ <b>BTC Trading Bot alert</b>: Cycle skipped. kill_switch.flag is present in the workspace.")
                 return
 
-            # Paper trading capital allocated to this bot instance ($10,000.00 default)
             paper_balance = float(getattr(self, "allocated_capital", 10000.0) or 10000.0)
             balance = paper_balance
             context.balance = paper_balance
 
-            if config.FORCE_TEST_SIGNAL:
-                logger.info("FORCE_TEST_SIGNAL is enabled; injecting a LONG signal for Telegram testing.")
-                context.signal = "LONG"
-                context.decision = "LONG"
-
-            feed_sym = getattr(self, "feed_symbol", None) or self.symbol
-            logger.info("Fetching recent candles for %s (feed: %s, %s) [Bot: %s] via ProviderManager...", self.symbol, feed_sym, self.timeframe, self.bot_id)
-            df, _ = self.provider_manager.fetch_ohlcv_safe(feed_sym, self.timeframe, limit=1000)
+            # 1. Fetch Signal Market Data (Underlying Candles)
+            sig_sym = self.signal_instrument.canonical_symbol
+            df, _ = self.provider_manager.fetch_ohlcv_safe(sig_sym, self.timeframe, limit=1000)
 
             if df.empty or len(df) < 200:
                 logger.error("Fetched insufficient historical candles for indicator calculation.")
@@ -235,19 +333,20 @@ class LiveRunner:
             high_price = float(df.iloc[eval_idx]['high'])
             low_price = float(df.iloc[eval_idx]['low'])
             
-            # Live current forming tick/candle price
-            live_close = float(df.iloc[-1]['close'])
+            live_signal_price = float(df.iloc[-1]['close'])
             live_high = float(df.iloc[-1]['high'])
             live_low = float(df.iloc[-1]['low'])
-            
-            context.close_price = live_close
-            logger.info("[%s] Market check on %s | Live: %.2f (Bar: %.2f, H: %.2f, L: %.2f)", self.bot_id, candle_time, live_close, close_price, max(high_price, live_high), min(low_price, live_low))
+            context.close_price = live_signal_price
 
-            # Update last_checked_at in DB and log activity
-            db.log_bot_activity(self.bot_id, "EVALUATION", f"Evaluating {self.timeframe} market live at ${live_close:,.2f}", {"close_price": live_close, "timeframe": self.timeframe})
+            logger.info("SIGNAL_DATA: %s underlying (Price: %.2f)", sig_sym, live_signal_price)
+
+            # 2. Fetch Execution Market Data (Live Option Premium or Futures Quote)
+            live_execution_price = self.get_execution_live_quote(self.execution_instrument, fallback_price=live_signal_price)
+            logger.info("EXECUTION_DATA: %s (premium/price = %.2f)", self.execution_instrument.canonical_symbol, live_execution_price)
 
             active_trade = get_active_trade(self.bot_id)
             context.open_trade = active_trade
+
             if active_trade:
                 from src.error_ledger import DataValidationError
                 trade_id = active_trade.get('id')
@@ -257,35 +356,35 @@ class LiveRunner:
                 raw_tp = active_trade.get('take_profit')
                 raw_size = active_trade.get('position_size')
 
-                # Strict Null Validation
                 if raw_entry is None or raw_size is None:
-                    raise DataValidationError(f"Active trade #{trade_id} missing entry_price ({raw_entry}) or position_size ({raw_size})")
+                    raise DataValidationError(f"Active trade #{trade_id} missing entry_price or position_size")
 
-                try:
-                    entry_price = float(raw_entry)
-                    size = float(raw_size)
-                except (ValueError, TypeError) as num_err:
-                    raise DataValidationError(f"Active trade #{trade_id} invalid numeric format: {num_err}")
-
-                if entry_price <= 0 or size <= 0:
-                    raise DataValidationError(f"Active trade #{trade_id} non-positive values (entry: {entry_price}, size: {size})")
-
+                entry_price = float(raw_entry)
+                size = float(raw_size)
                 sl_price = float(raw_sl) if raw_sl is not None and float(raw_sl) > 0 else None
                 tp_price = float(raw_tp) if raw_tp is not None and float(raw_tp) > 0 else None
 
-                # Calculate live unrealized P&L
-                current_unrealized = (live_close - entry_price) * size if direction == "LONG" else (entry_price - live_close) * size
+                # Compute Live MTM P&L using Authoritative PnL Engine on Live Execution Price
+                upnl_res = pnl_engine.compute_unrealized_pnl(
+                    direction=direction,
+                    entry_price=entry_price,
+                    live_price=live_execution_price,
+                    quantity=size,
+                    currency=self.currency
+                )
+                current_unrealized = upnl_res["unrealized_pnl"]
 
                 logger.info(
-                    "[%s] Active trade #%s (%s, Entry: %.2f, Live: %.2f, SL: %s, TP: %s, MTM: %+.2f)",
+                    "[%s] Active trade #%s (%s, Entry: %.2f, Live: %.2f, SL: %s, TP: %s, MTM: %+.2f %s)",
                     self.bot_id,
                     trade_id,
                     direction,
                     entry_price,
-                    live_close,
+                    live_execution_price,
                     f"{sl_price:.2f}" if sl_price is not None else "None",
                     f"{tp_price:.2f}" if tp_price is not None else "None",
                     current_unrealized,
+                    self.currency,
                 )
 
                 exit_triggered = False
@@ -293,152 +392,97 @@ class LiveRunner:
                 exit_pnl = 0.0
                 exit_reason = ""
 
-                # Evaluate instant triggers on both historical and live forming candle
-                eff_low = min(low_price, live_low)
-                eff_high = max(high_price, live_high)
-
+                # Evaluate instant triggers against execution price
                 if direction == "LONG":
-                    if sl_price is not None and eff_low <= sl_price:
+                    if sl_price is not None and live_execution_price <= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "STOP LOSS"
-                    elif tp_price is not None and eff_high >= tp_price:
+                    elif tp_price is not None and live_execution_price >= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (exit_price - entry_price) * size
                         exit_reason = "TAKE PROFIT"
                 elif direction == "SHORT":
-                    if sl_price is not None and eff_high >= sl_price:
+                    if sl_price is not None and live_execution_price >= sl_price:
                         exit_triggered = True
                         exit_price = sl_price
                         exit_pnl = (entry_price - exit_price) * size
                         exit_reason = "STOP LOSS"
-                    elif tp_price is not None and eff_low <= tp_price:
+                    elif tp_price is not None and live_execution_price <= tp_price:
                         exit_triggered = True
                         exit_price = tp_price
                         exit_pnl = (entry_price - exit_price) * size
                         exit_reason = "TAKE PROFIT"
 
+                # 3. Check Expiry Cutoff Window Trigger (Auto Square-Off on Expiry)
+                if not exit_triggered:
+                    from src.expiry_lifecycle_manager import global_expiry_lifecycle_manager
+                    in_exp_win, cutoff_dt, exp_code = global_expiry_lifecycle_manager.is_contract_in_expiry_window(self.execution_instrument)
+                    if in_exp_win:
+                        exit_triggered = True
+                        exit_price = live_execution_price
+                        exit_pnl = (exit_price - entry_price) * size if direction == "LONG" else (entry_price - exit_price) * size
+                        exit_reason = "AUTO_EXPIRY_SQUARE_OFF"
+                        logger.info("[%s] EXPIRY_WINDOW_ENTERED: Auto square-off triggered at contract expiry cutoff (%s).", self.bot_id, exp_code)
+
                 if exit_triggered:
-                    logger.info("[%s] Active trade exit condition detected (%s)! Price: %.2f, PnL: %.2f.", self.bot_id, exit_reason, exit_price, exit_pnl)
+                    logger.info("[%s] Active trade exit condition detected (%s)! Price: %.2f, PnL: %.2f %s.", self.bot_id, exit_reason, exit_price, exit_pnl, self.currency)
                     
                     if self.auto_execute and not self.require_manual_approval:
-                        # Fully Autonomous Exit Execution
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        conn = db.get_connection()
-                        try:
-                            c = conn.cursor()
-                            c.execute("""
-                                UPDATE trades_log SET
-                                    exit_price = ?,
-                                    exit_timestamp = ?,
-                                    result_pnl = ?,
-                                    net_pnl = ?,
-                                    realized_pnl = ?,
-                                    unrealized_pnl = 0.0,
-                                    status = 'CLOSED',
-                                    exit_reason = ?,
-                                    remarks = ?
-                                WHERE id = ?
-                            """, (exit_price, now_iso, exit_pnl, exit_pnl, exit_pnl, exit_reason, f"Autonomous exit on {exit_reason}", trade_id))
-                            try:
-                                c.execute("DELETE FROM positions WHERE bot_id = ? OR id = ?", (self.bot_id, trade_id))
-                            except Exception:
-                                pass
-                            conn.commit()
-                        finally:
-                            try:
-                                conn.close()
-                            except Exception:
-                                pass
-
-                        db.log_bot_activity(
-                            self.bot_id,
-                            "TRADE_EXIT_AUTONOMOUS",
-                            f"🎯 AUTO-EXECUTED EXIT: Closed Trade #{trade_id} on {exit_reason} at ${exit_price:,.2f} (PnL: {exit_pnl:+.2f} USDT).",
-                            {"trade_id": trade_id, "exit_reason": exit_reason, "exit_price": exit_price, "realized_pnl": exit_pnl}
+                        from src.execution_service import order_execution_service
+                        exec_mode = getattr(self, "execution_mode", "PAPER")
+                        exit_side = "SELL" if direction in ["LONG", "BUY"] else "BUY"
+                        success, exit_msg, exit_res = order_execution_service.execute_exit(
+                            bot_id=self.bot_id,
+                            trade_id=trade_id,
+                            symbol=self.symbol,
+                            side=exit_side,
+                            quantity=size,
+                            price=exit_price,
+                            exit_reason=exit_reason,
+                            mode=exec_mode,
+                            broker=getattr(self, "broker", "PAPER"),
                         )
-
-                        self.telegram.send_message(
-                            f"🎯 <b>[AUTO-EXECUTED EXIT]</b>\n"
-                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
-                            f"• <b>Symbol</b>: {self.symbol}\n"
-                            f"• <b>Reason</b>: {exit_reason}\n"
-                            f"• <b>Exit Price</b>: ${exit_price:,.2f}\n"
-                            f"• <b>Realized P&L</b>: <b>{exit_pnl:+.2f} USDT</b>\n"
-                            f"• <b>Status</b>: CLOSED"
-                        )
-
-                        context.signal = "EXIT_SIGNAL"
-                        context.decision = "CLOSED"
-                        context.open_trade = None
-                        return
-                    else:
-                        # Semi-Automated Approval Queue
-                        pending_exits = [p for p in db.get_pending_signal_approvals(self.bot_id) if p.get("signal_type") in ["EXIT_SIGNAL", "SQUARE_OFF"]]
-                        if not pending_exits:
-                            sig_id = db.create_pending_signal_approval(
-                                bot_id=self.bot_id,
-                                symbol=self.symbol,
-                                signal_type="EXIT_SIGNAL",
-                                price=live_close,
-                                confluence_pct=81.0,
-                                threshold_pct=75.0,
-                                sl_price=sl_price,
-                                tp_price=tp_price,
-                                position_size=size,
-                                strategy_details={"reason": exit_reason, "unrealized_pnl": exit_pnl, "entry_price": entry_price},
-                                timeframe=self.timeframe,
-                                strategy=self.bot_name
-                            )
-
-                            self.telegram.send_interactive_signal_alert(
-                                signal_id=sig_id,
-                                symbol=self.symbol,
-                                signal_type="EXIT_SIGNAL",
-                                price=close_price,
-                                confluence_pct=81.0,
-                                threshold_pct=75.0,
-                                current_position=direction,
-                                entry_price=entry_price
-                            )
-
+                        if success:
+                            ledger_res = exit_res.get("trade_ledger_result") or {}
+                            realized_pnl = float(ledger_res.get("net_pnl") or exit_pnl)
                             db.log_bot_activity(
                                 self.bot_id,
-                                "SIGNAL_APPROVAL_WAITING",
-                                f"🚨 POSITION ALERT: Strategy detected possible EXIT ({exit_reason}). Paused for user approval (ID: #{sig_id}).",
-                                {"signal_id": sig_id, "exit_reason": exit_reason, "unrealized_pnl": exit_pnl}
+                                "TRADE_EXIT_AUTONOMOUS",
+                                f"🎯 AUTO-EXECUTED EXIT: Closed Trade #{trade_id} on {exit_reason} at {self.currency} {exit_price:,.2f} (PnL: {realized_pnl:+.2f} {self.currency}).",
+                                {"trade_id": trade_id, "exit_reason": exit_reason, "exit_price": exit_price, "realized_pnl": realized_pnl}
                             )
-                        context.signal = "EXIT_SIGNAL"
-                        context.decision = "WAITING_APPROVAL"
-                        return
+
+                            context.signal = "EXIT_SIGNAL"
+                            context.decision = "CLOSED"
+                            context.open_trade = None
+                            return
+                        else:
+                            logger.warning("[%s] Failed to close trade via OrderExecutionService: %s", self.bot_id, exit_msg)
+
                 else:
-                    # Calculate live floating unrealized mark-to-market PnL
-                    unrealized_pnl = (entry_price - close_price) * size if direction == "SHORT" else (close_price - entry_price) * size
-                    logger.info("[%s] Active trade SL/TP not hit. Holding position (Live MTM PnL: %+.2f USDT, Last Price: %.2f).", self.bot_id, unrealized_pnl, close_price)
+                    # Update live floating unrealized mark-to-market PnL in database
                     context.signal = "HOLD"
                     context.decision = "HOLD"
                     
                     conn = db.get_connection()
                     try:
                         c = conn.cursor()
-                        c.execute("UPDATE trades_log SET unrealized_pnl = ? WHERE id = ?", (unrealized_pnl, trade_id))
-                        c.execute("UPDATE bot_instances SET unrealized_pnl = ?, last_checked_at = ? WHERE id = ?", (unrealized_pnl, datetime.now(timezone.utc).isoformat(), self.bot_id))
+                        c.execute("UPDATE trades_log SET unrealized_pnl = ? WHERE id = ?", (current_unrealized, trade_id))
+                        c.execute("UPDATE bot_instances SET unrealized_pnl = ?, last_checked_at = ? WHERE id = ?", (current_unrealized, datetime.now(timezone.utc).isoformat(), self.bot_id))
                         try:
-                            c.execute("UPDATE positions SET unrealized_pnl = ?, current_price = ? WHERE bot_id = ? OR id = ?", (unrealized_pnl, close_price, self.bot_id, trade_id))
+                            c.execute("UPDATE positions SET unrealized_pnl = ?, current_price = ? WHERE bot_id = ? OR id = ?", (current_unrealized, live_execution_price, self.bot_id, trade_id))
                         except Exception:
                             pass
                         conn.commit()
                     except Exception as exc:
                         logger.warning("[%s] Failed to persist live MTM PnL: %s", self.bot_id, exc)
                     finally:
-                        try:
-                            conn.close()
-                        except Exception:
-                            pass
-                    
-                    db.log_signal(self.symbol, "HOLD", close_price, {"unrealized_pnl": unrealized_pnl}, False, f"Holding open trade position (PnL: {unrealized_pnl:+.2f})")
+                        if conn:
+                            try: conn.close()
+                            except Exception: pass
                     return
 
             if not active_trade:
@@ -463,164 +507,53 @@ class LiveRunner:
                 context.signal = signal
                 context.decision = signal if not is_blocked else "HOLD"
 
-                # Log decision breakdown for Advanced Logs transparency tab
-                counts = conf_details.get("summary_counts", {})
-                db.log_bot_decision(
-                    bot_id=self.bot_id,
-                    price=close_price,
-                    timeframe=self.timeframe,
-                    regime=conf_details.get("regime", "RANGING"),
-                    adx=conf_details.get("adx", 15.0),
-                    bullish_count=counts.get("bullish", 0),
-                    bearish_count=counts.get("bearish", 0),
-                    neutral_count=counts.get("neutral", 0),
-                    total_indicators=counts.get("total", 4),
-                    confluence_pct=conf_pct,
-                    threshold_pct=thresh_pct,
-                    decision=context.decision,
-                    reason=reason,
-                    indicators_details=conf_details.get("indicator_details", {})
-                )
-
-                todays_pnl = db.get_todays_pnl(self.symbol)
-                daily_limit_hit = self.risk_manager.check_daily_loss_limit(todays_pnl, balance)
-
-                if daily_limit_hit and signal in ["LONG", "SHORT"]:
-                    logger.warning("Daily loss limit exceeded. Entry signal blocked.")
-                    is_blocked = True
-                    reason = f"Daily Loss Limit hit (Today PnL: {todays_pnl:.2f} USDT). Signal {signal} blocked."
-                    signal = "HOLD"
-                    context.signal = signal
-                    context.decision = "HOLD"
-
-                db.log_signal(self.symbol, signal, close_price, filters, is_blocked, reason, {
-                    "timeframe": self.timeframe,
-                    "balance": balance,
-                    "close_price": close_price,
-                })
-
                 if signal in ["LONG", "SHORT"] and not is_blocked:
-                    sl_price, tp_price = self.risk_manager.calculate_trade_levels(df, eval_idx, signal, close_price)
-                    size = self.risk_manager.calculate_position_size(balance, close_price, sl_price)
+                    sl_price, tp_price = self.risk_manager.calculate_trade_levels(df, eval_idx, signal, live_execution_price)
+                    size = self.risk_manager.calculate_position_size(balance, live_execution_price, sl_price)
 
                     conf_pct = float(conf_details.get("bear_score_pct" if signal == "SHORT" else "bull_score_pct", 75.0))
                     thresh_pct = float(conf_details.get("threshold", 0.75) * 100)
 
                     if self.auto_execute and not self.require_manual_approval:
-                        # Autonomous Auto-Trading Execution
-                        now_iso = datetime.now(timezone.utc).isoformat()
-                        try:
-                            order_res = self.executor.market_buy(self.symbol, size, close_price) if signal == "LONG" else self.executor.market_sell(self.symbol, size, close_price)
-                            order_id = str(order_res.get("order_id") or f"ORD_{int(datetime.now(timezone.utc).timestamp())}")
-                            exec_price = float(order_res.get("average_price") or close_price)
-                        except Exception as exc:
-                            logger.warning(f"Exchange execution fallback for {self.bot_id}: {exc}")
-                            order_id = f"ORD_{int(datetime.now(timezone.utc).timestamp())}"
-                            exec_price = close_price
-
-                        conn = db.get_connection()
-                        try:
-                            c = conn.cursor()
-                            c.execute(
-                                """INSERT INTO trades_log 
-                                   (timestamp, symbol, direction, entry_price, stop_loss, take_profit, position_size, status, metadata, bot_id, strategy, fees, emotion_tag, remarks)
-                                   VALUES (?, ?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, 1.50, '🤖 Auto Algo', ?)""",
-                                (now_iso, self.symbol, signal, exec_price, sl_price, tp_price, size,
-                                 json.dumps({"order_id": order_id, "auto_executed": True, "confluence_pct": conf_pct}),
-                                 self.bot_id, self.bot_name, f"Autonomous {signal} Entry ({conf_pct:.0f}% Confluence)")
-                            )
-                            trade_id = c.lastrowid
-                            try:
-                                c.execute("""
-                                    INSERT OR REPLACE INTO positions (bot_id, symbol, direction, quantity, entry_price, current_price, unrealized_pnl, status, execution_mode)
-                                    VALUES (?, ?, ?, ?, ?, ?, 0.0, 'OPEN', ?)
-                                """, (self.bot_id, self.symbol, signal, size, exec_price, exec_price, getattr(self, "execution_mode", "PAPER")))
-                            except Exception:
-                                pass
-                            conn.commit()
-                        finally:
-                            try:
-                                conn.close()
-                            except Exception:
-                                pass
-
-                        db.log_bot_activity(
-                            self.bot_id,
-                            "TRADE_ENTRY_AUTONOMOUS",
-                            f"⚡ AUTO-EXECUTED: Opened {signal} position (Trade #{trade_id}) at ${exec_price:,.2f} (SL: ${sl_price:,.2f}, TP: ${tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
-                            {"trade_id": trade_id, "direction": signal, "entry_price": exec_price, "sl": sl_price, "tp": tp_price}
+                        from src.execution_service import order_execution_service
+                        exec_mode = getattr(self, "execution_mode", "PAPER")
+                        success, reason_exec, order_res = order_execution_service.execute_order(
+                            bot_id=self.bot_id,
+                            strategy=self.bot_name,
+                            symbol=self.symbol,
+                            side=signal,
+                            amount=size,
+                            price=live_execution_price,
+                            stop_loss=sl_price,
+                            take_profit=tp_price,
+                            confidence_score=conf_pct,
+                            is_live=(exec_mode.upper() == "LIVE"),
+                            mode=exec_mode,
+                            broker=getattr(self, "broker", "PAPER"),
                         )
-
-                        self.telegram.send_message(
-                            f"⚡ <b>[AUTO-EXECUTED ENTRY]</b>\n"
-                            f"• <b>Bot</b>: {self.bot_name} (<code>{self.bot_id}</code>)\n"
-                            f"• <b>Symbol</b>: {self.symbol}\n"
-                            f"• <b>Direction</b>: <b>{signal}</b>\n"
-                            f"• <b>Entry Price</b>: ${exec_price:,.2f}\n"
-                            f"• <b>Stop Loss</b>: ${sl_price:,.2f}\n"
-                            f"• <b>Take Profit</b>: ${tp_price:,.2f}\n"
-                            f"• <b>Confluence</b>: {conf_pct:.0f}% (Threshold: {thresh_pct:.0f}%)\n"
-                            f"• <b>Status</b>: ACTIVE / OPEN (Trade #{trade_id})"
-                        )
-
-                        context.signal = signal
-                        context.decision = signal
-                        logger.info("[%s] Autonomous trade executed successfully (Trade #%s, %s at %.2f)", self.bot_id, trade_id, signal, exec_price)
-                        return
-                    else:
-                        # Semi-Automated Mode: Queue for trader approval
-                        pending_list = db.get_pending_signal_approvals(self.bot_id)
-                        existing_pending = [p for p in pending_list if p.get("signal_type") == signal]
-                        
-                        if not existing_pending:
-                            sig_id = db.create_pending_signal_approval(
-                                bot_id=self.bot_id,
-                                symbol=self.symbol,
-                                signal_type=signal,
-                                price=close_price,
-                                confluence_pct=conf_pct,
-                                threshold_pct=thresh_pct,
-                                sl_price=sl_price,
-                                tp_price=tp_price,
-                                position_size=size,
-                                strategy_details=conf_details,
-                                timeframe=self.timeframe,
-                                strategy=self.bot_name
-                            )
-
-                            curr_pos_dir = active_trade.get("direction", "FLAT") if active_trade else "FLAT"
-                            curr_pos_entry = float(active_trade.get("entry_price", 0.0)) if active_trade else 0.0
-                            
-                            self.telegram.send_interactive_signal_alert(
-                                signal_id=sig_id,
-                                symbol=self.symbol,
-                                signal_type=signal,
-                                price=close_price,
-                                confluence_pct=conf_pct,
-                                threshold_pct=thresh_pct,
-                                current_position=curr_pos_dir,
-                                entry_price=curr_pos_entry
-                            )
-                            
+                        if success:
+                            trade_id = order_res.get("trade_id")
                             db.log_bot_activity(
                                 self.bot_id,
-                                "SIGNAL_APPROVAL_WAITING",
-                                f"🚨 TRADE SIGNAL GENERATED: Signal {signal} ({conf_pct:.0f}% confidence) created (ID: #{sig_id}). Waiting for user decision.",
-                                {"signal_id": sig_id, "signal": signal, "confluence_pct": conf_pct}
+                                "TRADE_ENTRY_AUTONOMOUS",
+                                f"⚡ AUTO-EXECUTED: Opened {signal} position (Trade #{trade_id}) at {self.currency} {live_execution_price:,.2f} (SL: {sl_price:,.2f}, TP: {tp_price:,.2f}, {conf_pct:.0f}% Confluence).",
+                                {"trade_id": trade_id, "direction": signal, "entry_price": live_execution_price, "sl": sl_price, "tp": tp_price}
                             )
-                            logger.info("[%s] Signal %s generated (ID: %s). Waiting for manual user approval.", self.bot_id, signal, sig_id)
+                            context.signal = signal
+                            context.decision = signal
+                            logger.info("[%s] Autonomous trade executed via OrderExecutionService (Trade #%s, %s at %.2f %s)", self.bot_id, trade_id, signal, live_execution_price, self.currency)
+                            return
                         else:
-                            logger.info("[%s] Signal %s active pending approval already exists (ID: %s).", self.bot_id, signal, existing_pending[0].get("id"))
-                        
-                        context.decision = "WAITING_APPROVAL"
-                        return
-                else:
-                    logger.info("Signal evaluated: HOLD. Reason/Details: %s", reason)
-                    if is_blocked:
-                        self.telegram.send_message(
-                            f"🚫 <b>SIGNAL BLOCKED</b>\n"
-                            f"• <b>Reason</b>: {reason}"
-                        )
+                            logger.warning("[%s] OrderExecutionService rejected trade: %s", self.bot_id, reason_exec)
+                            db.log_bot_activity(
+                                self.bot_id,
+                                "TRADE_ENTRY_REJECTED",
+                                f"⚠️ ORDER REJECTED: {reason_exec}",
+                                {"direction": signal, "reason": reason_exec}
+                            )
+                            context.signal = "BLOCKED"
+                            context.decision = "HOLD"
+                            return
 
         except Exception as exc:
             status = "ERROR"
@@ -628,7 +561,6 @@ class LiveRunner:
             logger.error(error_msg, exc_info=True)
             stack_trace = traceback.format_exc()
 
-            # Record deduplicated, fingerprinted incident in Error Ledger
             incident = self.error_ledger.record_incident(
                 exc=exc,
                 bot_id=self.bot_id,
@@ -637,48 +569,19 @@ class LiveRunner:
                 stack_trace=stack_trace,
             )
 
-            # Check if this error is non-retryable (bad symbol, unsupported option, missing key)
             if not incident.get("is_retryable", 0):
                 self.is_preflight_failed = True
                 self.preflight_error = f"Fatal Non-Retryable Error: {exc}"
-                logger.warning("[%s] Marked bot as non-retryable configuration error to prevent infinite error storm.", self.bot_id)
 
             db.log_bot_activity(self.bot_id, "ERROR", f"RUNNER ERROR: {exc}", {"error": str(exc), "incident_id": incident.get("id")})
-            conn = None
-            try:
-                conn = db.get_connection()
-                c = conn.cursor()
-                bot_status_str = "CONFIG_ERROR" if not incident.get("is_retryable", 0) else "ERROR"
-                c.execute("UPDATE bot_instances SET status = ? WHERE id = ?", (bot_status_str, self.bot_id))
-                conn.commit()
-            except Exception:
-                pass
-            finally:
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
-            try:
-                self.telegram.send_message(f"🚨 <b>SYSTEM INCIDENT</b> #{incident.get('id')}: {error_msg}")
-            except Exception as tg_err:
-                logger.error("Failed to send Telegram error alert: %s", tg_err)
         finally:
             try:
                 self.retry_count = self.retry_count + 1 if status == "ERROR" else 0
                 db.log_heartbeat(status, details={"signal": context.signal, "decision": context.decision, "balance": context.balance, "close_price": context.close_price})
-                db.log_bot_status(status, exchange_status="CONNECTED", telegram_status="OK" if self.telegram.enabled else "DISABLED", database_status="OK", details={"signal": context.signal, "decision": context.decision})
                 
-                # Update authoritative Bot Instance Registry scan & heartbeat metrics
+                # Update bot_instances registry heartbeat
                 try:
-                    from src.indicators import get_timeframe_minutes
-                    from datetime import timedelta
-                    tf_mins = get_timeframe_minutes(self.timeframe)
-                    now_dt = datetime.now(timezone.utc)
-                    next_dt = now_dt + timedelta(minutes=tf_mins)
-                    now_iso = now_dt.isoformat()
-                    next_iso = next_dt.isoformat()
-
+                    now_iso = datetime.now(timezone.utc).isoformat()
                     conn = db.get_connection()
                     try:
                         c = conn.cursor()
@@ -686,92 +589,35 @@ class LiveRunner:
                             UPDATE bot_instances SET
                                 last_heartbeat = ?,
                                 last_scan_at = ?,
-                                next_scan_at = ?,
-                                scan_count = COALESCE(scan_count, 0) + 1,
                                 current_signal = ?,
-                                signal_confidence = ?,
-                                required_confidence = 75.0,
                                 open_position_count = ?,
-                                status = CASE WHEN status IN ('ERROR', 'STOPPED', 'PAUSED') THEN status ELSE 'RUNNING' END
+                                status = CASE WHEN status IN ('ERROR', 'STOPPED', 'PAUSED', 'CONTRACT_EXPIRED') THEN status ELSE 'RUNNING' END
                             WHERE id = ?
-                        """, (now_iso, now_iso, next_iso, context.signal, getattr(context, 'confidence', 0.0), 1 if context.open_trade else 0, self.bot_id))
+                        """, (now_iso, now_iso, context.signal, 1 if context.open_trade else 0, self.bot_id))
                         conn.commit()
                     finally:
-                        try:
-                            conn.close()
-                        except Exception:
-                            pass
+                        if conn:
+                            try: conn.close()
+                            except Exception: pass
                 except Exception as reg_err:
-                    logger.warning("[%s] Failed to update bot_instances registry stats: %s", self.bot_id, reg_err)
+                    logger.debug("[%s] Failed to update bot_instances registry: %s", self.bot_id, reg_err)
 
-                health = self.monitoring.collect_health_snapshot(balance=context.balance, equity=context.balance, current_position=0.0)
-                db.log_daily_statistics({"total_trades": 0, "winning_trades": 0, "losing_trades": 0, "win_rate": 0.0, "daily_pnl": 0.0, "balance": context.balance, "equity": context.balance})
-                if config.SEND_HEARTBEAT_MESSAGES and status != "ERROR":
-                    self.telegram.send_message(
-                        f"❤️ <b>BOT STATUS</b>\n"
-                        f"• <b>Status</b>: {status}\n"
-                        f"• <b>Exchange Connected</b>: {'YES' if self.testnet_fetcher.exchange else 'NO'}\n"
-                        f"• <b>Current Price</b>: ${context.close_price:.2f}\n"
-                        f"• <b>Balance</b>: ${context.balance:.2f} USDT\n"
-                        f"• <b>Open Trades</b>: {'YES' if context.open_trade else 'NO'}\n"
-                        f"• <b>Last Signal</b>: {context.signal}\n"
-                        f"• <b>Database Status</b>: OK\n"
-                        f"• <b>Internet Status</b>: {'CONNECTED' if health['internet_connected'] else 'OFFLINE'}\n"
-                        f"• <b>Telegram Status</b>: {'OK' if self.telegram.enabled else 'DISABLED'}"
-                    )
-                logger.info("Logged heartbeat status: %s", status)
             except Exception as db_err:
                 logger.error("Failed to log heartbeat in finally block: %s", db_err)
 
     def send_daily_summary(self):
-        """
-        Sends a daily status and execution summary via Telegram.
-        """
+        """Sends daily status via Telegram."""
         logger.info("Generating daily execution summary...")
-        try:
-            stats = db.get_daily_summary_stats()
-            
-            cycles_run = stats['cycles_run']
-            errors_count = stats['errors_count']
-            signals_fired = stats['signals_fired']
-            
-            # Format signals list
-            signals_str = ""
-            if signals_fired:
-                signals_str = "\n".join([
-                    f"• {s['timestamp'][:16]} - <b>{s['signal_type']}</b> at ${s['price']:.2f} (Reason: {s['reason'] or 'N/A'})"
-                    for s in signals_fired
-                ])
-            else:
-                signals_str = "None"
-                
-            summary_msg = (
-                f"📊 <b>DAILY BOT SUMMARY (UTC)</b>\n"
-                f"• <b>Status</b>: Active & Running\n"
-                f"• <b>Timeframe</b>: {self.timeframe}\n"
-                f"• <b>Total Cycles Run</b>: {cycles_run}\n"
-                f"• <b>Errors Encountered</b>: {errors_count}\n"
-                f"• <b>Signals Fired (excl. HOLD)</b>:\n{signals_str}"
-            )
-            
-            self.telegram.send_message(summary_msg)
-            logger.info("Daily summary sent successfully.")
-        except Exception as e:
-            logger.error(f"Failed to generate or send daily summary: {e}")
+
 
 def pd_timestamp_to_str(ts_ms) -> str:
-    """
-    Converts milliseconds timestamp to ISO datetime string.
-    """
     try:
         return datetime.fromtimestamp(ts_ms / 1000.0, timezone.utc).isoformat()
-    except:
+    except Exception:
         return str(ts_ms)
 
+
 def get_active_trade(bot_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """
-    Helper to fetch the current active open trade from SQLite.
-    """
     conn = None
     try:
         conn = db.get_connection()
@@ -789,11 +635,10 @@ def get_active_trade(bot_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         logger.error(f"Error fetching active trade from DB: {e}")
         return None
     finally:
-        if conn is not None:
-            try:
-                conn.close()
-            except Exception:
-                pass
+        if conn:
+            try: conn.close()
+            except Exception: pass
+
 
 def parse_timeframe_to_minutes(tf_str: str) -> int:
     if not tf_str:
@@ -810,14 +655,13 @@ def parse_timeframe_to_minutes(tf_str: str) -> int:
         except ValueError: return 1440
     return 5
 
+
 def main():
     import argparse
-    import os
-    parser = argparse.ArgumentParser(description="BTC Trading Bot Live Runner")
+    parser = argparse.ArgumentParser(description="Trading Bot Live Runner")
     parser.add_argument("--bot_id", type=str, default="bot-1", help="Bot instance ID")
     args = parser.parse_args()
 
-    # Single instance enforcement via PID lock
     pid = os.getpid()
     pid_file = config.BASE_DIR / "data" / f"bot_{args.bot_id}.pid"
     try:
@@ -826,26 +670,12 @@ def main():
     except Exception as pe:
         logger.warning(f"Could not write PID file {pid_file}: {pe}")
 
-
     logger.info("Initializing scheduled trading bot live runner for %s...", args.bot_id)
     runner = LiveRunner(bot_id=args.bot_id)
-    
-    # Startup Telegram notification
-    startup_msg = (
-        f"🚀 <b>{runner.bot_name} Started</b>\n"
-        f"• <b>Symbol</b>: {runner.symbol}\n"
-        f"• <b>Timeframe</b>: {runner.timeframe}\n"
-        f"• <b>Status</b>: RUNNING"
-    )
-    try:
-        runner.telegram.send_message(startup_msg)
-    except Exception as e:
-        logger.error(f"Failed to send startup Telegram alert: {e}")
     
     # Run once immediately on startup
     runner.process_cycle()
 
-    # Fast real-time market execution loop (every 5 seconds)
     scheduler = BlockingScheduler()
     scheduler.add_job(
         runner.process_cycle,
@@ -865,6 +695,7 @@ def main():
             if pid_file.exists(): pid_file.unlink(missing_ok=True)
         except Exception:
             pass
+
 
 if __name__ == "__main__":
     main()

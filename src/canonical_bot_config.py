@@ -14,7 +14,7 @@ import logging
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, cast
 
 logger = logging.getLogger("CanonicalBotConfig")
 
@@ -57,7 +57,7 @@ class TimeInForce(str, enum.Enum):
 
 def generate_slug(name: str) -> str:
     """Generate clean URL-safe slug from bot instance name."""
-    s = str(name).strip().lower()
+    s = name.strip().lower()
     s = re.sub(r"[^\w\s-]", "", s)
     s = re.sub(r"[\s_-]+", "-", s)
     return s.strip("-") or "unnamed-bot"
@@ -117,6 +117,7 @@ class BotUniverseConfig:
     lot_size: float = 1.0
     contract_multiplier: float = 1.0
     currency: str = "USDT"
+    underlying: Optional[str] = None
     expiry: Optional[str] = None
     strike: Optional[float] = None
     option_type: Optional[str] = None  # CALL, PUT, BOTH
@@ -233,6 +234,10 @@ class BotRiskConfig:
     broker_disconnect_behavior: str = "FAIL_CLOSED_HOLD"
     global_kill_switch_behavior: str = "CANCEL_PENDING_AND_HOLD"
     auto_square_off_time: Optional[str] = None  # e.g. "15:15" for intraday NSE
+    auto_square_off_on_expiry: bool = True
+    expiry_exit_buffer_minutes: int = 15
+    require_user_confirmation: bool = False
+    roll_on_expiry: bool = False
 
 
 @dataclass
@@ -276,7 +281,7 @@ class CanonicalBotConfig:
         """Convert to fully serializable dictionary."""
         d = asdict(self)
         # Convert enums to string values
-        def _enum_handler(obj):
+        def _enum_handler(obj: Any) -> Any:
             if isinstance(obj, dict):
                 return {k: _enum_handler(v) for k, v in obj.items()}
             elif isinstance(obj, list):
@@ -284,7 +289,7 @@ class CanonicalBotConfig:
             elif isinstance(obj, enum.Enum):
                 return obj.value
             return obj
-        return _enum_handler(d)
+        return cast(Dict[str, Any], _enum_handler(d))
 
     def to_json(self, indent: Optional[int] = None) -> str:
         """Serialize configuration to JSON string."""
@@ -292,8 +297,19 @@ class CanonicalBotConfig:
 
     def compute_hash(self) -> str:
         """Compute deterministic SHA-256 hash of configuration content."""
-        canonical_str = self.to_json()
+        d = self.to_dict()
+        if "identity" in d and isinstance(d["identity"], dict):
+            ident = dict(d["identity"])
+            ident.pop("created_at", None)
+            ident.pop("updated_at", None)
+            ident.pop("last_reconciliation_timestamp", None)
+            d["identity"] = ident
+        canonical_str = json.dumps(d, sort_keys=True)
         return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+
+    def compute_config_hash(self) -> str:
+        """Alias for compute_hash."""
+        return self.compute_hash()
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any], default_bot_id: str = "bot-unknown", default_name: str = "Trading Bot") -> "CanonicalBotConfig":
@@ -347,11 +363,18 @@ class CanonicalBotConfig:
         )
 
         # 2. Environment
-        env_data = data.get("environment", {})
-        mode_str = str(env_data.get("execution_mode") or data.get("execution_mode") or "PAPER").upper()
+        env_raw = data.get("environment")
+        env_data = env_raw if isinstance(env_raw, dict) else {}
+        mode_str = str(
+            env_data.get("execution_mode")
+            or (env_raw if isinstance(env_raw, str) else "")
+            or data.get("execution_mode")
+            or data.get("mode")
+            or "PAPER"
+        ).upper()
         exec_mode = BotExecutionMode.LIVE if mode_str == "LIVE" else BotExecutionMode.PAPER
         data_provider = env_data.get("data_provider_id") or data.get("data_provider_id") or data.get("exchange") or "ccxt_binance"
-        exec_broker = env_data.get("execution_broker_id") or data.get("broker_id") or data.get("execution_config", {}).get("broker_id") or "paper_simulator"
+        exec_broker = env_data.get("execution_broker_id") or data.get("broker_id") or data.get("broker") or data.get("execution_config", {}).get("broker_id") or "paper_simulator"
         account_alias = env_data.get("account_alias") or data.get("account_id") or data.get("execution_config", {}).get("account_id") or "primary"
         exchange = env_data.get("exchange") or data.get("exchange") or "BINANCE"
         timezone_str = env_data.get("timezone") or data.get("timezone") or "UTC"
@@ -370,10 +393,34 @@ class CanonicalBotConfig:
         )
 
         # 3. Universe
-        univ_data = data.get("universe", {})
+        univ_data = data.get("universe", {}) if isinstance(data.get("universe"), dict) else {}
         display_sym = univ_data.get("display_symbol") or data.get("symbol") or "BTC/USDT"
-        asset_class = (univ_data.get("asset_class") or data.get("asset_class") or "CRYPTO").upper()
+        asset_class = (univ_data.get("asset_class") or data.get("asset_class") or data.get("market") or "CRYPTO").upper()
         canon_inst_id = univ_data.get("canonical_instrument_id") or f"{exchange.upper()}:{display_sym.replace('/', '')}:SPOT"
+
+        strike_raw = univ_data.get("strike") if "strike" in univ_data else data.get("strike")
+        parsed_strike = None
+        if strike_raw is not None and str(strike_raw).strip() != "":
+            try:
+                parsed_strike = float(strike_raw)
+            except (ValueError, TypeError):
+                parsed_strike = None
+
+        strike_offset_raw = univ_data.get("strike_offset") if "strike_offset" in univ_data else (data.get("strike_offset") or data.get("derivatives", {}).get("strike_offset"))
+        parsed_strike_offset = 0.0
+        if strike_offset_raw is not None and str(strike_offset_raw).strip() != "":
+            try:
+                parsed_strike_offset = float(strike_offset_raw)
+            except (ValueError, TypeError):
+                parsed_strike_offset = 0.0
+
+        expiry_val = univ_data.get("expiry") or data.get("expiry") or data.get("derivatives", {}).get("expiry") or data.get("options_config", {}).get("expiry") or None
+        if expiry_val == "":
+            expiry_val = None
+
+        opt_type_val = univ_data.get("option_type") or data.get("option_type") or data.get("derivatives", {}).get("option_side") or data.get("options_config", {}).get("option_side") or None
+        if opt_type_val == "":
+            opt_type_val = None
 
         universe = BotUniverseConfig(
             asset_class=asset_class,
@@ -386,10 +433,11 @@ class CanonicalBotConfig:
             lot_size=float(univ_data.get("lot_size") or data.get("lot_size") or 1.0),
             contract_multiplier=float(univ_data.get("contract_multiplier") or 1.0),
             currency=univ_data.get("currency") or ("INR" if asset_class in ["INDIAN_STOCKS", "NSE"] else "USDT"),
-            expiry=univ_data.get("expiry") or data.get("derivatives", {}).get("expiry") or data.get("options_config", {}).get("expiry"),
-            strike=float(univ_data["strike"]) if univ_data.get("strike") is not None else None,
-            option_type=univ_data.get("option_type") or data.get("derivatives", {}).get("option_side") or data.get("options_config", {}).get("option_side"),
-            strike_offset=float(univ_data.get("strike_offset") or data.get("derivatives", {}).get("strike_offset") or 0.0),
+            underlying=univ_data.get("underlying") or data.get("underlying") or None,
+            expiry=expiry_val,
+            strike=parsed_strike,
+            option_type=opt_type_val,
+            strike_offset=parsed_strike_offset,
             settlement_asset=univ_data.get("settlement_asset") or "USDT",
             liquidity_filter_min_volume_24h=float(univ_data.get("liquidity_filter_min_volume_24h") or 0.0),
             max_spread_pct=float(univ_data.get("max_spread_pct") or 1.0),
@@ -472,13 +520,46 @@ class CanonicalBotConfig:
         )
 
         # 5. Capital
-        cap_data = data.get("capital", {})
-        alloc_cap = float(cap_data.get("allocated_capital") or data.get("allocated_capital") or 10000.0)
-        tot_cap = float(cap_data.get("total_capital") or data.get("total_capital") or alloc_cap)
-        risk_per_trade = float(cap_data.get("risk_per_trade_pct") or data.get("risk_pct") or data.get("risk_per_trade_pct") or 2.0)
+        cap_data = data.get("capital", {}) if isinstance(data.get("capital"), dict) else {}
+        raw_alloc = (
+            cap_data.get("allocated_capital")
+            or cap_data.get("allocatedCapital")
+            or data.get("allocated_capital")
+            or data.get("allocatedCapital")
+        )
+        if raw_alloc is None and not isinstance(data.get("capital"), dict):
+            raw_alloc = data.get("capital")
+        alloc_cap = float(raw_alloc) if isinstance(raw_alloc, (int, float, str)) else 10000.0
+
+        raw_tot = (
+            cap_data.get("total_capital")
+            or cap_data.get("totalCapital")
+            or data.get("total_capital")
+            or data.get("totalCapital")
+        )
+        tot_cap = float(raw_tot) if isinstance(raw_tot, (int, float, str)) else alloc_cap
+        risk_per_trade = float(
+            cap_data.get("risk_per_trade_pct")
+            or cap_data.get("riskPerTrade")
+            or cap_data.get("risk_pct")
+            or data.get("risk_pct")
+            or data.get("risk_per_trade_pct")
+            or data.get("riskPerTrade")
+            or 2.0
+        )
         lev = float(cap_data.get("leverage") or data.get("leverage") or 1.0)
 
-        sizing_str = str(cap_data.get("sizing_method", "RISK_PER_TRADE")).upper()
+        sizing_str = str(
+            cap_data.get("sizing_method")
+            or cap_data.get("sizingMethod")
+            or cap_data.get("sizing_mode")
+            or cap_data.get("sizingMode")
+            or data.get("sizing_method")
+            or data.get("sizingMethod")
+            or data.get("sizing_mode")
+            or data.get("sizingMode")
+            or "RISK_PER_TRADE"
+        ).upper()
         sizing_method = SizingMethod.RISK_PER_TRADE
         for sm in SizingMethod:
             if sm.value == sizing_str:
@@ -488,65 +569,99 @@ class CanonicalBotConfig:
         capital = BotCapitalConfig(
             total_capital=tot_cap,
             allocated_capital=alloc_cap,
-            risk_reserve=float(cap_data.get("risk_reserve") or data.get("risk_reserve") or 0.0),
-            department_budget=float(cap_data.get("department_budget") or data.get("department_budget") or 5000000.0),
-            reserved_margin=float(cap_data.get("reserved_margin") or 0.0),
+            risk_reserve=float(cap_data.get("risk_reserve") or cap_data.get("riskReserve") or data.get("risk_reserve") or 0.0),
+            department_budget=float(cap_data.get("department_budget") or cap_data.get("departmentBudget") or data.get("department_budget") or 5000000.0),
+            reserved_margin=float(cap_data.get("reserved_margin") or cap_data.get("reservedMargin") or 0.0),
             sizing_method=sizing_method,
-            fixed_quantity=float(cap_data.get("fixed_quantity") or data.get("quantity") or 0.0),
-            fixed_notional=float(cap_data.get("fixed_notional") or 0.0),
-            percentage_of_equity=float(cap_data.get("percentage_of_equity") or 20.0),
+            fixed_quantity=float(cap_data.get("fixed_quantity") or cap_data.get("fixedQuantity") or data.get("quantity") or 0.0),
+            fixed_notional=float(cap_data.get("fixed_notional") or cap_data.get("fixedNotional") or 0.0),
+            percentage_of_equity=float(cap_data.get("percentage_of_equity") or cap_data.get("percentageOfEquity") or 20.0),
             risk_per_trade_pct=risk_per_trade,
-            min_quantity=float(cap_data.get("min_quantity") or 0.0001),
-            max_quantity=float(cap_data.get("max_quantity") or 1000.0),
-            min_notional=float(cap_data.get("min_notional") or 10.0),
-            currency=cap_data.get("currency") or ("INR" if asset_class in ["INDIAN_STOCKS", "NSE"] else "USDT"),
+            min_quantity=float(cap_data.get("min_quantity") or cap_data.get("minQuantity") or 0.0001),
+            max_quantity=float(cap_data.get("max_quantity") or cap_data.get("maxQuantity") or 1000.0),
+            min_notional=float(cap_data.get("min_notional") or cap_data.get("minNotional") or 10.0),
+            currency=cap_data.get("currency") or data.get("currency") or ("INR" if asset_class in ["INDIAN_STOCKS", "NSE"] else "USDT"),
             leverage=lev,
-            estimated_fees_pct=float(cap_data.get("estimated_fees_pct") or 0.075),
-            expected_slippage_pct=float(cap_data.get("expected_slippage_pct") or 0.05),
+            estimated_fees_pct=float(cap_data.get("estimated_fees_pct") or cap_data.get("estimatedFeesPct") or 0.075),
+            expected_slippage_pct=float(cap_data.get("expected_slippage_pct") or cap_data.get("expectedSlippagePct") or 0.05),
         )
 
         # 6. Risk
-        risk_data = data.get("risk", {})
-        trailing_raw = risk_data.get("trailing_stop") or data.get("trailing_stop") or {}
+        risk_data = data.get("risk", {}) if isinstance(data.get("risk"), dict) else {}
+        trailing_raw = risk_data.get("trailing_stop") or risk_data.get("trailingStop") or data.get("trailing_stop") or data.get("trailingStop") or {}
         if isinstance(trailing_raw, bool):
-            trailing_cfg = BotTrailingStopConfig(enabled=trailing_raw, distance_pct=float(data.get("trailing_stop_pct") or 0.5))
+            trailing_cfg = BotTrailingStopConfig(enabled=trailing_raw, distance_pct=float(data.get("trailing_stop_pct") or data.get("trailingStopPct") or 0.5))
         elif isinstance(trailing_raw, dict):
             trailing_cfg = BotTrailingStopConfig(
-                enabled=bool(trailing_raw.get("enabled", True)),
+                enabled=bool(trailing_raw.get("enabled", trailing_raw.get("trailingStop", True))),
                 method=trailing_raw.get("method") or "percent",
-                distance_pct=float(trailing_raw.get("distance_pct") or trailing_raw.get("trailing_stop_pct") or 0.5),
-                activation_pct=float(trailing_raw.get("activation_pct") or 1.0),
+                distance_pct=float(trailing_raw.get("distance_pct") or trailing_raw.get("distancePct") or trailing_raw.get("trailing_stop_pct") or 0.5),
+                activation_pct=float(trailing_raw.get("activation_pct") or trailing_raw.get("activationPct") or 1.0),
             )
         else:
             trailing_cfg = BotTrailingStopConfig(enabled=False)
 
-        sl_pct = float(risk_data.get("stop_loss_pct") or data.get("stop_loss_pct") or 1.5)
-        tp_pct = float(risk_data.get("profit_target_pct") or data.get("profit_target_pct") or 3.0)
-        max_dd_pct = float(risk_data.get("max_daily_drawdown_pct") or data.get("max_daily_drawdown_pct") or 3.0)
+        sl_pct = float(
+            risk_data.get("stop_loss_pct")
+            or risk_data.get("stopLossPct")
+            or risk_data.get("stop_loss")
+            or risk_data.get("stopLoss")
+            or risk_data.get("stop_loss_value")
+            or risk_data.get("stopLossValue")
+            or data.get("stop_loss_pct")
+            or data.get("stop_loss")
+            or data.get("stopLoss")
+            or data.get("stop_loss_value")
+            or data.get("stopLossValue")
+            or 1.5
+        )
+        tp_pct = float(
+            risk_data.get("profit_target_pct")
+            or risk_data.get("profitTargetPct")
+            or risk_data.get("take_profit")
+            or risk_data.get("takeProfit")
+            or risk_data.get("take_profit_value")
+            or risk_data.get("takeProfitValue")
+            or data.get("profit_target_pct")
+            or data.get("take_profit")
+            or data.get("takeProfit")
+            or data.get("take_profit_value")
+            or data.get("takeProfitValue")
+            or 3.0
+        )
+        max_dd_pct = float(risk_data.get("max_daily_drawdown_pct") or risk_data.get("maxDailyDrawdownPct") or risk_data.get("max_drawdown") or risk_data.get("maxDrawdown") or data.get("max_daily_drawdown_pct") or data.get("max_drawdown") or data.get("maxDrawdown") or 3.0)
+        raw_max_daily_loss = risk_data.get("max_daily_loss_amount") or risk_data.get("maxDailyLossAmount") or risk_data.get("max_daily_loss") or risk_data.get("maxDailyLoss") or data.get("max_daily_loss_amount") or data.get("max_daily_loss") or data.get("maxDailyLoss")
+        max_daily_loss_val = float(raw_max_daily_loss) if raw_max_daily_loss is not None else (alloc_cap * (max_dd_pct / 100.0))
 
         risk = BotRiskConfig(
             stop_loss_pct=sl_pct,
             profit_target_pct=tp_pct,
             trailing_stop=trailing_cfg,
             max_daily_drawdown_pct=max_dd_pct,
-            max_daily_loss_amount=float(risk_data.get("max_daily_loss_amount") or (alloc_cap * (max_dd_pct / 100.0))),
-            max_portfolio_drawdown_pct=float(risk_data.get("max_portfolio_drawdown_pct") or 10.0),
-            max_open_positions=int(risk_data.get("max_open_positions") or data.get("max_open_positions") or data.get("max_positions") or 1),
-            max_portfolio_exposure_pct=float(risk_data.get("max_portfolio_exposure_pct") or 30.0),
-            max_leverage=float(risk_data.get("max_leverage") or lev),
-            max_spread_pct=float(risk_data.get("max_spread_pct") or 1.0),
-            max_slippage_pct=float(risk_data.get("max_slippage_pct") or data.get("max_slippage_pct") or 0.2),
-            max_consecutive_losses=int(risk_data.get("max_consecutive_losses") or 4),
-            max_orders_per_minute=int(risk_data.get("max_orders_per_minute") or 5),
+            max_daily_loss_amount=max_daily_loss_val,
+            max_portfolio_drawdown_pct=float(risk_data.get("max_portfolio_drawdown_pct") or risk_data.get("maxPortfolioDrawdownPct") or 10.0),
+            max_open_positions=int(risk_data.get("max_open_positions") or risk_data.get("maxOpenPositions") or data.get("max_open_positions") or data.get("maxOpenPositions") or data.get("max_positions") or 1),
+            max_portfolio_exposure_pct=float(risk_data.get("max_portfolio_exposure_pct") or risk_data.get("maxPortfolioExposurePct") or 30.0),
+            max_leverage=float(risk_data.get("max_leverage") or risk_data.get("maxLeverage") or lev),
+            max_spread_pct=float(risk_data.get("max_spread_pct") or risk_data.get("maxSpreadPct") or 1.0),
+            max_slippage_pct=float(risk_data.get("max_slippage_pct") or risk_data.get("maxSlippagePct") or data.get("max_slippage_pct") or 0.2),
+            max_consecutive_losses=int(risk_data.get("max_consecutive_losses") or risk_data.get("maxConsecutiveLosses") or 4),
+            max_orders_per_minute=int(risk_data.get("max_orders_per_minute") or risk_data.get("maxOrdersPerMinute") or 5),
             stale_data_timeout_seconds=float(risk_data.get("stale_data_timeout_seconds") or 60.0),
             broker_disconnect_behavior=risk_data.get("broker_disconnect_behavior") or "FAIL_CLOSED_HOLD",
             global_kill_switch_behavior=risk_data.get("global_kill_switch_behavior") or "CANCEL_PENDING_AND_HOLD",
             auto_square_off_time=risk_data.get("auto_square_off_time"),
+            auto_square_off_on_expiry=bool(risk_data.get("auto_square_off_on_expiry", True)),
+            expiry_exit_buffer_minutes=int(risk_data.get("expiry_exit_buffer_minutes", 15)),
+            require_user_confirmation=bool(risk_data.get("require_user_confirmation", False)),
+            roll_on_expiry=bool(risk_data.get("roll_on_expiry", False)),
         )
 
         # 7. Execution
         exec_data = data.get("execution") or data.get("execution_config") or {}
-        ot_str = str(exec_data.get("order_type") or "MARKET").upper()
+        if not isinstance(exec_data, dict):
+            exec_data = {}
+        ot_str = str(exec_data.get("order_type") or data.get("order_type") or "MARKET").upper()
         ot_map = {"MARKET": OrderType.MARKET, "LIMIT": OrderType.LIMIT, "STOP": OrderType.STOP, "STOP-LIMIT": OrderType.STOP_LIMIT}
         order_type = ot_map.get(ot_str, OrderType.MARKET)
 
@@ -565,7 +680,7 @@ class CanonicalBotConfig:
         )
 
         # 8. Monitoring
-        mon_data = data.get("monitoring", {})
+        mon_data = data.get("monitoring", {}) if isinstance(data.get("monitoring"), dict) else {}
         monitoring = BotMonitoringConfig(
             health_check_interval_seconds=int(mon_data.get("health_check_interval_seconds") or 10),
             heartbeat_enabled=bool(mon_data.get("heartbeat_enabled", True)),
@@ -586,20 +701,26 @@ class CanonicalBotConfig:
         )
 
     def validate(self) -> Tuple[bool, List[str]]:
-        """Validate entire canonical configuration against safety invariants."""
+        """Validate entire canonical configuration against institutional safety invariants."""
         errors: List[str] = []
         if not self.identity.name or not self.identity.name.strip():
             errors.append("Bot Name cannot be empty.")
         if self.capital.allocated_capital <= 0:
             errors.append("Allocated capital must be greater than zero.")
+        if self.risk.max_daily_loss_amount <= 0:
+            errors.append("Max daily loss amount must be greater than zero.")
         if self.risk.max_daily_loss_amount > self.capital.allocated_capital:
-            errors.append("Max daily loss cannot exceed allocated capital.")
+            errors.append("Max daily loss amount cannot exceed allocated capital.")
         if self.risk.max_daily_drawdown_pct <= 0 or self.risk.max_daily_drawdown_pct > 100:
             errors.append("Max drawdown percentage must be between 0% and 100%.")
         if self.risk.stop_loss_pct <= 0:
             errors.append("Stop loss percentage must be greater than zero.")
-        if not self.universe.canonical_instrument_id:
-            errors.append("Canonical Instrument ID is required.")
+        if self.risk.profit_target_pct <= 0:
+            errors.append("Profit target percentage must be greater than zero.")
+        if not self.universe.canonical_instrument_id and not self.universe.underlying and not self.universe.display_symbol and not self.universe.provider_symbol:
+            errors.append("At least one valid symbol or canonical instrument must be configured.")
+        if self.risk.max_open_positions <= 0:
+            errors.append("Max open positions must be at least 1.")
         return len(errors) == 0, errors
 
 

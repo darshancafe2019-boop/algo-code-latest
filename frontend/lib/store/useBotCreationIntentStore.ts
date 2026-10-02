@@ -54,7 +54,7 @@ export const useBotCreationIntentStore = create<BotCreationIntentState>((set) =>
  * Dispatches a typed BotCreationIntent:
  * 1. Generates an idempotency intent ID if missing
  * 2. Saves intent into central Zustand store and sessionStorage
- * 3. Navigates to `/strategy/create` (for Options) or `/bots/create` with full non-sensitive URL query params
+ * 3. Navigates to `/bots/create` with full non-sensitive URL query params
  */
 export function dispatchBotCreation(
   router: AppRouterInstance | { push: (url: string) => void },
@@ -69,9 +69,9 @@ export function dispatchBotCreation(
   useBotCreationIntentStore.getState().setIntent(intentWithId);
 
   const queryParams = new URLSearchParams();
-  queryParams.set("symbol", intentWithId.symbol);
-  queryParams.set("side", intentWithId.side);
-  queryParams.set("origin", intentWithId.origin);
+  if (intentWithId.symbol) queryParams.set("symbol", intentWithId.symbol);
+  if (intentWithId.side) queryParams.set("side", intentWithId.side);
+  if (intentWithId.origin) queryParams.set("origin", intentWithId.origin);
   if (intentWithId.canonicalSymbol) queryParams.set("canonicalSymbol", intentWithId.canonicalSymbol);
   if (intentWithId.canonicalContractId) queryParams.set("canonicalContractId", intentWithId.canonicalContractId);
   if (intentWithId.assetClass) queryParams.set("assetClass", intentWithId.assetClass);
@@ -89,10 +89,7 @@ export function dispatchBotCreation(
   if (intentWithId.ask != null) queryParams.set("ask", String(intentWithId.ask));
   if (intentWithId.lotSize != null) queryParams.set("lotSize", String(intentWithId.lotSize));
   if (intentWithId.mode) queryParams.set("mode", intentWithId.mode);
+  if (intentWithId.strategyTemplateId) queryParams.set("strategyId", intentWithId.strategyTemplateId);
 
-  // Normal BUY/SELL from Options, Futures, and Live Feed navigate directly to /bots/create
-  const targetPath = ((intentWithId.mode as string) === "strategy" || (intentWithId as any).targetRoute === "/strategy/create")
-    ? "/strategy/create"
-    : "/bots/create";
-  router.push(`${targetPath}?${queryParams.toString()}`);
+  router.push(`/bots/create?${queryParams.toString()}`);
 }

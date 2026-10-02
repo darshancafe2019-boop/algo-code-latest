@@ -144,6 +144,8 @@ export interface RequestOptions extends RequestInit {
   skipAuthRefresh?: boolean;
   idempotencyKey?: string;
   customHeaders?: Record<string, string>;
+  cacheTtlMs?: number;
+  skipCache?: boolean;
 }
 
 // Circuit Breaker State
@@ -171,8 +173,15 @@ export interface ResilientEventSourceHandle {
 }
 
 
+interface CacheEntry<T> {
+  data: ApiResponse<T>;
+  timestamp: number;
+  ttlMs: number;
+}
+
 class ResilientApiClient {
   private inFlightRequests: Map<string, Promise<ApiResponse<any>>> = new Map();
+  private fastGetCache: Map<string, CacheEntry<any>> = new Map();
   private circuitBreakers: Map<string, CircuitState> = new Map();
   private activeEventSources: Map<string, ResilientEventSourceHandle> = new Map();
   private maxConsecutiveFailures = Number(process.env.NEXT_PUBLIC_BACKEND_FAILURE_THRESHOLD) || 5;
@@ -770,6 +779,17 @@ class ResilientApiClient {
       }
     }
 
+    // Check fast GET in-memory cache
+    const cacheTtl = options.cacheTtlMs ?? (isIdempotent ? 12000 : 0);
+    const now = Date.now();
+    if (isIdempotent && cacheTtl > 0 && !options.skipCache) {
+      const cached = this.fastGetCache.get(resolvedUrl);
+      if (cached && (now - cached.timestamp < cached.ttlMs)) {
+        // Return fresh cached copy instantly in 0ms!
+        return cached.data as ApiResponse<T>;
+      }
+    }
+
     // Check in-flight deduplication
     if (shouldDeduplicate && this.inFlightRequests.has(resolvedUrl)) {
       return this.inFlightRequests.get(resolvedUrl) as Promise<ApiResponse<T>>;
@@ -789,6 +809,13 @@ class ResilientApiClient {
 
         if (result.ok) {
           this.recordCircuitResult(endpointKey, true);
+          if (isIdempotent && cacheTtl > 0) {
+            this.fastGetCache.set(resolvedUrl, {
+              data: result,
+              timestamp: Date.now(),
+              ttlMs: cacheTtl,
+            });
+          }
           return result;
         }
 
@@ -988,12 +1015,29 @@ class ResilientApiClient {
     return handle;
   }
 
+  /**
+   * Clears in-memory GET cache for a specific key or all matching keys
+   */
+  public invalidateCache(pattern?: string) {
+    if (!pattern) {
+      this.fastGetCache.clear();
+      return;
+    }
+    const cleanPattern = pattern.toLowerCase();
+    for (const key of Array.from(this.fastGetCache.keys())) {
+      if (key.toLowerCase().includes(cleanPattern)) {
+        this.fastGetCache.delete(key);
+      }
+    }
+  }
+
   // Convenience HTTP methods
   public get<T = any>(path: string, options: Omit<RequestOptions, "method"> = {}) {
     return this.request<T>(path, { ...options, method: "GET" });
   }
 
-  public post<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+  public async post<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+    this.invalidateCache(path.split("?")[0]);
     return this.request<T>(path, {
       ...options,
       method: "POST",
@@ -1001,7 +1045,8 @@ class ResilientApiClient {
     });
   }
 
-  public put<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+  public async put<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+    this.invalidateCache(path.split("?")[0]);
     return this.request<T>(path, {
       ...options,
       method: "PUT",
@@ -1009,11 +1054,13 @@ class ResilientApiClient {
     });
   }
 
-  public delete<T = any>(path: string, options: Omit<RequestOptions, "method"> = {}) {
+  public async delete<T = any>(path: string, options: Omit<RequestOptions, "method"> = {}) {
+    this.invalidateCache(path.split("?")[0]);
     return this.request<T>(path, { ...options, method: "DELETE" });
   }
 
-  public patch<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+  public async patch<T = any>(path: string, body?: any, options: Omit<RequestOptions, "method" | "body"> = {}) {
+    this.invalidateCache(path.split("?")[0]);
     return this.request<T>(path, {
       ...options,
       method: "PATCH",

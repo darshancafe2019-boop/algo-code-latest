@@ -100,8 +100,8 @@ class TestExecutionAdapter:
         }
 
 
-class LiveExecutionAdapter:
-    """Live Execution Adapter requiring strict server-side arming and 14-point validation."""
+class TestnetExecutionAdapter:
+    """Binance Spot Testnet Execution Adapter strictly connecting to testnet sandbox."""
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
         if _is_indian_symbol(symbol):
@@ -114,9 +114,19 @@ class LiveExecutionAdapter:
         fetcher = get_testnet_fetcher()
         engine = ExecutionEngine(fetcher.exchange)
         if side.upper() in ["BUY", "LONG"]:
-            res = engine.market_buy(symbol, amount, price)
+            res = engine.market_buy(symbol, amount, price, mode="TESTNET")
         else:
-            res = engine.market_sell(symbol, amount, price)
+            res = engine.market_sell(symbol, amount, price, mode="TESTNET")
+
+        raw_order = res.get("raw", {})
+        fee_cost = 0.0
+        if isinstance(raw_order, dict):
+            fee_info = raw_order.get("fee") or {}
+            fee_cost = float(fee_info.get("cost", 0.0)) if isinstance(fee_info, dict) else 0.0
+            if fee_cost == 0.0:
+                fees_list = raw_order.get("fees") or []
+                if isinstance(fees_list, list) and len(fees_list) > 0:
+                    fee_cost = sum(float(f.get("cost", 0.0)) for f in fees_list if isinstance(f, dict))
 
         return {
             "success": True,
@@ -129,9 +139,88 @@ class LiveExecutionAdapter:
             "filled_quantity": res.get("filled_amount", amount),
             "remaining_quantity": 0.0,
             "average_price": res.get("average_price", price),
-            "fees": 0.0,
+            "fees": fee_cost,
             "status": "FILLED",
-            "execution_mode": "LIVE"
+            "execution_mode": "TESTNET",
+            "raw": raw_order
+        }
+
+
+class LiveExecutionAdapter:
+    """
+    Live Production Execution Adapter strictly connecting to Binance Spot Production.
+    Fails closed on missing credentials, disabled live flags, or broker rejection.
+    """
+
+    def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
+        if _is_indian_symbol(symbol):
+            from src.upstox_broker_adapter import global_upstox_broker_adapter
+            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+
+        # 1. Hard Live Lock & Authorization Enforcement
+        from src import config
+        if not getattr(config, "LIVE_TRADING_ENABLED", False):
+            raise PermissionError("LIVE_TRADING_DISABLED: LIVE market order execution blocked (LIVE_TRADING_ENABLED=False).")
+        
+        from src.trading_authorization_service import global_trading_authorization_service
+        if global_trading_authorization_service.is_live_trading_locked():
+            raise PermissionError("LIVE_TRADING_LOCKED: LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
+
+        # 2. Production Credentials Validation (Fail-Closed)
+        live_key = getattr(config, "BINANCE_LIVE_API_KEY", "").strip()
+        live_secret = getattr(config, "BINANCE_LIVE_SECRET_KEY", "").strip()
+        if not live_key or not live_secret:
+            raise PermissionError("LIVE_CREDENTIALS_MISSING: BINANCE_LIVE_API_KEY and BINANCE_LIVE_SECRET_KEY must be configured for LIVE production execution. NEVER falling back to paper or testnet.")
+
+        # 3. Connect strictly to Binance Spot Production
+        from src.execution import ExecutionEngine
+        from src.data_fetcher import get_live_production_fetcher
+
+        fetcher = get_live_production_fetcher()
+        engine = ExecutionEngine(fetcher.exchange)
+
+        if side.upper() in ["BUY", "LONG"]:
+            res = engine.market_buy(symbol, amount, price, mode="LIVE")
+        else:
+            res = engine.market_sell(symbol, amount, price, mode="LIVE")
+
+        raw_order = res.get("raw", {})
+        order_id = str(res.get("order_id") or "")
+        
+        # 4. Strict Validation: Never accept mock/simulated order IDs in production
+        if not order_id or order_id.startswith("PAPER_") or order_id.startswith("TEST_"):
+            raise RuntimeError(f"INVALID_PRODUCTION_ORDER: Broker did not return a valid production order ID: {order_id}")
+
+        # 5. Fill Confirmation
+        order_status = str(raw_order.get("status", "")).upper()
+        filled_qty = float(res.get("filled_amount", 0.0))
+        if order_status in ["CANCELED", "REJECTED", "EXPIRED"] or filled_qty <= 0:
+            raise RuntimeError(f"LIVE_ORDER_REJECTED: Binance production order {order_id} rejected with status '{order_status}' and filled quantity {filled_qty}. No position created.")
+
+        fee_cost = 0.0
+        if isinstance(raw_order, dict):
+            fee_info = raw_order.get("fee") or {}
+            fee_cost = float(fee_info.get("cost", 0.0)) if isinstance(fee_info, dict) else 0.0
+            if fee_cost == 0.0:
+                fees_list = raw_order.get("fees") or []
+                if isinstance(fees_list, list) and len(fees_list) > 0:
+                    fee_cost = sum(float(f.get("cost", 0.0)) for f in fees_list if isinstance(f, dict))
+
+        return {
+            "success": True,
+            "order_id": order_id,
+            "broker_order_id": order_id,
+            "client_order_id": order_id,
+            "symbol": symbol,
+            "side": side,
+            "requested_quantity": amount,
+            "filled_quantity": filled_qty,
+            "remaining_quantity": 0.0,
+            "average_price": float(res.get("average_price", price)),
+            "fees": fee_cost,
+            "status": "FILLED",
+            "execution_mode": "LIVE",
+            "raw": raw_order
         }
 
 
@@ -144,6 +233,7 @@ class OrderExecutionService:
     def __init__(self):
         self.paper_adapter = PaperExecutionAdapter()
         self.test_adapter = TestExecutionAdapter()
+        self.testnet_adapter = TestnetExecutionAdapter()
         self.live_adapter = LiveExecutionAdapter()
 
     def generate_idempotency_key(self, bot_id: str, strategy: str, symbol: str, signal_time: str) -> str:
@@ -180,7 +270,13 @@ class OrderExecutionService:
         if price <= 0:
             return False, "INVALID_PRICE: Price must be greater than zero"
 
-        # 2. SymbolCheck
+        # 2b. ExpiryWindowCheck (Block new entries in contract expiry cutoff window)
+        from src.expiry_lifecycle_manager import global_expiry_lifecycle_manager
+        in_exp_win, cutoff_dt, exp_code = global_expiry_lifecycle_manager.is_contract_in_expiry_window(symbol)
+        if in_exp_win:
+            return False, f"NEW_ENTRY_BLOCKED_EXPIRY: Instrument '{symbol}' has reached contract expiry cutoff ({exp_code}). New entries strictly blocked."
+
+        # 2c. SymbolCheck
         inst = db.get_market_instrument(symbol)
         if inst and not inst.get("execution_available", True):
             return False, f"DATA_ONLY_SYMBOL: Instrument {symbol} does not support live execution"
@@ -271,8 +367,10 @@ class OrderExecutionService:
                 return False, "BROKER_CREDENTIALS_MISSING: Live execution blocked. Exchange API keys not configured."
             # Fail closed: Verify Market Health
             from src.market_data import global_stale_protection
-            if global_stale_protection.is_stale(symbol):
-                return False, f"LIVE_MARKET_FEED_STALE: Live execution blocked. Market feed for {symbol} is currently stale."
+            stale_info = global_stale_protection.is_stale(symbol)
+            if isinstance(stale_info, dict) and stale_info.get("is_stale", False):
+                return False, f"LIVE_MARKET_FEED_STALE: Live execution blocked. Market feed for {symbol} is currently stale ({stale_info.get('age_sec', 0)}s old)."
+
 
         # Broker-specific auth fail-closed check
         from src.dhan_broker_adapter import dhan_broker_adapter
@@ -365,7 +463,15 @@ class OrderExecutionService:
 
             return False, reason, {}
 
-        mode = "LIVE" if effective_live else ("TEST" if getattr(config, "TEST_MODE", False) else "PAPER")
+        if effective_live:
+            mode = "LIVE"
+        elif effective_mode == "TESTNET":
+            mode = "TESTNET"
+        elif effective_mode == "TEST" or getattr(config, "TEST_MODE", False):
+            mode = "TEST"
+        else:
+            mode = "PAPER"
+
         log_bot_event(
             event_type="ORDER_REQUESTED",
             message=f"Submitting {mode} order for {symbol} ({side}) amount={effective_qty} @ ${eff_price:,.2f}",
@@ -396,6 +502,8 @@ class OrderExecutionService:
                     return False, result.get("message", "Dhan order placement failed"), result
             elif mode == "TEST":
                 result = self.test_adapter.submit_order(symbol, side, effective_qty, eff_price)
+            elif mode == "TESTNET":
+                result = self.testnet_adapter.submit_order(symbol, side, effective_qty, eff_price)
             elif mode == "LIVE":
                 result = self.live_adapter.submit_order(symbol, side, effective_qty, eff_price)
             else:
@@ -633,6 +741,136 @@ class OrderExecutionService:
             "message": f"Order {order_id} has been cancelled."
         }
 
+    def execute_exit(
+        self,
+        bot_id: str = "manual_dispatcher",
+        trade_id: Optional[int] = None,
+        symbol: str = "",
+        side: str = "SELL",
+        quantity: float = 1.0,
+        price: Optional[float] = None,
+        exit_reason: str = "MANUAL_EXIT",
+        mode: str = "PAPER",
+        broker: str = "PAPER",
+        client_order_id: Optional[str] = None,
+        **kwargs
+    ) -> Tuple[bool, str, Dict[str, Any]]:
+        """
+        Authoritative Order Exit Entrypoint.
+        Routes closing order through broker adapter and updates Authoritative Trade Ledger.
+        """
+        # 1. Global Kill Switch Check
+        if config.KILL_SWITCH_FILE.exists() or getattr(config, "GLOBAL_TRADING_KILL_SWITCH", False):
+            return False, "KILL_SWITCH_ACTIVE: Global Trading Kill Switch is ACTIVATED", {}
+
+        effective_mode = (mode or getattr(config, "TRADING_MODE", "PAPER")).upper()
+        eff_price = price
+        if not eff_price or eff_price <= 0:
+            try:
+                from src.price_action_engine import price_action_engine
+                eff_price = price_action_engine.get_ltp(symbol) or 100.0
+            except Exception:
+                eff_price = 100.0
+
+        if client_order_id:
+            idem_key = f"IDEM_EXIT_{client_order_id}"
+        else:
+            now_iso = datetime.now(timezone.utc).isoformat()
+            idem_key = f"IDEM_EXIT_{bot_id}_{trade_id}_{symbol}_{now_iso[:16]}"
+
+        log_bot_event(
+            event_type="EXIT_ORDER_REQUESTED",
+            message=f"Submitting {effective_mode} exit order for Trade #{trade_id} {symbol} ({side}) amount={quantity} @ ${eff_price:,.2f} ({exit_reason})",
+            bot_instance_id=bot_id,
+            severity="INFO",
+            status="PENDING",
+            symbol=symbol,
+            correlation_id=idem_key
+        )
+
+        try:
+            if (broker or "").upper() == "DHAN":
+                from src.dhan_broker_adapter import dhan_broker_adapter
+                result = dhan_broker_adapter.place_order(
+                    symbol=symbol, side=side, quantity=quantity,
+                    price=eff_price, client_order_id=client_order_id, **kwargs
+                )
+                if not result.get("success", True) or result.get("status") == "FAILED":
+                    return False, result.get("message", "Dhan exit order placement failed"), result
+            elif effective_mode == "TEST":
+                result = self.test_adapter.submit_order(symbol, side, quantity, eff_price)
+            elif effective_mode == "TESTNET":
+                result = self.testnet_adapter.submit_order(symbol, side, quantity, eff_price)
+            elif effective_mode == "LIVE":
+                result = self.live_adapter.submit_order(symbol, side, quantity, eff_price)
+            else:
+                result = self.paper_adapter.submit_order(symbol, side, quantity, eff_price)
+
+            fill_avg_price = float(result.get("average_price") or result.get("price") or eff_price)
+            fill_qty = float(result.get("filled_quantity") or quantity)
+            fees = float(result.get("fees") or 1.50)
+
+            log_bot_event(
+                event_type="EXIT_ORDER_FILLED",
+                message=f"Exit Order FILLED: #{result.get('order_id', idem_key)} {symbol} ({side}) avg_price=${fill_avg_price:,.2f} ({exit_reason})",
+                bot_instance_id=bot_id,
+                severity="INFO",
+                status="SUCCESS",
+                order_id=str(result.get("order_id", idem_key)),
+                symbol=symbol,
+                correlation_id=idem_key,
+                metadata=result
+            )
+
+            # Close trade through Authoritative Trade Ledger
+            if trade_id:
+                from src.trade_ledger import trade_ledger
+                ok, ledger_res = trade_ledger.close_trade(
+                    trade_id=int(trade_id),
+                    exit_price=fill_avg_price,
+                    exit_reason=exit_reason,
+                    exit_qty=fill_qty,
+                    fees_exit=fees
+                )
+                if not ok:
+                    logger.warning(f"TradeLedger.close_trade returned error for trade #{trade_id}: {ledger_res.get('error')}")
+                result["trade_ledger_result"] = ledger_res
+
+            # Dispatch EXIT Telegram Alert
+            try:
+                from src.telegram_service import global_telegram_service
+                from src.db import get_bot_instance
+                bot_rec = get_bot_instance(bot_id) or {}
+                b_name = bot_rec.get("name", f"Bot {bot_id}")
+                global_telegram_service.send_order_alert(
+                    event_type="ORDER_FILLED",
+                    bot_name=b_name,
+                    symbol=symbol,
+                    side=side,
+                    quantity=fill_qty,
+                    price=fill_avg_price,
+                    order_id=str(result.get("order_id")),
+                    bot_id=bot_id
+                )
+            except Exception as tg_e:
+                logger.debug("Failed sending Telegram EXIT alert: %s", tg_e)
+
+            return True, f"Exit order executed successfully in {effective_mode} mode (Trade #{trade_id})", result
+
+        except Exception as e:
+            logger.error("Exit order execution failed for %s: %s", symbol, e)
+            log_bot_event(
+                event_type="EXIT_ORDER_REJECTED",
+                message=f"Exit execution error for {symbol}: {str(e)}",
+                bot_instance_id=bot_id,
+                severity="ERROR",
+                status="FAILED",
+                reason=str(e),
+                symbol=symbol,
+                correlation_id=idem_key
+            )
+            return False, f"Exit execution engine error: {str(e)}", {}
+
     def reduce_position(self, symbol: str, percentage: float, broker: str = "PAPER") -> Dict[str, Any]:
         """
         Reduces open position by percentage (e.g. 0.25 for 25%, 0.50 for 50%, 1.0 for 100%).
@@ -658,37 +896,51 @@ class OrderExecutionService:
         exit_qty = round(curr_qty * pct, 4)
         direction = str(pos.get("direction", "BUY")).upper()
         opposite_side = "SELL" if direction in ["BUY", "LONG"] else "BUY"
+        trade_id = pos.get("id")
+        exec_mode = str(pos.get("execution_mode", "PAPER")).upper()
 
         # Current price resolution
         from src.price_action_engine import price_action_engine
         current_price = price_action_engine.get_ltp(symbol_clean) or float(pos.get("entry_price", 100.0))
 
         if pct >= 0.99:
-            # Full Exit
-            _execute_statement(
-                "UPDATE trades_log SET status = 'CLOSED', exit_price = ?, exit_time = ? WHERE id = ?",
-                (current_price, datetime.now(timezone.utc).isoformat(), pos.get("id"))
-            )
-            log_bot_event(
-                event_type="POSITION_EXIT_FULL",
+            # Full Exit via execute_exit
+            success, msg, res = self.execute_exit(
+                bot_id=str(pos.get("bot_id", "manual_dispatcher")),
+                trade_id=trade_id,
                 symbol=symbol_clean,
-                status="SUCCESS",
-                message=f"Closed 100% position ({curr_qty} units) in {symbol_clean} @ {current_price}"
+                side=opposite_side,
+                quantity=curr_qty,
+                price=current_price,
+                exit_reason="MANUAL_FULL_EXIT",
+                mode=exec_mode,
+                broker=broker
             )
             return {
-                "success": True,
+                "success": success,
                 "action": "FULL_EXIT",
                 "symbol": symbol_clean,
                 "quantity": curr_qty,
-                "exit_price": current_price,
-                "remaining_quantity": 0.0
+                "exit_price": float(res.get("average_price") or current_price),
+                "remaining_quantity": 0.0,
+                "message": msg,
+                "result": res
             }
         else:
             # Partial Exit
             rem_qty = round(curr_qty - exit_qty, 4)
+            from src.trade_ledger import trade_ledger
+            trade_ledger.record_partial_fill(
+                trade_id=int(trade_id),
+                order_id=f"PART_EXIT_{uuid.uuid4().hex[:6]}",
+                fill_price=current_price,
+                fill_qty=exit_qty,
+                fee=1.0,
+                fill_side=opposite_side
+            )
             _execute_statement(
-                "UPDATE trades_log SET position_size = ?, partially_filled_quantity = ? WHERE id = ?",
-                (rem_qty, exit_qty, pos.get("id"))
+                "UPDATE trades_log SET position_size = ?, remaining_quantity = ? WHERE id = ?",
+                (rem_qty, rem_qty, pos.get("id"))
             )
             log_bot_event(
                 event_type="POSITION_EXIT_PARTIAL",
@@ -706,6 +958,26 @@ class OrderExecutionService:
                 "remaining_quantity": rem_qty
             }
 
+    def reconcile_order_with_broker(self, symbol: str, order_id: str, mode: str = "LIVE") -> Dict[str, Any]:
+        """
+        Reconciles an order with the real broker/exchange (Binance Production or Testnet).
+        Returns actual broker status, filled quantities, and fill price.
+        """
+        eff_mode = (mode or "LIVE").upper()
+        if eff_mode == "LIVE":
+            from src.data_fetcher import get_live_production_fetcher
+            fetcher = get_live_production_fetcher()
+        elif eff_mode == "TESTNET":
+            from src.data_fetcher import get_testnet_fetcher
+            fetcher = get_testnet_fetcher()
+        else:
+            return {"id": order_id, "status": "closed", "filled": 0.0, "mode": eff_mode}
+
+        from src.execution import ExecutionEngine
+        engine = ExecutionEngine(fetcher.exchange)
+        return engine.get_order_status(symbol, order_id)
+
 
 order_execution_service = OrderExecutionService()
 execution_service = order_execution_service
+

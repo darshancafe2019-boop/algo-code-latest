@@ -67,6 +67,27 @@ export interface OrderDestinationPreview {
 export type BotExecutionMode = "PAPER" | "LIVE";
 
 export type BotViewMode = "table" | "cards" | "matrix";
+export type DensityMode = "comfortable" | "compact";
+
+export interface BotLegItem {
+  id: string;
+  symbol: string;
+  side: "BUY" | "SELL";
+  quantity: number;
+  lot_size?: number;
+  strike?: number;
+  option_type?: "CE" | "PE" | "CALL" | "PUT";
+  expiry?: string;
+  entry_price?: number;
+  current_price?: number;
+  ltp?: number;
+  bid?: number;
+  ask?: number;
+  pnl?: number;
+  delta?: number;
+  theta?: number;
+  status?: string;
+}
 
 export interface FleetMetrics {
   total_bots: number;
@@ -81,18 +102,63 @@ export interface FleetMetrics {
   realized_pnl: number;
   unrealized_pnl: number;
   allocated_capital: number;
+  total_capital?: number;
   capital_used: number;
   current_exposure: number;
   available_capital: number;
+  open_positions_count?: number;
+  open_orders_count?: number;
+  avg_latency_ms?: number;
+  p95_latency_ms?: number;
+  dropped_packets?: number;
+  reconnect_count?: number;
+  currency?: string;
   emergency_halt_active: boolean;
 }
 
 export interface BotRowItem {
+  canonical_instrument_id?: string;
+  canonical_symbol?: string;
+  environment?: string;
+  selected_premium?: number;
+  selected_bid?: number;
+  selected_ask?: number;
+  selected_at?: string;
+  side?: "BUY" | "SELL" | string;
+  market_data_provider?: string;
+  entry_price?: number;
+  current_price?: number;
+  bid?: number;
+  ask?: number;
+  iv?: number;
+  oi?: number;
+  volume?: number;
   id: string;
   bot_id: string;
   bot_uid?: string;
   name: string;
   symbol: string;
+  signal_symbol?: string;
+  signal_instrument?: string;
+  execution_symbol?: string;
+  execution_instrument?: string;
+  is_multi_leg?: boolean;
+  strategy_type?: string;
+  legs?: BotLegItem[];
+  net_credit?: number;
+  current_net?: number;
+  greeks?: {
+    delta?: number;
+    theta?: number;
+    gamma?: number;
+    vega?: number;
+    iv?: number;
+  };
+  bot_family?: string;
+  family_role?: "original" | "clone";
+  clone_number?: number;
+  is_possible_duplicate?: boolean;
+  duplicate_reason?: string;
   asset_class: string;
   timeframe: string;
   strategy: string;
@@ -111,6 +177,7 @@ export interface BotRowItem {
   feed_status?: BotFeedStatus | string;
   latency_ms?: number;
   data_age_ms?: number;
+  last_tick_age_ms?: number;
   customer_id?: string;
   department_id?: string;
   broker_folder_id?: string;

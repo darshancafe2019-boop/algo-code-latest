@@ -704,7 +704,7 @@ class ServiceSupervisor:
             svc.start()
             if svc.proc and svc.proc.pid:
                 self.protected_pids.add(svc.proc.pid)
-            self._await_readiness(svc, max_retries=30, delay=0.5)
+            self._await_readiness(svc, max_retries=60, delay=0.5)
 
         self.running = True
         self.supervisor_running = True

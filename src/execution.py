@@ -35,7 +35,7 @@ class ExecutionEngine:
             if cost < float(min_cost):
                 raise ValueError(f"Order cost {cost} below market minimum cost {min_cost} for {symbol}")
 
-    def market_buy(self, symbol: str, amount: float, ref_price: float) -> Dict[str, Any]:
+    def market_buy(self, symbol: str, amount: float, ref_price: float, mode: str = "LIVE") -> Dict[str, Any]:
         amt = float(amount)
         try:
             # Use exchange helper to round to proper precision
@@ -48,8 +48,12 @@ class ExecutionEngine:
 
         from src import config
         from src.trading_authorization_service import global_trading_authorization_service
-        if global_trading_authorization_service.is_live_trading_locked() and getattr(config, "TRADING_MODE", "PAPER") == "LIVE":
-            raise PermissionError("LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
+        eff_mode = (mode or getattr(config, "TRADING_MODE", "PAPER")).upper()
+        if eff_mode == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
+                raise PermissionError("LIVE_TRADING_DISABLED: LIVE market order execution blocked (LIVE_TRADING_ENABLED=False).")
+            if global_trading_authorization_service.is_live_trading_locked():
+                raise PermissionError("LIVE_TRADING_LOCKED: LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
 
         order = self.exchange.create_order(symbol, 'market', 'buy', amt)
 
@@ -63,7 +67,7 @@ class ExecutionEngine:
             'raw': order,
         }
 
-    def market_sell(self, symbol: str, amount: float, ref_price: float) -> Dict[str, Any]:
+    def market_sell(self, symbol: str, amount: float, ref_price: float, mode: str = "LIVE") -> Dict[str, Any]:
         amt = float(amount)
         try:
             amt = float(self.exchange.amount_to_precision(symbol, amt))
@@ -74,8 +78,12 @@ class ExecutionEngine:
 
         from src import config
         from src.trading_authorization_service import global_trading_authorization_service
-        if global_trading_authorization_service.is_live_trading_locked() and getattr(config, "TRADING_MODE", "PAPER") == "LIVE":
-            raise PermissionError("LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
+        eff_mode = (mode or getattr(config, "TRADING_MODE", "PAPER")).upper()
+        if eff_mode == "LIVE":
+            if not getattr(config, "LIVE_TRADING_ENABLED", False):
+                raise PermissionError("LIVE_TRADING_DISABLED: LIVE market order execution blocked (LIVE_TRADING_ENABLED=False).")
+            if global_trading_authorization_service.is_live_trading_locked():
+                raise PermissionError("LIVE_TRADING_LOCKED: LIVE market order execution is strictly BLOCKED by authoritative Global Live Trading Lock.")
 
         order = self.exchange.create_order(symbol, 'market', 'sell', amt)
 
@@ -88,3 +96,12 @@ class ExecutionEngine:
             'average_price': float(average),
             'raw': order,
         }
+
+    def get_order_status(self, symbol: str, order_id: str) -> Dict[str, Any]:
+        """Queries actual broker order status and fill data from exchange."""
+        try:
+            return self.exchange.fetch_order(order_id, symbol)
+        except Exception as e:
+            logger.warning("Failed to fetch order status for %s (%s): %s", order_id, symbol, e)
+            return {}
+

@@ -1,0 +1,13 @@
+{
+  "git_commit": "4a4ac37eb2bc8f73d0788e3716fbaa6e66cc2dd3",
+  "python_version": "3.14.6",
+  "node_version": "v24.19.0",
+  "npm_version": "11.17.0",
+  "os": "Windows",
+  "test_run_1": {
+    "passed": 1345,
+    "failed": 51,
+    "warnings": 3,
+    "duration_sec": 973.34
+  }
+}

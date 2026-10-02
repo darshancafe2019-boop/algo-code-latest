@@ -637,6 +637,10 @@ class DhanFeedManager:
             "error_message": safe_msg,
         }
 
+    def get_connection_status(self) -> Dict[str, Any]:
+        """Alias for get_status returning connection status dictionary."""
+        return self.get_status()
+
     def get_cached_quotes(self) -> Dict[str, Dict[str, Any]]:
         """Returns dictionary of all cached ticks by symbol."""
         res: Dict[str, Dict[str, Any]] = {}

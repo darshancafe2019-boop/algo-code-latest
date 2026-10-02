@@ -93,6 +93,26 @@ class MarketTick:
         except Exception:
             return 999999.0
 
+    @property
+    def changePercent(self) -> Optional[float]:
+        if self.ltp is not None and self.previousClose and self.previousClose > 0:
+            return round(((self.ltp - self.previousClose) / self.previousClose) * 100.0, 2)
+        return None
+
+    @property
+    def change(self) -> Optional[float]:
+        if self.ltp is not None and self.previousClose and self.previousClose > 0:
+            return round(self.ltp - self.previousClose, 2)
+        return None
+
+    @property
+    def source(self) -> str:
+        return self.provider or "GATEWAY"
+
+    @property
+    def stale(self) -> bool:
+        return self.feedStatus == "STALE" or self.ageMs > 30000.0
+
     def is_valid(self) -> bool:
         valid, _ = validate_tick_quality(self)
         return valid

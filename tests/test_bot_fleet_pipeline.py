@@ -53,7 +53,7 @@ def test_2_create_call_option_bot(client):
         "underlying": "NIFTY",
         "symbol": "NIFTY26SEP25000CE",
         "strike": 25000,
-        "expiry": "2026-09-25",
+        "expiry": "2026-10-30",
         "security_id": "123456",
         "lot_size": 25,
         "exchange": "NSE",
@@ -86,7 +86,7 @@ def test_2_create_call_option_bot(client):
     assert bot["instrumentType"] == "OPTION"
     assert bot["optionType"] == "CALL"
     assert bot["strike"] == 25000
-    assert bot["expiry"] == "2026-09-25"
+    assert bot["expiry"] == "2026-10-30"
     assert bot["mode"] == "PAPER"
     assert bot["status"] in ["STOPPED", "DRAFT", "READY_PAPER", "READY", "RUNNING"]
     assert bot["createdAt"] != ""
@@ -102,7 +102,7 @@ def test_3_create_put_option_bot(client):
         "underlying": "BANKNIFTY",
         "symbol": "BANKNIFTY26SEP52000PE",
         "strike": 52000,
-        "expiry": "2026-09-25",
+        "expiry": "2026-10-30",
         "security_id": "654321",
         "lot_size": 15,
         "exchange": "NSE",
@@ -138,7 +138,7 @@ def test_4_create_futures_bot(client):
         "instrument_type": "FUTURE",
         "underlying": "NIFTY",
         "symbol": "NIFTY26SEPFUT",
-        "expiry": "2026-09-25",
+        "expiry": "2026-10-30",
         "security_id": "789012",
         "lot_size": 25,
         "exchange": "NSE",
@@ -217,7 +217,7 @@ def test_6_bot_deletion_and_cleanup(client):
         "underlying": "NIFTY",
         "symbol": "NIFTY26SEP26000CE",
         "strike": 26000,
-        "expiry": "2026-09-25",
+        "expiry": "2026-10-30",
         "capital": 10000,
         "mode": "PAPER",
     }

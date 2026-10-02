@@ -1,0 +1,3470 @@
+[
+  {
+    "file_line": "clean_leftover_test_bots.py:53",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = (b.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "clean_leftover_test_bots.py:121",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE id = ? AND status NOT IN ('RUNNING', 'STARTING') AND (execution_mode != 'LIVE' OR execution_mode IS NULL) AND COALESCE(is_deleted, 0) = 0"
+  },
+  {
+    "file_line": "clean_leftover_test_bots.py:146",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:1230",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = str(payload.get(\"mode\") or payload.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:1243",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "dashboard.py:1394",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bot_status[\"execution_mode\"] = bot_row.get(\"execution_mode\") or \"PAPER\""
+  },
+  {
+    "file_line": "dashboard.py:1407",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "current_mode = str(request.args.get(\"mode\") or bot_status.get(\"execution_mode\") or getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:1407",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "current_mode = str(request.args.get(\"mode\") or bot_status.get(\"execution_mode\") or getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:1619",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"trading_mode\": config.TRADING_MODE,"
+  },
+  {
+    "file_line": "dashboard.py:2086",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = data.get(\"execution_mode\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:2110",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "message=f\"Strategy '{strategy.get('name')}' ({version}) assigned to Bot {bot_id} in {execution_mode} mode\","
+  },
+  {
+    "file_line": "dashboard.py:2112",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "metadata={\"bot_id\": bot_id, \"strategy_id\": strat_id, \"version\": version, \"mode\": execution_mode}"
+  },
+  {
+    "file_line": "dashboard.py:2140",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=mode,"
+  },
+  {
+    "file_line": "dashboard.py:3365",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"trading_mode\": os.getenv(\"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:5437",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": str(t.get(\"execution_mode\") or \"PAPER\").upper(),"
+  },
+  {
+    "file_line": "dashboard.py:5465",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"execution_mode\") or request.args.get(\"mode\") or getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:5465",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"execution_mode\") or request.args.get(\"mode\") or getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:5523",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = str(payload.get(\"trading_mode\") or payload.get(\"execution_mode\") or payload.get(\"mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:5701",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode_param = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "dashboard.py:5710",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC\","
+  },
+  {
+    "file_line": "dashboard.py:5715",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC\","
+  },
+  {
+    "file_line": "dashboard.py:5750",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:5776",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:5802",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:5828",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:5854",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:5880",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:6119",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:6197",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:6240",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:6638",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = data.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:6648",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "c.execute(f\"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND id IN ({placeholders})\", [mode, *target_ids])"
+  },
+  {
+    "file_line": "dashboard.py:6650",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "c.execute(\"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ?\", (mode,))"
+  },
+  {
+    "file_line": "dashboard.py:7006",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bots = safe_query(\"SELECT id, name, status, execution_mode, started_at, last_heartbeat FROM bot_instances\")"
+  },
+  {
+    "file_line": "dashboard.py:7024",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"broker\": {\"status\": \"READY\", \"mode\": \"PAPER\", \"live_trading_enabled\": getattr(config, \"LIVE_TRADING_ENABLED\", False), \"last_updated\": now_str}"
+  },
+  {
+    "file_line": "dashboard.py:7081",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "dashboard.py:7278",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": b.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:7289",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bots = safe_query(\"SELECT id, name, symbol, timeframe, strategy, execution_mode, status, started_at, last_heartbeat, last_scan_at FROM bot_instances\")"
+  },
+  {
+    "file_line": "dashboard.py:7290",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "open_trades = safe_query(\"SELECT id, timestamp, symbol, direction, entry_price, position_size, stop_loss, take_profit, status, execution_mode FROM trades_log WHERE status = 'OPEN'\")"
+  },
+  {
+    "file_line": "dashboard.py:7303",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"live_trading_enabled\": getattr(config, \"LIVE_TRADING_ENABLED\", False),"
+  },
+  {
+    "file_line": "dashboard.py:7497",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, asset_class, execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:7625",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, asset_class, exchange, execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:7691",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"mode\": getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:7727",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "dashboard.py:7730",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "live_bots = safe_query(\"SELECT * FROM bot_instances WHERE execution_mode = 'LIVE' AND COALESCE(is_deleted, 0) = 0\")"
+  },
+  {
+    "file_line": "dashboard.py:7731",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "live_trades = safe_query(\"SELECT * FROM trades_log WHERE execution_mode = 'LIVE' AND status = 'OPEN'\")"
+  },
+  {
+    "file_line": "dashboard.py:8178",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "exec_mode = str(data.get(\"environment\", {}).get(\"execution_mode\") or data.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:8454",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": exec_mode,"
+  },
+  {
+    "file_line": "dashboard.py:8512",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "rows = db.safe_query(\"SELECT id, name, allocated_capital, execution_mode, status FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0\") or []"
+  },
+  {
+    "file_line": "dashboard.py:8517",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "b_env = str(b_dict.get(\"execution_mode\", \"\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:8623",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "dashboard.py:8885",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = str("
+  },
+  {
+    "file_line": "dashboard.py:8886",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env_cfg.get(\"execution_mode\")"
+  },
+  {
+    "file_line": "dashboard.py:8888",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "or data.get(\"execution_mode\")"
+  },
+  {
+    "file_line": "dashboard.py:8905",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if execution_mode == \"LIVE\":"
+  },
+  {
+    "file_line": "dashboard.py:8906",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "dashboard.py:8907",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "logger.warning(f\"Live bot creation for '{name}' blocked: LIVE_TRADING_ENABLED is False on server.\")"
+  },
+  {
+    "file_line": "dashboard.py:8908",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = \"PAPER\""
+  },
+  {
+    "file_line": "dashboard.py:8927",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "environment=execution_mode"
+  },
+  {
+    "file_line": "dashboard.py:8929",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if execution_mode == \"LIVE\":"
+  },
+  {
+    "file_line": "dashboard.py:8947",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT id, name, slug, config_json, status, execution_mode FROM bot_instances WHERE config_json LIKE ? AND COALESCE(is_deleted, 0) = 0\","
+  },
+  {
+    "file_line": "dashboard.py:8967",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": b.get(\"execution_mode\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:9006",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:9041",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, asset_class, exchange, execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:9051",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "exchange, execution_mode, initial_status, now_str, now_str, 75.0,"
+  },
+  {
+    "file_line": "dashboard.py:9083",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "environment=execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:9101",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "details={\"bot_id\": bot_id, \"name\": name, \"slug\": slug, \"mode\": execution_mode, \"version\": 1, \"config_hash\": config_hash}"
+  },
+  {
+    "file_line": "dashboard.py:9107",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"message\": f\"Bot instance '{name}' created safely in {execution_mode} mode (Status: {initial_status}).\","
+  },
+  {
+    "file_line": "dashboard.py:9118",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": execution_mode,"
+  },
+  {
+    "file_line": "dashboard.py:9270",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "{\"gate_id\": \"GATE_AUTHORIZATION\", \"category\": \"SAFETY\", \"label\": \"Server Authorization Gate\", \"status\": \"PASS\" if canonical_config.environment.execution_mode == BotExecutionMode.PAPER else \"WARNING\", \"reason\": \"Paper Simulator Active\" if canonical_config.environment.execution_mode == BotExecutionMode.PAPER else \"Live authorization token required\"}"
+  },
+  {
+    "file_line": "dashboard.py:9401",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"UPDATE bot_instances SET status = ?, execution_mode = ?, updated_at = ? WHERE id = ?\","
+  },
+  {
+    "file_line": "dashboard.py:9464",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = str(data.get(\"execution_mode\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:9515",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "name = ?, symbol = ?, strategy = ?, timeframe = ?, execution_mode = ?,"
+  },
+  {
+    "file_line": "dashboard.py:9520",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(name, symbol, strategy, timeframe, execution_mode, capital, updated_json_str, now_str, new_ver, updated_hash, bot_id)"
+  },
+  {
+    "file_line": "dashboard.py:10114",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = (data.get(\"mode\") or data.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:10118",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "res = global_bot_runtime_service.set_bot_execution_mode("
+  },
+  {
+    "file_line": "dashboard.py:10134",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "current_mode = (bot.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:10140",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "res = global_bot_runtime_service.set_bot_execution_mode("
+  },
+  {
+    "file_line": "dashboard.py:10909",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"details\": f\"Routed via {tr.get('execution_mode', 'PAPER')} Adapter. Broker Order ID: {tr.get('broker_order_id')}. Filled Qty: {tr.get('position_size')} @ ${tr.get('entry_price', 0.0):,.2f}.\""
+  },
+  {
+    "file_line": "dashboard.py:11065",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode_donut = [{\"mode\": em[\"mode\"], \"count\": em[\"total_trades\"]} for em in breakdowns[\"execution_modes\"]]"
+  },
+  {
+    "file_line": "dashboard.py:11130",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode_donut\": execution_mode_donut,"
+  },
+  {
+    "file_line": "dashboard.py:11302",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def api_analytics_execution_mode():"
+  },
+  {
+    "file_line": "dashboard.py:11309",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "return jsonify({\"success\": True, \"data\": payload[\"charts\"][\"execution_mode_donut\"], \"generated_at\": payload[\"generated_at\"], \"trade_count\": payload[\"trade_count\"]})"
+  },
+  {
+    "file_line": "dashboard.py:11559",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"signal_confidence\", \"trade_quality_score\", \"market_regime\", \"execution_mode\", \"status\","
+  },
+  {
+    "file_line": "dashboard.py:11576",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "t.get(\"trade_quality_score\", 85.0), t.get(\"market_regime\", \"TRENDING\"), t.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:11727",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "t.get(\"execution_mode\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:11838",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", True)"
+  },
+  {
+    "file_line": "dashboard.py:11839",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "dashboard.py:11861",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "dashboard.py:11862",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "dashboard.py:11891",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:11897",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"live_trading_enabled\": getattr(config, \"LIVE_TRADING_ENABLED\", False),"
+  },
+  {
+    "file_line": "dashboard.py:11952",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode_filter = request.args.get(\"execution_mode\", \"ALL\").upper()"
+  },
+  {
+    "file_line": "dashboard.py:11985",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "sql_where.append(\"execution_mode = ?\")"
+  },
+  {
+    "file_line": "dashboard.py:13123",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"trading_mode\": getattr(config, \"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:15952",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"mode\": config.TRADING_MODE,"
+  },
+  {
+    "file_line": "dashboard.py:16064",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "f\"Exchange: {config.EXCHANGE_NAME} ({config.TRADING_MODE})\","
+  },
+  {
+    "file_line": "dashboard.py:16174",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "raw_mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "dashboard.py:16185",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND UPPER(COALESCE(execution_mode, 'PAPER')) = ? ORDER BY id DESC\","
+  },
+  {
+    "file_line": "dashboard.py:16248",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:16255",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT COALESCE(SUM(net_pnl), 0.0) as pnl FROM trades_log WHERE (status IN ('CLOSED', 'FILLED') OR exit_timestamp IS NOT NULL) AND date(COALESCE(exit_timestamp, timestamp)) = date('now') AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?\","
+  },
+  {
+    "file_line": "dashboard.py:16410",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:16445",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "dashboard.py:17389",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17399",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17432",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17502",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17552",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17658",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17683",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17699",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:17941",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = request.args.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:18030",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM trades_log WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL') ORDER BY timestamp DESC\","
+  },
+  {
+    "file_line": "dashboard.py:18267",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = body.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\")).upper()"
+  },
+  {
+    "file_line": "dashboard.py:19338",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"trading_mode\": getattr(config, \"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:19803",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:19826",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:20004",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": status_data.get(\"tradingMode\", \"LIVE_AND_PAPER\"),"
+  },
+  {
+    "file_line": "dashboard.py:20118",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"LIVE_AND_PAPER\","
+  },
+  {
+    "file_line": "dashboard.py:20935",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"tradingMode\": getattr(config, \"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "streamlit_app.py:53",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"mode\": config.TRADING_MODE,"
+  },
+  {
+    "file_line": "test_bot_deletion_and_bulk_suite.py:30",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at)"
+  },
+  {
+    "file_line": "test_bot_deletion_and_bulk_suite.py:73",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at)"
+  },
+  {
+    "file_line": "test_bot_deletion_and_bulk_suite.py:105",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at)"
+  },
+  {
+    "file_line": "test_bot_deletion_and_bulk_suite.py:135",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at)"
+  },
+  {
+    "file_line": "test_bulk_delete_68_bots_suite.py:41",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "test_e2e_recovery_lifecycle.py:70",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "test_live_server_bot_creation.py:23",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "test_permanent_and_force_deletion_suite.py:32",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, last_error, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "test_permanent_and_force_deletion_suite.py:72",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "test_permanent_and_force_deletion_suite.py:123",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "test_unified_bot_creation.py:32",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "verify_e2e_master_suite.py:441",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "verify_intelligence_center_e2e.py:190",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert a_res[\"response\"][\"action_preview\"][\"execution_mode\"] == \"PAPER\", \"Default mode must be PAPER simulated\""
+  },
+  {
+    "file_line": "verify_strategy_ide_e2e.py:256",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "scratch/inspect_db_perf.py:26",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM trades_log WHERE execution_mode = 'PAPER' AND status IN ('OPEN', 'ACTIVE')\","
+  },
+  {
+    "file_line": "scratch/inspect_db_perf.py:27",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT * FROM bot_instances WHERE execution_mode = 'PAPER'\","
+  },
+  {
+    "file_line": "scratch/verify_all_surgical_repairs.py:10",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "os.environ[\"TRADING_MODE\"] = \"PAPER\""
+  },
+  {
+    "file_line": "scratch/verify_all_surgical_repairs.py:11",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "os.environ[\"LIVE_TRADING_ENABLED\"] = \"false\""
+  },
+  {
+    "file_line": "scripts/check_provider_status.py:36",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(f\"TRADING_MODE: {os.environ.get('TRADING_MODE', 'PAPER')}\")"
+  },
+  {
+    "file_line": "scripts/check_provider_status.py:38",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "print(f\"LIVE_TRADING_ENABLED: {os.environ.get('LIVE_TRADING_ENABLED', 'false')}\")"
+  },
+  {
+    "file_line": "scripts/create_fast_scalper_bot.py:15",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = \"PAPER\""
+  },
+  {
+    "file_line": "scripts/create_fast_scalper_bot.py:37",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode,"
+  },
+  {
+    "file_line": "scripts/create_fast_scalper_bot.py:48",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode,"
+  },
+  {
+    "file_line": "scripts/create_fast_scalper_bot.py:60",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "print(f\"Symbol: {symbol} | Timeframe: {timeframe} | Mode: {execution_mode}\")"
+  },
+  {
+    "file_line": "scripts/deploy_complete_bitcoin_bot_fleet.py:100",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "scripts/deploy_complete_bitcoin_bot_fleet.py:145",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode,"
+  },
+  {
+    "file_line": "scripts/deploy_complete_bitcoin_bot_fleet.py:188",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode,"
+  },
+  {
+    "file_line": "scripts/deploy_eth_turbo_bot.py:16",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = \"PAPER\""
+  },
+  {
+    "file_line": "scripts/deploy_eth_turbo_bot.py:42",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode,"
+  },
+  {
+    "file_line": "scripts/deploy_eth_turbo_bot.py:53",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode,"
+  },
+  {
+    "file_line": "scripts/deploy_eth_turbo_bot.py:103",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "print(f\"  Symbol:     {symbol} | Timeframe: {timeframe} | Mode: {execution_mode}\")"
+  },
+  {
+    "file_line": "scripts/dhan_rest_smoke_test.py:41",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(f\"Trading Mode:   {getattr(config, 'TRADING_MODE', 'PAPER')}\")"
+  },
+  {
+    "file_line": "scripts/dhan_rest_smoke_test.py:43",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "print(f\"Live Allowed:   {getattr(config, 'LIVE_TRADING_ENABLED', False)}\")"
+  },
+  {
+    "file_line": "scripts/inspect_all_trades.py:8",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "c.execute(\"SELECT id, bot_id, symbol, direction, status, execution_mode, net_pnl, realized_pnl, result_pnl, gross_pnl, exit_timestamp, timestamp FROM trades_log ORDER BY id DESC\")"
+  },
+  {
+    "file_line": "scripts/inspect_bots.py:6",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "c.execute(\"SELECT id, name, symbol, asset_class, status, execution_mode, timeframe, strategy, last_error FROM bot_instances WHERE COALESCE(is_deleted, 0) = 0\")"
+  },
+  {
+    "file_line": "scripts/inspect_bots.py:10",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "print(f\"[{b['id']}] '{b['name']}' | Symbol: {b['symbol']} | Status: {b['status']} | Mode: {b['execution_mode']} | Error: {b['last_error']}\")"
+  },
+  {
+    "file_line": "scripts/inspect_trades_schema.py:14",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "c.execute(\"SELECT id, symbol, status, execution_mode, result_pnl, net_pnl, pnl, exit_timestamp, timestamp FROM trades_log ORDER BY id DESC LIMIT 5\")"
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:60",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert config.TRADING_MODE in (\"PAPER\", \"TEST\", \"SIMULATION\"), f\"Unsafe trading mode: {config.TRADING_MODE}\""
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:61",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert config.LIVE_TRADING_ENABLED is False or getattr(config, \"TRADING_MODE\", \"PAPER\") == \"PAPER\", \"LIVE trading must remain disabled in test environment\""
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:61",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert config.LIVE_TRADING_ENABLED is False or getattr(config, \"TRADING_MODE\", \"PAPER\") == \"PAPER\", \"LIVE trading must remain disabled in test environment\""
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:63",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "print(\"[PASS] Trading mode invariants: TRADING_MODE=PAPER, LIVE_TRADING_ENABLED=False.\")"
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:63",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(\"[PASS] Trading mode invariants: TRADING_MODE=PAPER, LIVE_TRADING_ENABLED=False.\")"
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:389",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\""
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:400",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\", client_order_id=dup_id"
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:408",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\", client_order_id=dup_id"
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:416",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\""
+  },
+  {
+    "file_line": "scripts/production_hardening_and_failure_injection.py:424",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\""
+  },
+  {
+    "file_line": "scripts/test_upstox_live.py:96",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = os.getenv(\"TRADING_MODE\") or getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "scripts/test_upstox_live.py:104",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(f\"  TRADING_MODE:          {mode} (Fail-closed safety active)\")"
+  },
+  {
+    "file_line": "scripts/verify_global_market_pipeline.py:159",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = os.getenv(\"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "scripts/verify_global_market_pipeline.py:160",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(f\"  - TRADING_MODE:               {trading_mode}\")"
+  },
+  {
+    "file_line": "scripts/verify_market_pipeline.py:55",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"TRADING_MODE\","
+  },
+  {
+    "file_line": "scripts/verify_market_pipeline.py:79",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "print(f\"Paper Mode Guard:    {getattr(config, 'TRADING_MODE', 'PAPER')}\")"
+  },
+  {
+    "file_line": "src/angelone_broker_adapter.py:277",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/angelone_broker_adapter.py:316",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/angelone_broker_adapter.py:351",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/autonomous_repair_engine.py:37",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\", \"order_side\", \"symbol\", \"quantity\", \"price\""
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:174",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": rd.get(\"environment\") or bot_dict.get(\"environment\") or \"PAPER\","
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:221",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": b_item.environment.value if hasattr(b_item.environment, 'value') else str(b_item.environment),"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:369",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env = str(b.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:652",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": env,"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:900",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env = str(b.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:982",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def set_bot_execution_mode(self, bot_id: str, mode: str, requested_by: str = \"OPERATOR\") -> Dict[str, Any]:"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:997",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "old_mode = (bot.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:1002",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:1024",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"UPDATE bot_instances SET execution_mode = ?, updated_at = ? WHERE id = ?\","
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:1049",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:1132",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env = str(bot.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/bot_runtime_service.py:1162",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_trading_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "src/broker_router.py:16",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "- Live Safety Authorization Gate (Strict fail-closed when LIVE_TRADING_ENABLED=False)"
+  },
+  {
+    "file_line": "src/broker_router.py:361",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "When TRADING_MODE=PAPER, orders execute in high-fidelity sandbox:"
+  },
+  {
+    "file_line": "src/broker_router.py:496",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/broker_router.py:657",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"mode\": intent.mode or getattr(config, \"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "src/broker_router.py:670",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "src/broker_router.py:672",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "return False, \"LIVE_TRADING_DISABLED\", \"Live order rejected: Server-side LIVE_TRADING_ENABLED is False. Quant.OS is locked in PAPER mode.\""
+  },
+  {
+    "file_line": "src/broker_router.py:743",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "is_paper = (intent.mode == \"PAPER\") or (getattr(config, \"TRADING_MODE\", \"PAPER\").upper() == \"PAPER\")"
+  },
+  {
+    "file_line": "src/canonical_bot_config.py:94",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: BotExecutionMode = BotExecutionMode.PAPER"
+  },
+  {
+    "file_line": "src/canonical_bot_config.py:357",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env_data.get(\"execution_mode\")"
+  },
+  {
+    "file_line": "src/canonical_bot_config.py:359",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "or data.get(\"execution_mode\")"
+  },
+  {
+    "file_line": "src/canonical_bot_config.py:371",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=exec_mode,"
+  },
+  {
+    "file_line": "src/capital_service.py:149",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT id, name, symbol, strategy, execution_mode, status, allocated_capital, current_equity, realized_pnl, unrealized_pnl, currency FROM bot_instances WHERE broker_account_id = ? AND COALESCE(is_deleted, 0) = 0 ORDER BY name\","
+  },
+  {
+    "file_line": "src/capital_service.py:304",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "trade_sql += \" AND execution_mode = ?\""
+  },
+  {
+    "file_line": "src/capital_service.py:338",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bot_sql = \"SELECT allocated_capital, current_equity, risk_reserve, status, execution_mode FROM bot_instances WHERE customer_id = ? AND COALESCE(is_deleted, 0) = 0\""
+  },
+  {
+    "file_line": "src/capital_service.py:347",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bot_sql += \" AND execution_mode = ?\""
+  },
+  {
+    "file_line": "src/command_bus.py:280",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode_val = payload.get(\"execution_mode\") or payload.get(\"trading_mode\") or \"PAPER\""
+  },
+  {
+    "file_line": "src/command_bus.py:285",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(id, name, symbol, timeframe, strategy, allocated_capital, execution_mode, status, created_at, updated_at, config_json)"
+  },
+  {
+    "file_line": "src/command_bus.py:309",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"UPDATE bot_instances SET name = ?, symbol = ?, timeframe = ?, strategy = ?, allocated_capital = ?, execution_mode = ? WHERE id = ?\","
+  },
+  {
+    "file_line": "src/command_bus.py:316",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "payload.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "src/config.py:167",
+    "variable": "TRADING_MODE",
+    "operation": "WRITE",
+    "line_content": "TRADING_MODE = os.getenv(\"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "src/config.py:168",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "WRITE",
+    "line_content": "LIVE_TRADING_ENABLED = os.getenv(\"LIVE_TRADING_ENABLED\", \"false\").lower() == \"true\""
+  },
+  {
+    "file_line": "src/db.py:705",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "'CREATE INDEX IF NOT EXISTS \"idx_pg_trades_log_query\" ON \"trades_log\"(\"execution_mode\", \"status\", \"timestamp\" DESC);',"
+  },
+  {
+    "file_line": "src/db.py:706",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "'CREATE INDEX IF NOT EXISTS \"idx_pg_bot_instances_query\" ON \"bot_instances\"(\"execution_mode\", \"status\");',"
+  },
+  {
+    "file_line": "src/db.py:1188",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:1319",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"TEXT DEFAULT 'PAPER'\","
+  },
+  {
+    "file_line": "src/db.py:1502",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:2362",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:2464",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(\"execution_mode\", \"ALTER TABLE trades_log ADD COLUMN execution_mode TEXT DEFAULT 'PAPER'\"),"
+  },
+  {
+    "file_line": "src/db.py:2544",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_trades_log_mode_status ON trades_log(execution_mode, status)\")"
+  },
+  {
+    "file_line": "src/db.py:2545",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_trades_log_mode_status_ts ON trades_log(execution_mode, status, timestamp DESC)\")"
+  },
+  {
+    "file_line": "src/db.py:2546",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_trades_log_cust_mode ON trades_log(customer_id, execution_mode)\")"
+  },
+  {
+    "file_line": "src/db.py:2557",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_bot_instances_mode ON bot_instances(execution_mode, status)\")"
+  },
+  {
+    "file_line": "src/db.py:2604",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(\"execution_mode\", \"ALTER TABLE bot_instances ADD COLUMN execution_mode TEXT DEFAULT 'PAPER'\"),"
+  },
+  {
+    "file_line": "src/db.py:2852",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:2931",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"TEXT DEFAULT 'PAPER'\","
+  },
+  {
+    "file_line": "src/db.py:2976",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_bot_instances_exec_mode ON bot_instances(execution_mode)\")"
+  },
+  {
+    "file_line": "src/db.py:3149",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:3658",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:3682",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:3705",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:3769",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "src/db.py:5948",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:5959",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:5970",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:5981",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:5993",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "allocated_capital, current_equity, execution_mode, status,"
+  },
+  {
+    "file_line": "src/db.py:5999",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "b[\"allocated_capital\"], b[\"allocated_capital\"], b[\"execution_mode\"], b[\"status\"],"
+  },
+  {
+    "file_line": "src/db.py:8364",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8382",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8400",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8418",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8436",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8454",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/db.py:8784",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"SELECT * FROM trades_log WHERE execution_mode = 'PAPER' OR execution_mode IS NULL\")"
+  },
+  {
+    "file_line": "src/db.py:8787",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"SELECT * FROM bot_instances WHERE execution_mode = 'PAPER' AND COALESCE(is_deleted, 0) = 0\")"
+  },
+  {
+    "file_line": "src/db.py:8848",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"DELETE FROM trades_log WHERE execution_mode = 'PAPER' OR execution_mode IS NULL\")"
+  },
+  {
+    "file_line": "src/db.py:8849",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"UPDATE bot_instances SET current_equity = allocated_capital, realized_pnl = 0.0, unrealized_pnl = 0.0, trade_count = 0 WHERE execution_mode = 'PAPER'\")"
+  },
+  {
+    "file_line": "src/db.py:10264",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode, created_at, filled_at, remarks,"
+  },
+  {
+    "file_line": "src/db.py:10285",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "order.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "src/db.py:11475",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": b.get(\"environment\"),"
+  },
+  {
+    "file_line": "src/delta_exchange_adapter.py:292",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:253",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:328",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:338",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:352",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:375",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "getattr(config, \"TRADING_MODE\", \"PAPER\").upper() == \"LIVE\""
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:376",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "and getattr(config, \"LIVE_TRADING_ENABLED\", False) is True"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:529",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "getattr(config, \"TRADING_MODE\", \"PAPER\").upper() == \"LIVE\""
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:530",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "and getattr(config, \"LIVE_TRADING_ENABLED\", False) is True"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:611",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "getattr(config, \"TRADING_MODE\", \"PAPER\").upper() == \"LIVE\""
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:612",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "and getattr(config, \"LIVE_TRADING_ENABLED\", False) is True"
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:631",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "getattr(config, \"TRADING_MODE\", \"PAPER\").upper() == \"LIVE\""
+  },
+  {
+    "file_line": "src/dhan_broker_adapter.py:632",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "and getattr(config, \"LIVE_TRADING_ENABLED\", False) is True"
+  },
+  {
+    "file_line": "src/dhan_feed_manager.py:465",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/dhan_feed_manager.py:634",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/execution.py:51",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "if global_trading_authorization_service.is_live_trading_locked() and getattr(config, \"TRADING_MODE\", \"PAPER\") == \"LIVE\":"
+  },
+  {
+    "file_line": "src/execution.py:77",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "if global_trading_authorization_service.is_live_trading_locked() and getattr(config, \"TRADING_MODE\", \"PAPER\") == \"LIVE\":"
+  },
+  {
+    "file_line": "src/execution_service.py:77",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "src/execution_service.py:99",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"TEST\""
+  },
+  {
+    "file_line": "src/execution_service.py:134",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"LIVE\""
+  },
+  {
+    "file_line": "src/execution_service.py:257",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/execution_service.py:259",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "return False, f\"EXECUTION_MODE_MISMATCH: Live order requested but TRADING_MODE is '{mode}'\""
+  },
+  {
+    "file_line": "src/execution_service.py:267",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "src/execution_service.py:268",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "return False, \"LIVE_TRADING_DISABLED: LIVE_TRADING_ENABLED flag is False\""
+  },
+  {
+    "file_line": "src/execution_service.py:440",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "src/exness_broker_adapter.py:177",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/exness_broker_adapter.py:235",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/exness_broker_adapter.py:275",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/expiry_lifecycle_manager.py:524",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "env = str(t.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/expiry_lifecycle_manager.py:753",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "src/futures_terminal_service.py:670",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "exec_mode = order_request.get(\"execution_mode\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/futures_terminal_service.py:688",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": exec_mode,"
+  },
+  {
+    "file_line": "src/global_data_engine.py:150",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')"
+  },
+  {
+    "file_line": "src/global_data_engine.py:160",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')"
+  },
+  {
+    "file_line": "src/global_data_engine.py:170",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE execution_mode = ? AND status IN ('PENDING', 'SUBMITTED', 'OPEN')"
+  },
+  {
+    "file_line": "src/global_data_engine.py:177",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT allocated_capital, current_equity FROM bot_instances WHERE execution_mode = ?\","
+  },
+  {
+    "file_line": "src/global_data_engine.py:339",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')"
+  },
+  {
+    "file_line": "src/global_data_engine.py:382",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": trading_mode,"
+  },
+  {
+    "file_line": "src/global_data_engine.py:397",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "WHERE execution_mode = ?"
+  },
+  {
+    "file_line": "src/global_data_engine.py:418",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": trading_mode,"
+  },
+  {
+    "file_line": "src/global_data_engine.py:479",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "query = \"SELECT * FROM trades_log WHERE execution_mode = ?\""
+  },
+  {
+    "file_line": "src/global_data_engine.py:500",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?\","
+  },
+  {
+    "file_line": "src/global_data_engine.py:909",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "query = \"SELECT * FROM trades_log WHERE execution_mode = ?\""
+  },
+  {
+    "file_line": "src/global_data_engine.py:935",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "bots = db.safe_query(\"SELECT allocated_capital FROM bot_instances WHERE execution_mode = ?\", (trading_mode,))"
+  },
+  {
+    "file_line": "src/global_data_engine.py:1403",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "query = \"SELECT * FROM trades_log WHERE execution_mode = ?\""
+  },
+  {
+    "file_line": "src/instrument_resolver.py:1609",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\","
+  },
+  {
+    "file_line": "src/instrument_resolver.py:1628",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def resolve_bot(self, query: str, execution_mode: str = \"PAPER\", asset_class: Optional[str] = None) -> ResolutionResult:"
+  },
+  {
+    "file_line": "src/instrument_resolver.py:1629",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "return self.__class__.resolve_for_bot(query, execution_mode=execution_mode, asset_class=asset_class)"
+  },
+  {
+    "file_line": "src/intelligence_engine.py:100",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/intelligence_engine.py:332",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = bot.get(\"execution_mode\", \"PAPER\")"
+  },
+  {
+    "file_line": "src/intelligence_engine.py:841",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "strategy_id, strategy_version, execution_mode, decision_state,"
+  },
+  {
+    "file_line": "src/intelligence_engine.py:851",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "symbol, timeframe, strategy_name, strategy_version, execution_mode,"
+  },
+  {
+    "file_line": "src/intelligence_engine.py:873",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": execution_mode,"
+  },
+  {
+    "file_line": "src/intelligence_engine.py:1136",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\",  # Explicitly simulated"
+  },
+  {
+    "file_line": "src/live_authorization_manager.py:76",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def validate_bot_live_authorization(bot_id: str, execution_mode: str) -> Tuple[bool, Optional[str]]:"
+  },
+  {
+    "file_line": "src/live_authorization_manager.py:82",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if (execution_mode or \"\").upper() == \"PAPER\":"
+  },
+  {
+    "file_line": "src/live_runner.py:125",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "self.execution_mode = b.get(\"execution_mode\") or \"PAPER\""
+  },
+  {
+    "file_line": "src/live_runner.py:137",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "self.execution_mode = \"PAPER\""
+  },
+  {
+    "file_line": "src/live_runner.py:544",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT OR REPLACE INTO positions (bot_id, symbol, direction, quantity, entry_price, current_price, unrealized_pnl, status, execution_mode)"
+  },
+  {
+    "file_line": "src/live_runner.py:546",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"\"\", (self.bot_id, self.symbol, signal, size, exec_price, exec_price, getattr(self, \"execution_mode\", \"PAPER\")))"
+  },
+  {
+    "file_line": "src/option_order_intent.py:163",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = data.get(\"mode\") or data.get(\"execution_mode\") or \"PAPER\""
+  },
+  {
+    "file_line": "src/performance_analytics.py:119",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "sql += \" AND execution_mode = ?\""
+  },
+  {
+    "file_line": "src/performance_analytics.py:411",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "em = (t.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/performance_analytics.py:427",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_modes\": mode_list"
+  },
+  {
+    "file_line": "src/performance_analytics.py:543",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "return [t for t in all_trades if (t.get(\"execution_mode\") or \"PAPER\").upper() == mode_name][:limit]"
+  },
+  {
+    "file_line": "src/pnl_dashboard_engine.py:96",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "query += \" AND (UPPER(execution_mode) = ? OR UPPER(trade_status) = ?)\""
+  },
+  {
+    "file_line": "src/pnl_dashboard_engine.py:111",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "query += \" AND UPPER(execution_mode) = 'PAPER'\""
+  },
+  {
+    "file_line": "src/pnl_dashboard_engine.py:380",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if b[\"broker_id\"] in (t.get(\"exchange\") or \"\").upper() or b[\"broker_id\"] in (t.get(\"broker\") or \"\").upper() or (b[\"broker_id\"] == \"PAPER\" and (t.get(\"execution_mode\") or \"\").upper() == \"PAPER\")"
+  },
+  {
+    "file_line": "src/pnl_dashboard_engine.py:487",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": (t.get(\"execution_mode\") or \"PAPER\").upper(),"
+  },
+  {
+    "file_line": "src/process_manager.py:189",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = (bot_info.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/process_manager.py:190",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if mode == \"LIVE\" and not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "src/process_manager.py:191",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "return {\"valid\": False, \"reason\": \"LIVE trading is disabled on server. Set LIVE_TRADING_ENABLED=True on server to permit real capital execution.\"}"
+  },
+  {
+    "file_line": "src/process_manager.py:329",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:329",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:414",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:414",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:475",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:475",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:521",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:521",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode=bot_info.get(\"execution_mode\", config.TRADING_MODE),"
+  },
+  {
+    "file_line": "src/process_manager.py:844",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = (bot.get(\"execution_mode\") or \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/process_manager.py:848",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "src/reconciliation.py:31",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/self_healing_manager.py:45",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\", \"order_side\", \"symbol\", \"quantity\", \"price\""
+  },
+  {
+    "file_line": "src/telegram_service.py:867",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "f\"<b>Mode:</b>\\n{getattr(config, 'TRADING_MODE', 'PAPER')}\\n\\n\""
+  },
+  {
+    "file_line": "src/trade_audit_engine.py:204",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": t.get(\"execution_mode\") or \"PAPER\","
+  },
+  {
+    "file_line": "src/trade_audit_engine.py:270",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": t.get(\"execution_mode\") or \"PAPER\","
+  },
+  {
+    "file_line": "src/trade_audit_engine.py:317",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "{\"step\": 5, \"phase\": \"ORDER\", \"time\": t.get(\"timestamp\", \"\"), \"detail\": f\"Submitted {t.get('execution_mode', 'PAPER')} order #{broker_ord}\"},"
+  },
+  {
+    "file_line": "src/trade_ledger.py:126",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT DEFAULT 'PAPER'"
+  },
+  {
+    "file_line": "src/trade_ledger.py:193",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"TEXT DEFAULT 'PAPER'\","
+  },
+  {
+    "file_line": "src/trade_ledger.py:213",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cursor.execute(\"CREATE INDEX IF NOT EXISTS idx_trades_log_sym_mode ON trades_log(symbol, execution_mode)\")"
+  },
+  {
+    "file_line": "src/trade_ledger.py:354",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode, status, trade_status, trade_result, entry_reason, exit_reason,"
+  },
+  {
+    "file_line": "src/trade_ledger.py:386",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "trade_data.get(\"execution_mode\", \"PAPER\"), trade_data.get(\"entry_reason\", \"STRATEGY_SIGNAL\"),"
+  },
+  {
+    "file_line": "src/trading_authorization_service.py:160",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "is_authed, auth_err = LiveAuthorizationManager.validate_bot_live_authorization(bot_id=bot_id, execution_mode=\"LIVE\")"
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1151",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "_mode_for_auth = str(order_intent.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))).upper()"
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1168",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = str(order_intent.get(\"mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))).upper()"
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1170",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1175",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"message\": \"Live order rejected: LIVE_TRADING_ENABLED is False.\","
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1177",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"details\": {\"stage\": \"02_execution_mode\"}"
+  },
+  {
+    "file_line": "src/universal_risk_engine.py:1186",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"details\": {\"stage\": \"02_execution_mode\"}"
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:10",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "1. Enforces TRADING_MODE=PAPER by default."
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:90",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:120",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:138",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"LIVE\","
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:160",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:218",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"LIVE\","
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:270",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:287",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:300",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:331",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/upstox_broker_adapter.py:346",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:107",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\"               # \"PAPER\", \"SHADOW\", \"LIVE\", \"BACKTEST\""
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:844",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:868",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:897",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:919",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:972",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:1102",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": self.config.execution_mode"
+  },
+  {
+    "file_line": "src/volume_star_strategy.py:1135",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"mode\": self.config.execution_mode,"
+  },
+  {
+    "file_line": "src/zerodha_broker_adapter.py:239",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/zerodha_broker_adapter.py:278",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/zerodha_broker_adapter.py:314",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/conftest.py:116",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/conftest.py:128",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_actionable_option_chain_execution.py:13",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "9. Broker segregation and safety verification (TRADING_MODE=PAPER)"
+  },
+  {
+    "file_line": "tests/test_actionable_option_chain_execution.py:243",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"\"\"Test that LIVE mode requests fail safely when LIVE_TRADING_ENABLED=false.\"\"\""
+  },
+  {
+    "file_line": "tests/test_active_positions_system.py:33",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "status, execution_mode, bot_id, bot_instance_name, strategy_name, leverage, timestamp"
+  },
+  {
+    "file_line": "tests/test_active_positions_system.py:48",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "status, execution_mode, bot_id, bot_instance_name, strategy_name, leverage, timestamp"
+  },
+  {
+    "file_line": "tests/test_alert_storm_regression.py:108",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, allocated_capital, created_at, updated_at, execution_mode, status, is_deleted"
+  },
+  {
+    "file_line": "tests/test_all_api_contracts.py:199",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_authoritative_bot_creation_pipeline.py:51",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_authoritative_bot_creation_pipeline.py:154",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_binance_unified_market_data_pipeline.py:185",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert order_res.get(\"execution_mode\") in [\"PAPER\", \"TEST\"]"
+  },
+  {
+    "file_line": "tests/test_bot_command_center_pipeline.py:80",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "tests/test_bot_command_center_pipeline.py:105",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "tests/test_bot_control_center.py:94",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert bot[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_bot_control_center.py:235",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert data[\"live_trading_enabled\"] == getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_bot_error_root_cause_fix.py:46",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "res_bot = global_instrument_resolver.resolve_for_bot(\"ETH-OPTIONS\", execution_mode=\"PAPER\", asset_class=\"CRYPTO_OPTIONS\")"
+  },
+  {
+    "file_line": "tests/test_bot_error_root_cause_fix.py:93",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode,"
+  },
+  {
+    "file_line": "tests/test_bot_error_root_cause_fix.py:157",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert order[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:5",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "1. Safe paper-first invariants (TRADING_MODE=PAPER, LIVE_TRADING=false)."
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:39",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, strategy, timeframe, asset_class, exchange, execution_mode,"
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:58",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"\"\"Invariant: TRADING_MODE must be PAPER and LIVE_TRADING disabled by default.\"\"\""
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:59",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert config.TRADING_MODE == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:60",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert config.LIVE_TRADING_ENABLED is False"
+  },
+  {
+    "file_line": "tests/test_bot_fleet_command_center.py:102",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert bot[\"execution_mode\"] in [\"PAPER\", \"LIVE\"]"
+  },
+  {
+    "file_line": "tests/test_bot_instance_wizard.py:33",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_bot_instance_wizard.py:134",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_bot_instance_wizard.py:193",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_bot_instance_wizard.py:224",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_bot_registry_and_lifecycle.py:74",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"exchange\", \"execution_mode\", \"status\", \"created_at\", \"started_at\","
+  },
+  {
+    "file_line": "tests/test_bot_registry_and_lifecycle.py:94",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_bot_registry_and_lifecycle.py:109",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "self.assertEqual(b[\"execution_mode\"], \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_canonical_bot_config.py:36",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=BotExecutionMode.PAPER,"
+  },
+  {
+    "file_line": "tests/test_canonical_bot_config.py:129",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert canonical.environment.execution_mode == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_cleanup_bot_instances.py:21",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"INSERT OR REPLACE INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, execution_mode, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, ?, ?, 0, ?, ?)\","
+  },
+  {
+    "file_line": "tests/test_cleanup_bot_instances.py:27",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"INSERT OR REPLACE INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, execution_mode, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, ?, ?, 0, ?, ?)\","
+  },
+  {
+    "file_line": "tests/test_cleanup_bot_instances.py:33",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"INSERT OR REPLACE INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, execution_mode, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, ?, ?, 0, ?, ?)\","
+  },
+  {
+    "file_line": "tests/test_cleanup_bot_instances.py:39",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"INSERT OR REPLACE INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, execution_mode, status, open_position_count, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, ?, ?, 1, 0, ?, ?)\","
+  },
+  {
+    "file_line": "tests/test_cleanup_bot_instances.py:49",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"INSERT OR REPLACE INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, execution_mode, status, is_deleted, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 10000.0, ?, ?, 0, ?, ?)\","
+  },
+  {
+    "file_line": "tests/test_command_bus_and_state_consistency.py:79",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(id, name, symbol, timeframe, strategy, allocated_capital, execution_mode, status, started_at, last_heartbeat, created_at, updated_at, is_deleted)"
+  },
+  {
+    "file_line": "tests/test_command_bus_and_state_consistency.py:88",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(id, name, symbol, timeframe, strategy, allocated_capital, execution_mode, status, started_at, last_heartbeat, created_at, updated_at, is_deleted)"
+  },
+  {
+    "file_line": "tests/test_command_center_and_trace.py:52",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "take_profit, position_size, status, broker_order_id, execution_mode, correlation_id"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:19",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"\"\"Verify live order is blocked when LIVE_TRADING_ENABLED is False.\"\"\""
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:20",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:21",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:35",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:39",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:40",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", True)"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:54",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:55",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:59",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:120",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_critical_live_order_safety.py:132",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert result[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_crypto_derivatives.py:133",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_customer_broker_hierarchy_and_ledgers.py:261",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_dhan_lifecycle_and_gateway.py:138",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "self.assertFalse(getattr(config, \"LIVE_TRADING_ENABLED\", False))"
+  },
+  {
+    "file_line": "tests/test_dhan_real_market_pipeline_and_safety.py:39",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert hasattr(config, \"TRADING_MODE\")"
+  },
+  {
+    "file_line": "tests/test_dhan_real_market_pipeline_and_safety.py:40",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert hasattr(config, \"LIVE_TRADING_ENABLED\")"
+  },
+  {
+    "file_line": "tests/test_dhan_real_market_pipeline_and_safety.py:44",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert config.TRADING_MODE == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_dhan_real_market_pipeline_and_safety.py:45",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert config.LIVE_TRADING_ENABLED is False"
+  },
+  {
+    "file_line": "tests/test_dhan_real_market_pipeline_and_safety.py:77",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert tick[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_direct_option_order_execution.py:228",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"\"\"Validates that under TRADING_MODE=PAPER, orders execute in simulated OMS without external dispatch.\"\"\""
+  },
+  {
+    "file_line": "tests/test_direct_option_order_execution.py:372",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"\"\"Ensures LIVE order execution is strictly rejected when LIVE_TRADING_ENABLED=False.\"\"\""
+  },
+  {
+    "file_line": "tests/test_direct_option_order_execution.py:391",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "with patch.object(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "tests/test_expiry_lifecycle_manager.py:96",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO trades_log (id, bot_id, symbol, direction, position_size, entry_price, status, execution_mode, currency, timestamp)"
+  },
+  {
+    "file_line": "tests/test_expiry_lifecycle_manager.py:145",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO trades_log (id, bot_id, symbol, direction, position_size, entry_price, status, execution_mode, currency, timestamp)"
+  },
+  {
+    "file_line": "tests/test_expiry_lifecycle_manager.py:192",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO trades_log (id, bot_id, symbol, direction, position_size, entry_price, status, execution_mode, currency, timestamp)"
+  },
+  {
+    "file_line": "tests/test_expiry_lifecycle_manager.py:336",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO trades_log (id, bot_id, symbol, direction, position_size, entry_price, status, execution_mode, currency, timestamp)"
+  },
+  {
+    "file_line": "tests/test_full_e2e_platform_verification.py:44",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_full_e2e_platform_verification.py:113",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, execution_mode, created_at, updated_at)"
+  },
+  {
+    "file_line": "tests/test_futures_live_market_data.py:6",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "2. Safe PAPER mode invariants (TRADING_MODE=PAPER, LIVE_TRADING=false)."
+  },
+  {
+    "file_line": "tests/test_http_resilience_and_error_handling.py:65",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_http_resilience_and_error_handling.py:74",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert data[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_indian_market_integration.py:157",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "self.assertEqual(order[\"execution_mode\"], \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_instrument_resolution_and_reliability.py:216",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, execution_mode, created_at, updated_at)"
+  },
+  {
+    "file_line": "tests/test_live_market_data_monitoring.py:6",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "2. Safe PAPER mode invariants (TRADING_MODE=PAPER, LIVE_TRADING=false)."
+  },
+  {
+    "file_line": "tests/test_master_system_repair_audit.py:240",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_options_contract_resolution.py:116",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "tests/test_options_contract_resolution.py:145",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "id, name, symbol, asset_class, timeframe, strategy, execution_mode, status, allocated_capital, created_at, updated_at"
+  },
+  {
+    "file_line": "tests/test_options_workstation_e2e.py:108",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_options_workstation_workflow_e2e.py:70",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_performance_analytics.py:38",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert \"execution_mode_donut\" in charts"
+  },
+  {
+    "file_line": "tests/test_performance_and_trade_ledger.py:46",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_performance_and_trade_ledger.py:98",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_performance_and_trade_ledger.py:134",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_positions_intelligence_center.py:10",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "6. Permanent Paper Safety Invariants (TRADING_MODE=PAPER, LIVE_TRADING=false)"
+  },
+  {
+    "file_line": "tests/test_positions_intelligence_center.py:34",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"\"\"Permanent safety check: TRADING_MODE must be PAPER and LIVE_TRADING false.\"\"\""
+  },
+  {
+    "file_line": "tests/test_positions_intelligence_center.py:35",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert getattr(config, \"TRADING_MODE\", \"PAPER\") == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_positions_intelligence_center.py:74",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "assert pos[\"execution_mode\"] == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_scheduled_ai_trading_routine.py:37",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_scheduled_ai_trading_routine.py:38",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_scheduled_ai_trading_routine.py:48",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert config.TRADING_MODE == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_scheduled_ai_trading_routine.py:49",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert config.LIVE_TRADING_ENABLED is False"
+  },
+  {
+    "file_line": "tests/test_strategy_bot_creation_workflow.py:16",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_strategy_bot_creation_workflow.py:68",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_strategy_bot_creation_workflow.py:93",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:14",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "10. Strict dual-mode invariant (TRADING_MODE=PAPER, LIVE_TRADING_ENABLED=false)."
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:14",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "10. Strict dual-mode invariant (TRADING_MODE=PAPER, LIVE_TRADING_ENABLED=false)."
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:22",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "os.environ[\"TRADING_MODE\"] = \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:23",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "os.environ[\"LIVE_TRADING_ENABLED\"] = \"false\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:53",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "os.environ[\"TRADING_MODE\"] = \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:54",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "os.environ[\"LIVE_TRADING_ENABLED\"] = \"false\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:449",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"\"\"Verify created bots cannot execute live trades while LIVE_TRADING_ENABLED=false.\"\"\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:450",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "assert os.getenv(\"TRADING_MODE\", \"PAPER\") == \"PAPER\""
+  },
+  {
+    "file_line": "tests/test_unified_bot_creation_system.py:451",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "assert os.getenv(\"LIVE_TRADING_ENABLED\", \"false\").lower() == \"false\""
+  },
+  {
+    "file_line": "tests/test_volume_star_strategy.py:188",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cfg = VolumeStarConfig(timeframe=\"5m\", execution_mode=\"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_volume_star_strategy.py:225",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "cfg = VolumeStarConfig(timeframe=\"5m\", execution_mode=\"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:36",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "orig_trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:38",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "orig_live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:47",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", orig_trading_mode)"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:49",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "setattr(config, \"LIVE_TRADING_ENABLED\", orig_live_enabled)"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:73",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:85",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:89",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:108",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:112",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:132",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:242",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"LIVE\")"
+  },
+  {
+    "file_line": "tests/test_wave_a_architecture_and_reconciliation.py:263",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "setattr(config, \"TRADING_MODE\", \"PAPER\")"
+  },
+  {
+    "file_line": "tests/test_zero_duplication_policy.py:46",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "INSERT INTO bot_instances (id, name, symbol, strategy, timeframe, allocated_capital, status, execution_mode, created_at, updated_at)"
+  },
+  {
+    "file_line": "trading_orchestrator/db_init.py:113",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT DEFAULT 'PAPER',"
+  },
+  {
+    "file_line": "trading_orchestrator/ai/context_builder.py:22",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\""
+  },
+  {
+    "file_line": "trading_orchestrator/ai/context_builder.py:26",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode"
+  },
+  {
+    "file_line": "trading_orchestrator/ai/context_builder.py:30",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/ai/strategy_agent.py:31",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\","
+  },
+  {
+    "file_line": "trading_orchestrator/ai/strategy_agent.py:39",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/ai/strategy_agent.py:52",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "is_paper = (execution_mode.upper() == \"PAPER\")"
+  },
+  {
+    "file_line": "trading_orchestrator/ai/strategy_agent.py:140",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:54",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "\"trading_mode\": getattr(config, \"TRADING_MODE\", \"PAPER\"),"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:190",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = data.get(\"execution_mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:190",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = data.get(\"execution_mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:193",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "res = global_trading_scheduler.run_task_now(task_id=task_id, execution_mode=mode)"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:273",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode = data.get(\"execution_mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:273",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "execution_mode = data.get(\"execution_mode\", getattr(config, \"TRADING_MODE\", \"PAPER\"))"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:278",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/api/orchestrator_routes.py:366",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "trading_orchestrator/context/market_context.py:118",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\""
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_engine.py:50",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "server_trading_mode = getattr(config, \"TRADING_MODE\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_engine.py:51",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_enabled = getattr(config, \"LIVE_TRADING_ENABLED\", False)"
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_engine.py:92",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\" if intent.paperOnly else \"LIVE\","
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_engine.py:147",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\" if intent.paperOnly else \"LIVE\","
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_engine.py:203",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=\"PAPER\" if intent.paperOnly else \"LIVE\","
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_history.py:23",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\","
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_history.py:33",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "approval_status, execution_mode, created_at"
+  },
+  {
+    "file_line": "trading_orchestrator/decisions/decision_history.py:62",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/jobs.py:34",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\","
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/jobs.py:38",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "logger.info(\"[CHECKPOINT_RUNNER] Starting execution for %s [Run ID: %s, Mode: %s]\", checkpoint_id, run_id, execution_mode)"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/jobs.py:41",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mkt_ctx = build_comprehensive_market_context(symbols=target_symbols, execution_mode=execution_mode)"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/jobs.py:48",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/jobs.py:81",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if execution_mode.upper() == \"PAPER\":"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:492",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def run_task_now(self, task_id: str, execution_mode: str = \"PAPER\") -> Dict[str, Any]:"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:508",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:529",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:535",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:650",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "def trigger_checkpoint_manually(self, checkpoint_id: str, execution_mode: str = \"PAPER\") -> Dict[str, Any]:"
+  },
+  {
+    "file_line": "trading_orchestrator/scheduler/scheduler.py:652",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "return self.run_task_now(task_id=checkpoint_id, execution_mode=execution_mode)"
+  },
+  {
+    "file_line": "trading_orchestrator/workflow/workflow_engine.py:141",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode: str = \"PAPER\","
+  },
+  {
+    "file_line": "trading_orchestrator/workflow/workflow_engine.py:161",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/workflow/workflow_engine.py:219",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=execution_mode,"
+  },
+  {
+    "file_line": "trading_orchestrator/workflow/workflow_engine.py:226",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "global_workflow_state_mgr.transition_to(WorkflowState.EXECUTING, f\"Routing orders via {execution_mode} engine\")"
+  },
+  {
+    "file_line": "src/market_data/multi_market_broker_adapters.py:168",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:406",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL,"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:425",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode TEXT NOT NULL,"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:484",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = order_payload.get(\"execution_mode\", \"PAPER\").upper()"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:539",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:563",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "mode = order_payload.get(\"execution_mode\", \"PAPER\")"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:570",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(instance_id, strategy_id, strategy_name, underlying, exchange, broker_id, execution_mode, lots, status, net_debit_credit, required_margin, max_profit, max_loss, breakevens, legs_json, created_at, updated_at)"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:594",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "(order_id, instance_id, underlying, broker_id, execution_mode, status, legs_count, net_fill_cash_flow, raw_payload, executed_at)"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:901",
+    "variable": "execution_mode",
+    "operation": "WRITE",
+    "line_content": "execution_mode=payload.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:932",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": r[\"execution_mode\"],"
+  },
+  {
+    "file_line": "src/market_data/options_workstation_service.py:954",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": r[\"mode\"],"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:51",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode: str  # \"PAPER\" or \"LIVE\""
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:99",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "logger.info(f\"Executing pair intent {intent_id} for pair {intent.pair_id} ({intent.direction}) in {intent.execution_mode} mode.\")"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:119",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "if intent.execution_mode.upper() == \"PAPER\":"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:148",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not getattr(config, \"LIVE_TRADING_ENABLED\", False):"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:153",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "message=\"Live trading is locked on server. Set LIVE_TRADING_ENABLED=True.\","
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:200",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode, broker, filled_at, created_at"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:214",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "intent.execution_mode,"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:239",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "entry_price, current_price, unrealized_pnl, status, execution_mode,"
+  },
+  {
+    "file_line": "src/pairs_trading/pairs_execution_engine.py:256",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "intent.execution_mode,"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:236",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "COALESCE(execution_mode, 'PAPER') as mode,"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:241",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:253",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:266",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "COALESCE(execution_mode, 'PAPER') as mode,"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:272",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?"
+  },
+  {
+    "file_line": "src/data_core/accounts/account_manager.py:284",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?"
+  },
+  {
+    "file_line": "src/data_core/bots/consistency_engine.py:788",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "from src.config import LIVE_TRADING_ENABLED"
+  },
+  {
+    "file_line": "src/data_core/bots/consistency_engine.py:789",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "if not LIVE_TRADING_ENABLED:"
+  },
+  {
+    "file_line": "src/data_core/bots/consistency_engine.py:795",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "expected=\"LIVE_TRADING_ENABLED=true in server environment\","
+  },
+  {
+    "file_line": "src/data_core/bots/consistency_engine.py:798",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "correction=\"Set LIVE_TRADING_ENABLED=true in server configuration after safety audit\","
+  },
+  {
+    "file_line": "src/data_core/bots/deployment_engine.py:431",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "execution_mode, status, created_at, updated_at, allocated_capital,"
+  },
+  {
+    "file_line": "src/data_core/orders/order_manager.py:9",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "3. LIVE trading remains protected by server-side LIVE_TRADING_ENABLED=false safety switch."
+  },
+  {
+    "file_line": "src/data_core/providers/registry.py:168",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "environment=Environment.LIVE if os.getenv(\"LIVE_TRADING_ENABLED\", \"false\").lower() == \"true\" else Environment.PAPER,"
+  },
+  {
+    "file_line": "src/data_core/providers/registry.py:183",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "environment=Environment.LIVE if os.getenv(\"LIVE_TRADING_ENABLED\", \"false\").lower() == \"true\" else Environment.PAPER,"
+  },
+  {
+    "file_line": "src/data_core/providers/registry.py:198",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "environment=Environment.LIVE if os.getenv(\"LIVE_TRADING_ENABLED\", \"false\").lower() == \"true\" else Environment.PAPER,"
+  },
+  {
+    "file_line": "market_data/futures/routes.py:481",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "market_data/futures/routes.py:515",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "market_data/futures/routes.py:551",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": o.get(\"execution_mode\", \"PAPER\"),"
+  },
+  {
+    "file_line": "market_data/futures/routes.py:573",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "market_data/futures/routes.py:589",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": \"PAPER\","
+  },
+  {
+    "file_line": "market_data/futures/routes.py:651",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "\"message\": \"Real-money LIVE trading is currently locked by server safety gate (LIVE_TRADING_ENABLED=false). Execute in PAPER mode.\","
+  },
+  {
+    "file_line": "market_data/futures/routes.py:699",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "\"execution_mode\": mode,"
+  },
+  {
+    "file_line": "docs/evidence/phase0/generate_audit_evidence.py:82",
+    "variable": "LIVE_TRADING_ENABLED",
+    "operation": "READ",
+    "line_content": "live_gate_vars = [\"LIVE_TRADING_ENABLED\", \"execution_mode\", \"TRADING_MODE\", \"LIVE_ENABLED\"]"
+  },
+  {
+    "file_line": "docs/evidence/phase0/generate_audit_evidence.py:82",
+    "variable": "execution_mode",
+    "operation": "READ",
+    "line_content": "live_gate_vars = [\"LIVE_TRADING_ENABLED\", \"execution_mode\", \"TRADING_MODE\", \"LIVE_ENABLED\"]"
+  },
+  {
+    "file_line": "docs/evidence/phase0/generate_audit_evidence.py:82",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "live_gate_vars = [\"LIVE_TRADING_ENABLED\", \"execution_mode\", \"TRADING_MODE\", \"LIVE_ENABLED\"]"
+  },
+  {
+    "file_line": "docs/evidence/phase0/generate_audit_evidence.py:82",
+    "variable": "LIVE_ENABLED",
+    "operation": "READ",
+    "line_content": "live_gate_vars = [\"LIVE_TRADING_ENABLED\", \"execution_mode\", \"TRADING_MODE\", \"LIVE_ENABLED\"]"
+  },
+  {
+    "file_line": "app/blueprints/health.py:117",
+    "variable": "TRADING_MODE",
+    "operation": "READ",
+    "line_content": "mode = getattr(config, \"TRADING_MODE\", \"PAPER\")"
+  }
+]

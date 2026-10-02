@@ -107,6 +107,7 @@ export function openBotCreator(
   if (fullIntent.broker) queryParams.set("broker", fullIntent.broker);
   if (fullIntent.marketDataSource) queryParams.set("marketDataSource", fullIntent.marketDataSource);
 
-  const targetPath = fullIntent.mode === "strategy" ? "/strategy/create" : "/bots/create";
+  const targetPath = "/bots/create";
   router.push(`${targetPath}?${queryParams.toString()}`);
 }
+

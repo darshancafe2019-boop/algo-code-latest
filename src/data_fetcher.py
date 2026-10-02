@@ -15,53 +15,86 @@ class DataFetcher:
     """
     Handles fetching of historical and live crypto market data using ccxt.
     Uses Binance Mainnet public endpoints for historical data (no API key needed).
-    Uses Binance Testnet (Sandbox) for live runner order/balance checks if configured.
-    Implements a thread-safe singleton pattern per environment (Mainnet/Testnet).
+    Uses Binance Testnet (Sandbox) for isolated testnet orders and balance checks.
+    Uses Binance Spot Production for live production execution and account balance.
+    Implements a thread-safe singleton pattern per environment (PUBLIC / TESTNET / LIVE).
     """
-    _instances: Dict[bool, "DataFetcher"] = {}
+    _instances: Dict[str, "DataFetcher"] = {}
     _lock = threading.Lock()
 
-    def __new__(cls, use_testnet: bool = False):
+    def __new__(cls, use_testnet: bool = False, mode: Optional[str] = None):
+        env_mode = (mode or ("TESTNET" if use_testnet else "PUBLIC")).upper()
+        if env_mode == "MAINNET":
+            env_mode = "PUBLIC"
         with cls._lock:
-            if use_testnet not in cls._instances:
+            if env_mode not in cls._instances:
                 instance = super(DataFetcher, cls).__new__(cls)
                 instance._initialized = False
-                cls._instances[use_testnet] = instance
-            return cls._instances[use_testnet]
+                cls._instances[env_mode] = instance
+            return cls._instances[env_mode]
 
-    def __init__(self, use_testnet: bool = False):
+    def __init__(self, use_testnet: bool = False, mode: Optional[str] = None):
         if getattr(self, "_initialized", False):
             return
-        self.use_testnet = use_testnet
+        env_mode = (mode or ("TESTNET" if use_testnet else "PUBLIC")).upper()
+        if env_mode == "MAINNET":
+            env_mode = "PUBLIC"
+        self.mode = env_mode
+        self.use_testnet = (env_mode == "TESTNET")
+        self.is_live = (env_mode in ["LIVE", "PRODUCTION"])
         
-        if self.use_testnet:
+        if self.mode == "TESTNET":
             logger.info("Initializing CCXT Binance in TESTNET mode.")
-            # Set credentials for Testnet
             self.exchange = ccxt.binance({
                 'apiKey': config.BINANCE_TESTNET_API_KEY,
                 'secret': config.BINANCE_TESTNET_SECRET_KEY,
                 'enableRateLimit': True,
                 'timeout': 10000,
+                'options': {
+                    'adjustForTimeDifference': True,
+                    'recvWindow': 60000,
+                },
             })
             self.exchange.set_sandbox_mode(True)
+            try:
+                self.exchange.load_time_difference()
+            except Exception as td_err:
+                logger.debug("Could not sync exchange time difference: %s", td_err)
+
+        elif self.mode in ["LIVE", "PRODUCTION"]:
+            logger.info("Initializing CCXT Binance in PRODUCTION LIVE mode.")
+            self.exchange = ccxt.binance({
+                'apiKey': getattr(config, "BINANCE_LIVE_API_KEY", ""),
+                'secret': getattr(config, "BINANCE_LIVE_SECRET_KEY", ""),
+                'enableRateLimit': True,
+                'timeout': 10000,
+                'options': {
+                    'adjustForTimeDifference': True,
+                    'recvWindow': 60000,
+                },
+            })
+            self.exchange.set_sandbox_mode(False)
+            try:
+                self.exchange.load_time_difference()
+            except Exception as td_err:
+                logger.debug("Could not sync exchange time difference: %s", td_err)
+
         else:
-            logger.info("Initializing CCXT Binance in MAINNET mode (Public endpoints).")
-            # Public mainnet needs no API credentials
+            logger.info("Initializing CCXT Binance in PUBLIC MAINNET mode (Public endpoints).")
             self.exchange = ccxt.binance({
                 'enableRateLimit': True,
                 'timeout': 10000,
             })
+            self.exchange.set_sandbox_mode(False)
+            
         self._initialized = True
 
     def fetch_testnet_balance(self) -> float:
         """
         Fetches the USDT balance of the Binance Testnet account.
         This verifies that the credentials work on Testnet.
-        
-        Returns:
-            float: Available USDT balance.
         """
-        if not self.use_testnet:
+        if self.mode != "TESTNET":
             raise ValueError("Testnet balance can only be fetched when initialized in TESTNET mode.")
             
         try:
@@ -73,15 +106,86 @@ class DataFetcher:
             logger.error(f"Error fetching Testnet balance: {e}")
             raise e
 
+    def fetch_live_balance(self) -> float:
+        """
+        Fetches the USDT balance of the Binance Spot PRODUCTION account.
+        Fails closed if live production API keys are missing.
+        """
+        if not getattr(config, "BINANCE_LIVE_API_KEY", "") or not getattr(config, "BINANCE_LIVE_SECRET_KEY", ""):
+            raise PermissionError("LIVE_CREDENTIALS_MISSING: BINANCE_LIVE_API_KEY and BINANCE_LIVE_SECRET_KEY must be configured for LIVE production balance query.")
+            
+        try:
+            balance = self.exchange.fetch_balance()
+            usdt_balance = balance.get('USDT', {}).get('free', 0.0)
+            logger.info(f"Production Live free USDT balance: {usdt_balance}")
+            return float(usdt_balance)
+        except Exception as e:
+            logger.error(f"Error fetching Production Live balance: {e}")
+            raise e
+
+    def fetch_live_ohlcv(self, symbol: str = "BTC/USDT", timeframe: str = "1m", limit: int = 100) -> pd.DataFrame:
+        """Fetches OHLCV candlestick data and returns a pandas DataFrame."""
+        try:
+            raw = self.exchange.fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+            df = pd.DataFrame(raw, columns=["timestamp", "open", "high", "low", "close", "volume"])
+            df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True)
+            try:
+                from src.market_data.stale_protection import global_stale_protection
+                global_stale_protection.record_tick(symbol)
+            except Exception:
+                pass
+            return df
+        except Exception as e:
+            logger.warning(f"Error fetching live OHLCV for {symbol}: {e}")
+            return pd.DataFrame(columns=["timestamp", "open", "high", "low", "close", "volume"])
+
+    def fetch_quote(self, symbol: str = "BTC/USDT") -> Dict[str, Any]:
+        """Fetches the latest ticker quote for a symbol."""
+        try:
+            ticker = self.exchange.fetch_ticker(symbol)
+            try:
+                from src.market_data.stale_protection import global_stale_protection
+                global_stale_protection.record_tick(symbol)
+            except Exception:
+                pass
+            return ticker
+        except Exception as e:
+            logger.warning(f"Error fetching quote for {symbol}: {e}")
+            return {}
+
+    def get_usdt_balance(self) -> float:
+        """Fetches available USDT balance."""
+        try:
+            balance = self.exchange.fetch_balance()
+            return float(balance.get("USDT", {}).get("free", 0.0))
+        except Exception as e:
+            logger.warning(f"Error fetching USDT balance: {e}")
+            return 0.0
+
 
 def get_mainnet_fetcher() -> DataFetcher:
-    """Return the shared thread-safe singleton DataFetcher for Binance Mainnet."""
-    return DataFetcher(use_testnet=False)
+    """Return the shared thread-safe singleton DataFetcher for Binance Mainnet (Public)."""
+    return DataFetcher(mode="PUBLIC")
+
+
+def get_public_fetcher() -> DataFetcher:
+    """Return the shared thread-safe singleton DataFetcher for Binance Public."""
+    return DataFetcher(mode="PUBLIC")
 
 
 def get_testnet_fetcher() -> DataFetcher:
     """Return the shared thread-safe singleton DataFetcher for Binance Testnet."""
-    return DataFetcher(use_testnet=True)
+    return DataFetcher(mode="TESTNET")
+
+
+def get_live_fetcher() -> DataFetcher:
+    """Return the shared thread-safe singleton DataFetcher for Binance Spot PRODUCTION."""
+    return DataFetcher(mode="LIVE")
+
+
+def get_live_production_fetcher() -> DataFetcher:
+    """Return the shared thread-safe singleton DataFetcher for Binance Spot PRODUCTION."""
+    return DataFetcher(mode="LIVE")
 
 
 # =============================================================================

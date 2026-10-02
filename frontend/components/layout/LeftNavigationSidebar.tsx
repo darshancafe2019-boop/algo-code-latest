@@ -75,9 +75,14 @@ export function LeftNavigationSidebar({
     });
   }, [router]);
 
-  const handleNavClick = (item: NavItem) => {
+  const handleNavClick = (e: React.MouseEvent, item: NavItem) => {
     if (onTabSelect) {
+      e.preventDefault();
       onTabSelect(item.id);
+      if (typeof window !== "undefined") {
+        const newUrl = item.id === "dashboard" || item.id === "home" ? "/" : `/?tab=${item.id}`;
+        window.history.pushState({ tab: item.id }, "", newUrl);
+      }
     }
     setMobileDrawerOpen(false);
   };
@@ -126,7 +131,7 @@ export function LeftNavigationSidebar({
                     router.prefetch(item.path);
                   } catch {}
                 }}
-                onClick={() => handleNavClick(item)}
+                onClick={(e) => handleNavClick(e, item)}
                 title={isCollapsed ? item.label : undefined}
                 className={cn(
                   "w-full h-[50px] flex items-center gap-2.5 px-3 rounded-lg text-[13px] font-medium transition-colors relative group cursor-pointer text-left",
@@ -222,7 +227,7 @@ export function LeftNavigationSidebar({
                         router.prefetch(item.path);
                       } catch {}
                     }}
-                    onClick={() => handleNavClick(item)}
+                    onClick={(e) => handleNavClick(e, item)}
                     className={cn(
                       "w-full h-10 flex items-center gap-3 px-3 rounded-lg text-xs font-medium transition-colors text-left",
                       active

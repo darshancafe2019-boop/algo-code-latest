@@ -64,6 +64,21 @@ export interface BotCreationIntent {
   marketDataSource?: string;
 
   /** Core Pricing & Depth */
+  /**
+   * Historical premium/price captured when the user selected the contract.
+   * This is immutable selection context and MUST NOT be treated as the current live quote.
+   */
+  selectedPremium?: number | null;
+  selectedBid?: number | null;
+  selectedAsk?: number | null;
+  selectedMark?: number | null;
+  selectedAt?: number | null;
+  selectionMode?: "EXACT_CONTRACT" | "TARGET_PREMIUM";
+  targetPremium?: number | null;
+  premiumTolerance?: number | null;
+  contractLocked?: boolean;
+
+  /** Current quote context at dispatch time only; must be revalidated from live market data. */
   currentPrice?: number | null;
   ltp?: number | null;
   bid?: number | null;
@@ -126,5 +141,9 @@ export interface BotCreationIntent {
   mode?: "new" | "addLeg" | "strategy";
   creationIntentId?: string;
   uiDispatchTimestamp?: number;
+  /** Provider/exchange quote timestamp for freshness diagnostics when available. */
+  quoteTimestamp?: number | null;
+  /** Canonical underlying instrument, distinct from the selected derivative contract. */
+  underlyingCanonicalId?: string | null;
   timestamp: number;
 }

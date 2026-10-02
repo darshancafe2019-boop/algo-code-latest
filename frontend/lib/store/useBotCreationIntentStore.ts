@@ -84,6 +84,9 @@ export function dispatchBotCreation(
   if (intentWithId.optionType) queryParams.set("optionType", intentWithId.optionType);
   if (intentWithId.exchange) queryParams.set("exchange", intentWithId.exchange);
   if (intentWithId.securityId) queryParams.set("securityId", intentWithId.securityId);
+  if (intentWithId.selectedPremium != null) queryParams.set("selectedPremium", String(intentWithId.selectedPremium));
+  if (intentWithId.selectionMode) queryParams.set("selectionMode", intentWithId.selectionMode);
+  if (intentWithId.contractLocked != null) queryParams.set("contractLocked", String(intentWithId.contractLocked));
   if (intentWithId.currentPrice != null) queryParams.set("ltp", String(intentWithId.currentPrice));
   if (intentWithId.bid != null) queryParams.set("bid", String(intentWithId.bid));
   if (intentWithId.ask != null) queryParams.set("ask", String(intentWithId.ask));

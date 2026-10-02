@@ -95,6 +95,9 @@ export function BotWizardVNext() {
   const [contractLtp, setContractLtp] = useState<number>(0);
   const [contractBid, setContractBid] = useState<number>(0);
   const [contractAsk, setContractAsk] = useState<number>(0);
+  const [selectedPremiumAtSelection, setSelectedPremiumAtSelection] = useState<number | null>(null);
+  const [selectionMode, setSelectionMode] = useState<"EXACT_CONTRACT" | "TARGET_PREMIUM">("EXACT_CONTRACT");
+  const [contractLocked, setContractLocked] = useState<boolean>(false);
   const [creationOrigin, setCreationOrigin] = useState<string>("MANUAL");
   const [providerInstrumentId, setProviderInstrumentId] = useState<string>("");
   const [resolvedContract, setResolvedContract] = useState<ResolvedContract | null>(null);
@@ -213,6 +216,9 @@ export function BotWizardVNext() {
     const queryInstrumentId = searchParams?.get("instrumentId");
     const querySecurityId = searchParams?.get("securityId");
     const queryLotSize = searchParams?.get("lotSize");
+    const querySelectedPremium = searchParams?.get("selectedPremium");
+    const querySelectionMode = searchParams?.get("selectionMode");
+    const queryContractLocked = searchParams?.get("contractLocked");
     const queryLtp = searchParams?.get("ltp");
     const queryBid = searchParams?.get("bid");
     const queryAsk = searchParams?.get("ask");
@@ -266,7 +272,22 @@ export function BotWizardVNext() {
       : Number(stored?.lotSize || 1);
     const ltp = queryLtp
       ? Number(queryLtp)
-      : Number(stored?.currentPrice || 0);
+      : Number(stored?.currentPrice ?? stored?.ltp ?? 0);
+    const selectedPremiumRaw =
+      querySelectedPremium != null
+        ? Number(querySelectedPremium)
+        : Number(stored?.selectedPremium ?? stored?.currentPrice ?? stored?.ltp ?? 0);
+    const selectedPremium =
+      Number.isFinite(selectedPremiumRaw) && selectedPremiumRaw > 0 ? selectedPremiumRaw : null;
+    const nextSelectionMode =
+      querySelectionMode === "TARGET_PREMIUM" || stored?.selectionMode === "TARGET_PREMIUM"
+        ? "TARGET_PREMIUM"
+        : "EXACT_CONTRACT";
+    const nextContractLocked =
+      queryContractLocked != null
+        ? queryContractLocked === "true"
+        : stored?.contractLocked ??
+          Boolean((queryCanonical || stored?.canonicalContractId) && expiry && strike > 0 && optionType);
     const bid = queryBid ? Number(queryBid) : Number(stored?.bid || 0);
     const ask = queryAsk ? Number(queryAsk) : Number(stored?.ask || 0);
     const origin = queryOrigin || stored?.origin || "MANUAL";
@@ -297,6 +318,9 @@ export function BotWizardVNext() {
     setContractLtp(Number.isFinite(ltp) ? ltp : 0);
     setContractBid(Number.isFinite(bid) ? bid : 0);
     setContractAsk(Number.isFinite(ask) ? ask : 0);
+    setSelectedPremiumAtSelection(selectedPremium);
+    setSelectionMode(nextSelectionMode);
+    setContractLocked(nextContractLocked);
     setCreationOrigin(origin);
     setProviderInstrumentId(resolvedProviderInstrumentId);
     setCanonicalInstrumentId(canonicalId);

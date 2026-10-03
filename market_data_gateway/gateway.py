@@ -637,19 +637,30 @@ class MarketDataGateway:
             "subscriptions": list(adapter.get_subscribed_symbols()),
         })
 
+    async def handle_live_ping(self, request: web.Request) -> web.Response:
+        """Fast non-blocking liveness probe returning in < 1ms."""
+        return web.json_response({
+            "status": "LIVE",
+            "service": "MarketDataGateway",
+            "port": 5051,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
     async def handle_health(self, request: web.Request) -> web.Response:
+
         healths = []
         for adapter in self.adapters.values():
             try:
-                h = await adapter.health_check()
+                h = await asyncio.wait_for(adapter.health_check(), timeout=0.15)
                 healths.append(h.to_dict())
-            except Exception as exc:
+            except Exception:
                 healths.append({
                     "provider_id": adapter.provider_id,
-                    "status": "ERROR",
-                    "message": str(exc),
+                    "status": adapter.get_status(),
+                    "subscriptions": len(adapter.get_subscribed_symbols()),
                 })
         return web.json_response({
+
             "status": "OK",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "providers": healths,
@@ -1411,10 +1422,15 @@ async def cors_middleware(request: web.Request, handler):
             response = await handler(request)
         except web.HTTPException as ex:
             response = ex
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Gateway-Secret, X-Request-Id, Authorization, X-Idempotency-Key"
+    if not isinstance(response, web.StreamResponse) or not response.prepared:
+        try:
+            response.headers["Access-Control-Allow-Origin"] = "*"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Gateway-Secret, X-Request-Id, Authorization, X-Idempotency-Key"
+        except Exception:
+            pass
     return response
+
 
 
 def create_app() -> tuple:
@@ -1423,13 +1439,14 @@ def create_app() -> tuple:
 
     # Health & Matrix Endpoints
     app.router.add_get("/health", gateway.handle_health)
-    app.router.add_get("/health/live", gateway.handle_health)
+    app.router.add_get("/health/live", gateway.handle_live_ping)
     app.router.add_get("/health/ready", gateway.handle_health)
     app.router.add_get("/health/market-data", gateway.handle_market_data_health)
     app.router.add_get("/health/providers", gateway.handle_health)
     app.router.add_get("/api/health", gateway.handle_health)
-    app.router.add_get("/api/health/live", gateway.handle_health)
+    app.router.add_get("/api/health/live", gateway.handle_live_ping)
     app.router.add_get("/api/health/ready", gateway.handle_health)
+
     app.router.add_get("/api/market/health", gateway.handle_market_data_health)
     app.router.add_get("/api/market-data/health", gateway.handle_market_data_health)
     app.router.add_get("/api/market/status", gateway.handle_market_data_health)

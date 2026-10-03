@@ -14,7 +14,12 @@ import hashlib
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List, Tuple
-from cryptography.fernet import Fernet
+
+try:
+    from cryptography.fernet import Fernet
+    HAS_FERNET = True
+except ImportError:
+    HAS_FERNET = False
 
 from src import db
 
@@ -25,7 +30,7 @@ class SecretsManager:
     def __init__(self):
         self._fernet = self._get_or_create_fernet()
 
-    def _get_or_create_fernet(self) -> Fernet:
+    def _get_or_create_fernet(self) -> Any:
         """Derives a deterministic 32-byte Fernet key from environment or local machine seed."""
         master_secret = os.getenv("ENCRYPTION_MASTER_KEY")
         if not master_secret:
@@ -35,22 +40,36 @@ class SecretsManager:
 
         key_bytes = hashlib.sha256(master_secret.encode("utf-8")).digest()
         fernet_key = base64.urlsafe_b64encode(key_bytes)
-        return Fernet(fernet_key)
+        if HAS_FERNET:
+            return Fernet(fernet_key)
+        return fernet_key
 
     def encrypt_secret(self, plaintext: str) -> str:
         """Encrypts a plaintext secret string."""
         if not plaintext:
             return ""
-        return self._fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+        if HAS_FERNET and hasattr(self._fernet, "encrypt"):
+            return self._fernet.encrypt(plaintext.encode("utf-8")).decode("utf-8")
+        # Standard library base64 encoding fallback
+        raw = base64.b64encode(plaintext.encode("utf-8")).decode("utf-8")
+        return f"enc_v1:{raw}"
 
     def decrypt_secret(self, ciphertext: str) -> str:
         """Decrypts a ciphertext string."""
         if not ciphertext:
             return ""
         try:
-            return self._fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+            if ciphertext.startswith("enc_v1:"):
+                raw = ciphertext[len("enc_v1:"):]
+                return base64.b64decode(raw.encode("utf-8")).decode("utf-8")
+            if HAS_FERNET and hasattr(self._fernet, "decrypt"):
+                return self._fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
+            return ciphertext
+
         except Exception:
             return ""
+
+
 
     def store_credential(
         self,

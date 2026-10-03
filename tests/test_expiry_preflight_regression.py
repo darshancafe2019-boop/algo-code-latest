@@ -7,7 +7,7 @@ Specifically verifies the exact prompt failure scenario:
 - Full 24-gate preflight evaluation: 24 PASSED / 0 FAILED with dynamic unexpired contract
 """
 
-import pytest
+import unittest
 from src.data_core.models import Environment
 from src.data_core.bots.models import BotDeploymentSpec, StrategyLegItem
 from src.data_core.bots.consistency_engine import BotConsistencyEngine

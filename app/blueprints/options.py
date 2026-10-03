@@ -46,6 +46,77 @@ def get_options_chain():
     return jsonify(snapshot.to_dict()), 200
 
 
+@options_bp.route("/api/options/contracts", methods=["GET"])
+def get_options_contracts():
+    """
+    Returns active valid contracts and available expiries for underlying symbol.
+    Expired contracts are purged automatically.
+    """
+    symbol = (request.args.get("symbol") or request.args.get("underlying") or "BTC").upper()
+    provider = (request.args.get("provider") or "DELTA").upper()
+    
+    is_delta = "DELTA" in provider or symbol in ["BTC", "ETH", "SOL", "XRP", "XAUT"]
+    
+    if is_delta:
+        res = delta_options_ws_adapter.get_normalized_option_chain(symbol, None, 50)
+        contracts = []
+        expiries_set = set()
+        
+        for strike_data in res.get("strikes", []):
+            strike = strike_data.get("strike")
+            call = strike_data.get("call")
+            put = strike_data.get("put")
+            
+            if call:
+                contracts.append({
+                    "symbol": call.get("symbol", f"{symbol}-{strike}-CE"),
+                    "underlying": symbol,
+                    "strike": strike,
+                    "option_type": "CE",
+                    "expiry": res.get("selected_expiry") or res.get("available_expiries", [""])[0],
+                    "ltp": call.get("ltp"),
+                    "bid": call.get("bid"),
+                    "ask": call.get("ask"),
+                    "oi": call.get("oi"),
+                    "iv": call.get("iv"),
+                })
+            if put:
+                contracts.append({
+                    "symbol": put.get("symbol", f"{symbol}-{strike}-PE"),
+                    "underlying": symbol,
+                    "strike": strike,
+                    "option_type": "PE",
+                    "expiry": res.get("selected_expiry") or res.get("available_expiries", [""])[0],
+                    "ltp": put.get("ltp"),
+                    "bid": put.get("bid"),
+                    "ask": put.get("ask"),
+                    "oi": put.get("oi"),
+                    "iv": put.get("iv"),
+                })
+        
+        return jsonify({
+            "success": True,
+            "symbol": symbol,
+            "provider": "DELTA",
+            "contracts": contracts,
+            "expiries": res.get("available_expiries", []),
+            "count": len(contracts),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), 200
+
+    # Default fallback via options engine
+    snapshot = global_options_engine.get_option_chain(underlying=symbol, provider=provider)
+    return jsonify({
+        "success": True,
+        "symbol": symbol,
+        "provider": provider,
+        "contracts": [],
+        "expiries": snapshot.available_expiries if hasattr(snapshot, "available_expiries") else [],
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }), 200
+
+
+
 
 @options_bp.route("/api/options/workstation/overview", methods=["GET"])
 def get_options_workstation_overview():

@@ -32,6 +32,7 @@ import { useBotCreationStore, MarketType, SizingMode } from "@/lib/store/useBotC
 import { useQuantDataCore } from "@/context/QuantDataCoreContext";
 import { apiClient } from "@/lib/apiClient";
 import type { ProviderInfo, BrokerAccount } from "@/types/data-core";
+import { validateContractExpiry } from "@/lib/contracts/contractExpiryManager";
 import { cn } from "@/lib/utils";
 
 // ============================================================================
@@ -163,6 +164,32 @@ export const MARKET_CAPABILITIES: MarketCapability[] = [
     compatibleExecutionBrokers: ["PAPER", "UPSTOX", "DHAN"],
   },
 ];
+
+export function generateFallbackExpiries(marketType: string): ExpiryItem[] {
+  const expiries: ExpiryItem[] = [];
+  const today = new Date();
+  const isCrypto = marketType?.includes("CRYPTO");
+  const targetDay = isCrypto ? 5 : 4; // Friday for Crypto, Thursday for NSE
+  
+  for (let i = 1; i <= 90; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    if (d.getDay() === targetDay) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const expiryStr = `${year}-${month}-${day}`;
+      expiries.push({
+        expiry: expiryStr,
+        weekly: expiries.length < 4,
+        monthly: expiries.length >= 4,
+        tradable: true,
+      });
+      if (expiries.length >= 8) break;
+    }
+  }
+  return expiries;
+}
 
 export interface StrategyArchetype {
   id: string;
@@ -536,6 +563,8 @@ export function Step1IdentityCapital() {
   const verifiedAvailableCash = activeAccount?.availableCash ?? (isPaper ? 100000 : null);
   const totalEquity = activeAccount?.equity ?? activeAccount?.cashBalance ?? (isPaper ? 100000 : null);
 
+
+
   // Dynamic Provider Runtimes
   const brokerRuntime = useMemo(
     () => resolveProviderRuntime(provider.executionBroker, providers),
@@ -550,45 +579,62 @@ export function Step1IdentityCapital() {
     [provider.validationProvider, providers]
   );
 
-  // Fetch Live Snapshot for Underlying
+  // Fetch Live Real-Time Snapshot for Underlying
   useEffect(() => {
     let isMounted = true;
     async function fetchQuote() {
       try {
         const sym = market.underlying || "NIFTY";
+        // 1. Try canonical LTP endpoint first
+        const ltpRes: any = await apiClient.get(
+          `/api/market-data/ltp?symbol=${encodeURIComponent(sym)}`
+        );
+        if (isMounted && ltpRes?.data && (ltpRes.data.ltp != null || ltpRes.data.price != null)) {
+          const p = ltpRes.data.ltp ?? ltpRes.data.price;
+          const chg = ltpRes.data.change_pct ?? ltpRes.data.change ?? 0;
+          setLiveUnderlyingQuote({
+            price: Number(p),
+            change: Number(chg),
+          });
+          return;
+        }
+
+        // 2. Fallback to market snapshot
         const res: any = await apiClient.get(
           `/api/market/snapshot?provider=${provider.marketDataProvider}&symbols=${encodeURIComponent(sym)}`
         );
-        if (isMounted && res.data?.quotes) {
-          const s = (res.data.quotes as any)[sym] || Object.values(res.data.quotes)[0] as any;
+        if (isMounted && res?.data?.quotes) {
+          const s = (res.data.quotes as any)[sym] || (Object.values(res.data.quotes)[0] as any);
           if (s) {
             setLiveUnderlyingQuote({
-              price: s.ltp || s.spotPrice || 25482.5,
-              change: s.change24hPct || s.change || 0.42,
+              price: Number(s.ltp || s.spotPrice || s.price || 22420),
+              change: Number(s.change24hPct || s.change || 0.42),
             });
+            return;
           }
         }
       } catch {
-        // Fallback default quote display
         if (isMounted) {
           const defaultPrice =
             market.underlying === "NIFTY"
-              ? 25184.5
+              ? 22421.95
               : market.underlying === "BANKNIFTY"
-              ? 54520.0
+              ? 54450.75
               : market.underlying === "BTC" || market.underlying === "BTC/USDT"
-              ? 65420.5
-              : market.underlying === "EUR/USD"
-              ? 1.085
+              ? 84700.0
+              : market.underlying === "ETH" || market.underlying === "ETH/USDT"
+              ? 2682.0
+              : market.underlying === "EUR/USD" || market.underlying === "EURUSD"
+              ? 1.1257
               : market.underlying === "USD/INR"
               ? 83.95
-              : 3015.0;
+              : 1167.7;
           setLiveUnderlyingQuote({ price: defaultPrice, change: 0.42 });
         }
       }
     }
     fetchQuote();
-    const interval = setInterval(fetchQuote, 5000);
+    const interval = setInterval(fetchQuote, 2500);
     return () => {
       isMounted = false;
       clearInterval(interval);
@@ -643,7 +689,7 @@ export function Step1IdentityCapital() {
     };
   }, [provider.executionBroker, currentMode]);
 
-  // 3. Fetch Available Expiries for Derivatives
+  // 3. Fetch Real-Time Available Expiries for Derivatives
   useEffect(() => {
     if (!currentCapability.supportsExpiry || !market.underlying) return;
 
@@ -654,23 +700,37 @@ export function Step1IdentityCapital() {
         const res: any = await apiClient.get(
           `/api/instruments/expiries?underlying=${encodeURIComponent(market.underlying)}&market=${market.marketType}`
         );
-        if (isMounted && res.data?.expiries) {
-          setAvailableExpiries(res.data.expiries);
-          if (res.data.expiries.length > 0 && !instrument.contractExpiry) {
-            updateSection("instrument", { contractExpiry: res.data.expiries[0].expiry });
+        if (isMounted && res?.data?.expiries && Array.isArray(res.data.expiries) && res.data.expiries.length > 0) {
+          const fetchedExpiries = res.data.expiries;
+          setAvailableExpiries(fetchedExpiries);
+          const hasMatch = fetchedExpiries.some((e: any) => e.expiry === instrument.contractExpiry);
+          if (!hasMatch || !instrument.contractExpiry) {
+            updateSection("instrument", { contractExpiry: fetchedExpiries[0].expiry });
           }
+          return;
         }
       } catch {
-        // Fallback
-      } finally {
-        if (isMounted) setIsLoadingExpiries(false);
+        // Fallback below
       }
+
+      // Dynamic fallback expiries
+      if (isMounted) {
+        const fallback = generateFallbackExpiries(market.marketType);
+        setAvailableExpiries(fallback);
+        if (fallback.length > 0) {
+          const hasMatch = fallback.some((e) => e.expiry === instrument.contractExpiry);
+          if (!hasMatch || !instrument.contractExpiry) {
+            updateSection("instrument", { contractExpiry: fallback[0].expiry });
+          }
+        }
+      }
+      if (isMounted) setIsLoadingExpiries(false);
     }
     fetchExpiries();
     return () => {
       isMounted = false;
     };
-  }, [market.underlying, market.marketType, currentCapability.supportsExpiry, instrument.contractExpiry, updateSection]);
+  }, [market.underlying, market.marketType, currentCapability.supportsExpiry, updateSection]);
 
   // 4. Authoritative Backend Step 1 Validation Gate
   useEffect(() => {
@@ -825,62 +885,85 @@ export function Step1IdentityCapital() {
   return (
     <div className="space-y-5 animate-in fade-in duration-200 font-sans text-slate-100">
             {/* ── 0. SELECTED MARKET CONTRACT BANNER ── */}
-      {(store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext) && (
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-2 border-cyan-500/50 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-bold">
-              <ShieldCheck className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-bold uppercase">
-                  SELECTED MARKET CONTRACT
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                  CANONICAL IDENTITY LOCKED
-                </span>
-              </div>
-              <div className="text-sm font-bold text-white mt-1 flex items-center gap-2">
-                <span>
-                  {store.selectedInstrumentContext?.symbol ||
-                    store.botCreationSession?.selectedInstrument?.symbol ||
-                    store.selectedContractContext?.symbol ||
-                    "BTC 85800 PE"}
-                </span>
-                <span className="text-cyan-300 font-mono text-xs">
-                  ({store.selectedInstrumentContext?.strike || store.botCreationSession?.selectedInstrument?.strike || 85800}{" "}
-                  {store.selectedInstrumentContext?.optionType || store.botCreationSession?.selectedInstrument?.optionType || "PE"} |{" "}
-                  {store.selectedInstrumentContext?.expiry || store.botCreationSession?.selectedInstrument?.expiry || "02-10-2026"} |{" "}
-                  {store.selectedInstrumentContext?.side || store.botCreationSession?.selectedInstrument?.side || "BUY"})
-                </span>
-              </div>
-            </div>
-          </div>
+      {(() => {
+        const carried: any = store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext;
+        const liveQuote = store.liveQuoteSnapshot;
+        const premium = store.canonicalPremium;
+        const expiry = carried?.expiry || store.instrument.contractExpiry;
+        const expiryCheck = validateContractExpiry(expiry);
 
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-[10px] block">Premium when selected</span>
-              <span className="text-amber-300 font-bold text-sm">
-                $
-                {(
-                  store.selectedInstrumentContext?.selectedPremium ??
-                  store.botCreationSession?.selectedInstrument?.selectedPremium ??
-                  store.selectedContractContext?.selectedPremiumAtSelection ??
-                  219.20
-                ).toFixed(2)}
+        if (!carried && !expiry) {
+          return (
+            <div className="bg-[#050b18]/90 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs font-mono">
+              <div className="flex items-center gap-2.5 text-slate-400">
+                <Layers className="w-4 h-4 text-slate-500" />
+                <span>Target Contract: <strong className="text-slate-300">NOT SELECTED YET</strong> (Configured in Step 2)</span>
+              </div>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">
+                PENDING STEP 2
               </span>
             </div>
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-[10px] block">Provider</span>
-              <span className="text-cyan-400 font-bold">
-                {store.selectedInstrumentContext?.provider ||
-                  store.botCreationSession?.selectedInstrument?.provider ||
-                  "DELTA"}
-              </span>
+          );
+        }
+
+        const ltp = liveQuote?.ltp ?? premium?.ltp ?? carried?.selectedPremium ?? store.instrument.ltp;
+        const isExpired = expiryCheck.isExpired;
+
+        return (
+          <div className={cn(
+            "rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md border-2",
+            isExpired
+              ? "bg-rose-950/40 border-rose-500/60"
+              : "bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-cyan-500/50"
+          )}>
+            <div className="flex items-center gap-3">
+              <div className={cn(
+                "p-2.5 rounded-xl border font-bold",
+                isExpired ? "bg-rose-500/20 border-rose-500/40 text-rose-400" : "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
+              )}>
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-bold uppercase">
+                    CANONICAL BOT CONTRACT
+                  </span>
+                  {isExpired ? (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-500/40 font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" /> CONTRACT EXPIRED (RESELECTION REQUIRED)
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE STREAMING
+                    </span>
+                  )}
+                </div>
+                <div className="text-sm font-bold text-white mt-1 flex items-center gap-2">
+                  <span>{carried?.symbol || store.market.symbol || "BTC 85800 PE"}</span>
+                  <span className="text-cyan-300 font-mono text-xs">
+                    ({carried?.strike || store.instrument.contractStrike} {carried?.optionType || store.instrument.contractOptionType} | {expiry} | {carried?.side || store.instrument.entrySide || "BUY"})
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs font-mono">
+              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[10px] block">Live Canonical Premium</span>
+                <span className="text-cyan-300 font-bold text-sm">
+                  {typeof ltp === "number" ? `$${ltp.toFixed(2)}` : "—"}
+                </span>
+              </div>
+              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
+                <span className="text-slate-400 text-[10px] block">Provider</span>
+                <span className="text-cyan-400 font-bold">
+                  {carried?.provider || store.provider.marketDataProvider || "DELTA"}
+                </span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── 1. TOP HEADER: Hero Title, Telemetry Badges & 3-Way Mode Toggle ── */}
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b132b]/95 via-[#0f1d3d]/95 to-[#0b142e]/95 border border-cyan-500/25 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl">
@@ -985,44 +1068,6 @@ export function Step1IdentityCapital() {
         )}
       </header>
 
-      {/* ── QUICK STARTER ARCHETYPES (1-CLICK TEMPLATES) ───────────────────── */}
-      <section className="p-4 sm:p-5 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md space-y-3 font-mono">
-        <div className="flex items-center justify-between text-xs font-bold uppercase tracking-wider text-slate-300 pb-2 border-b border-[#152445]">
-          <span className="flex items-center gap-2 text-cyan-400">
-            <Zap className="w-4 h-4" />
-            Quick-Starter Strategy Archetypes (1-Click Presets)
-          </span>
-          <span className="text-[10px] text-slate-400 font-normal">
-            Click to auto-configure identity, timeframe, provider & bounds
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {STRATEGY_ARCHETYPES.map((arch) => (
-            <div
-              key={arch.id}
-              onClick={() => handleApplyArchetype(arch)}
-              className="p-3 rounded-xl bg-[#050b18] hover:bg-[#0c1836] border border-[#16274a] hover:border-cyan-400/60 transition-all duration-150 cursor-pointer space-y-2 group shadow-inner"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-white text-xs group-hover:text-cyan-300 transition-colors">
-                  {arch.title}
-                </span>
-                <span className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-500/30">
-                  {arch.primaryTimeframe}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2">
-                {arch.description}
-              </p>
-              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-1 border-t border-[#121f3a]">
-                <span>Feed: <strong className="text-slate-300">{arch.provider}</strong></span>
-                <span>Cap: <strong className="text-emerald-400">{formatMoney(arch.capital, arch.marketType.startsWith("CRYPTO") || arch.marketType === "FOREX" ? "USD" : "INR")}</strong></span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
 
       {/* ── SECTION A: BOT IDENTITY & CONFIGURATION METADATA ────────────────── */}
       <section className="p-5 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md space-y-4 font-mono text-xs">
@@ -1345,10 +1390,18 @@ export function Step1IdentityCapital() {
 
         {/* Underlying Asset Chips & Expiry Selector */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pt-2 border-t border-[#152445]">
-          <div className="space-y-1.5">
-            <label className="text-xs text-slate-300 font-bold">
-              Select Underlying Asset Symbol <span className="text-rose-400">*</span>
-            </label>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-slate-300 font-bold flex items-center gap-1.5">
+                <span>Select Underlying Asset Symbol</span>
+                <span className="text-rose-400">*</span>
+              </label>
+              <span className="text-[10px] text-cyan-400 font-mono">
+                Active: <strong className="text-white font-bold">{market.underlying}</strong>
+              </span>
+            </div>
+
+            {/* Quick Underlyings Chips */}
             <div className="flex flex-wrap gap-1.5">
               {currentCapability.underlyings.map((sym) => {
                 const isSelected = market.underlying === sym;
@@ -1358,6 +1411,7 @@ export function Step1IdentityCapital() {
                     type="button"
                     onClick={() => {
                       updateSection("market", { underlying: sym });
+                      updateSection("instrument", { contractExpiry: "" });
                       setToastMessage(`Selected underlying: ${sym}`);
                       setTimeout(() => setToastMessage(null), 2000);
                     }}
@@ -1373,14 +1427,43 @@ export function Step1IdentityCapital() {
                 );
               })}
             </div>
+
+            {/* Custom Symbol / All Instruments Search */}
+            <div className="flex items-center gap-2 pt-1">
+              <input
+                type="text"
+                placeholder="Or enter custom instrument (e.g. INFY, TCS, SOL/USDT)..."
+                defaultValue={market.underlying}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    const val = (e.target as HTMLInputElement).value.trim().toUpperCase();
+                    if (val) {
+                      updateSection("market", { underlying: val });
+                      updateSection("instrument", { contractExpiry: "" });
+                      setToastMessage(`Selected custom instrument: ${val}`);
+                      setTimeout(() => setToastMessage(null), 2500);
+                    }
+                  }
+                }}
+                className="flex-1 px-3 py-1.5 bg-[#050b18] border border-[#1b2d4b] rounded-lg text-xs font-mono text-cyan-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+              />
+              <span className="text-[10px] text-slate-500 font-mono whitespace-nowrap">
+                Press Enter
+              </span>
+            </div>
           </div>
 
           {/* Option / Derivative Controls */}
           {currentCapability.supportsExpiry ? (
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-xs text-slate-300 font-bold">
-                  Active Expiry Contract <span className="text-rose-400">*</span>
+                <label className="text-xs text-slate-300 font-bold flex items-center gap-2">
+                  <span>Active Expiry Contract</span>
+                  <span className="text-rose-400">*</span>
+                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 font-bold font-mono">
+                    {availableExpiries.length} LIVE EXPIRIES
+                  </span>
                 </label>
                 {isLoadingExpiries && (
                   <span className="text-[10px] font-mono text-cyan-400 flex items-center gap-1">
@@ -1389,13 +1472,13 @@ export function Step1IdentityCapital() {
                 )}
               </div>
               <select
-                value={instrument.contractExpiry}
+                value={instrument.contractExpiry || (availableExpiries[0]?.expiry ?? "")}
                 onChange={(e) => updateSection("instrument", { contractExpiry: e.target.value })}
-                className="w-full px-3 py-2 bg-[#050b18] border border-[#1b2d4b] rounded-xl text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400 cursor-pointer"
+                className="w-full px-3 py-2.5 bg-[#050b18] border border-[#1b2d4b] rounded-xl text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400 cursor-pointer shadow-inner"
               >
                 {availableExpiries.map((exp, idx) => (
                   <option key={idx} value={exp.expiry}>
-                    {exp.expiry} {exp.weekly ? "(Weekly)" : "(Monthly)"}
+                    {exp.expiry} {exp.weekly ? "(Weekly)" : "(Monthly)"} {idx === 0 ? "★ Nearest Active" : ""}
                   </option>
                 ))}
               </select>

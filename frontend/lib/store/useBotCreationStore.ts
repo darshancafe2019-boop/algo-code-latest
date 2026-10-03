@@ -29,6 +29,16 @@ import {
   compileStrategyRules,
 } from "./botCreationStateMachine";
 import { CentralCompatibilityEngine, StrategyRequirementSpec } from "../strategies/compatibilityEngine";
+import {
+  LiveQuoteSnapshot,
+  CanonicalPremiumSnapshot,
+  PremiumEngine,
+} from "@/lib/market-data/premiumEngine";
+import {
+  validateContractExpiry,
+  isContractExpired,
+  getAuthoritativeActiveExpiries,
+} from "@/lib/contracts/contractExpiryManager";
 
 export type MarketType =
   | "STOCKS"
@@ -200,10 +210,14 @@ export interface SelectedContractContext {
 }
 
 export interface AuthoritativeBotCreationStoreState {
-  // Authoritative Core State Machine Fields
   schemaVersion: number;
   draftId: string;
   revision: number;
+  configVersion: number;
+  marketDataVersion: number;
+  contractVersion: number;
+  strategyVersion: number;
+  riskVersion: number;
   lastSavedAt: string | null;
   saveStatus: "IDLE" | "SAVING" | "SAVED" | "ERROR" | "CONFLICT";
   currentStage: BotCreationStage;
@@ -223,9 +237,11 @@ export interface AuthoritativeBotCreationStoreState {
     step5StrategyLibrary: boolean;
   };
 
-  // ONE SHARED CANONICAL SELECTED CONTRACT CONTEXT
+  // ONE SHARED CANONICAL SELECTED CONTRACT CONTEXT & PRICING SNAPSHOTS
   botCreationSession: BotCreationSession | null;
   liveContractQuote: LiveContractQuote | null;
+  liveQuoteSnapshot: LiveQuoteSnapshot | null;
+  canonicalPremium: CanonicalPremiumSnapshot | null;
   selectedInstrumentContext: SelectedInstrumentContext | null;
   selectedContractContext: SelectedContractContext | null;
 
@@ -493,6 +509,9 @@ export interface BotCreationActions {
   loadDraft: (draftId?: string) => boolean;
   loadIntent: (intent: BotCreationIntent) => void;
   loadFromBot: (botConfig: any) => void;
+  setCanonicalQuote: (quote: LiveQuoteSnapshot) => void;
+  setCanonicalContract: (contract: SelectedInstrumentContext) => void;
+  checkAndPurgeExpiredContract: () => boolean;
   setBotCreationSession: (session: Partial<BotCreationSession> | null) => void;
   setSelectedInstrument: (instrument: Partial<SelectedInstrumentContext> | null) => void;
   setLiveContractQuote: (quote: Partial<LiveContractQuote> | null) => void;
@@ -531,8 +550,15 @@ const defaultProviderCapabilities: ProviderCapabilities = {
 
 const defaultInitialState: AuthoritativeBotCreationStoreState = {
   schemaVersion: 2,
+  configVersion: 1,
+  marketDataVersion: 1,
+  contractVersion: 1,
+  strategyVersion: 1,
+  riskVersion: 1,
   botCreationSession: null,
   liveContractQuote: null,
+  liveQuoteSnapshot: null,
+  canonicalPremium: null,
   draftId: `draft_${Math.random().toString(36).substring(2, 9)}`,
   revision: 1,
   lastSavedAt: null,
@@ -558,33 +584,55 @@ const defaultInitialState: AuthoritativeBotCreationStoreState = {
 
   modulesEnabled: {
     step3Indicators: true,
-    step4OptionChain: false,
+    step4OptionChain: true,
     step5StrategyLibrary: true,
   },
 
-  selectedInstrumentContext: null,
+  selectedInstrumentContext: {
+    canonicalInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
+    assetClass: "CRYPTO_OPTION",
+    exchange: "DELTA",
+    underlying: "BTC",
+    symbol: "BTC 85800 PE",
+    expiry: "02 OCT 2026",
+    strike: 85800,
+    optionType: "PE",
+    side: "BUY",
+    lotSize: 1,
+    tickSize: 0.1,
+    provider: "DELTA",
+    providerInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
+    brokerInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
+    selectionMode: "EXACT_CONTRACT",
+    selectedAt: Date.now(),
+    selectedPremium: 219.20,
+    selectedBid: 219.00,
+    selectedAsk: 219.40,
+    selectedMark: 219.20,
+    contractLocked: true,
+  },
   selectedContractContext: {
-    canonicalInstrumentId: "DELTA:BTC-27MAR26-68500-C",
+    canonicalInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
     assetClass: "CRYPTO_OPTIONS",
     exchange: "DELTA",
     underlying: "BTC",
-    symbol: "BTC 68500 CE",
-    expiry: "2026-03-27",
-    strike: 68500,
-    optionType: "CE",
+    symbol: "BTC 85800 PE",
+    expiry: "02 OCT 2026",
+    strike: 85800,
+    optionType: "PE",
     side: "BUY",
-    lotSize: 0.1,
+    lotSize: 1,
     provider: "DELTA",
-    providerInstrumentKey: "BTC-27MAR26-68500-C",
-    brokerInstrumentId: "BTC-27MAR26-68500-C",
+    providerInstrumentKey: "DELTA:BTC:85800:PE:02-OCT-2026",
+    brokerInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
     sourceOrigin: "DIRECT_INTENT",
     premiumSelectionMode: "EXACT_CONTRACT",
-    selectedPremiumAtSelection: 120.0,
-    targetPremium: 120.0,
+    selectedPremiumAtSelection: 219.20,
+    targetPremium: 219.20,
     premiumTolerance: 5.0,
-    selectedBidAtSelection: 118.0,
-    selectedAskAtSelection: 122.0,
-    selectedMarkAtSelection: 120.0,
+    selectedBidAtSelection: 219.00,
+    selectedAskAtSelection: 219.40,
+    selectedMarkAtSelection: 219.20,
     selectedAt: new Date().toISOString(),
     contractLocked: true,
   },
@@ -621,43 +669,43 @@ const defaultInitialState: AuthoritativeBotCreationStoreState = {
     marketType: "CRYPTO_OPTIONS",
     exchange: "DELTA",
     underlying: "BTC",
-    symbol: "BTC 68500 CE",
-    canonicalInstrumentId: "DELTA:BTC-26MAR26-68500-C",
+    symbol: "BTC 85800 PE",
+    canonicalInstrumentId: "DELTA:BTC:85800:PE:02-OCT-2026",
     instrumentClass: "OPTION_SINGLE",
-    contractType: "CE",
-    lotSize: 0.1,
-    tickSize: 0.5,
+    contractType: "PE",
+    lotSize: 1,
+    tickSize: 0.1,
     contractMultiplier: 1.0,
     sessionState: "24/7",
   },
 
   instrument: {
-    contractStrike: 68500,
-    contractExpiry: "2026-03-27",
-    contractOptionType: "CE",
+    contractStrike: 85800,
+    contractExpiry: "02 OCT 2026",
+    contractOptionType: "PE",
     entrySide: "BUY",
-    spotPrice: 68500,
-    ltp: 120.0,
-    bid: 118.0,
-    ask: 122.0,
-    executablePremium: 122.0, // BUY uses ASK
-    iv: 48.5,
+    spotPrice: 86420,
+    ltp: 223.90,
+    bid: 223.70,
+    ask: 224.10,
+    executablePremium: 224.10, // BUY uses ASK
+    iv: 54.0,
     basis: 0,
-    oi: 12500,
-    daysToExpiry: 5,
+    oi: 8900,
+    daysToExpiry: 0,
     origin: "OPTIONS",
     strikeMode: "ATM",
     contractMode: "DYNAMIC",
-    targetPremium: 120,
+    targetPremium: 219.20,
     minimumPremium: 100,
-    maximumPremium: 140,
+    maximumPremium: 300,
     provenance: {
-      value: 122.0,
+      value: 224.10,
       source: "DELTA",
       channel: "WEBSOCKET",
       receivedAt: new Date().toISOString(),
       exchangeTimestamp: new Date().toISOString(),
-      ageMs: 140,
+      ageMs: 28,
       stale: false,
     },
   },
@@ -1595,6 +1643,156 @@ export const useBotCreationStore = create<AuthoritativeBotCreationStoreState & B
     }));
 
     get().recomputeValidation();
+  },
+
+  setCanonicalQuote: (quote: LiveQuoteSnapshot) => {
+    const state = get();
+    const side = state.instrument.entrySide || state.selectedContractContext?.side || "BUY";
+    const ref = state.selectedContractContext?.selectedPremiumAtSelection || quote.ltp;
+    const premium = PremiumEngine.derivePremiumSnapshot(quote, side, ref, state.marketDataVersion + 1);
+
+    set((s) => ({
+      liveQuoteSnapshot: quote,
+      canonicalPremium: premium,
+      marketDataVersion: s.marketDataVersion + 1,
+      liveContractQuote: {
+        canonicalInstrumentId: quote.instrumentId,
+        provider: quote.provider,
+        ltp: quote.ltp,
+        bid: quote.bid,
+        ask: quote.ask,
+        bidQty: quote.bidQty,
+        askQty: quote.askQty,
+        markPrice: quote.mid,
+        volume: quote.volume,
+        oi: quote.oi,
+        iv: quote.iv,
+        delta: quote.delta,
+        gamma: quote.gamma,
+        theta: quote.theta,
+        vega: quote.vega,
+        serverReceivedTimestamp: quote.receivedAt,
+        dataAgeMs: quote.dataAgeMs,
+        quality: quote.quality === "DEGRADED" ? "STALE" : (quote.quality as any),
+      },
+      instrument: {
+        ...s.instrument,
+        ltp: quote.ltp,
+        bid: quote.bid,
+        ask: quote.ask,
+        executablePremium: side === "BUY" ? quote.ask : quote.bid,
+        iv: quote.iv,
+        oi: quote.oi,
+      },
+    }));
+  },
+
+  setCanonicalContract: (inst: SelectedInstrumentContext) => {
+    const expiryValidation = validateContractExpiry(inst.expiry);
+    if (expiryValidation.isExpired) {
+      set({
+        invalidationNotice: `CONTRACT EXPIRED: ${inst.symbol} on ${inst.expiry} is expired. Reselection required.`,
+      });
+      return;
+    }
+
+    const state = get();
+    const ltp = inst.selectedPremium || inst.selectedMark || state.instrument.ltp || 120.0;
+    const bid = inst.selectedBid || ltp * 0.995;
+    const ask = inst.selectedAsk || ltp * 1.005;
+
+    const quote = PremiumEngine.normalizeQuote({
+      instrumentId: inst.canonicalInstrumentId,
+      provider: inst.provider,
+      symbol: inst.symbol,
+      expiry: inst.expiry || "",
+      strike: inst.strike || 0,
+      optionType: (inst.optionType === "PUT" || inst.optionType === "PE" ? "PE" : "CE"),
+      underlying: inst.underlying,
+      underlyingSpotPrice: inst.underlyingSpotPrice || state.instrument.spotPrice,
+      ltp,
+      bid,
+      ask,
+    });
+
+    const premium = PremiumEngine.derivePremiumSnapshot(quote, inst.side || "BUY", ltp, state.contractVersion + 1);
+
+    set((s) => ({
+      configVersion: s.configVersion + 1,
+      contractVersion: s.contractVersion + 1,
+      marketDataVersion: s.marketDataVersion + 1,
+      liveQuoteSnapshot: quote,
+      canonicalPremium: premium,
+      selectedInstrumentContext: inst,
+      selectedContractContext: {
+        canonicalInstrumentId: inst.canonicalInstrumentId,
+        assetClass: inst.assetClass,
+        exchange: inst.exchange,
+        underlying: inst.underlying,
+        symbol: inst.symbol,
+        expiry: inst.expiry || "",
+        strike: inst.strike || 0,
+        optionType: (inst.optionType === "PUT" || inst.optionType === "PE" ? "PE" : "CE") as any,
+        side: inst.side || "BUY",
+        lotSize: inst.lotSize || 1,
+        provider: inst.provider,
+        providerInstrumentKey: inst.providerInstrumentId || inst.canonicalInstrumentId,
+        brokerInstrumentId: inst.brokerInstrumentId || inst.canonicalInstrumentId,
+        sourceOrigin: "OPTION_CHAIN",
+        premiumSelectionMode: inst.selectionMode,
+        selectedPremiumAtSelection: ltp,
+        targetPremium: ltp,
+        premiumTolerance: 5.0,
+        selectedBidAtSelection: bid,
+        selectedAskAtSelection: ask,
+        selectedMarkAtSelection: ltp,
+        selectedAt: new Date(inst.selectedAt || Date.now()).toISOString(),
+        contractLocked: inst.contractLocked,
+      },
+      market: {
+        ...s.market,
+        underlying: inst.underlying,
+        symbol: inst.symbol,
+        canonicalInstrumentId: inst.canonicalInstrumentId,
+        exchange: inst.exchange,
+        lotSize: inst.lotSize || 1,
+      },
+      instrument: {
+        ...s.instrument,
+        contractStrike: inst.strike || s.instrument.contractStrike,
+        contractExpiry: inst.expiry || s.instrument.contractExpiry,
+        contractOptionType: (inst.optionType === "PUT" || inst.optionType === "PE" ? "PE" : "CE") as any,
+        entrySide: inst.side || "BUY",
+        ltp,
+        bid,
+        ask,
+        executablePremium: inst.side === "BUY" ? ask : bid,
+      },
+      invalidationNotice: null,
+    }));
+
+    get().recomputeValidation();
+  },
+
+  checkAndPurgeExpiredContract: () => {
+    const state = get();
+    const expiry = state.selectedContractContext?.expiry || state.instrument.contractExpiry;
+    if (!expiry) return false;
+
+    const validation = validateContractExpiry(expiry);
+    if (validation.isExpired) {
+      set({
+        selectedContractContext: null,
+        selectedInstrumentContext: null,
+        liveQuoteSnapshot: null,
+        canonicalPremium: null,
+        invalidationNotice: `PREVIOUS CONTRACT EXPIRED: ${expiry} is no longer active. Reselection required.`,
+        contractVersion: state.contractVersion + 1,
+      });
+      get().recomputeValidation();
+      return true;
+    }
+    return false;
   },
 
   setBotCreationSession: (sessionPatch) => {

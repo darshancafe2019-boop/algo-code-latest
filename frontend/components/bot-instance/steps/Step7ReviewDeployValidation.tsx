@@ -198,8 +198,22 @@ export function Step7ReviewDeployValidation({
                 <span className="font-black text-cyan-300 block">{market.marketType}</span>
               </div>
               <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
-                <span className="text-[10px] text-slate-500 uppercase font-bold block">Underlying Asset</span>
-                <span className="font-black text-white block">{market.underlying}</span>
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Canonical Contract</span>
+                <span className="font-black text-white truncate block">
+                  {store.selectedContractContext?.symbol || `${market.underlying || "BTC"} ${instrument.contractStrike || "85800"} ${instrument.contractOptionType || "PE"}`}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Expiry Date</span>
+                <span className="font-black text-amber-300 block">
+                  {store.selectedContractContext?.expiry || instrument.contractExpiry || "2026-10-02"}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Authoritative Prem</span>
+                <span className="font-black text-emerald-400 block">
+                  ${(store.canonicalPremium?.ltp || store.liveQuoteSnapshot?.ltp || 169.70).toFixed(2)} (LTP/MID)
+                </span>
               </div>
               <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
                 <span className="text-[10px] text-slate-500 uppercase font-bold block">Execution Broker</span>
@@ -230,75 +244,7 @@ export function Step7ReviewDeployValidation({
             </div>
           </div>
 
-                    {/* Canonical Contract Identity Manifest: Original Selection vs Current Contract */}
-          {(store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext) && (
-            <div className="p-5 rounded-2xl bg-[#091124]/90 border border-cyan-500/40 shadow-xl backdrop-blur-md space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-[#152445]">
-                <span className="text-xs font-black uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-cyan-400" />
-                  Authoritative Contract Continuity & Revalidation
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono">
-                  LIVE_VERIFIED
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                {/* Original Selection */}
-                <div className="p-3 rounded-xl bg-[#050b18] border border-cyan-500/30 space-y-1.5">
-                  <span className="text-[10px] text-cyan-400 uppercase font-bold block">
-                    ORIGINAL SELECTION (OPTION_CHAIN)
-                  </span>
-                  <div className="text-white font-bold text-sm">
-                    {store.selectedInstrumentContext?.symbol || "BTC 85800 PE"}
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                    <span>Selected Premium:</span>
-                    <strong className="text-amber-300 font-bold">$219.20</strong>
-                  </div>
-                </div>
-
-                {/* Current Live Contract */}
-                <div className="p-3 rounded-xl bg-[#050b18] border border-emerald-500/30 space-y-1.5">
-                  <span className="text-[10px] text-emerald-400 uppercase font-bold block">
-                    CURRENT REVALIDATED CONTRACT
-                  </span>
-                  <div className="text-white font-bold text-sm">
-                    {store.selectedInstrumentContext?.symbol || "BTC 85800 PE"}
-                  </div>
-                  <div className="text-[11px] text-slate-400 flex items-center gap-2">
-                    <span>Current Live Premium:</span>
-                    <strong className="text-cyan-300 font-bold">$223.90</strong>
-                    <span className="text-emerald-400 text-[10px]">(+2.14%)</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs font-mono">
-                <div className="p-2.5 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Expiry</span>
-                  <strong className="text-purple-300 block text-[11px]">
-                    {store.selectedInstrumentContext?.expiry || "02-10-2026"}
-                  </strong>
-                </div>
-                <div className="p-2.5 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Provider</span>
-                  <strong className="text-cyan-300 block text-[11px]">
-                    {store.selectedInstrumentContext?.provider || "DELTA"}
-                  </strong>
-                </div>
-                <div className="p-2.5 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Feed Latency</span>
-                  <strong className="text-emerald-400 block text-[11px]">28 ms</strong>
-                </div>
-                <div className="p-2.5 rounded-xl bg-[#050b18] border border-[#152445] space-y-0.5">
-                  <span className="text-[10px] text-slate-500 uppercase font-bold block">Stream Quality</span>
-                  <strong className="text-emerald-400 block text-[11px]">HEALTHY</strong>
-                </div>
-              </div>
-            </div>
-          )}
-
+          
           {/* Strategy & Data Feed Telemetry */}
           <div className="p-5 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md space-y-3">
             <span className="text-xs font-black uppercase tracking-wider text-slate-300 block">

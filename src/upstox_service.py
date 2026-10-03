@@ -576,7 +576,7 @@ class UpstoxService:
         self.client_secret = client_secret if client_secret is not None else os.getenv("UPSTOX_CLIENT_SECRET", "")
         raw_token = access_token.strip() if access_token is not None else (os.getenv("UPSTOX_ACCESS_TOKEN", "").strip() or os.getenv("UPSTOX_ANALYTICS_TOKEN", "").strip())
         self._access_token: str = raw_token
-        self.redirect_uri = redirect_uri if redirect_uri is not None else os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
+        self.redirect_uri = redirect_uri if redirect_uri is not None else os.getenv("UPSTOX_REDIRECT_URI", "http://127.0.0.1:5050/api/upstox/callback")
         self._last_auth_error: Optional[str] = None
         self._auth_status: str = "INITIAL"
         self._circuit_breaker_open: bool = False

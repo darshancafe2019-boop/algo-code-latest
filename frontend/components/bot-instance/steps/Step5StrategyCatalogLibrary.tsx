@@ -13,7 +13,6 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
-  ShieldCheck,
   Zap,
   Info,
   Check,
@@ -24,6 +23,8 @@ import {
   Target,
 } from "lucide-react";
 import { CRYPTO_30_STRATEGIES, CryptoStrategyDefinition } from "@/lib/strategies/crypto30Strategies";
+import { StrategyResolver, ResolvedStrategyPlan } from "@/lib/strategies/strategyResolver";
+import { validateContractExpiry } from "@/lib/contracts/contractExpiryManager";
 import { useBotCreationStore } from "@/lib/store/useBotCreationStore";
 import { cn } from "@/lib/utils";
 
@@ -38,12 +39,35 @@ const CATEGORIES = [
 
 export function Step5StrategyCatalogLibrary() {
   const store = useBotCreationStore();
-  const { strategies, market, updateSection, setStep } = store;
+  const { strategies, market, instrument, provider, updateSection, setStep } = store;
 
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [activeStrategyId, setActiveStrategyId] = useState<string>(strategies.primaryStrategyId || "crypto-strat-01");
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const underlying = market.underlying || "BTC";
+  const spotPrice = instrument.spotPrice || 86420;
+  const expiry = instrument.contractExpiry || store.selectedContractContext?.expiry || "02 OCT 2026";
+  const activeProvider = provider.marketDataProvider || "DELTA";
+
+  // Dynamic Strategy Plan Resolution
+  const resolvedPlan: ResolvedStrategyPlan = useMemo(() => {
+    return StrategyResolver.resolveStrategyPlan({
+      strategyId: activeStrategyId,
+      underlying,
+      spotPrice,
+      expiry,
+      provider: activeProvider,
+      lotSize: market.lotSize || 1,
+    });
+  }, [activeStrategyId, underlying, spotPrice, expiry, activeProvider, market.lotSize]);
+
+  // Catalog Readiness Analysis
+  const readinessSummary = useMemo(() => {
+    const ids = CRYPTO_30_STRATEGIES.map((s) => s.id);
+    return StrategyResolver.evaluateCatalogReadiness(ids, underlying, spotPrice, expiry, activeProvider);
+  }, [underlying, spotPrice, expiry, activeProvider]);
 
   const filteredStrategies = useMemo(() => {
     return CRYPTO_30_STRATEGIES.filter((s) => {
@@ -68,72 +92,13 @@ export function Step5StrategyCatalogLibrary() {
       primaryTimeframe: strat.primaryTimeframe,
       strategyVersion: strat.version,
     });
-    setToastMessage(`Selected strategy: #${strat.number} ${strat.name}. Parameters loaded.`);
+    setToastMessage(`Selected strategy: #${strat.number} ${strat.name}. Live execution plan resolved.`);
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const isModuleEnabled = store.modulesEnabled?.step5StrategyLibrary ?? true;
-
   return (
     <div className="space-y-5 animate-in fade-in duration-200 font-sans text-slate-100">
-            {/* ── 0. ACTIVE MARKET CONTEXT & TWO-LAYER STRATEGY ARCHITECTURE ── */}
-      {(store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext) && (
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-2 border-cyan-500/50 rounded-2xl p-4 shadow-xl space-y-3 backdrop-blur-md">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-slate-800 pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-bold">
-                <ShieldCheck className="w-5 h-5 text-cyan-400" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-bold">
-                    ACTIVE MARKET CONTEXT
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    LIVE QUALITY: HEALTHY (28ms)
-                  </span>
-                </div>
-                <div className="text-base font-bold text-white mt-1 flex items-center gap-2">
-                  <span>{store.selectedInstrumentContext?.symbol || "BTC 85800 PE"}</span>
-                  <span className="text-cyan-300 font-mono text-xs">
-                    (Expiry: {store.selectedInstrumentContext?.expiry || "02-10-2026"} | BUY | DELTA)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">Selected Premium</span>
-                <span className="text-slate-200 font-bold">$219.20</span>
-              </div>
-              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">Current Live Premium</span>
-                <span className="text-cyan-300 font-bold text-sm">$223.90</span>
-                <span className="text-emerald-400 text-[9px] block">+2.14%</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Two Strategy Layers Explanation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
-            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
-              <span className="text-[10px] text-purple-400 font-bold uppercase">Layer A: Option Structure</span>
-              <div className="text-white font-bold">Bear Put Spread (Anchor: BTC 85800 PE)</div>
-              <p className="text-[10px] text-slate-400">Decides WHAT option legs are traded.</p>
-            </div>
-
-            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 space-y-0.5">
-              <span className="text-[10px] text-cyan-400 font-bold uppercase">Layer B: Algorithmic Entry Engine</span>
-              <div className="text-white font-bold">{currentStrategy?.name || "Trend Pullback to EMA"}</div>
-              <p className="text-[10px] text-slate-400">Decides WHEN the bot enters and exits positions.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 1. TOP HEADER: Hero Title, ON/OFF Switch & Active Strategy Summary ── */}
+      {/* ── 1. TOP HEADER: Hero Title & True Live Strategy Readiness ── */}
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b132b]/95 via-[#0f1d3d]/95 to-[#0b142e]/95 border border-cyan-500/25 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl">
         <div className="absolute -right-20 -top-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -153,38 +118,24 @@ export function Step5StrategyCatalogLibrary() {
                     STAGE 5 / 7
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-purple-950 text-purple-300 border border-purple-500/40 font-bold">
-                    TARGET: {market.underlying || "NIFTY"}
+                    TARGET: {underlying} @ ${spotPrice.toLocaleString()}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                    30 READY
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-700 font-bold">
+                    30 TEMPLATES LOADED
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE READY: {readinessSummary.liveReadyCount}
                   </span>
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Select and auto-populate calibrated rule templates from the complete 30-strategy algorithmic library across 5 specialized market regimes.
+                  Select calibrated institutional strategy archetypes with dynamic live option leg resolution, margin valuation, and pre-trade liquidity verification.
                 </p>
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
-            {/* Direct ON / OFF Module Switch */}
-            <div className="flex items-center gap-2 bg-[#050b18] p-1.5 rounded-2xl border border-[#1b2d4b] shadow-lg font-mono">
-              <span className="text-[11px] text-slate-400 font-bold px-1.5">Module:</span>
-              <button
-                type="button"
-                onClick={() => store.toggleModule("step5StrategyLibrary")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                  isModuleEnabled
-                    ? "bg-emerald-500 text-slate-950 shadow-emerald-500/20"
-                    : "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
-                }`}
-                title="Toggle 30-Strategy Library Module ON/OFF"
-              >
-                <span className={`w-2 h-2 rounded-full ${isModuleEnabled ? "bg-slate-950 animate-pulse" : "bg-rose-400"}`} />
-                <span>{isModuleEnabled ? "ON (ACTIVE)" : "OFF (DISABLED)"}</span>
-              </button>
-            </div>
-
             <div className="text-xs font-mono text-cyan-300 px-3.5 py-2 rounded-xl bg-[#050b18] border border-[#1b2d4b] shadow-lg font-bold">
               Active: <strong className="text-white">#{currentStrategy.number} {currentStrategy.name}</strong>
             </div>
@@ -204,32 +155,6 @@ export function Step5StrategyCatalogLibrary() {
           </div>
         )}
       </header>
-
-      {/* ── INACTIVE NOTICE BANNER IF TOGGLED OFF ── */}
-      {!isModuleEnabled && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/95 to-slate-900/90 border border-amber-500/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
-              <Compass className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                30 Strategy Library Module is <span className="text-rose-400 font-mono">[DISABLED / OFF]</span>
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Preset strategy library rules are bypassed. Custom indicator rules from Step 3 or pure price rules will be used.
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => store.setModuleEnabled("step5StrategyLibrary", true)}
-            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-          >
-            🧭 Turn ON 30-Strategy Library
-          </button>
-        </div>
-      )}
 
       {/* ── 2. CATEGORY PILLS & SEARCH BAR ─────────────────────────────────── */}
       <section className="p-4 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3 font-mono text-xs">

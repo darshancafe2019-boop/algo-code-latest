@@ -53,7 +53,7 @@ BINANCE_TESTNET_ENDPOINT = os.getenv("BINANCE_TESTNET_ENDPOINT", "https://testne
 # Indian Market & Broker Integration (Upstox / Dhan)
 UPSTOX_CLIENT_ID = os.getenv("UPSTOX_CLIENT_ID", "")
 UPSTOX_CLIENT_SECRET = os.getenv("UPSTOX_CLIENT_SECRET", "")
-UPSTOX_REDIRECT_URI = os.getenv("UPSTOX_REDIRECT_URI", "http://localhost:5050/api/upstox/callback")
+UPSTOX_REDIRECT_URI = os.getenv("UPSTOX_REDIRECT_URI", "http://127.0.0.1:5050/api/upstox/callback")
 UPSTOX_ACCESS_TOKEN = os.getenv("UPSTOX_ACCESS_TOKEN", "")
 ENABLE_INDIA_MARKET = os.getenv("ENABLE_INDIA_MARKET", "true").lower() == "true"
 ENABLE_INDIA_FNO = os.getenv("ENABLE_INDIA_FNO", "false").lower() == "true"
@@ -62,7 +62,7 @@ INDIA_BROKER = os.getenv("INDIA_BROKER", "UPSTOX")
 FYERS_APP_ID = os.getenv("FYERS_APP_ID", "")
 FYERS_CLIENT_ID = os.getenv("FYERS_CLIENT_ID", FYERS_APP_ID)
 FYERS_SECRET_ID = os.getenv("FYERS_SECRET_ID", os.getenv("FYERS_SECRET_KEY", ""))
-FYERS_REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI", "http://localhost:3100/api/fyers/callback")
+FYERS_REDIRECT_URI = os.getenv("FYERS_REDIRECT_URI", "http://127.0.0.1:3100/api/fyers/callback")
 FYERS_ACCESS_TOKEN = os.getenv("FYERS_ACCESS_TOKEN", "")
 
 # Angel One SmartAPI Integration

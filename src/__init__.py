@@ -1,25 +1,4 @@
-from . import config
-from . import db
-from . import audit
-from . import indicators
-from . import strategy
-from . import execution
-from . import execution_service
-from . import process_manager
-from . import data_fetcher
-from . import indicator_schema
-from . import indicator_cache
-from . import universal_risk_engine
-from . import latency_profiler
-from . import trade_ledger
-from . import pnl_engine
-from . import performance_analytics
-from . import command_bus
-from . import market_intelligence
-from . import market_universe
-from . import market_providers
-from . import trade_audit_engine
-from . import strategy_builder
+import importlib
 
 __all__ = [
     "config",
@@ -45,4 +24,11 @@ __all__ = [
     "trade_audit_engine",
     "strategy_builder",
 ]
+
+for _mod_name in __all__:
+    try:
+        globals()[_mod_name] = importlib.import_module(f".{_mod_name}", package=__name__)
+    except Exception:
+        pass
+
 

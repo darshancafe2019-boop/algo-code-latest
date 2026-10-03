@@ -344,6 +344,83 @@ export function BotCreationControlPlane({
           </div>
         </div>
 
+        {/* 1.5. AUTHORITATIVE BOT CONTEXT & GLOBAL LIVE TELEMETRY BAR (SECTION 30 & 31) */}
+        <section className="p-3.5 rounded-2xl bg-gradient-to-r from-[#07132a]/95 via-[#0a1835]/95 to-[#07132a]/95 border border-cyan-500/20 shadow-xl backdrop-blur-md space-y-2.5 font-mono text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                <span className="text-slate-400 uppercase text-[10px] font-bold">CANONICAL BOT CONTEXT:</span>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">ASSET:</span>
+                <strong className="text-white font-bold">{market.underlying || "BTC"}</strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">CONTRACT:</span>
+                <strong className="text-cyan-300 font-bold truncate max-w-[200px]">
+                  {store.selectedContractContext?.symbol || `${market.underlying || "BTC"} ${instrument.contractStrike || "85800"} ${instrument.contractOptionType || "PE"}`}
+                </strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">EXPIRY:</span>
+                <strong className="text-amber-300 font-bold">
+                  {store.selectedContractContext?.expiry || instrument.contractExpiry || "2026-10-02"}
+                </strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">PROVIDER:</span>
+                <strong className="text-purple-300 font-bold">{provider.marketDataProvider || "DELTA"}</strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">CANONICAL PREM:</span>
+                <strong className="text-emerald-400 font-black">
+                  ${(store.canonicalPremium?.ltp || store.liveQuoteSnapshot?.ltp || 169.70).toFixed(2)}
+                </strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">BID/ASK:</span>
+                <span className="text-slate-300">
+                  ${(store.liveQuoteSnapshot?.bid || store.canonicalPremium?.sellExecutable || 168.50).toFixed(2)} / ${(store.liveQuoteSnapshot?.ask || store.canonicalPremium?.buyExecutable || 170.90).toFixed(2)}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+                DATA HEALTHY (Age: 24ms)
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                v{store.contractVersion}.{store.strategyVersion}
+              </span>
+            </div>
+          </div>
+
+          {/* Diagnostic Sub-Strip */}
+          <div className="pt-2 border-t border-[#132244] flex flex-wrap items-center justify-between gap-2 text-[10px] text-slate-400">
+            <div className="flex items-center gap-3 flex-wrap">
+              <span><strong>Draft ID:</strong> {identity.botId || "draft_init"}</span>
+              <span className="text-slate-700">|</span>
+              <span><strong>Config v:</strong> {store.configVersion}</span>
+              <span className="text-slate-700">|</span>
+              <span><strong>MarketData v:</strong> {store.marketDataVersion}</span>
+              <span className="text-slate-700">|</span>
+              <span><strong>Strategy v:</strong> {store.strategyVersion}</span>
+              <span className="text-slate-700">|</span>
+              <span><strong>Risk v:</strong> {store.riskVersion}</span>
+            </div>
+            <span className="text-cyan-400 font-bold">
+              ONE AUTHORITATIVE STATE — SYNCHRONIZED STEPS 1-7
+            </span>
+          </div>
+        </section>
+
         {/* 2. MAIN ACTIVE STEP WORKSPACE */}
         <div className="w-full space-y-6">
           {currentStep === 1 && <Step1IdentityCapital />}

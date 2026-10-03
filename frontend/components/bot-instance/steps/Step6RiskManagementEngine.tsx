@@ -73,42 +73,6 @@ export function Step6RiskManagementEngine() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200 font-sans text-slate-100">
-            {/* ── 0. CARRIED CONTRACT RISK TELEMETRY & LIVE SIZING ── */}
-      {(store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext) && (
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-2 border-cyan-500/50 rounded-2xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-3 text-xs font-mono backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] text-slate-400 uppercase font-bold">Target Contract:</span>
-                <strong className="text-white text-sm">
-                  {store.selectedInstrumentContext?.symbol || "BTC 85800 PE"}
-                </strong>
-                <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[9px] border border-emerald-500/40 font-bold">
-                  BUY (Lot: {store.selectedInstrumentContext?.lotSize || 1})
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Expiry: <strong className="text-purple-300">{store.selectedInstrumentContext?.expiry || "02-10-2026"}</strong> | Provider: DELTA
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-500 text-[10px] block">Selected Historical</span>
-              <strong className="text-slate-300">$219.20</strong>
-            </div>
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-500 text-[10px] block">Current Live Price</span>
-              <strong className="text-cyan-300 text-sm">$223.90</strong>
-              <span className="text-emerald-400 text-[9px] block">Drift: +2.14%</span>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── 1. TOP HEADER: Hero Title & 4-Tier Navigation Pills ────────────── */}
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b132b]/95 via-[#0f1d3d]/95 to-[#0b142e]/95 border border-cyan-500/25 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl">
@@ -180,34 +144,57 @@ export function Step6RiskManagementEngine() {
       </header>
 
       {/* ── 2. REAL-TIME RISK SIMULATION TELEMETRY BAR ──────────────────────── */}
-      <section className="p-4 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
-        <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold block">Stop Loss Risk Amount</span>
-          <div className="text-sm font-black text-rose-400">
-            {formatMoney(stopLossAmount, capital.currency)}{" "}
-            <span className="text-[10px] font-normal text-slate-400">({risk.stopLossPct}%)</span>
+      <section className="p-4 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md space-y-3 font-mono text-xs">
+        {/* Canonical Anchor Sub-strip */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-2.5 border-b border-[#152445] text-[11px]">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-slate-400">Canonical Contract:</span>
+            <strong className="text-cyan-300 font-bold">
+              {store.selectedContractContext?.symbol || `${store.market.underlying || "BTC"} ${store.instrument.contractStrike || "85800"} ${store.instrument.contractOptionType || "PE"}`}
+            </strong>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">Expiry:</span>
+            <strong className="text-white font-bold">{store.selectedContractContext?.expiry || store.instrument.contractExpiry || "2026-10-02"}</strong>
+            <span className="text-slate-600">|</span>
+            <span className="text-slate-400">Authoritative Prem (LTP/MID):</span>
+            <strong className="text-emerald-400 font-bold">
+              ${(store.canonicalPremium?.ltp || store.liveQuoteSnapshot?.ltp || 169.70).toFixed(2)}
+            </strong>
           </div>
+          <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
+            SYNCED: STEP 1-7 DRAFT STATE
+          </span>
         </div>
 
-        <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold block">Target Profit Gain</span>
-          <div className="text-sm font-black text-emerald-400">
-            {formatMoney(takeProfitAmount, capital.currency)}{" "}
-            <span className="text-[10px] font-normal text-slate-400">({risk.takeProfitPct}%)</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
+            <span className="text-[10px] text-slate-500 uppercase font-bold block">Stop Loss Risk Amount</span>
+            <div className="text-sm font-black text-rose-400">
+              {formatMoney(stopLossAmount, capital.currency)}{" "}
+              <span className="text-[10px] font-normal text-slate-400">({risk.stopLossPct}%)</span>
+            </div>
           </div>
-        </div>
 
-        <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold block">Risk : Reward Ratio</span>
-          <div className="text-sm font-black text-cyan-300">
-            1 : {rrRatio}
+          <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
+            <span className="text-[10px] text-slate-500 uppercase font-bold block">Target Profit Gain</span>
+            <div className="text-sm font-black text-emerald-400">
+              {formatMoney(takeProfitAmount, capital.currency)}{" "}
+              <span className="text-[10px] font-normal text-slate-400">({risk.takeProfitPct}%)</span>
+            </div>
           </div>
-        </div>
 
-        <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
-          <span className="text-[10px] text-slate-500 uppercase font-bold block">Max Daily Loss Cap</span>
-          <div className="text-sm font-black text-amber-400">
-            {formatMoney(risk.maxDailyLoss, capital.currency)}
+          <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
+            <span className="text-[10px] text-slate-500 uppercase font-bold block">Risk : Reward Ratio</span>
+            <div className="text-sm font-black text-cyan-300">
+              1 : {rrRatio}
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-[#050b18] border border-[#152445] space-y-1">
+            <span className="text-[10px] text-slate-500 uppercase font-bold block">Max Daily Loss Cap</span>
+            <div className="text-sm font-black text-amber-400">
+              {formatMoney(risk.maxDailyLoss, capital.currency)}
+            </div>
           </div>
         </div>
       </section>

@@ -119,25 +119,6 @@ from src.email_service import global_email_service
 # Initialize Flask App
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Register Authoritative Strategy & Premium Instrument Resolver Routes
-try:
-    from src.strategy_resolver_routes import register_strategy_resolver_routes
-    register_strategy_resolver_routes(app)
-except Exception as _strat_route_err:
-    logger.warning(f"Strategy resolver routes registration warning: {_strat_route_err}")
-
-try:
-    from src.premium_resolver_routes import register_premium_resolver_routes
-    register_premium_resolver_routes(app)
-except Exception as _prem_route_err:
-    logger.warning(f"Premium resolver routes registration warning: {_prem_route_err}")
-
-try:
-    from app.blueprints.market_data import market_data_bp
-    app.register_blueprint(market_data_bp)
-except Exception as _mkt_bp_err:
-    logger.warning(f"Market data blueprint registration warning: {_mkt_bp_err}")
-
 # Bootstrap administrative identity and verify database authorization
 try:
     global_auth_manager.initialize_bootstrap_admin()
@@ -411,6 +392,14 @@ try:
     logger.info("Successfully registered market_data_bp.")
 except Exception as mdbp_err:
     logger.warning(f"Notice: Failed registering market data blueprint: {mdbp_err}")
+
+try:
+    from app.blueprints.options import options_bp
+    app.register_blueprint(options_bp)
+    logger.info("Successfully registered options_bp.")
+except Exception as opt_bp_err:
+    logger.warning(f"Notice: Failed registering options blueprint: {opt_bp_err}")
+
 
 # (Orchestrator Blueprint registered in startup sequence at line 131)
 
@@ -13128,43 +13117,6 @@ def api_incidents_summary():
     return jsonify({"status": "success", "metrics": metrics})
 
 
-@app.route("/api/system/health", methods=["GET"])
-def api_system_health():
-    """Returns comprehensive multi-subsystem health telemetry and multi-broker status."""
-    try:
-        from src.self_healing_manager import global_self_healing_manager
-        from src.dhan_broker_adapter import dhan_broker_adapter
-        from src.upstox_broker_adapter import upstox_broker_adapter
-        from src.delta_exchange_adapter import delta_exchange_adapter
-
-        health = global_self_healing_manager.get_system_health_status()
-        return jsonify({
-            "status": "success",
-            "app": "healthy",
-            "database": "healthy",
-            "trading_mode": getattr(config, "TRADING_MODE", "PAPER"),
-            "kill_switch_active": getattr(config, "GLOBAL_KILL_SWITCH", False),
-            "dhan": {
-                "auth": "connected" if dhan_broker_adapter.is_authenticated else "not_configured",
-                "marketData": "live" if dhan_broker_adapter.is_authenticated else "ready",
-                "trading": "ready",
-                "environment": "SANDBOX" if "sandbox" in dhan_broker_adapter.base_url.lower() else "LIVE"
-            },
-            "upstox": {
-                "auth": "connected" if upstox_broker_adapter.is_authenticated else "not_configured",
-                "marketData": "live" if upstox_broker_adapter.is_authenticated else "ready",
-                "trading": "ready"
-            },
-            "delta": {
-                "auth": "connected" if delta_exchange_adapter.is_authenticated else "not_configured",
-                "marketData": "live" if delta_exchange_adapter.is_authenticated else "ready",
-                "trading": "ready"
-            },
-            "health": health
-        }), 200
-    except Exception as e:
-        logger.error(f"Error in GET /api/system/health: {e}")
-        return jsonify({"status": "error", "error": str(e)}), 500
 
 
 @app.route("/api/incidents/<incident_id>", methods=["GET"])

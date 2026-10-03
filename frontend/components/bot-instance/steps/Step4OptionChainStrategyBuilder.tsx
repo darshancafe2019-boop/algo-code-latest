@@ -31,6 +31,8 @@ import {
 import { formatMoney } from "@/lib/formatters";
 import { CANONICAL_21_OPTION_STRATEGIES, OptionStrategyCatalogItem } from "@/lib/strategies/options21Catalog";
 import { useBotCreationStore } from "@/lib/store/useBotCreationStore";
+import { getAuthoritativeActiveExpiries, isContractExpired } from "@/lib/contracts/contractExpiryManager";
+import { PremiumEngine, LiveQuoteSnapshot, CanonicalPremiumSnapshot } from "@/lib/market-data/premiumEngine";
 import { cn } from "@/lib/utils";
 
 interface EditableLeg {
@@ -53,7 +55,7 @@ interface EditableLeg {
 
 export function Step4OptionChainStrategyBuilder() {
   const store = useBotCreationStore();
-  const { market, instrument, strategies, updateSection, setStep } = store;
+  const { market, instrument, strategies, updateSection, setStep, liveQuoteSnapshot, canonicalPremium } = store;
 
   const [activeStrategyId, setActiveStrategyId] = useState<string>(
     strategies.primaryStrategyId || "short-iron-condor"
@@ -63,10 +65,18 @@ export function Step4OptionChainStrategyBuilder() {
 
   const anchorContract: any = store.botCreationSession?.selectedInstrument || store.selectedContractContext;
   const underlying = anchorContract?.underlying || market.underlying || "BTC";
-  const [selectedExpiry, setSelectedExpiry] = useState<string>(
-    anchorContract?.expiry || instrument.contractExpiry || "2026-10-30"
-  );
-  const spotPrice = instrument.spotPrice || (underlying === "BANKNIFTY" ? 54520 : underlying === "BTC" ? 85000 : 25184.5);
+  
+  const activeExpiries = useMemo(() => {
+    return getAuthoritativeActiveExpiries(underlying);
+  }, [underlying]);
+
+  const [selectedExpiry, setSelectedExpiry] = useState<string>(() => {
+    const rawExp = anchorContract?.expiry || instrument.contractExpiry;
+    if (rawExp && !isContractExpired(rawExp)) return rawExp;
+    return activeExpiries[0] || "02 OCT 2026";
+  });
+
+  const spotPrice = liveQuoteSnapshot?.ltp || instrument.spotPrice || (underlying === "BANKNIFTY" ? 54520 : underlying === "BTC" ? 85800 : 25184.5);
   const strikeStep = underlying === "BANKNIFTY" ? 100 : underlying === "BTC" ? 500 : 50;
   const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
 
@@ -75,15 +85,15 @@ export function Step4OptionChainStrategyBuilder() {
     return CANONICAL_21_OPTION_STRATEGIES.find((s) => s.id === activeStrategyId) || CANONICAL_21_OPTION_STRATEGIES[8];
   }, [activeStrategyId]);
 
-  // Construct Editable Legs dynamically anchored to carried contract
+  // Construct Editable Legs dynamically anchored to canonical contract
   const [legs, setLegs] = useState<EditableLeg[]>(() => {
-    if (anchorContract && anchorContract.strike) {
+    if (anchorContract && anchorContract.strike && !isContractExpired(anchorContract.expiry)) {
       const anchorStrike = anchorContract.strike;
       const anchorType = (anchorContract.optionType === "PUT" || anchorContract.optionType === "PE") ? "PE" : "CE";
       const anchorSide = anchorContract.side || "BUY";
-      const anchorLtp = anchorContract.selectedPremium || anchorContract.selectedPremiumAtSelection || 104.5;
-      const anchorBid = anchorContract.selectedBid || anchorLtp * 0.99;
-      const anchorAsk = anchorContract.selectedAsk || anchorLtp * 1.01;
+      const anchorLtp = canonicalPremium?.ltp || anchorContract.selectedPremium || anchorContract.selectedPremiumAtSelection || 169.70;
+      const anchorBid = liveQuoteSnapshot?.bid || canonicalPremium?.sellExecutable || anchorContract.selectedBid || anchorLtp * 0.99;
+      const anchorAsk = liveQuoteSnapshot?.ask || canonicalPremium?.buyExecutable || anchorContract.selectedAsk || anchorLtp * 1.01;
 
       return [
         {
@@ -97,7 +107,7 @@ export function Step4OptionChainStrategyBuilder() {
           ltp: anchorLtp,
           bid: anchorBid,
           ask: anchorAsk,
-          iv: 0.54,
+          iv: canonicalPremium?.iv || 0.54,
           delta: anchorType === "PE" ? -0.42 : 0.48,
           gamma: 0.00012,
           theta: -18.5,
@@ -263,54 +273,9 @@ export function Step4OptionChainStrategyBuilder() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const isModuleEnabled = store.modulesEnabled?.step4OptionChain ?? true;
-
   return (
     <div className="space-y-5 animate-in fade-in duration-200 font-sans text-slate-100">
-      {/* ── 0. ANCHOR CONTRACT & DYNAMIC LEG SYNTHESIS BANNER ── */}
-      {(store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext) && (
-        <div className="bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-2 border-cyan-500/50 rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-bold">
-              <ShieldCheck className="w-5 h-5 text-cyan-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-bold">
-                  STRATEGY ANCHOR CONTRACT
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold">
-                  LIVE REVALIDATED
-                </span>
-              </div>
-              <div className="text-sm font-bold text-white mt-1 flex items-center gap-2">
-                <span>
-                  {store.selectedInstrumentContext?.symbol ||
-                    store.botCreationSession?.selectedInstrument?.symbol ||
-                    "BTC 85800 PE"}
-                </span>
-                <span className="text-cyan-300 font-mono text-xs">
-                  (Expiry: {store.selectedInstrumentContext?.expiry || "02-10-2026"} | BUY | Provider: DELTA)
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-3 text-xs font-mono">
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-[10px] block">Anchor Live Premium</span>
-              <span className="text-cyan-300 font-bold text-sm">$223.90</span>
-              <span className="text-emerald-400 text-[9px] block">+2.14% Live</span>
-            </div>
-            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-              <span className="text-slate-400 text-[10px] block">Option Structure</span>
-              <span className="text-purple-300 font-bold">{currentStrategy?.name || "Bear Put Spread"}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── 1. TOP HEADER: Hero Title, ON/OFF Switch & 3-Way Mode Switcher ───── */}
+      {/* ── 1. TOP HEADER: Hero Title & Key Metrics ───── */}
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b132b]/95 via-[#0f1d3d]/95 to-[#0b142e]/95 border border-cyan-500/25 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl">
         <div className="absolute -right-20 -top-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -342,27 +307,7 @@ export function Step4OptionChainStrategyBuilder() {
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
-            {/* Direct ON / OFF Module Switch */}
-            <div className="flex items-center gap-2 bg-[#050b18] p-1.5 rounded-2xl border border-[#1b2d4b] shadow-lg font-mono">
-              <span className="text-[11px] text-slate-400 font-bold px-1.5">Module:</span>
-              <button
-                type="button"
-                onClick={() => store.toggleModule("step4OptionChain")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-sm ${
-                  isModuleEnabled
-                    ? "bg-emerald-500 text-slate-950 shadow-emerald-500/20"
-                    : "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
-                }`}
-                title="Toggle Option Chain Module ON/OFF"
-              >
-                <span className={`w-2 h-2 rounded-full ${isModuleEnabled ? "bg-slate-950 animate-pulse" : "bg-rose-400"}`} />
-                <span>{isModuleEnabled ? "ON (ACTIVE)" : "OFF (DISABLED)"}</span>
-              </button>
-            </div>
-          </div>
-      </div>
+        </div>
 
         {/* Feedback Toast Banner */}
         {toastMessage && (
@@ -377,32 +322,6 @@ export function Step4OptionChainStrategyBuilder() {
           </div>
         )}
       </header>
-
-      {/* ── INACTIVE NOTICE BANNER IF TOGGLED OFF ── */}
-      {!isModuleEnabled && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-900/90 via-slate-900/95 to-slate-900/90 border border-amber-500/40 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
-          <div className="flex items-center gap-3.5">
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shrink-0">
-              <Zap className="w-5 h-5" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                Option Chain & 21 Strats Module is <span className="text-rose-400 font-mono">[DISABLED / OFF]</span>
-              </h4>
-              <p className="text-xs text-slate-400 mt-0.5">
-                This bot will execute single-leg signals. Turn this ON to attach multi-leg option strategies (Iron Condor, Straddles, Spreads).
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => store.setModuleEnabled("step4OptionChain", true)}
-            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-mono font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all cursor-pointer whitespace-nowrap active:scale-95"
-          >
-            ⚡ Turn ON Option Chain Studio
-          </button>
-        </div>
-      )}
 
       {/* ── 2. LIVE TELEMETRY & EXPIRY BAR ─────────────────────────────────── */}
       <section className="p-3.5 rounded-2xl bg-[#091124]/90 border border-[#152445] shadow-xl backdrop-blur-md flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
@@ -440,9 +359,11 @@ export function Step4OptionChainStrategyBuilder() {
             }}
             className="px-3 py-1.5 bg-[#050b18] border border-[#1b2d4b] rounded-xl text-xs font-mono font-bold text-cyan-300 focus:outline-none focus:border-cyan-400 cursor-pointer shadow-inner"
           >
-            <option value="2026-10-02">02 OCT 2026 (Weekly)</option>
-            <option value="2026-10-09">09 OCT 2026</option>
-            <option value="2026-10-30">30 OCT 2026 (Monthly)</option>
+            {activeExpiries.map((exp) => (
+              <option key={exp} value={exp}>
+                {exp}
+              </option>
+            ))}
           </select>
         </div>
       </section>

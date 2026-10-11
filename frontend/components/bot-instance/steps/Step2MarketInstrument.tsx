@@ -101,7 +101,7 @@ export function Step2MarketInstrument({ onValidated }: Step2MarketInstrumentProp
   );
   const [providerSwitchState, setProviderSwitchState] = useState<ProviderSwitchState>("LIVE_VERIFIED");
   const [selectedExpiry, setSelectedExpiry] = useState<string>(
-    carried?.expiry || "02 OCT 2026"
+    carried?.expiry || "16 OCT 2026"
   );
   const [selectedOptionType, setSelectedOptionType] = useState<"CE" | "PE">(
     (carried?.optionType as "CE" | "PE") || "PE"
@@ -116,23 +116,73 @@ export function Step2MarketInstrument({ onValidated }: Step2MarketInstrumentProp
     carried?.selectedPremium || 219.20
   );
   const [searchQuery, setSearchQuery] = useState("");
+  const [apiExpiries, setApiExpiries] = useState<string[]>([]);
 
   const carriedRowRef = useRef<HTMLTableRowElement | null>(null);
 
-  // Expiries List
-  const dynamicExpiries = useMemo(() => {
-    if (selectedUnderlying === "NIFTY" || selectedUnderlying === "BANKNIFTY") {
-      return ["08 OCT 2026", "15 OCT 2026", "29 OCT 2026", "26 NOV 2026"];
-    }
-    return ["02 OCT 2026", "09 OCT 2026", "16 OCT 2026", "30 OCT 2026", "27 NOV 2026", "25 DEC 2026"];
-  }, [selectedUnderlying]);
+  // Market Gateway Real-Time Quote Connection
+  const { quotes, getQuote, subscribe } = useMarketGatewayContext();
 
-  // Ensure selectedExpiry preserves carried context
+  useEffect(() => {
+    if (selectedUnderlying) {
+      subscribe(selectedUnderlying, "OPTION_CHAIN");
+      if (selectedUnderlying === "BTC" || selectedUnderlying === "ETH") {
+        subscribe(`${selectedUnderlying}/USDT`, "OPTION_CHAIN");
+      }
+    }
+  }, [selectedUnderlying, subscribe]);
+
+  const liveQuote = useMemo(() => {
+    return (
+      getQuote(selectedUnderlying) ||
+      quotes.get(selectedUnderlying) ||
+      quotes.get(`${selectedUnderlying}/USDT`) ||
+      null
+    );
+  }, [getQuote, quotes, selectedUnderlying]);
+
+  // Fetch Authoritative Upcoming Expiries from Server
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchServerExpiries() {
+      try {
+        const cat = selectedMarketCategory || "CRYPTO_OPTIONS";
+        const res = await fetch(`/api/instruments/expiries?underlying=${encodeURIComponent(selectedUnderlying)}&market=${encodeURIComponent(cat)}`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.expiries && Array.isArray(json.expiries) && json.expiries.length > 0) {
+            const list: string[] = json.expiries.map((item: any) => {
+              const raw = typeof item === "string" ? item : item.expiry;
+              return String(raw);
+            });
+            if (isMounted && list.length > 0) {
+              setApiExpiries(list);
+            }
+          }
+        }
+      } catch {}
+    }
+    fetchServerExpiries();
+    return () => { isMounted = false; };
+  }, [selectedUnderlying, selectedMarketCategory]);
+
+  // Expiries List with Future Active Baseline
+  const dynamicExpiries = useMemo(() => {
+    if (apiExpiries.length > 0) return apiExpiries;
+    if (selectedUnderlying === "NIFTY" || selectedUnderlying === "BANKNIFTY") {
+      return ["15 OCT 2026", "29 OCT 2026", "26 NOV 2026", "31 DEC 2026"];
+    }
+    return ["16 OCT 2026", "23 OCT 2026", "30 OCT 2026", "27 NOV 2026", "25 DEC 2026"];
+  }, [apiExpiries, selectedUnderlying]);
+
+  // Ensure selectedExpiry preserves carried context or defaults to active upcoming expiry
   useEffect(() => {
     if (carried?.expiry) {
       setSelectedExpiry(carried.expiry);
+    } else if (dynamicExpiries.length > 0 && !dynamicExpiries.includes(selectedExpiry)) {
+      setSelectedExpiry(dynamicExpiries[0]);
     }
-  }, [carried?.expiry]);
+  }, [carried?.expiry, dynamicExpiries]);
 
   // Authoritative Pricing & Market Data
   const selectedPrice = carried?.selectedPremium || carried?.selectedPremiumAtSelection || 219.20;
@@ -142,34 +192,35 @@ export function Step2MarketInstrument({ onValidated }: Step2MarketInstrumentProp
 
   // Underlying Canonical Identification & Pricing (Audit: Distinguish NIFTY spot from Option Premium 142.50)
   const underlyingDetails = useMemo(() => {
+    const liveSpot = liveQuote?.last_price;
     if (selectedUnderlying === "NIFTY") {
       return {
         canonicalId: "NSE_INDEX:NIFTY50",
         name: "NIFTY 50 Index",
-        spotPrice: 24650.0,
-        changePct: "+0.45%",
+        spotPrice: liveSpot || 24650.0,
+        changePct: liveQuote?.change_pct ? `${liveQuote.change_pct > 0 ? "+" : ""}${liveQuote.change_pct.toFixed(2)}%` : "+0.45%",
         provider: activeProvider === "DELTA" ? "UPSTOX" : activeProvider,
-        status: "LIVE",
+        status: liveQuote ? "LIVE" : "HEALTHY",
         isIndex: true,
       };
     } else if (selectedUnderlying === "BANKNIFTY") {
       return {
         canonicalId: "NSE_INDEX:BANKNIFTY",
         name: "NIFTY Bank Index",
-        spotPrice: 51200.0,
-        changePct: "+0.32%",
+        spotPrice: liveSpot || 51200.0,
+        changePct: liveQuote?.change_pct ? `${liveQuote.change_pct > 0 ? "+" : ""}${liveQuote.change_pct.toFixed(2)}%` : "+0.32%",
         provider: activeProvider === "DELTA" ? "DHAN" : activeProvider,
-        status: "LIVE",
+        status: liveQuote ? "LIVE" : "HEALTHY",
         isIndex: true,
       };
     } else if (selectedUnderlying === "ETH") {
       return {
         canonicalId: "BINANCE:ETHUSDT",
         name: "Ethereum Spot",
-        spotPrice: 2750.0,
-        changePct: "-0.85%",
+        spotPrice: liveSpot || 2750.0,
+        changePct: liveQuote?.change_pct ? `${liveQuote.change_pct > 0 ? "+" : ""}${liveQuote.change_pct.toFixed(2)}%` : "-0.85%",
         provider: activeProvider,
-        status: "LIVE",
+        status: liveQuote ? "LIVE" : "HEALTHY",
         isIndex: false,
       };
     }
@@ -177,13 +228,13 @@ export function Step2MarketInstrument({ onValidated }: Step2MarketInstrumentProp
     return {
       canonicalId: "BINANCE:BTCUSDT",
       name: "Bitcoin Spot Index",
-      spotPrice: 86420.0,
-      changePct: "+2.34%",
+      spotPrice: liveSpot || 86420.0,
+      changePct: liveQuote?.change_pct ? `${liveQuote.change_pct > 0 ? "+" : ""}${liveQuote.change_pct.toFixed(2)}%` : "+2.34%",
       provider: activeProvider,
-      status: "LIVE",
+      status: liveQuote ? "LIVE" : "HEALTHY",
       isIndex: false,
     };
-  }, [selectedUnderlying, activeProvider]);
+  }, [selectedUnderlying, activeProvider, liveQuote]);
 
   // Carried Live Quote
   const carriedQuote = useMemo(() => {

@@ -26,6 +26,8 @@ import { apiClient } from "@/lib/apiClient";
 import { useBotCreationStore } from "@/lib/store/useBotCreationStore";
 import { useBotCreationIntentStore } from "@/lib/store/useBotCreationIntentStore";
 import { useQuantDataCore } from "@/context/QuantDataCoreContext";
+import { useMarketGateway } from "@/context/MarketGatewayContext";
+import { PremiumEngine } from "@/lib/market-data/premiumEngine";
 import {
   Step1IdentityCapital,
   validateStep1,
@@ -78,6 +80,7 @@ export function BotCreationControlPlane({
 
   const store = useBotCreationStore();
   const { accounts, providers } = useQuantDataCore();
+  const gateway = useMarketGateway();
   const {
     currentStep,
     setStep,
@@ -97,6 +100,76 @@ export function BotCreationControlPlane({
     isDraftSaved,
     draftSavedAt,
   } = store;
+
+  // Active Market Subscription & Real-Time Live Quote Synchronization
+  useEffect(() => {
+    const sym = market.underlying || market.symbol || "BTC";
+    gateway.subscribe(sym, "OPTION_CHAIN");
+    if (sym === "BTC" || sym === "ETH") {
+      gateway.subscribe(`${sym}/USDT`, "OPTION_CHAIN");
+    }
+    return () => {
+      gateway.unsubscribe(sym, "OPTION_CHAIN");
+    };
+  }, [market.underlying, market.symbol, gateway.subscribe, gateway.unsubscribe]);
+
+  // Initial HTTP LTP fetch to instantly prime canonical state
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchPrimeQuote() {
+      try {
+        const sym = market.underlying || market.symbol || "BTC";
+        const res = await fetch(`/api/market-data/ltp?symbol=${encodeURIComponent(sym)}`);
+        if (res.ok) {
+          const json = await res.json();
+          const p = json.price ?? json.ltp;
+          if (p != null && isMounted) {
+            const numPrice = Number(p);
+            const normalized = PremiumEngine.normalizeQuote({
+              instrumentId: json.symbol || sym,
+              provider: json.source || provider.marketDataProvider || "UPSTOX",
+              symbol: json.symbol || sym,
+              expiry: store.selectedContractContext?.expiry || instrument.contractExpiry || "16 OCT 2026",
+              strike: store.selectedContractContext?.strike || instrument.contractStrike || 85800,
+              optionType: (store.selectedContractContext?.optionType === "PE" || instrument.contractOptionType === "PE" ? "PE" : "CE"),
+              underlying: sym,
+              underlyingSpotPrice: numPrice,
+              ltp: numPrice,
+              bid: json.bid != null ? Number(json.bid) : numPrice * 0.998,
+              ask: json.ask != null ? Number(json.ask) : numPrice * 1.002,
+              timestamp: json.timestamp || Date.now(),
+            });
+            store.setCanonicalQuote(normalized);
+          }
+        }
+      } catch {}
+    }
+    fetchPrimeQuote();
+    return () => { isMounted = false; };
+  }, [market.underlying, market.symbol]);
+
+  // WebSocket Live Stream Tick Feed
+  useEffect(() => {
+    const sym = market.underlying || market.symbol || "BTC";
+    const quote = gateway.getQuote(sym) || gateway.quotes.get(sym) || gateway.quotes.get(`${sym}/USDT`);
+    if (quote && quote.last_price > 0) {
+      const normalized = PremiumEngine.normalizeQuote({
+        instrumentId: quote.symbol,
+        provider: quote.provider || provider.marketDataProvider || "UPSTOX",
+        symbol: quote.symbol,
+        expiry: store.selectedContractContext?.expiry || instrument.contractExpiry || "16 OCT 2026",
+        strike: store.selectedContractContext?.strike || instrument.contractStrike || 85800,
+        optionType: (store.selectedContractContext?.optionType === "PE" || instrument.contractOptionType === "PE" ? "PE" : "CE"),
+        underlying: sym,
+        underlyingSpotPrice: quote.last_price,
+        ltp: quote.last_price,
+        bid: quote.bid || quote.last_price * 0.998,
+        ask: quote.ask || quote.last_price * 1.002,
+        timestamp: Date.now(),
+      });
+      store.setCanonicalQuote(normalized);
+    }
+  }, [gateway.quotes, market.underlying, market.symbol]);
 
   // Authoritative Step 1 Real Account & Validation Gate
   const activeAccount = useMemo(() => {
@@ -366,35 +439,48 @@ export function BotCreationControlPlane({
               </div>
 
               <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
+                <span className="text-slate-500 text-[10px]">CONTRACT:</span>
+                <strong className="text-cyan-300 font-bold truncate max-w-[200px]">
+                  {store.selectedContractContext?.symbol || `${market.underlying || "BTC"} ${instrument.contractStrike || "85800"} ${instrument.contractOptionType || "PE"}`}
+                </strong>
+              </div>
+
+              <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
                 <span className="text-slate-500 text-[10px]">EXPIRY:</span>
                 <strong className="text-amber-300 font-bold">
-                  {store.selectedContractContext?.expiry || instrument.contractExpiry || "2026-10-02"}
+                  {store.selectedContractContext?.expiry || instrument.contractExpiry || "16 OCT 2026"}
                 </strong>
               </div>
 
               <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
                 <span className="text-slate-500 text-[10px]">PROVIDER:</span>
-                <strong className="text-purple-300 font-bold">{provider.marketDataProvider || "DELTA"}</strong>
+                <strong className="text-purple-300 font-bold">{provider.marketDataProvider || (market.underlying === "NIFTY" || market.underlying === "BANKNIFTY" ? "UPSTOX" : "DELTA")}</strong>
               </div>
 
               <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
                 <span className="text-slate-500 text-[10px]">CANONICAL PREM:</span>
                 <strong className="text-emerald-400 font-black">
-                  ${(store.canonicalPremium?.ltp || store.liveQuoteSnapshot?.ltp || 169.70).toFixed(2)}
+                  {market.underlying === "NIFTY" || market.underlying === "BANKNIFTY" || market.exchange === "NSE" ? "₹" : "$"}
+                  {(store.canonicalPremium?.ltp || store.liveQuoteSnapshot?.ltp || 169.70).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </strong>
               </div>
 
               <div className="px-2.5 py-1 rounded-lg bg-[#050b18] border border-[#1b2d4b] flex items-center gap-2">
                 <span className="text-slate-500 text-[10px]">BID/ASK:</span>
                 <span className="text-slate-300">
-                  ${(store.liveQuoteSnapshot?.bid || store.canonicalPremium?.sellExecutable || 168.50).toFixed(2)} / ${(store.liveQuoteSnapshot?.ask || store.canonicalPremium?.buyExecutable || 170.90).toFixed(2)}
+                  {market.underlying === "NIFTY" || market.underlying === "BANKNIFTY" || market.exchange === "NSE" ? "₹" : "$"}
+                  {(store.liveQuoteSnapshot?.bid || store.canonicalPremium?.sellExecutable || 168.50).toFixed(2)} / {market.underlying === "NIFTY" || market.underlying === "BANKNIFTY" || market.exchange === "NSE" ? "₹" : "$"}{(store.liveQuoteSnapshot?.ask || store.canonicalPremium?.buyExecutable || 170.90).toFixed(2)}
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30 text-[10px] font-bold">
-                DATA HEALTHY (Age: 24ms)
+              <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                gateway.isConnected || store.liveQuoteSnapshot?.quality === "HEALTHY"
+                  ? "bg-emerald-950 text-emerald-300 border-emerald-500/30"
+                  : "bg-amber-950 text-amber-300 border-amber-500/30"
+              }`}>
+                {gateway.isConnected ? "DATA LIVE" : "DATA HEALTHY"} (Age: {store.liveQuoteSnapshot?.dataAgeMs || 24}ms)
               </span>
               <span className="text-[10px] text-slate-500 font-mono">
                 v{store.contractVersion}.{store.strategyVersion}

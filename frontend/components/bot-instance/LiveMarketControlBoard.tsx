@@ -149,7 +149,9 @@ export function LiveMarketControlBoard({
         const res = await fetch(`/api/market-data/ltp?symbol=${encodeURIComponent(underlying)}`);
         if (res.ok) {
           const json = await res.json();
-          if (json.ok && json.ltp) return json;
+          if (json.ok && (json.ltp != null || json.price != null)) {
+            return { ...json, ltp: json.ltp ?? json.price };
+          }
         }
         const fallbackRes = await fetch(`/api/market/quote?symbol=${encodeURIComponent(underlying)}`);
         if (fallbackRes.ok) {

@@ -426,6 +426,14 @@ try:
 except Exception as srbp_err:
     logger.warning(f"Notice: Failed registering strategy resolver routes: {srbp_err}")
 
+# Register Bot Wizard & Fleet Management Blueprint
+try:
+    from src.bot_wizard_blueprint import bot_wizard_blueprint
+    app.register_blueprint(bot_wizard_blueprint)
+    logger.info("Successfully registered bot_wizard_blueprint.")
+except Exception as bwb_err:
+    logger.warning(f"Notice: Failed registering bot_wizard_blueprint: {bwb_err}")
+
 
 
 

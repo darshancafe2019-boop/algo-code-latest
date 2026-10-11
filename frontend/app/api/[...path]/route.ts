@@ -41,7 +41,15 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const startTime = performance.now();
 
   // ── 1. Market Data Gateway Proxy with Auto-Fallback ─────────────────────────
-  if (subPath.startsWith("market/") || subPath === "market") {
+  const isGatewayOnlyPath = (subPath.startsWith("market/") || subPath === "market") &&
+    !subPath.startsWith("market/funds") &&
+    !subPath.startsWith("market/expiries") &&
+    !subPath.startsWith("market/instruments") &&
+    !subPath.startsWith("market/markets") &&
+    !subPath.startsWith("market/quote") &&
+    !subPath.startsWith("market/option-chain");
+
+  if (isGatewayOnlyPath) {
     const gatewayPath = subPath.replace(/^market\/?/, "");
     const gatewayTarget = `${GATEWAY_URL}/${gatewayPath}${url.search}`;
     try {

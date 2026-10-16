@@ -13603,7 +13603,7 @@ def api_auth_login():
         # Resolve authoritative operator email address strictly server-side
         user_email = (user.get("email") or "").strip()
         if username == "admin":
-            user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+            user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "admin@quantos.internal").strip()
             db.sync_admin_email_in_db("admin", user_email)
             user["email"] = user_email
         elif not user_email or "@" not in user_email or user_email.endswith(".local"):
@@ -13981,9 +13981,10 @@ def api_auth_email_otp_resend():
         user_email = challenge.get("recipient_email", "")
     elif email_input:
         # Resolve user by email or username
-        if email_input == "admin" or email_input == "ashishparadkar1999@gmail.com":
+        auth_admin_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or "admin@quantos.internal").strip().lower()
+        if email_input == "admin" or email_input.lower() == auth_admin_email or email_input.lower() == "ashishparadkar1999@gmail.com":
             user = db.get_user_by_username("admin")
-            user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip().lower()
+            user_email = auth_admin_email
         else:
             user = db.get_user_by_username(email_input)
             if not user:
@@ -14027,7 +14028,7 @@ def api_auth_email_otp_resend():
         }), 404
 
     if user.get("username") == "admin":
-        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip().lower()
+        user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or (user.get("email") or "") or "admin@quantos.internal").strip().lower()
     elif not user_email:
         user_email = (user.get("email") or "").strip().lower()
 
@@ -14453,7 +14454,7 @@ def api_auth_username_request_otp():
 
     user_email = (user.get("email") or "").strip()
     if user["username"] == "admin":
-        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+        user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "admin@quantos.internal").strip()
 
     if not user_email or "@" not in user_email:
         return jsonify({"status": "error", "error_code": "NO_VERIFIED_EMAIL", "message": "No verified email address found on file."}), 400
@@ -14652,7 +14653,7 @@ def api_auth_password_request_change_otp():
 
     user_email = (user.get("email") or "").strip()
     if user["username"] == "admin":
-        user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+        user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "admin@quantos.internal").strip()
 
     if not user_email or "@" not in user_email:
         return jsonify({"status": "error", "error_code": "NO_VERIFIED_EMAIL", "message": "No verified email address found on file."}), 400
@@ -15091,7 +15092,7 @@ def api_auth_me():
 def api_auth_password_forgot():
     """
     Handles Forgot Password request by dispatching a 6-digit Password Reset OTP.
-    Always resolves the admin user to ashishparadkar1999@gmail.com server-side.
+    Resolves the admin user to authoritative email server-side.
     Always returns a generic confirmation message to prevent account enumeration.
     """
     request_id = f"req_{secrets.token_hex(6)}"
@@ -15124,7 +15125,7 @@ def api_auth_password_forgot():
     if user and user.get("is_active"):
         user_email = (user.get("email") or "").strip()
         if user.get("username") == "admin":
-            user_email = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com").strip()
+            user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "admin@quantos.internal").strip()
             db.sync_admin_email_in_db("admin", user_email)
             user["email"] = user_email
 

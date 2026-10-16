@@ -336,7 +336,7 @@ export default function ForgotPasswordPage() {
                   autoComplete="email username"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="admin or ashishparadkar1999@gmail.com"
+                  placeholder="admin or user@domain.com"
                   disabled={isSubmitting}
                   className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
                 />

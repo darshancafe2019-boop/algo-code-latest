@@ -51,6 +51,20 @@ jobs:
     name: Backend Tests & Database Compatibility
     runs-on: ubuntu-latest
     needs: security-audit
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: testpassword
+          POSTGRES_DB: quantos_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -66,7 +80,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Backend Health & Liveness Tests
+      - name: Run Backend Health & Blueprint Registration Tests
         env:
           TRADING_MODE: PAPER
           LIVE_TRADING_ENABLED: "false"
@@ -79,12 +93,33 @@ jobs:
           res = client.get('/health/live')
           assert res.status_code == 200, f'Expected 200 from /health/live, got {res.status_code}'
           print('[✓] /health/live response verified:', res.get_json().get('status'))
+          # Verify bot_wizard_blueprint is registered
+          rules = [r.rule for r in app.url_map.iter_rules()]
+          assert '/api/bots' in rules, 'Expected /api/bots from bot_wizard_blueprint to be registered'
+          print('[✓] bot_wizard_blueprint is successfully registered.')
+          import os; os._exit(0)
           "
 
-      - name: Run Database Migration Dry-Run Test
+      - name: Run Targeted Audit & Repair Verification Test Suite
+        env:
+          TRADING_MODE: PAPER
+          LIVE_TRADING_ENABLED: "false"
+          MASTER_LIVE_TRADING: "false"
+          FORCE_SQLITE: "true"
         run: |
-          python scripts/migrate_sqlite_to_postgres.py --dry-run || true
-          echo "[✓] Migration tool syntax and dry-run validated."
+          python tests/test_audit_repair_verification.py
+
+      - name: Run Database Migration and Schema Verification Against Test PostgreSQL
+        env:
+          DATABASE_URL: postgresql://postgres:testpassword@localhost:5432/quantos_test
+        run: |
+          echo '[+] Running migration dry-run against isolated PostgreSQL service...'
+          python scripts/migrate_sqlite_to_postgres.py --dry-run --pg-url postgresql://postgres:testpassword@localhost:5432/quantos_test
+          echo '[+] Running live schema and data migration against isolated PostgreSQL service...'
+          python scripts/migrate_sqlite_to_postgres.py --pg-url postgresql://postgres:testpassword@localhost:5432/quantos_test
+          echo '[+] Running post-migration verification against isolated PostgreSQL service...'
+          python scripts/migrate_sqlite_to_postgres.py --verify-only --pg-url postgresql://postgres:testpassword@localhost:5432/quantos_test
+          echo '[✓] PostgreSQL migration and data integrity verified successfully.'
 
   # ── 3. Frontend Validation Suite ────────────────────────────────────────────
   frontend-validation:

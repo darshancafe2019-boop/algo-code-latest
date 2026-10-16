@@ -419,7 +419,11 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             with sqlite3.connect(str(ALGO_DB_PATH), timeout=10.0) as conn_algo:
                 strat_name = payload_data.get("trading_strategy", {}).get("strategy_name") or "Trend Pullback to EMA"
                 tf = payload_data.get("timeframe") or "5m"
-                cap_val = float(payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0)
+                raw_cap = payload_data.get("capital") or payload_data.get("allocated_capital") or payload_data.get("capital_allocation") or 10000.0
+                if isinstance(raw_cap, dict):
+                    cap_val = float(raw_cap.get("allocated_amount") or raw_cap.get("amount") or raw_cap.get("allocated_capital") or 10000.0)
+                else:
+                    cap_val = float(raw_cap or 10000.0)
                 risk_val = float(risk.get("risk_per_trade") or 2.0)
                 conn_algo.execute("""
                     INSERT OR REPLACE INTO bot_instances (
@@ -443,6 +447,7 @@ def deploy_wizard_bot(payload_data: Dict[str, Any]) -> Dict[str, Any]:
             logger.warning(f"Could not auto-start BotEngine for {bot_id}: {se}")
 
     return {
+        "success": True,
         "bot_id": bot_id,
         "name": bot_name,
         "status": status,

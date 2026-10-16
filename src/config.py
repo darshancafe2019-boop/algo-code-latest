@@ -14,7 +14,7 @@ def _load_env_fallback(file_path: Path):
                 k, v = line.split("=", 1)
                 k = k.strip()
                 v = v.strip().strip("'\"")
-                if k:
+                if k and k not in os.environ:
                     os.environ[k] = v
     except Exception:
         pass
@@ -37,7 +37,7 @@ for _env_file in [
 ]:
     if _env_file.is_file():
         if _load_dotenv is not None:
-            _load_dotenv(dotenv_path=_env_file, override=True)
+            _load_dotenv(dotenv_path=_env_file, override=False)
         else:
             _load_env_fallback(_env_file)
 
@@ -137,8 +137,8 @@ OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", os.getenv("AUTH_EMAIL_FROM", os.get
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", OTP_FROM_EMAIL)
 AUTH_EMAIL_FROM = os.getenv("AUTH_EMAIL_FROM", OTP_FROM_EMAIL)
 RESEND_WEBHOOK_SECRET = os.getenv("RESEND_WEBHOOK_SECRET", "")
-AUTH_ADMIN_EMAIL = os.getenv("AUTH_ADMIN_EMAIL", "ashishparadkar1999@gmail.com")
-AUTH_BOOTSTRAP_EMAIL = os.getenv("AUTH_BOOTSTRAP_EMAIL", "ashishparadkar1999@gmail.com")
+AUTH_ADMIN_EMAIL = os.getenv("AUTH_ADMIN_EMAIL", "admin@quantos.internal")
+AUTH_BOOTSTRAP_EMAIL = os.getenv("AUTH_BOOTSTRAP_EMAIL", AUTH_ADMIN_EMAIL)
 APP_PUBLIC_URL = os.getenv("APP_PUBLIC_URL", "http://localhost:3100")
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))

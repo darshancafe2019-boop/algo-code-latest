@@ -11902,7 +11902,7 @@ def sync_admin_email_in_db(username: str = "admin", target_email: Optional[str] 
         or os.environ.get("AUTH_ADMIN_EMAIL")
         or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
         or getattr(config, "AUTH_ADMIN_EMAIL", "")
-        or "ashishparadkar1999@gmail.com"
+        or "admin@quantos.internal"
     ).strip()
     return safe_execute("UPDATE users SET email = ? WHERE username = ?", (resolved_email, username))
 

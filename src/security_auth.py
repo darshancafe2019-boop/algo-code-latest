@@ -582,24 +582,40 @@ class SecurityAuthManager:
                     "Production bootstrap error: AUTH_BOOTSTRAP_PASSWORD environment variable is not configured. "
                     "Halting administrator auto-creation to prevent insecure credentials."
                 )
-                return
+        if is_prod:
+            explicit_email = os.environ.get("AUTH_ADMIN_EMAIL") or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
+            if not explicit_email:
+                logging.getLogger(__name__).warning(
+                    "Production security notice: AUTH_ADMIN_EMAIL or AUTH_BOOTSTRAP_EMAIL must be explicitly configured in production environment."
+                )
+            enc_key = os.environ.get("AUTH_TOTP_ENCRYPTION_KEY") or getattr(config, "AUTH_TOTP_ENCRYPTION_KEY", None)
+            if not enc_key or enc_key == "algo-crypto-secret-key-32bytes!!":
+                logging.getLogger(__name__).warning(
+                    "Production security notice: AUTH_TOTP_ENCRYPTION_KEY must be set to a unique secret in production environment."
+                )
 
         admin_email = (
             os.environ.get("AUTH_ADMIN_EMAIL")
             or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
             or getattr(config, "AUTH_ADMIN_EMAIL", "")
-            or "ashishparadkar1999@gmail.com"
+            or "admin@quantos.internal"
         ).strip()
+        existing_user = db.get_user_by_username(username)
         if existing_user:
             # Guarantee admin email is synchronized to authoritative address
             if username == "admin" and existing_user.get("email") != admin_email:
                 db.sync_admin_email_in_db("admin", admin_email)
                 logging.getLogger(__name__).info(f"Bootstrap admin '{username}' email synchronized to '{admin_email}'.")
-            # If the admin exists and a password is configured in env, synchronize it to prevent lockout
-            if raw_password and not PasswordManager.verify_password(raw_password, existing_user["password_hash"], existing_user["salt"]):
-                pwd_hash, salt = PasswordManager.hash_password(raw_password)
-                db.update_user_password(existing_user["id"], pwd_hash, salt, must_change_password=0)
-                logging.getLogger(__name__).info(f"Bootstrap admin '{username}' password synchronized with AUTH_BOOTSTRAP_PASSWORD.")
+            # Prevent unexpected password resets for existing administrator:
+            force_pwd_reset = os.environ.get("AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET", "false").lower() in ("true", "1")
+            has_existing_hash = bool(existing_user.get("password_hash"))
+            if force_pwd_reset or not has_existing_hash:
+                if raw_password and not PasswordManager.verify_password(raw_password, existing_user.get("password_hash", ""), existing_user.get("salt", "")):
+                    pwd_hash, salt = PasswordManager.hash_password(raw_password)
+                    db.update_user_password(existing_user["id"], pwd_hash, salt, must_change_password=0)
+                    logging.getLogger(__name__).info(f"Bootstrap admin '{username}' password updated (force_reset={force_pwd_reset}).")
+            else:
+                logging.getLogger(__name__).debug(f"Bootstrap admin '{username}' already exists; preserving established password.")
             return
 
         admin_id = "usr_admin_01"

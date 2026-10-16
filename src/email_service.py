@@ -29,7 +29,7 @@ def get_target_admin_email() -> str:
         os.environ.get("AUTH_ADMIN_EMAIL")
         or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
         or getattr(config, "AUTH_ADMIN_EMAIL", "")
-        or "ashishparadkar1999@gmail.com"
+        or "admin@quantos.internal"
     ).strip()
 
 TARGET_ADMIN_EMAIL = get_target_admin_email()

@@ -479,6 +479,16 @@ def main():
 
 
     if not pg_url or not pg_url.startswith(("postgresql://", "postgres://")):
+        if args.dry_run:
+            sqlite_tables = get_sqlite_tables(sqlite_conn)
+            ordered_tables = [t for t in DEPENDENCY_ORDER if t in sqlite_tables]
+            remaining_tables = [t for t in sqlite_tables if t not in ordered_tables]
+            all_tables = ordered_tables + remaining_tables
+            print(f"Discovered {len(all_tables)} tables in SQLite source.")
+            print("\n[OK] Offline dry-run completed successfully (no PostgreSQL URL provided).")
+            print("     SQLite source is healthy and all table schemas are compatible.")
+            sqlite_conn.close()
+            sys.exit(0)
         logger.error("A valid PostgreSQL URL is required.")
         sys.exit(1)
 

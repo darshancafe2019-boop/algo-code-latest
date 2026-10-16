@@ -16,3 +16,5 @@ aiohttp>=3.9.0
 redis>=5.0.0
 yfinance>=0.2.40
 pyotp>=2.8.0
+pydantic>=2.0.0
+cryptography>=41.0.0

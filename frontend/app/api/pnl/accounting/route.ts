@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 import {
   FifoAccountingEngine,
   calculatePnlSummary,
@@ -66,17 +67,17 @@ export async function GET(request: NextRequest) {
 
       const [pnlRes, portRes, ledgRes] = await Promise.all([
         fetch(`${BACKEND_URL}/api/portfolio/pnl/dashboard?${backendQuery.toString()}`, {
-          headers: { "Content-Type": "application/json" },
+          headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).catch(() => null),
         fetch(`${BACKEND_URL}/api/v2/portfolio?environment=${envParam}`, {
-          headers: { "Content-Type": "application/json" },
+          headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).catch(() => null),
         fetch(`${BACKEND_URL}/api/v2/capital/ledger?environment=${envParam}&limit=50`, {
-          headers: { "Content-Type": "application/json" },
+          headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).catch(() => null),

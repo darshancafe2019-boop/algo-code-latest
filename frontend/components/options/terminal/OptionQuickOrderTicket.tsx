@@ -19,9 +19,12 @@ import {
   Sliders,
   DollarSign,
   ArrowRight,
+  Bot,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useGlobalData } from "@/context/GlobalDataContext";
 import { ActionableOptionContract } from "@/types/option-terminal";
+import { openBotCreator } from "@/lib/bot-creation-bridge";
 
 interface OptionQuickOrderTicketProps {
   isOpen: boolean;
@@ -40,6 +43,7 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
   currency = "₹",
   onOrderSuccess,
 }) => {
+  const router = useRouter();
   const { tradingMode, portfolioSnapshot, positions, riskSummary, refreshAll } = useGlobalData();
 
   // Core Form State
@@ -64,6 +68,44 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
   const [feedback, setFeedback] = useState<{ status: "success" | "error" | "warn"; message: string } | null>(null);
 
   const prevContractKeyRef = useRef<string>("");
+
+  const handleLaunchBot = () => {
+    if (!contract) return;
+    onClose();
+    const optType = contract.optionType === "PE" || contract.optionType === "PUT" ? "PUT" : "CALL";
+    const canonicalContractId = `${contract.broker || "NSE"}:${contract.broker === "DELTA" ? "DELTA" : "NSE_FO"}:${contract.underlying}:${contract.expiry}:${contract.strike}:${optType}:${contract.instrumentId || contract.securityId || contract.symbol}`;
+    openBotCreator({
+      symbol: contract.symbol,
+      canonicalSymbol: canonicalContractId,
+      canonicalContractId,
+      tradingSymbol: contract.symbol,
+      instrumentId: contract.instrumentId || contract.securityId,
+      securityId: contract.securityId || contract.instrumentId,
+      side,
+      assetClass: contract.broker === "DELTA" || contract.symbol.includes("BTC") || contract.symbol.includes("ETH") ? "CRYPTO_OPTIONS" : "OPTIONS",
+      market: contract.broker === "DELTA" ? "CRYPTO" : "INDIAN",
+      exchange: contract.broker === "DELTA" ? "DELTA" : "NSE",
+      broker: contract.broker || "PAPER",
+      currentPrice: contract.ltp,
+      ltp: contract.ltp,
+      bid: contract.bid,
+      ask: contract.ask,
+      underlying: contract.underlying,
+      expiry: contract.expiry,
+      strike: contract.strike,
+      optionType: optType === "CALL" ? "CE" : "PE",
+      lotSize: contract.lotSize || 1,
+      openInterest: contract.oi,
+      volume: contract.volume,
+      delta: contract.delta ?? contract.greeks?.delta,
+      gamma: contract.gamma ?? contract.greeks?.gamma,
+      theta: contract.theta ?? contract.greeks?.theta,
+      vega: contract.vega ?? contract.greeks?.vega,
+      iv: contract.iv ?? contract.greeks?.iv,
+      origin: "OPTIONS",
+      sourcePage: "OPTION_QUICK_TICKET",
+    }, router);
+  };
 
   // Dynamic lot size based on Dhan index specifications
   const defaultLotSize = useMemo(() => {
@@ -667,6 +709,16 @@ export const OptionQuickOrderTicket: React.FC<OptionQuickOrderTicketProps> = ({
             <span>{feedback.message}</span>
           </div>
         )}
+
+        {/* Create Algo Bot Quick Action */}
+        <button
+          type="button"
+          onClick={handleLaunchBot}
+          className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-purple-500/15 via-cyan-500/15 to-emerald-500/15 hover:from-purple-500/25 hover:via-cyan-500/25 hover:to-emerald-500/25 border border-purple-500/35 text-purple-300 hover:text-white text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm"
+        >
+          <Bot className="w-4 h-4 text-purple-400" />
+          <span>Create Trading Bot with this Contract</span>
+        </button>
 
         {/* Action Buttons */}
         <div className="grid grid-cols-2 gap-2 pt-1">

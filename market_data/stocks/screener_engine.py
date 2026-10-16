@@ -89,7 +89,7 @@ class StockScreenerEngine:
 
         paginated_records = []
         for inst, old_q, rec in paginated_pairs:
-            q = global_stock_quote_engine.get_quote(inst.instrument_id) or old_q
+            q = global_stock_quote_engine.get_quote(inst.instrument_id, fetch_live_if_missing=False) or old_q
             rec["last_price"] = q.last_price
             rec["open_price"] = q.open_price
             rec["high_price"] = q.high_price

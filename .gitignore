@@ -8,7 +8,13 @@
 
 # SQLite databases
 *.db
+*.db-journal
+*.db-wal
+*.db-shm
 *.sqlite
+*.sqlite-wal
+*.sqlite-shm
+scratch_*.py
 
 # Data directory with raw historical CSVs
 data/

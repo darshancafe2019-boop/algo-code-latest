@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { FleetMetrics } from "@/types/bot-control";
 import { cn } from "@/lib/utils";
-import { formatMoney, formatNumber } from "@/lib/formatters";
+import { formatMoney, formatNumber, resolveCurrencySymbol } from "@/lib/formatters";
 
 interface SimpleFleetSummaryHeaderProps {
   metrics: FleetMetrics;
@@ -105,7 +105,7 @@ export function SimpleFleetSummaryHeader({
     return () => clearInterval(interval);
   }, []);
 
-  const currSymbol = "$";
+  const currSymbol = resolveCurrencySymbol(currency);
   const totalBots = metrics.total_bots || 19;
   const runningBots = metrics.running || 2;
   const todayPnl = metrics.today_pnl ?? -2.75;
@@ -265,9 +265,9 @@ export function SimpleFleetSummaryHeader({
           </div>
 
           <div className="p-2.5 rounded-xl bg-[#08101e] border border-[#13233c] shadow-sm">
-            <span className="text-[10px] text-slate-400 uppercase block">Today's P&L</span>
+            <span className="text-[10px] text-slate-400 uppercase block">Today&apos;s P&L</span>
             <strong className={`text-base block mt-0.5 ${todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-              {todayPnl >= 0 ? "+" : ""}{currSymbol}{Math.abs(todayPnl).toFixed(2)}
+              {todayPnl >= 0 ? "+" : "-"}{currSymbol}{Math.abs(todayPnl).toFixed(2)}
             </strong>
             <span className="text-[9px] text-slate-500">Realized + Unrealized</span>
           </div>

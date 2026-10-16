@@ -24,6 +24,8 @@ export {
   formatExactNumber,
   formatPnL,
   formatRatio,
+  detectMarketCurrency,
+  resolveCurrencySymbol,
   safeArray,
   safeMap,
   logInvalidNumericField,

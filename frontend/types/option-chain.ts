@@ -1,10 +1,10 @@
 export type Moneyness = "ITM" | "ATM" | "OTM";
 
-export type OptionSource = "ALL" | "DHAN" | "UPSTOX" | "DELTA" | "DELTA_INDIA" | "BINANCE" | "PAPER_SIMULATOR";
+export type OptionSource = "ALL" | "AUTO" | "DHAN" | "UPSTOX" | "DELTA" | "DELTA_INDIA" | "BINANCE" | "PAPER_SIMULATOR";
 
 export interface OptionContract {
   instrumentId: string;
-  provider: "DHAN" | "UPSTOX" | "DELTA" | "BINANCE" | "PAPER_SIMULATOR";
+  provider: "DHAN" | "UPSTOX" | "DELTA" | "DELTA_INDIA" | "BINANCE" | "PAPER_SIMULATOR" | "AUTO";
   providerInstrumentId: string;
   underlying: string;
   expiry: string;

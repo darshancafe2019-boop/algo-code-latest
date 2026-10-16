@@ -56,10 +56,7 @@ class PaperExecutionAdapter:
     """Simulated Paper Execution Adapter maintaining identical order contract as Live."""
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
-        if _is_indian_symbol(symbol):
-            from src.upstox_broker_adapter import global_upstox_broker_adapter
-            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
-
+        # STRICT PAPER ISOLATION: Pure virtual in-memory simulation for all symbols (Indian & Global)
         sim_order_id = f"PAPER_ORD_{uuid.uuid4().hex[:10]}"
         return {
             "success": True,
@@ -105,8 +102,24 @@ class TestnetExecutionAdapter:
 
     def submit_order(self, symbol: str, side: str, amount: float, price: float) -> Dict[str, Any]:
         if _is_indian_symbol(symbol):
-            from src.upstox_broker_adapter import global_upstox_broker_adapter
-            return global_upstox_broker_adapter.place_order(symbol, side, amount, price)
+            # Pure simulated mock fill for testnet Indian symbols
+            test_order_id = f"TESTNET_MOCK_{uuid.uuid4().hex[:10]}"
+            return {
+                "success": True,
+                "order_id": test_order_id,
+                "broker_order_id": test_order_id,
+                "client_order_id": test_order_id,
+                "symbol": symbol,
+                "side": side,
+                "requested_quantity": amount,
+                "filled_quantity": amount,
+                "remaining_quantity": 0.0,
+                "average_price": price,
+                "fees": 0.0,
+                "status": "FILLED",
+                "execution_mode": "TESTNET",
+                "raw": {}
+            }
 
         from src.execution import ExecutionEngine
         from src.data_fetcher import get_testnet_fetcher
@@ -304,7 +317,17 @@ class OrderExecutionService:
         from src.instrument_resolver import global_instrument_resolver
         res_inst = global_instrument_resolver.resolve(symbol)
         lot_sz = res_inst.instrument.lot_size if res_inst.is_valid and res_inst.instrument else 1.0
-        max_allowed_qty = max(config.MAX_POSITION_SIZE, lot_sz * 20.0)
+        
+        bot_max_size = None
+        try:
+            bot_rec = db.get_bot_instance(bot_id)
+            if bot_rec and bot_rec.get("max_position_size"):
+                bot_max_size = float(bot_rec["max_position_size"])
+        except Exception:
+            pass
+
+        base_max = bot_max_size if bot_max_size and bot_max_size > 0 else config.MAX_POSITION_SIZE
+        max_allowed_qty = max(base_max, lot_sz * 20.0, 50.0)
 
         if amount > max_allowed_qty:
             return False, f"EXCEEDS_MAX_POSITION_SIZE: Requested {amount} > max {max_allowed_qty}"

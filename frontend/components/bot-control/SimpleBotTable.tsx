@@ -27,7 +27,7 @@ import {
   Edit3,
 } from "lucide-react";
 import { BotRowItem, DensityMode } from "@/types/bot-control";
-import { formatMoney, formatNumber } from "@/lib/formatters";
+import { formatMoney, formatNumber, resolveCurrencySymbol } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 export type { BotRowItem };
@@ -209,6 +209,7 @@ export function SimpleBotTable({
               // Contract Specifications
               const isExactBtcOption = bot.name.includes("85800") || bot.symbol.includes("85800");
               const symbol = isExactBtcOption ? "BTC 85800 PE" : bot.symbol || "BTC 85800 PE";
+              const currSym = resolveCurrencySymbol((bot as any).currency || (bot.pnl as any)?.currency || (symbol?.includes("NIFTY") || symbol?.includes("BANK") ? "INR" : "USD"));
               const expiry = isExactBtcOption ? "02 OCT 2026" : (bot.expiry || "02 OCT");
               const selectedPrem = isExactBtcOption ? 219.20 : (bot.selected_premium || 219.20);
               const currentPrem = selectedPrem + 4.70;
@@ -297,7 +298,7 @@ export function SimpleBotTable({
                         <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-950 text-emerald-300 border border-emerald-500/40">
                           {pos.direction || "LONG"} {pos.size || 1}L
                         </span>
-                        <div className="text-[10px] text-slate-400 mt-0.5">Avg: ${selectedPrem.toFixed(2)}</div>
+                        <div className="text-[10px] text-slate-400 mt-0.5">Avg: {currSym}{selectedPrem.toFixed(2)}</div>
                       </div>
                     ) : (
                       <span className="text-slate-400 font-bold text-xs">FLAT</span>
@@ -306,23 +307,23 @@ export function SimpleBotTable({
 
                   {/* 6. Price / Premium */}
                   <td className="py-2 px-2.5 font-mono text-xs">
-                    <div className="text-cyan-300 font-bold text-xs">${currentPrem.toFixed(2)}</div>
+                    <div className="text-cyan-300 font-bold text-xs">{currSym}{currentPrem.toFixed(2)}</div>
                     <div className="text-[10px] text-emerald-400 font-semibold">+{premDiffPct}%</div>
-                    <div className="text-[9px] text-slate-500">Sel: ${selectedPrem.toFixed(2)}</div>
+                    <div className="text-[9px] text-slate-500">Sel: {currSym}{selectedPrem.toFixed(2)}</div>
                   </td>
 
                   {/* 7. P&L */}
                   <td className="py-2 px-2.5 font-mono text-xs">
                     <div className={`font-bold ${todayPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                      {todayPnl >= 0 ? "+" : ""}${todayPnl.toFixed(2)}
+                      {todayPnl >= 0 ? "+" : "-"}{currSym}{Math.abs(todayPnl).toFixed(2)}
                     </div>
-                    <div className="text-[9px] text-slate-400">Unreal: ${unrealizedPnl.toFixed(2)}</div>
+                    <div className="text-[9px] text-slate-400">Unreal: {unrealizedPnl >= 0 ? "+" : "-"}{currSym}{Math.abs(unrealizedPnl).toFixed(2)}</div>
                   </td>
 
                   {/* 8. Capital */}
                   <td className="py-2 px-2.5 font-mono text-xs">
-                    <div className="text-white font-bold">${formatNumber(bot.allocated_capital || 10000, 0)}</div>
-                    <div className="text-[10px] text-slate-400">Used: $1.2K</div>
+                    <div className="text-white font-bold">{currSym}{formatNumber(bot.allocated_capital || 10000, 0)}</div>
+                    <div className="text-[10px] text-slate-400">Used: {currSym}1.2K</div>
                     <div className="text-[9px] text-slate-500">Risk: 1%</div>
                   </td>
 

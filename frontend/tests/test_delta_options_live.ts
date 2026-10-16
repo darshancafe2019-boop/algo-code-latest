@@ -92,22 +92,27 @@ async function runLiveAuditSuite() {
     assertTest(11, "Option Ticks Pipeline Active", true, `Provider: ${diag.provider || "DELTA"}`);
 
     // 12. LTP Populated Where Available
-    assertTest(12, "LTP Populated Where Available", true, "LTP preserves real market prices or null");
+    const hasLtpField = strikes.some(s => (s.call && s.call.ltp !== undefined) || (s.put && s.put.ltp !== undefined));
+    assertTest(12, "LTP Field Present", hasLtpField, "LTP field properly mapped in chain response");
 
     // 13. Bid Populated Where Available
-    assertTest(13, "Bid Populated Where Available", true, "Bid preserves real book or null");
+    const hasBid = strikes.some(s => (s.call && s.call.bid !== null && s.call.bid > 0) || (s.put && s.put.bid !== null && s.put.bid > 0));
+    assertTest(13, "Bid Populated Where Available", hasBid, "Bid order book populated");
 
     // 14. Ask Populated Where Available
-    assertTest(14, "Ask Populated Where Available", true, "Ask preserves real book or null");
+    const hasAsk = strikes.some(s => (s.call && s.call.ask !== null && s.call.ask > 0) || (s.put && s.put.ask !== null && s.put.ask > 0));
+    assertTest(14, "Ask Populated Where Available", hasAsk, "Ask order book populated");
 
     // 15. OI Populated Where Available
-    assertTest(15, "OI Populated Where Available", true, "OI preserves real broker OI or null");
+    const hasOi = strikes.some(s => (s.call && s.call.oi !== null && s.call.oi > 0) || (s.put && s.put.oi !== null && s.put.oi > 0));
+    assertTest(15, "OI Populated Where Available", hasOi, "OI populated from broker feed");
 
     // 16. Greeks Populated Where Available
-    assertTest(16, "Greeks Populated Where Available", true, "Greeks engine configured");
+    const hasGreeks = strikes.some(s => (s.call && s.call.delta !== null && s.call.delta !== undefined) || (s.put && s.put.delta !== null && s.put.delta !== undefined));
+    assertTest(16, "Greeks Populated Where Available", hasGreeks, "Greeks populated from exchange");
 
     // 17. Timestamp Valid
-    assertTest(17, "Timestamp Valid", Boolean(chainRes.timestamp), `Timestamp: ${chainRes.timestamp}`);
+    assertTest(17, "Timestamp Valid", Boolean(chainRes.timestamp || chainRes.exchange_timestamp), `Timestamp: ${chainRes.timestamp || chainRes.exchange_timestamp}`);
 
     // 18. Freshness Valid
     const freshness = chainRes.freshness || chainRes.data_status || chainRes.freshnessStatus;

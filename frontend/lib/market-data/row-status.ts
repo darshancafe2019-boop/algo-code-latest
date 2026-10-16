@@ -213,10 +213,7 @@ export function resolveInstrumentProvider(
     sym === "MIDCPNIFTY" ||
     sym === "SENSEX"
   ) {
-    if (sym.startsWith("UPSTOX:") || instProv.includes("UPSTOX")) {
-      return { provider: "upstox", providerLabel: "UPSTOX" };
-    }
-    return { provider: "dhan", providerLabel: "DHAN" };
+    return { provider: "upstox", providerLabel: "UPSTOX" };
   }
 
   // 5. US / Global Equities (NASDAQ, NYSE)

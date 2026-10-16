@@ -620,40 +620,6 @@ export function LoginGateway() {
               </p>
             </div>
 
-            {/* Dev Mode OTP Banner */}
-            {devOtp && (
-              <div
-                className={`mb-3 p-3.5 border rounded-2xl cursor-pointer transition-all duration-300 ${
-                  devOtpFlash
-                    ? "bg-amber-400/25 border-amber-400 shadow-lg shadow-amber-500/30 scale-[1.01]"
-                    : "bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20"
-                }`}
-                onClick={() => {
-                  const chars = devOtp.split("");
-                  setOtpDigits(chars);
-                  digitInputRefs.current[5]?.focus();
-                  submitEmailOTP(devOtp);
-                }}
-                title="Click to auto-fill and submit"
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-amber-400 flex items-center gap-1.5">
-                    <Zap className="h-3 w-3" />
-                    DEV MODE — No Email Provider Configured
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {devOtpFlash && (
-                      <span className="text-[9px] font-mono text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-1.5 py-0.5 rounded animate-pulse font-bold">NEW</span>
-                    )}
-                    <span className="text-[9px] font-mono text-amber-600 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">Click to auto-fill</span>
-                  </div>
-                </div>
-                <div className="text-center py-1">
-                  <span className={`font-mono text-3xl font-black tracking-[0.3em] transition-colors duration-300 ${devOtpFlash ? "text-amber-200" : "text-amber-300"}`}>{devOtp}</span>
-                </div>
-                <p className="text-[10px] font-mono text-amber-600 text-center mt-1">OTP shown here because RESEND_API_KEY is not set in .env</p>
-              </div>
-            )}
 
 
             {/* 6-Digit OTP Input Boxes */}

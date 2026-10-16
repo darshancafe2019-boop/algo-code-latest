@@ -11,12 +11,14 @@ import {
   TrendingUp,
   ExternalLink,
   Layers,
+  Bot,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
 import { formatPrice, formatPercent, formatVolume, formatQuantity, formatNumber, formatMoney } from "@/lib/formatters";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { useSymbolQuote } from "@/lib/market-data/market-feed-store";
 import { getMarketRowStatus, normalizeProvider } from "@/lib/market-data/row-status";
+import { openBotCreator } from "@/lib/bot-creation-bridge";
 
 interface SimpleMarketTableProps {
   instruments: MarketInstrument[];
@@ -42,7 +44,7 @@ export const COMPREHENSIVE_OPTION_UNDERLYINGS = new Set([
   "MIDCPNIFTY",
   "SENSEX",
   "BANKEX",
-  // Top F&O Stocks (NSE / Dhan)
+  // Top F&O Stocks (NSE / Upstox)
   "RELIANCE",
   "TCS",
   "INFY",
@@ -148,7 +150,7 @@ export function resolveOptionUnderlying(inst: MarketInstrument): {
   const cleanUnderlying = ((inst as any).underlying || rawClean || sym).toUpperCase();
   const isCrypto = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"].includes(cleanUnderlying);
   const exchange = inst.exchange || (isCrypto ? "DELTA" : "NSE");
-  const provider = isCrypto ? "DELTA_INDIA" : "DHAN";
+  const provider = isCrypto ? "DELTA_INDIA" : "UPSTOX";
 
   return {
     hasOptions,
@@ -317,7 +319,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-center min-w-[130px]">Bid / Ask</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : cat === "FUTURES" ? (
                   <>
@@ -332,7 +334,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-center min-w-[90px]">Lot Size</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : cat === "OPTIONS" ? (
                   <>
@@ -348,7 +350,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-right min-w-[90px]">{renderSortHeader("IV", "implied_volatility", "right")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : cat === "CRYPTO" ? (
                   <>
@@ -363,7 +365,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("OI", "open_interest", "right")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : cat === "FOREX" ? (
                   <>
@@ -376,7 +378,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Day Low", "low_24h", "right")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : cat === "INDICES" ? (
                   <>
@@ -389,7 +391,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-right min-w-[110px]">{renderSortHeader("Low", "low_24h", "right")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 ) : (
                   /* ALL / DEFAULT UNIVERSAL FULL-WIDTH COLUMNS */
@@ -403,7 +405,7 @@ export function SimpleMarketTable({
                     <th className="py-3.5 px-4 text-center min-w-[110px]">Trend</th>
                     <th className="py-3.5 px-4 text-center min-w-[100px]">{renderSortHeader("Status", "data_status", "center")}</th>
                     <th className="py-3.5 px-4 text-center min-w-[120px]">Options</th>
-                    <th className="py-3.5 px-5 text-right min-w-[100px]">Action</th>
+                    <th className="py-3.5 px-5 text-right min-w-[140px]">Action</th>
                   </>
                 )}
               </tr>
@@ -478,6 +480,7 @@ const MemoizedMarketRow = memo(function MarketRow({
   onLaunchOptionChain,
   onLaunchTrade,
 }: MarketRowProps) {
+  const router = useRouter();
   const { getQuote, connectionStatus, providerHealth } = useMarketGatewayContext();
   const sym = instrument.canonical_symbol || instrument.provider_symbol || instrument.symbol || "UNKNOWN";
   const name = instrument.company_name || instrument.name || sym;
@@ -642,21 +645,80 @@ const MemoizedMarketRow = memo(function MarketRow({
     </td>
   );
 
-  // Dedicated Action / Trade Button
+  const handleLaunchBot = () => {
+    let targetAssetClass: any = "EQUITY";
+    const uSym = sym.toUpperCase();
+    const isCrypto = instrument.currency === "USD" || uSym.includes("BTC") || uSym.includes("ETH") || uSym.includes("SOL");
+    if (category === "OPTIONS" || instrument.asset_class === "OPTIONS" || instrument.option_type) {
+      targetAssetClass = isCrypto ? "CRYPTO_OPTIONS" : "OPTIONS";
+    } else if (category === "FUTURES" || instrument.asset_class === "FUTURES" || uSym.endsWith("-PERP")) {
+      targetAssetClass = isCrypto ? "CRYPTO_FUTURES" : "FUTURES";
+    } else if (category === "CRYPTO" || instrument.asset_class === "CRYPTO") {
+      targetAssetClass = "CRYPTO";
+    } else if (category === "COMMODITIES" || instrument.asset_class === "COMMODITY") {
+      targetAssetClass = "COMMODITY";
+    } else if (category === "FOREX" || instrument.asset_class === "FOREX") {
+      targetAssetClass = "FOREX";
+    } else {
+      targetAssetClass = "EQUITY";
+    }
+
+    openBotCreator({
+      symbol: sym,
+      canonicalSymbol: instrument.canonical_symbol || sym,
+      tradingSymbol: (instrument as any).trading_symbol || instrument.symbol || sym,
+      instrumentId: instrument.instrument_id || sym,
+      securityId: (instrument as any).security_id || instrument.instrument_id || sym,
+      assetClass: targetAssetClass,
+      market: instrument.currency === "INR" ? "INDIAN" : "CRYPTO",
+      exchange: instrument.exchange || (instrument.currency === "INR" ? "NSE" : "DELTA"),
+      broker: (instrument.provider || (instrument.currency === "INR" ? "UPSTOX" : "DELTA")).toUpperCase() as any,
+      ltp: price ?? 0,
+      currentPrice: price ?? 0,
+      bid: bid ?? undefined,
+      ask: ask ?? undefined,
+      lotSize: instrument.lot_size || 1,
+      underlying: instrument.underlying_id || (instrument as any).underlying || sym.split("-")[0] || sym,
+      expiry: instrument.expiry || undefined,
+      strike: instrument.strike != null && instrument.strike > 0 ? instrument.strike : undefined,
+      optionType: instrument.option_type && instrument.option_type !== "NONE" ? (instrument.option_type === "PUT" || instrument.option_type === "PE" ? "PE" : "CE") : undefined,
+      openInterest: instrument.open_interest || undefined,
+      volume: volume ?? undefined,
+      side: "BUY",
+      origin: category === "OPTIONS" ? "OPTIONS" : category === "FUTURES" ? "FUTURES" : "SCANNER",
+      sourcePage: "MARKET_UNIVERSE_TABLE",
+    }, router);
+  };
+
+  // Dedicated Action / Trade & Bot Button
   const actionCell = (
     <td className="px-5 text-right">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          onLaunchTrade();
-        }}
-        className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[12.5px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98] ml-auto"
-        title="Trade Instrument"
-      >
-        <Zap className="w-3.5 h-3.5 text-cyan-400" />
-        <span>Trade</span>
-      </button>
+      <div className="inline-flex items-center gap-1.5 justify-end">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleLaunchBot();
+          }}
+          className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/40 text-[12px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+          title="Create Trading Bot with this Market"
+        >
+          <Bot className="w-3.5 h-3.5 text-purple-400" />
+          <span>Bot</span>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onLaunchTrade();
+          }}
+          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/40 text-[12px] font-bold transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+          title="Trade Instrument"
+        >
+          <Zap className="w-3.5 h-3.5 text-cyan-400" />
+          <span>Trade</span>
+        </button>
+      </div>
     </td>
   );
 

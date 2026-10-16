@@ -19,7 +19,16 @@ import {
   Zap,
 } from "lucide-react";
 import { BotInstanceExtended, BotStatus } from "@/types/bot-control";
-import { formatNumber, formatPrice, formatPercent, formatPnL, toNumeric, formatMoney } from "@/lib/formatters";
+import {
+  formatNumber,
+  formatPrice,
+  formatPercent,
+  formatPnL,
+  toNumeric,
+  formatMoney,
+  formatSignedMoney,
+  detectMarketCurrency,
+} from "@/lib/formatters";
 
 interface BotInstancesTableProps {
   bots: BotInstanceExtended[];
@@ -218,6 +227,7 @@ export function BotInstancesTable({
               const isError = bot.status === "ERROR" || bot.status === "HALTED";
               const pnl = bot.live_pnl || 0.0;
               const isPosPnl = pnl >= 0;
+              const { symbol: currSym } = detectMarketCurrency(bot);
 
               return (
                 <tr
@@ -278,11 +288,11 @@ export function BotInstancesTable({
                     {bot.risk?.risk_per_trade_pct ?? 1.5}%
                   </td>
                   <td className="p-3 text-right font-mono font-bold text-[var(--theme-text-primary)]">
-                    {formatMoney(bot.allocated_capital || 10000.0, "$")}
+                    {formatMoney(bot.allocated_capital || 10000.0, currSym)}
                   </td>
                   <td className="p-3 text-right font-mono font-bold">
                     <span className={isPosPnl ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}>
-                      {isPosPnl ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}
+                      {formatSignedMoney(pnl, currSym)}
                     </span>
                   </td>
                   <td className="p-3 text-center font-mono text-[10px]">
@@ -384,6 +394,7 @@ export function BotInstancesTable({
           const isStopped = bot.status === "STOPPED" || bot.status === "CREATED";
           const pnl = bot.live_pnl || 0.0;
           const isPosPnl = pnl >= 0;
+          const { symbol: currSym } = detectMarketCurrency(bot);
 
           return (
             <div
@@ -416,12 +427,12 @@ export function BotInstancesTable({
                 </div>
                 <div>
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Capital</span>
-                  <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(bot.allocated_capital || 10000, "$")}</span>
+                  <span className="font-bold text-[var(--theme-text-primary)]">{formatMoney(bot.allocated_capital || 10000, currSym)}</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[var(--theme-text-muted)] block">Today P&L</span>
                   <span className={`font-bold ${isPosPnl ? "text-[var(--theme-profit)]" : "text-[var(--theme-loss)]"}`}>
-                    {isPosPnl ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}
+                    {formatSignedMoney(pnl, currSym)}
                   </span>
                 </div>
                 <div>

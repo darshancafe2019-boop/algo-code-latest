@@ -146,9 +146,10 @@ class RiskManager:
         position_size_btc = risk_amount_usdt / sl_distance
         max_possible_btc = account_balance / entry_price
         
-        if position_size_btc > max_possible_btc:
-            logger.info(f"Capping position size {position_size_btc:.6f} BTC to available cash equivalent {max_possible_btc:.6f} BTC.")
-            position_size_btc = max_possible_btc
+        max_limit = getattr(config, "MAX_POSITION_SIZE", 20.0)
+        if position_size_btc > max_limit:
+            logger.info(f"Capping position size {position_size_btc:.6f} to MAX_POSITION_SIZE {max_limit:.6f}.")
+            position_size_btc = max_limit
 
         btc_size = round(position_size_btc, 6)
         log_bot_event(

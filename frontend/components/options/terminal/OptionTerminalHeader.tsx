@@ -108,9 +108,9 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
 
   const getProviderConnectionBadge = () => {
     const isAuthErr =
-      freshnessStatus === "AUTHENTICATION_FAILED" ||
+      (freshnessStatus === "AUTHENTICATION_FAILED" ||
       freshnessStatus === "AUTH_FAILED" ||
-      freshnessStatus === "AUTH_REQUIRED";
+      freshnessStatus === "AUTH_REQUIRED") && spotPrice <= 0;
     if (isAuthErr) {
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold" title="Provider API credentials required or invalid">
@@ -122,13 +122,20 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
     return (
       <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 text-slate-300 border border-slate-700 text-xs sm:text-sm font-mono font-bold">
         <span className="w-2 h-2 rounded-full bg-emerald-400" />
-        {source}: CONNECTED
+        {source === "AUTO" ? "FEED: AUTO" : `${source}: CONNECTED`}
       </span>
     );
   };
 
   const getDataFreshnessBadge = () => {
-    if (freshnessStatus === "LIVE") {
+    const isLiveSignal =
+      freshnessStatus === "LIVE" ||
+      freshnessStatus === "CONNECTED" ||
+      freshnessStatus === "ACTIVE" ||
+      freshnessStatus === "REAL_TIME" ||
+      (spotPrice > 0 && marketStatus !== "CLOSED");
+
+    if (isLiveSignal) {
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -160,7 +167,7 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
         </span>
       );
     }
-    if (freshnessStatus === "AUTHENTICATION_FAILED" || freshnessStatus === "AUTH_FAILED" || freshnessStatus === "AUTH_REQUIRED") {
+    if ((freshnessStatus === "AUTHENTICATION_FAILED" || freshnessStatus === "AUTH_FAILED" || freshnessStatus === "AUTH_REQUIRED") && spotPrice <= 0) {
       return (
         <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 text-xs sm:text-sm font-mono font-bold">
           <span className="w-2 h-2 rounded-full bg-rose-400" />
@@ -265,11 +272,12 @@ export const OptionTerminalHeader: React.FC<OptionTerminalHeaderProps> = ({
               onChange={(e) => onChangeSource(e.target.value)}
               className="bg-[#0E1726] border border-slate-700/80 text-purple-300 font-bold rounded-lg px-2.5 py-1.5 outline-none cursor-pointer text-xs sm:text-sm"
             >
-              <option value="ALL">ALL PROVIDERS</option>
+              <option value="AUTO">AUTO (BEST FEED)</option>
+              <option value="UPSTOX">UPSTOX v3 (LIVE)</option>
+              <option value="DELTA_INDIA">DELTA INDIA (CRYPTO)</option>
               <option value="DHAN">DHAN HQ v2</option>
-              <option value="UPSTOX">UPSTOX v3</option>
-              <option value="DELTA_INDIA">DELTA INDIA</option>
               <option value="BINANCE">BINANCE</option>
+              <option value="ALL">ALL PROVIDERS</option>
             </select>
           )}
 

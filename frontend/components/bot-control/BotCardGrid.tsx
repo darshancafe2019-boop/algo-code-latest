@@ -22,7 +22,7 @@ import {
   Radio,
 } from "lucide-react";
 import { BotRowItem } from "@/types/bot-control";
-import { formatMoney, formatNumber } from "@/lib/formatters";
+import { formatMoney, formatNumber, resolveCurrencySymbol } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 
 function getBotTimestamp(bot: BotRowItem): { date: string; time: string; full: string } {
@@ -182,8 +182,8 @@ export function BotCardGrid({
           : (Number(bot.pnl?.realized ?? bot.realized_pnl ?? 0) + unrealizedPnl);
         const isPnlPositive = pnl >= 0;
 
-        const botCurrency = (bot.currency || currency || (bot.symbol.includes("NIFTY") || bot.symbol.includes("BANK") ? "INR" : "USD")).toUpperCase();
-        const currSym = botCurrency === "INR" || botCurrency === "₹" ? "₹" : botCurrency === "USDT" ? "USDT " : "$";
+        const botCurrency = bot.currency || currency || (bot.symbol?.includes("NIFTY") || bot.symbol?.includes("BANK") ? "INR" : "USD");
+        const currSym = resolveCurrencySymbol(botCurrency);
 
         const signalInst = bot.signal_instrument || bot.signal_symbol || bot.underlying || bot.symbol;
         const execInst = bot.execution_instrument || bot.execution_symbol || bot.symbol;
@@ -315,7 +315,7 @@ export function BotCardGrid({
                     isPnlPositive ? "text-[#00E89A]" : "text-[#FF3B5C]"
                   )}
                 >
-                  {isPnlPositive ? "+" : ""}{formatMoney(Math.abs(pnl), currSym)}
+                  {isPnlPositive ? "+" : "-"}{currSym}{Math.abs(pnl).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
             </div>

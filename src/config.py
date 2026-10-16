@@ -110,15 +110,23 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database Configuration (PostgreSQL / SQLite)
-DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "sqlite").lower()
-if os.getenv("FORCE_SQLITE", "true").lower() == "true" or DATABASE_PROVIDER != "postgresql":
+_raw_db_url = os.getenv("DATABASE_URL", "").strip()
+_has_pg_url = _raw_db_url.startswith("postgresql://") or _raw_db_url.startswith("postgres://")
+_force_sqlite = os.getenv("FORCE_SQLITE", "").lower() in ("true", "1", "yes")
+
+DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "postgresql" if _has_pg_url and not _force_sqlite else "sqlite").lower()
+
+if _force_sqlite or (DATABASE_PROVIDER != "postgresql" and not _has_pg_url):
     DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
     os.environ["DATABASE_URL"] = DATABASE_URL
     os.environ["DATABASE_PROVIDER"] = "sqlite"
     IS_POSTGRES = False
 else:
-    DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH.as_posix()}")
+    DATABASE_URL = _raw_db_url or f"sqlite:///{DB_PATH.as_posix()}"
     IS_POSTGRES = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
+    if IS_POSTGRES:
+        os.environ["DATABASE_PROVIDER"] = "postgresql"
+        os.environ["FORCE_SQLITE"] = "false"
 
 
 # Institutional Authentication, 2FA & Password Reset

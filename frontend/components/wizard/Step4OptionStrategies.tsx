@@ -1,0 +1,420 @@
+"use client";
+
+import React, { useEffect, useState, useMemo } from "react";
+import { BotWizardDraft, OptionStrategyConfig, SelectedLeg, formatPositionBotName } from "./types";
+import { api } from "../../lib/api";
+import {
+  TrendingUp,
+  Activity,
+  Layers,
+  CheckCircle2,
+  AlertCircle,
+  BarChart2,
+  RefreshCw,
+  Plus,
+  Trash2,
+} from "lucide-react";
+
+interface Step4Props {
+  draft: BotWizardDraft;
+  updateDraft: (updates: Partial<BotWizardDraft>) => void;
+  onNext: () => void;
+  onPrev: () => void;
+}
+
+export default function Step4OptionStrategies({ draft, updateDraft, onNext, onPrev }: Step4Props) {
+  const [strategies, setStrategies] = useState<any[]>([]);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string>(
+    draft.option_strategy?.strategy_id || ""
+  );
+  const [loading, setLoading] = useState(false);
+  const [calculatingPayoff, setCalculatingPayoff] = useState(false);
+  const currencySymbol = draft.market_type.includes("INDIA") ? "₹" : "$";
+
+  useEffect(() => {
+    const loadOptionStrategies = async () => {
+      setLoading(true);
+      try {
+        const list = await api.getOptionStrategies();
+        setStrategies(list || []);
+      } catch (err) {
+        console.error("Failed to load option strategies", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadOptionStrategies();
+  }, []);
+
+  const handleSelectStrategy = async (strat: any) => {
+    setSelectedStrategyId(strat.id);
+    const contract = draft.contract;
+    const baseStrike = contract?.strike || 85000;
+    const baseExpiry = contract?.expiry || "2026-10-09";
+    const baseLot = contract?.lot_size || 0.001;
+    const basePrem = contract?.premium || 150.0;
+
+    // Build default legs for the strategy template
+    const templateList = strat.structure_template || strat.default_legs || [];
+    const stepSize = baseStrike > 10000 ? 500 : (baseStrike > 1000 ? 50 : 5);
+
+    const legs: SelectedLeg[] = templateList.map((legTemplate: any, i: number) => {
+      let strikeOffset = 0;
+      if (typeof legTemplate.strike_offset === "number") {
+        strikeOffset = legTemplate.strike_offset;
+      } else if (typeof legTemplate.strike_offset === "string") {
+        if (legTemplate.strike_offset.includes("+1") || legTemplate.strike_offset.includes("OTM")) {
+          strikeOffset = stepSize;
+        } else if (legTemplate.strike_offset.includes("-1") || legTemplate.strike_offset.includes("ITM")) {
+          strikeOffset = -stepSize;
+        }
+      }
+
+      const legStrike = baseStrike + strikeOffset;
+      const premEst = Math.max(10, basePrem - Math.abs(strikeOffset) * 0.05);
+      return {
+        symbol: `${legTemplate.option_type}-${draft.underlying}-${legStrike}-${baseExpiry}`,
+        strike: legStrike,
+        option_type: (legTemplate.option_type || "CE") as "CE" | "PE",
+        side: (legTemplate.side || "BUY") as "BUY" | "SELL",
+        ratio: legTemplate.ratio || 1,
+        premium: premEst,
+        lot_size: baseLot,
+        expiry: baseExpiry,
+        greeks: {
+          delta: legTemplate.option_type === "CE" ? 0.5 : -0.5,
+          gamma: 0.00005,
+          theta: -25.0,
+          vega: 20.0,
+          iv: 55.0,
+          greeks_source: "CALCULATED",
+        },
+      };
+    });
+
+    // Request Payoff calculation from backend
+    try {
+      setCalculatingPayoff(true);
+      const payoffRes = await api.calculateOptionPayoff({
+        strategy_id: strat.id,
+        underlying_spot: baseStrike,
+        spot_price: baseStrike,
+        legs: legs,
+      });
+
+      const optConfig: OptionStrategyConfig = {
+        strategy_id: strat.id,
+        strategy_name: strat.name,
+        market_view: strat.market_view,
+        enabled: true,
+        legs,
+        net_cost: payoffRes.net_cost,
+        cost_type: payoffRes.cost_type,
+        max_profit: payoffRes.max_profit,
+        max_loss: payoffRes.max_loss,
+        breakevens: payoffRes.breakevens || [],
+        greeks: payoffRes.greeks || { delta: 0, gamma: 0, theta: 0, vega: 0 },
+        payoff_points: payoffRes.payoff_points || [],
+      };
+
+      updateDraft({
+        option_strategy: optConfig,
+        bot_name: formatPositionBotName(draft.contract?.symbol || draft.underlying, strat.name),
+      });
+    } catch (err) {
+      console.error("Payoff calculation error", err);
+    } finally {
+      setCalculatingPayoff(false);
+    }
+  };
+
+  const handleDisableStrategy = () => {
+    setSelectedStrategyId("");
+    updateDraft({ option_strategy: null });
+  };
+
+  const optStrategy = draft.option_strategy;
+  const spotPrice = draft.contract?.strike || 85000;
+
+  // Payoff chart dimensions and scaling
+  const chartPoints = optStrategy?.payoff_points || [];
+  const minPrice = chartPoints.length > 0 ? chartPoints[0].underlying_price : spotPrice * 0.85;
+  const maxPrice = chartPoints.length > 0 ? chartPoints[chartPoints.length - 1].underlying_price : spotPrice * 1.15;
+  const pnls = chartPoints.map((p) => p.pnl);
+  const minPnl = pnls.length > 0 ? Math.min(...pnls, -100) : -500;
+  const maxPnl = pnls.length > 0 ? Math.max(...pnls, 100) : 500;
+
+  const svgWidth = 650;
+  const svgHeight = 220;
+
+  const getX = (price: number) => ((price - minPrice) / (maxPrice - minPrice || 1)) * (svgWidth - 40) + 20;
+  const getY = (pnl: number) => svgHeight - 20 - ((pnl - minPnl) / (maxPnl - minPnl || 1)) * (svgHeight - 40);
+
+  const polylinePoints = chartPoints
+    .map((pt) => `${getX(pt.underlying_price)},${getY(pt.pnl)}`)
+    .join(" ");
+
+  const zeroY = getY(0);
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header Info Banner */}
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex items-start justify-between gap-4">
+        <div className="flex items-start gap-4">
+          <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
+            <Layers className="h-6 w-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-3">
+              <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
+                Step 4 — Option Strategy & Payoff Architecture
+              </h3>
+              <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+                MULTI-LEG STRUCTURES
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+              Deploy from 21 canonical option multi-leg structures. All strike legs, spreads, breakevens, and payoff curves derive deterministically from the live option chain.
+            </p>
+          </div>
+        </div>
+
+        {optStrategy && (
+          <button
+            type="button"
+            onClick={handleDisableStrategy}
+            className="text-xs sm:text-sm font-mono font-bold text-slate-300 hover:text-rose-400 px-4 py-2.5 rounded-xl border border-slate-800 bg-slate-900/80 hover:bg-slate-800 transition-all cursor-pointer shadow-sm active:scale-95 whitespace-nowrap"
+          >
+            Disable Strategy Layer
+          </button>
+        )}
+      </div>
+
+      {/* Strategy Selector Carousel / Grid */}
+      <div className="space-y-3 bg-[#0B1426]/90 p-5 rounded-2xl border border-slate-800/80 shadow-lg">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white">
+            21 Quantitative Option Strategies
+          </h4>
+          <span className="text-xs sm:text-sm font-mono text-slate-300">
+            Base Contract: <strong className="text-emerald-400">{draft.contract?.symbol || "No contract chosen in Step 2"}</strong>
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2.5 max-h-56 overflow-y-auto pr-1 scrollbar-none">
+          {strategies.map((strat) => {
+            const isSelected = selectedStrategyId === strat.id;
+            return (
+              <button
+                key={strat.id}
+                type="button"
+                onClick={() => handleSelectStrategy(strat)}
+                className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  isSelected
+                    ? "border-cyan-500/60 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/30 ring-1 ring-cyan-400/40"
+                    : "border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700 hover:text-white hover:bg-slate-900"
+                }`}
+              >
+                <div className="text-xs sm:text-sm font-mono font-bold truncate">{strat.name}</div>
+                <div className="text-xs font-mono text-cyan-300/90 mt-1 font-medium">{strat.market_view}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Active Strategy Detail & Live Payoff Chart */}
+      {optStrategy ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Strategy Analytics & Legs */}
+          <div className="lg:col-span-5 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div>
+                <h4 className="text-base sm:text-lg font-mono font-bold text-white">{optStrategy.strategy_name}</h4>
+                <span className="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-cyan-300 border border-cyan-500/30 mt-1 inline-block">
+                  {optStrategy.market_view}
+                </span>
+              </div>
+              <span className="text-sm sm:text-base font-mono font-black text-emerald-400">
+                {optStrategy.cost_type}: {currencySymbol}{optStrategy.net_cost != null && !isNaN(Number(optStrategy.net_cost)) ? Math.abs(Number(optStrategy.net_cost)).toFixed(2) : "0.00"}
+              </span>
+            </div>
+
+            {/* Metrics Matrix */}
+            <div className="grid grid-cols-2 gap-3 text-xs sm:text-sm font-mono">
+              <div className="p-3.5 rounded-xl bg-[#070D1A] border border-slate-800/80 shadow-inner">
+                <span className="text-slate-400 text-xs block font-bold uppercase">MAX PROFIT</span>
+                <span className="font-extrabold text-emerald-400 text-base sm:text-lg mt-0.5 block">
+                  {optStrategy.max_profit === "UNLIMITED"
+                    ? "UNLIMITED"
+                    : (optStrategy.max_profit != null && !isNaN(Number(optStrategy.max_profit))
+                        ? `${currencySymbol}${Number(optStrategy.max_profit).toFixed(2)}`
+                        : String(optStrategy.max_profit || "N/A"))}
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#070D1A] border border-slate-800/80 shadow-inner">
+                <span className="text-slate-400 text-xs block font-bold uppercase">MAX LOSS</span>
+                <span className="font-extrabold text-rose-400 text-base sm:text-lg mt-0.5 block">
+                  {optStrategy.max_loss === "UNLIMITED"
+                    ? "UNLIMITED"
+                    : (optStrategy.max_loss != null && !isNaN(Number(optStrategy.max_loss))
+                        ? `${currencySymbol}${Number(optStrategy.max_loss).toFixed(2)}`
+                        : String(optStrategy.max_loss || "N/A"))}
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#070D1A] border border-slate-800/80 shadow-inner">
+                <span className="text-slate-400 text-xs block font-bold uppercase">BREAKEVENS</span>
+                <span className="font-bold text-slate-100 text-xs sm:text-sm mt-0.5 block">
+                  {optStrategy.breakevens && optStrategy.breakevens.length > 0
+                    ? optStrategy.breakevens.map((b) => `${currencySymbol}${b != null && !isNaN(Number(b)) ? Number(b).toFixed(0) : b}`).join(", ")
+                    : "N/A"}
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-[#070D1A] border border-slate-800/80 shadow-inner">
+                <span className="text-slate-400 text-xs block font-bold uppercase">NET DELTA</span>
+                <span className="font-bold text-cyan-300 text-xs sm:text-sm mt-0.5 block">
+                  {optStrategy.greeks?.delta != null && !isNaN(Number(optStrategy.greeks.delta))
+                    ? Number(optStrategy.greeks.delta).toFixed(3)
+                    : "-"}
+                </span>
+              </div>
+            </div>
+
+            {/* Strategy Legs Table */}
+            <div className="space-y-2 pt-3 border-t border-slate-800/80">
+              <span className="text-xs sm:text-sm font-mono font-bold text-slate-200 uppercase">Configured Legs:</span>
+              <div className="space-y-2">
+                {optStrategy.legs.map((leg, i) => (
+                  <div
+                    key={i}
+                    className="p-3 rounded-xl bg-[#070D1A] border border-slate-800/80 flex items-center justify-between text-xs sm:text-sm font-mono shadow-inner"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span
+                        className={`px-2.5 py-1 rounded-md text-xs font-bold ${
+                          leg.side === "BUY" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" : "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                        }`}
+                      >
+                        {leg.side}
+                      </span>
+                      <span className="font-bold text-white text-sm">{leg.strike}</span>
+                      <span className="text-slate-300 font-bold">{leg.option_type}</span>
+                    </div>
+                    <div className="text-right text-slate-200 font-bold">
+                      {currencySymbol}{leg.premium != null && !isNaN(Number(leg.premium)) ? Number(leg.premium).toFixed(2) : "0.00"} <span className="text-slate-400 text-xs">x{leg.ratio}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Payoff Chart Canvas */}
+          <div className="lg:col-span-7 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4 flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                <BarChart2 className="h-5 w-5 text-cyan-400" />
+                Live Expiry Payoff Curve ($ P&L)
+              </h4>
+              <span className="text-xs sm:text-sm font-mono text-slate-300">
+                Underlying Spot: <strong className="text-emerald-400">${spotPrice.toLocaleString()}</strong>
+              </span>
+            </div>
+
+            {/* SVG Payoff Curve */}
+            <div className="w-full bg-[#070D1A] rounded-xl p-4 border border-slate-800/80 shadow-inner">
+              <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-52 overflow-visible">
+                {/* Zero P&L reference line */}
+                <line
+                  x1="20"
+                  y1={zeroY}
+                  x2={svgWidth - 20}
+                  y2={zeroY}
+                  stroke="#475569"
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                />
+
+                {/* Spot Price vertical line */}
+                <line
+                  x1={getX(spotPrice)}
+                  y1="20"
+                  x2={getX(spotPrice)}
+                  y2={svgHeight - 20}
+                  stroke="#06b6d4"
+                  strokeWidth="1.5"
+                  strokeDasharray="3 3"
+                />
+
+                {/* Payoff Curve line */}
+                {polylinePoints && (
+                  <polyline
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth="2.5"
+                    points={polylinePoints}
+                  />
+                )}
+
+                {/* Breakeven lines */}
+                {optStrategy.breakevens.map((be, idx) => (
+                  <g key={idx}>
+                    <line
+                      x1={getX(be)}
+                      y1="20"
+                      x2={getX(be)}
+                      y2={svgHeight - 20}
+                      stroke="#f59e0b"
+                      strokeWidth="1"
+                    />
+                    <text
+                      x={getX(be)}
+                      y={svgHeight - 6}
+                      fill="#f59e0b"
+                      fontSize="11"
+                      fontFamily="monospace"
+                      fontWeight="bold"
+                      textAnchor="middle"
+                    >
+                      BE: ${be.toFixed(0)}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+
+            <div className="flex items-center justify-between text-xs sm:text-sm font-mono text-slate-300 px-2 font-medium">
+              <span className="text-cyan-400 font-bold">● Current Spot Price</span>
+              <span className="text-amber-400 font-bold">● Breakeven Targets</span>
+              <span className="text-emerald-400 font-bold">● Expiry P&L Profile</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="py-14 text-center text-sm sm:text-base font-mono text-slate-300 border border-dashed border-slate-800/80 rounded-2xl bg-[#070D1A]/50">
+          Option strategy layer is currently disabled. The bot will trade the base instrument selected in Step 2 directly.
+        </div>
+      )}
+
+      {/* Navigation Footer */}
+      <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
+        <button
+          type="button"
+          onClick={onPrev}
+          className="rounded-xl border border-slate-800 bg-[#0B1426] hover:bg-slate-800 px-6 py-3 text-xs sm:text-sm font-mono font-bold text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
+        >
+          ← Return to Step 3
+        </button>
+
+        <button
+          type="button"
+          onClick={onNext}
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 px-7 py-3 text-xs sm:text-sm font-mono font-black text-white shadow-lg shadow-blue-600/30 transition-all cursor-pointer active:scale-95"
+        >
+          <span>Continue to Step 5: Trading Strategy</span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+  );
+}

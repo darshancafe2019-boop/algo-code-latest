@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,13 +16,17 @@ export async function POST(req: NextRequest) {
 
   try {
     const rawBody = await req.text();
+    const forwardHeaders = getForwardHeaders(req, requestId);
+    if (!forwardHeaders.has("content-type")) {
+      forwardHeaders.set("Content-Type", "application/json");
+    }
+    if (!forwardHeaders.has("accept")) {
+      forwardHeaders.set("Accept", "application/json");
+    }
+
     const upstreamRes = await fetch(`${BACKEND_URL}/api/bots/create`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "X-Request-Id": requestId,
-      },
+      headers: forwardHeaders,
       body: rawBody,
       signal: AbortSignal.timeout(15000),
       cache: "no-store",

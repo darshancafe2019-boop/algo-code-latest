@@ -1,6 +1,14 @@
 "use client";
 
-import { formatMoney, formatNumber, formatPrice, formatQuantity, formatVolume } from "@/lib/formatters";
+import {
+  formatMoney,
+  formatSignedMoney,
+  formatNumber,
+  formatPrice,
+  formatQuantity,
+  formatVolume,
+  detectMarketCurrency,
+} from "@/lib/formatters";
 import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -137,6 +145,7 @@ export function BotDetailDrawer({
   const isStopped = status === "STOPPED" || status === "CREATED";
   const pnl = bot.live_pnl || 0;
   const isPositivePnl = pnl >= 0;
+  const { symbol: currSym } = detectMarketCurrency(bot);
 
   // Tabs List
   const tabs: Array<{ id: DrawerTab; label: string; icon: any }> = [
@@ -254,14 +263,14 @@ export function BotDetailDrawer({
                     isPositivePnl ? "text-[#22D3EE]" : "text-red-400"
                   }`}
                 >
-                  {isPositivePnl ? `+$${pnl.toFixed(2)}` : `-$${Math.abs(pnl).toFixed(2)}`}
+                  {formatSignedMoney(pnl, currSym)}
                 </span>
               </div>
 
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
                 <span className="text-[10px] text-[#52627A] font-bold uppercase block">Allocated Capital</span>
                 <span className="text-base font-bold font-mono text-[#F7FAFC]">
-                  {formatMoney(bot.allocated_capital, "$")}
+                  {formatMoney(bot.allocated_capital, currSym)}
                 </span>
               </div>
 
@@ -433,7 +442,7 @@ export function BotDetailDrawer({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
                 <span className="text-[10px] text-[#52627A] font-bold uppercase block">Risk Per Trade</span>
-                <span className="text-sm font-bold font-mono text-cyan-400">1.0% ($100.00)</span>
+                <span className="text-sm font-bold font-mono text-cyan-400">1.0% ({formatMoney((bot.allocated_capital || 10000) * 0.01, currSym)})</span>
               </div>
 
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
@@ -448,7 +457,7 @@ export function BotDetailDrawer({
 
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
                 <span className="text-[10px] text-[#52627A] font-bold uppercase block">Daily Loss Cap</span>
-                <span className="text-sm font-bold font-mono text-amber-400">$500.00 Max</span>
+                <span className="text-sm font-bold font-mono text-amber-400">{formatMoney(bot.risk?.max_daily_loss || 500, currSym)} Max</span>
               </div>
 
               <div className="p-3 bg-[#07101A] border border-[#122033] rounded-xl space-y-1">
@@ -509,7 +518,7 @@ export function BotDetailDrawer({
                         </td>
                         <td className="py-2 px-3 text-slate-300">{ord.type || "MARKET"}</td>
                         <td className="py-2 px-3 text-white font-bold">{ord.qty}</td>
-                        <td className="py-2 px-3 text-cyan-300">{formatMoney(ord.price, "$")}</td>
+                        <td className="py-2 px-3 text-cyan-300">{formatMoney(ord.price, currSym)}</td>
                         <td className="py-2 px-3">
                           <span
                             className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
@@ -564,7 +573,7 @@ export function BotDetailDrawer({
                           (Number(pos?.unrealized_pnl) || 0) >= 0 ? "text-[#22D3EE]" : "text-red-400"
                         }`}
                       >
-                        {(Number(pos?.unrealized_pnl) || 0) >= 0 ? `+$${(Number(pos?.unrealized_pnl) || 0).toFixed(2)}` : `-$${Math.abs(Number(pos?.unrealized_pnl) || 0).toFixed(2)}`}
+                        {formatSignedMoney(pos?.unrealized_pnl, currSym)}
                       </span>
                     </div>
                   </div>
@@ -572,19 +581,19 @@ export function BotDetailDrawer({
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono text-[#7C8CA3]">
                     <div>
                       <span className="text-[#52627A]">Entry Price:</span>
-                      <p className="text-white font-bold">{formatMoney(pos.entry_price, "$")}</p>
+                      <p className="text-white font-bold">{formatMoney(pos.entry_price, currSym)}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Current Price:</span>
-                      <p className="text-cyan-300 font-bold">{formatMoney(pos.current_price, "$")}</p>
+                      <p className="text-cyan-300 font-bold">{formatMoney(pos.current_price, currSym)}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Stop Loss:</span>
-                      <p className="text-red-400 font-bold">{formatMoney(pos.stop_loss, "$")}</p>
+                      <p className="text-red-400 font-bold">{formatMoney(pos.stop_loss, currSym)}</p>
                     </div>
                     <div>
                       <span className="text-[#52627A]">Take Profit:</span>
-                      <p className="text-[#22D3EE] font-bold">{formatMoney(pos.take_profit, "$")}</p>
+                      <p className="text-[#22D3EE] font-bold">{formatMoney(pos.take_profit, currSym)}</p>
                     </div>
                   </div>
                 </div>
@@ -690,7 +699,7 @@ export function BotDetailDrawer({
                     </div>
 
                     <div className="flex items-center justify-between text-[10px] text-[#52627A] pt-1 border-t border-[#122033]">
-                      <span>Price: {formatMoney(d.price, "$")}</span>
+                      <span>Price: {formatMoney(d.price, currSym)}</span>
                       <span className="text-[#22D3EE]">Risk: PASSED</span>
                     </div>
                   </div>

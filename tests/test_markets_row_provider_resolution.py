@@ -17,7 +17,7 @@ def test_01_indian_equities_resolve_provider_and_closed_session():
     assert len(instruments) > 0
 
     for inst in instruments:
-        assert inst.get("provider") in ["upstox", "dhan"]
+        assert inst.get("provider") == "upstox"
         assert inst.get("marketSession") in ["OPEN", "CLOSED"]
         assert inst.get("priceState") in ["LIVE_TRADE", "LAST_TRADED"]
         # Symbol and display name must be defined
@@ -42,5 +42,5 @@ def test_03_specific_symbols_resolution():
         insts = res.get("instruments", [])
         if insts:
             inst = insts[0]
-            assert inst.get("provider") in ["upstox", "dhan"]
+            assert inst.get("provider") == "upstox"
             assert inst.get("priceState") in ["LAST_TRADED", "LIVE_TRADE"]

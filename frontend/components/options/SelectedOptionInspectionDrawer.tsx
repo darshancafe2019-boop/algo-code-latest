@@ -2,9 +2,11 @@
 
 import { formatMoney } from "@/lib/formatters";
 import React, { useState } from "react";
-import { X, Shield, Activity, Radio, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Shield, Activity, Radio, AlertTriangle, Bot } from "lucide-react";
 import { OptionContractQuote } from "@/types/option-chain";
 import { getExpiryDisplay } from "@/lib/expiry-utils";
+import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import { SimpleOptionOrderTicket } from "./SimpleOptionOrderTicket";
 import { TradeAnalysisModal } from "@/components/trade_analysis/TradeAnalysisModal";
 
@@ -33,6 +35,7 @@ export function SelectedOptionInspectionDrawer({
   currency = "₹",
   onExecuteOrder,
 }: SelectedOptionInspectionDrawerProps) {
+  const router = useRouter();
   const [isTradeAnalysisOpen, setIsTradeAnalysisOpen] = useState(false);
 
   if (!isOpen || !strike || !optionType || !quote) return null;
@@ -47,6 +50,42 @@ export function SelectedOptionInspectionDrawer({
   const instrumentId = quote.instrumentId || quote.symbol || `${providerName}_${underlying}_${strike}_${optionType}`;
   const contractKey = quote.contractKey || `${providerName}:${brokerAccount}:${environment}:${quote.exchange || "NSE"}:OPTIONS:${underlying}:${expiry}:${strike}:${optionType}:${instrumentId}`;
   const isStale = quote.freshnessStatus === "STALE" || (quote.dataAgeMs && quote.dataAgeMs > 8000);
+
+  const isCrypto = providerName.toUpperCase().includes("DELTA") || currency === "$";
+  const lotSize = isCrypto ? 1 : underlying.includes("BANKNIFTY") ? 15 : underlying.includes("SENSEX") ? 10 : 25;
+
+  const handleLaunchBot = () => {
+    onClose();
+    dispatchBotCreation(router, {
+      symbol: quote.symbol || `${underlying} ${strike} ${optionType}`,
+      canonicalSymbol: contractKey,
+      canonicalContractId: contractKey,
+      side: "BUY",
+      assetClass: isCrypto ? "CRYPTO_OPTIONS" : "INDIAN_OPTIONS",
+      underlying,
+      exchange: isCrypto ? "DELTA" : (quote.exchange || "NSE"),
+      broker: providerName,
+      marketDataSource: isCrypto ? "DELTA" : "UPSTOX",
+      securityId: instrumentId,
+      tradingSymbol: quote.symbol || `${underlying} ${strike} ${optionType}`,
+      currentPrice: quote.ltp || 0,
+      bid: quote.bid,
+      ask: quote.ask,
+      strike,
+      expiry,
+      optionType: optionType === "CE" ? "CALL" : "PUT",
+      lotSize,
+      openInterest: quote.open_interest,
+      volume: quote.volume,
+      delta: quote.delta,
+      gamma: quote.gamma,
+      theta: quote.theta,
+      vega: quote.vega,
+      iv: quote.iv,
+      origin: "OPTIONS",
+      timestamp: Date.now(),
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -178,6 +217,18 @@ export function SelectedOptionInspectionDrawer({
           >
             <Activity className="w-4 h-4 text-[#22D3EE]" />
             <span>Open Trade Analysis Dashboard & Indicators</span>
+          </button>
+        </div>
+
+        {/* Direct Bot Creation Action */}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={handleLaunchBot}
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg active:scale-[0.99] border border-cyan-400/30"
+          >
+            <Bot className="w-4 h-4 text-cyan-300" />
+            <span>Create Trading Bot with this Contract</span>
           </button>
         </div>
 

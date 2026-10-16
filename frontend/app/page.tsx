@@ -6,17 +6,35 @@ import { CommandCenterShell } from "@/components/layout/CommandCenterShell";
 import { HomeExecutiveOverview } from "@/components/home/HomeExecutiveOverview";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
+const loadWithRetry = <T,>(fn: () => Promise<T>): Promise<T> => {
+  return fn().catch((err) => {
+    const msg = String(err?.message || "");
+    if (
+      err?.name === "ChunkLoadError" ||
+      msg.includes("Loading chunk") ||
+      msg.includes("Failed to fetch dynamically imported module")
+    ) {
+      return new Promise<T>((resolve, reject) => {
+        setTimeout(() => {
+          fn().then(resolve).catch(reject);
+        }, 600);
+      });
+    }
+    throw err;
+  });
+};
+
 // Code-split heavy tabs with zero-layout-shift and no SSR hydration delay
 const RuntimeCommandCenter = dynamic(
-  () => import("@/components/command-center/RuntimeCommandCenter").then((m) => m.RuntimeCommandCenter),
+  () => loadWithRetry(() => import("@/components/command-center/RuntimeCommandCenter").then((m) => m.RuntimeCommandCenter)),
   { ssr: false, loading: () => null }
 );
 const TradingTerminal = dynamic(
-  () => import("@/components/terminal/TradingTerminal").then((m) => m.TradingTerminal),
+  () => loadWithRetry(() => import("@/components/terminal/TradingTerminal").then((m) => m.TradingTerminal)),
   { ssr: false, loading: () => null }
 );
 const BotControlTab = dynamic(
-  () => import("@/components/bot-control/BotControlTab").then((m) => m.BotControlTab),
+  () => loadWithRetry(() => import("@/components/bot-control/BotControlTab").then((m) => m.BotControlTab)),
   { ssr: false, loading: () => null }
 );
 const StrategyBuilder = dynamic(

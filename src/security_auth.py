@@ -350,10 +350,11 @@ _ACTIVITY_UPDATE_INTERVAL_SEC = 60.0
 
 
 class SessionManager:
-    """Cryptographically secure session manager with rotation and idle timeout."""
+    """Cryptographically secure session manager with daily rotation, 24h expiration, and idle timeout."""
 
-    SESSION_EXPIRY_DAYS = 7
-    IDLE_TIMEOUT_MINUTES = 30
+    SESSION_EXPIRY_DAYS = 1
+    SESSION_EXPIRY_HOURS = 24
+    IDLE_TIMEOUT_MINUTES = 720  # 12 hours idle timeout
 
     @staticmethod
     def invalidate_cache(token_hash: Optional[str] = None):
@@ -366,15 +367,19 @@ class SessionManager:
     @staticmethod
     def create_session(user_id: str, device_name: str = "Browser", ip_address: str = "127.0.0.1", user_agent: str = "") -> Tuple[str, Dict[str, Any]]:
         """
-        Creates a new session.
+        Creates a new daily trading session.
         Returns (raw_session_token, session_metadata).
         """
         raw_token = secrets.token_urlsafe(32)
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
         session_id = f"sess-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc)
-        expires_at = (now + timedelta(days=SessionManager.SESSION_EXPIRY_DAYS)).isoformat()
-        now_iso = now.isoformat()
+        now_utc = datetime.now(timezone.utc)
+        now_local = datetime.now()
+        today_date = now_local.strftime("%Y-%m-%d")
+        # Daily Trading Session: expires at 23:59:59 local time tonight (or max 24 hours)
+        midnight_tonight = datetime.combine(now_local.date() + timedelta(days=1), datetime.min.time())
+        expires_at = midnight_tonight.astimezone(timezone.utc).isoformat()
+        now_iso = now_utc.isoformat()
 
         session_dict = {
             "session_id": session_id,
@@ -384,6 +389,7 @@ class SessionManager:
             "ip_address": ip_address,
             "user_agent": user_agent,
             "approximate_location": "Localhost",
+            "login_date": today_date,
             "last_active_at": now_iso,
             "expires_at": expires_at,
         }
@@ -402,17 +408,42 @@ class SessionManager:
 
     @staticmethod
     def validate_session(raw_token: str) -> Optional[Dict[str, Any]]:
-        """Validates raw token against stored session hash, cached in-memory with idle timeout enforcement."""
+        """Validates raw token against stored session hash, cached in-memory with strict daily expiry and idle timeout."""
         if not raw_token:
             return None
         token_hash = hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
         now_ts = time.time()
+        now = datetime.now(timezone.utc)
+        today_local = datetime.now().strftime("%Y-%m-%d")
 
         # 1. Fast in-memory hit
         cached_entry = _SESSION_CACHE.get(token_hash)
         if cached_entry:
             cached_at, cached_session = cached_entry
             if now_ts - cached_at < _SESSION_CACHE_TTL_SEC:
+                # Daily Login Rule: verify session belongs to current calendar day
+                cached_login_date = cached_session.get("login_date")
+                if not cached_login_date and cached_session.get("created_at"):
+                    cached_login_date = cached_session.get("created_at", "")[:10]
+                if cached_login_date and cached_login_date != today_local:
+                    db.revoke_session(cached_session["session_id"])
+                    _SESSION_CACHE.pop(token_hash, None)
+                    return None
+
+                # Check absolute expiration on cached item
+                exp_str = cached_session.get("expires_at")
+                if exp_str:
+                    try:
+                        exp_dt = datetime.fromisoformat(exp_str)
+                        if exp_dt.tzinfo is None:
+                            exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                        if now >= exp_dt:
+                            db.revoke_session(cached_session["session_id"])
+                            _SESSION_CACHE.pop(token_hash, None)
+                            return None
+                    except Exception:
+                        pass
+
                 # Throttle database activity update to at most once per 60s
                 last_act = _LAST_ACTIVITY_UPDATE.get(cached_session["session_id"], 0.0)
                 if now_ts - last_act > _ACTIVITY_UPDATE_INTERVAL_SEC:
@@ -426,8 +457,30 @@ class SessionManager:
             _SESSION_CACHE.pop(token_hash, None)
             return None
 
-        # Enforce idle timeout
-        now = datetime.now(timezone.utc)
+        # 3. Daily Login Rule: verify session belongs to current calendar day
+        session_login_date = session.get("login_date")
+        if not session_login_date and session.get("created_at"):
+            session_login_date = session.get("created_at", "")[:10]
+        if session_login_date and session_login_date != today_local:
+            db.revoke_session(session["session_id"])
+            _SESSION_CACHE.pop(token_hash, None)
+            return None
+
+        # 4. Check absolute session expiration (midnight tonight or 24-hour daily lifetime)
+        exp_str = session.get("expires_at")
+        if exp_str:
+            try:
+                exp_dt = datetime.fromisoformat(exp_str)
+                if exp_dt.tzinfo is None:
+                    exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+                if now >= exp_dt:
+                    db.revoke_session(session["session_id"])
+                    _SESSION_CACHE.pop(token_hash, None)
+                    return None
+            except Exception:
+                pass
+
+        # 5. Enforce idle timeout (12 hours)
         try:
             last_active_str = session.get("last_active_at")
             if last_active_str:
@@ -531,8 +584,12 @@ class SecurityAuthManager:
                 )
                 return
 
-        existing_user = db.get_user_by_username(username)
-        admin_email = os.environ.get("AUTH_ADMIN_EMAIL") or os.environ.get("AUTH_BOOTSTRAP_EMAIL") or "ashishparadkar1999@gmail.com"
+        admin_email = (
+            os.environ.get("AUTH_ADMIN_EMAIL")
+            or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
+            or getattr(config, "AUTH_ADMIN_EMAIL", "")
+            or "ashishparadkar1999@gmail.com"
+        ).strip()
         if existing_user:
             # Guarantee admin email is synchronized to authoritative address
             if username == "admin" and existing_user.get("email") != admin_email:

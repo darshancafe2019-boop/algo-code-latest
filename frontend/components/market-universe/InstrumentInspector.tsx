@@ -28,12 +28,14 @@ import {
   Sliders,
   DollarSign,
   Maximize2,
+  Bot,
 } from "lucide-react";
 import { MarketInstrument } from "@/types/market-universe";
 import { formatPrice, formatPercent, formatVolume, formatQuantity, formatExactNumber, formatNumber, formatMoney } from "@/lib/formatters";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { getMarketRowStatus, normalizeProvider } from "@/lib/market-data/row-status";
+import { openBotCreator } from "@/lib/bot-creation-bridge";
 
 interface InstrumentInspectorProps {
   instrument: MarketInstrument | null;
@@ -76,6 +78,8 @@ export function InstrumentInspector({
   const rawQuote = instrument ? (getQuote(sym) || (instrument.symbol ? getQuote(instrument.symbol) : null) || (instrument.provider_symbol ? getQuote(instrument.provider_symbol) : null)) : null;
 
   const isAllowedProviderQuote = rawQuote && (
+    rawQuote.provider === "upstox" ||
+    rawQuote.provider === "upstox_ws" ||
     rawQuote.provider === "dhan" ||
     rawQuote.provider === "dhan_ws" ||
     rawQuote.provider === "delta_options" ||
@@ -231,6 +235,51 @@ export function InstrumentInspector({
     } finally {
       setIsPlacingOrder(false);
     }
+  };
+
+  const handleLaunchBot = () => {
+    if (!instrument) return;
+    let targetAssetClass: any = "EQUITY";
+    if (isOptions) {
+      targetAssetClass = instrument.currency === "USD" || sym.includes("BTC") || sym.includes("ETH") ? "CRYPTO_OPTIONS" : "OPTIONS";
+    } else if (isFutures) {
+      targetAssetClass = instrument.currency === "USD" || sym.includes("BTC") || sym.includes("ETH") ? "CRYPTO_FUTURES" : "FUTURES";
+    } else if (assetClass === "CRYPTO") {
+      targetAssetClass = "CRYPTO";
+    } else if (assetClass === "COMMODITY") {
+      targetAssetClass = "COMMODITY";
+    } else if (assetClass === "FOREX") {
+      targetAssetClass = "FOREX";
+    } else {
+      targetAssetClass = "EQUITY";
+    }
+
+    openBotCreator({
+      symbol: sym,
+      canonicalSymbol: instrument.canonical_symbol || sym,
+      tradingSymbol: (instrument as any).trading_symbol || instrument.symbol || sym,
+      instrumentId: instrument.instrument_id || sym,
+      securityId: (instrument as any).security_id || instrument.instrument_id || sym,
+      assetClass: targetAssetClass,
+      market: instrument.currency === "INR" ? "INDIAN" : "CRYPTO",
+      exchange: instrument.exchange || (instrument.currency === "INR" ? "NSE" : "DELTA"),
+      broker: (instrument.provider || (instrument.currency === "INR" ? "UPSTOX" : "DELTA")).toUpperCase() as any,
+      ltp: price,
+      currentPrice: price,
+      bid: bid != null ? bid : undefined,
+      ask: ask != null ? ask : undefined,
+      lotSize: instrument.lot_size || 1,
+      underlying: instrument.underlying_id || (instrument as any).underlying || sym.split("-")[0] || sym,
+      expiry: instrument.expiry || undefined,
+      strike: instrument.strike != null && instrument.strike > 0 ? instrument.strike : undefined,
+      optionType: instrument.option_type && instrument.option_type !== "NONE" ? (instrument.option_type === "PUT" || instrument.option_type === "PE" ? "PE" : "CE") : undefined,
+      openInterest: instrument.open_interest || undefined,
+      volume: volume || undefined,
+      delta: instrument.delta || undefined,
+      side: tradeSide,
+      origin: isOptions ? "OPTIONS" : isFutures ? "FUTURES" : "SCANNER",
+      sourcePage: "MARKET_UNIVERSE_INSPECTOR",
+    }, router);
   };
 
   return (
@@ -468,6 +517,17 @@ export function InstrumentInspector({
             {/* Quick Navigation Action Links */}
             <div className="space-y-1.5 pt-2 border-t border-slate-800">
               <button
+                onClick={handleLaunchBot}
+                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-purple-500/15 via-cyan-500/15 to-emerald-500/15 hover:from-purple-500/25 hover:via-cyan-500/25 hover:to-emerald-500/25 text-purple-200 hover:text-white font-bold text-xs transition border border-purple-500/40 flex items-center justify-between shadow-sm group"
+              >
+                <div className="flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-purple-400 group-hover:scale-110 transition-transform" />
+                  <span>Create Trading Bot with {sym}</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-purple-400/70" />
+              </button>
+
+              <button
                 onClick={() => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
                 className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 font-bold text-xs transition border border-slate-800 flex items-center justify-between"
               >
@@ -663,6 +723,16 @@ export function InstrumentInspector({
               <span>
                 {isPlacingOrder ? "Executing..." : `Submit Paper ${tradeSide} Order`}
               </span>
+            </button>
+
+            {/* Create Algo Bot from Trade Tab */}
+            <button
+              type="button"
+              onClick={handleLaunchBot}
+              className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-purple-300 hover:text-purple-200 border border-purple-500/30 text-xs font-bold transition flex items-center justify-center gap-2"
+            >
+              <Bot className="w-3.5 h-3.5 text-purple-400" />
+              <span>Configure Algo Bot for {sym}</span>
             </button>
           </div>
         )}

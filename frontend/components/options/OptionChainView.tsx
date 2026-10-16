@@ -11,7 +11,7 @@ interface OptionChainViewProps {
 }
 
 export function OptionChainView({
-  initialSource = "DHAN",
+  initialSource = "AUTO",
   initialUnderlying,
   isSourceLocked = false,
 }: OptionChainViewProps = {}) {

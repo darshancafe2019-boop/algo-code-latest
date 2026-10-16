@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
     }
 
     const isCrypto = CRYPTO_UNDERLYINGS.has(underlying) || sourceParam.includes("DELTA");
-    const compatibleProviders: string[] = isCrypto ? ["DELTA"] : ["DHAN", "UPSTOX"];
+    const compatibleProviders: string[] = isCrypto ? ["DELTA"] : ["UPSTOX"];
 
     // ── 1. Query Authoritative Central Backend ────────────────────────────────
     try {

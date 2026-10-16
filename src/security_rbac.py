@@ -13,6 +13,7 @@ Provides:
 - @require_assurance_level(level): Action assurance level enforcement
 """
 
+import os
 import time
 from functools import wraps
 from datetime import datetime, timezone
@@ -89,7 +90,13 @@ def get_current_user_and_session(allow_dev_fallback: bool = False) -> Tuple[Opti
 
     session = SessionManager.validate_session(token) if token else None
     if not session:
-        if allow_dev_fallback and request.headers.get("X-Unauthenticated") != "true":
+        auth_require_login = os.getenv("AUTH_REQUIRE_LOGIN", "true").lower() in ("true", "1")
+        bootstrap_enabled = os.getenv("AUTH_BOOTSTRAP_ENABLED", "false").lower() in ("true", "1")
+        is_testing = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+
+        effective_fallback = allow_dev_fallback and bootstrap_enabled and not auth_require_login and not is_testing
+
+        if effective_fallback and request.headers.get("X-Unauthenticated") != "true":
             admin = db.get_user_by_username("admin")
             if admin:
                 return admin, {"session_id": "sess-local-dev", "device_name": "Localhost", "ip_address": "127.0.0.1"}

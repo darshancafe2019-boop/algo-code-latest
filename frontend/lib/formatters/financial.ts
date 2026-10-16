@@ -162,6 +162,63 @@ export function formatPercent(
 }
 
 /**
+/**
+ * Detects whether an asset, bot, market, or symbol belongs to the Indian market or Global/Crypto market.
+ * Returns authoritative currency code ("INR" | "USD") and currency symbol ("₹" | "$").
+ */
+export function detectMarketCurrency(item?: any): { code: "INR" | "USD"; symbol: "₹" | "$" } {
+  if (!item) return { code: "USD", symbol: "$" };
+
+  // Explicit currency strings
+  const curr = typeof item === "string" ? item : (item.currency || item.pnl?.currency || item.capital?.currency || item.market?.currency);
+  if (curr && typeof curr === "string") {
+    const cUpper = curr.trim().toUpperCase();
+    if (cUpper === "INR" || cUpper === "₹" || cUpper === "RS" || cUpper === "RUPEE" || cUpper === "RUPEES") {
+      return { code: "INR", symbol: "₹" };
+    }
+    if (cUpper === "USD" || cUpper === "$" || cUpper === "USDT" || cUpper === "USDC") {
+      return { code: "USD", symbol: "$" };
+    }
+  }
+
+  // Symbol, exchange, provider, market_type checks
+  const sym = String(item.symbol || item.market?.symbol || item.name || item.contract?.symbol || (typeof item === "string" ? item : "")).toUpperCase();
+  const exchange = String(item.exchange || item.market?.exchange || item.provider || item.data_provider?.provider || item.broker || "").toUpperCase();
+  const marketType = String(item.market_type || item.market?.market_type || item.market?.asset_class || "").toUpperCase();
+
+  const isIndia =
+    marketType.includes("INDIA") ||
+    marketType.includes("NSE") ||
+    marketType.includes("BSE") ||
+    /NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX|RELIANCE|TCS|INFY|HDFCBANK|SBIN|TATAMOTORS/.test(sym) ||
+    /NSE|BSE|UPSTOX|ZERODHA|DHAN|ANGEL|FYERS|KITE/.test(exchange);
+
+  return isIndia ? { code: "INR", symbol: "₹" } : { code: "USD", symbol: "$" };
+}
+
+/**
+ * Resolves a currency string, code, or symbol to a clean standard symbol.
+ * Converts "USD" -> "$", "USDT" -> "$", "INR" -> "₹", "EUR" -> "€", "GBP" -> "£", "JPY" -> "¥".
+ * Also safely detects Indian market tokens ("NIFTY", "UPSTOX", "NSE") -> "₹".
+ * Prevents awkward formatting like "-USD409.28".
+ */
+export function resolveCurrencySymbol(currency?: string | null): string {
+  if (!currency) return "$";
+  const trimmed = currency.trim();
+  const upper = trimmed.toUpperCase();
+  if (upper === "USD" || upper === "$" || upper === "USDT" || upper === "USDC") return "$";
+  if (upper === "INR" || upper === "₹" || upper === "RS" || upper === "RS." || upper === "RUPEE" || upper === "RUPEES") return "₹";
+  if (upper === "EUR" || upper === "€") return "€";
+  if (upper === "GBP" || upper === "£") return "£";
+  if (upper === "JPY" || upper === "¥") return "¥";
+  if (/NIFTY|BANKNIFTY|FINNIFTY|MIDCPNIFTY|SENSEX|BANKEX|RELIANCE|UPSTOX|DHAN|ZERODHA|NSE|BSE|INDIA/.test(upper)) {
+    return "₹";
+  }
+  if (trimmed.length === 1) return trimmed;
+  return `${trimmed} `;
+}
+
+/**
  * Formats a currency value with locale formatting (default INR "₹" or USD "$").
  * e.g. formatCurrency(24850.5, "₹", 2) -> "₹24,850.50"
  *      formatCurrency(null) -> "—"
@@ -175,12 +232,13 @@ export function formatCurrency(
   const num = toFiniteNumber(value);
   if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
-  const locale = currency === "₹" ? "en-IN" : "en-US";
+  const symbol = resolveCurrencySymbol(currency);
+  const locale = symbol === "₹" ? "en-IN" : "en-US";
   const formatted = Math.abs(cleanNum).toLocaleString(locale, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-  const prefix = cleanNum < 0 ? `-${currency}` : currency;
+  const prefix = cleanNum < 0 ? `-${symbol}` : symbol;
   return `${prefix}${formatted}`;
 }
 
@@ -197,12 +255,13 @@ export function formatPrice(
   if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
   const resolvedDecimals = getDynamicDecimals(cleanNum, decimals);
-  const locale = currency === "₹" ? "en-IN" : "en-US";
+  const symbol = resolveCurrencySymbol(currency);
+  const locale = symbol === "₹" ? "en-IN" : "en-US";
   const formatted = Math.abs(cleanNum).toLocaleString(locale, {
     minimumFractionDigits: resolvedDecimals,
     maximumFractionDigits: resolvedDecimals,
   });
-  const prefix = cleanNum < 0 ? `-${currency}` : currency;
+  const prefix = cleanNum < 0 ? `-${symbol}` : symbol;
   return `${prefix}${formatted}`;
 }
 
@@ -296,11 +355,12 @@ export function formatPnL(
   const isNegative = cleanNum < 0;
   const isZero = cleanNum === 0;
   const sign = isPositive ? "+" : isNegative ? "-" : "";
-  const locale = currency === "₹" ? "en-IN" : "en-US";
+  const symbol = resolveCurrencySymbol(currency);
+  const locale = symbol === "₹" ? "en-IN" : "en-US";
   const absNum = Math.abs(cleanNum);
 
   return {
-    formatted: `${sign}${currency}${absNum.toLocaleString(locale, {
+    formatted: `${sign}${symbol}${absNum.toLocaleString(locale, {
       minimumFractionDigits: decimals,
       maximumFractionDigits: decimals,
     })}`,
@@ -370,26 +430,27 @@ export function formatVolume(
   const num = toFiniteNumber(value);
   if (num === null) return fallback;
   const cleanNum = normalizeZero(num);
-  if (cleanNum === 0) return `${currency}0`;
+  const symbol = currency ? resolveCurrencySymbol(currency) : "";
+  if (cleanNum === 0) return symbol ? `${symbol}0` : "0";
   const abs = Math.abs(cleanNum);
   const sign = cleanNum < 0 ? "-" : "";
 
   if (abs >= 1_000_000_000) {
     const val = abs / 1_000_000_000;
     const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}B`;
+    return `${sign}${symbol}${formatted}B`;
   }
   if (abs >= 1_000_000) {
     const val = abs / 1_000_000;
     const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}M`;
+    return `${sign}${symbol}${formatted}M`;
   }
   if (abs >= 1_000) {
     const val = abs / 1_000;
     const formatted = val >= 100 ? val.toFixed(0) : val >= 10 ? val.toFixed(1) : val.toFixed(2);
-    return `${sign}${currency}${formatted}K`;
+    return `${sign}${symbol}${formatted}K`;
   }
-  return `${sign}${currency}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+  return `${sign}${symbol}${cleanNum.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
 }
 
 /**

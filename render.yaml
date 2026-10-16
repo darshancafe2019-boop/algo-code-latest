@@ -15,10 +15,18 @@ services:
         value: PAPER
       - key: LIVE_TRADING_ENABLED
         value: "false"
+      - key: MASTER_LIVE_TRADING
+        value: "false"
+      - key: DATABASE_PROVIDER
+        value: postgresql
+      - key: FORCE_SQLITE
+        value: "false"
       - key: EMAIL_PROVIDER
         value: resend
       - key: AUTH_ADMIN_EMAIL
-        value: ashishparadkar1999@gmail.com
+        sync: false
+      - key: AUTH_BOOTSTRAP_EMAIL
+        sync: false
       - key: AUTH_EMAIL_FROM
         value: onboarding@resend.dev
       - key: DATABASE_URL
@@ -29,6 +37,14 @@ services:
         sync: false
       - key: AUTH_TOTP_ENCRYPTION_KEY
         sync: false
+      - key: MARKET_GATEWAY_URL
+        sync: false
+      - key: MARKET_GATEWAY_SECRET
+        sync: false
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
 
   # 2. Market Data Gateway (Low-Latency Streaming Gateway)
   - type: web
@@ -38,7 +54,21 @@ services:
     startCommand: python start_gateway.py
     healthCheckPath: /health/live
     envVars:
-      - key: HOST
+      - key: MARKET_GATEWAY_HOST
         value: 0.0.0.0
+      - key: TRADING_MODE
+        value: PAPER
+      - key: LIVE_TRADING_ENABLED
+        value: "false"
+      - key: MASTER_LIVE_TRADING
+        value: "false"
+      - key: ENABLE_DELTA_OPTIONS
+        value: "true"
       - key: MARKET_GATEWAY_SECRET
+        sync: false
+      - key: DELTA_API_KEY
+        sync: false
+      - key: DELTA_API_SECRET
+        sync: false
+      - key: UPSTOX_ACCESS_TOKEN
         sync: false

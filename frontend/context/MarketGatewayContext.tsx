@@ -278,7 +278,13 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     reconnectTimerRef.current = setTimeout(() => {
       reconnectTimerRef.current = null;
       if (mountedRef.current) {
-        connectWS();
+        if (typeof window !== "undefined" && window.requestAnimationFrame) {
+          window.requestAnimationFrame(() => {
+            if (mountedRef.current) connectWS();
+          });
+        } else {
+          connectWS();
+        }
       }
     }, delay);
   }, []);

@@ -34,6 +34,7 @@ def get_system_health():
     }), 200
 
 
+@health_bp.route("/health/live", methods=["GET"])
 @health_bp.route("/api/health/live", methods=["GET"])
 def get_liveness():
     """Liveness probe: verifies process is active, database is healthy, and event loop is responsive."""
@@ -57,6 +58,7 @@ def get_liveness():
     return jsonify(payload), 200
 
 
+@health_bp.route("/health/ready", methods=["GET"])
 @health_bp.route("/api/health/ready", methods=["GET"])
 def get_readiness():
     """

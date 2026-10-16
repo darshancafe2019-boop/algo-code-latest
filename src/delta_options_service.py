@@ -135,25 +135,48 @@ class DeltaOptionsService:
             except Exception:
                 continue
 
-        # If DB expiries are empty or expired, trigger fresh catalogue discovery
-        if not valid_expiries:
-            logger.info(f"No future expiries found in DB for {und}. Triggering live catalogue sync...")
-            self.sync_catalogue(force=True)
-            db_expiries = db.get_delta_expiries(und, active_only=True)
-            for e in db_expiries:
-                settle_str = e.get("settlement_time", "")
-                try:
-                    clean = settle_str.replace("Z", "+00:00")
-                    dt = datetime.fromisoformat(clean)
-                    if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
-                    if dt >= now_utc:
-                        dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
-                        e_copy = dict(e)
-                        e_copy["days_to_expiry"] = round(dte, 2)
-                        valid_expiries.append(e_copy)
-                except Exception:
-                    continue
+        # 2. If DB has few or incomplete expiries, discover directly from live Delta tickers
+        if len(valid_expiries) < 6:
+            try:
+                tickers = self.client.get_tickers(
+                    underlying_asset_symbols=[und],
+                    contract_types=["call_options", "put_options"]
+                )
+                seen_dates = set()
+                live_exp_items = []
+                for t in (tickers or []):
+                    sym = t.get("symbol", "")
+                    parts = sym.split("-")
+                    if len(parts) >= 4 and len(parts[-1]) == 6:
+                        raw_date = parts[-1]
+                        if raw_date not in seen_dates:
+                            seen_dates.add(raw_date)
+                            try:
+                                dt = datetime.strptime(raw_date, "%d%m%y").replace(hour=12, minute=0, second=0, tzinfo=timezone.utc)
+                                if dt >= now_utc:
+                                    dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
+                                    dd_mm_yyyy = dt.strftime("%d-%m-%Y")
+                                    settle_iso = dt.isoformat()
+                                    live_exp_items.append({
+                                        "underlying_symbol": und,
+                                        "expiry_date": dd_mm_yyyy,
+                                        "settlement_time": settle_iso,
+                                        "days_to_expiry": round(dte, 2),
+                                        "chain_symbol": f"{und}-{raw_date}",
+                                        "is_active": 1,
+                                        "last_synced_at": now_utc.isoformat(),
+                                    })
+                            except Exception:
+                                pass
+                if live_exp_items:
+                    live_exp_items.sort(key=lambda x: x.get("settlement_time", ""))
+                    valid_expiries = live_exp_items
+                    try:
+                        db.upsert_delta_expiries(und, live_exp_items)
+                    except Exception as _up_err:
+                        logger.debug(f"Upsert delta expiries note: {_up_err}")
+            except Exception as _disc_err:
+                logger.warning(f"Live ticker expiry discovery note for {und}: {_disc_err}")
 
         # Sort ascending by settlement time
         valid_expiries.sort(key=lambda x: x.get("settlement_time", ""))

@@ -893,6 +893,19 @@ class UniversalOptionsEngine:
                 freshness_status=freshness,
             )
 
+        if dhan_query_failed or not is_auth:
+            # Fallback to Upstox live option chain if available to prevent market blackout
+            try:
+                from src.upstox_service import UpstoxService
+                upstox_svc = UpstoxService()
+                if upstox_svc.is_authenticated:
+                    logger.info(f"Dhan auth failed/unavailable for {und}. Falling back to Upstox live option chain.")
+                    upstox_snap = self.fetch_upstox_option_chain(und, spot_price, expiry, strike_count, environment)
+                    if upstox_snap and upstox_snap.strikes:
+                        return upstox_snap
+            except Exception as fb_err:
+                logger.debug(f"Upstox fallback error: {fb_err}")
+
         if dhan_query_failed:
             now_iso = datetime.now(timezone.utc).isoformat()
             return OptionChainSnapshot(
@@ -1488,43 +1501,43 @@ class UniversalOptionsEngine:
         if prov in ["ALL", "AUTO"]:
             if underlying.upper() in ["BTC", "ETH", "SOL", "XRP"]:
                 delta_snap = self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
-                if delta_snap.status == "LIVE" and delta_snap.strikes:
+                if delta_snap and delta_snap.status == "LIVE" and delta_snap.strikes:
                     return delta_snap
-                if environment == "PAPER" or delta_snap.status != "LIVE":
-                    return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
-                return delta_snap
+                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             # For Indian markets, prioritize live feeds in order: UPSTOX, DHAN, FYERS
             upstox_snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if upstox_snap.status == "LIVE" and upstox_snap.strikes:
+            if upstox_snap and upstox_snap.status == "LIVE" and upstox_snap.strikes:
                 return upstox_snap
             dhan_snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if dhan_snap.status == "LIVE" and dhan_snap.strikes:
+            if dhan_snap and dhan_snap.status == "LIVE" and dhan_snap.strikes:
                 return dhan_snap
             fyers_snap = self.fetch_fyers_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if fyers_snap.status == "LIVE" and fyers_snap.strikes:
+            if fyers_snap and fyers_snap.status == "LIVE" and fyers_snap.strikes:
                 return fyers_snap
-            # Fallback to calculated analytical option chain if no live provider is connected or in paper mode
-            if environment == "PAPER" or (dhan_snap.status != "LIVE" and upstox_snap.status != "LIVE" and fyers_snap.status != "LIVE"):
-                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
-            return upstox_snap if upstox_snap.strikes else dhan_snap
+            # Fallback to calculated analytical option chain if no live provider is connected
+            return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
         elif prov == "UPSTOX":
             snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if snap.status != "LIVE" and environment == "PAPER":
+            if (not snap or not snap.strikes or snap.status != "LIVE") and environment == "PAPER":
                 return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             return snap
         elif prov == "DHAN":
             snap = self.fetch_dhan_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if snap.status != "LIVE" and environment == "PAPER":
-                return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
+            if not snap or not snap.strikes or snap.status != "LIVE":
+                upstox_snap = self.fetch_upstox_option_chain(underlying, spot_price, expiry, strike_count, environment)
+                if upstox_snap and upstox_snap.strikes and upstox_snap.status == "LIVE":
+                    return upstox_snap
+                if environment == "PAPER":
+                    return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             return snap
         elif prov == "FYERS":
             snap = self.fetch_fyers_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if snap.status != "LIVE" and environment == "PAPER":
+            if (not snap or not snap.strikes or snap.status != "LIVE") and environment == "PAPER":
                 return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             return snap
         elif prov in ["DELTA", "DELTA_INDIA"]:
             snap = self.fetch_delta_option_chain(underlying, spot_price, expiry, strike_count, environment)
-            if snap.status != "LIVE" and environment == "PAPER":
+            if (not snap or not snap.strikes or snap.status != "LIVE") and environment == "PAPER":
                 return self.generate_paper_option_chain(underlying, spot_price, expiry, strike_count)
             return snap
         elif prov in ["BINANCE", "BINANCE_OPTIONS", "EOPTIONS"]:

@@ -52,6 +52,19 @@ export function BackendAvailabilityBanner() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!isOffline) return;
+    const interval = setInterval(async () => {
+      const success = await apiClient.probeHealth();
+      if (success) {
+        apiClient.resetCircuit();
+        setIsOffline(false);
+        setIsRetrying(false);
+      }
+    }, 2000);
+    return () => clearInterval(interval);
+  }, [isOffline]);
+
   if (!isOffline) return null;
 
   const timeAgoSec = Math.max(1, Math.round((Date.now() - lastOnlineTime) / 1000));

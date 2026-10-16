@@ -100,11 +100,23 @@ export function formatPrice(
 ): string {
   const num = toNumeric(value);
   if (num === null) return fallback;
-  const formatted = num.toLocaleString("en-US", {
+  const upper = currency ? currency.trim().toUpperCase() : "";
+  const symbol = upper === "USD" || upper === "USDT" || upper === "USDC" || currency === "$"
+    ? "$"
+    : upper === "INR" || upper === "RS" || currency === "₹"
+    ? "₹"
+    : upper === "EUR" || currency === "€"
+    ? "€"
+    : upper === "GBP" || currency === "£"
+    ? "£"
+    : currency;
+  const sign = num < 0 ? "-" : "";
+  const absNum = Math.abs(num);
+  const formatted = absNum.toLocaleString(symbol === "₹" ? "en-IN" : "en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
   });
-  return currency ? `${currency}${formatted}` : formatted;
+  return symbol ? `${sign}${symbol}${formatted}` : `${sign}${formatted}`;
 }
 
 /**

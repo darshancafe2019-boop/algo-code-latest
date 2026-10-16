@@ -69,6 +69,10 @@ module.exports = {
           red: "#FF3B5C",
           amber: "#F59E0B",
         },
+        surface: "#111622",
+        "surface-raised": "#181f30",
+        border: "#232b3e",
+        "border-light": "#2f3a52",
       },
       fontSize: {
         "2xs": "var(--qos-text-2xs)",

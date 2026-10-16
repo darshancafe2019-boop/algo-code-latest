@@ -26,7 +26,7 @@ jobs:
       - name: Verify No Secrets or Environment Credentials Tracked
         run: |
           echo "[+] Auditing repository for forbidden credential files..."
-          FORBIDDEN_FILES=$(git ls-files | grep -E "(\.env|\.db$|\.sqlite$|\.pem$|\.key$|quantos_supervisor\.lock)" || true)
+          FORBIDDEN_FILES=$(git ls-files | grep -E "(\.env|\.db$|\.sqlite$|\.pem$|\.key$|quantos_supervisor\.lock)" | grep -vE "(^|/)\.env\.(example|sample|template)$" || true)
           if [ -n "$FORBIDDEN_FILES" ]; then
             echo "[!] SECURITY ALERT: Sensitive files detected in Git tree:"
             echo "$FORBIDDEN_FILES"

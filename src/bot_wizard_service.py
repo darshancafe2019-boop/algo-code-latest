@@ -61,14 +61,21 @@ def _ensure_schema():
             """)
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS bot_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id TEXT PRIMARY KEY,
                     bot_id TEXT NOT NULL,
                     event_type TEXT NOT NULL,
                     severity TEXT NOT NULL DEFAULT 'INFO',
                     message TEXT NOT NULL,
+                    payload TEXT DEFAULT '{}',
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            try:
+                event_cols = [r[1] for r in conn.execute("PRAGMA table_info(bot_events)").fetchall()]
+                if "payload" not in event_cols:
+                    conn.execute("ALTER TABLE bot_events ADD COLUMN payload TEXT DEFAULT '{}'")
+            except Exception as mig_err:
+                logger.debug(f"bot_events payload migration check: {mig_err}")
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS orders (
                     id TEXT PRIMARY KEY,
@@ -92,10 +99,18 @@ def _ensure_schema():
                     entry_price REAL NOT NULL,
                     current_price REAL,
                     unrealized_pnl REAL DEFAULT 0.0,
+                    realized_pnl REAL DEFAULT 0.0,
                     status TEXT DEFAULT 'OPEN',
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            try:
+                pos_cols = [r[1] for r in conn.execute("PRAGMA table_info(positions)").fetchall()]
+                if "realized_pnl" not in pos_cols:
+                    conn.execute("ALTER TABLE positions ADD COLUMN realized_pnl REAL DEFAULT 0.0")
+            except Exception as mig_err:
+                logger.debug(f"positions realized_pnl migration check: {mig_err}")
+
             conn.execute("""
                 CREATE TABLE IF NOT EXISTS trades (
                     id TEXT PRIMARY KEY,
@@ -105,9 +120,17 @@ def _ensure_schema():
                     quantity REAL NOT NULL,
                     price REAL NOT NULL,
                     realized_pnl REAL DEFAULT 0.0,
+                    fees REAL DEFAULT 0.0,
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             """)
+            try:
+                trade_cols = [r[1] for r in conn.execute("PRAGMA table_info(trades)").fetchall()]
+                if "fees" not in trade_cols:
+                    conn.execute("ALTER TABLE trades ADD COLUMN fees REAL DEFAULT 0.0")
+            except Exception as mig_err:
+                logger.debug(f"trades fees migration check: {mig_err}")
+
             conn.commit()
     except Exception as e:
         logger.error(f"Failed to ensure schema in {DB_PATH}: {e}")
@@ -278,10 +301,20 @@ def _log_bot_event(conn, bot_id: str, event_type: str, severity: str, message: s
     evt_id = f"EVT-{uuid.uuid4().hex[:12].upper()}"
     ts = datetime.now(timezone.utc).isoformat()
     p_str = json.dumps(payload or {})
-    conn.execute("""
-        INSERT INTO bot_events (id, event_type, severity, bot_id, message, payload, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (evt_id, event_type, severity, bot_id, message, p_str, ts))
+    try:
+        conn.execute("""
+            INSERT INTO bot_events (id, event_type, severity, bot_id, message, payload, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (evt_id, event_type, severity, bot_id, message, p_str, ts))
+    except Exception as e:
+        logger.debug(f"Direct bot event log failed ({e}), attempting resilient fallback.")
+        try:
+            conn.execute("""
+                INSERT INTO bot_events (bot_id, event_type, severity, message, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (bot_id, event_type, severity, message, ts))
+        except Exception as e2:
+            logger.warning(f"Failed to record bot event: {e2}")
 
 
 # ── 2. WIZARD BOT DEPLOYMENT ───────────────────────────────────────────────────
@@ -472,16 +505,25 @@ def list_bots() -> List[Dict[str, Any]]:
 
             # Pre-fetch aggregated metrics across all bots in 3 bulk queries (eliminating 150+ sequential roundtrips)
             pos_open_map: Dict[str, Tuple[int, float]] = {}
-            for prow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(unrealized_pnl), 0.0) FROM positions WHERE quantity > 0 GROUP BY bot_id").fetchall():
-                pos_open_map[prow[0]] = (int(prow[1] or 0), float(prow[2] or 0.0))
+            try:
+                for prow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(unrealized_pnl), 0.0) FROM positions WHERE quantity > 0 GROUP BY bot_id").fetchall():
+                    pos_open_map[prow[0]] = (int(prow[1] or 0), float(prow[2] or 0.0))
+            except Exception:
+                pass
 
             pos_real_map: Dict[str, float] = {}
-            for prow in conn.execute("SELECT bot_id, COALESCE(sum(realized_pnl), 0.0) FROM positions GROUP BY bot_id").fetchall():
-                pos_real_map[prow[0]] = float(prow[1] or 0.0)
+            try:
+                for prow in conn.execute("SELECT bot_id, COALESCE(sum(realized_pnl), 0.0) FROM positions GROUP BY bot_id").fetchall():
+                    pos_real_map[prow[0]] = float(prow[1] or 0.0)
+            except Exception:
+                pass
 
             trades_map: Dict[str, Tuple[int, float]] = {}
-            for trow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(fees), 0.0) FROM trades GROUP BY bot_id").fetchall():
-                trades_map[trow[0]] = (int(trow[1] or 0), float(trow[2] or 0.0))
+            try:
+                for trow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(fees), 0.0) FROM trades GROUP BY bot_id").fetchall():
+                    trades_map[trow[0]] = (int(trow[1] or 0), float(trow[2] or 0.0))
+            except Exception:
+                pass
 
             for r in rows:
                 try:

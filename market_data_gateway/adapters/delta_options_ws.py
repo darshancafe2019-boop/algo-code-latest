@@ -1087,22 +1087,40 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             if pid_int:
                 self._product_id_to_symbol[pid_int] = symbol
 
-            now_iso = datetime.now(timezone.utc).isoformat()
-            exchange_ts = str(item.get("t") or item.get("timestamp") or now_iso)
+            now_utc = datetime.now(timezone.utc)
+            now_iso = now_utc.isoformat()
 
-            # Mark price
+            # Exchange timestamp extraction (Delta WS uses 'ts' in microseconds, REST uses 'timestamp')
+            raw_ts = item.get("ts") or item.get("timestamp") or item.get("t")
+            exchange_ts: Optional[str] = None
+            exchange_ts_ms: Optional[int] = None
+            if raw_ts is not None:
+                try:
+                    ts_num = int(raw_ts)
+                    if ts_num > 1e14:  # Microseconds (16 digits)
+                        exchange_ts_ms = ts_num // 1000
+                    elif ts_num > 1e11:  # Milliseconds (13 digits)
+                        exchange_ts_ms = ts_num
+                    elif ts_num > 1e8:  # Seconds (10 digits)
+                        exchange_ts_ms = ts_num * 1000
+                    if exchange_ts_ms is not None:
+                        exchange_ts = datetime.fromtimestamp(exchange_ts_ms / 1000.0, tz=timezone.utc).isoformat()
+                except (ValueError, TypeError):
+                    exchange_ts = str(raw_ts)
+
+            # Mark price (theoretical valuation)
             raw_mp = item.get("m") or item.get("mark_price")
-            mark_price = float(raw_mp) if raw_mp is not None else None
+            mark_price = float(raw_mp) if raw_mp is not None and float(raw_mp) > 0 else None
 
-            # Spot price
+            # Spot price (underlying index reference)
             raw_sp = item.get("sp") or item.get("spot_price") or default_spot
-            spot_price = float(raw_sp) if raw_sp is not None else None
+            spot_price = float(raw_sp) if raw_sp is not None and float(raw_sp) > 0 else None
             if spot_price is not None and spot_price > 0:
                 self._spot_price_cache[symbol] = spot_price
                 if symbol.endswith("USD"):
                     self._spot_price_cache[symbol[:-3]] = spot_price
 
-            # Quotes: [best_bid, bid_size, best_ask, ask_size, impact_mid]
+            # Quotes: Official Delta spec is q = [best_ask, ask_size, best_bid, bid_size, impact_mid]
             quotes_raw = item.get("q") or item.get("quotes") or []
             best_bid: Optional[float] = None
             best_ask: Optional[float] = None
@@ -1110,10 +1128,19 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             ask_size: Optional[float] = None
 
             if isinstance(quotes_raw, list) and len(quotes_raw) >= 4:
-                best_bid = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
-                bid_size = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
-                best_ask = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
-                ask_size = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
+                ask_val = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
+                ask_sz  = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
+                bid_val = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
+                bid_sz  = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
+
+                best_ask = ask_val
+                ask_size = ask_sz
+                best_bid = bid_val
+                bid_size = bid_sz
+
+                # Do not use min/max to hide crossed books; preserve raw exchange data and log warning
+                if best_bid is not None and best_ask is not None and best_bid > best_ask:
+                    self._logger.warning(f"[DELTA_WS] Crossed order book on {symbol}: Bid {best_bid} > Ask {best_ask}")
             elif isinstance(quotes_raw, dict):
                 bb = quotes_raw.get("best_bid")
                 ba = quotes_raw.get("best_ask")
@@ -1123,8 +1150,10 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 best_ask = float(ba) if ba is not None and float(ba) > 0 else None
                 bid_size = float(bs) if bs is not None and float(bs) > 0 else None
                 ask_size = float(as_) if as_ is not None and float(as_) > 0 else None
+                if best_bid is not None and best_ask is not None and best_bid > best_ask:
+                    self._logger.warning(f"[DELTA_WS] Crossed order book on {symbol}: Bid {best_bid} > Ask {best_ask}")
 
-            # Greeks: [delta, gamma, rho, theta, vega]
+            # Greeks: Official Delta spec is g = [delta, gamma, rho, theta, vega]
             greeks_raw = item.get("g") or item.get("greeks") or []
             delta: Optional[float] = None
             gamma: Optional[float] = None
@@ -1135,27 +1164,30 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             if isinstance(greeks_raw, list) and len(greeks_raw) >= 5:
                 delta = float(greeks_raw[0]) if greeks_raw[0] is not None else None
                 gamma = float(greeks_raw[1]) if greeks_raw[1] is not None else None
-                rho = float(greeks_raw[2]) if greeks_raw[2] is not None else None
+                rho   = float(greeks_raw[2]) if greeks_raw[2] is not None else None
                 theta = float(greeks_raw[3]) if greeks_raw[3] is not None else None
-                vega = float(greeks_raw[4]) if greeks_raw[4] is not None else None
+                vega  = float(greeks_raw[4]) if greeks_raw[4] is not None else None
             elif isinstance(greeks_raw, dict):
                 delta = float(greeks_raw["delta"]) if greeks_raw.get("delta") is not None else None
                 gamma = float(greeks_raw["gamma"]) if greeks_raw.get("gamma") is not None else None
                 theta = float(greeks_raw["theta"]) if greeks_raw.get("theta") is not None else None
-                vega = float(greeks_raw["vega"]) if greeks_raw.get("vega") is not None else None
-                rho = float(greeks_raw["rho"]) if greeks_raw.get("rho") is not None else None
+                vega  = float(greeks_raw["vega"]) if greeks_raw.get("vega") is not None else None
+                rho   = float(greeks_raw["rho"]) if greeks_raw.get("rho") is not None else None
 
-            # IV: [mark_iv, bid_iv, ask_iv]
+            # IV: Official Delta spec is qiv = [ask_iv, bid_iv, mark_iv]
             qiv_raw = item.get("qiv") or []
-            mark_iv: Optional[float] = None
-            bid_iv: Optional[float] = None
             ask_iv: Optional[float] = None
-            if isinstance(qiv_raw, list) and len(qiv_raw) >= 3:
-                mark_iv = float(qiv_raw[0]) if qiv_raw[0] is not None and float(qiv_raw[0]) > 0 else None
-                bid_iv = float(qiv_raw[1]) if qiv_raw[1] is not None and float(qiv_raw[1]) > 0 else None
-                ask_iv = float(qiv_raw[2]) if qiv_raw[2] is not None and float(qiv_raw[2]) > 0 else None
+            bid_iv: Optional[float] = None
+            mark_iv: Optional[float] = None
+            if isinstance(qiv_raw, list):
+                if len(qiv_raw) >= 1 and qiv_raw[0] is not None and float(qiv_raw[0]) > 0:
+                    ask_iv = float(qiv_raw[0])
+                if len(qiv_raw) >= 2 and qiv_raw[1] is not None and float(qiv_raw[1]) > 0:
+                    bid_iv = float(qiv_raw[1])
+                if len(qiv_raw) >= 3 and qiv_raw[2] is not None and float(qiv_raw[2]) > 0:
+                    mark_iv = float(qiv_raw[2])
 
-            # Open Interest: [oi_contracts, oi_change]
+            # Open Interest: raw contract / underlying value
             oi_raw = item.get("oi") or []
             oi: Optional[float] = None
             if isinstance(oi_raw, list) and len(oi_raw) >= 1:
@@ -1191,12 +1223,17 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 pb_lower = float(pb_raw[0]) if pb_raw[0] is not None else None
                 pb_upper = float(pb_raw[1]) if pb_raw[1] is not None else None
 
-            # Construct Strongly-Typed DeltaTicker
+            # True Trade Price (LTP) strictly separated from Mark Price:
+            # If no trades have occurred today, last_price is None or close_px, NEVER mark_price!
+            raw_trade = item.get("close") or item.get("c") or close_px
+            trade_price: Optional[float] = float(raw_trade) if raw_trade is not None and float(raw_trade) > 0 else None
+
+            # Construct Strongly-Typed DeltaTicker with strict LTP / Mark separation
             delta_ticker = DeltaTicker(
                 symbol=symbol,
                 product_id=pid_int,
-                last_price=mark_price or close_px or best_bid or best_ask,
-                mark_price=mark_price,
+                last_price=trade_price,  # TRUE LTP (None if un-traded, NEVER mark_price)
+                mark_price=mark_price,  # Theoretical Mark Price
                 spot_price=spot_price,
                 best_bid=best_bid,
                 best_ask=best_ask,
@@ -1208,7 +1245,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 open_price=open_px,
                 high_price=high_px,
                 low_price=low_px,
-                close_price=close_px,
+                close_price=trade_price,
                 mark_iv=mark_iv,
                 bid_iv=bid_iv,
                 ask_iv=ask_iv,
@@ -1528,57 +1565,66 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             delta_sym = to_delta_symbol(s_clean)
             symbol_map_req[s_clean] = delta_sym
 
-            if s_clean in self._canonical_quote_cache:
-                res[s_clean] = self._canonical_quote_cache[s_clean]
-            elif delta_sym in self._canonical_quote_cache:
-                res[s_clean] = self._canonical_quote_cache[delta_sym]
+            cached_q = self._canonical_quote_cache.get(s_clean) or self._canonical_quote_cache.get(delta_sym)
+            if cached_q:
+                cached_q.mark_stale(live_threshold_sec=3.0, delayed_threshold_sec=10.0)
+                if not cached_q.is_stale:
+                    res[s_clean] = cached_q
+                else:
+                    missing_delta_syms.add(delta_sym)
             else:
                 missing_delta_syms.add(delta_sym)
 
         if missing_delta_syms:
             try:
-                tickers = await asyncio.to_thread(global_delta_client.get_tickers)
-                now_iso = datetime.now(timezone.utc).isoformat()
-                for t in tickers:
-                    sym = t.get("symbol")
-                    if sym:
-                        quotes_dict = t.get("quotes") or {}
+                for ds in missing_delta_syms:
+                    # 1. Direct single ticker REST endpoint for precise, fresh quote
+                    single_t = await asyncio.to_thread(global_delta_client.get_ticker, ds)
+                    if single_t and isinstance(single_t, dict):
+                        quotes_dict = single_t.get("quotes") or {}
                         bb = float(quotes_dict.get("best_bid") or 0.0) if quotes_dict.get("best_bid") else None
                         ba = float(quotes_dict.get("best_ask") or 0.0) if quotes_dict.get("best_ask") else None
-                        raw_lp = t.get("mark_price") or t.get("close") or bb or ba or 0.0
-                        lp = float(raw_lp) if raw_lp is not None else 0.0
+                        # True trade close price: NEVER substitute mark_price for trade price
+                        raw_lp = single_t.get("close")
+                        trade_lp = float(raw_lp) if raw_lp is not None and float(raw_lp) > 0 else None
+                        mark_px = float(single_t.get("mark_price", 0.0)) if single_t.get("mark_price") else None
+                        now_utc = datetime.now(timezone.utc)
+                        now_iso = now_utc.isoformat()
+
+                        raw_ts = single_t.get("timestamp") or single_t.get("ts")
+                        ex_ts_str = now_iso
+                        if raw_ts:
+                            try:
+                                ts_num = int(raw_ts)
+                                ts_ms = ts_num // 1000 if ts_num > 1e14 else (ts_num if ts_num > 1e11 else ts_num * 1000)
+                                ex_ts_str = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc).isoformat()
+                            except Exception:
+                                ex_ts_str = str(raw_ts)
 
                         norm = NormalizedQuote(
-                            symbol=sym,
+                            symbol=ds,
                             exchange="DELTA",
                             provider="delta_options_ws",
-                            last_price=lp,
+                            last_price=float(trade_lp or 0.0),
                             bid=bb,
                             ask=ba,
-                            mark_price=float(t.get("mark_price", 0.0)) if t.get("mark_price") else None,
-                            spot_price=float(t.get("spot_price", 0.0)) if t.get("spot_price") else None,
-                            volume=float(t.get("volume", 0.0)) if t.get("volume") else 0.0,
-                            turnover=float(t.get("turnover_usd", 0.0)) if t.get("turnover_usd") else None,
-                            high=float(t.get("high", 0.0)) if t.get("high") else None,
-                            low=float(t.get("low", 0.0)) if t.get("low") else None,
-                            open=float(t.get("open", 0.0)) if t.get("open") else None,
-                            close=float(t.get("close", 0.0)) if t.get("close") else None,
-                            oi=float(t.get("oi", 0.0)) if t.get("oi") else None,
-                            funding_rate=float(t.get("funding_rate", 0.0)) if t.get("funding_rate") else None,
-                            change_pct=float(t.get("mark_change_24h", 0.0)) if t.get("mark_change_24h") else None,
-                            event_timestamp=str(t.get("timestamp") or now_iso),
+                            mark_price=mark_px,
+                            spot_price=float(single_t.get("spot_price", 0.0)) if single_t.get("spot_price") else None,
+                            volume=float(single_t.get("volume", 0.0)) if single_t.get("volume") else 0.0,
+                            open=float(single_t.get("open", 0.0)) if single_t.get("open") else None,
+                            high=float(single_t.get("high", 0.0)) if single_t.get("high") else None,
+                            low=float(single_t.get("low", 0.0)) if single_t.get("low") else None,
+                            close=trade_lp,
+                            oi=float(single_t.get("oi", 0.0)) if single_t.get("oi") else None,
+                            event_timestamp=ex_ts_str,
                             received_timestamp=now_iso,
                             data_mode="REAL_TIME",
                             is_stale=False,
                         )
                         self._emit_quote_with_aliases(norm)
-
-                for s_clean, delta_sym in symbol_map_req.items():
-                    if s_clean not in res:
-                        if s_clean in self._canonical_quote_cache:
-                            res[s_clean] = self._canonical_quote_cache[s_clean]
-                        elif delta_sym in self._canonical_quote_cache:
-                            res[s_clean] = self._canonical_quote_cache[delta_sym]
+                        for s_clean, mapped_sym in symbol_map_req.items():
+                            if mapped_sym == ds:
+                                res[s_clean] = norm
             except Exception as e:
                 self._logger.warning(f"Error in Delta REST snapshot fallback: {e}")
 
@@ -1754,6 +1800,18 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 conv = f"{parts[2]}-{parts[1]}-{parts[0]}"
                 if conv in available_expiries_list:
                     target_expiry_date = conv
+            if not target_expiry_date and len(clean_exp) == 6 and clean_exp.isdigit():
+                conv = f"{clean_exp[:2]}-{clean_exp[2:4]}-20{clean_exp[4:]}"
+                if conv in available_expiries_list:
+                    target_expiry_date = conv
+            if not target_expiry_date:
+                try:
+                    dt_p = datetime.strptime(clean_exp, "%d %b %Y")
+                    conv = dt_p.strftime("%d-%m-%Y")
+                    if conv in available_expiries_list:
+                        target_expiry_date = conv
+                except Exception:
+                    pass
 
         if not target_expiry_date and available_expiries_list:
             target_expiry_date = available_expiries_list[0]
@@ -1874,13 +1932,15 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             greeks_obj = t.get("greeks") or {}
 
             # Prices & Quotes
-            mark_price = float(cached_live.mark_price if cached_live and cached_live.mark_price is not None else (t.get("mark_price") or t.get("close_price") or 0.0))
+            mark_price = float(cached_live.mark_price if cached_live and cached_live.mark_price is not None else (t.get("mark_price") or 0.0))
             best_bid = float(cached_live.best_bid if cached_live and cached_live.best_bid is not None else (quotes_obj.get("best_bid") or 0.0))
             best_ask = float(cached_live.best_ask if cached_live and cached_live.best_ask is not None else (quotes_obj.get("best_ask") or 0.0))
             bid_size = float(cached_live.bid_size if cached_live and cached_live.bid_size is not None else (quotes_obj.get("bid_size") or 0.0))
             ask_size = float(cached_live.ask_size if cached_live and cached_live.ask_size is not None else (quotes_obj.get("ask_size") or 0.0))
+            if best_bid > 0 and best_ask > 0 and best_bid > best_ask:
+                self._logger.warning(f"[DELTA_CHAIN] Crossed order book on {sym}: Bid {best_bid} > Ask {best_ask}")
 
-            # IV & Greeks
+            # IV & Greeks (Delta spec: qiv = [ask_iv, bid_iv, mark_iv])
             mark_iv = float(cached_live.mark_iv if cached_live and cached_live.mark_iv is not None else (quotes_obj.get("mark_iv") or t.get("mark_vol") or 0.0))
             bid_iv = float(cached_live.bid_iv if cached_live and cached_live.bid_iv is not None else (quotes_obj.get("bid_iv") or 0.0))
             ask_iv = float(cached_live.ask_iv if cached_live and cached_live.ask_iv is not None else (quotes_obj.get("ask_iv") or 0.0))
@@ -1894,6 +1954,38 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             open_interest = float(cached_live.open_interest if cached_live and cached_live.open_interest is not None else (t.get("oi") or t.get("open_interest") or 0.0))
             volume = float(cached_live.volume_24h if cached_live and cached_live.volume_24h is not None else (t.get("volume") or 0.0))
 
+            # Contract sizing and physical units
+            contract_value = float(t.get("contract_value") or (0.001 if "BTC" in und else 1.0))
+            oi_contracts = round(open_interest / contract_value) if contract_value > 0 and open_interest > 0 else 0
+            vol_contracts = round(volume / contract_value) if contract_value > 0 and volume > 0 else 0
+
+            # True Last Traded Price (LTP) strictly separated from Mark Price:
+            # If no trades have occurred today, last_price is None, NEVER mark_price!
+            true_ltp: Optional[float] = None
+            if cached_live and cached_live.last_price is not None and cached_live.last_price > 0:
+                true_ltp = cached_live.last_price
+            elif cached_live and cached_live.close_price is not None and cached_live.close_price > 0:
+                true_ltp = cached_live.close_price
+            elif t.get("close") is not None and float(t.get("close") or 0.0) > 0:
+                true_ltp = float(t.get("close"))
+            elif t.get("close_price") is not None and float(t.get("close_price") or 0.0) > 0:
+                true_ltp = float(t.get("close_price"))
+
+            # Timestamp & freshness
+            now_utc = datetime.now(timezone.utc)
+            now_iso = now_utc.isoformat()
+            raw_ts = (cached_live.exchange_timestamp if cached_live and cached_live.exchange_timestamp else None) or t.get("timestamp") or t.get("ts")
+            exchange_ts_str: Optional[str] = None
+            quote_age_ms: Optional[int] = None
+            if raw_ts:
+                try:
+                    ts_val = int(raw_ts)
+                    ts_ms = ts_val // 1000 if ts_val > 1e14 else (ts_val if ts_val > 1e11 else ts_val * 1000)
+                    exchange_ts_str = datetime.fromtimestamp(ts_ms / 1000.0, tz=timezone.utc).isoformat()
+                    quote_age_ms = max(0, int((now_utc.timestamp() * 1000) - ts_ms))
+                except Exception:
+                    exchange_ts_str = str(raw_ts)
+
             leg_dict = {
                 "source": "DELTA_EXCHANGE",
                 "broker": "DELTA",
@@ -1906,8 +1998,10 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 "side": "CALL" if is_call else "PUT",
                 "spot": spot_price,
                 "mark": mark_price if mark_price > 0 else None,
-                "ltp": mark_price if mark_price > 0 else None,
-                "lastPrice": mark_price if mark_price > 0 else None,
+                "markPrice": mark_price if mark_price > 0 else None,
+                "ltp": true_ltp,            # TRUE Last Traded Price (None if un-traded, NEVER mark_price)
+                "lastPrice": true_ltp,      # TRUE Last Traded Price
+                "tradePrice": true_ltp,     # Explicit Trade Price
                 "bid": best_bid if best_bid > 0 else None,
                 "ask": best_ask if best_ask > 0 else None,
                 "bidSize": bid_size if bid_size > 0 else None,
@@ -1921,9 +2015,13 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 "rho": rho if rho != 0 else None,
                 "theta": theta if theta != 0 else None,
                 "vega": vega if vega != 0 else None,
-                "openInterest": open_interest,
+                "openInterest": open_interest,        # Raw underlying units (BTC)
                 "oi": open_interest,
-                "volume": volume,
+                "oiContracts": oi_contracts,          # Standard integer contract count
+                "contractValue": contract_value,      # Multiplier (0.001 BTC)
+                "contractUnit": "BTC",
+                "volume": volume,                    # Raw underlying units (BTC)
+                "volumeContracts": vol_contracts,     # Standard integer contract count
                 "greeks": {
                     "delta": delta,
                     "gamma": gamma,
@@ -1932,10 +2030,37 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                     "rho": rho,
                     "iv": mark_iv,
                 },
-                "exchangeTs": str(t.get("timestamp") or now_iso),
+                "exchangeTs": exchange_ts_str,
+                "quoteAgeMs": quote_age_ms,
                 "receivedAt": now_iso,
-                "status": "LIVE" if self._status == "LIVE" else "REST_SNAPSHOT",
+                "status": "LIVE" if (quote_age_ms is not None and quote_age_ms < 15000) else "REST_SNAPSHOT",
             }
+
+            # Warm canonical quote cache with this fresh leg quote so /api/market/quote has fresh data
+            try:
+                norm_leg = NormalizedQuote(
+                    symbol=sym,
+                    exchange="DELTA",
+                    provider="delta_options_ws",
+                    last_price=float(true_ltp or 0.0),
+                    bid=best_bid if best_bid > 0 else None,
+                    ask=best_ask if best_ask > 0 else None,
+                    mark_price=mark_price if mark_price > 0 else None,
+                    spot_price=spot_price,
+                    volume=volume,
+                    open=None,
+                    high=None,
+                    low=None,
+                    close=true_ltp,
+                    oi=open_interest,
+                    event_timestamp=exchange_ts_str or now_iso,
+                    received_timestamp=now_iso,
+                    data_mode="REAL_TIME",
+                    is_stale=False,
+                )
+                self._canonical_quote_cache[sym] = norm_leg
+            except Exception:
+                pass
 
             if strike_val not in strikes_map:
                 strikes_map[strike_val] = {"call": None, "put": None}

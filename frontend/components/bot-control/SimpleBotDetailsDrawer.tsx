@@ -22,7 +22,7 @@ import {
   Zap,
 } from "lucide-react";
 import { BotRowItem } from "@/types/bot-control";
-import { formatMoney, formatNumber } from "@/lib/formatters";
+import { formatMoney, formatNumber, formatSignedMoney, detectMarketCurrency } from "@/lib/formatters";
 
 interface SimpleBotDetailsDrawerProps {
   isOpen: boolean;
@@ -56,6 +56,7 @@ export function SimpleBotDetailsDrawer({
 
   const isExactBtc = bot.name.includes("85800") || bot.symbol.includes("85800");
   const symbol = isExactBtc ? "BTC 85800 PE" : bot.symbol || "BTC 85800 PE";
+  const { symbol: currSym } = detectMarketCurrency({ ...bot, symbol });
   const expiry = isExactBtc ? "02 OCT 2026" : (bot.expiry || "02 OCT 2026");
   const selectedPrem = isExactBtc ? 219.20 : (bot.selected_premium || 219.20);
   const currentPrem = selectedPrem + 4.70;
@@ -117,19 +118,19 @@ export function SimpleBotDetailsDrawer({
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
               <div>
                 <span className="text-slate-500 block text-[10px]">Selected Premium</span>
-                <strong className="text-slate-200">${selectedPrem.toFixed(2)}</strong>
+                <strong className="text-slate-200">{currSym}{selectedPrem.toFixed(2)}</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Current Live LTP</span>
-                <strong className="text-cyan-300">${currentPrem.toFixed(2)}</strong>
+                <strong className="text-cyan-300">{currSym}{currentPrem.toFixed(2)}</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Drift / Change</span>
-                <strong className="text-emerald-400">+2.14% (+$4.70)</strong>
+                <strong className="text-emerald-400">+2.14% (+{currSym}4.70)</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Bid / Ask</span>
-                <strong className="text-slate-300">${(currentPrem - 0.2).toFixed(2)} / ${(currentPrem + 0.2).toFixed(2)}</strong>
+                <strong className="text-slate-300">{currSym}{(currentPrem - 0.2).toFixed(2)} / {currSym}{(currentPrem + 0.2).toFixed(2)}</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Feed Latency</span>
@@ -155,8 +156,8 @@ export function SimpleBotDetailsDrawer({
                 </strong>
               </div>
               <div>
-                <span className="text-slate-500 block text-[10px]">Today's P&L</span>
-                <strong className="text-rose-400">-$2.75</strong>
+                <span className="text-slate-500 block text-[10px]">Today&apos;s P&L</span>
+                <strong className="text-rose-400">-{currSym}2.75</strong>
               </div>
             </div>
           </div>
@@ -169,11 +170,11 @@ export function SimpleBotDetailsDrawer({
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-slate-500 block text-[10px]">Allocated Capital</span>
-                <strong className="text-white">${formatNumber(bot.allocated_capital || 10000, 0)}</strong>
+                <strong className="text-white">{currSym}{formatNumber(bot.allocated_capital || 10000, 0)}</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Max Risk Per Trade</span>
-                <strong className="text-cyan-300">1.0% (${(bot.allocated_capital || 10000) * 0.01})</strong>
+                <strong className="text-cyan-300">1.0% ({currSym}{(bot.allocated_capital || 10000) * 0.01})</strong>
               </div>
               <div>
                 <span className="text-slate-500 block text-[10px]">Profit Target</span>

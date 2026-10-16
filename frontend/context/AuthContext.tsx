@@ -74,6 +74,18 @@ const LOCKOUT_UNTIL_KEY = "algo_auth_lockout_until";
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_DURATION_MS = 30_000;
 
+/**
+ * Returns current calendar date in local timezone as YYYY-MM-DD.
+ * Avoids UTC timezone mismatch when enforcing daily trading day logins.
+ */
+export const getLocalCalendarDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<AuthSession | null>(null);
@@ -95,15 +107,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setIsLocked(false);
     try {
       sessionStorage.removeItem(LOCK_STORAGE_KEY);
+      localStorage.removeItem("quantos_session_token");
+      localStorage.removeItem("quantos_session_date");
+      sessionStorage.removeItem("quantos_session_token");
     } catch {}
   }, []);
 
-  // Check active session against authoritative backend HttpOnly cookie
+  // Check active session against authoritative backend HttpOnly cookie or Bearer token
   const checkSession = useCallback(async (): Promise<boolean> => {
     try {
+      const todayStr = getLocalCalendarDate();
+      const headers: Record<string, string> = { Accept: "application/json" };
+      try {
+        const storedDate = localStorage.getItem("quantos_session_date");
+        // Strict Daily Login Enforcement:
+        // If session was issued on a previous calendar day, invalidate and require fresh login today
+        if (storedDate && storedDate !== todayStr) {
+          clearSessionState();
+          setIsLoading(false);
+          return false;
+        }
+
+        const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+        if (storedToken) {
+          headers["Authorization"] = `Bearer ${storedToken}`;
+        }
+      } catch {}
+
       const res = await fetch("/api/auth/me", {
         method: "GET",
-        headers: { Accept: "application/json" },
+        headers,
         credentials: "include",
       });
 
@@ -113,6 +146,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUser(data.user);
           setSession(data.session || null);
           setIsAuthenticated(true);
+
+          if (data.session_token) {
+            try {
+              localStorage.setItem("quantos_session_token", data.session_token);
+              localStorage.setItem("quantos_session_date", todayStr);
+            } catch {}
+          }
 
           // Restore terminal lock state if it was actively locked in this tab
           try {
@@ -170,11 +210,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.addEventListener("quantos:auth_restored", handleAuthRestored);
     window.addEventListener("quantos:auth_required", handleAuthRequired);
 
+    // Periodic & Tab-Focus Daily Session Guard:
+    // If midnight passes while the tab is open, immediately invalidate and present Login Gateway
+    const verifyDailySessionStatus = () => {
+      try {
+        const storedDate = localStorage.getItem("quantos_session_date");
+        const todayStr = getLocalCalendarDate();
+        if (storedDate && storedDate !== todayStr) {
+          clearSessionState();
+          setIsLoading(false);
+        }
+      } catch {}
+    };
+
+    const intervalId = setInterval(verifyDailySessionStatus, 30000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        verifyDailySessionStatus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     checkSession();
 
     return () => {
       window.removeEventListener("quantos:auth_restored", handleAuthRestored);
       window.removeEventListener("quantos:auth_required", handleAuthRequired);
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [checkSession, clearSessionState]);
 
@@ -274,6 +337,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setFailedAttempts(0);
         setLockoutUntil(null);
+        if (data.session_token) {
+          try {
+            const todayStr = getLocalCalendarDate();
+            localStorage.setItem("quantos_session_token", data.session_token);
+            localStorage.setItem("quantos_session_date", todayStr);
+          } catch {}
+        }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
@@ -365,6 +435,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setFailedAttempts(0);
         setLockoutUntil(null);
+        if (data.session_token) {
+          try {
+            const todayStr = getLocalCalendarDate();
+            localStorage.setItem("quantos_session_token", data.session_token);
+            localStorage.setItem("quantos_session_date", todayStr);
+          } catch {}
+        }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
@@ -451,6 +528,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLocked(false);
         setFailedAttempts(0);
         setLockoutUntil(null);
+        if (data.session_token) {
+          try {
+            const todayStr = getLocalCalendarDate();
+            localStorage.setItem("quantos_session_token", data.session_token);
+            localStorage.setItem("quantos_session_date", todayStr);
+          } catch {}
+        }
         try {
           sessionStorage.removeItem(LOCK_STORAGE_KEY);
           sessionStorage.removeItem(FAILED_ATTEMPTS_KEY);
@@ -611,9 +695,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Handle Logout
   const logout = async (): Promise<void> => {
     try {
+      try {
+        localStorage.removeItem("quantos_session_token");
+        localStorage.removeItem("quantos_session_date");
+        sessionStorage.removeItem("quantos_session_token");
+      } catch {}
       await fetch("/api/auth/logout", {
         method: "POST",
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", "X-Unauthenticated": "true" },
         credentials: "include",
       });
     } catch {
@@ -626,9 +715,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Revoke All Sessions
   const logoutAll = async (): Promise<void> => {
     try {
+      try {
+        localStorage.removeItem("quantos_session_token");
+        localStorage.removeItem("quantos_session_date");
+        sessionStorage.removeItem("quantos_session_token");
+      } catch {}
       await fetch("/api/auth/logout-all", {
         method: "POST",
-        headers: { Accept: "application/json" },
+        headers: { Accept: "application/json", "X-Unauthenticated": "true" },
         credentials: "include",
       });
     } catch {

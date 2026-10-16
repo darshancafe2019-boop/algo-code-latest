@@ -143,34 +143,41 @@ class GlobalDataEngine:
         open_orders = []
         bots = []
         try:
-            # 1. Fetch Closed Trades for Mode
+            # 1. Fetch Closed Trades for Mode (project only necessary ledger fields)
             closed_trades = db.safe_query(
                 """
-                SELECT * FROM trades_log 
+                SELECT net_pnl, realized_pnl, result_pnl, gross_pnl, fees, funding, exit_timestamp, timestamp
+                FROM trades_log 
                 WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')
                 ORDER BY timestamp ASC
                 """,
                 (trading_mode,),
             )
 
-            # 2. Fetch Active Open Positions for Mode
+            # 2. Fetch Active Open Positions for Mode (Grouped by symbol to scale to large trade logs)
             open_positions = db.safe_query(
                 """
-                SELECT * FROM trades_log 
+                SELECT symbol, COALESCE(direction, side, 'LONG') as side_dir, 
+                       SUM(position_size) as total_size,
+                       AVG(entry_price) as avg_price,
+                       AVG(COALESCE(leverage, 1.0)) as avg_leverage,
+                       SUM(fees) as total_fees
+                FROM trades_log 
                 WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
-                ORDER BY timestamp DESC
+                GROUP BY symbol, COALESCE(direction, side, 'LONG')
                 """,
                 (trading_mode,),
             )
 
-            # 3. Fetch Open Orders
-            open_orders = db.safe_query(
+            # 3. Fetch Open Orders Count
+            open_orders_row = db.safe_query_one(
                 """
-                SELECT * FROM trades_log 
+                SELECT COUNT(*) as cnt FROM trades_log 
                 WHERE execution_mode = ? AND status IN ('PENDING', 'SUBMITTED', 'OPEN')
                 """,
                 (trading_mode,),
             )
+            open_orders_count = int(open_orders_row.get("cnt") or 0) if open_orders_row else 0
 
             # 4. Fetch Bot Allocations & Starting Capital
             bots = db.safe_query(
@@ -226,11 +233,11 @@ class GlobalDataEngine:
 
         for pos in open_positions:
             sym = pos.get("symbol", "BTC/USDT")
-            direction = str(pos.get("direction") or pos.get("side") or "LONG").upper()
-            entry_p = float(pos.get("entry_price") or pos.get("average_entry_price") or 0.0)
-            qty = float(pos.get("position_size") or pos.get("entry_quantity") or 0.0)
-            multiplier = float(pos.get("leverage") or 1.0)
-            fee = float(pos.get("fees") or 0.0)
+            direction = str(pos.get("side_dir") or pos.get("direction") or pos.get("side") or "LONG").upper()
+            entry_p = float(pos.get("avg_price") or pos.get("entry_price") or pos.get("average_entry_price") or 0.0)
+            qty = float(pos.get("total_size") or pos.get("position_size") or pos.get("entry_quantity") or 0.0)
+            multiplier = float(pos.get("avg_leverage") or pos.get("leverage") or 1.0)
+            fee = float(pos.get("total_fees") or pos.get("fees") or 0.0)
 
             live_p = self.get_latest_price(sym) or entry_p
             pos_unrealized = compute_unrealized_pnl(
@@ -293,7 +300,7 @@ class GlobalDataEngine:
             "fees": _decimal_round(float(total_fees)),
             "funding": _decimal_round(float(total_funding)),
             "openPositions": len(open_positions),
-            "openOrders": len(open_orders),
+            "openOrders": open_orders_count,
             "totalTradesCount": total_trades,
             "winningTradesCount": win_count,
             "losingTradesCount": loss_count,

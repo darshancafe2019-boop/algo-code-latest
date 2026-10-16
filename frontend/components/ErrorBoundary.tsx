@@ -69,6 +69,10 @@ export class ErrorBoundary extends Component<Props, State> {
     const errorClass = error?.name || "Error";
     const message = error?.message || "Unknown error";
     const timestamp = new Date().toISOString();
+    const isChunkError =
+      errorClass === "ChunkLoadError" ||
+      message.includes("Loading chunk") ||
+      message.includes("Failed to fetch dynamically imported module");
 
     console.error(`[REACT_ERROR_BOUNDARY] [${component}] caught an error:`, {
       component,
@@ -78,9 +82,32 @@ export class ErrorBoundary extends Component<Props, State> {
       timestamp,
       componentStack: errorInfo.componentStack ? sanitizeErrorLog(errorInfo.componentStack) : undefined,
     });
+
+    // Auto-recover from stale Next.js chunks if not already attempted recently
+    if (isChunkError && typeof window !== "undefined") {
+      const retryKey = `chunk_retry_${component.replace(/\s+/g, "_")}`;
+      const lastRetry = sessionStorage.getItem(retryKey);
+      const now = Date.now();
+      if (!lastRetry || now - Number(lastRetry) > 15000) {
+        sessionStorage.setItem(retryKey, String(now));
+        window.location.reload();
+      }
+    }
   }
 
   public handleRetry = () => {
+    const err = this.state.error as any;
+    const msg = String(err?.message || "");
+    const isChunkError =
+      err?.name === "ChunkLoadError" ||
+      msg.includes("Loading chunk") ||
+      msg.includes("Failed to fetch dynamically imported module");
+
+    if (isChunkError && typeof window !== "undefined") {
+      window.location.reload();
+      return;
+    }
+
     if (this.props.onReset) {
       try {
         this.props.onReset();
@@ -100,23 +127,30 @@ export class ErrorBoundary extends Component<Props, State> {
         ? (typeof err.message === "string" ? err.message : JSON.stringify(err))
         : (typeof err === "string" ? err : "An unexpected error occurred in this module.");
 
+      const isChunkError =
+        err?.name === "ChunkLoadError" ||
+        errorMessage.includes("Loading chunk") ||
+        errorMessage.includes("Failed to fetch dynamically imported module");
+
       return (
         <div className="rounded-2xl border border-[var(--theme-loss)]/30 bg-[var(--theme-loss)]/10 p-5 backdrop-blur-md text-[var(--theme-loss)] my-3 shadow-lg select-none font-sans">
           <div className="flex items-center gap-3 mb-2">
             <AlertTriangle className="h-5 w-5 text-[var(--theme-loss)] shrink-0" />
             <h3 className="font-bold text-sm text-[var(--theme-text-primary)]">
-              {this.props.title || "Section Component Failed"}
+              {isChunkError ? "Module Update Detected" : (this.props.title || "Section Component Failed")}
             </h3>
           </div>
           <p className="text-xs text-[var(--theme-text-muted)] mb-3 font-mono break-all">
-            {errorMessage}
+            {isChunkError
+              ? "A fresh build bundle was detected from the server. Click Reload below to synchronize components."
+              : errorMessage}
           </p>
           <button
             onClick={this.handleRetry}
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[var(--theme-elevated)] hover:bg-[var(--theme-surface)] text-[var(--theme-text-primary)] text-xs font-mono font-bold transition-colors border border-[var(--theme-border)] shadow-sm"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            Retry Section
+            {isChunkError ? "Reload Application" : "Retry Section"}
           </button>
         </div>
       );

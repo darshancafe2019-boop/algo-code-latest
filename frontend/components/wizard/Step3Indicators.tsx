@@ -94,41 +94,48 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
-      <div className="rounded-xl border border-blue-500/20 bg-blue-950/10 p-4 sm:p-5 flex items-start gap-4">
-        <div className="rounded-lg bg-blue-500/10 border border-blue-500/30 p-2 text-blue-400">
-          <Sliders className="h-5 w-5" />
+      {/* Header Info Banner */}
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 shadow-xl flex items-start gap-4">
+        <div className="h-12 w-12 rounded-xl bg-blue-600/10 border border-blue-500/30 flex items-center justify-center text-cyan-400 flex-shrink-0 shadow-sm">
+          <Sliders className="h-6 w-6" />
         </div>
         <div>
-          <h3 className="text-sm font-semibold text-white">Step 3 — Technical Indicators & Signal Rules</h3>
-          <p className="text-xs text-slate-400 mt-1">
-            Build multi-timeframe quantitative signal rules. All indicator mathematics execute on real live candle streams from {draft.broker}.
+          <div className="flex items-center gap-3">
+            <h3 className="text-base sm:text-lg font-black text-white font-mono uppercase tracking-wide">
+              Step 3 — Technical Indicators & Signal Rules
+            </h3>
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
+              ALGORITHMIC FILTERS
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+            Construct multi-timeframe quantitative entry and exit conditions. Indicators are calculated deterministically on live streaming candle feeds from {draft.broker}.
           </p>
         </div>
       </div>
 
       {/* Active Rules Pipeline */}
-      <div className="rounded-xl border border-slate-800 bg-slate-950/80 p-5 space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-200 flex items-center gap-2">
-            <Layers className="h-4 w-4 text-blue-400" />
+      <div className="rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
+          <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white flex items-center gap-2">
+            <Layers className="h-5 w-5 text-cyan-400" />
             Configured Signal Rules ({draft.indicators.length})
           </h4>
-          <span className="text-[11px] font-mono text-slate-400">
-            Evaluating on: <strong className="text-emerald-400">{draft.contract?.symbol || draft.underlying}</strong>
+          <span className="text-xs sm:text-sm font-mono text-slate-300">
+            Evaluating Target: <strong className="text-emerald-400">{draft.contract?.symbol || draft.underlying}</strong>
           </span>
         </div>
 
         {draft.indicators.length === 0 ? (
-          <div className="py-8 text-center text-xs font-mono text-slate-500 border border-dashed border-slate-800 rounded-xl">
-            No indicators added yet. Select indicators from the registry below to construct entry/exit filters.
+          <div className="py-12 text-center text-sm sm:text-base font-mono text-slate-300 border border-dashed border-slate-800/80 rounded-2xl bg-[#070D1A]/60">
+            No indicators active. Select indicators from the registry below to add automated execution conditions.
           </div>
         ) : (
           <div className="space-y-3">
             {draft.indicators.map((cond, idx) => (
               <div
                 key={cond.id}
-                className="p-3.5 rounded-lg border border-slate-800 bg-slate-900/90 flex flex-wrap items-center justify-between gap-3 text-xs font-mono"
+                className="p-4 rounded-xl border border-slate-800/90 bg-[#070D1A] flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-mono shadow-inner"
               >
                 {/* Logic Connector */}
                 {idx > 0 && (
@@ -137,7 +144,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                     onChange={(e) =>
                       updateCondition(cond.id, { logical_operator: e.target.value as any })
                     }
-                    className="rounded bg-blue-600/20 border border-blue-500/40 px-2 py-1 text-xs font-bold text-blue-300 focus:outline-none"
+                    className="rounded-lg bg-blue-600/20 border border-blue-500/40 px-3 py-1.5 text-xs sm:text-sm font-bold text-cyan-300 focus:outline-none"
                   >
                     <option value="AND">AND</option>
                     <option value="OR">OR</option>
@@ -146,14 +153,14 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                 )}
 
                 {/* Indicator Name & Timeframe */}
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-white bg-slate-800 px-2.5 py-1 rounded">
+                <div className="flex items-center gap-2.5">
+                  <span className="font-bold text-white bg-slate-900 border border-slate-800 px-3.5 py-1.5 rounded-lg text-xs sm:text-sm">
                     {cond.indicator_name}
                   </span>
                   <select
                     value={cond.timeframe}
                     onChange={(e) => updateCondition(cond.id, { timeframe: e.target.value })}
-                    className="rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-300 focus:outline-none"
+                    className="rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs sm:text-sm text-slate-200 focus:outline-none font-bold"
                   >
                     {["1m", "3m", "5m", "15m", "30m", "1H", "4H", "1D", "1W"].map((tf) => (
                       <option key={tf} value={tf}>
@@ -167,7 +174,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                 <select
                   value={cond.operator}
                   onChange={(e) => updateCondition(cond.id, { operator: e.target.value as any })}
-                  className="rounded border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs text-blue-300 font-bold focus:outline-none"
+                  className="rounded-lg border border-slate-800 bg-slate-900 px-3.5 py-1.5 text-xs sm:text-sm text-cyan-300 font-bold focus:outline-none"
                 >
                   <option value="GREATER_THAN">GREATER THAN (&gt;)</option>
                   <option value="LESS_THAN">LESS THAN (&lt;)</option>
@@ -187,7 +194,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                     onChange={(e) =>
                       updateCondition(cond.id, { target_value: parseFloat(e.target.value) || 0 })
                     }
-                    className="w-20 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white font-bold text-right focus:outline-none font-mono"
+                    className="w-28 rounded-lg border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs sm:text-sm text-white font-black text-right focus:outline-none font-mono"
                   />
                 </div>
 
@@ -196,18 +203,18 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                   <button
                     type="button"
                     onClick={() => setEditingCondition(cond)}
-                    className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                    className="p-2.5 rounded-lg text-slate-300 hover:text-cyan-300 hover:bg-slate-800/80 transition-colors cursor-pointer"
                     title="Configure Indicator Parameters"
                   >
-                    <Settings2 className="h-4 w-4" />
+                    <Settings2 className="h-5 w-5" />
                   </button>
                   <button
                     type="button"
                     onClick={() => removeCondition(cond.id)}
-                    className="p-1.5 rounded text-red-400 hover:text-red-300 hover:bg-red-950/40 transition-colors"
+                    className="p-2.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors cursor-pointer"
                     title="Remove Rule"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -218,20 +225,20 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
 
       {/* Indicator Selection Grid */}
       <div className="space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">
+        <div className="flex flex-wrap items-center justify-between gap-3 bg-[#0B1426]/90 p-4 rounded-2xl border border-slate-800/80 shadow-lg">
+          <h4 className="text-sm sm:text-base font-mono font-bold uppercase tracking-wider text-white">
             Available Indicator Library
           </h4>
-          <div className="flex items-center gap-1 overflow-x-auto">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
             {categories.map((cat) => (
               <button
                 key={cat}
                 type="button"
                 onClick={() => setSelectedCategory(cat)}
-                className={`text-[11px] font-mono px-2.5 py-1 rounded transition-colors ${
+                className={`text-xs sm:text-sm font-mono font-bold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
                   selectedCategory === cat
-                    ? "bg-blue-600 text-white font-bold"
-                    : "bg-slate-900 text-slate-400 hover:text-slate-200"
+                    ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/30"
+                    : "bg-slate-900/60 text-slate-300 hover:text-white hover:bg-slate-800"
                 }`}
               >
                 {cat}
@@ -240,24 +247,24 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {filteredIndicators.map((ind) => (
             <div
               key={ind.id}
-              className="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 transition-all flex flex-col justify-between"
+              className="p-5 rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] hover:border-cyan-500/50 transition-all flex flex-col justify-between shadow-lg"
             >
               <div>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-white">{ind.name}</span>
-                  <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm sm:text-base font-mono font-bold text-white">{ind.name}</span>
+                  <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-cyan-300 font-bold">
                     {ind.category}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 mt-1.5 leading-snug">{ind.description}</p>
+                <p className="text-xs sm:text-sm text-slate-300 mt-2.5 leading-relaxed font-sans">{ind.description}</p>
               </div>
 
-              <div className="mt-4 pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                <span className="text-[10px] font-mono text-slate-500">
+              <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                <span className="text-xs font-mono text-slate-400 truncate max-w-[130px]">
                   {Array.isArray(ind.parameters) && ind.parameters.length > 0
                     ? ind.parameters.slice(0, 2).map((p: any) => `${p.label || p.name}:${p.default}`).join(", ")
                     : ind.default_params && typeof ind.default_params === "object"
@@ -269,9 +276,9 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                 <button
                   type="button"
                   onClick={() => addIndicator(ind)}
-                  className="text-xs font-mono px-2.5 py-1 rounded bg-blue-600/20 text-blue-300 hover:bg-blue-600 hover:text-white border border-blue-500/30 flex items-center gap-1 transition-all"
+                  className="text-xs sm:text-sm font-mono font-bold px-3.5 py-2 rounded-xl bg-blue-600/10 text-cyan-300 hover:bg-blue-600 hover:text-white border border-cyan-500/30 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-sm"
                 >
-                  <Plus className="h-3 w-3" /> Add
+                  <Plus className="h-4 w-4" /> Add Rule
                 </button>
               </div>
             </div>
@@ -281,16 +288,16 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
 
       {/* Parameter Edit Modal */}
       {editingCondition && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-950 p-6 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-[#0B1426] p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-              <h3 className="text-sm font-mono font-bold text-white">
+              <h3 className="text-base font-mono font-bold text-white">
                 Configure {editingCondition.indicator_name} Parameters
               </h3>
               <button
                 type="button"
                 onClick={() => setEditingCondition(null)}
-                className="text-slate-500 hover:text-white text-xs font-mono"
+                className="text-slate-400 hover:text-white text-sm font-mono cursor-pointer"
               >
                 ✕ Close
               </button>
@@ -301,7 +308,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                 const isBool = typeof val === "boolean";
                 return (
                   <div key={key}>
-                    <label className="block text-xs font-mono text-slate-400 mb-1 capitalize">
+                    <label className="block text-xs sm:text-sm font-mono text-slate-200 mb-1.5 capitalize font-bold">
                       {key.replace(/_/g, " ")}:
                     </label>
                     {isBool ? (
@@ -317,14 +324,14 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                             params: updatedParams,
                           });
                         }}
-                        className={`w-full py-2 px-3 rounded-lg text-xs font-mono font-bold border transition-colors flex items-center justify-between ${
+                        className={`w-full py-2.5 px-3.5 rounded-xl text-xs sm:text-sm font-mono font-bold border transition-colors flex items-center justify-between cursor-pointer ${
                           val
                             ? "bg-emerald-950/40 border-emerald-500/50 text-emerald-400"
                             : "bg-slate-900 border-slate-800 text-slate-400"
                         }`}
                       >
                         <span>{key.replace(/_/g, " ")}</span>
-                        <span className="text-[10px] uppercase font-bold">{val ? "ENABLED" : "DISABLED"}</span>
+                        <span className="text-xs uppercase font-bold">{val ? "ENABLED" : "DISABLED"}</span>
                       </button>
                     ) : (
                       <input
@@ -342,7 +349,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                             params: updatedParams,
                           });
                         }}
-                        className="w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs font-mono text-white focus:border-blue-500 focus:outline-none"
+                        className="w-full rounded-xl border border-slate-800 bg-[#070D1A] px-3.5 py-2.5 text-xs sm:text-sm font-mono text-white focus:border-cyan-500 focus:outline-none"
                       />
                     )}
                   </div>
@@ -357,7 +364,7 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
                   updateCondition(editingCondition.id, { params: editingCondition.params });
                   setEditingCondition(null);
                 }}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-xs font-mono font-bold text-white hover:bg-blue-500 transition-colors"
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2.5 text-xs sm:text-sm font-mono font-bold text-white hover:from-blue-500 hover:to-indigo-500 transition-all cursor-pointer shadow-md"
               >
                 Save Parameters
               </button>
@@ -367,21 +374,22 @@ export default function Step3Indicators({ draft, updateDraft, onNext, onPrev }: 
       )}
 
       {/* Navigation Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+      <div className="flex items-center justify-between pt-5 border-t border-slate-800/80">
         <button
           type="button"
           onClick={onPrev}
-          className="rounded-lg border border-slate-800 bg-slate-900 px-5 py-2.5 text-xs font-mono font-bold text-slate-300 hover:text-white transition-colors"
+          className="rounded-xl border border-slate-800 bg-[#0B1426] hover:bg-slate-800 px-6 py-3 text-xs sm:text-sm font-mono font-bold text-slate-200 hover:text-white transition-all cursor-pointer shadow-sm active:scale-95"
         >
-          ← Back: Step 2
+          ← Return to Step 2
         </button>
 
         <button
           type="button"
           onClick={onNext}
-          className="rounded-lg bg-blue-600 px-6 py-2.5 text-xs font-mono font-bold text-white shadow-lg hover:bg-blue-500 transition-all flex items-center gap-2"
+          className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 px-7 py-3 text-xs sm:text-sm font-mono font-black text-white shadow-lg shadow-blue-600/30 transition-all cursor-pointer active:scale-95"
         >
-          Proceed to Step 4: Option Strategies →
+          <span>Continue to Step 4: Option Strategies</span>
+          <span>→</span>
         </button>
       </div>
     </div>

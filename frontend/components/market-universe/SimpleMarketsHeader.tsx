@@ -134,7 +134,6 @@ export function SimpleMarketsHeader({
   const PROVIDERS_LIST = [
     { id: "ALL", name: "ALL FEEDS", color: "cyan" },
     { id: "UPSTOX", name: "UPSTOX V3", color: "purple" },
-    { id: "DHAN", name: "DHANHQ v2", color: "emerald" },
     { id: "DELTA", name: "DELTA INDIA", color: "blue" },
     { id: "BINANCE", name: "BINANCE", color: "amber" },
     { id: "OANDA", name: "OANDA FOREX", color: "sky" },

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { Bot, Play, Pause, Square, ShieldCheck, DollarSign, TrendingUp } from "lucide-react";
+import { formatSignedMoney, resolveCurrencySymbol } from "@/lib/formatters";
 
 interface Metrics {
   total_bots: number;
@@ -15,7 +16,8 @@ interface Metrics {
   total_pnl: number;
 }
 
-export function BotSummaryCards({ metrics }: { metrics: Metrics }) {
+export function BotSummaryCards({ metrics, currency = "$" }: { metrics: Metrics; currency?: string }) {
+  const currSym = resolveCurrencySymbol(currency);
   const todayPnl = Number(metrics?.today_pnl) || 0;
   const totalPnl = Number(metrics?.total_pnl) || 0;
   const totalBots = metrics?.total_bots ?? 0;
@@ -62,8 +64,8 @@ export function BotSummaryCards({ metrics }: { metrics: Metrics }) {
     },
     {
       title: "Today's Realized P&L",
-      value: `${todayPnl >= 0 ? "+" : "-"}$${Math.abs(todayPnl).toFixed(2)}`,
-      sub: `Total: ${totalPnl >= 0 ? "+" : "-"}$${Math.abs(totalPnl).toFixed(2)}`,
+      value: formatSignedMoney(todayPnl, currSym),
+      sub: `Total: ${formatSignedMoney(totalPnl, currSym)}`,
       icon: TrendingUp,
       color: todayPnl >= 0 ? "text-emerald-400" : "text-red-400",
       bg: todayPnl >= 0 ? "bg-emerald-500/10" : "bg-red-500/10",

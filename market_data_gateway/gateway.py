@@ -886,8 +886,11 @@ class MarketDataGateway:
         matched_q: Optional[NormalizedQuote] = None
         for a in aliases:
             if a in self._quote_cache:
-                matched_q = self._quote_cache[a]
-                break
+                q_candidate = self._quote_cache[a]
+                q_candidate.mark_stale(live_threshold_sec=3.0, delayed_threshold_sec=10.0)
+                if not q_candidate.is_stale:
+                    matched_q = q_candidate
+                    break
 
         if not matched_q:
             adapter = self.failover.get_best_provider(sym)
@@ -905,6 +908,13 @@ class MarketDataGateway:
                                 break
                 except (asyncio.TimeoutError, Exception) as ex:
                     logger.debug("Snapshot query note for %s from %s: %s", sym, adapter.provider_id, ex)
+
+        # Fallback to existing cached quote if provider query timed out
+        if not matched_q:
+            for a in aliases:
+                if a in self._quote_cache:
+                    matched_q = self._quote_cache[a]
+                    break
 
         if matched_q:
             matched_q.mark_stale(live_threshold_sec=5.0, delayed_threshold_sec=15.0)
@@ -1185,7 +1195,8 @@ class MarketDataGateway:
         Centralized server-side cache keyed by PROVIDER:UNDERLYING:EXPIRY.
         """
         und = (request.rel_url.query.get("underlying") or request.rel_url.query.get("symbol") or "NIFTY").upper().strip()
-        provider = (request.rel_url.query.get("provider") or request.rel_url.query.get("source") or ("DELTA_INDIA" if und in ["BTC", "ETH", "SOL", "XRP"] else "DHAN")).upper().strip()
+        raw_prov = (request.rel_url.query.get("provider") or request.rel_url.query.get("source") or ("DELTA_INDIA" if und in ["BTC", "ETH", "SOL", "XRP"] else "UPSTOX")).upper().strip()
+        provider = "UPSTOX" if raw_prov == "DHAN" else raw_prov
         expiry = request.rel_url.query.get("expiry") or None
         strike_count_str = request.rel_url.query.get("strike_count") or "40"
         strike_count = int(strike_count_str) if strike_count_str.isdigit() else 40
@@ -1272,7 +1283,9 @@ class MarketDataGateway:
     async def handle_options_expiries(self, request: web.Request) -> web.Response:
         """Returns official/standard available expiries for underlying."""
         und = (request.rel_url.query.get("underlying") or "NIFTY").upper().strip()
-        provider = (request.rel_url.query.get("provider") or "DHAN").upper().strip()
+        provider = (request.rel_url.query.get("provider") or "UPSTOX").upper().strip()
+        if provider == "DHAN":
+            provider = "UPSTOX"
 
         try:
             from src.market_data.instrument_master import global_instrument_master
@@ -1551,7 +1564,7 @@ def create_app() -> tuple:
 
 
 async def main():
-    port = int(os.environ.get("MARKET_GATEWAY_PORT", "5051"))
+    port = int(os.environ.get("PORT") or os.environ.get("MARKET_GATEWAY_PORT") or "5051")
     host = os.environ.get("MARKET_GATEWAY_HOST", "0.0.0.0")
     app, _ = create_app()
     runner = web.AppRunner(app, handle_signals=False)

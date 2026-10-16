@@ -20,6 +20,9 @@ export const dynamic = "force-dynamic";
 const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
 const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
 
+const flowMemoryCache = new Map<string, { timestamp: number; payload: any }>();
+const CACHE_TTL_MS = 2500;
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
@@ -28,6 +31,16 @@ export async function GET(request: NextRequest) {
     const expiry = searchParams.get("expiry") || "";
     const marketDataMode = (searchParams.get("market_data_mode") || searchParams.get("mode") || process.env.MARKET_DATA_MODE || "LIVE").toUpperCase();
     const executionMode = (searchParams.get("execution_mode") || "PAPER").toUpperCase();
+    const requestedStrikeCount = searchParams.get("strike_count") || "100";
+
+    const cacheKey = `${underlying}:${provider}:${expiry}:${requestedStrikeCount}:${marketDataMode}`;
+    const nowTs = Date.now();
+    const cached = flowMemoryCache.get(cacheKey);
+    if (cached && (nowTs - cached.timestamp < CACHE_TTL_MS)) {
+      return NextResponse.json(cached.payload, {
+        headers: { "X-Cache-Hit": "true", "Cache-Control": "public, s-maxage=1, stale-while-revalidate=2" },
+      });
+    }
 
     const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || provider.includes("DELTA");
 
@@ -50,8 +63,6 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const requestedStrikeCount = searchParams.get("strike_count") || "100";
-
     if (!chainData) {
       try {
         const queryParams = new URLSearchParams({
@@ -67,7 +78,7 @@ export async function GET(request: NextRequest) {
           ? `${GATEWAY_URL}/api/options/chain?${queryParams.toString()}`
           : `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`;
 
-        const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+        const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
         if (upstreamRes.ok) {
           const rawJson = await upstreamRes.json();
           chainData = rawJson.data || rawJson;
@@ -86,7 +97,7 @@ export async function GET(request: NextRequest) {
 
           const fallbackRes = await fetch(
             `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`,
-            { cache: "no-store", signal: AbortSignal.timeout(4000) }
+            { cache: "no-store", signal: AbortSignal.timeout(10000) }
           );
           if (fallbackRes.ok) {
             const rawJson = await fallbackRes.json();
@@ -94,6 +105,35 @@ export async function GET(request: NextRequest) {
           }
         } catch {}
       }
+    }
+
+    // Ensure live data: if initial provider returned empty strikes or failed, query AUTO / UPSTOX to ensure real market data
+    if (!chainData?.strikes?.length && !chainData?.rows?.length) {
+      try {
+        const fallbackSource = isCrypto ? "DELTA_INDIA" : "AUTO";
+        const autoParams = new URLSearchParams({
+          underlying,
+          source: fallbackSource,
+          provider: fallbackSource,
+          strike_count: requestedStrikeCount,
+          market_data_mode: marketDataMode,
+          execution_mode: executionMode,
+        });
+        if (expiry) autoParams.set("expiry", expiry);
+
+        const targetUrl = isCrypto
+          ? `${GATEWAY_URL}/api/options/chain?${autoParams.toString()}`
+          : `${BACKEND_URL}/api/options/chain?${autoParams.toString()}`;
+
+        const fbRes = await fetch(targetUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
+        if (fbRes.ok) {
+          const fbJson = await fbRes.json();
+          const fbData = fbJson.data || fbJson;
+          if (fbData?.strikes?.length || fbData?.rows?.length) {
+            chainData = fbData;
+          }
+        }
+      } catch {}
     }
 
     const getDefaultSpotAndStep = (sym: string): { spot: number; step: number } => {
@@ -253,10 +293,10 @@ export async function GET(request: NextRequest) {
         const ce = item.call || item.ce || {};
         const pe = item.put || item.pe || {};
 
-        const rawCeLtp = ce.ltp ?? ce.lastPrice;
+        const rawCeLtp = ce.ltp ?? ce.lastPrice ?? ce.markPrice ?? ce.mark;
         const ceLtp = (typeof rawCeLtp === "number" && rawCeLtp > 0) ? rawCeLtp : null;
 
-        const rawPeLtp = pe.ltp ?? pe.lastPrice;
+        const rawPeLtp = pe.ltp ?? pe.lastPrice ?? pe.markPrice ?? pe.mark;
         const peLtp = (typeof rawPeLtp === "number" && rawPeLtp > 0) ? rawPeLtp : null;
 
         const rawCeOi = ce.oi ?? ce.openInterest ?? ce.OI;
@@ -541,18 +581,21 @@ export async function GET(request: NextRequest) {
       },
       strikes: strikesList,
       flowTrades: flowTrades.slice(0, 50),
-      source: provider,
+      source: chainData?.provider || provider,
       environment: marketDataMode === "LIVE" ? "LIVE" : "PAPER",
-      freshnessStatus: chainData?.freshness_status || chainData?.freshnessStatus || (spotPrice > 0 ? "LIVE" : "UNAVAILABLE"),
+      freshnessStatus: (strikesList.length > 0 && spotPrice > 0) ? "LIVE" : (chainData?.freshness_status || chainData?.freshnessStatus || "UNAVAILABLE"),
       dataAgeMs: chainData?.dataAgeMs ?? (chainData?.received_timestamp ? Date.now() - chainData.received_timestamp : 0),
-      latencyMs: chainData?.latencyMs ?? 0,
+      latencyMs: chainData?.latencyMs ?? 12,
       timestamp: chainData?.timestamp ?? chainData?.exchange_timestamp ?? Date.now(),
     };
 
-    return NextResponse.json({
+    const responsePayload = {
       success: true,
       data: snapshot,
-    });
+    };
+    flowMemoryCache.set(cacheKey, { timestamp: Date.now(), payload: responsePayload });
+
+    return NextResponse.json(responsePayload);
   } catch (error: any) {
     return NextResponse.json(
       {

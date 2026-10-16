@@ -11,6 +11,9 @@ import {
   formatQuantity,
   formatPnL,
   formatRatio,
+  formatSignedMoney,
+  detectMarketCurrency,
+  resolveCurrencySymbol,
   safeArray,
   safeMap,
 } from "../lib/formatters";
@@ -63,6 +66,22 @@ assert(formatCurrency(-1234.5, "₹", 2) === "-₹1,234.50", "formatCurrency neg
 assert(formatCurrency(null, "₹", 2) === "—", "formatCurrency null returns fallback");
 assert(formatCurrency(undefined, "₹", 2) === "—", "formatCurrency undefined returns fallback");
 assert(formatCurrency(0, "₹", 2) === "₹0.00", "formatCurrency 0 returns ₹0.00");
+assert(resolveCurrencySymbol("USD") === "$", "resolveCurrencySymbol USD -> $");
+assert(resolveCurrencySymbol("USDT") === "$", "resolveCurrencySymbol USDT -> $");
+assert(resolveCurrencySymbol("INR") === "₹", "resolveCurrencySymbol INR -> ₹");
+assert(resolveCurrencySymbol("NIFTY 2026-10-19 22700 CE") === "₹", "resolveCurrencySymbol NIFTY -> ₹");
+assert(resolveCurrencySymbol("UPSTOX") === "₹", "resolveCurrencySymbol UPSTOX -> ₹");
+assert(detectMarketCurrency({ symbol: "NIFTY 2026-10-19 22700 CE" }).symbol === "₹", "detectMarketCurrency NIFTY symbol -> ₹");
+assert(detectMarketCurrency({ name: "nifty fifty" }).symbol === "₹", "detectMarketCurrency nifty fifty name -> ₹");
+assert(detectMarketCurrency({ market: { exchange: "UPSTOX" } }).symbol === "₹", "detectMarketCurrency UPSTOX exchange -> ₹");
+assert(detectMarketCurrency({ symbol: "BTCUSD" }).symbol === "$", "detectMarketCurrency BTCUSD -> $");
+assert(formatCurrency(-409.28, "USD", 2) === "-$409.28", "formatCurrency with raw USD code places sign before $");
+assert(formatCurrency(409.28, "USD", 2) === "$409.28", "formatCurrency positive USD code");
+assert(formatSignedMoney(-409.28, "USD") === "-$409.28", "formatSignedMoney negative USD code");
+assert(formatSignedMoney(409.28, "USD") === "+$409.28", "formatSignedMoney positive USD code");
+assert(formatSignedMoney(0, "USD") === "$0.00", "formatSignedMoney zero USD code");
+assert(formatSignedMoney(-409.28, "₹") === "-₹409.28", "formatSignedMoney negative INR code");
+assert(formatSignedMoney(1500, "₹") === "+₹1,500.00", "formatSignedMoney positive INR code");
 
 // 4. formatPercent tests
 assert(formatPercent(12.34, 2) === "12.34%", "formatPercent standard");

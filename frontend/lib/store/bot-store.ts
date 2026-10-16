@@ -31,15 +31,15 @@ export const useBotStore = create<BotStoreState>((set) => ({
   globalKillSwitch: "ARMED",
   wsConnected: false,
 
-  setBots: (bots) => set({ bots }),
+  setBots: (bots) => set({ bots: Array.isArray(bots) ? bots : [] }),
   setSelectedBotId: (selectedBotId) => set({ selectedBotId }),
   setActiveSnapshot: (activeSnapshot) => set({ activeSnapshot }),
-  setAllOrders: (allOrders) => set({ allOrders }),
-  setAllPositions: (allPositions) => set({ allPositions }),
+  setAllOrders: (allOrders) => set({ allOrders: Array.isArray(allOrders) ? allOrders : [] }),
+  setAllPositions: (allPositions) => set({ allPositions: Array.isArray(allPositions) ? allPositions : [] }),
   setGlobalKillSwitch: (globalKillSwitch) => set({ globalKillSwitch }),
   setWsConnected: (wsConnected) => set({ wsConnected }),
   updateBotInList: (updatedBot) =>
     set((state) => ({
-      bots: state.bots.map((b) => (b.id === updatedBot.id ? updatedBot : b)),
+      bots: (Array.isArray(state.bots) ? state.bots : []).map((b) => (b.id === updatedBot.id ? updatedBot : b)),
     })),
 }));

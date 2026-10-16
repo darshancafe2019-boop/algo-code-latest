@@ -135,8 +135,18 @@ def add_cors_headers(response):
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]
-    if origin in allowed_origins or not origin:
-        response.headers["Access-Control-Allow-Origin"] = origin or "*"
+    frontend_url = os.environ.get("FRONTEND_URL") or os.environ.get("APP_PUBLIC_URL") or getattr(config, "APP_PUBLIC_URL", "")
+    if frontend_url:
+        allowed_origins.append(frontend_url.rstrip("/"))
+
+    is_allowed = (
+        not origin
+        or origin in allowed_origins
+        or origin.endswith(".vercel.app")
+        or (frontend_url and origin == frontend_url.rstrip("/"))
+    )
+    if is_allowed:
+        response.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Request-Id, Authorization, X-Requested-With, X-CSRF-Token, X-Step-Up-Token, X-Idempotency-Key"
     response.headers["Access-Control-Allow-Credentials"] = "true"
@@ -148,7 +158,8 @@ def enforce_server_side_security():
     """Authoritative server-side authentication, RBAC, and password-change gate."""
     # 1. Handle CORS Preflight OPTIONS
     if request.method == "OPTIONS":
-        return
+        resp = make_response("", 204)
+        return add_cors_headers(resp)
 
     path = request.path
 
@@ -178,6 +189,13 @@ def enforce_server_side_security():
         or path.startswith("/api/health")
         or path.startswith("/health")
         or path.startswith("/static/")
+        or path.startswith("/api/market/")
+        or path.startswith("/api/market-data/")
+        or path.startswith("/api/universe/")
+        or path.startswith("/api/options/")
+        or path.startswith("/api/strategies/")
+        or path.startswith("/api/instruments/")
+        or path.startswith("/api/providers")
         or path in ["/favicon.ico", "/manifest.json"]
         or path in [
             "/api/auth/login",
@@ -200,12 +218,12 @@ def enforce_server_side_security():
 
     # 3. All other /api/* endpoints require active authenticated session
     if path.startswith("/api/"):
+        auth_require_login = os.getenv("AUTH_REQUIRE_LOGIN", "true").lower() in ("true", "1")
         is_testing = bool(app.config.get("TESTING")) or bool(os.environ.get("PYTEST_CURRENT_TEST"))
         is_demo_or_bootstrap = (
             os.getenv("AUTH_BOOTSTRAP_ENABLED", "false").lower() == "true"
             or os.getenv("NEXT_PUBLIC_AUTH_DEMO_MODE", "false").lower() == "true"
-            or os.getenv("DEBUG", "false").lower() == "true"
-        )
+        ) and not auth_require_login
         user, session = get_current_user_and_session(allow_dev_fallback=is_testing or is_demo_or_bootstrap)
         if not user or not session:
             return jsonify({
@@ -7878,17 +7896,38 @@ def api_bots_list():
     """List all configured active bot instances with authoritative canonical snapshots."""
     try:
         from src.bot_runtime_service import global_bot_runtime_service
+        from src import bot_wizard_service
         snapshot = global_bot_runtime_service.get_fleet_snapshot()
+        runtime_bots = snapshot.get("bots", [])
+        wizard_bots = bot_wizard_service.list_bots()
+
+        # Merge by id to eliminate duplicates while keeping live runtime data
+        bot_map = {b["id"]: b for b in wizard_bots}
+        for b in runtime_bots:
+            bot_map[b["id"]] = b
+        all_bots = list(bot_map.values())
+
+        metrics = dict(snapshot.get("metrics") or {})
+        total = len(all_bots)
+        active = sum(1 for b in all_bots if str(b.get("status", "")).upper() in ("RUNNING", "ACTIVE", "READY"))
+        metrics["total_bots"] = total
+        metrics["active_bots"] = active
+        metrics["stopped_bots"] = max(0, total - active)
+        if "total_pnl" not in metrics:
+            metrics["total_pnl"] = sum(float(b.get("pnl", {}).get("total", 0.0)) for b in all_bots)
+
         return jsonify({
             "status": "success",
-            "metrics": snapshot["metrics"],
-            "bots": snapshot["bots"],
-            "total": snapshot.get("total", len(snapshot["bots"])),
-            "total_bots": snapshot.get("total", len(snapshot["bots"])),
+            "success": True,
+            "metrics": metrics,
+            "bots": all_bots,
+            "data": all_bots,
+            "total": total,
+            "total_bots": total,
         })
     except Exception as exc:
         logger.error("Error in api_bots_list: %s", exc)
-        return jsonify({"status": "error", "message": str(exc), "bots": [], "total": 0, "total_bots": 0}), 500
+        return jsonify({"status": "error", "message": str(exc), "bots": [], "data": [], "total": 0, "total_bots": 0}), 500
 
 
 
@@ -9461,9 +9500,33 @@ def api_bots_capital_reservation():
     }), 200
 
 
-@app.route("/api/bots/<bot_id>", methods=["GET", "PUT", "POST"])
+@app.route("/api/bots/<bot_id>", methods=["GET", "PUT", "POST", "DELETE"])
 def api_bots_update(bot_id):
     """Retrieve details or update configuration of an existing bot instance."""
+    if bot_id in ("run-all", "start-all") and request.method == "POST":
+        try:
+            from src import bot_wizard_service
+            res = bot_wizard_service.start_all_bots()
+            return jsonify({"status": "success", "success": True, "data": res, **res}), 200
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 500
+
+    if bot_id == "stop-all" and request.method == "POST":
+        try:
+            from src import bot_wizard_service
+            res = bot_wizard_service.stop_all_bots()
+            return jsonify({"status": "success", "success": True, "data": res, **res}), 200
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 500
+
+    if bot_id == "delete-all" and request.method in ("POST", "DELETE"):
+        try:
+            from src import bot_wizard_service
+            res = bot_wizard_service.delete_all_bots(force=True)
+            return jsonify({"status": "success", "success": True, "data": res, **res}), 200
+        except Exception as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 500
+
     if request.method == "GET":
         try:
             from src.bot_runtime_service import global_bot_runtime_service
@@ -9918,6 +9981,18 @@ def api_bots_bulk_delete():
     is_force = bool(data.get("force", False))
     res, status_code = execute_bulk_permanent_bot_deletion(bot_ids, force=is_force)
     return jsonify(res), status_code
+
+
+@app.route("/api/bots/delete-all", methods=["POST", "DELETE"])
+def api_bots_delete_all():
+    """Delete ALL bot instances cleanly across the platform."""
+    try:
+        from src.bot_wizard_service import delete_all_bots
+        res = delete_all_bots(force=True)
+        return jsonify(res), 200
+    except Exception as e:
+        logger.error(f"Error executing delete-all in dashboard.py: {e}")
+        return jsonify({"status": "error", "success": False, "message": str(e)}), 500
 
 
 @app.route("/api/bots/bulk-stop", methods=["POST"])
@@ -13438,6 +13513,15 @@ def _verify_resend_webhook_signature(raw_body: bytes, headers: Any, secret: str)
 
 # ============================================================================
 # SECTION 7: INSTITUTIONAL SECURITY
+
+def get_daily_cookie_max_age() -> int:
+    """Returns seconds remaining until midnight tonight (local calendar day), max 86400, min 300."""
+    now_local = datetime.now()
+    midnight_local = datetime.combine(now_local.date() + timedelta(days=1), datetime.min.time())
+    secs = int((midnight_local - now_local).total_seconds())
+    return max(300, min(86400, secs))
+
+
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
     """
@@ -13588,20 +13672,19 @@ def api_auth_login():
 
         masked_dest = _mask_email_address(user_email)
 
-        # Dev mode: if no real email provider is configured (console/outbox fallback),
-        # include the OTP in the response so it can be displayed directly on the login screen.
-        is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
+        # Real provider check: if RESEND_API_KEY or SMTP is configured, NEVER leak OTP in response
         is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
-        no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST) or is_test_mode
+        has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
+        include_dev_otp = is_test_mode and not has_real_provider
 
         response_payload: Dict[str, Any] = {
             "status": "EMAIL_OTP_REQUIRED",
             "challenge_id": challenge_id,
             "destination": masked_dest,
-            "message": "Verification code sent.",
+            "message": "Verification code sent to your registered email.",
             "request_id": request_id
         }
-        if no_real_provider:
+        if include_dev_otp:
             response_payload["dev_otp"] = otp_code
             response_payload["dev_mode"] = True
 
@@ -13851,7 +13934,7 @@ def api_auth_email_otp_verify():
         httponly=True,
         samesite="Lax",
         secure=is_https,
-        max_age=7 * 86400,
+        max_age=get_daily_cookie_max_age(),
         path="/"
     )
     return resp
@@ -14002,9 +14085,9 @@ def api_auth_email_otp_resend():
 
     masked_dest = _mask_email_address(user_email)
 
-    # Dev mode passthrough: include OTP in response if no real email provider is configured
-    is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
-    no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
+    is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
+    has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
+    include_dev_otp = is_test_mode and not has_real_provider
     resend_payload = {
         "status": "success",
         "success": True,
@@ -14014,7 +14097,7 @@ def api_auth_email_otp_resend():
         "cooldown_seconds": 60,
         "request_id": request_id
     }
-    if no_real_provider:
+    if include_dev_otp:
         resend_payload["dev_otp"] = otp_code
         resend_payload["dev_mode"] = True
     return jsonify(resend_payload), 200
@@ -14147,7 +14230,7 @@ def api_auth_2fa_verify():
         httponly=True,
         samesite="Lax",
         secure=is_https,
-        max_age=7 * 86400,
+        max_age=get_daily_cookie_max_age(),
         path="/"
     )
     return resp
@@ -14214,7 +14297,7 @@ def api_auth_change_password():
         httponly=True,
         samesite="Lax",
         secure=is_https,
-        max_age=7 * 86400,
+        max_age=get_daily_cookie_max_age(),
         path="/"
     )
     return resp
@@ -14252,7 +14335,7 @@ def api_auth_logout():
             )
 
     resp = make_response(jsonify({"status": "success", "message": "Logged out successfully."}))
-    resp.delete_cookie("algo_session_token", path="/")
+    resp.delete_cookie("algo_session_token", path="/", httponly=True, samesite="Lax")
     return resp
 
 
@@ -14264,7 +14347,7 @@ def api_auth_logout_all():
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
     db.revoke_all_user_sessions(user["id"])
     resp = make_response(jsonify({"status": "success", "message": "All sessions revoked."}))
-    resp.delete_cookie("algo_session_token", path="/")
+    resp.delete_cookie("algo_session_token", path="/", httponly=True, samesite="Lax")
     return resp
 
 
@@ -14753,7 +14836,7 @@ def api_auth_password_change_with_otp():
         httponly=True,
         samesite="Lax",
         secure=is_https,
-        max_age=7 * 86400,
+        max_age=get_daily_cookie_max_age(),
         path="/"
     )
     return resp
@@ -14934,8 +15017,15 @@ def api_auth_me():
     Returns profile, active session, roles and permissions for current caller.
     Clean Contract: Returns 200 with authenticated: False when unauthenticated,
     avoiding noisy client console errors on ordinary initial page loads.
+    In development/bootstrap mode, automatically restores the operator admin session.
     """
-    user, session = get_current_user_and_session(allow_dev_fallback=False)
+    auth_require_login = os.getenv("AUTH_REQUIRE_LOGIN", "true").lower() in ("true", "1")
+    is_testing = bool(app.config.get("TESTING")) or bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    bootstrap_enabled = os.getenv("AUTH_BOOTSTRAP_ENABLED", "false").lower() in ("true", "1")
+    is_explicit_unauth = request.headers.get("X-Unauthenticated") == "true"
+    allow_fallback = (is_testing or bootstrap_enabled) and not is_explicit_unauth and not auth_require_login
+
+    user, session = get_current_user_and_session(allow_dev_fallback=allow_fallback)
     if not user or not session:
         return jsonify({
             "status": "success",
@@ -14948,7 +15038,7 @@ def api_auth_me():
     passkeys = json.loads(user.get("passkeys_json") or "[]")
     recovery_codes = json.loads(user.get("recovery_codes_json") or "[]")
 
-    return jsonify({
+    payload = {
         "status": "success",
         "authenticated": True,
         "user": {
@@ -14963,7 +15053,38 @@ def api_auth_me():
         },
         "session": session,
         "permissions": permissions,
-    }), 200
+    }
+
+    resp = make_response(jsonify(payload), 200)
+
+    # If this request came in without a cookie in dev fallback mode, automatically provision
+    # a real persistent session token and set the cookie and bearer token
+    existing_cookie = request.cookies.get("algo_session_token")
+    if not existing_cookie and allow_fallback and user.get("id"):
+        try:
+            raw_token, session_meta = SessionManager.create_session(
+                user_id=user["id"],
+                device_name="Local Terminal",
+                ip_address=request.remote_addr or "127.0.0.1",
+                user_agent=request.headers.get("User-Agent", "QuantOS-Client")
+            )
+            is_https = request.is_secure or (request.headers.get("X-Forwarded-Proto") == "https")
+            resp.set_cookie(
+                "algo_session_token",
+                raw_token,
+                httponly=True,
+                samesite="Lax",
+                secure=is_https,
+                max_age=get_daily_cookie_max_age(),
+                path="/"
+            )
+            payload["session"] = session_meta
+            payload["session_token"] = raw_token
+            resp.set_data(json.dumps(payload))
+        except Exception as e:
+            logger.warning("[AUTH_ME] Failed to auto-provision dev session: %s", e)
+
+    return resp
 
 
 @app.route("/api/auth/password/forgot", methods=["POST"])
@@ -15597,7 +15718,7 @@ def api_webauthn_login_verify():
         httponly=True,
         samesite="Lax",
         secure=is_https,
-        max_age=7 * 86400,
+        max_age=get_daily_cookie_max_age(),
         path="/"
     )
     return resp
@@ -17697,7 +17818,6 @@ def api_stream_portfolio():
         headers={
             "Cache-Control": "no-cache",
             "X-Accel-Buffering": "no",
-            "Connection": "keep-alive"
         }
     )
 
@@ -18008,10 +18128,11 @@ def api_dashboard_snapshot():
         movers_payload = _compute_top_movers()
         
         # 5. Open Positions Summary
-        open_positions = db.safe_query(
-            "SELECT * FROM trades_log WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL') ORDER BY timestamp DESC",
+        open_pos_row = db.safe_query(
+            "SELECT COUNT(*) as cnt FROM trades_log WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')",
             (mode,)
         )
+        open_positions_count = int(open_pos_row[0].get("cnt", 0)) if open_pos_row else 0
         
         # 6. Recent Alerts
         alerts_rows = db.safe_query(
@@ -18083,7 +18204,7 @@ def api_dashboard_snapshot():
             "mode": mode,
             "portfolio": portfolio_snap,
             "positionsSummary": {
-                "openPositionsCount": len(open_positions),
+                "openPositionsCount": open_positions_count,
                 "marginUsed": portfolio_snap.get("marginUsed", 0.0),
                 "unrealizedPnl": portfolio_snap.get("unrealizedPnl", 0.0),
             },
@@ -21396,7 +21517,7 @@ if __name__ == "__main__":
             waitress = importlib.import_module("waitress")
             logger.info(f"Starting production WSGI server (Waitress) on port {port}...")
             print(f"[+] Starting Production WSGI Server (Waitress) on 0.0.0.0:{port}...")
-            waitress.serve(app, host="0.0.0.0", port=port, threads=int(os.getenv("WSGI_THREADS", "8")), channel_timeout=120)
+            waitress.serve(app, host="0.0.0.0", port=port, threads=int(os.getenv("WSGI_THREADS", "16")), channel_timeout=120)
         except (ImportError, ModuleNotFoundError, Exception):
             logger.info(f"Waitress not installed or failed; starting multi-threaded Flask server on port {port}...")
             app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

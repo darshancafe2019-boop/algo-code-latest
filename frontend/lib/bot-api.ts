@@ -18,22 +18,67 @@ const API_BASE_URL = typeof window !== "undefined" ? "/api" : (process.env.BACKE
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   const cleanEndpoint = endpoint.startsWith("/api") ? endpoint.replace(/^\/api/, "") : endpoint;
   const url = `${API_BASE_URL}${cleanEndpoint.startsWith("/") ? "" : "/"}${cleanEndpoint}`;
+  const isGet = !options?.method || options.method.toUpperCase() === "GET";
 
-  const res = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+  let lastErr: any = null;
+  const maxAttempts = isGet ? 2 : 1;
 
-  const body = await res.json().catch(() => ({}));
-  if (body.success === false && body.error) {
-    throw new Error(body.error?.message || "API request failed");
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...((options?.headers as Record<string, string>) || {}),
+      };
+
+      if (typeof window !== "undefined" && !headers["Authorization"]) {
+        try {
+          const now = new Date();
+          const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+          const storedDate = localStorage.getItem("quantos_session_date");
+          if (storedDate && storedDate !== todayStr) {
+            localStorage.removeItem("quantos_session_token");
+            localStorage.removeItem("quantos_session_date");
+            sessionStorage.removeItem("quantos_session_token");
+          } else {
+            const storedToken =
+              localStorage.getItem("quantos_session_token") ||
+              sessionStorage.getItem("quantos_session_token");
+            if (storedToken) {
+              headers["Authorization"] = `Bearer ${storedToken}`;
+            }
+          }
+        } catch {}
+      }
+
+      const res = await fetch(url, {
+        credentials: "include",
+        signal: options?.signal || AbortSignal.timeout(20000),
+        ...options,
+        headers,
+      });
+
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok || (body && (body.success === false || body.status === "error"))) {
+        const errorMsg =
+          body?.error?.message ||
+          body?.message ||
+          (typeof body?.error === "string" ? body.error : `Request failed with status ${res.status}`);
+        throw new Error(errorMsg);
+      }
+
+      // Accommodate dual schema responses (body.data or body.bots or body)
+      return (body.data !== undefined ? body.data : (body.bots !== undefined ? body.bots : body)) as T;
+    } catch (err: any) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        await new Promise((r) => setTimeout(r, 800));
+      }
+    }
   }
-  // Accommodate dual schema responses (body.data or body.bots or body)
-  return (body.data !== undefined ? body.data : (body.bots !== undefined ? body.bots : body)) as T;
+
+  throw lastErr;
 }
 
 export const api = {
@@ -64,6 +109,18 @@ export const api = {
   deleteBot: (botId: string) =>
     request<{ bot_id: string; deleted: boolean }>(`/bots/${botId}`, {
       method: "DELETE",
+    }),
+  deleteAllBots: () =>
+    request<{ success: boolean; deleted_count: number; message?: string }>("/bots/delete-all", {
+      method: "POST",
+    }),
+  runAllBots: () =>
+    request<{ success: boolean; started_count: number; message?: string }>("/bots/run-all", {
+      method: "POST",
+    }),
+  stopAllBots: () =>
+    request<{ success: boolean; stopped_count: number; message?: string }>("/bots/stop-all", {
+      method: "POST",
     }),
 
   // Bot Orders & Executions

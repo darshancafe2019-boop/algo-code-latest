@@ -12,9 +12,25 @@ from flask import Blueprint, jsonify, request
 from src.market_data import global_options_engine
 from src.delta_options_service import global_delta_options_service
 from src.delta_exchange_adapter import global_delta_adapter
+import asyncio
+import inspect
 from market_data_gateway.adapters.delta_options_ws import delta_options_ws_adapter
 
 options_bp = Blueprint("options", __name__)
+
+
+def _run_async_safe(coro):
+    if not inspect.iscoroutine(coro):
+        return coro
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                return executor.submit(asyncio.run, coro).result()
+        return loop.run_until_complete(coro)
+    except Exception:
+        return asyncio.run(coro)
 
 
 @options_bp.route("/api/options/chain", methods=["GET"])
@@ -23,16 +39,21 @@ def get_options_chain():
     Returns live option chain with Black-Scholes Greeks, IV, PCR, and Max Pain.
     Strict Zero-Fabrication: If unquoted, values remain strict null.
     """
-    provider = (request.args.get("provider") or request.args.get("source") or "DELTA").upper()
-    underlying = (request.args.get("underlying") or request.args.get("symbol") or "BTC").upper()
+    underlying = (request.args.get("underlying") or request.args.get("symbol") or "").upper()
+    is_indian = any(ind in underlying for ind in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"])
+    default_prov = "UPSTOX" if is_indian else "DELTA"
+    provider = (request.args.get("provider") or request.args.get("source") or default_prov).upper()
+    if not underlying:
+        underlying = "NIFTY" if "UPSTOX" in provider else "BTC"
+
     expiry = request.args.get("expiry")
     mode = request.args.get("mode", "LIVE").upper()
     strike_count = int(request.args.get("strike_count", 25))
 
-    is_delta = "DELTA" in provider or underlying in ["BTC", "ETH", "SOL", "XRP", "XAUT"]
+    is_delta = not is_indian and ("DELTA" in provider or underlying in ["BTC", "ETH", "SOL", "XRP", "XAUT"])
 
     if is_delta:
-        res = delta_options_ws_adapter.get_normalized_option_chain(underlying, expiry, strike_count)
+        res = _run_async_safe(delta_options_ws_adapter.get_normalized_option_chain(underlying, expiry, strike_count))
         return jsonify(res), 200
 
     snapshot = global_options_engine.get_option_chain(
@@ -52,13 +73,17 @@ def get_options_contracts():
     Returns active valid contracts and available expiries for underlying symbol.
     Expired contracts are purged automatically.
     """
-    symbol = (request.args.get("symbol") or request.args.get("underlying") or "BTC").upper()
-    provider = (request.args.get("provider") or "DELTA").upper()
+    symbol = (request.args.get("symbol") or request.args.get("underlying") or "").upper()
+    is_indian = any(ind in symbol for ind in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"])
+    default_prov = "UPSTOX" if is_indian else "DELTA"
+    provider = (request.args.get("provider") or default_prov).upper()
+    if not symbol:
+        symbol = "NIFTY" if "UPSTOX" in provider else "BTC"
     
-    is_delta = "DELTA" in provider or symbol in ["BTC", "ETH", "SOL", "XRP", "XAUT"]
+    is_delta = not is_indian and ("DELTA" in provider or symbol in ["BTC", "ETH", "SOL", "XRP", "XAUT"])
     
     if is_delta:
-        res = delta_options_ws_adapter.get_normalized_option_chain(symbol, None, 50)
+        res = _run_async_safe(delta_options_ws_adapter.get_normalized_option_chain(symbol, None, 50))
         contracts = []
         expiries_set = set()
         

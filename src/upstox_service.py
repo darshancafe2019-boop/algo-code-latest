@@ -1044,6 +1044,9 @@ class UpstoxService:
                 f"Upstox API circuit breaker open ({self._auth_status}). Token expired or invalid."
             )
 
+        if getattr(self, "_rate_limit_until", 0) > time.monotonic():
+            raise RuntimeError("Upstox API rate limited (HTTP 429). Rate limit backoff active.")
+
         base = self.BASE_URL_V3 if api_version == "v3" else self.BASE_URL_V2
         url = f"{base}/{endpoint.lstrip('/')}"
         if params:
@@ -1081,6 +1084,9 @@ class UpstoxService:
                 self._last_auth_error_code = "UDAPI100050"
                 self._last_auth_message = "Invalid token used to access API (UDAPI100050)"
                 self._last_auth_error = "HTTP 401: UDAPI100050 Invalid token"
+            elif he.code == 429 or "UDAPI10005" in body or "Too Many Request" in body:
+                self._rate_limit_until = time.monotonic() + 20.0
+                logger.warning("Upstox HTTP error on %s: 429 Too Many Requests. Rate limit backoff for 20s.", endpoint)
             else:
                 self._last_auth_error = f"HTTP {he.code}: {body or he.reason}"
                 logger.warning("Upstox HTTP error on %s: %s (Body: %s)", endpoint, he.code, body)
@@ -1523,35 +1529,12 @@ class UpstoxService:
         return []
 
     def get_option_expiries(self, underlying: str = "NIFTY") -> List[str]:
-        """Queries dynamic active option expiries for underlying from Upstox."""
+        """Queries dynamic active option expiries for underlying from Upstox using contract cache."""
         if not self.is_authenticated:
             return []
-        und_clean = underlying.upper().strip()
-        reg_entry = OFFICIAL_UPSTOX_KEYS.get(und_clean, {})
-        instrument_key = reg_entry.get("instrument_key")
-        if not instrument_key:
-            if und_clean in ["NIFTY", "NIFTY 50", "NIFTY50"]:
-                instrument_key = "NSE_INDEX|Nifty 50"
-            elif und_clean in ["BANKNIFTY", "NIFTY BANK"]:
-                instrument_key = "NSE_INDEX|Nifty Bank"
-            elif und_clean in ["FINNIFTY", "NIFTY FIN SERVICE"]:
-                instrument_key = "NSE_INDEX|Nifty Fin Service"
-            elif und_clean in ["MIDCPNIFTY", "NIFTY MID SELECT", "NIFTY MIDCAP SELECT"]:
-                instrument_key = "NSE_INDEX|NIFTY MID SELECT"
-            elif und_clean in ["SENSEX", "BSE SENSEX"]:
-                instrument_key = "BSE_INDEX|SENSEX"
-            elif und_clean in ["RELIANCE"]:
-                instrument_key = "NSE_EQ|INE002A01018"
-            elif und_clean in ["TCS"]:
-                instrument_key = "NSE_EQ|INE467B01029"
-            elif und_clean in ["HDFCBANK"]:
-                instrument_key = "NSE_EQ|INE040A01034"
-            else:
-                return []
         try:
-            res = self._make_request("option/contract", params={"instrument_key": instrument_key}, api_version="v2")
-            if res.get("status") == "success" and "data" in res:
-                contracts = res.get("data", [])
+            contracts = self.get_option_contracts(underlying)
+            if contracts:
                 expiries = sorted(list(set(c.get("expiry") for c in contracts if c.get("expiry"))))
                 return expiries
         except Exception as e:
@@ -1565,7 +1548,7 @@ class UpstoxService:
         strike_count: int = 20,
     ) -> Dict[str, Any]:
         """
-        Queries official Upstox Option Chain endpoint.
+        Queries official Upstox Option Chain endpoint with high-performance caching.
         Endpoint: GET /v2/option/chain
         """
         if not self.is_authenticated:
@@ -1601,14 +1584,19 @@ class UpstoxService:
                     "message": f"Could not resolve Upstox instrument key for underlying '{underlying}'."
                 }
 
-        target_expiry = expiry
-        avail_exp: List[str] = []
-        if not target_expiry:
-            avail_exp = self.get_option_expiries(underlying)
-            if avail_exp:
-                target_expiry = avail_exp[0]
-        else:
-            avail_exp = [target_expiry]
+        avail_exp = self.get_option_expiries(underlying)
+        target_expiry = expiry or (avail_exp[0] if avail_exp else None)
+        if target_expiry and avail_exp and target_expiry not in avail_exp:
+            avail_exp = [target_expiry] + avail_exp
+
+        # In-memory high-frequency caching to prevent Upstox API throttling and Waitress worker starvation
+        cache_key = f"{und_clean}:{target_expiry or 'ATM'}:{strike_count}"
+        now_ts = time.time()
+        if not hasattr(self, "_option_chain_cache"):
+            self._option_chain_cache = {}
+        cached_entry = self._option_chain_cache.get(cache_key)
+        if cached_entry and (now_ts - cached_entry[0] < 3.0):
+            return cached_entry[1]
 
         params = {"instrument_key": instrument_key}
         if target_expiry:
@@ -1687,7 +1675,7 @@ class UpstoxService:
                 start = max(0, atm_idx - half)
                 strikes = strikes[start : start + strike_count]
 
-            return {
+            result_chain = {
                 "status": "success",
                 "provider": "UPSTOX",
                 "underlying": underlying,
@@ -1698,6 +1686,8 @@ class UpstoxService:
                 "rows": strikes,
                 "data": res.get("data", []),
             }
+            self._option_chain_cache[cache_key] = (now_ts, result_chain)
+            return result_chain
         except Exception as e:
             logger.warning("Upstox option chain query error: %s", e)
             return {"status": "error", "message": str(e)}

@@ -83,7 +83,12 @@ def get_market_quote():
 
     if code == 200 and res.get("ok"):
         ts_ms = res.get("timestamp")
-        ts_iso = datetime.fromtimestamp(ts_ms / 1000.0, timezone.utc).isoformat() if ts_ms else None
+        if isinstance(ts_ms, (int, float)):
+            ts_iso = datetime.fromtimestamp(ts_ms / 1000.0, timezone.utc).isoformat()
+        elif isinstance(ts_ms, str) and ts_ms:
+            ts_iso = ts_ms
+        else:
+            ts_iso = datetime.now(timezone.utc).isoformat()
         return jsonify({
             "status": "success",
             "symbol": res.get("symbol", symbol),

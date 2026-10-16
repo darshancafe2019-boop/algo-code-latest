@@ -150,3 +150,19 @@ export interface BotWizardDraft {
   // Step 6: Risk Management
   risk: RiskConfig;
 }
+
+export function formatPositionBotName(symbolOrPosition?: string | null, typeOrStrat?: string | null): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const dateStr = `${year}-${month}-${day} ${hours}:${minutes}`;
+
+  const cleanSym = (symbolOrPosition || "POSITION").trim();
+  if (typeOrStrat && !cleanSym.includes(typeOrStrat)) {
+    return `${cleanSym} ${typeOrStrat} [${dateStr}]`;
+  }
+  return `${cleanSym} [${dateStr}]`;
+}

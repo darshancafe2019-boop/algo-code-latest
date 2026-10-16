@@ -166,7 +166,7 @@ export function BotControlCard({ bot, onOpenIndicators }: Props) {
                 pnl >= 0 ? "text-[#00E890]" : "text-[#E26D6D]"
               }`}
             >
-              {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
+              {pnl >= 0 ? "+" : "-"}{(bot.symbol?.includes("NIFTY") || bot.symbol?.includes("BANK")) ? "₹" : "$"}{Math.abs(pnl).toFixed(2)}
             </span>
           </div>
 

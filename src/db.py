@@ -597,7 +597,7 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                 pass
             conn = None
         err_str = str(e).lower()
-        logger.error("safe_query error: %s", e)
+        logger.error("safe_query error: %s, sql=%s", e, sql)
         if any(w in err_str for w in ["malformed", "corrupt", "unsupported file format", "file is not a database"]):
             logger.critical("Corrupt database detected in safe_query, initiating automatic recovery...")
             validate_and_repair_sqlite()
@@ -3544,6 +3544,10 @@ def init_db(force: bool = False) -> None:
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_user ON user_sessions(user_id, is_revoked)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(token_hash)")
                 cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_sessions_lookup ON user_sessions(token_hash, is_revoked, expires_at)")
+                try:
+                    cursor.execute("ALTER TABLE user_sessions ADD COLUMN login_date TEXT DEFAULT ''")
+                except Exception:
+                    pass
 
                 cursor.execute(
                     """
@@ -9274,14 +9278,14 @@ def get_instruments_master(
             d["provider"] = "binance"
             d["market_status"] = "OPEN"
             d["marketSession"] = "24X7"
-            d["priceState"] = "LAST_TRADED"
+            d["priceState"] = "LIVE_TRADE"
         elif ex in ["DELTA"] or "DELTA" in sym or "delta" in stored_prov:
             d["provider"] = "delta"
             d["market_status"] = "OPEN"
             d["marketSession"] = "24X7"
-            d["priceState"] = "LAST_TRADED"
+            d["priceState"] = "LIVE_TRADE"
         elif ex in ["NSE", "BSE", "NFO", "MCX"] or "INDIAN" in ac or "STOCK" in ac or "EQUITY" in ac or sym in ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX"]:
-            d["provider"] = "upstox" if ("upstox" in stored_prov or "UPSTOX" in sym) else "dhan"
+            d["provider"] = "upstox"
             d["market_status"] = "OPEN" if nse_is_open else "CLOSED"
             d["marketSession"] = "OPEN" if nse_is_open else "CLOSED"
             d["priceState"] = "LAST_TRADED"
@@ -10808,6 +10812,10 @@ def reconcile_startup_bot_states() -> Dict[str, Any]:
         pid_str = b.get("process_id", "")
 
         if status in ["RUNNING", "PAUSED", "STARTING", "RESUMING"]:
+            # Quant Wizard / BotEngine bots run as in-process threads, not separate OS processes
+            if b_id.startswith("BOT-"):
+                continue
+
             is_alive = False
             if pid_str and pid_str.isdigit():
                 pid = int(pid_str)
@@ -11887,9 +11895,16 @@ def record_email_delivery_event(
     )
 
 
-def sync_admin_email_in_db(username: str = "admin", target_email: str = "ashishparadkar1999@gmail.com") -> bool:
+def sync_admin_email_in_db(username: str = "admin", target_email: Optional[str] = None) -> bool:
     """Safely updates administrator email in database without affecting password hashes or creating duplicates."""
-    return safe_execute("UPDATE users SET email = ? WHERE username = ?", (target_email, username))
+    resolved_email = (
+        target_email
+        or os.environ.get("AUTH_ADMIN_EMAIL")
+        or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
+        or getattr(config, "AUTH_ADMIN_EMAIL", "")
+        or "ashishparadkar1999@gmail.com"
+    ).strip()
+    return safe_execute("UPDATE users SET email = ? WHERE username = ?", (resolved_email, username))
 
 
 def create_temp_auth_challenge(challenge_id: str, user_id: str, ip_address: str, expires_at: str) -> bool:
@@ -11936,29 +11951,54 @@ def delete_temp_totp_enrollment(enrollment_id: str) -> bool:
 
 
 def create_user_session(session_dict: Dict[str, Any]) -> bool:
-    """Creates a new active user session."""
+    """Creates a new active user session with daily login date stamp."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    return safe_execute(
-        """
-        INSERT INTO user_sessions (
-            session_id, user_id, token_hash, device_name, ip_address,
-            user_agent, approximate_location, last_active_at, expires_at,
-            is_revoked, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
-        """,
-        (
-            session_dict["session_id"],
-            session_dict["user_id"],
-            session_dict["token_hash"],
-            session_dict.get("device_name", "MacBook / Chrome"),
-            session_dict.get("ip_address", "127.0.0.1"),
-            session_dict.get("user_agent", ""),
-            session_dict.get("approximate_location", "Indore, India"),
-            session_dict.get("last_active_at", now_iso),
-            session_dict["expires_at"],
-            now_iso,
+    login_date = session_dict.get("login_date") or datetime.now().strftime("%Y-%m-%d")
+    try:
+        return safe_execute(
+            """
+            INSERT INTO user_sessions (
+                session_id, user_id, token_hash, device_name, ip_address,
+                user_agent, approximate_location, last_active_at, expires_at,
+                login_date, is_revoked, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            """,
+            (
+                session_dict["session_id"],
+                session_dict["user_id"],
+                session_dict["token_hash"],
+                session_dict.get("device_name", "MacBook / Chrome"),
+                session_dict.get("ip_address", "127.0.0.1"),
+                session_dict.get("user_agent", ""),
+                session_dict.get("approximate_location", "Indore, India"),
+                session_dict.get("last_active_at", now_iso),
+                session_dict["expires_at"],
+                login_date,
+                now_iso,
+            )
         )
-    )
+    except Exception:
+        return safe_execute(
+            """
+            INSERT INTO user_sessions (
+                session_id, user_id, token_hash, device_name, ip_address,
+                user_agent, approximate_location, last_active_at, expires_at,
+                is_revoked, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)
+            """,
+            (
+                session_dict["session_id"],
+                session_dict["user_id"],
+                session_dict["token_hash"],
+                session_dict.get("device_name", "MacBook / Chrome"),
+                session_dict.get("ip_address", "127.0.0.1"),
+                session_dict.get("user_agent", ""),
+                session_dict.get("approximate_location", "Indore, India"),
+                session_dict.get("last_active_at", now_iso),
+                session_dict["expires_at"],
+                now_iso,
+            )
+        )
 
 
 def get_user_session_by_token_hash(token_hash: str) -> Optional[Dict[str, Any]]:

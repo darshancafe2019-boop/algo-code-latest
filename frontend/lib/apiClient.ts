@@ -179,6 +179,14 @@ interface CacheEntry<T> {
   ttlMs: number;
 }
 
+const getLocalCalendarDate = (): string => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 class ResilientApiClient {
   private inFlightRequests: Map<string, Promise<ApiResponse<any>>> = new Map();
   private fastGetCache: Map<string, CacheEntry<any>> = new Map();
@@ -321,12 +329,27 @@ class ResilientApiClient {
         }
 
         const meUrl = this.resolveUrl("/api/auth/me");
+        const headers: Record<string, string> = {
+          Accept: "application/json",
+          "X-Request-Id": this.generateRequestId(),
+        };
+        try {
+          const todayStr = getLocalCalendarDate();
+          const storedDate = localStorage.getItem("quantos_session_date");
+          if (storedDate && storedDate !== todayStr) {
+            localStorage.removeItem("quantos_session_token");
+            localStorage.removeItem("quantos_session_date");
+            sessionStorage.removeItem("quantos_session_token");
+          }
+          const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+          if (storedToken) {
+            headers["Authorization"] = `Bearer ${storedToken}`;
+          }
+        } catch {}
+
         const res = await fetch(meUrl, {
           method: "GET",
-          headers: {
-            Accept: "application/json",
-            "X-Request-Id": this.generateRequestId(),
-          },
+          headers,
           credentials: "include",
           cache: "no-store",
           signal: AbortSignal.timeout(4000),
@@ -336,6 +359,13 @@ class ResilientApiClient {
           const data = await res.json().catch(() => ({}));
           if (data.status === "success" && data.authenticated && data.user) {
             console.info("[AUTH] Session restored successfully.");
+            if (data.session_token) {
+              try {
+                const todayStr = getLocalCalendarDate();
+                localStorage.setItem("quantos_session_token", data.session_token);
+                localStorage.setItem("quantos_session_date", todayStr);
+              } catch {}
+            }
             window.dispatchEvent(
               new CustomEvent("quantos:auth_restored", { detail: { user: data.user, session: data.session } })
             );
@@ -627,6 +657,23 @@ class ResilientApiClient {
       "X-Request-Id": requestId,
       ...(options.customHeaders || {}),
     };
+
+    if (typeof window !== "undefined" && !headers["Authorization"]) {
+      try {
+        const todayStr = getLocalCalendarDate();
+        const storedDate = localStorage.getItem("quantos_session_date");
+        if (storedDate && storedDate !== todayStr) {
+          localStorage.removeItem("quantos_session_token");
+          localStorage.removeItem("quantos_session_date");
+          sessionStorage.removeItem("quantos_session_token");
+        } else {
+          const storedToken = localStorage.getItem("quantos_session_token") || sessionStorage.getItem("quantos_session_token");
+          if (storedToken) {
+            headers["Authorization"] = `Bearer ${storedToken}`;
+          }
+        }
+      } catch {}
+    }
 
     if (options.idempotencyKey) {
       headers["X-Idempotency-Key"] = options.idempotencyKey;

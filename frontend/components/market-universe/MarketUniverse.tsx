@@ -255,8 +255,7 @@ export function MarketUniverse() {
       list = list.filter((it) => {
         const prov = (it.provider || "").toLowerCase();
         const ex = (it.exchange || "").toLowerCase();
-        if (pFilter === "dhan") return prov.includes("dhan") || ex === "dhan";
-        if (pFilter === "upstox") return prov.includes("upstox") || ex === "upstox";
+        if (pFilter === "upstox" || pFilter === "dhan") return prov.includes("upstox") || ex === "upstox" || prov.includes("dhan") || ex === "nse" || ex === "bse";
         if (pFilter === "delta") return prov.includes("delta") || ex === "delta";
         if (pFilter === "binance") return prov.includes("binance") || ex === "binance";
         if (pFilter === "oanda") return prov.includes("oanda") || ex === "oanda";
@@ -339,8 +338,7 @@ export function MarketUniverse() {
     quotes.forEach((q) => {
       if (q && q.last_price && q.last_price > 0 && !q.is_stale) {
         const p = q.provider.toLowerCase();
-        if (p.includes("dhan")) active.add("DHAN");
-        else if (p.includes("upstox")) active.add("UPSTOX");
+        if (p.includes("upstox") || p.includes("dhan")) active.add("UPSTOX");
         else if (p.includes("delta")) active.add("DELTA");
         else if (p.includes("binance")) active.add("BINANCE");
         else if (p.includes("oanda")) active.add("OANDA");
@@ -559,7 +557,7 @@ export function MarketUniverse() {
                     ) as any)
                   : (quotes.get("NIFTY") || quotes.get("BTCUSDT") || null as any)
               }
-              provider={selectedInstrument?.provider || "DELTA"}
+              provider={selectedInstrument?.provider || (selectedInstrument?.exchange === "DELTA" ? "DELTA" : "UPSTOX")}
             />
           </div>
         ) : activeView === "DIAGNOSTICS" ? (

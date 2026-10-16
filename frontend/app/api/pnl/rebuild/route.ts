@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
 
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
     try {
       const res = await fetch(`${BACKEND_URL}/api/portfolio/reconcile`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getForwardHeaders(request),
         body: JSON.stringify({ broker, mode, reset_cache: resetCache }),
       });
       if (res.ok) {

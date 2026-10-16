@@ -58,6 +58,7 @@ import {
   getStandardOptionLotSize,
 } from "@/types/option-order-intent";
 import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
+import { useMarketGateway } from "@/context/MarketGatewayContext";
 
 interface OptionChainTerminalProps {
   initialUnderlying?: string;
@@ -70,7 +71,7 @@ const STORAGE_ONE_CLICK_KEY = "quantos_one_click_trading_mode";
 
 export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   initialUnderlying = "NIFTY",
-  initialSource = "DHAN",
+  initialSource = "AUTO",
   isSourceLocked = false,
 }) => {
   const router = useRouter();
@@ -111,7 +112,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       if (["BTC", "ETH", "SOL", "XRP", "BNB"].includes(cleanUnd)) {
         setSource("DELTA_INDIA");
       } else if (!urlProvider && (source === "DELTA_INDIA" || source === "BINANCE")) {
-        setSource("DHAN");
+        setSource("AUTO");
       }
     }
     if (urlProvider) {
@@ -120,7 +121,17 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
     if (urlExpiry) {
       setSelectedExpiry(urlExpiry);
     }
-  }, [urlUnderlying, urlProvider, urlExpiry]);
+  }, [urlUnderlying, urlProvider, urlExpiry, source]);
+
+  // Live market gateway streaming subscription for active underlying
+  const { subscribe, unsubscribe } = useMarketGateway();
+  useEffect(() => {
+    if (!underlying) return;
+    subscribe(underlying, "OPTION_CHAIN");
+    return () => {
+      unsubscribe(underlying, "OPTION_CHAIN");
+    };
+  }, [underlying, subscribe, unsubscribe]);
 
   // Sub-tabs
   const [terminalTab, setTerminalTab] = useState<"CHAIN" | "FLOW" | "ANALYTICS">("CHAIN");
@@ -226,14 +237,14 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
       });
       if (selectedExpiry) params.append("expiry", selectedExpiry);
 
-      const res = await apiClient.get<any>(`/api/options/flow?${params.toString()}`, { timeoutMs: 6000 });
+      const res = await apiClient.get<any>(`/api/options/flow?${params.toString()}`, { timeoutMs: 12000 });
       if (!res.ok || !res.data) {
         throw new Error(res.error?.message || "Failed to load option chain snapshot");
       }
       return res.data;
     },
-    staleTime: 3000,
-    refetchInterval: () => (apiClient.isOffline() ? false : 5000),
+    staleTime: 2500,
+    refetchInterval: () => (apiClient.isOffline() ? false : 3500),
     retry: 1,
   });
 
@@ -905,7 +916,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
           if (["BTC", "ETH", "SOL", "XRP"].includes(u)) {
             setSource("DELTA_INDIA");
           } else if (source === "DELTA_INDIA" || source === "BINANCE") {
-            setSource("DHAN");
+            setSource("AUTO");
           }
         }}
         spotPrice={snapshot?.spotPrice || 0}

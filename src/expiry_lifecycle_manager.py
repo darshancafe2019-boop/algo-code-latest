@@ -503,7 +503,7 @@ class DerivativeExpiryManager:
             """
             SELECT * FROM trades_log 
             WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL', 'EXPIRY_EXIT_PENDING', 'SQUARE_OFF_PENDING', 'EXPIRY_EXIT_SUBMITTED')
-            ORDER BY id DESC
+            ORDER BY id DESC LIMIT 250
             """
         )
 
@@ -632,6 +632,16 @@ class DerivativeExpiryManager:
                             exec_price = float(uq.get("last_price") or uq.get("ltp") or 0.0)
                     except Exception:
                         pass
+
+        # Fallback to central live quote resolver (handles Indian options derived pricing & crypto options)
+        if exec_price is None or exec_price <= 0:
+            try:
+                from src.bot_wizard_service import get_live_quote
+                wq = get_live_quote(sym)
+                if wq and float(wq.get("last") or wq.get("price") or 0.0) > 0:
+                    exec_price = float(wq.get("last") or wq.get("price"))
+            except Exception:
+                pass
 
         # If quote is missing, check if past settlement
         if exec_price is None or exec_price <= 0:
@@ -855,6 +865,8 @@ class DerivativeExpiryManager:
         now_utc = datetime.now(timezone.utc)
 
         for p in positions:
+            if str(p.environment).upper() == "PAPER":
+                continue
             in_window, cutoff_utc, code = self.is_contract_in_expiry_window(p.trading_symbol, now=now_utc)
             if in_window:
                 logger.info("[%s] Startup recovery found expiring/expired position #%s (%s, code: %s).", p.bot_id, p.position_id, p.trading_symbol, code)
@@ -874,6 +886,9 @@ class DerivativeExpiryManager:
 
         for p in positions:
             if not p.auto_square_off_on_expiry:
+                continue
+            # Paper trading positions are managed autonomously by their strategy TP/SL
+            if str(p.environment).upper() == "PAPER":
                 continue
 
             info = self.get_contract_expiry_info(p.trading_symbol, square_off_minutes=p.expiry_exit_buffer_minutes, now=now_utc)

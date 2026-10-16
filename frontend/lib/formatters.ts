@@ -1,8 +1,4 @@
-/**
- * Centralized, Audited Financial Number Formatting Utilities for Quant.OS
- * ========================================================================
- * Re-exports and integrates authoritative formatters from financial.ts and numbers.ts.
- */
+import { resolveCurrencySymbol } from "./formatters/financial";
 
 export {
   toFiniteNumber,
@@ -24,6 +20,8 @@ export {
   formatExactNumber,
   formatPnL,
   formatRatio,
+  detectMarketCurrency,
+  resolveCurrencySymbol,
   safeArray,
   safeMap,
   logInvalidNumericField,
@@ -59,13 +57,15 @@ export function formatSignedMoney(
   value: number | string | null | undefined,
   currency: string = "$"
 ): string {
-  if (value === null || value === undefined || value === "") return `${currency}0.00`;
+  const symbol = resolveCurrencySymbol(currency);
+  if (value === null || value === undefined || value === "") return `${symbol}0.00`;
   const num = typeof value === "string" ? parseFloat(value) : value;
-  if (isNaN(num)) return `${currency}0.00`;
+  if (isNaN(num)) return `${symbol}0.00`;
 
   const sign = num > 0 ? "+" : num < 0 ? "-" : "";
   const absVal = Math.abs(num);
-  return `${sign}${currency}${absVal.toLocaleString("en-US", {
+  const locale = symbol === "₹" ? "en-IN" : "en-US";
+  return `${sign}${symbol}${absVal.toLocaleString(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

@@ -253,8 +253,8 @@ class AccountManager:
                       AND UPPER(COALESCE(execution_mode, 'PAPER')) = ?
                 """, (env_str,))
                 overall_row = c.fetchone()
-                total_env_realized = float(overall_row[0] or 0.0) if overall_row else 0.0
-                total_env_fees = float(overall_row[1] or 0.0) if overall_row else 0.0
+                total_env_realized = float(overall_row[0] or 0.0) if (overall_row and len(overall_row) > 0 and overall_row[0] is not None) else 0.0
+                total_env_fees = float(overall_row[1] or 0.0) if (overall_row and len(overall_row) > 1 and overall_row[1] is not None) else 0.0
 
                 # 2. Open positions unrealized PnL & margin by broker / account
                 open_pos_rows = []
@@ -287,13 +287,15 @@ class AccountManager:
                 except Exception:
                     pass
 
-                total_env_unrealized = float(overall_pos[0] or 0.0) if overall_pos else 0.0
-                total_env_margin = float(overall_pos[1] or 0.0) if overall_pos else 0.0
-                total_env_pos_count = int(overall_pos[2] or 0) if overall_pos else 0
+                total_env_unrealized = float(overall_pos[0] or 0.0) if (overall_pos and len(overall_pos) > 0 and overall_pos[0] is not None) else 0.0
+                total_env_margin = float(overall_pos[1] or 0.0) if (overall_pos and len(overall_pos) > 1 and overall_pos[1] is not None) else 0.0
+                total_env_pos_count = int(overall_pos[2] or 0) if (overall_pos and len(overall_pos) > 2 and overall_pos[2] is not None) else 0
 
                 # Map closed trade stats
                 broker_pnl_map: Dict[str, Dict[str, float]] = {}
                 for r in closed_rows:
+                    if not r or len(r) < 5:
+                        continue
                     brk = str(r[0] or "").upper()
                     acc_id = str(r[1] or "")
                     realized = float(r[3] or 0.0)
@@ -310,11 +312,13 @@ class AccountManager:
                 # Map open position stats
                 broker_pos_map: Dict[str, Dict[str, float]] = {}
                 for r in open_pos_rows:
+                    if not r or len(r) < 5:
+                        continue
                     brk = str(r[0] or "").upper()
                     acc_id = str(r[1] or "")
-                    unrealized = float(r[3] or 0.0)
-                    margin = float(r[4] or 0.0)
-                    cnt = int(r[5] or 0)
+                    unrealized = float(r[2] or 0.0)
+                    margin = float(r[3] or 0.0)
+                    cnt = int(r[4] or 0)
 
                     key = f"{brk}:{acc_id}"
                     broker_pos_map[key] = {"unrealized": unrealized, "margin": margin, "count": cnt}

@@ -291,8 +291,13 @@ class CapitalAccountingService:
             cb.other_charges = round(other, 2)
             cb.total_expenses = round(b_fees + taxes + funding + exch + slip + other, 2)
 
-            # 3. Realized & Unrealized P&L from trades_log and bot_instances
-            trade_sql = "SELECT result_pnl, unrealized_pnl, fees, status FROM trades_log WHERE customer_id = ?"
+            # 3. Realized & Unrealized P&L from trades_log via high-speed SQL aggregates
+            trade_sql = """
+                SELECT 
+                    COALESCE(SUM(result_pnl), 0.0) as sum_realized,
+                    COALESCE(SUM(CASE WHEN UPPER(status) = 'OPEN' THEN unrealized_pnl ELSE 0.0 END), 0.0) as sum_unrealized
+                FROM trades_log WHERE customer_id = ?
+            """
             trade_params: List[Any] = [customer_id]
             if department_id:
                 trade_sql += " AND department_id = ?"
@@ -304,16 +309,9 @@ class CapitalAccountingService:
                 trade_sql += " AND execution_mode = ?"
                 trade_params.append(environment)
 
-            trades = db.safe_query(trade_sql, tuple(trade_params))
-            realized_pnl = 0.0
-            unrealized_pnl = 0.0
-            for t in trades:
-                realized_pnl += float(t.get("result_pnl") or 0.0)
-                if str(t.get("status") or "").upper() == "OPEN":
-                    unrealized_pnl += float(t.get("unrealized_pnl") or 0.0)
-
-            cb.realized_pnl = round(realized_pnl, 2)
-            cb.unrealized_pnl = round(unrealized_pnl, 2)
+            t_row = db.safe_query_one(trade_sql, tuple(trade_params)) or {}
+            cb.realized_pnl = round(float(t_row.get("sum_realized") or 0.0), 2)
+            cb.unrealized_pnl = round(float(t_row.get("sum_unrealized") or 0.0), 2)
 
             # Authoritative Net Equity Formula
             cb.net_equity = round(

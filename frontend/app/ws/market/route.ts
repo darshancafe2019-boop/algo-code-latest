@@ -18,7 +18,7 @@ export async function GET(): Promise<Response> {
       status: "ACTIVE",
       service: "MarketDataGateway",
       direct_ws_url: `${GATEWAY_WS_URL}/ws`,
-      recommended_client_target: "ws://127.0.0.1:5051/ws",
+      recommended_client_target: `${GATEWAY_WS_URL}/ws`,
       transport: "DirectWebSocket",
       timestamp: new Date().toISOString(),
     },

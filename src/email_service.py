@@ -23,9 +23,16 @@ from typing import Any, Dict, Optional, Tuple
 
 from src import config, db
 
-logger = logging.getLogger("EmailService")
+def get_target_admin_email() -> str:
+    """Returns authoritative administrator recipient email from configuration."""
+    return (
+        os.environ.get("AUTH_ADMIN_EMAIL")
+        or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
+        or getattr(config, "AUTH_ADMIN_EMAIL", "")
+        or "ashishparadkar1999@gmail.com"
+    ).strip()
 
-TARGET_ADMIN_EMAIL = "ashishparadkar1999@gmail.com"
+TARGET_ADMIN_EMAIL = get_target_admin_email()
 
 
 def mask_email_address(email: Optional[str]) -> str:
@@ -408,8 +415,8 @@ class EmailService:
         Enforces that admin challenges strictly deliver to ashishparadkar1999@gmail.com.
         """
         clean_recipient = normalize_email(to_email)
-        if username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
-            clean_recipient = TARGET_ADMIN_EMAIL
+        if not clean_recipient or username == "admin" or user_id in ("usr_admin_01", "usr_authoritative_admin"):
+            clean_recipient = get_target_admin_email()
 
         subject = "Your Quant.OS verification code"
 
@@ -473,8 +480,8 @@ If you did not request this code, ignore this email.
         Enforces that admin password recovery strictly delivers to ashishparadkar1999@gmail.com.
         """
         clean_recipient = normalize_email(to_email)
-        if username == "admin" or user_id == "usr_admin_01" or user_id == "usr_authoritative_admin":
-            clean_recipient = TARGET_ADMIN_EMAIL
+        if not clean_recipient or username == "admin" or user_id in ("usr_admin_01", "usr_authoritative_admin"):
+            clean_recipient = get_target_admin_email()
 
         subject = "Your Quant.OS password reset code"
 

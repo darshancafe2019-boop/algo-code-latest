@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMoney } from "@/lib/formatters";
+import { formatMoney, formatSignedMoney, resolveCurrencySymbol } from "@/lib/formatters";
 import React, { useState } from "react";
 import {
   DollarSign,
@@ -23,13 +23,17 @@ import { BotMetricsSummary } from "@/types/bot-control";
 
 interface BotOverviewMetricsProps {
   metrics: BotMetricsSummary;
+  currency?: string;
 }
 
-export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
+export function BotOverviewMetrics({ metrics, currency = "$" }: BotOverviewMetricsProps) {
+  const currSym = resolveCurrencySymbol(currency);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
 
-  const isPositiveToday = (metrics.today_pnl || 0) >= 0;
-  const isPositiveTotal = (metrics.total_pnl || 0) >= 0;
+  const todayPnlVal = Number(metrics.today_pnl) || 0;
+  const totalPnlVal = Number(metrics.total_pnl) || 0;
+  const isPositiveToday = todayPnlVal > 0;
+  const isPositiveTotal = totalPnlVal > 0;
 
   const totalCapital = metrics.total_capital || metrics.current_equity || metrics.current_balance || 10000.0;
   const allocatedCapital = metrics.allocated_capital || metrics.start_balance || 10000.0;
@@ -120,13 +124,11 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
                 isPositiveToday ? "text-emerald-400" : "text-rose-400"
               }`}
             >
-              {isPositiveToday
-                ? `+$${(Number(metrics?.today_pnl) || 0).toFixed(2)}`
-                : `-$${Math.abs(Number(metrics?.today_pnl) || 0).toFixed(2)}`}
+              {formatSignedMoney(todayPnlVal, currSym)}
             </span>
           </div>
           <div className="text-[10px] text-slate-500 font-mono">
-            Total: {isPositiveTotal ? `+$${(Number(metrics?.total_pnl) || 0).toFixed(2)}` : `-$${Math.abs(Number(metrics?.total_pnl) || 0).toFixed(2)}`}
+            Total: {formatSignedMoney(totalPnlVal, currSym)}
           </div>
 
           {/* Metric Provenance Tooltip */}
@@ -139,11 +141,11 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
               <div className="space-y-0.5 text-[10px] text-slate-300">
                 <div className="flex justify-between">
                   <span>Realized Today:</span>
-                  <span className="font-bold text-emerald-400">+${(Number(metrics?.today_pnl) || 0).toFixed(2)}</span>
+                  <span className="font-bold text-emerald-400">{formatSignedMoney(Number(metrics?.today_pnl) || 0, currSym)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Fees & Slippage:</span>
-                  <span className="text-slate-400">-$0.00</span>
+                  <span className="text-slate-400">-{currSym}0.00</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Source:</span>
@@ -226,7 +228,7 @@ export function BotOverviewMetrics({ metrics }: BotOverviewMetricsProps) {
         <div className="px-3 py-1.5 rounded-xl bg-[#070D14] border border-[#1A2A3F] flex items-center justify-between">
           <span className="text-slate-500 text-[10px] uppercase">Realized P&L:</span>
           <span className={`font-bold ${isPositiveTotal ? "text-emerald-400" : "text-rose-400"}`}>
-            {isPositiveTotal ? `+$${(Number(metrics.total_pnl) || 0).toFixed(2)}` : `-$${Math.abs(Number(metrics.total_pnl) || 0).toFixed(2)}`}
+            {formatSignedMoney(Number(metrics.total_pnl) || 0, currSym)}
           </span>
         </div>
 

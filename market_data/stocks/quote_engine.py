@@ -47,8 +47,44 @@ class LiveQuoteFetcher:
         data = None
         ticker_str = cls.get_ticker_symbol(symbol, exchange)
 
-        # 1. Primary Live Feed: YFinance Fast Info
-        if symbol.isalnum() or symbol.replace("-", "").isalnum():
+        # 0. Primary Authoritative Feed for Indian Equities & Global Equities: Market Data Gateway (port 5051)
+        try:
+            import urllib.request
+            import json
+            gw_url = f"http://127.0.0.1:5051/api/market/quote?symbol={symbol}"
+            req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
+            with urllib.request.urlopen(req, timeout=0.6) as resp:
+                if resp.status == 200:
+                    gw_data = json.loads(resp.read().decode("utf-8"))
+                    if gw_data.get("ok") and gw_data.get("price"):
+                        p = float(gw_data["price"])
+                        vol = float(gw_data.get("volume") or 100000.0)
+                        open_p = float(gw_data.get("open") or p)
+                        high_p = float(gw_data.get("high") or p * 1.01)
+                        low_p = float(gw_data.get("low") or p * 0.99)
+                        prev_close = float(gw_data.get("previous_close") or open_p or p)
+                        chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                        chg_abs = round(p - prev_close, 2)
+                        data = {
+                            "last_price": round(p, 2),
+                            "open": round(open_p, 2),
+                            "high": round(high_p, 2),
+                            "low": round(low_p, 2),
+                            "previous_close": round(prev_close, 2),
+                            "change_pct": chg_pct,
+                            "change_abs": chg_abs,
+                            "volume": vol,
+                            "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
+                            "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
+                            "market_cap": None,
+                            "data_quality": "LIVE",
+                            "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
+                        }
+        except Exception as e:
+            logger.debug(f"Gateway live fetch note for {symbol}: {e}")
+
+        # 1. Secondary Live Feed: YFinance Fast Info (if gateway had no quote)
+        if not data and (symbol.isalnum() or symbol.replace("-", "").isalnum()):
             try:
                 import logging as _log
                 _log.getLogger("yfinance").setLevel(_log.CRITICAL)
@@ -93,7 +129,7 @@ class LiveQuoteFetcher:
             except Exception as e:
                 logger.debug(f"Live fetch note for {ticker_str}: {e}")
 
-        # 2. Secondary Fallback for Indian Equities: NseService
+        # 3. Tertiary Fallback for Indian Equities: NseService
         if not data and exchange == "NSE":
             try:
                 from src.nse_service import NseService
@@ -137,8 +173,8 @@ class StockQuoteEngine:
     def _seed_baseline_quotes(self) -> None:
         """Seeds realistic baseline live prices for standard top equities."""
         sample_quotes = {
-            "RELIANCE": {"last": 1226.40, "open": 1235.0, "high": 1248.0, "low": 1222.0, "prev": 1243.90, "vol": 6800000.0, "avg_vol": 6500000.0, "high_52w": 1611.80, "low_52w": 1235.30, "mcap": 16596224769946.0},
-            "TCS": {"last": 2105.00, "open": 2180.0, "high": 2195.0, "low": 2095.0, "prev": 2190.00, "vol": 3100000.0, "avg_vol": 2800000.0, "high_52w": 3350.00, "low_52w": 1976.80, "mcap": 7616074225390.0},
+            "RELIANCE": {"last": 1211.20, "open": 1215.0, "high": 1215.4, "low": 1193.0, "prev": 1211.20, "vol": 17225283.0, "avg_vol": 15000000.0, "high_52w": 1611.80, "low_52w": 1193.0, "mcap": 16380000000000.0},
+            "TCS": {"last": 2465.00, "open": 2382.0, "high": 2484.7, "low": 2375.7, "prev": 2465.00, "vol": 12166634.0, "avg_vol": 10000000.0, "high_52w": 3350.00, "low_52w": 2375.7, "mcap": 8920000000000.0},
             "HDFCBANK": {"last": 731.00, "open": 718.0, "high": 735.0, "low": 715.0, "prev": 713.00, "vol": 12000000.0, "avg_vol": 11000000.0, "high_52w": 1020.50, "low_52w": 681.90, "mcap": 11269519857192.0},
             "INFY": {"last": 1051.40, "open": 1055.0, "high": 1062.0, "low": 1048.0, "prev": 1058.60, "vol": 5200000.0, "avg_vol": 4800000.0, "high_52w": 1728.00, "low_52w": 982.40, "mcap": 4258484933254.0},
             "ICICIBANK": {"last": 1338.90, "open": 1345.0, "high": 1352.0, "low": 1332.0, "prev": 1347.60, "vol": 8400000.0, "avg_vol": 7800000.0, "high_52w": 1480.00, "low_52w": 1187.60, "mcap": 9610312931031.0},
@@ -249,6 +285,60 @@ class StockQuoteEngine:
         if not to_fetch:
             return
 
+        # 1. Batch Snapshot from Market Data Gateway (port 5051)
+        remaining = []
+        try:
+            import urllib.request
+            import json
+            symbols_to_gw = [inst.symbol for inst in to_fetch]
+            gw_url = f"http://127.0.0.1:5051/api/market/snapshot?symbols={','.join(symbols_to_gw)}"
+            req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
+            with urllib.request.urlopen(req, timeout=1.5) as resp:
+                if resp.status == 200:
+                    gw_data = json.loads(resp.read().decode("utf-8"))
+                    quotes_map = gw_data.get("quotes", {})
+                    for inst in to_fetch:
+                        q_data = quotes_map.get(inst.symbol) or quotes_map.get(inst.symbol.upper())
+                        if q_data and q_data.get("last_price"):
+                            p = float(q_data["last_price"])
+                            vol = float(q_data.get("volume") or 100000.0)
+                            open_p = float(q_data.get("open") or p)
+                            high_p = float(q_data.get("high") or p * 1.01)
+                            low_p = float(q_data.get("low") or p * 0.99)
+                            prev_close = float(q_data.get("previous_close") or open_p or p)
+                            chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                            chg_abs = round(p - prev_close, 2)
+                            norm = StockQuoteNormalizer.normalize_quote(
+                                raw={
+                                    "last_price": round(p, 2),
+                                    "open": round(open_p, 2),
+                                    "high": round(high_p, 2),
+                                    "low": round(low_p, 2),
+                                    "previous_close": round(prev_close, 2),
+                                    "change_pct": chg_pct,
+                                    "change_abs": chg_abs,
+                                    "volume": vol,
+                                    "high_52w": round(float(q_data.get("high_52w") or p * 1.25), 2),
+                                    "low_52w": round(float(q_data.get("low_52w") or p * 0.75), 2),
+                                    "market_cap": None,
+                                    "data_quality": "LIVE",
+                                },
+                                instrument_id=inst.instrument_id,
+                                symbol=inst.symbol,
+                                exchange=inst.exchange,
+                                currency=inst.currency,
+                                provider="Upstox-Live" if q_data.get("provider") == "upstox" else (q_data.get("provider") or "Live-Market-Feed"),
+                                avg_volume_30d=vol
+                            )
+                            self._quotes[inst.instrument_id] = norm
+                        else:
+                            remaining.append(inst)
+        except Exception:
+            remaining = to_fetch
+
+        if not remaining:
+            return
+
         def fetch_single(inst):
             try:
                 live = LiveQuoteFetcher.fetch_live_data(inst.symbol, inst.exchange)
@@ -268,10 +358,10 @@ class StockQuoteEngine:
             return inst.instrument_id, None
 
         try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=min(12, len(to_fetch))) as executor:
-                future_to_inst = {executor.submit(fetch_single, inst): inst for inst in to_fetch}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(remaining))) as executor:
+                future_to_inst = {executor.submit(fetch_single, inst): inst for inst in remaining}
                 try:
-                    for future in concurrent.futures.as_completed(future_to_inst, timeout=2.5):
+                    for future in concurrent.futures.as_completed(future_to_inst, timeout=2.0):
                         try:
                             iid, norm = future.result()
                             if norm:
@@ -286,25 +376,32 @@ class StockQuoteEngine:
     def update_quote(self, quote: NormalizedStockQuote) -> None:
         self._quotes[quote.instrument_id] = quote
 
-    def get_quote(self, instrument_id: str) -> Optional[NormalizedStockQuote]:
+    def get_quote(self, instrument_id: str, fetch_live_if_missing: bool = True) -> Optional[NormalizedStockQuote]:
         inst = global_stock_master.get_by_id(instrument_id)
         if not inst:
             return self._quotes.get(instrument_id)
 
+        # Check existing quote in cache first!
+        if instrument_id in self._quotes:
+            q = self._quotes[instrument_id]
+            if not fetch_live_if_missing or q.data_quality == "LIVE":
+                return q
+
         # On-demand live fetch for single stock
-        live = LiveQuoteFetcher.fetch_live_data(inst.symbol, inst.exchange)
-        if live:
-            norm = StockQuoteNormalizer.normalize_quote(
-                raw=live,
-                instrument_id=inst.instrument_id,
-                symbol=inst.symbol,
-                exchange=inst.exchange,
-                currency=inst.currency,
-                provider=live.get("provider", "Live-Market-Feed"),
-                avg_volume_30d=live.get("volume", 500000.0)
-            )
-            self._quotes[instrument_id] = norm
-            return norm
+        if fetch_live_if_missing:
+            live = LiveQuoteFetcher.fetch_live_data(inst.symbol, inst.exchange)
+            if live:
+                norm = StockQuoteNormalizer.normalize_quote(
+                    raw=live,
+                    instrument_id=inst.instrument_id,
+                    symbol=inst.symbol,
+                    exchange=inst.exchange,
+                    currency=inst.currency,
+                    provider=live.get("provider", "Live-Market-Feed"),
+                    avg_volume_30d=live.get("volume", 500000.0)
+                )
+                self._quotes[instrument_id] = norm
+                return norm
 
         if instrument_id in self._quotes:
             return self._quotes[instrument_id]

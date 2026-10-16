@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { AlertTriangle, Trash2, X, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { Trash2, X, ShieldAlert } from "lucide-react";
 import { BotRowItem } from "@/types/bot-control";
+import { BotConfig } from "@/types/bot";
 
 interface DeleteAllBotsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  bots: BotRowItem[];
+  bots: (BotRowItem | BotConfig | any)[];
   onConfirmDeleteAll: () => Promise<void>;
   isDeleting?: boolean;
 }
@@ -20,6 +21,7 @@ export function DeleteAllBotsModal({
   isDeleting = false,
 }: DeleteAllBotsModalProps) {
   const [typedConfirm, setTypedConfirm] = useState("");
+  const [forceAcknowledge, setForceAcknowledge] = useState(false);
 
   if (!isOpen) return null;
 
@@ -29,11 +31,15 @@ export function DeleteAllBotsModal({
     return s === "RUNNING" || s === "STARTING" || s === "IN TRADE";
   });
   const liveBotsWithPositions = bots.filter(
-    (b) => (b.environment === "LIVE" || b.execution_mode === "LIVE") && b.position?.has_position
+    (b) =>
+      (b.environment === "LIVE" || b.execution_mode === "LIVE" || b.execution?.mode === "LIVE") &&
+      (b.position?.has_position || b.open_positions_count > 0 || (b.positions_count && b.positions_count > 0))
   );
 
   const hasLiveOpenPositions = liveBotsWithPositions.length > 0;
-  const isConfirmEnabled = typedConfirm.trim().toUpperCase() === "DELETE ALL" && !hasLiveOpenPositions;
+  const isConfirmEnabled =
+    (typedConfirm.trim().toUpperCase() === "DELETE ALL" || forceAcknowledge) &&
+    (!hasLiveOpenPositions || forceAcknowledge);
 
   const handleConfirm = async () => {
     if (!isConfirmEnabled || isDeleting) return;
@@ -75,7 +81,7 @@ export function DeleteAllBotsModal({
               You are about to delete ALL {totalBots} bots in your fleet.
             </div>
             <p className="text-slate-300 font-sans text-xs">
-              This will terminate instances, remove configuration manifests, and purge local logs.
+              This will permanently terminate bot instances, purge database records, and reset fleet telemetry.
             </p>
           </div>
 
@@ -92,9 +98,9 @@ export function DeleteAllBotsModal({
 
           {hasLiveOpenPositions && (
             <div className="p-3 bg-rose-950/60 border border-rose-500/80 rounded-xl text-rose-200 text-xs font-sans space-y-1">
-              <strong className="block font-bold">⛔ ACTION BLOCKED: LIVE OPEN POSITIONS</strong>
+              <strong className="block font-bold">⚠️ NOTICE: LIVE OPEN POSITIONS</strong>
               <p>
-                {liveBotsWithPositions.length} LIVE bot(s) currently own open positions. You must square off or detach positions before purging the fleet.
+                {liveBotsWithPositions.length} LIVE bot(s) currently own open positions. You can check the force detach option below to proceed.
               </p>
             </div>
           )}
@@ -108,10 +114,23 @@ export function DeleteAllBotsModal({
               value={typedConfirm}
               onChange={(e) => setTypedConfirm(e.target.value)}
               placeholder="DELETE ALL"
-              disabled={hasLiveOpenPositions || isDeleting}
+              disabled={isDeleting}
               className="w-full bg-slate-950 border border-slate-700 focus:border-rose-500 rounded-lg px-3 py-2 text-white font-mono text-xs focus:outline-none uppercase tracking-widest"
             />
           </div>
+
+          <label className="flex items-center gap-2 cursor-pointer pt-1 text-slate-300 select-none">
+            <input
+              type="checkbox"
+              checked={forceAcknowledge}
+              onChange={(e) => setForceAcknowledge(e.target.checked)}
+              disabled={isDeleting}
+              className="h-4 w-4 rounded border-slate-700 bg-slate-900 text-rose-600 focus:ring-rose-500 focus:ring-offset-slate-900"
+            />
+            <span className="text-[11px] font-sans">
+              I understand this action is permanent and cannot be undone
+            </span>
+          </label>
         </div>
 
         {/* Footer */}

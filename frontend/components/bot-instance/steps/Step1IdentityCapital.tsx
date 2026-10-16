@@ -884,88 +884,8 @@ export function Step1IdentityCapital() {
 
   return (
     <div className="space-y-5 animate-in fade-in duration-200 font-sans text-slate-100">
-            {/* ── 0. SELECTED MARKET CONTRACT BANNER ── */}
-      {(() => {
-        const carried: any = store.selectedInstrumentContext || store.botCreationSession?.selectedInstrument || store.selectedContractContext;
-        const liveQuote = store.liveQuoteSnapshot;
-        const premium = store.canonicalPremium;
-        const expiry = carried?.expiry || store.instrument.contractExpiry;
-        const expiryCheck = validateContractExpiry(expiry);
+            {/* ── 1. TOP HEADER: Hero Title, Telemetry Badges & 3-Way Mode Toggle ── */}
 
-        if (!carried && !expiry) {
-          return (
-            <div className="bg-[#050b18]/90 border border-slate-800 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs font-mono">
-              <div className="flex items-center gap-2.5 text-slate-400">
-                <Layers className="w-4 h-4 text-slate-500" />
-                <span>Target Contract: <strong className="text-slate-300">NOT SELECTED YET</strong> (Configured in Step 2)</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-900 text-slate-500 border border-slate-800">
-                PENDING STEP 2
-              </span>
-            </div>
-          );
-        }
-
-        const ltp = liveQuote?.ltp ?? premium?.ltp ?? carried?.selectedPremium ?? store.instrument.ltp;
-        const isExpired = expiryCheck.isExpired;
-
-        return (
-          <div className={cn(
-            "rounded-2xl p-4 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 backdrop-blur-md border-2",
-            isExpired
-              ? "bg-rose-950/40 border-rose-500/60"
-              : "bg-gradient-to-r from-blue-950/80 via-slate-900 to-indigo-950/80 border-cyan-500/50"
-          )}>
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "p-2.5 rounded-xl border font-bold",
-                isExpired ? "bg-rose-500/20 border-rose-500/40 text-rose-400" : "bg-cyan-500/20 border-cyan-500/40 text-cyan-400"
-              )}>
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-cyan-950 text-cyan-300 border border-cyan-500/40 font-bold uppercase">
-                    CANONICAL BOT CONTRACT
-                  </span>
-                  {isExpired ? (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-950 text-rose-300 border border-rose-500/40 font-bold flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> CONTRACT EXPIRED (RESELECTION REQUIRED)
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> LIVE STREAMING
-                    </span>
-                  )}
-                </div>
-                <div className="text-sm font-bold text-white mt-1 flex items-center gap-2">
-                  <span>{carried?.symbol || store.market.symbol || "BTC 85800 PE"}</span>
-                  <span className="text-cyan-300 font-mono text-xs">
-                    ({carried?.strike || store.instrument.contractStrike} {carried?.optionType || store.instrument.contractOptionType} | {expiry} | {carried?.side || store.instrument.entrySide || "BUY"})
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs font-mono">
-              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">Live Canonical Premium</span>
-                <span className="text-cyan-300 font-bold text-sm">
-                  {typeof ltp === "number" ? `$${ltp.toFixed(2)}` : "—"}
-                </span>
-              </div>
-              <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800">
-                <span className="text-slate-400 text-[10px] block">Provider</span>
-                <span className="text-cyan-400 font-bold">
-                  {carried?.provider || store.provider.marketDataProvider || "DELTA"}
-                </span>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ── 1. TOP HEADER: Hero Title, Telemetry Badges & 3-Way Mode Toggle ── */}
       <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0b132b]/95 via-[#0f1d3d]/95 to-[#0b142e]/95 border border-cyan-500/25 p-4 sm:p-5 shadow-2xl backdrop-blur-2xl">
         <div className="absolute -right-20 -top-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />

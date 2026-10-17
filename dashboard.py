@@ -174,7 +174,7 @@ def enforce_server_side_security():
             "/api/market-data/dhan/quotes", "/api/market-data/delta/quotes", "/api/brokers/delta/status",
             "/api/market-data/delta/status", "/api/delta/ping", "/api/market-data/stream",
             "/api/market/providers/health", "/api/risk/summary", "/api/stream/portfolio",
-            "/api/portfolio/snapshot", "/api/security/overview", "/api/hierarchy/tree", "/api/capital/summary",
+            "/api/portfolio/snapshot", "/api/dashboard/snapshot", "/api/security/overview", "/api/hierarchy/tree", "/api/capital/summary",
             "/api/options/chain", "/api/options/sources/status",
             "/api/reports/generate", "/api/reports/history", "/api/reports/live/stream",
             "/api/connections/matrix", "/api/market-intelligence/overview", "/api/options/analyze-strategy",
@@ -17898,8 +17898,14 @@ def _is_nse_equity_sym(sym: str) -> bool:
         return False
     return True
 
+_top_movers_cache: Dict[str, Any] = {"ts": 0.0, "data": None}
+
 def _compute_top_movers() -> Dict[str, List[Dict[str, Any]]]:
     """Dynamically computes top gainers, losers, and most active instruments from live cache and market universe."""
+    now_ts = time.time()
+    if _top_movers_cache["data"] is not None and (now_ts - _top_movers_cache["ts"] < 10.0):
+        return _top_movers_cache["data"]
+
     universe: List[Dict[str, Any]] = []
     seen_symbols = set()
 
@@ -18056,11 +18062,14 @@ def _compute_top_movers() -> Dict[str, List[Dict[str, Any]]]:
             for i in items[:8]
         ]
 
-    return {
+    res = {
         "gainers": _fmt(gainers),
         "losers": _fmt(losers),
         "active": _fmt(active)
     }
+    _top_movers_cache["ts"] = now_ts
+    _top_movers_cache["data"] = res
+    return res
 
 
 @app.route("/api/dashboard/snapshot", methods=["GET"])

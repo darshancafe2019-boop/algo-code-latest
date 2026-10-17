@@ -140,7 +140,7 @@ export function HomeExecutiveOverview() {
   const { data: snapshotData, isLoading: isSnapshotLoading, isError: isSnapshotError } = useQuery({
     queryKey: ["dashboardSnapshot", tradingMode],
     queryFn: async () => {
-      const res = await apiClient.get<any>(`/api/dashboard/snapshot?mode=${tradingMode}`, { timeoutMs: 5000 });
+      const res = await apiClient.get<any>(`/api/dashboard/snapshot?mode=${tradingMode}`, { timeoutMs: 15000 });
       return res.ok ? res.data : null;
     },
     staleTime: 3000,

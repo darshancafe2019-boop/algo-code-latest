@@ -213,7 +213,8 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       return "ws://127.0.0.1:5051/ws";
     }
 
-    const host = window.location.hostname || "127.0.0.1";
+    const rawHost = window.location.hostname;
+    const host = (!rawHost || rawHost === "localhost") ? "127.0.0.1" : rawHost;
     const port = process.env.NEXT_PUBLIC_MARKET_GATEWAY_PORT || "5051";
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 

@@ -120,7 +120,7 @@ class GlobalDataEngine:
 
         return None
 
-    def get_portfolio_snapshot(self, mode: str = "PAPER", max_age_sec: float = 1.5) -> Dict[str, Any]:
+    def get_portfolio_snapshot(self, mode: str = "PAPER", max_age_sec: float = 2.5) -> Dict[str, Any]:
         """
         Builds the authoritative canonical portfolio snapshot.
         Exact contract implementation matching Phase 8 specification.
@@ -143,16 +143,27 @@ class GlobalDataEngine:
         open_orders = []
         bots = []
         try:
-            # 1. Fetch Closed Trades for Mode (project only necessary ledger fields)
-            closed_trades = db.safe_query(
+            # 1. Fast SQL Aggregation for Closed Trades Ledger Metrics (sub-millisecond scaling)
+            agg_row = db.safe_query_one(
                 """
-                SELECT net_pnl, realized_pnl, result_pnl, gross_pnl, fees, funding, exit_timestamp, timestamp
+                SELECT 
+                    COUNT(*) as total_trades,
+                    TOTAL(COALESCE(gross_pnl, net_pnl, 0)) as total_gross,
+                    TOTAL(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) as total_net,
+                    TOTAL(COALESCE(fees, 0)) as total_fees,
+                    TOTAL(COALESCE(funding, 0)) as total_funding,
+                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as daily_pnl,
+                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as weekly_pnl,
+                    TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as monthly_pnl,
+                    COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN 1 END) as win_count,
+                    COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN 1 END) as loss_count,
+                    TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as win_sum,
+                    TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN ABS(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) ELSE 0 END) as loss_sum
                 FROM trades_log 
                 WHERE execution_mode = ? AND status IN ('CLOSED', 'FILLED')
-                ORDER BY timestamp ASC
                 """,
-                (trading_mode,),
-            )
+                (today_start_iso, week_start_iso, month_start_iso, trading_mode),
+            ) or {}
 
             # 2. Fetch Active Open Positions for Mode (Grouped by symbol to scale to large trade logs)
             open_positions = db.safe_query(
@@ -186,46 +197,25 @@ class GlobalDataEngine:
             )
         except Exception as e:
             logger.warning("Error reading portfolio database state: %s", e)
+            agg_row = {}
 
         total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
         starting_balance = 50000.0 if is_paper else max(10000.0, total_allocated)
 
-        # 5. Calculate Realized P&L, Fees, and Trading Metrics from Ledger
-        gross_realized = Decimal("0.0")
-        net_realized = Decimal("0.0")
-        total_fees = Decimal("0.0")
-        total_funding = Decimal("0.0")
-        daily_pnl = Decimal("0.0")
-        weekly_pnl = Decimal("0.0")
-        monthly_pnl = Decimal("0.0")
+        # 5. Extract Realized P&L, Fees, and Trading Metrics directly from SQL aggregate
+        gross_realized = Decimal(str(agg_row.get("total_gross") or 0.0))
+        net_realized = Decimal(str(agg_row.get("total_net") or 0.0))
+        total_fees = Decimal(str(agg_row.get("total_fees") or 0.0))
+        total_funding = Decimal(str(agg_row.get("total_funding") or 0.0))
+        daily_pnl = Decimal(str(agg_row.get("daily_pnl") or 0.0))
+        weekly_pnl = Decimal(str(agg_row.get("weekly_pnl") or 0.0))
+        monthly_pnl = Decimal(str(agg_row.get("monthly_pnl") or 0.0))
 
-        wins = []
-        losses = []
-
-        for t in closed_trades:
-            raw_pnl = t.get("net_pnl") if t.get("net_pnl") is not None else (t.get("realized_pnl") if t.get("realized_pnl") is not None else (t.get("result_pnl") or 0.0))
-            pnl_val = Decimal(str(raw_pnl))
-            gross_val = Decimal(str(t.get("gross_pnl") if t.get("gross_pnl") is not None else pnl_val))
-            fee_val = Decimal(str(t.get("fees") or 0.0))
-            fund_val = Decimal(str(t.get("funding") or 0.0))
-            ts_str = t.get("exit_timestamp") or t.get("timestamp") or ""
-
-            gross_realized += gross_val
-            net_realized += pnl_val
-            total_fees += fee_val
-            total_funding += fund_val
-
-            if pnl_val > 0:
-                wins.append(float(pnl_val))
-            elif pnl_val < 0:
-                losses.append(float(abs(pnl_val)))
-
-            if ts_str.startswith(now_dt.strftime("%Y-%m-%d")) or ts_str >= today_start_iso:
-                daily_pnl += pnl_val
-            if ts_str >= week_start_iso:
-                weekly_pnl += pnl_val
-            if ts_str >= month_start_iso:
-                monthly_pnl += pnl_val
+        win_count = int(agg_row.get("win_count") or 0)
+        loss_count = int(agg_row.get("loss_count") or 0)
+        total_trades = int(agg_row.get("total_trades") or (win_count + loss_count))
+        sum_wins = float(agg_row.get("win_sum") or 0.0)
+        sum_losses = float(agg_row.get("loss_sum") or 0.0)
 
         # 6. Calculate Mark-to-Market Unrealized P&L across Open Positions
         total_unrealized = Decimal("0.0")
@@ -261,12 +251,7 @@ class GlobalDataEngine:
         available_capital = max(Decimal("0.0"), portfolio_equity - margin_used)
         buying_power = available_capital * Decimal("2.0")  # 2x standard intraday buying power
 
-        total_trades = len(wins) + len(losses)
-        win_count = len(wins)
-        loss_count = len(losses)
         win_rate = (win_count / total_trades * 100.0) if total_trades > 0 else 0.0
-        sum_wins = sum(wins)
-        sum_losses = sum(losses)
         profit_factor = (sum_wins / sum_losses) if sum_losses > 0 else (99.9 if sum_wins > 0 else 0.0)
         avg_win = (sum_wins / win_count) if win_count > 0 else 0.0
         avg_loss = (sum_losses / loss_count) if loss_count > 0 else 0.0

@@ -28,20 +28,14 @@ from src.domain.enums import BotStatus, ExecutionMode, AssetClass, Exchange, Pro
 logger = logging.getLogger("BotWizardService")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT_DIR / "quant_bot_v2.db"
 ALGO_DB_PATH = ROOT_DIR / "data" / "trading_bot.db"
+DB_PATH = ALGO_DB_PATH
 
 
-def _get_db_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(DB_PATH), timeout=15.0)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA journal_mode=WAL;")
-        conn.execute("PRAGMA busy_timeout=15000;")
-        conn.execute("PRAGMA synchronous=NORMAL;")
-    except Exception:
-        pass
-    return conn
+def _get_db_connection():
+    """Returns a connection to the authoritative persistent database (PostgreSQL in production, SQLite in local dev)."""
+    from src.db import get_authoritative_connection
+    return get_authoritative_connection()
 
 
 def _ensure_schema():

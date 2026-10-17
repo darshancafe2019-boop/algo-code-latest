@@ -110,10 +110,7 @@ export async function GET(req: NextRequest) {
       // 2. Connect dedicated WebSocket to Python Market Data Gateway
       try {
         const wsUrl = new URL(GATEWAY_WS_URL);
-        if (GATEWAY_SECRET) {
-          wsUrl.searchParams.set("secret", GATEWAY_SECRET);
-        }
-
+        // Pass secret exclusively via secure header to prevent logging in proxy query parameters
         ws = new WebSocket(wsUrl.toString(), {
           headers: GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : undefined,
           handshakeTimeout: 5000,

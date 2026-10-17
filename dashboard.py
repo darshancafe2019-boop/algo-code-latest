@@ -129,6 +129,9 @@ except Exception as _bootstrap_err:
 @app.after_request
 def add_cors_headers(response):
     origin = request.headers.get("Origin", "")
+    if not origin:
+        return response
+
     allowed_origins = [
         "http://localhost:3100",
         "http://127.0.0.1:3100",
@@ -139,23 +142,22 @@ def add_cors_headers(response):
     if frontend_url:
         allowed_origins.append(frontend_url.rstrip("/"))
 
-    is_allowed = (
-        not origin
-        or origin in allowed_origins
-        or origin.endswith(".vercel.app")
-        or (frontend_url and origin == frontend_url.rstrip("/"))
-    )
+    allowed_extra = os.environ.get("ALLOWED_CORS_ORIGINS", "")
+    if allowed_extra:
+        allowed_origins.extend([o.strip().rstrip("/") for o in allowed_extra.split(",") if o.strip()])
+
+    is_allowed = origin in allowed_origins or (frontend_url and origin == frontend_url.rstrip("/"))
     if is_allowed:
-        response.headers["Access-Control-Allow-Origin"] = origin if origin else "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Request-Id, Authorization, X-Requested-With, X-CSRF-Token, X-Step-Up-Token, X-Idempotency-Key"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+        response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Request-Id, Authorization, X-Requested-With, X-CSRF-Token, X-Step-Up-Token, X-Idempotency-Key"
+        response.headers["Access-Control-Allow-Credentials"] = "true"
     return response
 
 
 @app.before_request
 def enforce_server_side_security():
-    """Authoritative server-side authentication, RBAC, and password-change gate."""
+    """Authoritative server-side authentication, RBAC, CSRF, and password-change gate."""
     # 1. Handle CORS Preflight OPTIONS
     if request.method == "OPTIONS":
         resp = make_response("", 204)
@@ -163,29 +165,15 @@ def enforce_server_side_security():
 
     path = request.path
 
-    # 2. Public Whitelist - Health probes, static assets, primary auth routes, and read-only status telemetry
+    # 2. Public Whitelist - Health probes, static assets, primary auth routes, and public market telemetry
     if (
         path in [
             "/", "/health", "/api/health", "/api/health/live", "/api/health/ready", "/api/health/dependencies", "/api/health/system",
-            "/api/status", "/api/dhan/status", "/api/dhan/funds", "/api/dhan/profile", "/api/dhan/holdings",
-            "/api/dhan/positions", "/api/dhan/orders", "/api/upstox/status", "/api/delta/status",
-            "/api/fyers/status", "/api/fyers/funds", "/api/fyers/profile", "/api/brokers/fyers/status",
-            "/api/brokers/dhan/status", "/api/market-data/dhan/status", "/api/market-data/status",
-            "/api/market-data/dhan/quotes", "/api/market-data/delta/quotes", "/api/brokers/delta/status",
-            "/api/market-data/delta/status", "/api/delta/ping", "/api/market-data/stream",
-            "/api/market/providers/health", "/api/risk/summary", "/api/stream/portfolio",
-            "/api/portfolio/snapshot", "/api/dashboard/snapshot", "/api/security/overview", "/api/hierarchy/tree", "/api/capital/summary",
-            "/api/options/chain", "/api/options/sources/status",
-            "/api/reports/generate", "/api/reports/history", "/api/reports/live/stream",
-            "/api/connections/matrix", "/api/market-intelligence/overview", "/api/options/analyze-strategy",
-            "/api/indicators/compute"
+            "/api/delta/ping", "/api/market-data/status", "/api/market-data/dhan/quotes", "/api/market-data/delta/quotes",
+            "/api/market-data/stream", "/api/market/providers/health", "/api/options/chain", "/api/options/sources/status",
+            "/api/options/analyze-strategy", "/api/indicators/compute",
+            "/favicon.ico", "/manifest.json", "/robots.txt"
         ]
-        or path.startswith("/api/reports")
-        or path.startswith("/api/orchestrator")
-        or path.startswith("/api/connections")
-        or path.startswith("/api/market-intelligence")
-        or path.startswith("/api/indicators")
-        or path.startswith("/api/contracts")
         or path.startswith("/api/health")
         or path.startswith("/health")
         or path.startswith("/static/")
@@ -195,11 +183,12 @@ def enforce_server_side_security():
         or path.startswith("/api/options/")
         or path.startswith("/api/strategies/")
         or path.startswith("/api/instruments/")
+        or path.startswith("/api/contracts/")
+        or path.startswith("/api/indicators/")
         or path.startswith("/feed/")
         or path.startswith("/api/feed/")
         or path.startswith("/v3/feed/")
         or path.startswith("/api/upstox/feed/")
-        or path in ["/favicon.ico", "/manifest.json"]
         or path in [
             "/api/auth/login",
             "/api/auth/logout",
@@ -242,6 +231,26 @@ def enforce_server_side_security():
                 "error_code": "PASSWORD_CHANGE_REQUIRED",
                 "message": "Password change required before accessing platform features."
             }), 403
+
+        # Enforce CSRF protection for browser sessions on mutating operations
+        if request.method in ["POST", "PUT", "PATCH", "DELETE"]:
+            token_cookie = request.cookies.get("algo_session_token")
+            if token_cookie:
+                origin = request.headers.get("Origin") or request.headers.get("Referer") or ""
+                host = request.headers.get("Host") or ""
+                csrf_header = request.headers.get("X-CSRF-Token") or request.headers.get("X-Requested-With")
+                if origin:
+                    clean_origin = origin.replace("http://", "").replace("https://", "").split("/")[0]
+                    clean_host = host.split("/")[0]
+                    frontend_clean = os.environ.get("FRONTEND_URL", "").replace("http://", "").replace("https://", "").split("/")[0]
+                    is_local = clean_origin.startswith("127.0.0.1") or clean_origin.startswith("localhost")
+                    matches_host = clean_origin == clean_host or (frontend_clean and clean_origin == frontend_clean)
+                    if not (is_local or matches_host or csrf_header):
+                        return jsonify({
+                            "status": "error",
+                            "error_code": "CSRF_VALIDATION_FAILED",
+                            "message": "Cross-Site Request Forgery validation failed."
+                        }), 403
 
         # Enforce RBAC for state-changing operations
         if request.method in ["POST", "PUT", "PATCH", "DELETE"]:

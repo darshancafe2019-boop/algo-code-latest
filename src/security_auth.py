@@ -132,7 +132,13 @@ class TOTPManager:
     @staticmethod
     def _get_fernet() -> Any:
         from cryptography.fernet import Fernet
-        key_raw = (getattr(config, "AUTH_TOTP_ENCRYPTION_KEY", None) or "algo-crypto-secret-key-32bytes!!").encode("utf-8")
+        key = getattr(config, "AUTH_TOTP_ENCRYPTION_KEY", None) or os.getenv("AUTH_TOTP_ENCRYPTION_KEY", "")
+        is_prod = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
+        if not key or key == "algo-crypto-secret-key-32bytes!!":
+            if is_prod:
+                raise RuntimeError("FATAL SECURITY CONFIGURATION: Insecure default AUTH_TOTP_ENCRYPTION_KEY is forbidden in production.")
+            key = "algo-crypto-secret-key-32bytes!!"
+        key_raw = key.encode("utf-8")
         key_hash = hashlib.sha256(key_raw).digest()
         b64_key = base64.urlsafe_b64encode(key_hash)
         return Fernet(b64_key)
@@ -146,8 +152,11 @@ class TOTPManager:
             f = cls._get_fernet()
             return f.encrypt(secret_b32.strip().encode("utf-8")).decode("utf-8")
         except Exception as e:
-            logger.warning("Secret encryption warning: %s", e)
-            return secret_b32
+            logger.error("Secret encryption failed: %s", e)
+            is_prod = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
+            if is_prod:
+                raise RuntimeError(f"FATAL: 2FA secret encryption failed: {e}")
+            raise
 
     @classmethod
     def decrypt_secret(cls, secret_or_encrypted: str) -> str:

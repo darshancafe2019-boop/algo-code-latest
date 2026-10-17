@@ -114,23 +114,54 @@ _raw_db_url = os.getenv("DATABASE_URL", "").strip()
 _has_pg_url = _raw_db_url.startswith("postgresql://") or _raw_db_url.startswith("postgres://")
 _force_sqlite = os.getenv("FORCE_SQLITE", "").lower() in ("true", "1", "yes")
 
+_is_production = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
 DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "postgresql" if _has_pg_url and not _force_sqlite else "sqlite").lower()
 
-if _force_sqlite or (DATABASE_PROVIDER != "postgresql" and not _has_pg_url):
+if _force_sqlite:
     DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
     os.environ["DATABASE_URL"] = DATABASE_URL
     os.environ["DATABASE_PROVIDER"] = "sqlite"
     IS_POSTGRES = False
+elif DATABASE_PROVIDER == "postgresql":
+    if not _has_pg_url:
+        if _is_production:
+            raise RuntimeError(
+                "FATAL CONFIGURATION ERROR: DATABASE_PROVIDER is set to 'postgresql' in production, "
+                "but DATABASE_URL is missing or invalid. Never silently switch to temporary SQLite in production."
+            )
+        # In non-production tests without a PG instance, fallback to SQLite only if not in production
+        DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"
+        os.environ["DATABASE_URL"] = DATABASE_URL
+        os.environ["DATABASE_PROVIDER"] = "sqlite"
+        IS_POSTGRES = False
+    else:
+        DATABASE_URL = _raw_db_url
+        os.environ["DATABASE_PROVIDER"] = "postgresql"
+        os.environ["FORCE_SQLITE"] = "false"
+        IS_POSTGRES = True
 else:
-    DATABASE_URL = _raw_db_url or f"sqlite:///{DB_PATH.as_posix()}"
+    DATABASE_URL = _raw_db_url if _has_pg_url else f"sqlite:///{DB_PATH.as_posix()}"
     IS_POSTGRES = DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgres://")
     if IS_POSTGRES:
         os.environ["DATABASE_PROVIDER"] = "postgresql"
         os.environ["FORCE_SQLITE"] = "false"
+    else:
+        os.environ["DATABASE_PROVIDER"] = "sqlite"
 
 
 # Institutional Authentication, 2FA & Password Reset
 AUTH_TOTP_ENCRYPTION_KEY = os.getenv("AUTH_TOTP_ENCRYPTION_KEY", "algo-crypto-secret-key-32bytes!!")
+if _is_production and (not AUTH_TOTP_ENCRYPTION_KEY or AUTH_TOTP_ENCRYPTION_KEY == "algo-crypto-secret-key-32bytes!!"):
+    raise RuntimeError(
+        "FATAL SECURITY CONFIGURATION: AUTH_TOTP_ENCRYPTION_KEY must be set to a secure, unique 32+ character key in production."
+    )
+
+AUTH_SESSION_SECRET = os.getenv("AUTH_SESSION_SECRET", "")
+if _is_production and not AUTH_SESSION_SECRET:
+    raise RuntimeError(
+        "FATAL SECURITY CONFIGURATION: AUTH_SESSION_SECRET must be configured in production."
+    )
+
 EMAIL_PROVIDER = os.getenv("EMAIL_PROVIDER", "resend").lower()
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 OTP_FROM_EMAIL = os.getenv("OTP_FROM_EMAIL", os.getenv("AUTH_EMAIL_FROM", os.getenv("RESEND_FROM_EMAIL", "Quant.OS Security <onboarding@resend.dev>")))

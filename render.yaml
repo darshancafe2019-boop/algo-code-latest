@@ -3,10 +3,13 @@ services:
   - type: web
     name: quantos-backend
     runtime: python
+    region: singapore
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn dashboard:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
     healthCheckPath: /health/live
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: FLASK_ENV
         value: production
       - key: APP_ENV
@@ -21,6 +24,8 @@ services:
         value: postgresql
       - key: FORCE_SQLITE
         value: "false"
+      - key: AUTH_REQUIRE_LOGIN
+        value: "true"
       - key: EMAIL_PROVIDER
         value: resend
       - key: AUTH_ADMIN_EMAIL
@@ -50,10 +55,13 @@ services:
   - type: web
     name: quantos-gateway
     runtime: python
+    region: singapore
     buildCommand: pip install -r requirements.txt
     startCommand: python start_gateway.py
     healthCheckPath: /health/live
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
       - key: MARKET_GATEWAY_HOST
         value: 0.0.0.0
       - key: TRADING_MODE

@@ -1060,8 +1060,12 @@ class MarketDataGateway:
             or remote_host in ("0.0.0.0", "::")
         )
 
-        if GATEWAY_SECRET and secret != GATEWAY_SECRET and not is_loopback:
-            raise web.HTTPForbidden(reason="Invalid gateway secret")
+        is_prod = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
+        if not is_loopback:
+            if not GATEWAY_SECRET and is_prod:
+                raise web.HTTPForbidden(reason="Gateway secret must be configured in production")
+            if GATEWAY_SECRET and secret != GATEWAY_SECRET:
+                raise web.HTTPForbidden(reason="Invalid gateway secret")
 
         ws = web.WebSocketResponse(heartbeat=30)
         await ws.prepare(request)

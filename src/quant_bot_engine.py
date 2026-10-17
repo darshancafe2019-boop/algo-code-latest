@@ -35,14 +35,14 @@ from typing import Dict, Any, List, Optional, Tuple
 logger = logging.getLogger("QuantBotEngine")
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
-DB_PATH = ROOT_DIR / "quant_bot_v2.db"
 ALGO_DB_PATH = ROOT_DIR / "data" / "trading_bot.db"
+DB_PATH = ALGO_DB_PATH
 
 
 def _get_db():
-    conn = sqlite3.connect(str(DB_PATH), timeout=10.0)
-    conn.row_factory = sqlite3.Row
-    return conn
+    """Returns a connection to the authoritative persistent database (PostgreSQL in production, SQLite in local dev)."""
+    from src.db import get_authoritative_connection
+    return get_authoritative_connection()
 
 
 class QuantBotEngine:

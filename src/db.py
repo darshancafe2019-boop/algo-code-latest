@@ -91,6 +91,84 @@ def translate_sqlite_sql_to_postgres(sql: str) -> str:
     return pg_sql
 
 
+class RowAdapter(dict):
+    """Hybrid row dictionary supporting both string column keys and integer indices."""
+    def __init__(self, d: dict, keys: list):
+        super().__init__(d)
+        self._keys = keys
+        self._values = [d.get(k) for k in keys]
+
+    def __getitem__(self, item):
+        if isinstance(item, int):
+            return self._values[item]
+        return super().__getitem__(item)
+
+
+class CursorAdapter:
+    """Cursor adapter providing RowAdapter instances for dictionary and numeric access."""
+    def __init__(self, cur):
+        self._cur = cur
+
+    def fetchone(self):
+        r = self._cur.fetchone()
+        if r is None:
+            return None
+        cols = [getattr(d, "name", d[0]) for d in self._cur.description] if self._cur.description else list(r.keys())
+        return RowAdapter(dict(r), cols)
+
+    def fetchall(self):
+        rows = self._cur.fetchall()
+        if not rows:
+            return []
+        cols = [getattr(d, "name", d[0]) for d in self._cur.description] if self._cur.description else list(rows[0].keys())
+        return [RowAdapter(dict(r), cols) for r in rows]
+
+    @property
+    def description(self):
+        return self._cur.description
+
+    @property
+    def rowcount(self):
+        return getattr(self._cur, "rowcount", -1)
+
+
+class PostgresConnectionAdapter:
+    """Wraps a psycopg Connection to translate SQLite SQL dialects and return CursorAdapters."""
+    def __init__(self, pg_conn):
+        self._pg_conn = pg_conn
+
+    def execute(self, sql: str, params: tuple = ()):
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        from psycopg.rows import dict_row
+        cur = self._pg_conn.cursor(row_factory=dict_row)
+        cur.execute(pg_sql, params)
+        return CursorAdapter(cur)
+
+    def executemany(self, sql: str, seq_of_params):
+        pg_sql = translate_sqlite_sql_to_postgres(sql)
+        cur = self._pg_conn.cursor()
+        cur.executemany(pg_sql, seq_of_params)
+        return CursorAdapter(cur)
+
+    def cursor(self):
+        from psycopg.rows import dict_row
+        return CursorAdapter(self._pg_conn.cursor(row_factory=dict_row))
+
+    def commit(self):
+        self._pg_conn.commit()
+
+    def rollback(self):
+        self._pg_conn.rollback()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type is not None:
+            self._pg_conn.rollback()
+        else:
+            self._pg_conn.commit()
+
 
 def with_db_retry(max_retries: int = 5, base_delay: float = 0.05, max_delay: float = 1.0) -> Callable[[F], F]:
     """
@@ -462,6 +540,44 @@ def get_db_transaction():
             pass
 
 
+@contextmanager
+def get_authoritative_connection():
+    """
+    Context manager returning an active connection to the authoritative database:
+    - In PostgreSQL mode (production): yields a PostgresConnectionAdapter wrapping a pool connection with RowAdapter.
+    - In SQLite mode (local dev/test): yields an optimized sqlite3.Connection with sqlite3.Row factory.
+    """
+    if getattr(config, "IS_POSTGRES", False):
+        pool = get_db_pool()
+        if pool is not None:
+            with pool.connection() as conn:
+                adapter = PostgresConnectionAdapter(conn)
+                yield adapter
+                conn.commit()
+                return
+        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+            import psycopg
+            conn = psycopg.connect(config.DATABASE_URL, connect_timeout=5)
+            try:
+                adapter = PostgresConnectionAdapter(conn)
+                yield adapter
+                conn.commit()
+                return
+            finally:
+                conn.close()
+        raise RuntimeError("Authoritative PostgreSQL connection pool unavailable in production mode.")
+
+    conn = get_connection()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
 @with_db_retry(max_retries=5)
 def safe_execute(sql: str, params: tuple = ()) -> bool:
     """Execute a mutating statement (INSERT, UPDATE, DELETE) inside an explicit committed transaction."""
@@ -483,8 +599,11 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     with conn.transaction():
                         with conn.cursor() as cur:
                             getattr(cur, "execute")(pg_sql, params)
-                pg_ok = True
                 _record_pg_success()
+                duration_ms = round((time.perf_counter() - t0) * 1000, 2)
+                if duration_ms > 250.0:
+                    logger.warning("SLOW QUERY DETECTED [duration=%0.2fms, req_id=%s] sql=%s", duration_ms, req_id, sql[:120].strip())
+                return True
             except Exception as e:
                 _trip_pg_circuit_breaker(60.0, str(e))
                 duration_ms = round((time.perf_counter() - t0) * 1000, 2)
@@ -493,7 +612,8 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     "Database execute failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
-        elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+                raise RuntimeError(f"Database execute failed on authoritative PostgreSQL engine: {e}")
+        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
             try:
                 import psycopg
                 pg_sql = translate_sqlite_sql_to_postgres(sql)
@@ -502,22 +622,24 @@ def safe_execute(sql: str, params: tuple = ()) -> bool:
                     with conn.transaction():
                         with conn.cursor() as cur:
                             getattr(cur, "execute")(pg_sql, params)
-                    pg_ok = True
                     _record_pg_success()
+                    return True
                 finally:
                     conn.close()
             except Exception as e:
                 _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL execute failed: %s", e)
+                raise RuntimeError(f"Direct PostgreSQL execute failed: {e}")
+        else:
+            raise RuntimeError("Authoritative PostgreSQL connection pool unavailable in production mode.")
 
-    # Maintain SQLite database in sync
+    # Maintain SQLite database ONLY when running on SQLite engine
     try:
         with get_db_transaction() as conn:
             cursor = conn.cursor()
             cursor.execute(sql, params)
     except Exception as sqlite_err:
-        if not pg_ok:
-            raise sqlite_err
+        raise sqlite_err
 
     duration_ms = round((time.perf_counter() - t0) * 1000, 2)
     if duration_ms > 250.0:
@@ -561,7 +683,8 @@ def safe_query(sql: str, params: tuple = ()) -> list:
                     "Database query failed [class=%s, code=%s, duration=%0.2fms, req_id=%s] sql=%s: %s",
                     type(e).__name__, pg_code, duration_ms, req_id, sql[:120].strip(), e
                 )
-        elif getattr(config, "IS_POSTGRES", False) and getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
+                raise RuntimeError(f"Database query failed on authoritative PostgreSQL engine: {e}")
+        elif getattr(config, "DATABASE_URL", None) and time.time() >= _pg_circuit_broken_until:
             try:
                 import psycopg
                 from psycopg.rows import dict_row
@@ -578,6 +701,9 @@ def safe_query(sql: str, params: tuple = ()) -> list:
             except Exception as e:
                 _trip_pg_circuit_breaker(60.0, str(e))
                 logger.exception("Direct PostgreSQL query failed: %s", e)
+                raise RuntimeError(f"Direct PostgreSQL query failed: {e}")
+        else:
+            raise RuntimeError("Authoritative PostgreSQL connection pool unavailable in production mode.")
 
     conn = None
     try:
@@ -1505,6 +1631,27 @@ def init_db(force: bool = False) -> None:
                     )
                     """
                 )
+
+                # Dynamic column migrations for positions
+                try:
+                    cursor.execute("PRAGMA table_info(positions)")
+                    existing_pos_cols = {row["name"] if isinstance(row, sqlite3.Row) else row[1] for row in cursor.fetchall()}
+                    pos_missing_cols = [
+                        ("average_entry_price", "ALTER TABLE positions ADD COLUMN average_entry_price REAL DEFAULT 0.0"),
+                        ("provider", "ALTER TABLE positions ADD COLUMN provider TEXT DEFAULT 'SIM'"),
+                        ("instrument_id", "ALTER TABLE positions ADD COLUMN instrument_id TEXT DEFAULT ''"),
+                        ("total_pnl", "ALTER TABLE positions ADD COLUMN total_pnl REAL DEFAULT 0.0"),
+                        ("opened_at", "ALTER TABLE positions ADD COLUMN opened_at TEXT DEFAULT ''"),
+                        ("metadata_json", "ALTER TABLE positions ADD COLUMN metadata_json TEXT DEFAULT '{}'"),
+                    ]
+                    for col_name, alter_sql in pos_missing_cols:
+                        if col_name not in existing_pos_cols:
+                            try:
+                                cursor.execute(alter_sql)
+                            except Exception:
+                                pass
+                except Exception as pos_mig_err:
+                    logger.debug(f"positions dynamic column migration check: {pos_mig_err}")
 
                 # Dynamic column migrations for telegram_logs
                 try:

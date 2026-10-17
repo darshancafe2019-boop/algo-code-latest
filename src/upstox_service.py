@@ -730,6 +730,9 @@ class UpstoxService:
 
         if clean_upper.startswith("NSE:") or clean_upper.startswith("BSE:"):
             base_sym = clean_upper.split(":", 1)[1]
+            resolved = self.resolve_instrument_key(base_sym)
+            if resolved:
+                return resolved
             if base_sym in _UPSTOX_EQUITY_BY_SYMBOL:
                 return _UPSTOX_EQUITY_BY_SYMBOL[base_sym]["instrument_key"]
             if base_sym in _UPSTOX_FUTURES_BY_SYMBOL:
@@ -1237,7 +1240,16 @@ class UpstoxService:
             ik = self.resolve_instrument_key(s) or s
             key_to_orig[ik] = s
 
-        ik_param = ",".join(key_to_orig.keys())
+        # Filter for valid Upstox instrument keys (must contain '|' or ':' or start with NSE_/BSE_)
+        valid_keys = [
+            ik for ik in key_to_orig.keys()
+            if ("|" in ik or ":" in ik or ik.startswith("NSE_") or ik.startswith("BSE_"))
+            and not ik.startswith("C-") and not ik.startswith("P-") and not ik.startswith("BTC") and not ik.startswith("ETH")
+        ]
+        if not valid_keys:
+            return {"status": "success", "data": {}, "quotes": {}}
+
+        ik_param = ",".join(valid_keys)
         now_iso = datetime.now(timezone.utc).isoformat()
 
         try:

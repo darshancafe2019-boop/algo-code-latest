@@ -23,6 +23,8 @@ from typing import Any, Dict, Optional, Tuple
 
 from src import config, db
 
+logger = logging.getLogger("email_service")
+
 def get_target_admin_email() -> str:
     """Returns authoritative administrator recipient email from configuration."""
     return (

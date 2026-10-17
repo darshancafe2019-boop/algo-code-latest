@@ -318,7 +318,7 @@ class DeltaOptionsClient:
             meta = res.get("meta", {})
             next_after = meta.get("after") if isinstance(meta, dict) else None
 
-            if not next_after or next_after in visited_cursors or len(raw_products) < 100:
+            if not next_after or next_after in visited_cursors or len(raw_products) == 0:
                 break
 
             visited_cursors.add(next_after)
@@ -364,6 +364,7 @@ class DeltaOptionsClient:
         """
         Fetches live tickers from /v2/tickers with optional filters.
         When contract_types is omitted/None, fetches all contract types (perpetuals, futures, options).
+        Automatically normalizes expiry_date to Delta's expected DD-MM-YYYY format.
         """
         params: Dict[str, Any] = {}
         if contract_types:
@@ -373,7 +374,12 @@ class DeltaOptionsClient:
             params["underlying_asset_symbols"] = ",".join(underlying_asset_symbols)
 
         if expiry_date:
-            params["expiry_date"] = expiry_date
+            exp_str = expiry_date.strip()
+            # If YYYY-MM-DD, normalize to DD-MM-YYYY expected by /v2/tickers
+            if len(exp_str) == 10 and exp_str[4] == "-" and exp_str[7] == "-":
+                parts = exp_str.split("-")
+                exp_str = f"{parts[2]}-{parts[1]}-{parts[0]}"
+            params["expiry_date"] = exp_str
 
         res = self._request("/v2/tickers", params=params, method="GET", use_cache=False, weight=1.0)
         result = res.get("result", [])

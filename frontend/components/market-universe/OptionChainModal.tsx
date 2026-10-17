@@ -21,7 +21,7 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
   const { data, isLoading, refetch, isFetching } = useQuery<{ status: string; data: OptionChainData }>({
     queryKey: ["optionChain", selectedUnderlying, selectedExpiry],
     queryFn: async () => {
-      const res = await fetch(`/api/market/options/chain?underlying=${selectedUnderlying}&expiry=${selectedExpiry}`);
+      const res = await fetch(`/api/market/option-chain?underlying=${encodeURIComponent(selectedUnderlying)}&expiry=${encodeURIComponent(selectedExpiry)}`);
       if (!res.ok) throw new Error("Failed to fetch option chain");
       return res.json();
     },
@@ -29,8 +29,8 @@ export function OptionChainModal({ underlying, isOpen, onClose, onSelectContract
     refetchInterval: 3000,
   });
 
-  const chain = data?.data;
-  const spotPrice = chain?.spot_price || 0.0;
+  const chain = data?.data || (data as any);
+  const spotPrice = chain?.spot_price || chain?.spot || 0.0;
   const strikes = chain?.strikes || [];
   const normalizedExpiries = React.useMemo(() => {
     const rawExpiries = chain?.available_expiries || [];

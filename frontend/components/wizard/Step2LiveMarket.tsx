@@ -46,29 +46,107 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
   const isStockMarket = draft.market_type === "INDIA_STOCK" || draft.market_type === "US_STOCK" || draft.market_type === "CRYPTO_SPOT";
   const currencySymbol = draft.market_type.includes("INDIA") ? "₹" : "$";
 
-  // Safe numerical and Greek formatters (bulletproof against null/undefined in Indian & Crypto feeds)
-  const formatGreek = (val: any, decimals: number = 3, defaultVal: string = "-"): string => {
+  // Safe numerical, price, and Greek formatters (strict zero-fabrication: null/empty/untraded -> "—")
+  const renderPrice = (val: any, decimals: number = 2): string => {
+    if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
+      return "—";
+    }
+    const n = Number(val);
+    if (n <= 0) return "—";
+    return `${currencySymbol}${n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}`;
+  };
+
+  const renderRawPrice = (val: any, decimals: number = 2): string => {
+    if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
+      return "—";
+    }
+    const n = Number(val);
+    if (n <= 0) return "—";
+    return n.toLocaleString(undefined, { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  };
+
+  const renderGreek = (val: any, decimals: number = 3): string => {
+    if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
+      return "—";
+    }
+    return Number(val).toFixed(decimals);
+  };
+
+  const renderPercent = (val: any, decimals: number = 1): string => {
+    if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
+      return "—";
+    }
+    return `${Number(val).toFixed(decimals)}%`;
+  };
+
+  const renderInt = (val: any): string => {
+    if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
+      return "—";
+    }
+    const n = Math.round(Number(val));
+    if (n <= 0) return "—";
+    return n.toLocaleString();
+  };
+
+  const formatGreek = (val: any, decimals: number = 3, defaultVal: string = "—"): string => {
     if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
       return defaultVal;
     }
     return Number(val).toFixed(decimals);
   };
 
-  const formatPrice = (val: any, decimals: number = 2, defaultVal: string = "0.00"): string => {
+  const formatPrice = (val: any, decimals: number = 2, defaultVal: string = "—"): string => {
     if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
       return defaultVal;
     }
-    return Number(val).toFixed(decimals);
+    const n = Number(val);
+    if (n <= 0 && defaultVal === "—") return defaultVal;
+    return n.toFixed(decimals);
   };
 
-  const formatPercent = (val: any, decimals: number = 1, defaultVal: string = "-"): string => {
+  const toIsoDate = (val: any): string => {
+    if (!val) return "";
+    const s = String(val).trim();
+    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) {
+      const [d, m, y] = s.split("-");
+      return `${y}-${m}-${d}`;
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      return s;
+    }
+    if (s.includes("T")) {
+      return s.split("T")[0];
+    }
+    try {
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
+    } catch {}
+    return s;
+  };
+
+  const toDdMmYyyy = (val: any): string => {
+    if (!val) return "";
+    const s = String(val).trim();
+    if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const [y, m, d] = s.split("-");
+      return `${d}-${m}-${y}`;
+    }
+    if (s.includes("T")) {
+      const [y, m, d] = s.split("T")[0].split("-");
+      return `${d}-${m}-${y}`;
+    }
+    return s;
+  };
+
+  const formatPercent = (val: any, decimals: number = 1, defaultVal: string = "—"): string => {
     if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
       return defaultVal;
     }
     return `${Number(val).toFixed(decimals)}%`;
   };
 
-  const formatInt = (val: any, defaultVal: string = "0"): string => {
+  const formatInt = (val: any, defaultVal: string = "—"): string => {
     if (val === null || val === undefined || val === "" || isNaN(Number(val))) {
       return defaultVal;
     }
@@ -77,21 +155,208 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
 
   const formatStrike = (st: any): string => {
     if (st === null || st === undefined || isNaN(Number(st))) {
-      return String(st || "-");
+      return String(st || "—");
     }
     return Number(st).toLocaleString();
   };
 
   const calculateDaysToExpiry = (dateStr: string): number => {
     try {
-      const target = new Date(dateStr).getTime();
+      const iso = toIsoDate(dateStr);
+      const target = new Date(`${iso}T12:00:00Z`).getTime();
       const now = Date.now();
       const diffDays = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-      return isNaN(diffDays) ? 0 : Math.max(0, diffDays);
+      return isNaN(diffDays) ? 0 : diffDays;
     } catch {
       return 0;
     }
   };
+
+  // 1-second real-time clock for truthful age calculation
+  const [nowMs, setNowMs] = useState<number>(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // State synchronization and request sequencing guards
+  const selectedExpiryRef = React.useRef(selectedExpiry);
+  selectedExpiryRef.current = selectedExpiry;
+  const inFlightRef = React.useRef(false);
+  const reqSeqRef = React.useRef(0);
+
+  // Authoritative Feed Status Derivation: LIVE | STALE | RECONNECTING | NO QUOTES | API ERROR | EXPIRED | UNAVAILABLE
+  const feedDiagnostics = useMemo(() => {
+    if (errorMsg) {
+      return {
+        status: "API ERROR",
+        badgeColor: "bg-rose-500/10 text-rose-400 border-rose-500/30",
+        dotColor: "bg-rose-400",
+        ageSec: null as number | null,
+        tickTimeStr: null as string | null,
+        receivedTimeStr: null as string | null,
+        message: errorMsg,
+      };
+    }
+
+    const isSelectedExpExpired = (() => {
+      if (!selectedExpiry) return false;
+      const match = expiries.find((e: any) => toIsoDate(e.expiry_iso) === toIsoDate(selectedExpiry));
+      if (match && match.days_to_expiry < 0) return true;
+      const expIso = toIsoDate(selectedExpiry);
+      if (expIso) {
+        const expDate = new Date(`${expIso}T12:00:00Z`).getTime();
+        if (!isNaN(expDate) && expDate < Date.now() - 3600000) return true;
+      }
+      return false;
+    })();
+
+    if (isSelectedExpExpired) {
+      return {
+        status: "EXPIRED",
+        badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        dotColor: "bg-amber-400",
+        ageSec: null as number | null,
+        tickTimeStr: null as string | null,
+        receivedTimeStr: null as string | null,
+        message: "Selected expiry has settled.",
+      };
+    }
+
+    if (!optionChain && loading) {
+      return {
+        status: "UNAVAILABLE",
+        badgeColor: "bg-slate-500/10 text-slate-400 border-slate-500/30",
+        dotColor: "bg-slate-400",
+        ageSec: null as number | null,
+        tickTimeStr: null as string | null,
+        receivedTimeStr: null as string | null,
+        message: "Loading authoritative market feed...",
+      };
+    }
+
+    if (!optionChain && !loading) {
+      return {
+        status: "UNAVAILABLE",
+        badgeColor: "bg-slate-500/10 text-slate-400 border-slate-500/30",
+        dotColor: "bg-slate-400",
+        ageSec: null as number | null,
+        tickTimeStr: null as string | null,
+        receivedTimeStr: null as string | null,
+        message: "No feed response from broker.",
+      };
+    }
+
+    const rawTs = optionChain?.exchange_ts || optionChain?.exchangeTs || optionChain?.timestamp;
+    let tickTimeMs = 0;
+    let tickTimeStr = "—";
+    if (rawTs) {
+      try {
+        const d = new Date(rawTs);
+        if (!isNaN(d.getTime())) {
+          tickTimeMs = d.getTime();
+          tickTimeStr = d.toLocaleTimeString([], { hour12: false });
+        }
+      } catch {}
+    }
+
+    const recTs = optionChain?.received_at || optionChain?.receivedAt || optionChain?.timestamp;
+    let recTimeStr = "—";
+    if (recTs) {
+      try {
+        const d = new Date(recTs);
+        if (!isNaN(d.getTime())) {
+          recTimeStr = d.toLocaleTimeString([], { hour12: false });
+        }
+      } catch {}
+    }
+
+    const ageSec = tickTimeMs > 0 ? Math.max(0, Math.floor((nowMs - tickTimeMs) / 1000)) : 0;
+
+    const strikes = optionChain?.strikes || optionChain?.chain || optionChain?.rows || [];
+    if (strikes.length === 0) {
+      return {
+        status: "NO QUOTES",
+        badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        dotColor: "bg-amber-400",
+        ageSec,
+        tickTimeStr,
+        receivedTimeStr: recTimeStr,
+        message: "No live option contracts listed for this expiry.",
+      };
+    }
+
+    const rawStatus = String(optionChain?.status || optionChain?.data_status || "").toUpperCase();
+    if (rawStatus === "RECONNECTING" || rawStatus === "CONNECTING") {
+      return {
+        status: "RECONNECTING",
+        badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        dotColor: "bg-amber-400",
+        ageSec,
+        tickTimeStr,
+        receivedTimeStr: recTimeStr,
+        message: "Reconnecting to live WebSocket stream...",
+      };
+    }
+
+    if (rawStatus === "STALE" || rawStatus === "DELAYED" || ageSec > 30) {
+      return {
+        status: "STALE",
+        badgeColor: "bg-amber-500/10 text-amber-400 border-amber-500/30",
+        dotColor: "bg-amber-400",
+        ageSec,
+        tickTimeStr,
+        receivedTimeStr: recTimeStr,
+        message: `Feed is delayed (${ageSec}s old).`,
+      };
+    }
+
+    return {
+      status: "LIVE",
+      badgeColor: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+      dotColor: "bg-emerald-400",
+      ageSec,
+      tickTimeStr,
+      receivedTimeStr: recTimeStr,
+      message: "Streaming live exchange quotes.",
+    };
+  }, [errorMsg, selectedExpiry, expiries, optionChain, loading, nowMs]);
+
+  // Selected Contract Status & Diagnostics
+  const contractDiagnostics = useMemo(() => {
+    if (!draft.contract) return null;
+    const rawTs = draft.contract.timestamp;
+    let tickMs = 0;
+    let tickTimeStr = "—";
+    if (rawTs) {
+      try {
+        const d = new Date(rawTs);
+        if (!isNaN(d.getTime())) {
+          tickMs = d.getTime();
+          tickTimeStr = d.toLocaleTimeString([], { hour12: false });
+        }
+      } catch {}
+    }
+    const ageSec = tickMs > 0 ? Math.max(0, Math.floor((nowMs - tickMs) / 1000)) : 0;
+
+    let st = "LIVE";
+    if (draft.contract.is_live === false) {
+      st = "STALE";
+    } else if (ageSec > 30) {
+      st = "STALE";
+    } else if (!draft.contract.premium || draft.contract.premium <= 0) {
+      st = "NO QUOTES";
+    }
+
+    return {
+      status: st,
+      ageSec,
+      tickTimeStr,
+      receivedTimeStr: tickTimeStr,
+    };
+  }, [draft.contract, nowMs]);
 
   // Only reset expiry and option chain when underlying or market type genuinely changes
   const prevMarketUnderlyingRef = React.useRef(`${draft.market_type}:${draft.underlying}`);
@@ -100,6 +365,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
     if (prevMarketUnderlyingRef.current !== currentKey) {
       prevMarketUnderlyingRef.current = currentKey;
       setSelectedExpiry(draft.contract?.expiry || "");
+      selectedExpiryRef.current = draft.contract?.expiry || "";
       setOptionChain(null);
       setExpiries([]);
       setErrorMsg(null);
@@ -108,97 +374,137 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
 
   // Load Expiries & Option Chain or Instruments
   const fetchMarketData = async (silent: boolean = false) => {
+    if (inFlightRef.current && silent) return;
+    inFlightRef.current = true;
+    const currentSeq = ++reqSeqRef.current;
     if (!silent) setLoading(true);
     setErrorMsg(null);
     try {
       if (isOptionMarket) {
         const expList = await api.getExpiries(draft.market_type, draft.underlying);
+        if (currentSeq !== reqSeqRef.current) return;
         const rawList = Array.isArray(expList) ? expList : ((expList as any)?.data || (expList as any)?.expiries || []);
         const normalizedExpiries = rawList.map((item: any) => {
-          if (typeof item === "string") {
-            return { expiry: item, label: item, days_to_expiry: calculateDaysToExpiry(item) };
-          }
-          const expStr = item.expiry || item.expiry_iso || item.expiry_date || item.label || String(item);
+          const rawExp = typeof item === "string" ? item : (item.expiry || item.expiry_iso || item.expiry_date || item.label || String(item));
+          const iso = toIsoDate(rawExp);
+          const ddmmyyyy = toDdMmYyyy(rawExp);
+          const rawLabel = typeof item === "object" ? (item.display_label || item.label || item.display) : "";
+          const dte = item.days_to_expiry ?? calculateDaysToExpiry(iso);
+
+          let suffix = "";
+          if (dte <= 0.5) suffix = " (Today)";
+          else if (dte <= 1.5) suffix = " (Tomorrow)";
+          else if (dte <= 2.5) suffix = " (Daily)";
+          else if (dte <= 21) suffix = " (Weekly)";
+          else suffix = " (Monthly)";
+
+          const displayLabel = rawLabel || `${ddmmyyyy}${suffix}`;
+
           return {
-            expiry: expStr,
-            label: item.label || item.display || expStr,
-            days_to_expiry: item.days_to_expiry ?? calculateDaysToExpiry(expStr),
+            expiry: ddmmyyyy,
+            expiry_iso: iso,
+            expiry_date: ddmmyyyy,
+            settlement_time: item.settlement_time || `${iso}T12:00:00Z`,
+            label: displayLabel,
+            display_label: displayLabel,
+            days_to_expiry: dte,
+            expiry_type: item.expiry_type || (dte <= 2.5 ? "DAILY" : dte <= 21 ? "WEEKLY" : "MONTHLY"),
+            contract_count: item.contract_count || 0,
           };
         });
+
+        // Ensure chronological order strictly by ISO date
+        normalizedExpiries.sort((a, b) => a.expiry_iso.localeCompare(b.expiry_iso));
         setExpiries(normalizedExpiries);
 
         // Determine active expiry:
-        // Priority 1: User's explicitly selected expiry if valid in list
-        // Priority 2: Draft contract expiry if valid in list
-        // Priority 3: First upcoming expiry (days_to_expiry >= 0)
-        // Priority 4: First available expiry in list
+        // Priority 1: User's explicitly selected expiry if valid in list (using ISO match)
+        // Priority 2: Draft contract expiry if valid in list (using ISO match)
+        // Priority 3: Earliest upcoming expiry (days_to_expiry >= 0)
+        // Priority 4: First available expiry
         let activeExp = "";
-        if (selectedExpiry && normalizedExpiries.some((e: any) => e.expiry === selectedExpiry)) {
-          activeExp = selectedExpiry;
-        } else if (draft.contract?.expiry && normalizedExpiries.some((e: any) => e.expiry === draft.contract.expiry)) {
-          activeExp = draft.contract.expiry;
+        const currentSelected = selectedExpiryRef.current || selectedExpiry;
+        const matchSelected = normalizedExpiries.find((e: any) => toIsoDate(e.expiry_iso) === toIsoDate(currentSelected));
+        const matchDraft = normalizedExpiries.find((e: any) => toIsoDate(e.expiry_iso) === toIsoDate(draft.contract?.expiry || ""));
+
+        if (matchSelected) {
+          activeExp = matchSelected.expiry;
+        } else if (matchDraft) {
+          activeExp = matchDraft.expiry;
         } else {
           const upcoming = normalizedExpiries.find((e: any) => e.days_to_expiry >= 0);
           activeExp = upcoming ? upcoming.expiry : (normalizedExpiries.length > 0 ? normalizedExpiries[0].expiry : "");
         }
 
-        if (activeExp && activeExp !== selectedExpiry) {
+        if (activeExp && toIsoDate(activeExp) !== toIsoDate(selectedExpiryRef.current)) {
           setSelectedExpiry(activeExp);
+          selectedExpiryRef.current = activeExp;
         }
 
         const chain = await api.getLiveOptionChain(draft.market_type, draft.underlying, activeExp);
+        if (currentSeq !== reqSeqRef.current) return;
         if (chain) {
           setOptionChain(chain);
           const spot = chain?.underlying_price ?? chain?.spot_price ?? chain?.spot;
-          if (spot !== undefined && spot !== null && !isNaN(Number(spot))) {
+          if (spot !== undefined && spot !== null && !isNaN(Number(spot)) && Number(spot) > 0) {
             setLiveUnderlyingQuote({
               symbol: chain.underlying,
               ltp: Number(spot),
-              is_live: true,
+              is_live: chain.status === "LIVE" || chain.data_status === "LIVE",
               provider: chain.provider || draft.broker,
               timestamp: chain.timestamp || new Date().toISOString(),
             });
           }
 
-          const strikes = chain?.strikes || chain?.chain || [];
+          const strikes = chain?.strikes || chain?.chain || chain?.rows || [];
 
-          // 1. If contract is already selected, refresh its live quote without infinite loops
+          // 1. If contract is already selected, refresh its live quote ONLY if chain matches selected expiry
           if (draft.contract && strikes.length > 0) {
-            const matchStrike = Number(draft.contract.strike);
-            const matchingRow = strikes.find((r: any) => Number(r.strike) === matchStrike);
-            if (matchingRow) {
-              const isCall =
-                draft.contract.option_type === "CE" ||
-                (draft.contract.symbol || "").includes("CE") ||
-                (draft.contract.symbol || "").includes("-C");
-              const freshLeg = isCall ? (matchingRow.call || matchingRow.ce) : (matchingRow.put || matchingRow.pe);
-              if (freshLeg) {
-                const freshLtp = Number(freshLeg.ltp ?? freshLeg.price ?? freshLeg.last ?? freshLeg.bid ?? draft.contract.premium);
-                if (freshLtp > 0 && Math.abs(freshLtp - (draft.contract.premium || 0)) > 0.001) {
-                  updateDraft({
-                    contract: {
-                      ...draft.contract,
-                      premium: freshLtp,
-                      bid: Number(freshLeg.bid != null ? freshLeg.bid : draft.contract.bid),
-                      ask: Number(freshLeg.ask != null ? freshLeg.ask : draft.contract.ask),
-                      volume: Number(freshLeg.volume != null ? freshLeg.volume : draft.contract.volume),
-                      open_interest: Number(
-                        (freshLeg.open_interest ?? freshLeg.oi) != null
-                          ? (freshLeg.open_interest ?? freshLeg.oi)
-                          : draft.contract.open_interest
-                      ),
-                      timestamp: chain.timestamp || new Date().toISOString(),
-                      is_live: true,
-                      greeks: {
-                        ...draft.contract.greeks,
-                        delta: freshLeg.delta ?? draft.contract.greeks?.delta,
-                        gamma: freshLeg.gamma ?? draft.contract.greeks?.gamma,
-                        theta: freshLeg.theta ?? draft.contract.greeks?.theta,
-                        vega: freshLeg.vega ?? draft.contract.greeks?.vega,
-                        iv: freshLeg.iv ?? draft.contract.greeks?.iv,
+            const chainExpIso = toIsoDate(chain.expiry || chain.selected_expiry || activeExp);
+            const contractExpIso = toIsoDate(draft.contract.expiry);
+            if (chainExpIso === contractExpIso) {
+              const matchStrike = Number(draft.contract.strike);
+              const matchingRow = strikes.find((r: any) => Number(r.strike) === matchStrike);
+              if (matchingRow) {
+                const isCall =
+                  draft.contract.option_type === "CE" ||
+                  (draft.contract.symbol || "").includes("CE") ||
+                  (draft.contract.symbol || "").includes("-C");
+                const freshLeg = isCall ? (matchingRow.call || matchingRow.ce) : (matchingRow.put || matchingRow.pe);
+                if (freshLeg) {
+                  const rawLtp = freshLeg.ltp ?? freshLeg.lastPrice ?? freshLeg.tradePrice ?? freshLeg.close ?? null;
+                  const freshLtp = rawLtp != null && !isNaN(Number(rawLtp)) && Number(rawLtp) > 0 ? Number(rawLtp) : null;
+                  const freshBid = freshLeg.bid != null && !isNaN(Number(freshLeg.bid)) ? Number(freshLeg.bid) : null;
+                  const freshAsk = freshLeg.ask != null && !isNaN(Number(freshLeg.ask)) ? Number(freshLeg.ask) : null;
+
+                  const isActuallyLive = Boolean(freshLeg.exchange_ts || freshLeg.exchangeTs || chain.status === "LIVE" || chain.data_status === "LIVE");
+
+                  if (freshLtp !== null && Math.abs(freshLtp - (draft.contract.premium || 0)) > 0.001) {
+                    updateDraft({
+                      contract: {
+                        ...draft.contract,
+                        premium: freshLtp,
+                        bid: freshBid !== null ? freshBid : draft.contract.bid,
+                        ask: freshAsk !== null ? freshAsk : draft.contract.ask,
+                        volume: Number(freshLeg.volume != null ? freshLeg.volume : draft.contract.volume),
+                        open_interest: Number(
+                          (freshLeg.open_interest ?? freshLeg.oi) != null
+                            ? (freshLeg.open_interest ?? freshLeg.oi)
+                            : draft.contract.open_interest
+                        ),
+                        timestamp: chain.timestamp || new Date().toISOString(),
+                        is_live: isActuallyLive,
+                        greeks: {
+                          ...draft.contract.greeks,
+                          delta: freshLeg.delta ?? draft.contract.greeks?.delta,
+                          gamma: freshLeg.gamma ?? draft.contract.greeks?.gamma,
+                          theta: freshLeg.theta ?? draft.contract.greeks?.theta,
+                          vega: freshLeg.vega ?? draft.contract.greeks?.vega,
+                          iv: freshLeg.iv ?? draft.contract.greeks?.iv,
+                        },
                       },
-                    },
-                  });
+                    });
+                  }
                 }
               }
             }
@@ -212,10 +518,12 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
             }, strikes[0]);
             const targetLeg = atmRow?.call || atmRow?.put || atmRow?.ce || atmRow?.pe;
             if (targetLeg) {
-              const fallbackPrem = (targetLeg.bid != null && targetLeg.ask != null && !isNaN(Number(targetLeg.bid)) && !isNaN(Number(targetLeg.ask)))
-                ? (Number(targetLeg.bid) + Number(targetLeg.ask)) / 2
-                : 0;
-              const legPremium = Number(targetLeg.ltp ?? targetLeg.price ?? targetLeg.last ?? fallbackPrem ?? 0);
+              const rawLtp = targetLeg.ltp ?? targetLeg.lastPrice ?? targetLeg.tradePrice ?? targetLeg.close ?? null;
+              const legPremium = rawLtp != null && !isNaN(Number(rawLtp)) && Number(rawLtp) > 0 ? Number(rawLtp) : 0;
+              const legBid = targetLeg.bid != null && !isNaN(Number(targetLeg.bid)) ? Number(targetLeg.bid) : 0;
+              const legAsk = targetLeg.ask != null && !isNaN(Number(targetLeg.ask)) ? Number(targetLeg.ask) : 0;
+              const isActuallyLive = Boolean(targetLeg.exchange_ts || targetLeg.exchangeTs || chain.status === "LIVE" || chain.data_status === "LIVE");
+
               updateDraft({
                 contract: {
                   instrument_id: String(targetLeg.product_id || targetLeg.symbol),
@@ -224,9 +532,9 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                   expiry: targetLeg.expiry || activeExp,
                   strike: atmRow.strike,
                   option_type: targetLeg.option_type || "CE",
-                  premium: isNaN(legPremium) ? 0 : legPremium,
-                  bid: Number(targetLeg.bid || 0),
-                  ask: Number(targetLeg.ask || 0),
+                  premium: legPremium,
+                  bid: legBid,
+                  ask: legAsk,
                   volume: Number(targetLeg.volume || 0),
                   open_interest: Number(targetLeg.open_interest || targetLeg.oi || 0),
                   lot_size: Number(targetLeg.lot_size || (draft.market_type.includes("INDIA") ? (draft.underlying === "BANKNIFTY" ? 15 : 25) : 0.001)),
@@ -234,7 +542,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                   provider: draft.broker,
                   exchange: draft.market_type.includes("INDIA") ? "NSE" : "DELTA",
                   timestamp: chain.timestamp || new Date().toISOString(),
-                  is_live: true,
+                  is_live: isActuallyLive,
                   greeks: {
                     delta: targetLeg.delta ?? null,
                     gamma: targetLeg.gamma ?? null,
@@ -251,32 +559,8 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
         }
       } else {
         const insts = await api.getInstruments(draft.market_type, draft.underlying, searchTerm);
+        if (currentSeq !== reqSeqRef.current) return;
         let safeInsts = Array.isArray(insts) ? insts : ((insts as any)?.data || []);
-
-        // Resilience Fallback: If empty, construct a primary live contract using underlying so user is never blocked
-        if (safeInsts.length === 0 && draft.underlying) {
-          const isIndia = draft.market_type.includes("INDIA");
-          const primSym = (draft.underlying === "NIFTY" && !draft.market_type.includes("OPTION")) ? "NIFTY 50" : draft.underlying;
-          const fallbackPrice = isIndia ? 22615.20 : 65000.0;
-          safeInsts = [{
-            instrument_id: `${isIndia ? "NSE" : "CRYPTO"}:${primSym}`,
-            canonical_instrument_id: `${isIndia ? "NSE" : "CRYPTO"}:${primSym}`,
-            symbol: primSym,
-            underlying: draft.underlying,
-            contract_type: "EQUITY",
-            lot_size: 1,
-            tick_size: 0.05,
-            provider: isIndia ? "UPSTOX" : "DELTA",
-            exchange: isIndia ? "NSE" : "DELTA",
-            ltp: fallbackPrice,
-            price: fallbackPrice,
-            premium: fallbackPrice,
-            bid: Math.round(fallbackPrice * 0.9998 * 100) / 100,
-            ask: Math.round(fallbackPrice * 1.0002 * 100) / 100,
-            volume: 15420000,
-            open_interest: 0,
-          }];
-        }
         setInstruments(safeInsts);
         if (safeInsts.length > 0) {
           const firstInst = safeInsts[0];
@@ -284,7 +568,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
           setLiveUnderlyingQuote({
             symbol: firstInst.symbol,
             ltp: firstPrice,
-            is_live: true,
+            is_live: Boolean(firstInst.is_live),
             provider: firstInst.provider || draft.broker,
             timestamp: new Date().toISOString(),
           });
@@ -308,7 +592,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                     volume: Number(matchingInst.volume || draft.contract.volume),
                     open_interest: Number(matchingInst.open_interest || draft.contract.open_interest),
                     timestamp: new Date().toISOString(),
-                    is_live: true,
+                    is_live: Boolean(matchingInst.is_live),
                   },
                 });
               }
@@ -323,16 +607,16 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                 strike: firstInst.strike || 0,
                 option_type: null,
                 premium: firstPrice,
-                bid: Number(firstInst.bid || (firstPrice > 0 ? firstPrice * 0.9998 : 0)),
-                ask: Number(firstInst.ask || (firstPrice > 0 ? firstPrice * 1.0002 : 0)),
-                volume: firstInst.volume || 0,
-                open_interest: firstInst.open_interest || 0,
-                lot_size: firstInst.lot_size || 1,
-                tick_size: firstInst.tick_size || 0.05,
+                bid: Number(firstInst.bid || 0),
+                ask: Number(firstInst.ask || 0),
+                volume: Number(firstInst.volume || 0),
+                open_interest: Number(firstInst.open_interest || 0),
+                lot_size: Number(firstInst.lot_size || 1),
+                tick_size: Number(firstInst.tick_size || 0.05),
                 provider: firstInst.provider || draft.broker,
                 exchange: firstInst.exchange || (draft.market_type.includes("INDIA") ? "NSE" : "DELTA"),
                 timestamp: new Date().toISOString(),
-                is_live: true,
+                is_live: Boolean(firstInst.is_live),
               },
               bot_name: formatPositionBotName(firstInst.symbol),
             });
@@ -340,8 +624,9 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
         }
       }
     } catch (err: any) {
-      if (!silent) setErrorMsg(err.message || "Failed to fetch live market data");
+      if (currentSeq === reqSeqRef.current && !silent) setErrorMsg(err.message || "Failed to fetch live market data");
     } finally {
+      inFlightRef.current = false;
       if (!silent) setLoading(false);
     }
   };
@@ -352,22 +637,23 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
       fetchMarketData(true);
     }, 4000);
     return () => clearInterval(interval);
-  }, [draft.market_type, draft.underlying, selectedExpiry, searchTerm]);
+  }, [draft.market_type, draft.underlying, selectedExpiry]);
 
   const handleSelectExpiry = async (expVal: string) => {
-    if (expVal === selectedExpiry) return;
+    if (toIsoDate(expVal) === toIsoDate(selectedExpiryRef.current)) return;
     setSelectedExpiry(expVal);
+    selectedExpiryRef.current = expVal;
     setLoading(true);
     try {
       const chain = await api.getLiveOptionChain(draft.market_type, draft.underlying, expVal);
       if (chain) {
         setOptionChain(chain);
         const spot = chain?.underlying_price ?? chain?.spot_price ?? chain?.spot;
-        if (spot !== undefined && spot !== null && !isNaN(Number(spot))) {
+        if (spot !== undefined && spot !== null && !isNaN(Number(spot)) && Number(spot) > 0) {
           setLiveUnderlyingQuote({
             symbol: chain.underlying,
             ltp: Number(spot),
-            is_live: true,
+            is_live: chain.status === "LIVE" || chain.data_status === "LIVE",
             provider: chain.provider || draft.broker,
             timestamp: chain.timestamp || new Date().toISOString(),
           });
@@ -390,10 +676,12 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
 
   const handleSelectLeg = (leg: any, strike: number, optType: "CE" | "PE") => {
     if (!leg) return;
-    const fallbackPrem = (leg.bid != null && leg.ask != null && !isNaN(Number(leg.bid)) && !isNaN(Number(leg.ask)))
-      ? (Number(leg.bid) + Number(leg.ask)) / 2
-      : 0;
-    const legPremium = Number(leg.ltp ?? leg.price ?? leg.last ?? fallbackPrem ?? 0);
+    const rawLtp = leg.ltp ?? leg.lastPrice ?? leg.tradePrice ?? leg.close ?? null;
+    const legPremium = rawLtp != null && !isNaN(Number(rawLtp)) && Number(rawLtp) > 0 ? Number(rawLtp) : 0;
+    const legBid = leg.bid != null && !isNaN(Number(leg.bid)) ? Number(leg.bid) : 0;
+    const legAsk = leg.ask != null && !isNaN(Number(leg.ask)) ? Number(leg.ask) : 0;
+    const isActuallyLive = Boolean(leg.exchange_ts || leg.exchangeTs || optionChain?.status === "LIVE" || optionChain?.data_status === "LIVE");
+
     handleSelectContract({
       instrument_id: String(leg.product_id || leg.symbol),
       symbol: leg.symbol,
@@ -401,9 +689,9 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
       expiry: leg.expiry || selectedExpiry,
       strike: strike,
       option_type: optType,
-      premium: isNaN(legPremium) ? 0 : legPremium,
-      bid: Number(leg.bid || 0),
-      ask: Number(leg.ask || 0),
+      premium: legPremium,
+      bid: legBid,
+      ask: legAsk,
       volume: Number(leg.volume || 0),
       open_interest: Number(leg.open_interest || leg.oi || 0),
       lot_size: Number(leg.lot_size || (draft.market_type.includes("INDIA") ? 25 : 0.001)),
@@ -411,7 +699,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
       provider: draft.broker,
       exchange: draft.market_type.includes("INDIA") ? "UPSTOX" : "DELTA",
       timestamp: optionChain?.timestamp,
-      is_live: true,
+      is_live: isActuallyLive,
       greeks: {
         delta: leg.delta ?? null,
         gamma: leg.gamma ?? null,
@@ -538,10 +826,27 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
         </div>
 
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs sm:text-sm font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 shadow-sm">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-            LIVE FEED (4s)
-          </span>
+          <div
+            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-mono font-bold border shadow-sm ${feedDiagnostics.badgeColor}`}
+            title={`Exchange Tick: ${feedDiagnostics.tickTimeStr || "—"} | Received: ${feedDiagnostics.receivedTimeStr || "—"} | Age: ${feedDiagnostics.ageSec != null ? `${feedDiagnostics.ageSec}s` : "—"}`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${feedDiagnostics.dotColor} ${
+                feedDiagnostics.status === "LIVE" ? "animate-ping" : ""
+              }`}
+            />
+            <span>{feedDiagnostics.status}</span>
+            {feedDiagnostics.ageSec !== null && (
+              <span className="text-[11px] opacity-80 border-l border-current/20 pl-2">
+                {feedDiagnostics.ageSec}s
+              </span>
+            )}
+            {feedDiagnostics.tickTimeStr && feedDiagnostics.tickTimeStr !== "—" && (
+              <span className="text-[10px] opacity-70 hidden sm:inline">
+                • {feedDiagnostics.tickTimeStr}
+              </span>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => fetchMarketData(false)}
@@ -574,13 +879,13 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
               </div>
               <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-xs sm:text-sm font-mono text-slate-300 mt-2 font-medium">
                 <span>
-                  LTP: <strong className="text-emerald-400 font-bold">{currencySymbol}{formatPrice(draft.contract.premium)}</strong>
+                  LTP: <strong className="text-emerald-400 font-bold">{renderPrice(draft.contract.premium)}</strong>
                 </span>
                 <span>
-                  Bid: <strong className="text-slate-200">{currencySymbol}{formatPrice(draft.contract.bid)}</strong>
+                  Bid: <strong className="text-slate-200">{renderPrice(draft.contract.bid)}</strong>
                 </span>
                 <span>
-                  Ask: <strong className="text-slate-200">{currencySymbol}{formatPrice(draft.contract.ask)}</strong>
+                  Ask: <strong className="text-slate-200">{renderPrice(draft.contract.ask)}</strong>
                 </span>
                 {draft.contract.expiry && <span>Expiry: <strong className="text-slate-200">{draft.contract.expiry}</strong></span>}
                 {draft.contract.strike && <span>Strike: <strong className="text-slate-200">{formatStrike(draft.contract.strike)}</strong></span>}
@@ -589,14 +894,53 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                     Type: {draft.contract.option_type === "CE" ? "CALL (CE)" : "PUT (PE)"}
                   </span>
                 )}
+                <span>
+                  Vol: <strong className="text-slate-200">{renderInt(draft.contract.volume)}</strong>
+                </span>
+                <span>
+                  OI: <strong className="text-slate-200">{renderInt(draft.contract.open_interest)}</strong>
+                </span>
+                {draft.contract.greeks && (
+                  <>
+                    <span>Δ: <strong className="text-cyan-300">{renderGreek(draft.contract.greeks.delta, 3)}</strong></span>
+                    <span>θ: <strong className="text-amber-300">{renderGreek(draft.contract.greeks.theta, 1)}</strong></span>
+                    <span>IV: <strong className="text-purple-300">{draft.contract.greeks.iv != null && !isNaN(Number(draft.contract.greeks.iv)) ? `${Number(draft.contract.greeks.iv).toFixed(1)}%` : "—"}</strong></span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="text-right font-mono text-xs text-slate-400">
-            <span className="inline-flex items-center gap-1.5 text-emerald-400 font-bold px-3 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/30">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" /> STREAM READY
-            </span>
+          <div className="text-right font-mono text-xs text-slate-400 space-y-1.5">
+            <div className="flex items-center justify-end gap-2">
+              <span className={`inline-flex items-center gap-1.5 font-bold px-3 py-1 rounded-full text-xs border shadow-sm ${
+                contractDiagnostics?.status === "LIVE"
+                  ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/30"
+                  : contractDiagnostics?.status === "STALE"
+                  ? "bg-amber-950/60 text-amber-400 border-amber-500/30"
+                  : contractDiagnostics?.status === "NO QUOTES"
+                  ? "bg-amber-950/40 text-amber-300 border-amber-500/30"
+                  : "bg-slate-800 text-slate-300 border-slate-700"
+              }`}>
+                <span className={`h-2 w-2 rounded-full ${
+                  contractDiagnostics?.status === "LIVE" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
+                }`} />
+                {contractDiagnostics?.status || "LIVE"}
+              </span>
+            </div>
+            {contractDiagnostics && (
+              <div className="text-[11px] text-slate-400 flex items-center justify-end gap-2 font-mono">
+                {contractDiagnostics.tickTimeStr && contractDiagnostics.tickTimeStr !== "—" && (
+                  <span>Tick: <strong className="text-slate-300">{contractDiagnostics.tickTimeStr}</strong></span>
+                )}
+                {contractDiagnostics.ageSec !== null && (
+                  <>
+                    <span>•</span>
+                    <span>Age: <strong className="text-slate-300">{contractDiagnostics.ageSec}s</strong></span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -876,11 +1220,11 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                             call ? (
                               viewMode === "greeks" ? (
                                 <>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatPercent(call.iv, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-200 hover:bg-emerald-500/10 font-medium"}`}>{formatGreek(call.delta, 3)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatGreek(call.gamma, 4)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatGreek(call.theta, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatGreek(call.vega, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderPercent(call.iv, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-200 hover:bg-emerald-500/10 font-medium"}`}>{renderGreek(call.delta, 3)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderGreek(call.gamma, 4)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderGreek(call.theta, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderGreek(call.vega, 1)}</td>
                                   <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-3 text-right border-r border-slate-800 cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/20" : "hover:bg-emerald-500/10"}`}>
                                     <button
                                       type="button"
@@ -890,21 +1234,23 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                                       }}
                                       className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${isCallSelected
                                           ? "bg-emerald-500 text-slate-950 shadow-md ring-2 ring-emerald-400 font-black"
-                                          : "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30"
+                                          : call.ltp != null && Number(call.ltp) > 0
+                                            ? "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30"
+                                            : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                                         }`}
                                     >
-                                      {currencySymbol}{formatPrice(call.ltp, 2)}
+                                      {renderPrice(call.ltp, 2)}
                                     </button>
                                   </td>
                                 </>
                               ) : (
                                 <>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatInt(call.open_interest || call.oi)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatPercent(call.iv, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-200 hover:bg-emerald-500/10 font-medium"}`}>{formatGreek(call.delta, 3)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{formatGreek(call.theta, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{call.bid != null && !isNaN(Number(call.bid)) ? `${currencySymbol}${formatPrice(call.bid, 1)}` : "-"}</td>
-                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{call.ask != null && !isNaN(Number(call.ask)) ? `${currencySymbol}${formatPrice(call.ask, 1)}` : "-"}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderInt(call.open_interest || call.oi)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderPercent(call.iv, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-200 hover:bg-emerald-500/10 font-medium"}`}>{renderGreek(call.delta, 3)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{renderGreek(call.theta, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{call.bid != null && Number(call.bid) > 0 ? renderPrice(call.bid, 1) : "—"}</td>
+                                  <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-2.5 text-right cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/15 text-emerald-300 font-bold" : "text-slate-300 hover:bg-emerald-500/10"}`}>{call.ask != null && Number(call.ask) > 0 ? renderPrice(call.ask, 1) : "—"}</td>
                                   <td onClick={() => handleSelectLeg(call, strike, "CE")} className={`py-2.5 px-3 text-right border-r border-slate-800 cursor-pointer transition-colors ${isCallSelected ? "bg-emerald-500/20" : "hover:bg-emerald-500/10"}`}>
                                     <button
                                       type="button"
@@ -914,17 +1260,19 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                                       }}
                                       className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${isCallSelected
                                           ? "bg-emerald-500 text-slate-950 shadow-md ring-2 ring-emerald-400 font-black"
-                                          : "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30"
+                                          : call.ltp != null && Number(call.ltp) > 0
+                                            ? "bg-emerald-950/40 text-emerald-400 hover:bg-emerald-600 hover:text-white border border-emerald-500/30"
+                                            : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                                         }`}
                                     >
-                                      {currencySymbol}{formatPrice(call.ltp, 2)}
+                                      {renderPrice(call.ltp, 2)}
                                     </button>
                                   </td>
                                 </>
                               )
                             ) : (
                               <td colSpan={viewMode === "greeks" ? 6 : 7} className="text-center text-slate-500 py-3 border-r border-slate-800">
-                                -
+                                —
                               </td>
                             )
                           )}
@@ -979,17 +1327,19 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                                       }}
                                       className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${isPutSelected
                                           ? "bg-red-500 text-slate-950 shadow-md ring-2 ring-red-400 font-black"
-                                          : "bg-red-950/40 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30"
+                                          : put.ltp != null && Number(put.ltp) > 0
+                                            ? "bg-red-950/40 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30"
+                                            : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                                         }`}
                                     >
-                                      {currencySymbol}{formatPrice(put.ltp, 2)}
+                                      {renderPrice(put.ltp, 2)}
                                     </button>
                                   </td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-200 hover:bg-red-500/10 font-medium"}`}>{formatGreek(put.delta, 3)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatGreek(put.gamma, 4)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatGreek(put.theta, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatGreek(put.vega, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatPercent(put.iv, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-200 hover:bg-red-500/10 font-medium"}`}>{renderGreek(put.delta, 3)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderGreek(put.gamma, 4)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderGreek(put.theta, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderGreek(put.vega, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderPercent(put.iv, 1)}</td>
                                 </>
                               ) : (
                                 <>
@@ -1002,23 +1352,25 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                                       }}
                                       className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer ${isPutSelected
                                           ? "bg-red-500 text-slate-950 shadow-md ring-2 ring-red-400 font-black"
-                                          : "bg-red-950/40 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30"
+                                          : put.ltp != null && Number(put.ltp) > 0
+                                            ? "bg-red-950/40 text-red-400 hover:bg-red-600 hover:text-white border border-red-500/30"
+                                            : "bg-slate-900/60 text-slate-400 hover:text-slate-200 border border-slate-800"
                                         }`}
                                     >
-                                      {currencySymbol}{formatPrice(put.ltp, 2)}
+                                      {renderPrice(put.ltp, 2)}
                                     </button>
                                   </td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{put.bid != null && !isNaN(Number(put.bid)) ? `${currencySymbol}${formatPrice(put.bid, 1)}` : "-"}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{put.ask != null && !isNaN(Number(put.ask)) ? `${currencySymbol}${formatPrice(put.ask, 1)}` : "-"}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-200 hover:bg-red-500/10 font-medium"}`}>{formatGreek(put.delta, 3)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatGreek(put.theta, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatPercent(put.iv, 1)}</td>
-                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{formatInt(put.open_interest || put.oi)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{put.bid != null && Number(put.bid) > 0 ? renderPrice(put.bid, 1) : "—"}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{put.ask != null && Number(put.ask) > 0 ? renderPrice(put.ask, 1) : "—"}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-200 hover:bg-red-500/10 font-medium"}`}>{renderGreek(put.delta, 3)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderGreek(put.theta, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderPercent(put.iv, 1)}</td>
+                                  <td onClick={() => handleSelectLeg(put, strike, "PE")} className={`py-2.5 px-2.5 text-left cursor-pointer transition-colors ${isPutSelected ? "bg-red-500/15 text-red-300 font-bold" : "text-slate-300 hover:bg-red-500/10"}`}>{renderInt(put.open_interest || put.oi)}</td>
                                 </>
                               )
                             ) : (
                               <td colSpan={viewMode === "greeks" ? 6 : 7} className="text-center text-slate-500 py-3 border-l border-slate-800">
-                                -
+                                —
                               </td>
                             )
                           )}
@@ -1075,9 +1427,9 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                         strike: null,
                         option_type: null,
                         premium: inst.ltp || inst.price || inst.premium || 0,
-                        bid: inst.bid || (inst.price ? Math.round(inst.price * 0.9998 * 100) / 100 : 0),
-                        ask: inst.ask || (inst.price ? Math.round(inst.price * 1.0002 * 100) / 100 : 0),
-                        volume: inst.volume || 0,
+                        bid: inst.bid != null && Number(inst.bid) > 0 ? Number(inst.bid) : null,
+                        ask: inst.ask != null && Number(inst.ask) > 0 ? Number(inst.ask) : null,
+                        volume: inst.volume != null ? Number(inst.volume) : null,
                         open_interest: inst.open_interest || 0,
                         lot_size: inst.lot_size || 1,
                         tick_size: inst.tick_size || 0.01,
@@ -1101,8 +1453,7 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
 
                     <div className="mt-3.5 flex items-baseline justify-between">
                       <div className="text-xl sm:text-2xl font-mono font-black text-emerald-400">
-                        {currencySymbol}
-                        {formatPrice(inst.ltp || inst.price || inst.premium)}
+                        {renderPrice(inst.ltp || inst.price || inst.premium)}
                       </div>
                       {inst.change_pct != null && !isNaN(Number(inst.change_pct)) && (
                         <span
@@ -1116,17 +1467,9 @@ export default function Step2LiveMarket({ draft, updateDraft, onNext, onPrev }: 
                     </div>
 
                     <div className="mt-3 grid grid-cols-2 gap-2 text-xs font-mono text-slate-300 pt-3 border-t border-slate-800/80">
-                      <div>Bid: <span className="text-white font-medium">{(() => {
-                        const p = Number(inst.ltp || inst.price || inst.premium || 0);
-                        const b = inst.bid != null && Number(inst.bid) > 0 ? Number(inst.bid) : (p > 0 ? p * 0.9998 : null);
-                        return b != null ? `${currencySymbol}${formatPrice(b)}` : "-";
-                      })()}</span></div>
-                      <div>Ask: <span className="text-white font-medium">{(() => {
-                        const p = Number(inst.ltp || inst.price || inst.premium || 0);
-                        const a = inst.ask != null && Number(inst.ask) > 0 ? Number(inst.ask) : (p > 0 ? p * 1.0002 : null);
-                        return a != null ? `${currencySymbol}${formatPrice(a)}` : "-";
-                      })()}</span></div>
-                      <div>Vol: <span className="text-white font-medium">{formatInt(inst.volume || 10000)}</span></div>
+                      <div>Bid: <span className="text-white font-medium">{renderPrice(inst.bid)}</span></div>
+                      <div>Ask: <span className="text-white font-medium">{renderPrice(inst.ask)}</span></div>
+                      <div>Vol: <span className="text-white font-medium">{renderInt(inst.volume)}</span></div>
                       <div>Lot: <span className="text-white font-medium">{inst.lot_size || 1}</span></div>
                     </div>
                   </button>

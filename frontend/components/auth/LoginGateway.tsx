@@ -620,7 +620,23 @@ export function LoginGateway() {
               </p>
             </div>
 
-
+            {/* Dev OTP Auto-Fill Helper */}
+            {devOtp && (
+              <div className="flex items-center justify-center -mt-1 mb-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const digits = devOtp.split("").slice(0, 6);
+                    setOtpDigits(digits);
+                    submitEmailOTP(devOtp);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/60 border border-cyan-500/40 text-cyan-300 hover:bg-cyan-900/50 text-xs font-mono transition-all ${devOtpFlash ? "ring-2 ring-cyan-400 scale-105" : ""}`}
+                >
+                  <Zap className="h-3.5 w-3.5 text-cyan-400" />
+                  <span>Dev OTP Auto-Fill ({devOtp})</span>
+                </button>
+              </div>
+            )}
 
             {/* 6-Digit OTP Input Boxes */}
             <div>

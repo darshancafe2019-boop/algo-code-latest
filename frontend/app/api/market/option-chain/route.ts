@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     const gwRes = await fetch(gwUrl, {
       cache: "no-store",
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(8000),
     });
 
     if (gwRes.ok) {
@@ -53,16 +53,21 @@ export async function GET(req: NextRequest) {
 
           const formatLeg = (leg: any, optType: "CE" | "PE") => {
             if (!leg) return null;
-            const ltp = Number(leg.ltp ?? leg.lastPrice ?? leg.last ?? leg.price ?? leg.markPrice ?? 0);
-            const bid = Number(leg.bid ?? (ltp > 0 ? ltp * 0.995 : 0));
-            const ask = Number(leg.ask ?? (ltp > 0 ? ltp * 1.005 : 0));
+            // True LTP from exchange (null if un-traded, never fabricated from bid/ask)
+            const rawLtp = leg.ltp ?? leg.lastPrice ?? leg.tradePrice ?? leg.close ?? leg.last ?? null;
+            const ltp = rawLtp != null && !isNaN(Number(rawLtp)) && Number(rawLtp) > 0 ? Number(rawLtp) : null;
+            const mark = leg.mark != null && !isNaN(Number(leg.mark)) ? Number(leg.mark) : (leg.markPrice != null && !isNaN(Number(leg.markPrice)) ? Number(leg.markPrice) : (leg.mark_price != null && !isNaN(Number(leg.mark_price)) ? Number(leg.mark_price) : ltp));
+
+            const bid = leg.bid != null && !isNaN(Number(leg.bid)) && Number(leg.bid) > 0 ? Number(leg.bid) : null;
+            const ask = leg.ask != null && !isNaN(Number(leg.ask)) && Number(leg.ask) > 0 ? Number(leg.ask) : null;
             const oi = Number(leg.open_interest ?? leg.openInterest ?? leg.oi ?? 0);
             const vol = Number(leg.volume ?? 0);
-            const iv = Number(leg.iv ?? leg.markIv ?? 0);
-            const delta = leg.delta != null ? Number(leg.delta) : (optType === "CE" ? 0.5 : -0.5);
-            const gamma = leg.gamma != null ? Number(leg.gamma) : 0.0001;
-            const theta = leg.theta != null ? Number(leg.theta) : -5.0;
-            const vega = leg.vega != null ? Number(leg.vega) : 2.0;
+            const iv = leg.iv != null && !isNaN(Number(leg.iv)) ? Number(leg.iv) : (leg.markIv != null ? Number(leg.markIv) : null);
+            const delta = leg.delta != null && !isNaN(Number(leg.delta)) ? Number(leg.delta) : null;
+            const gamma = leg.gamma != null && !isNaN(Number(leg.gamma)) ? Number(leg.gamma) : null;
+            const theta = leg.theta != null && !isNaN(Number(leg.theta)) ? Number(leg.theta) : null;
+            const vega = leg.vega != null && !isNaN(Number(leg.vega)) ? Number(leg.vega) : null;
+            const rho = leg.rho != null && !isNaN(Number(leg.rho)) ? Number(leg.rho) : null;
 
             return {
               symbol: leg.symbol || `${underlying} ${selectedExp} ${strike} ${optType}`,
@@ -75,9 +80,12 @@ export async function GET(req: NextRequest) {
               last: ltp,
               price: ltp,
               premium: ltp,
+              mark: mark,
+              markPrice: mark,
+              mark_price: mark,
               bid: bid,
               ask: ask,
-              spread: Math.max(0, ask - bid),
+              spread: (bid != null && ask != null) ? Math.max(0, ask - bid) : null,
               volume: vol,
               open_interest: oi,
               oi: oi,
@@ -86,17 +94,23 @@ export async function GET(req: NextRequest) {
               gamma: gamma,
               theta: theta,
               vega: vega,
+              rho: rho,
               lot_size: Number(leg.lot_size || (isCrypto ? 0.001 : (underlying === "BANKNIFTY" ? 15 : 25))),
               tick_size: Number(leg.tick_size || 0.05),
-              moneyness: leg.moneyness || (optType === "CE" ? (strike < spotPrice ? "ITM" : "OTM") : (strike > spotPrice ? "ITM" : "OTM")),
+              moneyness: leg.moneyness || (optType === "CE" ? (strike < spotPrice ? "ITM" : (strike === atmStrike ? "ATM" : "OTM")) : (strike > spotPrice ? "ITM" : (strike === atmStrike ? "ATM" : "OTM"))),
               greeks: {
                 delta: delta,
                 gamma: gamma,
                 theta: theta,
                 vega: vega,
+                rho: rho,
                 iv: iv,
                 greeks_source: isCrypto ? "DELTA_LIVE" : "GATEWAY_LIVE",
               },
+              exchange_ts: leg.exchangeTs || leg.exchange_timestamp || null,
+              quote_age_ms: leg.quoteAgeMs ?? null,
+              received_at: leg.receivedAt || new Date().toISOString(),
+              status: leg.status || "LIVE",
             };
           };
 
@@ -116,6 +130,7 @@ export async function GET(req: NextRequest) {
           };
         });
 
+        const isActuallyLive = gwChain.status === "LIVE" || gwChain.data_status === "LIVE";
         const responsePayload = {
           underlying,
           spot: spotPrice,
@@ -134,9 +149,17 @@ export async function GET(req: NextRequest) {
           rows: formattedRows,
           provider: gwChain.provider || provider,
           total_contracts: formattedRows.length,
-          pcr: gwChain.pcr || gwChain.pcr_oi || 1.0,
+          pcr: gwChain.pcr ?? gwChain.pcr_oi ?? (() => {
+            let callOi = 0, putOi = 0;
+            for (const row of formattedRows) {
+              if (row.call?.open_interest) callOi += Number(row.call.open_interest);
+              if (row.put?.open_interest) putOi += Number(row.put.open_interest);
+            }
+            return callOi > 0 ? Number((putOi / callOi).toFixed(2)) : 1.0;
+          })(),
           max_pain: gwChain.max_pain || gwChain.maxPain || atmStrike,
-          is_live: true,
+          is_live: isActuallyLive,
+          data_status: isActuallyLive ? "LIVE" : "REST_SNAPSHOT",
           timestamp: gwChain.timestamp || new Date().toISOString(),
         };
 
@@ -164,6 +187,12 @@ export async function GET(req: NextRequest) {
 
           const formatLeg = (leg: any, optType: "CE" | "PE") => {
             if (!leg) return null;
+            const rawLtp = leg.ltp ?? leg.lastPrice ?? leg.tradePrice ?? leg.close ?? null;
+            const ltp = rawLtp != null && !isNaN(Number(rawLtp)) && Number(rawLtp) > 0 ? Number(rawLtp) : null;
+            const markPrice = leg.markPrice ?? leg.mark ?? null;
+            const bid = leg.bid != null && !isNaN(Number(leg.bid)) && Number(leg.bid) > 0 ? Number(leg.bid) : null;
+            const ask = leg.ask != null && !isNaN(Number(leg.ask)) && Number(leg.ask) > 0 ? Number(leg.ask) : null;
+
             return {
               symbol: leg.symbol,
               strike: leg.strike,
@@ -171,30 +200,31 @@ export async function GET(req: NextRequest) {
               product_id: leg.productId || leg.symbol,
               instrument_id: String(leg.productId || leg.symbol),
               expiry: leg.expiry || snap.selectedExpiry,
-              ltp: leg.ltp ?? leg.lastPrice ?? leg.markPrice ?? 0,
-              last: leg.ltp ?? leg.lastPrice ?? leg.markPrice ?? 0,
-              price: leg.ltp ?? leg.lastPrice ?? leg.markPrice ?? 0,
-              premium: leg.ltp ?? leg.lastPrice ?? leg.markPrice ?? 0,
-              bid: leg.bid ?? 0,
-              ask: leg.ask ?? 0,
-              spread: Math.max(0, (leg.ask ?? 0) - (leg.bid ?? 0)),
-              volume: leg.volume ?? 0,
-              open_interest: leg.openInterest ?? leg.oi ?? 0,
-              oi: leg.openInterest ?? leg.oi ?? 0,
-              iv: leg.iv ?? leg.markIv ?? 0,
-              delta: leg.delta ?? 0,
-              gamma: leg.gamma ?? 0,
-              theta: leg.theta ?? 0,
-              vega: leg.vega ?? 0,
+              ltp,
+              last: ltp,
+              price: ltp,
+              premium: ltp,
+              markPrice,
+              bid,
+              ask,
+              spread: (bid != null && ask != null) ? Math.max(0, ask - bid) : null,
+              volume: Number(leg.volume ?? 0),
+              open_interest: Number(leg.openInterest ?? leg.oi ?? 0),
+              oi: Number(leg.openInterest ?? leg.oi ?? 0),
+              iv: leg.iv != null && !isNaN(Number(leg.iv)) ? Number(leg.iv) : (leg.markIv != null ? Number(leg.markIv) : null),
+              delta: leg.delta != null && !isNaN(Number(leg.delta)) ? Number(leg.delta) : null,
+              gamma: leg.gamma != null && !isNaN(Number(leg.gamma)) ? Number(leg.gamma) : null,
+              theta: leg.theta != null && !isNaN(Number(leg.theta)) ? Number(leg.theta) : null,
+              vega: leg.vega != null && !isNaN(Number(leg.vega)) ? Number(leg.vega) : null,
               lot_size: leg.lotSize ?? 0.001,
               tick_size: leg.tickSize ?? 0.1,
               moneyness: leg.moneyness || (optType === "CE" ? (r.strike < (snap.spotPrice || 0) ? "ITM" : "OTM") : (r.strike > (snap.spotPrice || 0) ? "ITM" : "OTM")),
               greeks: {
-                delta: leg.delta ?? 0,
-                gamma: leg.gamma ?? 0,
-                theta: leg.theta ?? 0,
-                vega: leg.vega ?? 0,
-                iv: leg.iv ?? 0,
+                delta: leg.delta != null && !isNaN(Number(leg.delta)) ? Number(leg.delta) : null,
+                gamma: leg.gamma != null && !isNaN(Number(leg.gamma)) ? Number(leg.gamma) : null,
+                theta: leg.theta != null && !isNaN(Number(leg.theta)) ? Number(leg.theta) : null,
+                vega: leg.vega != null && !isNaN(Number(leg.vega)) ? Number(leg.vega) : null,
+                iv: leg.iv != null && !isNaN(Number(leg.iv)) ? Number(leg.iv) : null,
                 greeks_source: "DELTA_LIVE",
               },
             };
@@ -233,6 +263,15 @@ export async function GET(req: NextRequest) {
           rows: formattedRows,
           provider: "DELTA",
           total_contracts: formattedRows.length,
+          pcr: (() => {
+            let callOi = 0, putOi = 0;
+            for (const row of formattedRows) {
+              if (row.call?.open_interest) callOi += Number(row.call.open_interest);
+              if (row.put?.open_interest) putOi += Number(row.put.open_interest);
+            }
+            return callOi > 0 ? Number((putOi / callOi).toFixed(2)) : 1.0;
+          })(),
+          max_pain: snap.atmStrike || 0,
           is_live: true,
           timestamp: new Date().toISOString(),
         };
@@ -270,162 +309,31 @@ export async function GET(req: NextRequest) {
     console.warn("[/api/market/option-chain] Backend query fallback:", err?.message);
   }
 
-  // ── 4. High-Fidelity Synthesized Multi-Asset Fallback ─────────────────────
-  const getIndianMarketDefaults = (sym: string) => {
-    if (sym.includes("BANK")) return { spot: 55844.0, step: 100, lot: 15, tick: 0.05 };
-    if (sym.includes("FIN")) return { spot: 25387.0, step: 50, lot: 25, tick: 0.05 };
-    if (sym.includes("MID")) return { spot: 12950.0, step: 25, lot: 75, tick: 0.05 };
-    if (sym.includes("SENSEX")) return { spot: 81500.0, step: 100, lot: 10, tick: 0.05 };
-    if (sym === "RELIANCE") return { spot: 1211.0, step: 20, lot: 250, tick: 0.05 };
-    if (sym === "TCS") return { spot: 2465.0, step: 20, lot: 175, tick: 0.05 };
-    if (sym === "INFY") return { spot: 1890.0, step: 20, lot: 400, tick: 0.05 };
-    if (sym === "HDFCBANK") return { spot: 1680.0, step: 10, lot: 550, tick: 0.05 };
-    return { spot: 23146.0, step: 50, lot: 25, tick: 0.05 };
-  };
-
-  const defaults = getIndianMarketDefaults(underlying);
-  const spotPrice = defaults.spot;
-  const strikeStep = defaults.step;
-  const lotSize = defaults.lot;
-  const tickSize = defaults.tick;
-  const atmStrike = Math.round(spotPrice / strikeStep) * strikeStep;
-  const selectedExp = expiry || "2026-10-19";
-
-  const fallbackStrikes = [];
-  for (let i = -12; i <= 12; i++) {
-    const strike = atmStrike + i * strikeStep;
-    const isATM = strike === atmStrike;
-    const dist = (strike - spotPrice) / spotPrice;
-
-    // Realistic Call Option Pricing
-    const cIntrinsic = Math.max(0, spotPrice - strike);
-    const cTimeVal = Math.max(5.0, (spotPrice * 0.016) * Math.exp(-Math.abs(dist) * 8));
-    const cLtp = Number((cIntrinsic + cTimeVal).toFixed(2));
-    const cBid = Number((cLtp * 0.995).toFixed(2));
-    const cAsk = Number((cLtp * 1.005).toFixed(2));
-    const cDelta = Number(Math.min(0.99, Math.max(0.01, 0.5 - (dist * 4))).toFixed(3));
-    const cOI = Math.max(12000, Math.round(150000 * Math.exp(-Math.abs(dist) * 5)));
-    const cVol = Math.round(cOI * 0.4);
-
-    // Realistic Put Option Pricing
-    const pIntrinsic = Math.max(0, strike - spotPrice);
-    const pTimeVal = Math.max(5.0, (spotPrice * 0.016) * Math.exp(-Math.abs(dist) * 8));
-    const pLtp = Number((pIntrinsic + pTimeVal).toFixed(2));
-    const pBid = Number((pLtp * 0.995).toFixed(2));
-    const pAsk = Number((pLtp * 1.005).toFixed(2));
-    const pDelta = Number(Math.max(-0.99, Math.min(-0.01, cDelta - 1.0)).toFixed(3));
-    const pOI = Math.max(11000, Math.round(145000 * Math.exp(-Math.abs(dist) * 5)));
-    const pVol = Math.round(pOI * 0.4);
-
-    const callLeg = {
-      symbol: `${underlying}-${selectedExp}-${strike}-CE`,
-      strike,
-      option_type: "CE",
-      product_id: `${underlying}-${selectedExp}-${strike}-CE`,
-      instrument_id: `${underlying}-${selectedExp}-${strike}-CE`,
-      expiry: selectedExp,
-      ltp: cLtp,
-      last: cLtp,
-      price: cLtp,
-      premium: cLtp,
-      bid: cBid,
-      ask: cAsk,
-      spread: Number((cAsk - cBid).toFixed(2)),
-      volume: cVol,
-      open_interest: cOI,
-      oi: cOI,
-      iv: 14.8,
-      delta: cDelta,
-      gamma: 0.0002,
-      theta: -8.5,
-      vega: 3.2,
-      lot_size: lotSize,
-      tick_size: tickSize,
-      moneyness: strike < spotPrice ? "ITM" : "OTM",
-      greeks: {
-        delta: cDelta,
-        gamma: 0.0002,
-        theta: -8.5,
-        vega: 3.2,
-        iv: 14.8,
-        greeks_source: "SYNTHETIC_LIVE",
-      },
-    };
-
-    const putLeg = {
-      symbol: `${underlying}-${selectedExp}-${strike}-PE`,
-      strike,
-      option_type: "PE",
-      product_id: `${underlying}-${selectedExp}-${strike}-PE`,
-      instrument_id: `${underlying}-${selectedExp}-${strike}-PE`,
-      expiry: selectedExp,
-      ltp: pLtp,
-      last: pLtp,
-      price: pLtp,
-      premium: pLtp,
-      bid: pBid,
-      ask: pAsk,
-      spread: Number((pAsk - pBid).toFixed(2)),
-      volume: pVol,
-      open_interest: pOI,
-      oi: pOI,
-      iv: 15.2,
-      delta: pDelta,
-      gamma: 0.0002,
-      theta: -8.2,
-      vega: 3.1,
-      lot_size: lotSize,
-      tick_size: tickSize,
-      moneyness: strike > spotPrice ? "ITM" : "OTM",
-      greeks: {
-        delta: pDelta,
-        gamma: 0.0002,
-        theta: -8.2,
-        vega: 3.1,
-        iv: 15.2,
-        greeks_source: "SYNTHETIC_LIVE",
-      },
-    };
-
-    fallbackStrikes.push({
-      strike,
-      strikePrice: strike,
-      call: callLeg,
-      put: putLeg,
-      ce: callLeg,
-      pe: putLeg,
-      isATM,
-      is_atm: isATM,
-    });
-  }
-
-  const fallbackPayload = {
-    underlying,
-    spot: spotPrice,
-    spot_price: spotPrice,
-    underlying_price: spotPrice,
-    atm_strike: atmStrike,
-    atmStrike,
-    selected_expiry: selectedExp,
-    selectedExpiry: selectedExp,
-    expiry: selectedExp,
-    available_expiries: [selectedExp, "2026-10-27", "2026-11-03", "2026-11-09"],
-    availableExpiries: [selectedExp, "2026-10-27", "2026-11-03", "2026-11-09"],
-    expiries: [selectedExp, "2026-10-27", "2026-11-03", "2026-11-09"],
-    strikes: fallbackStrikes,
-    chain: fallbackStrikes,
-    rows: fallbackStrikes,
-    provider: "SYNTHETIC_RESERVE",
-    total_contracts: fallbackStrikes.length,
-    pcr: 1.02,
-    max_pain: atmStrike,
-    is_live: true,
-    timestamp: new Date().toISOString(),
-  };
-
+  // ── 4. Truthful Unavailable Response (Zero Fabrication) ───────────────────
   return NextResponse.json({
-    success: true,
-    data: fallbackPayload,
-    ...fallbackPayload,
+    success: false,
+    underlying,
+    spot: 0,
+    spot_price: 0,
+    underlying_price: 0,
+    atm_strike: null,
+    atmStrike: null,
+    selected_expiry: expiry || "",
+    selectedExpiry: expiry || "",
+    expiry: expiry || "",
+    available_expiries: [],
+    availableExpiries: [],
+    expiries: [],
+    strikes: [],
+    chain: [],
+    rows: [],
+    provider: provider,
+    total_contracts: 0,
+    pcr: 1.0,
+    max_pain: null,
+    is_live: false,
+    data_status: "UNAVAILABLE",
+    timestamp: new Date().toISOString(),
+    message: "No live option contracts currently available from exchange feed.",
   });
 }

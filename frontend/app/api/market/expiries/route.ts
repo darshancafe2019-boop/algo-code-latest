@@ -76,45 +76,82 @@ export async function GET(req: NextRequest) {
       if (Array.isArray(rawExpiries) && rawExpiries.length > 0) {
         const nowMs = Date.now();
         const formatted = rawExpiries.map((expItem: any, idx: number) => {
-          let expIso = typeof expItem === "string" ? expItem : (expItem.expiry || expItem.expiry_iso || expItem.expiry_date || String(expItem));
-          // Normalize DD-MM-YYYY to YYYY-MM-DD if needed
-          if (typeof expIso === "string" && expIso.length === 10 && expIso[2] === "-" && expIso[5] === "-") {
-            const parts = expIso.split("-");
-            expIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+          let rawStr = typeof expItem === "string" ? expItem : (expItem.expiry || expItem.expiry_iso || expItem.expiry_date || String(expItem));
+          let expIso = rawStr;
+          let ddmmyyyy = rawStr;
+
+          // Normalize DD-MM-YYYY vs YYYY-MM-DD
+          if (typeof rawStr === "string" && rawStr.length === 10) {
+            if (rawStr[2] === "-" && rawStr[5] === "-") {
+              const parts = rawStr.split("-");
+              expIso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              ddmmyyyy = rawStr;
+            } else if (rawStr[4] === "-" && rawStr[7] === "-") {
+              const parts = rawStr.split("-");
+              ddmmyyyy = `${parts[2]}-${parts[1]}-${parts[0]}`;
+              expIso = rawStr;
+            }
           }
 
           let daysToExpiry = 0;
           try {
             const expTime = new Date(expIso).getTime();
-            daysToExpiry = Math.max(0, Math.ceil((expTime - nowMs) / (1000 * 60 * 60 * 24)));
+            daysToExpiry = Math.max(0, (expTime - nowMs) / (1000 * 60 * 60 * 24));
           } catch {
             daysToExpiry = (idx + 1) * 7;
           }
 
           let suffix = "";
-          if (daysToExpiry <= 0.5) suffix = " (Today)";
-          else if (daysToExpiry <= 1.5) suffix = " (Tomorrow)";
-          else if (daysToExpiry <= 7) suffix = " (Weekly)";
-          else if (daysToExpiry <= 35) suffix = " (Monthly)";
+          let expiryType = "MONTHLY";
+          if (daysToExpiry <= 0.5) {
+            suffix = " (Today)";
+            expiryType = "DAILY";
+          } else if (daysToExpiry <= 1.5) {
+            suffix = " (Tomorrow)";
+            expiryType = "DAILY";
+          } else if (daysToExpiry <= 2.5) {
+            suffix = " (Daily)";
+            expiryType = "DAILY";
+          } else if (daysToExpiry <= 21) {
+            suffix = " (Weekly)";
+            expiryType = "WEEKLY";
+          } else {
+            suffix = " (Monthly)";
+            expiryType = "MONTHLY";
+          }
+
+          const displayLabel = expItem.display_label || expItem.label || `${ddmmyyyy}${suffix}`;
 
           return {
             expiry: expIso,
-            expiry_date: expIso,
             expiry_iso: expIso,
-            label: `${expIso}${suffix}`,
-            display: expIso,
-            days_to_expiry: daysToExpiry,
-            category: daysToExpiry <= 7 ? "WEEKLY" : "MONTHLY",
+            expiry_date: ddmmyyyy,
+            settlement_time: expItem.settlement_time || `${expIso}T12:00:00Z`,
+            display_label: displayLabel,
+            label: displayLabel,
+            display: ddmmyyyy,
+            expiry_type: expItem.expiry_type || expiryType,
+            underlying: underlying,
+            region: isCrypto ? "INDIA" : "NSE",
+            contract_count: expItem.contract_count || 0,
+            state: expItem.state || "live",
+            source: isCrypto ? "DELTA_INDIA" : "GATEWAY_UPSTOX_LIVE",
+            last_synced_at: new Date().toISOString(),
+            days_to_expiry: Math.round(daysToExpiry * 100) / 100,
+            category: expiryType,
             tradable: true,
           };
         });
+
+        // Ensure chronological ordering by ISO date
+        formatted.sort((a: any, b: any) => a.expiry_iso.localeCompare(b.expiry_iso));
 
         return NextResponse.json({
           success: true,
           data: formatted,
           raw_expiries: rawExpiries,
           expiries: formatted,
-          source: isCrypto ? "DELTA_LIVE" : "GATEWAY_UPSTOX_LIVE",
+          source: isCrypto ? "DELTA_INDIA" : "GATEWAY_UPSTOX_LIVE",
         });
       }
     }

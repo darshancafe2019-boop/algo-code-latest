@@ -599,11 +599,11 @@ class ServiceSupervisor:
         next_cmd_bin = FRONTEND_DIR / "node_modules" / ".bin" / ("next.cmd" if sys.platform == "win32" else "next")
         
         if next_dist.exists():
-            frontend_cmd = ["node", str(next_dist), "dev", "-p", str(FRONTEND_PORT)]
+            frontend_cmd = ["node", str(next_dist), "dev", "-H", "0.0.0.0", "-p", str(FRONTEND_PORT)]
         elif next_cmd_bin.exists():
-            frontend_cmd = [str(next_cmd_bin), "dev", "-p", str(FRONTEND_PORT)]
+            frontend_cmd = [str(next_cmd_bin), "dev", "-H", "0.0.0.0", "-p", str(FRONTEND_PORT)]
         else:
-            frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-p", str(FRONTEND_PORT)]
+            frontend_cmd = [NPM_EXEC, "run", "dev", "--", "-H", "0.0.0.0", "-p", str(FRONTEND_PORT)]
 
         self.services["FRONTEND"] = ManagedService(
             name="FRONTEND",

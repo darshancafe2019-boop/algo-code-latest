@@ -6193,7 +6193,8 @@ def audit_and_clean_db() -> Dict[str, Any]:
         trades = [dict(r) for r in cursor.fetchall()]
         report["trades_audited"] = len(trades)
 
-        seen_trades = []
+        from collections import defaultdict
+        seen_by_key = defaultdict(list)
         duplicate_ids = []
 
         for t in trades:
@@ -6207,34 +6208,34 @@ def audit_and_clean_db() -> Dict[str, Any]:
                 except Exception:
                     pass
 
+            key = (t.get("symbol"), t.get("direction"))
+            bucket = seen_by_key[key]
             is_dup = False
-            for prev in seen_trades:
-                if (t["symbol"] == prev["symbol"] and
-                    t["direction"] == prev["direction"] and
-                    abs(float(t["entry_price"]) - float(prev["entry_price"])) < 0.01 and
-                    abs(float(t["position_size"]) - float(prev["position_size"])) < 0.00001):
 
-                    prev_dt = prev.get("dt")
-                    if prev_dt and prev_dt.tzinfo is None:
-                        prev_dt = prev_dt.replace(tzinfo=timezone.utc)
-
+            cutoff = t_dt.timestamp() - 15 if t_dt else None
+            idx = len(bucket) - 1
+            while idx >= 0:
+                prev = bucket[idx]
+                prev_dt = prev.get("dt")
+                if cutoff and prev_dt and prev_dt.timestamp() < cutoff:
+                    break
+                if (abs(float(t["entry_price"] or 0) - float(prev["entry_price"] or 0)) < 0.01 and
+                    abs(float(t["position_size"] or 0) - float(prev["position_size"] or 0)) < 0.00001):
                     if t_dt and prev_dt:
-                        diff_sec = abs((t_dt - prev_dt).total_seconds())
-                        if diff_sec <= 15:
+                        if abs((t_dt - prev_dt).total_seconds()) <= 15:
                             is_dup = True
                             break
                     elif t_time_str == prev["timestamp"]:
                         is_dup = True
                         break
+                idx -= 1
 
             if is_dup:
                 duplicate_ids.append(t["id"])
                 report["details"].append(f"Duplicate trade ID {t['id']} ({t['symbol']} {t['direction']} @ ${t['entry_price']})")
             else:
-                seen_trades.append({
+                bucket.append({
                     "id": t["id"],
-                    "symbol": t["symbol"],
-                    "direction": t["direction"],
                     "entry_price": t["entry_price"],
                     "position_size": t["position_size"],
                     "timestamp": t_time_str,
@@ -6247,9 +6248,9 @@ def audit_and_clean_db() -> Dict[str, Any]:
             report["duplicate_trades_removed"] = len(duplicate_ids)
             logger.info("DB Audit: Removed %d duplicate trade records: %s", len(duplicate_ids), duplicate_ids)
 
-        # Reconcile, sanitize, and backfill trade PnLs
+        # Reconcile, sanitize, and backfill trade PnLs only for uncomputed or anomalous closed trades
         from src.pnl_engine import compute_authoritative_pnl
-        cursor.execute("SELECT * FROM trades_log WHERE status = 'CLOSED'")
+        cursor.execute("SELECT * FROM trades_log WHERE status = 'CLOSED' AND (net_pnl IS NULL OR realized_pnl IS NULL OR (symbol LIKE '%SOL%' AND exit_price > 1000))")
         closed_trades = [dict(r) for r in cursor.fetchall()]
         fixed_trades_cnt = 0
 
@@ -9187,32 +9188,40 @@ def get_instruments_master(
     if asset_class and asset_class.upper() != "ALL":
         ac_up = asset_class.upper()
         if ac_up in ["STOCK", "STOCKS", "EQUITIES", "EQUITY"]:
-            conditions.append("(asset_class IN ('Stock', 'Indian Equities', 'Global Equities', 'EQUITY', 'INDIAN_STOCKS', 'GLOBAL_STOCKS') OR instrument_type = 'EQUITY' OR instrument_type = 'CASH')")
+            conditions.append("(((asset_class IN ('Stock', 'Indian Equities', 'EQUITY', 'INDIAN_STOCKS') OR instrument_type IN ('EQUITY', 'CASH')) AND exchange IN ('NSE', 'BSE')) OR (country = 'IN' AND instrument_type IN ('EQUITY', 'CASH')))")
+        elif ac_up in ["GLOBAL", "US", "GLOBAL_STOCKS", "GLOBAL EQUITIES"]:
+            conditions.append("((asset_class IN ('Global Equities', 'GLOBAL_STOCKS', 'Stock') AND exchange IN ('NASDAQ', 'NYSE', 'LSE', 'TSE', 'HKEX', 'Euronext', 'XETRA', 'CBOE')) OR country = 'US')")
         elif ac_up in ["FUNDS", "FUND", "ETF", "ETFS"]:
             conditions.append("(asset_class IN ('Funds', 'FUND', 'ETF', 'ETFs') OR instrument_type IN ('FUND', 'ETF'))")
         elif ac_up in ["FUTURES", "FUTURE"]:
-            conditions.append("(asset_class IN ('Futures', 'FUTURES') OR instrument_type IN ('FUTURE', 'PERPETUAL'))")
+            conditions.append("(asset_class IN ('Futures', 'FUTURES') OR instrument_type IN ('FUTURES', 'FUTURE', 'PERPETUAL'))")
         elif ac_up in ["OPTIONS", "OPTION"]:
-            conditions.append("(asset_class IN ('Options', 'OPTIONS') OR instrument_type = 'OPTION')")
+            conditions.append("(asset_class IN ('Options', 'OPTIONS') OR instrument_type IN ('OPTIONS', 'OPTION', 'CALL', 'PUT'))")
         elif ac_up in ["CRYPTO", "CRYPTOCURRENCY"]:
-            conditions.append("(asset_class IN ('Crypto', 'CRYPTO') OR exchange = 'BINANCE')")
+            conditions.append("(asset_class IN ('Crypto', 'CRYPTO') OR exchange IN ('BINANCE', 'DELTA', 'DELTA_INDIA'))")
         elif ac_up in ["FOREX", "FX", "CURRENCY"]:
             conditions.append("(asset_class IN ('Forex', 'FOREX') OR exchange = 'OANDA')")
         elif ac_up in ["INDICES", "INDEX"]:
-            conditions.append("(asset_class IN ('Indices', 'INDEX', 'INDIAN_INDICES', 'GLOBAL_INDICES') OR instrument_type = 'REFERENCE_INDEX')")
+            conditions.append("(asset_class IN ('Indices', 'INDEX', 'INDIAN_INDICES', 'GLOBAL_INDICES') OR instrument_type IN ('INDEX', 'REFERENCE_INDEX'))")
         elif ac_up in ["BONDS", "BOND", "TREASURY"]:
             conditions.append("(asset_class IN ('Bonds', 'BOND') OR instrument_type = 'BOND')")
         elif ac_up in ["ECONOMY", "MACRO", "ECONOMIC_SERIES"]:
             conditions.append("(asset_class IN ('Economy', 'ECONOMIC_SERIES') OR instrument_type = 'ECONOMIC_SERIES')")
         elif ac_up in ["COMMODITIES", "COMMODITY"]:
-            conditions.append("asset_class IN ('Commodities', 'COMMODITIES')")
+            conditions.append("(asset_class IN ('Commodities', 'COMMODITIES') OR exchange IN ('MCX', 'COMEX'))")
         else:
             conditions.append("(asset_class = ? OR asset_class = ? OR instrument_type = ?)")
             params.extend([asset_class, asset_class.upper(), asset_class.upper()])
 
     if exchange and exchange.upper() != "ALL":
-        conditions.append("exchange = ?")
-        params.append(exchange.upper())
+        ex_up = exchange.upper()
+        if ex_up == "UPSTOX":
+            conditions.append("exchange IN ('NSE', 'BSE', 'NFO', 'MCX')")
+        elif ex_up in ("DELTA", "DELTA_INDIA"):
+            conditions.append("exchange IN ('DELTA', 'DELTA_INDIA', 'BINANCE')")
+        else:
+            conditions.append("exchange = ?")
+            params.append(ex_up)
 
     if instrument_type and instrument_type.upper() != "ALL":
         conditions.append("instrument_type = ?")
@@ -9331,14 +9340,15 @@ def get_universe_summary_stats() -> Dict[str, Any]:
     sql = """
         SELECT
             COUNT(*) as total_instruments,
-            SUM(CASE WHEN asset_class IN ('INDIAN_STOCKS', 'Stock') AND exchange = 'NSE' THEN 1 ELSE 0 END) as indian_stocks,
-            SUM(CASE WHEN asset_class IN ('INDIAN_INDICES', 'GLOBAL_INDICES', 'Indices') THEN 1 ELSE 0 END) as indices,
-            SUM(CASE WHEN asset_class IN ('GLOBAL_STOCKS', 'Stock') AND exchange IN ('NASDAQ', 'NYSE') THEN 1 ELSE 0 END) as global_stocks,
-            SUM(CASE WHEN asset_class IN ('CRYPTO', 'Crypto') THEN 1 ELSE 0 END) as crypto,
-            SUM(CASE WHEN asset_class IN ('FOREX', 'Forex') THEN 1 ELSE 0 END) as forex,
-            SUM(CASE WHEN asset_class IN ('COMMODITIES', 'Commodities') THEN 1 ELSE 0 END) as commodities,
-            SUM(CASE WHEN instrument_type = 'FUTURES' THEN 1 ELSE 0 END) as futures,
-            SUM(CASE WHEN instrument_type = 'OPTIONS' THEN 1 ELSE 0 END) as options,
+            SUM(CASE WHEN ((asset_class IN ('INDIAN_STOCKS', 'Stock', 'Indian Equities', 'EQUITY') AND exchange IN ('NSE', 'BSE')) OR (country = 'IN' AND instrument_type = 'EQUITY')) THEN 1 ELSE 0 END) as indian_stocks,
+            SUM(CASE WHEN (asset_class IN ('INDIAN_INDICES', 'GLOBAL_INDICES', 'Indices', 'INDEX') OR instrument_type IN ('INDEX', 'REFERENCE_INDEX')) THEN 1 ELSE 0 END) as indices,
+            SUM(CASE WHEN ((asset_class IN ('GLOBAL_STOCKS', 'Global Equities', 'Stock') AND exchange IN ('NASDAQ', 'NYSE', 'LSE', 'TSE', 'HKEX', 'Euronext', 'XETRA', 'CBOE')) OR country = 'US') THEN 1 ELSE 0 END) as global_stocks,
+            SUM(CASE WHEN (asset_class IN ('CRYPTO', 'Crypto') OR exchange IN ('BINANCE', 'DELTA', 'DELTA_INDIA')) THEN 1 ELSE 0 END) as crypto,
+            SUM(CASE WHEN (asset_class IN ('FOREX', 'Forex') OR exchange = 'OANDA') THEN 1 ELSE 0 END) as forex,
+            SUM(CASE WHEN (asset_class IN ('COMMODITIES', 'Commodities') OR exchange IN ('MCX', 'COMEX')) THEN 1 ELSE 0 END) as commodities,
+            SUM(CASE WHEN (asset_class IN ('Futures', 'FUTURES') OR instrument_type IN ('FUTURES', 'FUTURE', 'PERPETUAL')) THEN 1 ELSE 0 END) as futures,
+            SUM(CASE WHEN (asset_class IN ('Options', 'OPTIONS') OR instrument_type IN ('OPTIONS', 'OPTION', 'CALL', 'PUT')) THEN 1 ELSE 0 END) as options,
+            SUM(CASE WHEN (asset_class IN ('Bonds', 'BOND') OR instrument_type = 'BOND') THEN 1 ELSE 0 END) as bonds,
             SUM(CASE WHEN volatility_category IN ('High', 'Extreme') THEN 1 ELSE 0 END) as high_volatility,
             SUM(CASE WHEN exchange = 'NSE' THEN 1 ELSE 0 END) as nse_total,
             SUM(CASE WHEN exchange = 'BSE' THEN 1 ELSE 0 END) as bse_total,
@@ -9352,9 +9362,21 @@ def get_universe_summary_stats() -> Dict[str, Any]:
         row = {
             "total_instruments": 0, "indian_stocks": 0, "indices": 0, "global_stocks": 0,
             "crypto": 0, "forex": 0, "commodities": 0, "futures": 0, "options": 0,
-            "high_volatility": 0, "nse_total": 0, "bse_total": 0, "paper_enabled": 0,
-            "live_enabled": 0, "tradable": 0
+            "bonds": 0, "high_volatility": 0, "nse_total": 0, "bse_total": 0,
+            "paper_enabled": 0, "live_enabled": 0, "tradable": 0
         }
+
+    # Add uppercase canonical category aliases for direct frontend tab mapping
+    row["ALL"] = row.get("total_instruments", 0)
+    row["STOCKS"] = row.get("indian_stocks", 0)
+    row["INDICES"] = row.get("indices", 0)
+    row["GLOBAL"] = row.get("global_stocks", 0)
+    row["FUTURES"] = row.get("futures", 0)
+    row["OPTIONS"] = row.get("options", 0)
+    row["CRYPTO"] = row.get("crypto", 0)
+    row["FOREX"] = row.get("forex", 0)
+    row["COMMODITIES"] = row.get("commodities", 0)
+    row["BONDS"] = row.get("bonds", 0)
 
     # Add legacy key aliases
     row["crypto_count"] = row.get("crypto", 0)
@@ -9362,6 +9384,13 @@ def get_universe_summary_stats() -> Dict[str, Any]:
     row["global_stocks_count"] = row.get("global_stocks", 0)
     row["forex_count"] = row.get("forex", 0)
     row["indices_count"] = row.get("indices", 0)
+    row["futures_count"] = row.get("futures", 0)
+    row["options_count"] = row.get("options", 0)
+    row["commodities_count"] = row.get("commodities", 0)
+    row["bonds_count"] = row.get("bonds", 0)
+    row["asset_classes_covered"] = 8
+    row["active_markets"] = 5
+    row["providers_connected"] = 4
     return row
 
 
@@ -9532,33 +9561,52 @@ def get_option_chain_from_db(underlying: str, expiry: Optional[str] = None) -> D
 
 
 def get_futures_chain_from_db(underlying: str) -> List[Dict[str, Any]]:
-    """Builds Futures term structure (Near, Next, Far) for an underlying."""
+    """Builds Futures term structure (Near, Next, Far) for an underlying with alias normalization."""
+    clean_und = (underlying or "NIFTY").strip().upper()
+    und_aliases = [clean_und]
+    if clean_und in ("NIFTY", "NIFTY50", "NIFTY 50"):
+        und_aliases = ["NIFTY", "NIFTY50", "NIFTY 50", "NSE_INDEX|Nifty 50"]
+    elif clean_und in ("BANKNIFTY", "NIFTY BANK"):
+        und_aliases = ["BANKNIFTY", "NIFTY BANK", "NSE_INDEX|Nifty Bank"]
+    elif clean_und in ("FINNIFTY", "NIFTY FIN SERVICE"):
+        und_aliases = ["FINNIFTY", "NIFTY FIN SERVICE", "NSE_INDEX|Nifty Fin Service"]
+    elif clean_und in ("MIDCAP", "MIDCPNIFTY"):
+        und_aliases = ["MIDCAP", "MIDCPNIFTY", "NSE_INDEX|NIFTY MID SELECT"]
+
+    placeholders = ",".join(["?"] * len(und_aliases))
     spot_row = safe_query_one(
-        "SELECT last_price FROM instruments WHERE (canonical_symbol = ? OR underlying_symbol = ?) AND instrument_type IN ('EQUITY', 'INDEX', 'SPOT') LIMIT 1",
-        (underlying, underlying)
+        f"SELECT last_price FROM instruments WHERE (canonical_symbol IN ({placeholders}) OR underlying_symbol IN ({placeholders})) AND instrument_type IN ('EQUITY', 'INDEX', 'SPOT') LIMIT 1",
+        tuple(und_aliases + und_aliases)
     )
-    spot_price = spot_row["last_price"] if spot_row else 0.0
+    spot_price = float(spot_row["last_price"]) if spot_row and spot_row.get("last_price") else 0.0
 
     fut_rows = safe_query(
-        """
+        f"""
         SELECT * FROM instruments
-        WHERE underlying_symbol = ? AND instrument_type = 'FUTURES'
+        WHERE (underlying_symbol IN ({placeholders}) OR canonical_symbol IN ({placeholders})) AND instrument_type = 'FUTURES'
         ORDER BY expiry ASC
         LIMIT 6
         """,
-        (underlying,)
+        tuple(und_aliases + und_aliases)
     )
 
     enriched_contracts = []
     today = datetime.now(timezone.utc).date()
     for fut in fut_rows:
         fut_price = float(fut.get("last_price", 0.0))
-        basis = round(fut_price - spot_price, 2)
-        exp_str = fut.get("expiry", "")
+        basis = round(fut_price - spot_price, 2) if spot_price > 0 else 0.0
+        exp_str = str(fut.get("expiry", ""))
         days_to_exp = 0
         if exp_str and exp_str != "PERPETUAL":
             try:
-                exp_d = datetime.strptime(exp_str, "%Y-%m-%d").date()
+                # Handle YYYY-MM-DD or ms timestamp
+                if exp_str.isdigit() and len(exp_str) > 8:
+                    exp_num = float(exp_str)
+                    if exp_num > 10**10:
+                        exp_num /= 1000.0
+                    exp_d = datetime.fromtimestamp(exp_num, tz=timezone.utc).date()
+                else:
+                    exp_d = datetime.strptime(exp_str[:10], "%Y-%m-%d").date()
                 days_to_exp = max(0, (exp_d - today).days)
             except Exception:
                 days_to_exp = 0
@@ -12266,12 +12314,19 @@ def get_delta_underlyings(active_only: bool = True) -> List[Dict[str, Any]]:
 
 
 def upsert_delta_expiries(underlying: str, expiries_list: List[Dict[str, Any]]) -> int:
-    """Upsert a list of expiry records for a given underlying."""
-    now_iso = datetime.now(timezone.utc).isoformat()
+    """Upsert a list of expiry records for a given underlying with standardized settlement timestamps."""
+    now_utc = datetime.now(timezone.utc)
+    now_iso = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     count = 0
     with get_db_transaction() as conn:
         cursor = conn.cursor()
         for item in expiries_list:
+            raw_settle = item.get("settlement_time", "")
+            # Normalize settlement_time to standard ISO ending in 'Z'
+            clean_settle = raw_settle.replace("+00:00", "Z") if raw_settle else ""
+            if clean_settle and not clean_settle.endswith("Z"):
+                clean_settle = clean_settle + "Z"
+
             cursor.execute(
                 """
                 INSERT INTO delta_option_expiries (
@@ -12286,7 +12341,7 @@ def upsert_delta_expiries(underlying: str, expiries_list: List[Dict[str, Any]]) 
                 (
                     underlying.upper().strip(),
                     item["expiry_date"],
-                    item["settlement_time"],
+                    clean_settle,
                     float(item.get("days_to_expiry", 0.0)),
                     int(item.get("is_active", 1)),
                     item.get("last_synced_at", now_iso),
@@ -12300,10 +12355,12 @@ def get_delta_expiries(underlying: str, active_only: bool = True) -> List[Dict[s
     """Fetches expiries for an underlying ordered by settlement time, strictly excluding expired dates when active_only=True."""
     und = underlying.upper().strip()
     if active_only:
-        now_iso = datetime.now(timezone.utc).isoformat()
+        now_utc = datetime.now(timezone.utc)
+        now_iso_z = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        now_iso_std = now_utc.isoformat()
         return safe_query(
-            "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? AND is_active = 1 AND settlement_time >= ? ORDER BY settlement_time ASC",
-            (und, now_iso),
+            "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? AND is_active = 1 AND (settlement_time >= ? OR settlement_time >= ?) ORDER BY settlement_time ASC",
+            (und, now_iso_z, now_iso_std),
         )
     return safe_query(
         "SELECT * FROM delta_option_expiries WHERE underlying_symbol = ? ORDER BY settlement_time ASC",
@@ -12602,18 +12659,18 @@ def archive_expired_delta_contracts(current_time_iso: Optional[str] = None) -> i
 def purge_all_expired_records(current_time_iso: Optional[str] = None) -> Dict[str, int]:
     """Purges all expired option contracts, expiries, orphaned quotes, instruments, and expired auth tokens."""
     if not current_time_iso:
-        current_time_iso = datetime.now(timezone.utc).isoformat()
+        current_time_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     results = {}
     with get_db_transaction() as conn:
         cursor = conn.cursor()
-        cursor.execute("DELETE FROM delta_option_contracts WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        cursor.execute("DELETE FROM delta_option_contracts WHERE settlement_time < ?", (current_time_iso,))
         results["delta_option_contracts"] = cursor.rowcount
-        cursor.execute("DELETE FROM delta_option_expiries WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        cursor.execute("DELETE FROM delta_option_expiries WHERE settlement_time < ?", (current_time_iso,))
         results["delta_option_expiries"] = cursor.rowcount
         cursor.execute("DELETE FROM delta_option_quotes WHERE settlement_time < ? OR product_id NOT IN (SELECT product_id FROM delta_option_contracts)", (current_time_iso,))
         results["delta_option_quotes"] = cursor.rowcount
-        cursor.execute("DELETE FROM delta_option_chain_snapshots WHERE settlement_time < ? OR (expiry_date < ? AND expiry_date != '')", (current_time_iso, today_str))
+        cursor.execute("DELETE FROM delta_option_chain_snapshots WHERE settlement_time < ?", (current_time_iso,))
         results["delta_option_chain_snapshots"] = cursor.rowcount
         cursor.execute("DELETE FROM instruments WHERE expiry IS NOT NULL AND expiry != '' AND expiry != 'PERPETUAL' AND expiry < ?", (today_str,))
         results["instruments"] = cursor.rowcount

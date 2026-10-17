@@ -110,14 +110,53 @@ class DeltaOptionsService:
         """
         Discovers, normalizes, and filters valid future expiries for an underlying.
         Strictly excludes past/expired dates (settlement_time < now_utc).
+        Reconciles cached data with live Delta Exchange products and tickers.
+        Never fabricates dates and never silently hides near-term daily expiries.
         """
         und = underlying.upper().strip()
         now_utc = datetime.now(timezone.utc)
+        now_iso = now_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-        # 1. First fetch active expiries from database
+        # 1. Check if catalogue sync is needed
+        time_since_sync = time.time() - self._last_catalogue_sync_time
         db_expiries = db.get_delta_expiries(und, active_only=True)
 
+        # Check if DB has daily expiries (dte < 1.5). If current UTC time is before 12:00 UTC,
+        # today's daily expiry (dte < 0.5) must be present.
+        has_near_daily = False
+        if db_expiries:
+            for e in db_expiries:
+                st = e.get("settlement_time", "").replace("Z", "+00:00")
+                try:
+                    dt = datetime.fromisoformat(st)
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    if 0 <= (dt - now_utc).total_seconds() <= 86400 * 1.5:
+                        has_near_daily = True
+                        break
+                except Exception:
+                    pass
+
+        # If cache is stale or missing near daily or DB is empty, sync from live Delta Exchange
+        if not db_expiries or time_since_sync > 90.0 or (not has_near_daily and time_since_sync > 20.0):
+            try:
+                self.sync_catalogue(force=False)
+                db_expiries = db.get_delta_expiries(und, active_only=True)
+            except Exception as ex:
+                logger.warning(f"Catalogue sync during get_available_expiries for {und}: {ex}")
+
+        # Fetch contract counts per settlement_time from active contracts in DB
+        active_contracts = db.get_delta_contracts(underlying=und, active_only=True)
+        counts_by_settle: Dict[str, int] = {}
+        for c in active_contracts:
+            st = c.get("settlement_time", "")
+            if st:
+                clean_st = st.replace("+00:00", "Z")
+                counts_by_settle[clean_st] = counts_by_settle.get(clean_st, 0) + 1
+
+        seen_dates = set()
         valid_expiries: List[Dict[str, Any]] = []
+
         for e in db_expiries:
             settle_str = e.get("settlement_time", "")
             if not settle_str:
@@ -127,58 +166,63 @@ class DeltaOptionsService:
                 dt = datetime.fromisoformat(clean)
                 if dt.tzinfo is None:
                     dt = dt.replace(tzinfo=timezone.utc)
-                if dt >= now_utc:
-                    dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
-                    e_copy = dict(e)
-                    e_copy["days_to_expiry"] = round(dte, 2)
-                    valid_expiries.append(e_copy)
+                if dt < now_utc:
+                    continue  # Strictly exclude past/settled dates
+
+                dd_mm_yyyy = dt.strftime("%d-%m-%Y")
+                if dd_mm_yyyy in seen_dates:
+                    continue  # Deduplicate by calendar date
+                seen_dates.add(dd_mm_yyyy)
+
+                dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
+                clean_z = dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+                iso_date = dt.strftime("%Y-%m-%d")
+                chain_suffix = dt.strftime("%d%m%y")
+
+                # Derive official expiry_type
+                if dte <= 2.5:
+                    exp_type = "DAILY"
+                elif dte <= 21.0:
+                    exp_type = "WEEKLY"
+                elif dte <= 65.0:
+                    exp_type = "MONTHLY"
+                else:
+                    exp_type = "QUARTERLY"
+
+                # Derived display label
+                if dte <= 0.5:
+                    label = f"{dd_mm_yyyy} (Today)"
+                elif dte <= 1.5:
+                    label = f"{dd_mm_yyyy} (Tomorrow)"
+                elif exp_type == "DAILY":
+                    label = f"{dd_mm_yyyy} (Daily)"
+                elif exp_type == "WEEKLY":
+                    label = f"{dd_mm_yyyy} (Weekly)"
+                else:
+                    label = f"{dd_mm_yyyy} (Monthly)"
+
+                cnt = counts_by_settle.get(clean_z) or counts_by_settle.get(settle_str) or (len(active_contracts) // max(1, len(db_expiries)))
+
+                valid_expiries.append({
+                    "expiry_iso": iso_date,
+                    "expiry_date": dd_mm_yyyy,
+                    "settlement_time": clean_z,
+                    "display_label": label,
+                    "expiry_type": exp_type,
+                    "underlying": und,
+                    "region": self.region,
+                    "contract_count": cnt,
+                    "state": "live" if dte <= 7.0 else "upcoming",
+                    "source": f"DELTA_{self.region}",
+                    "last_synced_at": e.get("last_synced_at") or now_iso,
+                    "days_to_expiry": round(dte, 2),
+                    "chain_symbol": f"{und}-{chain_suffix}",
+                    "is_active": 1,
+                })
             except Exception:
                 continue
 
-        # 2. If DB has few or incomplete expiries, discover directly from live Delta tickers
-        if len(valid_expiries) < 6:
-            try:
-                tickers = self.client.get_tickers(
-                    underlying_asset_symbols=[und],
-                    contract_types=["call_options", "put_options"]
-                )
-                seen_dates = set()
-                live_exp_items = []
-                for t in (tickers or []):
-                    sym = t.get("symbol", "")
-                    parts = sym.split("-")
-                    if len(parts) >= 4 and len(parts[-1]) == 6:
-                        raw_date = parts[-1]
-                        if raw_date not in seen_dates:
-                            seen_dates.add(raw_date)
-                            try:
-                                dt = datetime.strptime(raw_date, "%d%m%y").replace(hour=12, minute=0, second=0, tzinfo=timezone.utc)
-                                if dt >= now_utc:
-                                    dte = max(0.0, (dt - now_utc).total_seconds() / 86400.0)
-                                    dd_mm_yyyy = dt.strftime("%d-%m-%Y")
-                                    settle_iso = dt.isoformat()
-                                    live_exp_items.append({
-                                        "underlying_symbol": und,
-                                        "expiry_date": dd_mm_yyyy,
-                                        "settlement_time": settle_iso,
-                                        "days_to_expiry": round(dte, 2),
-                                        "chain_symbol": f"{und}-{raw_date}",
-                                        "is_active": 1,
-                                        "last_synced_at": now_utc.isoformat(),
-                                    })
-                            except Exception:
-                                pass
-                if live_exp_items:
-                    live_exp_items.sort(key=lambda x: x.get("settlement_time", ""))
-                    valid_expiries = live_exp_items
-                    try:
-                        db.upsert_delta_expiries(und, live_exp_items)
-                    except Exception as _up_err:
-                        logger.debug(f"Upsert delta expiries note: {_up_err}")
-            except Exception as _disc_err:
-                logger.warning(f"Live ticker expiry discovery note for {und}: {_disc_err}")
-
-        # Sort ascending by settlement time
+        # Sort ascending by settlement time strictly
         valid_expiries.sort(key=lambda x: x.get("settlement_time", ""))
         return valid_expiries
 
@@ -563,7 +607,8 @@ class DeltaOptionsService:
                 pass
 
         if spot_price <= 0:
-            spot_price = 78000.0 if und == "BTC" else (3500.0 if und == "ETH" else 100.0)
+            logger.warning(f"Live spot price currently unavailable for {und} from Delta indices or quotes.")
+            spot_price = 0.0
 
         # 6. Group contracts by Strike Price into Dual-Sided Ladder (Actual Listed Strikes ONLY)
         strikes_map: Dict[float, Dict[str, Any]] = {}
@@ -860,7 +905,7 @@ class DeltaOptionsService:
             expiries = self.get_available_expiries(und_sym)
             contracts = db.get_delta_contracts(underlying=und_sym, active_only=True)
 
-            spot_px = delta_options_ws_adapter.get_spot_price(und_sym) or (78000.0 if und_sym == "BTC" else (3500.0 if und_sym == "ETH" else 100.0))
+            spot_px = delta_options_ws_adapter.get_spot_price(und_sym) or 0.0
 
             res.append({
                 "symbol": und_sym,

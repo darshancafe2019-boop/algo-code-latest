@@ -195,7 +195,10 @@ def enforce_server_side_security():
         or path.startswith("/api/options/")
         or path.startswith("/api/strategies/")
         or path.startswith("/api/instruments/")
-        or path.startswith("/api/providers")
+        or path.startswith("/feed/")
+        or path.startswith("/api/feed/")
+        or path.startswith("/v3/feed/")
+        or path.startswith("/api/upstox/feed/")
         or path in ["/favicon.ico", "/manifest.json"]
         or path in [
             "/api/auth/login",
@@ -2879,6 +2882,35 @@ def api_universe_summary():
         "summary": summary,
         "timestamp": datetime.now(timezone.utc).isoformat()
     })
+
+
+@app.route("/feed/market-data-feed/authorize", methods=["GET"])
+@app.route("/api/feed/market-data-feed/authorize", methods=["GET"])
+@app.route("/v3/feed/market-data-feed/authorize", methods=["GET"])
+@app.route("/api/upstox/feed/authorize", methods=["GET"])
+def api_feed_market_data_feed_authorize():
+    """Official Upstox V3 Market Data Feed Authorize endpoint proxy."""
+    try:
+        from src.upstox_service import UpstoxService
+        svc = UpstoxService()
+        res = svc.authorize_market_data_feed()
+        status_code = 200 if res.get("success") else 500
+        return jsonify({
+            "status": "success" if res.get("success") else "error",
+            "success": res.get("success", False),
+            "data": res.get("raw_data") or {"authorizedRedirectUri": res.get("authorized_redirect_uri")},
+            "authorized_redirect_uri": res.get("authorized_redirect_uri"),
+            "feed": "Upstox V3 Market Data Feed",
+            "market_segments": ["NSE_EQ", "NSE_FO", "BSE_EQ", "MCX_FO", "US_EQUITY"],
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), status_code
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error": str(e),
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }), 500
 
 
 @app.route("/api/universe/sessions", methods=["GET"])
@@ -13672,10 +13704,12 @@ def api_auth_login():
 
         masked_dest = _mask_email_address(user_email)
 
-        # Real provider check: if RESEND_API_KEY or SMTP is configured, NEVER leak OTP in response
+        # Real provider check: in non-production development or testing, include dev_otp
         is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
+        is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
+        is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
         has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-        include_dev_otp = is_test_mode and not has_real_provider
+        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
 
         response_payload: Dict[str, Any] = {
             "status": "EMAIL_OTP_REQUIRED",
@@ -14087,8 +14121,10 @@ def api_auth_email_otp_resend():
     masked_dest = _mask_email_address(user_email)
 
     is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
+    is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
+    is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
     has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-    include_dev_otp = is_test_mode and not has_real_provider
+    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
     resend_payload = {
         "status": "success",
         "success": True,

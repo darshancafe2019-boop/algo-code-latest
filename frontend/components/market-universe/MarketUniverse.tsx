@@ -133,6 +133,8 @@ export function MarketUniverse() {
           ? "Indices"
           : activeCategory === "STOCKS"
           ? "Equities"
+          : activeCategory === "GLOBAL"
+          ? "Global"
           : activeCategory === "FUNDS"
           ? "Funds"
           : activeCategory === "BONDS"
@@ -153,7 +155,7 @@ export function MarketUniverse() {
       if (assetClassParam !== "ALL") params.set("asset_class", assetClassParam);
       if (debouncedSearch) params.set("query", debouncedSearch);
       if (filters.exchange !== "ALL") params.set("exchange", filters.exchange);
-      params.set("limit", "500");
+      params.set("limit", "1500");
 
       try {
         const res = await apiClient.get<MarketUniverseResponse>(`/api/universe/instruments?${params.toString()}`);
@@ -210,20 +212,25 @@ export function MarketUniverse() {
     return universeData?.instruments || [];
   }, [universeData]);
 
-  // Client-side Filtering & Category counts
+  // Authoritative category counts utilizing server statistics with client fallback
   const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { ALL: rawInstruments.length };
-    for (const it of rawInstruments) {
-      const cls = it.asset_class?.toUpperCase() || "OTHER";
-      counts[cls] = (counts[cls] || 0) + 1;
-      if (cls === "EQUITIES" || cls === "EQUITY") counts["STOCKS"] = (counts["STOCKS"] || 0) + 1;
-      if (cls === "INDICES" || cls === "INDEX") counts["INDICES"] = (counts["INDICES"] || 0) + 1;
-      if (cls === "COMMODITY") counts["COMMODITIES"] = (counts["COMMODITIES"] || 0) + 1;
-    }
+    const s = (summaryData?.summary as any) || {};
+    const counts: Record<string, number> = {
+      ALL: s.total_instruments ?? s.ALL ?? rawInstruments.length,
+      STOCKS: s.indian_stocks ?? s.STOCKS ?? 0,
+      INDICES: s.indices ?? s.INDICES ?? 0,
+      GLOBAL: s.global_stocks ?? s.GLOBAL ?? 0,
+      FUTURES: s.futures ?? s.FUTURES ?? 0,
+      OPTIONS: s.options ?? s.OPTIONS ?? 0,
+      CRYPTO: s.crypto ?? s.CRYPTO ?? 0,
+      FOREX: s.forex ?? s.FOREX ?? 0,
+      COMMODITIES: s.commodities ?? s.COMMODITIES ?? 0,
+      BONDS: s.bonds ?? s.BONDS ?? 0,
+    };
     counts["WATCHLISTS"] = watchlistSymbols.size;
     counts["WATCHLIST"] = watchlistSymbols.size;
     return counts;
-  }, [rawInstruments, watchlistSymbols]);
+  }, [summaryData, rawInstruments.length, watchlistSymbols]);
 
   const displayedInstruments = useMemo(() => {
     let list = [...rawInstruments];
@@ -417,7 +424,11 @@ export function MarketUniverse() {
       {/* 1. Header: Universal Search, Category Tabs, Telemetry & Filter Controls */}
       <ErrorBoundary title="Markets Header Error">
         <SimpleMarketsHeader
-          totalInstruments={displayedInstruments.length || rawInstruments.length}
+          totalInstruments={
+            activeCategory === "ALL"
+              ? (summaryData?.summary?.total_instruments || universeData?.total_count || displayedInstruments.length)
+              : (categoryCounts[activeCategory] || displayedInstruments.length)
+          }
           liveCount={liveCount}
           providerCount={providerCount}
           lastUpdateMs={newestTickElapsedMs}

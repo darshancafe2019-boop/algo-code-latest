@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getForwardHeaders } from "@/lib/proxy-headers";
+import {
+  getBackendBaseUrl,
+  getGatewayHttpUrl,
+  getGatewaySecret,
+  isProduction,
+} from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
-const GATEWAY_SECRET = process.env.MARKET_GATEWAY_SECRET || "";
 
 /**
  * Universal Permanent 404-Proof Backend-for-Frontend (BFF) Proxy Handler
@@ -40,6 +43,37 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const requestId = req.headers.get("x-request-id") || `bff_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = performance.now();
 
+  const BACKEND_URL = getBackendBaseUrl();
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
+
+  // Fail-closed in production if backend URL is not configured
+  if (isProduction() && !BACKEND_URL) {
+    return NextResponse.json(
+      {
+        ok: false,
+        success: false,
+        status: "error",
+        data: null,
+        error: {
+          code: "BACKEND_NOT_CONFIGURED",
+          message: "Quant.OS Engine backend URL is not configured. Set BACKEND_INTERNAL_URL or BACKEND_API_URL in production environment.",
+          retryable: false,
+        },
+        requestId,
+        timestamp: new Date().toISOString(),
+        latencyMs: 0,
+      },
+      {
+        status: 503,
+        headers: {
+          "X-Request-Id": requestId,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+  }
+
   // ── 1. Market Data Gateway Proxy with Auto-Fallback ─────────────────────────
   const isGatewayOnlyPath = (subPath.startsWith("market/") || subPath === "market") &&
     !subPath.startsWith("market/funds") &&
@@ -49,14 +83,14 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
     !subPath.startsWith("market/quote") &&
     !subPath.startsWith("market/option-chain");
 
-  if (isGatewayOnlyPath) {
+  if (isGatewayOnlyPath && GATEWAY_URL) {
     const gatewayPath = subPath.replace(/^market\/?/, "");
     const gatewayTarget = `${GATEWAY_URL}/${gatewayPath}${url.search}`;
     try {
       const resp = await fetch(gatewayTarget, {
         method: req.method,
         headers: {
-          "X-Gateway-Secret": GATEWAY_SECRET,
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
           "Content-Type": "application/json",
           "X-Request-Id": requestId,
         },
@@ -84,6 +118,26 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   // ── 2. Special Case: /api/health* Probes ────────────────────────────────────
   if (subPath.startsWith("health")) {
+    if (!BACKEND_URL) {
+      return NextResponse.json(
+        {
+          status: "unavailable",
+          backend: false,
+          database: false,
+          market_data: false,
+          binance: false,
+          upstox: false,
+          frontend: { status: "HEALTHY", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+          error: {
+            code: "BACKEND_NOT_CONFIGURED",
+            message: "Backend engine URL is not configured. Set BACKEND_INTERNAL_URL or BACKEND_API_URL.",
+          },
+          proxy_latency_ms: Math.round(performance.now() - startTime),
+        },
+        { status: 503, headers: { "X-Request-Id": requestId } }
+      );
+    }
+
     if (subPath === "health/live") {
       try {
         const liveRes = await fetch(`${BACKEND_URL}/api/health/live`, {
@@ -210,17 +264,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   }
 
   // ── 3. General Proxy Forwarding with Intelligent Path Fallback ──────────────
-  const forwardHeaders = new Headers();
-  req.headers.forEach((val, key) => {
-    const lowerKey = key.toLowerCase();
-    if (!["host", "connection", "content-length", "transfer-encoding"].includes(lowerKey)) {
-      forwardHeaders.set(key, val);
-    }
-  });
-
-  forwardHeaders.set("X-Request-Id", requestId);
-  const clientIp = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "127.0.0.1";
-  forwardHeaders.set("X-Forwarded-For", clientIp);
+  const forwardHeaders = getForwardHeaders(req, requestId);
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot");

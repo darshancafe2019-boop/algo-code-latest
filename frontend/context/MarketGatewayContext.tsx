@@ -192,6 +192,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
   const getGatewayWsUrl = useCallback((): string => {
     const envWsUrl =
+      process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
       process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
       process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
       process.env.NEXT_PUBLIC_MARKET_WS_URL;
@@ -202,7 +203,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
           return `${proto}//${window.location.host}${envWsUrl}`;
         }
-        return `ws://127.0.0.1:5051${envWsUrl}`;
+        return process.env.NODE_ENV === "production" ? "" : `ws://127.0.0.1:5051${envWsUrl}`;
       }
       if (envWsUrl.startsWith("http://")) return envWsUrl.replace("http://", "ws://");
       if (envWsUrl.startsWith("https://")) return envWsUrl.replace("https://", "wss://");
@@ -210,7 +211,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     }
 
     if (typeof window === "undefined") {
-      return "ws://127.0.0.1:5051/ws";
+      return process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws";
+    }
+
+    // In production on Vercel: NEVER connect to window.location.hostname:5051 or 127.0.0.1:5051
+    if (process.env.NODE_ENV === "production") {
+      return "";
     }
 
     const rawHost = window.location.hostname;
@@ -311,6 +317,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     useMarketFeedStore.getState().setConnectionStatus(nextStatus);
 
     const wsUrl = getGatewayWsUrl();
+    if (!wsUrl) {
+      setConnectionStatus("DISCONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("DISCONNECTED");
+      return;
+    }
+
     let ws: WebSocket;
 
     try {

@@ -1,96 +1,106 @@
 import { NextResponse } from "next/server";
 import { marketDataConfig } from "@/lib/market-data/config";
+import { getGatewayHttpUrl, getGatewaySecret, isProduction } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const secret = getGatewaySecret();
 
-  try {
-    const res = await fetch(`${GATEWAY_URL}/health`, {
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json({
-        status: "healthy",
-        gateway: "CONNECTED",
-        timestamp: Date.now(),
-        ...data,
+  if (GATEWAY_URL) {
+    try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (secret) {
+        headers["X-Gateway-Secret"] = secret;
+      }
+      const res = await fetch(`${GATEWAY_URL}/health`, {
+        cache: "no-store",
+        headers,
+        signal: AbortSignal.timeout(3000),
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json({
+          status: "healthy",
+          gateway: "CONNECTED",
+          timestamp: Date.now(),
+          ...data,
+        });
+      }
+    } catch {
+      // Gateway offline or timed out
     }
-  } catch {
-    // Local fallback
   }
 
   const hasDhan = Boolean(marketDataConfig.dhan.clientId && marketDataConfig.dhan.accessToken);
   const hasUpstox = Boolean(marketDataConfig.upstox.apiKey && marketDataConfig.upstox.accessToken);
   const hasTwelveData = Boolean(marketDataConfig.twelvedata.apiKey && marketDataConfig.twelvedata.apiKey !== "demo");
+  const hasDelta = Boolean(marketDataConfig.delta.apiKey);
 
   return NextResponse.json({
-    status: "healthy",
-    gateway: "EMBEDDED",
+    status: isProduction() && !GATEWAY_URL ? "unavailable" : "degraded",
+    gateway: GATEWAY_URL ? "UNAVAILABLE" : "NOT_CONFIGURED",
     timestamp: Date.now(),
     providers: {
       dhan: {
         configured: hasDhan,
         authenticated: hasDhan,
         rest: hasDhan ? "OK" : "NOT_CONFIGURED",
-        websocket: hasDhan ? "CONNECTED" : "DISCONNECTED",
-        subscriptions: 15,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        websocket: "DISCONNECTED",
+        subscriptions: 0,
+        lastTickAt: null,
+        stale: true,
+        error: GATEWAY_URL ? "Gateway offline" : "Gateway not configured",
       },
       upstox: {
         configured: hasUpstox,
         authenticated: hasUpstox,
         rest: hasUpstox ? "OK" : "NOT_CONFIGURED",
-        websocket: hasUpstox ? "CONNECTED" : "DISCONNECTED",
-        subscriptions: 8,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        websocket: "DISCONNECTED",
+        subscriptions: 0,
+        lastTickAt: null,
+        stale: true,
+        error: GATEWAY_URL ? "Gateway offline" : "Gateway not configured",
       },
       delta: {
-        configured: true,
-        authenticated: true,
-        rest: "OK",
-        websocket: "CONNECTED",
+        configured: hasDelta,
+        authenticated: hasDelta,
+        rest: hasDelta ? "OK" : "NOT_CONFIGURED",
+        websocket: "DISCONNECTED",
         endpoint: "wss://public-socket.india.delta.exchange",
-        subscriptions: 24,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        subscriptions: 0,
+        lastTickAt: null,
+        stale: true,
+        error: GATEWAY_URL ? "Gateway offline" : "Gateway not configured",
       },
       twelvedata: {
         configured: hasTwelveData,
         authenticated: hasTwelveData,
         rest: hasTwelveData ? "OK" : "NOT_CONFIGURED",
-        websocket: hasTwelveData ? "CONNECTED" : "DISCONNECTED",
+        websocket: "DISCONNECTED",
         subscriptions: 0,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: hasTwelveData ? null : "NO LIVE PROVIDER",
+        lastTickAt: null,
+        stale: true,
+        error: hasTwelveData ? (GATEWAY_URL ? "Gateway offline" : "Gateway not configured") : "NO LIVE PROVIDER",
       },
       binance: {
         configured: true,
-        authenticated: true,
-        rest: "OK",
-        websocket: "CONNECTED",
-        subscriptions: 10,
-        lastTickAt: Date.now(),
-        stale: false,
-        error: null,
+        authenticated: false,
+        rest: "STANDBY",
+        websocket: "DISCONNECTED",
+        subscriptions: 0,
+        lastTickAt: null,
+        stale: true,
+        error: GATEWAY_URL ? "Gateway offline" : "Gateway not configured",
       },
     },
     metrics: {
-      ticksPerSec: 48.5,
-      activeSockets: 3,
-      totalSubscriptions: 57,
-      avgLatencyMs: 22,
+      ticksPerSec: 0,
+      activeSockets: 0,
+      totalSubscriptions: 0,
+      avgLatencyMs: 0,
     },
   });
 }

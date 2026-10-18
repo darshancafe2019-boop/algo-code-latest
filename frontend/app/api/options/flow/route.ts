@@ -14,17 +14,19 @@ import {
   OptionStrikeRowData,
   OptionTerminalSnapshot,
 } from "@/types/option-terminal";
+import { getBackendBaseUrl, getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
-
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
 
 const flowMemoryCache = new Map<string, { timestamp: number; payload: any }>();
 const CACHE_TTL_MS = 2500;
 
 export async function GET(request: NextRequest) {
   try {
+    const BACKEND_URL = getBackendBaseUrl();
+    const GATEWAY_URL = getGatewayHttpUrl();
+    const gatewaySecret = getGatewaySecret();
+
     const searchParams = request.nextUrl.searchParams;
     const underlying = (searchParams.get("underlying") || searchParams.get("symbol") || "NIFTY").toUpperCase();
     const provider = (searchParams.get("provider") || searchParams.get("source") || "DHAN").toUpperCase();
@@ -74,36 +76,46 @@ export async function GET(request: NextRequest) {
         });
         if (expiry) queryParams.set("expiry", expiry);
 
-        const primaryUrl = isCrypto
-          ? `${GATEWAY_URL}/api/options/chain?${queryParams.toString()}`
-          : `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`;
+        const primaryBase = isCrypto ? GATEWAY_URL : BACKEND_URL;
+        if (primaryBase) {
+          const primaryUrl = isCrypto
+            ? `${GATEWAY_URL}/api/options/chain?${queryParams.toString()}`
+            : `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`;
 
-        const upstreamRes = await fetch(primaryUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
-        if (upstreamRes.ok) {
-          const rawJson = await upstreamRes.json();
-          chainData = rawJson.data || rawJson;
+          const headers: Record<string, string> = {};
+          if (isCrypto && gatewaySecret) {
+            headers["X-Gateway-Secret"] = gatewaySecret;
+          }
+
+          const upstreamRes = await fetch(primaryUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(10000) });
+          if (upstreamRes.ok) {
+            const rawJson = await upstreamRes.json();
+            chainData = rawJson.data || rawJson;
+          }
         }
       } catch {
         // Gateway may be offline, fallback to backend
-        try {
-          const queryParams = new URLSearchParams({
-            underlying,
-            source: provider,
-            strike_count: requestedStrikeCount,
-            market_data_mode: marketDataMode,
-            execution_mode: executionMode,
-          });
-          if (expiry) queryParams.set("expiry", expiry);
+        if (BACKEND_URL) {
+          try {
+            const queryParams = new URLSearchParams({
+              underlying,
+              source: provider,
+              strike_count: requestedStrikeCount,
+              market_data_mode: marketDataMode,
+              execution_mode: executionMode,
+            });
+            if (expiry) queryParams.set("expiry", expiry);
 
-          const fallbackRes = await fetch(
-            `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`,
-            { cache: "no-store", signal: AbortSignal.timeout(10000) }
-          );
-          if (fallbackRes.ok) {
-            const rawJson = await fallbackRes.json();
-            chainData = rawJson.data || rawJson;
-          }
-        } catch {}
+            const fallbackRes = await fetch(
+              `${BACKEND_URL}/api/options/chain?${queryParams.toString()}`,
+              { cache: "no-store", signal: AbortSignal.timeout(10000) }
+            );
+            if (fallbackRes.ok) {
+              const rawJson = await fallbackRes.json();
+              chainData = rawJson.data || rawJson;
+            }
+          } catch {}
+        }
       }
     }
 
@@ -121,16 +133,24 @@ export async function GET(request: NextRequest) {
         });
         if (expiry) autoParams.set("expiry", expiry);
 
-        const targetUrl = isCrypto
-          ? `${GATEWAY_URL}/api/options/chain?${autoParams.toString()}`
-          : `${BACKEND_URL}/api/options/chain?${autoParams.toString()}`;
+        const targetBase = isCrypto ? GATEWAY_URL : BACKEND_URL;
+        if (targetBase) {
+          const targetUrl = isCrypto
+            ? `${GATEWAY_URL}/api/options/chain?${autoParams.toString()}`
+            : `${BACKEND_URL}/api/options/chain?${autoParams.toString()}`;
 
-        const fbRes = await fetch(targetUrl, { cache: "no-store", signal: AbortSignal.timeout(10000) });
-        if (fbRes.ok) {
-          const fbJson = await fbRes.json();
-          const fbData = fbJson.data || fbJson;
-          if (fbData?.strikes?.length || fbData?.rows?.length) {
-            chainData = fbData;
+          const headers: Record<string, string> = {};
+          if (isCrypto && gatewaySecret) {
+            headers["X-Gateway-Secret"] = gatewaySecret;
+          }
+
+          const fbRes = await fetch(targetUrl, { headers, cache: "no-store", signal: AbortSignal.timeout(10000) });
+          if (fbRes.ok) {
+            const fbJson = await fbRes.json();
+            const fbData = fbJson.data || fbJson;
+            if (fbData?.strikes?.length || fbData?.rows?.length) {
+              chainData = fbData;
+            }
           }
         }
       } catch {}

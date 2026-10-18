@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +14,12 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL(`/settings/brokers?fyers_error=${encodeURIComponent(error || "Missing auth_code")}`, req.url));
   }
 
-  const appId = (process.env.FYERS_APP_ID || process.env.FYERS_CLIENT_ID || "CMQYDMNBL9-200").trim();
-  const secretId = (process.env.FYERS_SECRET_ID || process.env.FYERS_SECRET_KEY || "qHOdqxDGXOTFLGgU").trim();
+  const appId = (process.env.FYERS_APP_ID || process.env.FYERS_CLIENT_ID || (isProduction() ? "" : "CMQYDMNBL9-200")).trim();
+  const secretId = (process.env.FYERS_SECRET_ID || process.env.FYERS_SECRET_KEY || (isProduction() ? "" : "qHOdqxDGXOTFLGgU")).trim();
+
+  if (!appId || !secretId) {
+    return NextResponse.redirect(new URL(`/settings/brokers?fyers_error=${encodeURIComponent("FYERS credentials not configured")}`, req.url));
+  }
 
   try {
     const appIdHash = crypto.createHash("sha256").update(`${appId}:${secretId}`).digest("hex");
@@ -35,16 +41,21 @@ export async function GET(req: NextRequest) {
     if (data.s === "ok" && data.access_token) {
       process.env.FYERS_ACCESS_TOKEN = data.access_token;
       // Also notify Python backend
-      const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || "http://127.0.0.1:5050";
-      await fetch(`${BACKEND_URL}/api/fyers/credentials`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          app_id: appId,
-          secret_id: secretId,
-          access_token: data.access_token,
-        }),
-      }).catch(() => {});
+      const backendUrl = getBackendBaseUrl();
+      if (backendUrl) {
+        await fetch(`${backendUrl}/api/fyers/credentials`, {
+          method: "POST",
+          headers: {
+            ...getForwardHeaders(req),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            secret_id: secretId,
+            access_token: data.access_token,
+          }),
+        }).catch(() => {});
+      }
 
       return NextResponse.redirect(new URL("/settings/brokers?fyers_status=connected", req.url));
     } else {

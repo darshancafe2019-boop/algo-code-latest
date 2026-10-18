@@ -368,7 +368,7 @@ export function SimpleConnectionsSection() {
             app_id: fyersAppId.trim(),
             secret_id: fyersSecretId.trim(),
             access_token: fyersAccessToken.trim(),
-            redirect_uri: "http://localhost:3100/api/fyers/callback",
+            redirect_uri: typeof window !== "undefined" ? `${window.location.origin}/api/fyers/callback` : "",
           }),
         });
       }

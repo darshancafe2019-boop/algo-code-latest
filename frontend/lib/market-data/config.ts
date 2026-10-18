@@ -67,14 +67,20 @@ export const marketDataConfig: MarketDataConfig = {
     wsUrl: process.env.TWELVE_DATA_WS_URL || "wss://ws.twelvedata.com/v1/quotes/price",
   },
   redis: {
-    url: process.env.REDIS_URL || process.env.REDIS_CACHE_URL || "redis://127.0.0.1:6379",
+    url: process.env.REDIS_URL || process.env.REDIS_CACHE_URL || (process.env.NODE_ENV === "production" ? "" : "redis://127.0.0.1:6379"),
     keyPrefix: "quantos:market:",
     ttlSeconds: 60,
     enabled: !!(process.env.REDIS_URL || process.env.REDIS_CACHE_URL),
   },
   gateway: {
-    url: process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051",
-    secret: process.env.MARKET_GATEWAY_SECRET || "",
+    url:
+      process.env.MARKET_GATEWAY_URL ||
+      process.env.MARKET_DATA_GATEWAY_URL ||
+      process.env.MARKET_DATA_GATEWAY_HTTP_URL ||
+      (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:5051"),
+    secret: typeof window === "undefined"
+      ? (process.env.MARKET_GATEWAY_SECRET || process.env.MARKET_DATA_GATEWAY_SECRET || "")
+      : "",
   },
   isServer: typeof window === "undefined",
 };

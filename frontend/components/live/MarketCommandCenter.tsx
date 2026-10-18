@@ -137,7 +137,18 @@ export function MarketCommandCenter() {
     }
 
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL || "ws://127.0.0.1:5051/ws/market";
+      const wsUrl =
+        process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
+        process.env.NEXT_PUBLIC_MARKET_WS_URL ||
+        (process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws/market");
+
+      if (!wsUrl) {
+        setConnectionStatus("DISCONNECTED");
+        return;
+      }
+
       console.log("[COMMAND CENTER] Connecting Market Gateway WS:", wsUrl);
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;

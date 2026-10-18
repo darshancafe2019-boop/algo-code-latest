@@ -1,38 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
-const GATEWAY_URL = process.env.MARKET_DATA_GATEWAY_HTTP_URL || "http://127.0.0.1:5051";
-
 export async function GET(req: NextRequest, { params }: { params: { route?: string[] } }) {
+  const BACKEND_URL = getBackendBaseUrl();
   const path = (params.route || []).join("/");
-  const url = `${BACKEND_URL}/api/providers_v2/${path}${req.nextUrl.search}`;
 
-  try {
-    const res = await fetch(url, {
-      headers: { "Content-Type": "application/json" },
-      cache: "no-store",
-      signal: AbortSignal.timeout(1500),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data, { status: res.status });
-    }
-  } catch (_error) {}
+  if (BACKEND_URL) {
+    const url = `${BACKEND_URL}/api/providers_v2/${path}${req.nextUrl.search}`;
+    try {
+      const res = await fetch(url, {
+        headers: getForwardHeaders(req),
+        cache: "no-store",
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data, { status: res.status });
+      }
+    } catch (_error) {}
+  }
 
   // Resilient fallback for provider health subroutes e.g. /api/providers/dhan/health
   if (path.endsWith("/health") || path.endsWith("/status")) {
     const providerId = (params.route || [])[0] || "dhan";
     return NextResponse.json({
-      status: "success",
+      status: isProduction() && !BACKEND_URL ? "unavailable" : "degraded",
       provider_id: providerId,
-      connectionState: "CONNECTED",
-      latencyMs: 42,
-      lastTickIso: new Date().toISOString(),
-      lastError: null,
-      subscriptionsCount: 5,
+      connectionState: "DISCONNECTED",
+      latencyMs: 0,
+      lastTickIso: null,
+      lastError: BACKEND_URL ? "Backend offline" : "Backend not configured",
+      subscriptionsCount: 0,
       timestamp: new Date().toISOString(),
     });
   }
@@ -44,26 +46,29 @@ export async function GET(req: NextRequest, { params }: { params: { route?: stri
 }
 
 export async function POST(req: NextRequest, { params }: { params: { route?: string[] } }) {
+  const BACKEND_URL = getBackendBaseUrl();
   const path = (params.route || []).join("/");
-  const url = `${BACKEND_URL}/api/providers_v2/${path}`;
 
   let body = {};
   try {
     body = await req.json();
   } catch {}
 
-  try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(1500),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data, { status: res.status });
-    }
-  } catch (_error) {}
+  if (BACKEND_URL) {
+    const url = `${BACKEND_URL}/api/providers_v2/${path}`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: getForwardHeaders(req),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data, { status: res.status });
+      }
+    } catch (_error) {}
+  }
 
   // If select or test route
   if (path === "select") {

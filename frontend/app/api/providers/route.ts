@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
-const GATEWAY_URL = process.env.MARKET_DATA_GATEWAY_HTTP_URL || "http://127.0.0.1:5051";
 
 // Global in-memory platform active roles (persists role selections across component mounts)
 let globalActiveRoles = {
@@ -16,17 +15,27 @@ let globalActiveRoles = {
 };
 
 export async function GET(req: NextRequest) {
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const gatewaySecret = getGatewaySecret();
+
   // 1. Direct fast Gateway status query
   let gwHealth: any = null;
-  try {
-    const gwRes = await fetch(`${GATEWAY_URL}/health`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(800),
-    });
-    if (gwRes.ok) {
-      gwHealth = await gwRes.json();
-    }
-  } catch (_err) {}
+  if (GATEWAY_URL) {
+    try {
+      const headers: Record<string, string> = {};
+      if (gatewaySecret) {
+        headers["X-Gateway-Secret"] = gatewaySecret;
+      }
+      const gwRes = await fetch(`${GATEWAY_URL}/health`, {
+        cache: "no-store",
+        headers,
+        signal: AbortSignal.timeout(800),
+      });
+      if (gwRes.ok) {
+        gwHealth = await gwRes.json();
+      }
+    } catch (_err) {}
+  }
 
   const providersMap: Record<string, any> = {};
   if (gwHealth && Array.isArray(gwHealth.providers)) {
@@ -85,8 +94,8 @@ export async function GET(req: NextRequest) {
       connected: dhanState === "CONNECTED",
       authenticated: hasDhanCreds,
       websocket: dhanGw?.stream_status || (dhanState === "CONNECTED" ? "CONNECTED" : "DISCONNECTED"),
-      subscriptions: dhanGw?.subscribed_symbols || 5,
-      lastTickAt: dhanGw?.last_tick_time || new Date().toISOString(),
+      subscriptions: dhanGw?.subscribed_symbols || 0,
+      lastTickAt: dhanGw?.last_tick_time || null,
       marketData: true,
       primary: globalActiveRoles.marketDataProvider === "dhan",
       secondary: globalActiveRoles.secondaryFailoverProvider === "dhan",
@@ -109,16 +118,16 @@ export async function GET(req: NextRequest) {
       },
       health: {
         state: dhanState,
-        pingMs: dhanGw?.latency_ms || 230,
-        lastTickMsAgo: 100,
-        lastTickIso: dhanGw?.last_tick_time || new Date().toISOString(),
-        subscriptionsCount: dhanGw?.subscribed_symbols || 5,
+        pingMs: dhanGw?.latency_ms || 0,
+        lastTickMsAgo: null,
+        lastTickIso: dhanGw?.last_tick_time || null,
+        subscriptionsCount: dhanGw?.subscribed_symbols || 0,
         maxSubscriptions: 500,
         apiHealthy: true,
         authValid: hasDhanCreds,
         websocketConnected: dhanState === "CONNECTED",
         lastError: null,
-        authenticatedAt: new Date().toISOString(),
+        authenticatedAt: hasDhanCreds ? new Date().toISOString() : null,
       },
       description: "Official Dhan HQ Trading & Market Feed API with direct order execution and live depth.",
       authenticationType: "Access Token",
@@ -814,14 +823,17 @@ export async function POST(req: NextRequest) {
     }
 
     // Also forward to backend if available
-    try {
-      await fetch(`${BACKEND_URL}/api/providers_v2/select`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(1000),
-      });
-    } catch (_err) {}
+    const BACKEND_URL = getBackendBaseUrl();
+    if (BACKEND_URL) {
+      try {
+        await fetch(`${BACKEND_URL}/api/providers_v2/select`, {
+          method: "POST",
+          headers: getForwardHeaders(req),
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(1000),
+        });
+      } catch (_err) {}
+    }
 
     return NextResponse.json({
       status: "success",

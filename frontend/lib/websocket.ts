@@ -30,7 +30,17 @@ class WebSocketClient {
 
     this.isExplicitDisconnect = false;
     try {
-      const wsUrl = process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS || "ws://127.0.0.1:5051/ws";
+      const wsUrl =
+        process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
+        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
+        process.env.NEXT_PUBLIC_MARKET_WS_URL ||
+        (process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws");
+
+      if (!wsUrl) {
+        return;
+      }
+
       this.socket = new WebSocket(wsUrl);
 
       this.socket.onopen = () => {

@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const resolved = params instanceof Promise ? await params : params;
   const botId = resolved?.id;
   const requestId =
@@ -25,12 +29,12 @@ export async function GET(
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        upstreamRes = await fetch(`${BACKEND_URL}/api/bots/${botId}`, {
+        upstreamRes = await fetch(`${backendUrl}/api/bots/${botId}`, {
           headers: getForwardHeaders(req, requestId),
           signal: AbortSignal.timeout(20000),
           cache: "no-store",
         });
-        if (upstreamRes.ok) break;
+        if (upstreamRes.ok || upstreamRes.status === 401 || upstreamRes.status === 403 || upstreamRes.status === 404) break;
       } catch (err: any) {
         lastErr = err;
         if (attempt < 2) await new Promise((r) => setTimeout(r, 600));
@@ -66,6 +70,14 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const resolved = params instanceof Promise ? await params : params;
   const botId = resolved?.id;
   const requestId =
@@ -73,7 +85,7 @@ export async function DELETE(
     `bot_del_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
 
   try {
-    const upstreamRes = await fetch(`${BACKEND_URL}/api/bots/${botId}`, {
+    const upstreamRes = await fetch(`${backendUrl}/api/bots/${botId}`, {
       method: "DELETE",
       headers: getForwardHeaders(req, requestId),
       signal: AbortSignal.timeout(8000),
@@ -105,6 +117,14 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const resolved = params instanceof Promise ? await params : params;
   const botId = resolved?.id;
   const requestId =
@@ -113,7 +133,7 @@ export async function POST(
 
   try {
     const rawBody = await req.text();
-    const upstreamRes = await fetch(`${BACKEND_URL}/api/bots/${botId}`, {
+    const upstreamRes = await fetch(`${backendUrl}/api/bots/${botId}`, {
       method: "POST",
       headers: getForwardHeaders(req, requestId),
       body: rawBody,

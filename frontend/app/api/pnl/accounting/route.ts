@@ -16,9 +16,9 @@ import {
   EquityCurvePoint,
 } from "@/types/pnl-journal";
 
-export const dynamic = "force-dynamic";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
+export const dynamic = "force-dynamic";
 
 // High-speed in-memory micro-cache (TTL 1500ms)
 const pnlMicroCache = new Map<string, { payload: PnlJournalDashboardPayload; timestamp: number }>();
@@ -44,6 +44,14 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const backendUrl = getBackendBaseUrl();
+    if (isProduction() && !backendUrl) {
+      return NextResponse.json(
+        { error: "Backend service URL is not configured in production environment." },
+        { status: 503 }
+      );
+    }
+
     let rawBackendData: any = null;
 
     let rawPortfolioData: any = null;
@@ -66,17 +74,17 @@ export async function GET(request: NextRequest) {
       const envParam = mode === "LIVE" ? "LIVE" : "PAPER";
 
       const [pnlRes, portRes, ledgRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/portfolio/pnl/dashboard?${backendQuery.toString()}`, {
+        fetch(`${backendUrl}/api/portfolio/pnl/dashboard?${backendQuery.toString()}`, {
           headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).catch(() => null),
-        fetch(`${BACKEND_URL}/api/v2/portfolio?environment=${envParam}`, {
+        fetch(`${backendUrl}/api/v2/portfolio?environment=${envParam}`, {
           headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),
         }).catch(() => null),
-        fetch(`${BACKEND_URL}/api/v2/capital/ledger?environment=${envParam}&limit=50`, {
+        fetch(`${backendUrl}/api/v2/capital/ledger?environment=${envParam}&limit=50`, {
           headers: getForwardHeaders(request),
           cache: "no-store",
           signal: AbortSignal.timeout(5000),

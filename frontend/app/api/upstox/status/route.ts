@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_INTERNAL_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * GET /api/upstox/status
@@ -38,10 +35,12 @@ export async function GET(req: NextRequest) {
     let isConnected = Boolean(accessToken && accessToken.length > 10);
     let backendInfo: any = null;
 
-    if (!isConnected) {
+    const backendUrl = getBackendBaseUrl();
+    if (!isConnected && backendUrl) {
       try {
-        const backendRes = await fetch(`${BACKEND_INTERNAL_URL}/api/upstox/status`, {
+        const backendRes = await fetch(`${backendUrl}/api/upstox/status`, {
           cache: "no-store",
+          headers: getForwardHeaders(req),
           signal: AbortSignal.timeout(3000),
         });
         if (backendRes.ok) {

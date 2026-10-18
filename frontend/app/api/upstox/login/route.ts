@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import { isProduction } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,9 +15,9 @@ const UPSTOX_AUTH_DIALOG_URL = "https://api.upstox.com/v2/login/authorization/di
  */
 export async function GET(req: NextRequest) {
   try {
-    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "127.0.0.1:3100";
-    const proto = req.headers.get("x-forwarded-proto") || "http";
-    const origin = req.nextUrl?.origin || `${proto}://${host}`;
+    const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || (isProduction() ? "" : "127.0.0.1:3100");
+    const proto = req.headers.get("x-forwarded-proto") || (isProduction() ? "https" : "http");
+    const origin = req.nextUrl?.origin || (host ? `${proto}://${host}` : "");
 
     const apiKey = (
       process.env.UPSTOX_API_KEY ||
@@ -64,8 +65,8 @@ export async function GET(req: NextRequest) {
 
     return response;
   } catch (error: any) {
-    const origin = req.nextUrl?.origin || "http://localhost:3100";
-    const errorUrl = new URL("/settings", origin);
+    const origin = req.nextUrl?.origin || (isProduction() ? "" : "http://localhost:3100");
+    const errorUrl = new URL("/settings", origin || "https://quantos.vercel.app");
     errorUrl.searchParams.set("tab", "brokers");
     errorUrl.searchParams.set("upstox", "error");
     errorUrl.searchParams.set("error_code", "LOGIN_INIT_FAILED");

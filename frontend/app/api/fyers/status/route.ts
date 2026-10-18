@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isProduction } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,7 +15,11 @@ export async function GET(req: NextRequest) {
   const appId = (process.env.FYERS_APP_ID || process.env.FYERS_CLIENT_ID || "").trim();
   const secretId = (process.env.FYERS_SECRET_ID || process.env.FYERS_SECRET_KEY || "").trim();
   const accessToken = (process.env.FYERS_ACCESS_TOKEN || "").trim();
-  const redirectUri = (process.env.FYERS_REDIRECT_URI || "http://localhost:3100/api/fyers/callback").trim();
+
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || (isProduction() ? "" : "localhost:3100");
+  const proto = req.headers.get("x-forwarded-proto") || (isProduction() ? "https" : "http");
+  const defaultRedirectUri = host ? `${proto}://${host}/api/fyers/callback` : "";
+  const redirectUri = (process.env.FYERS_REDIRECT_URI || defaultRedirectUri).trim();
 
   const isConfigured = Boolean(appId && (secretId || accessToken));
   const maskedAppId =
@@ -45,17 +50,14 @@ export async function GET(req: NextRequest) {
     latencyMs = Math.round(performance.now() - startTime);
 
     if (pingRes.ok) {
-      const data = await pingRes.json();
       isConnected = isConfigured;
     } else {
       errorMessage = `Fyers API returned HTTP ${pingRes.status}`;
-      isConnected = isConfigured; // Endpoint is responsive even if specific status code returned
+      isConnected = false;
     }
   } catch (err: any) {
-    latencyMs = Math.round(performance.now() - startTime);
-    if (isConfigured) {
-      isConnected = true; // Still marked as configured with fallback paper simulator
-    }
+    latencyMs = 0;
+    isConnected = false;
     errorMessage = err.name === "AbortError" ? "Connection timed out (4s)" : err.message;
   }
 
@@ -69,9 +71,9 @@ export async function GET(req: NextRequest) {
     hasSecretId: Boolean(secretId),
     hasToken: Boolean(accessToken),
     redirectUri,
-    latencyMs: latencyMs > 0 ? latencyMs : 24,
+    latencyMs: isConnected ? latencyMs : null,
     baseUrl: FYERS_API_BASE,
-    tradingMode: process.env.FYERS_TRADING_ENABLED === "true" ? "LIVE" : "PAPER_SIMULATION",
+    tradingMode: isConnected && process.env.FYERS_TRADING_ENABLED === "true" ? "LIVE" : "PAPER_SIMULATION",
     supportedMarkets: [
       "NSE Equities (Cash/Intraday/Delivery)",
       "NSE Index Derivatives (NIFTY/BANKNIFTY/FINNIFTY/MIDCPNIFTY)",
@@ -79,12 +81,19 @@ export async function GET(req: NextRequest) {
       "BSE Equities & SENSEX Options",
       "MCX Commodities"
     ],
-    funds: {
-      available: 1000000.0,
-      utilized: 0.0,
-      collateral: 0.0,
-      withdrawable: 1000000.0
-    },
+    funds: isConnected
+      ? {
+          available: 1000000.0,
+          utilized: 0.0,
+          collateral: 0.0,
+          withdrawable: 1000000.0,
+        }
+      : {
+          available: 0.0,
+          utilized: 0.0,
+          collateral: 0.0,
+          withdrawable: 0.0,
+        },
     positionsCount: 0,
     ordersCount: 0,
     errorMessage: isConnected ? null : errorMessage,

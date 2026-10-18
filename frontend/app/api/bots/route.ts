@@ -1,17 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const url = new URL(req.url);
-  const targetUrl = `${BACKEND_URL}/api/bots${url.search}`;
+  const targetUrl = `${backendUrl}/api/bots${url.search}`;
   const requestId =
     req.headers.get("x-request-id") ||
     `bots_get_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
@@ -43,13 +47,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const requestId =
     req.headers.get("x-request-id") ||
     `bots_post_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
 
   try {
     const rawBody = await req.text();
-    const upstreamRes = await fetch(`${BACKEND_URL}/api/bots/create`, {
+    const upstreamRes = await fetch(`${backendUrl}/api/bots/create`, {
       method: "POST",
       headers: getForwardHeaders(req, requestId),
       body: rawBody,

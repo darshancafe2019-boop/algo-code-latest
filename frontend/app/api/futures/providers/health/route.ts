@@ -1,98 +1,99 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
-  try {
-    const backendRes = await fetch(`${BACKEND_URL}/api/futures/providers/health`, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "X-Request-Id": req.headers.get("x-request-id") || `fut_h_${Date.now()}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(4000),
-    });
+  const BACKEND_URL = getBackendBaseUrl();
+  const requestId = req.headers.get("x-request-id") || `fut_h_${Date.now()}`;
 
-    if (backendRes.ok) {
-      const data = await backendRes.json();
-      return NextResponse.json(data, { status: 200 });
+  if (BACKEND_URL) {
+    try {
+      const backendRes = await fetch(`${BACKEND_URL}/api/futures/providers/health`, {
+        method: "GET",
+        headers: getForwardHeaders(req, requestId),
+        cache: "no-store",
+        signal: AbortSignal.timeout(4000),
+      });
+
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        return NextResponse.json(data, { status: 200 });
+      }
+    } catch (err) {
+      // Backend offline
     }
-  } catch (err) {
-    // Fallback response
   }
 
-  const now = new Date().toISOString();
   return NextResponse.json({
-    status: "SUCCESS",
+    status: isProduction() && !BACKEND_URL ? "UNAVAILABLE" : "DEGRADED",
     count: 7,
-    live_providers_count: 3,
+    live_providers_count: 0,
     total_providers_count: 6,
-    overall_status: "LIVE",
+    overall_status: "OFFLINE",
     providers: [
       {
         provider: "BINANCE_USDM",
         display_name: "Binance USD-M Futures",
-        configured: true,
-        rest_status: "CONNECTED",
-        websocket_status: "CONNECTED",
-        subscription_status: "ACTIVE",
-        decoder_status: "OPERATIONAL",
-        instrument_count: 8,
-        first_tick_received: true,
-        last_real_tick_at: now,
-        last_tick_age_ms: 45.0,
-        status: "LIVE",
+        configured: Boolean(process.env.BINANCE_API_KEY),
+        rest_status: "DISCONNECTED",
+        websocket_status: "DISCONNECTED",
+        subscription_status: "IDLE",
+        decoder_status: "STANDBY",
+        instrument_count: 0,
+        first_tick_received: false,
+        last_real_tick_at: null,
+        last_tick_age_ms: null,
+        status: "DISCONNECTED",
         error_code: null,
-        error_details: null,
+        error_details: BACKEND_URL ? "Backend offline" : "Backend unconfigured",
         reconnect_count: 0,
       },
       {
         provider: "BINANCE_COINM",
         display_name: "Binance COIN-M Futures",
-        configured: true,
-        rest_status: "CONNECTED",
-        websocket_status: "CONNECTED",
-        subscription_status: "ACTIVE",
-        decoder_status: "OPERATIONAL",
-        instrument_count: 3,
-        first_tick_received: true,
-        last_real_tick_at: now,
-        last_tick_age_ms: 85.0,
-        status: "LIVE",
+        configured: Boolean(process.env.BINANCE_API_KEY),
+        rest_status: "DISCONNECTED",
+        websocket_status: "DISCONNECTED",
+        subscription_status: "IDLE",
+        decoder_status: "STANDBY",
+        instrument_count: 0,
+        first_tick_received: false,
+        last_real_tick_at: null,
+        last_tick_age_ms: null,
+        status: "DISCONNECTED",
         error_code: null,
-        error_details: null,
+        error_details: BACKEND_URL ? "Backend offline" : "Backend unconfigured",
         reconnect_count: 0,
       },
       {
         provider: "DELTA_INDIA",
         display_name: "Delta Exchange India",
-        configured: true,
-        rest_status: "CONNECTED",
-        websocket_status: "CONNECTED",
-        subscription_status: "ACTIVE",
-        decoder_status: "OPERATIONAL",
-        instrument_count: 4,
-        first_tick_received: true,
-        last_real_tick_at: now,
-        last_tick_age_ms: 110.0,
-        status: "LIVE",
+        configured: Boolean(process.env.DELTA_API_KEY),
+        rest_status: "DISCONNECTED",
+        websocket_status: "DISCONNECTED",
+        subscription_status: "IDLE",
+        decoder_status: "STANDBY",
+        instrument_count: 0,
+        first_tick_received: false,
+        last_real_tick_at: null,
+        last_tick_age_ms: null,
+        status: "DISCONNECTED",
         error_code: null,
-        error_details: null,
+        error_details: BACKEND_URL ? "Backend offline" : "Backend unconfigured",
         reconnect_count: 0,
       },
       {
         provider: "UPSTOX",
         display_name: "Upstox Futures (NSE)",
-        configured: true,
+        configured: Boolean(process.env.UPSTOX_API_KEY || process.env.UPSTOX_ACCESS_TOKEN),
         rest_status: "AUTH_REQUIRED",
         websocket_status: "DISCONNECTED",
         subscription_status: "IDLE",
         decoder_status: "NOT_APPLICABLE",
-        instrument_count: 4,
+        instrument_count: 0,
         first_tick_received: false,
         last_real_tick_at: null,
         last_tick_age_ms: null,
@@ -104,12 +105,12 @@ export async function GET(req: NextRequest) {
       {
         provider: "DHAN",
         display_name: "Dhan Futures (NSE)",
-        configured: true,
+        configured: Boolean(process.env.DHAN_CLIENT_ID && process.env.DHAN_ACCESS_TOKEN),
         rest_status: "AUTH_REQUIRED",
         websocket_status: "DISCONNECTED",
         subscription_status: "IDLE",
         decoder_status: "NOT_APPLICABLE",
-        instrument_count: 4,
+        instrument_count: 0,
         first_tick_received: false,
         last_real_tick_at: null,
         last_tick_age_ms: null,
@@ -126,7 +127,7 @@ export async function GET(req: NextRequest) {
         websocket_status: "NOT_CONFIGURED",
         subscription_status: "NOT_APPLICABLE",
         decoder_status: "NOT_APPLICABLE",
-        instrument_count: 2,
+        instrument_count: 0,
         first_tick_received: false,
         last_real_tick_at: null,
         last_tick_age_ms: null,
@@ -139,15 +140,15 @@ export async function GET(req: NextRequest) {
         provider: "PAPER_SIM",
         display_name: "Paper Simulator Engine",
         configured: true,
-        rest_status: "CONNECTED",
-        websocket_status: "CONNECTED",
-        subscription_status: "ACTIVE",
-        decoder_status: "OPERATIONAL",
-        instrument_count: 3,
-        first_tick_received: true,
-        last_real_tick_at: now,
-        last_tick_age_ms: 1.0,
-        status: "LIVE",
+        rest_status: "STANDBY",
+        websocket_status: "DISCONNECTED",
+        subscription_status: "IDLE",
+        decoder_status: "STANDBY",
+        instrument_count: 0,
+        first_tick_received: false,
+        last_real_tick_at: null,
+        last_tick_age_ms: null,
+        status: "STANDBY",
         error_code: null,
         error_details: null,
         reconnect_count: 0,

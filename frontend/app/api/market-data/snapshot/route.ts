@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -10,26 +11,32 @@ export async function GET(req: NextRequest) {
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
 
-  const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
 
-  try {
-    const url = symbols.length > 0
-      ? `${GATEWAY_URL}/api/v1/snapshot?symbols=${encodeURIComponent(symbols.join(","))}`
-      : `${GATEWAY_URL}/api/v1/snapshot`;
+  if (GATEWAY_URL) {
+    try {
+      const url = symbols.length > 0
+        ? `${GATEWAY_URL}/api/v1/snapshot?symbols=${encodeURIComponent(symbols.join(","))}`
+        : `${GATEWAY_URL}/api/v1/snapshot`;
 
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { "Content-Type": "application/json" },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data, {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+        },
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data, {
+          headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        });
+      }
+    } catch {
+      // Gateway fallback
     }
-  } catch {
-    // Gateway fallback
   }
 
   return NextResponse.json(
@@ -48,20 +55,26 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const symbols = Array.isArray(body.symbols) ? body.symbols : [];
 
-    const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+    const GATEWAY_URL = getGatewayHttpUrl();
+    const GATEWAY_SECRET = getGatewaySecret();
 
-    const res = await fetch(`${GATEWAY_URL}/api/v1/snapshot`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbols }),
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data, {
-        headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+    if (GATEWAY_URL) {
+      const res = await fetch(`${GATEWAY_URL}/api/v1/snapshot`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+        },
+        body: JSON.stringify({ symbols }),
+        cache: "no-store",
       });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data, {
+          headers: { "Cache-Control": "no-store, no-cache, must-revalidate" },
+        });
+      }
     }
   } catch {
     // Gateway fallback

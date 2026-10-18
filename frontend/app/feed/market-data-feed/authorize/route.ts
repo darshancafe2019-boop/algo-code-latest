@@ -1,18 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      {
+        status: "error",
+        success: false,
+        error: "Backend service URL is not configured in production environment.",
+      },
+      { status: 503 }
+    );
+  }
+
   try {
-    const res = await fetch(`${BACKEND_URL}/feed/market-data-feed/authorize`, {
+    const res = await fetch(`${backendUrl}/feed/market-data-feed/authorize`, {
       cache: "no-store",
-      headers: { Accept: "application/json" },
+      headers: {
+        ...getForwardHeaders(req),
+        Accept: "application/json",
+      },
       signal: AbortSignal.timeout(6000),
     });
 

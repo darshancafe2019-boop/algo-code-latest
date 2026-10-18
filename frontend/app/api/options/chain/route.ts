@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:5050";
 const CRYPTO_UNDERLYINGS = new Set(["BTC", "ETH", "SOL", "XRP", "XAUT", "AVAX", "DOGE"]);
-
-const GATEWAY_URL =
-  process.env.MARKET_GATEWAY_URL ||
-  process.env.NEXT_PUBLIC_MARKET_GATEWAY_URL ||
-  `http://127.0.0.1:${process.env.MARKET_GATEWAY_PORT || "5051"}`;
 
 const chainMemoryCache = new Map<string, { timestamp: number; payload: any }>();
 const CACHE_TTL_MS = 3000;
 
 export async function GET(req: NextRequest) {
   try {
+    const BACKEND_URL = getBackendBaseUrl();
+    const GATEWAY_URL = getGatewayHttpUrl();
+    const gatewaySecret = getGatewaySecret();
+
     const search = req.nextUrl.searchParams;
     const rawUnderlying = search.get("underlying") || search.get("symbol") || "NIFTY";
     const underlying = rawUnderlying.trim().toUpperCase();
@@ -39,36 +38,42 @@ export async function GET(req: NextRequest) {
     const isCrypto = CRYPTO_UNDERLYINGS.has(underlying) || sourceParam.includes("DELTA");
     const compatibleProviders: string[] = isCrypto ? ["DELTA"] : ["UPSTOX"];
 
-    // ── 1. Query Authoritative Central Backend (Port 5050) ────────────────────
+    // ── 1. Query Authoritative Central Backend ──────────────────────────────
     let chainData: any = null;
-    try {
-      const backendUrl = `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(sourceParam)}&strike_count=${strikeCount}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}`;
-      const backendRes = await fetch(backendUrl, {
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(4000),
-      });
+    if (BACKEND_URL) {
+      try {
+        const backendUrl = `${BACKEND_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&source=${encodeURIComponent(sourceParam)}&strike_count=${strikeCount}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}`;
+        const backendRes = await fetch(backendUrl, {
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+          signal: AbortSignal.timeout(4000),
+        });
 
-      if (backendRes.ok) {
-        const body = await backendRes.json();
-        const dataObj = body.data || body;
-        const strikes = dataObj.strikes || dataObj.rows || [];
-        if (Array.isArray(strikes) && strikes.length > 0) {
-          chainData = dataObj;
+        if (backendRes.ok) {
+          const body = await backendRes.json();
+          const dataObj = body.data || body;
+          const strikes = dataObj.strikes || dataObj.rows || [];
+          if (Array.isArray(strikes) && strikes.length > 0) {
+            chainData = dataObj;
+          }
         }
+      } catch (backendErr) {
+        console.warn("[/api/options/chain] Backend fetch notice:", backendErr);
       }
-    } catch (backendErr) {
-      console.warn("[/api/options/chain] Backend fetch notice:", backendErr);
     }
 
-    // ── 2. Fallback to Central Market Data Gateway (Port 5051) ────────────────
-    if (!chainData) {
+    // ── 2. Fallback to Central Market Data Gateway ───────────────────────────
+    if (!chainData && GATEWAY_URL) {
       try {
         const prov = isCrypto ? "DELTA" : "UPSTOX";
         const gwUrl = `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&provider=${prov}&strike_count=${strikeCount}${expiry ? `&expiry=${encodeURIComponent(expiry)}` : ""}`;
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (gatewaySecret) {
+          headers["X-Gateway-Secret"] = gatewaySecret;
+        }
         const gwRes = await fetch(gwUrl, {
           cache: "no-store",
-          headers: { Accept: "application/json" },
+          headers,
           signal: AbortSignal.timeout(3000),
         });
 

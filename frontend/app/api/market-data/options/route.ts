@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { optionChainEngine } from "@/lib/market-data/option-chain-engine";
 import { marketState } from "@/lib/market-data/market-state";
+import { getGatewayHttpUrl, getBackendBaseUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const BACKEND_URL = getBackendBaseUrl();
+  const gatewaySecret = getGatewaySecret();
   const { searchParams } = new URL(req.url);
   const underlying = searchParams.get("underlying") || searchParams.get("symbol");
   const expiry = searchParams.get("expiry") || undefined;
@@ -28,15 +29,23 @@ export async function GET(req: NextRequest) {
   if (!chain) {
     try {
       const isDelta = cleanUnderlying === "BTC" || cleanUnderlying === "ETH" || cleanUnderlying === "SOL" || (source && source.toUpperCase().includes("DELTA"));
-      const targetUrl = isDelta
-        ? `${GATEWAY_URL}/api/options/chain?underlying=${cleanUnderlying}&source=DELTA_INDIA${expiry ? `&expiry=${expiry}` : ""}`
-        : `${BACKEND_URL}/api/options/chain?underlying=${cleanUnderlying}${expiry ? `&expiry=${expiry}` : ""}`;
+      const targetBase = isDelta ? GATEWAY_URL : BACKEND_URL;
 
-      const res = await fetch(targetUrl, {
-        headers: { Accept: "application/json" },
-        cache: "no-store",
-        signal: AbortSignal.timeout(4000),
-      });
+      if (targetBase) {
+        const targetUrl = isDelta
+          ? `${GATEWAY_URL}/api/options/chain?underlying=${cleanUnderlying}&source=DELTA_INDIA${expiry ? `&expiry=${expiry}` : ""}`
+          : `${BACKEND_URL}/api/options/chain?underlying=${cleanUnderlying}${expiry ? `&expiry=${expiry}` : ""}`;
+
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (isDelta && gatewaySecret) {
+          headers["X-Gateway-Secret"] = gatewaySecret;
+        }
+
+        const res = await fetch(targetUrl, {
+          headers,
+          cache: "no-store",
+          signal: AbortSignal.timeout(4000),
+        });
 
       if (res.ok) {
         const payload = await res.json();
@@ -95,10 +104,11 @@ export async function GET(req: NextRequest) {
           }
         }
       }
-    } catch {
-      // upstream fetch failed
     }
+  } catch {
+    // upstream fetch failed
   }
+}
 
   if (!chain) {
     return NextResponse.json(

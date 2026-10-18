@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_INTERNAL_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * POST /api/fyers/credentials
@@ -28,26 +25,43 @@ export async function POST(req: NextRequest) {
     }
 
     // Forward to backend Python vault if running
-    try {
-      const backendRes = await fetch(`${BACKEND_INTERNAL_URL}/api/fyers/credentials`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          app_id: appId,
-          secret_id: secretId,
-          access_token: accessToken,
-          redirect_uri: redirectUri,
-        }),
-        cache: "no-store",
-        signal: AbortSignal.timeout(3000),
-      });
+    const backendUrl = getBackendBaseUrl();
+    if (backendUrl) {
+      try {
+        const backendRes = await fetch(`${backendUrl}/api/fyers/credentials`, {
+          method: "POST",
+          headers: {
+            ...getForwardHeaders(req),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            app_id: appId,
+            secret_id: secretId,
+            access_token: accessToken,
+            redirect_uri: redirectUri,
+          }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(3000),
+        });
 
-      if (backendRes.ok) {
-        const data = await backendRes.json();
-        return NextResponse.json(data);
+        if (backendRes.ok) {
+          const data = await backendRes.json();
+          return NextResponse.json(data);
+        }
+        if (backendRes.status === 401 || backendRes.status === 403) {
+          const data = await backendRes.json().catch(() => ({ success: false, message: "Unauthorized" }));
+          return NextResponse.json(data, { status: backendRes.status });
+        }
+      } catch {
+        // If backend offline in development, fallback to local env
       }
-    } catch {
-      // If backend offline, process locally in Node process.env
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      return NextResponse.json(
+        { success: false, message: "Backend credentials vault is unreachable in production." },
+        { status: 503 }
+      );
     }
 
     process.env.FYERS_APP_ID = appId;

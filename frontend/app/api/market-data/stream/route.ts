@@ -1,18 +1,13 @@
 import { NextRequest } from "next/server";
 import WebSocket from "ws";
+import {
+  getGatewayWsUrl,
+  getGatewaySecret,
+  isProduction,
+} from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const GATEWAY_WS_URL =
-  process.env.MARKET_DATA_GATEWAY_WS_URL ||
-  process.env.MARKET_GATEWAY_WS_URL ||
-  "ws://127.0.0.1:5051/ws";
-
-const GATEWAY_SECRET =
-  process.env.MARKET_GATEWAY_SECRET ||
-  process.env.MARKET_DATA_GATEWAY_SECRET ||
-  "";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -94,6 +89,26 @@ export async function GET(req: NextRequest) {
         }
       };
 
+      const wsEndpoint = getGatewayWsUrl();
+      const gatewaySecret = getGatewaySecret();
+
+      if (!wsEndpoint) {
+        safeEnqueue(
+          `data: ${JSON.stringify({
+            type: "STATUS",
+            data: {
+              status: "GATEWAY_UNAVAILABLE",
+              message: "Market gateway WebSocket is not configured in production environment.",
+              provider: providerFilter || "ALL",
+              subscribedSymbols: requestedSymbols,
+              timestamp: new Date().toISOString(),
+            },
+          })}\n\n`
+        );
+        cleanup();
+        return;
+      }
+
       // 1. Send immediate connecting status packet
       safeEnqueue(
         `data: ${JSON.stringify({
@@ -109,10 +124,10 @@ export async function GET(req: NextRequest) {
 
       // 2. Connect dedicated WebSocket to Python Market Data Gateway
       try {
-        const wsUrl = new URL(GATEWAY_WS_URL);
+        const wsUrl = new URL(wsEndpoint);
         // Pass secret exclusively via secure header to prevent logging in proxy query parameters
         ws = new WebSocket(wsUrl.toString(), {
-          headers: GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : undefined,
+          headers: gatewaySecret ? { "X-Gateway-Secret": gatewaySecret } : undefined,
           handshakeTimeout: 5000,
           perMessageDeflate: false, // Ensure zero native bufferutil/zlib compression issues
         });

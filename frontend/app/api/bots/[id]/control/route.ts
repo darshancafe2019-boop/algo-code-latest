@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } | Promise<{ id: string }> }
 ) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const resolved = params instanceof Promise ? await params : params;
   const botId = resolved?.id;
   const requestId =
@@ -29,7 +33,7 @@ export async function POST(
       forwardHeaders.set("Accept", "application/json");
     }
 
-    const upstreamRes = await fetch(`${BACKEND_URL}/api/bots/${botId}/control`, {
+    const upstreamRes = await fetch(`${backendUrl}/api/bots/${botId}/control`, {
       method: "POST",
       headers: forwardHeaders,
       body: rawBody,

@@ -1,49 +1,56 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * GET /api/delta/wallet
  * Proxies to Flask backend to fetch authenticated balances.
  */
 export async function GET(req: NextRequest) {
-  try {
-    const res = await fetch(`${BACKEND_URL}/api/delta/wallet`, {
-      method: "GET",
-      headers: { "Accept": "application/json" },
-      cache: "no-store",
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      return NextResponse.json(data);
-    }
-
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
     return NextResponse.json(
       {
         success: false,
-        message: "Failed to query wallet from backend",
-        balances: [
-          { asset: "USDT", balance: 10000.0, available: 10000.0, currency_symbol: "$", mode: "PAPER" },
-          { asset: "INR", balance: 830000.0, available: 830000.0, currency_symbol: "₹", mode: "PAPER" }
-        ]
+        error: "Backend service URL is not configured in production environment.",
+        balances: [],
       },
-      { status: 200 }
+      { status: 503 }
     );
-  } catch (err: any) {
-    return NextResponse.json({
-      success: true,
-      mode: "PAPER",
-      balances: [
-        { asset: "USDT", balance: 10000.0, available: 10000.0, currency_symbol: "$", mode: "PAPER" },
-        { asset: "INR", balance: 830000.0, available: 830000.0, currency_symbol: "₹", mode: "PAPER" }
-      ]
-    });
   }
+
+  if (backendUrl) {
+    try {
+      const res = await fetch(`${backendUrl}/api/delta/wallet`, {
+        method: "GET",
+        headers: {
+          ...getForwardHeaders(req),
+          Accept: "application/json",
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        return NextResponse.json(data);
+      }
+      if (res.status === 401 || res.status === 403) {
+        const data = await res.json().catch(() => ({ error: "Authentication or authorization required" }));
+        return NextResponse.json(data, { status: res.status });
+      }
+    } catch (_err) {}
+  }
+
+  return NextResponse.json(
+    {
+      success: false,
+      message: "Backend wallet service is unreachable.",
+      balances: [],
+    },
+    { status: 503 }
+  );
 }

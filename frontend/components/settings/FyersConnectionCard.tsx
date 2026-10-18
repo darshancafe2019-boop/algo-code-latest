@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/formatters";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ShieldCheck,
@@ -61,7 +61,7 @@ export function FyersConnectionCard() {
   const [appIdInput, setAppIdInput] = useState("");
   const [secretIdInput, setSecretIdInput] = useState("");
   const [accessTokenInput, setAccessTokenInput] = useState("");
-  const [redirectUriInput, setRedirectUriInput] = useState("http://localhost:3100/api/fyers/callback");
+  const [redirectUriInput, setRedirectUriInput] = useState("");
   const [copiedKey, setCopiedKey] = useState(false);
   const [showCurlHint, setShowCurlHint] = useState(false);
   const [notification, setNotification] = useState<{
@@ -82,6 +82,14 @@ export function FyersConnectionCard() {
     staleTime: 5000,
     refetchInterval: 15000,
   });
+
+  useEffect(() => {
+    if (data?.redirectUri) {
+      setRedirectUriInput(data.redirectUri);
+    } else if (typeof window !== "undefined") {
+      setRedirectUriInput(`${window.location.origin}/api/fyers/callback`);
+    }
+  }, [data?.redirectUri]);
 
   const isConnected = Boolean(data?.connected);
 

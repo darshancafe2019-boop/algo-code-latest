@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 
@@ -6,7 +7,8 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const symbols = searchParams.get("symbols") || "";
 
-  const GATEWAY_URL = process.env.MARKET_GATEWAY_URL || "http://127.0.0.1:5051";
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
 
   // Create a TransformStream to stream Server-Sent Events to the client
   const stream = new TransformStream();
@@ -26,10 +28,13 @@ export async function GET(req: NextRequest) {
   );
 
   // If client provides symbols, forward a subscription query to Gateway if available
-  if (symbols) {
+  if (symbols && GATEWAY_URL) {
     fetch(`${GATEWAY_URL}/api/v1/subscribe`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+      },
       body: JSON.stringify({ symbols: symbols.split(",") }),
     }).catch(() => {});
   }

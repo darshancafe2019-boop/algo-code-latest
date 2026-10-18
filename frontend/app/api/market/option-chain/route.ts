@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getBackendBaseUrl,
+  getGatewayHttpUrl,
+  getGatewaySecret,
+} from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const GATEWAY_URL =
-  process.env.MARKET_GATEWAY_URL ||
-  process.env.NEXT_PUBLIC_MARKET_GATEWAY_URL ||
-  `http://127.0.0.1:${process.env.MARKET_GATEWAY_PORT || "5051"}`;
-
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
@@ -22,21 +17,28 @@ export async function GET(req: NextRequest) {
   const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || marketType.includes("CRYPTO");
   const provider = isCrypto ? "DELTA" : (searchParams.get("provider") || "UPSTOX");
 
-  // ── 1. Query Central Market Data Gateway directly (Port 5051) ─────────────
-  // Gateway maintains the live, unified option chains for both Indian (Upstox) & Crypto (Delta)
-  try {
-    let gwUrl = `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&provider=${encodeURIComponent(provider)}`;
-    if (expiry) {
-      gwUrl += `&expiry=${encodeURIComponent(expiry)}`;
-    }
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const BACKEND_URL = getBackendBaseUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
 
-    const gwRes = await fetch(gwUrl, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(8000),
-    });
+  // ── 1. Query Central Market Data Gateway directly if configured ─────────────
+  if (GATEWAY_URL) {
+    try {
+      let gwUrl = `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&provider=${encodeURIComponent(provider)}`;
+      if (expiry) {
+        gwUrl += `&expiry=${encodeURIComponent(expiry)}`;
+      }
 
-    if (gwRes.ok) {
+      const gwRes = await fetch(gwUrl, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+        },
+        signal: AbortSignal.timeout(8000),
+      });
+
+      if (gwRes.ok) {
       const gwChain = await gwRes.json();
       const rawRows: any[] = gwChain.strikes || gwChain.rows || [];
 
@@ -173,6 +175,7 @@ export async function GET(req: NextRequest) {
   } catch (gwErr: any) {
     console.warn("[/api/market/option-chain] Gateway probe notice:", gwErr?.message);
   }
+}
 
   // ── 2. Crypto Specialization: Delta Product Service fallback ──────────────
   if (isCrypto) {
@@ -287,26 +290,28 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 3. Query Backend API (Port 5050) ───────────────────────────────────────
-  try {
-    const upstreamRes = await fetch(
-      `${BACKEND_URL}/api/market/option-chain?${searchParams.toString()}`,
-      { cache: "no-store", signal: AbortSignal.timeout(4000) }
-    );
-    if (upstreamRes.ok) {
-      const body = await upstreamRes.json();
-      const payload = body.data || body;
-      const strikes = payload.strikes || payload.chain || payload.rows || [];
-      if (Array.isArray(strikes) && strikes.length > 0) {
-        return NextResponse.json({
-          success: true,
-          data: payload,
-          ...payload,
-        });
+  // ── 3. Query Backend API if configured ────────────────────────────────────
+  if (BACKEND_URL) {
+    try {
+      const upstreamRes = await fetch(
+        `${BACKEND_URL}/api/market/option-chain?${searchParams.toString()}`,
+        { cache: "no-store", signal: AbortSignal.timeout(4000) }
+      );
+      if (upstreamRes.ok) {
+        const body = await upstreamRes.json();
+        const payload = body.data || body;
+        const strikes = payload.strikes || payload.chain || payload.rows || [];
+        if (Array.isArray(strikes) && strikes.length > 0) {
+          return NextResponse.json({
+            success: true,
+            data: payload,
+            ...payload,
+          });
+        }
       }
+    } catch (err: any) {
+      console.warn("[/api/market/option-chain] Backend query fallback:", err?.message);
     }
-  } catch (err: any) {
-    console.warn("[/api/market/option-chain] Backend query fallback:", err?.message);
   }
 
   // ── 4. Truthful Unavailable Response (Zero Fabrication) ───────────────────

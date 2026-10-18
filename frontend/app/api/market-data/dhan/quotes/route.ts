@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { marketState } from "@/lib/market-data/market-state";
 import { NormalizedQuote } from "@/lib/market-data/types";
+import { getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,25 +24,34 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 2. Fetch live snapshot from Market Data Gateway (port 5051) for requested/missing symbols
+  // 2. Fetch live snapshot from Market Data Gateway for requested/missing symbols
   const toFetch = symbols.length > 0 ? symbols : ["RELIANCE", "NIFTY", "BANKNIFTY", "TCS", "INFY", "HDFCBANK", "ICICIBANK", "SBIN"];
-  try {
-    const gwRes = await fetch(`http://127.0.0.1:5051/snapshot?symbols=${toFetch.join(",")}`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(3000),
-    });
-    if (gwRes.ok) {
-      const gwData = await gwRes.json();
-      const gwQuotes = gwData.quotes || {};
-      for (const [sym, rawQ] of Object.entries(gwQuotes)) {
-        if (rawQ && typeof rawQ === "object") {
-          const normQ = rawQ as NormalizedQuote;
-          quotesMap[sym] = normQ;
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
+
+  if (GATEWAY_URL) {
+    try {
+      const gwRes = await fetch(`${GATEWAY_URL}/snapshot?symbols=${toFetch.join(",")}`, {
+        cache: "no-store",
+        headers: {
+          "Accept": "application/json",
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+        },
+        signal: AbortSignal.timeout(3000),
+      });
+      if (gwRes.ok) {
+        const gwData = await gwRes.json();
+        const gwQuotes = gwData.quotes || {};
+        for (const [sym, rawQ] of Object.entries(gwQuotes)) {
+          if (rawQ && typeof rawQ === "object") {
+            const normQ = rawQ as NormalizedQuote;
+            quotesMap[sym] = normQ;
+          }
         }
       }
+    } catch (err) {
+      console.debug("[DHAN API] Gateway snapshot fetch note:", err);
     }
-  } catch (err) {
-    console.debug("[DHAN API] Gateway snapshot fetch note:", err);
   }
 
   // 3. Fallback for option contracts or missing symbols

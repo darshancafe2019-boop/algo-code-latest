@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UPSTOX_TOKEN_URL = "https://api.upstox.com/v2/login/authorization/token";
-const BACKEND_INTERNAL_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * GET /api/upstox/callback
@@ -16,9 +14,9 @@ const BACKEND_INTERNAL_URL =
  * and syncs token with the backend engine.
  */
 export async function GET(req: NextRequest) {
-  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || "127.0.0.1:3100";
-  const proto = req.headers.get("x-forwarded-proto") || "http";
-  const origin = req.nextUrl?.origin || `${proto}://${host}`;
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || (isProduction() ? "" : "127.0.0.1:3100");
+  const proto = req.headers.get("x-forwarded-proto") || (isProduction() ? "https" : "http");
+  const origin = req.nextUrl?.origin || (host ? `${proto}://${host}` : "");
   const urlObj = new URL(req.url);
   const searchParams = req.nextUrl?.searchParams || urlObj.searchParams;
 
@@ -186,21 +184,27 @@ export async function GET(req: NextRequest) {
     const connectedAt = new Date().toISOString();
 
     // 7. Synchronize Token with Backend Algo Engine & Database
-    try {
-      await fetch(`${BACKEND_INTERNAL_URL}/api/upstox/sync-token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          access_token: accessToken,
-          user_name: userName,
-          user_id: userId,
-          email: email,
-          broker: broker,
-          connected_at: connectedAt,
-        }),
-      });
-    } catch {
-      // Non-blocking if Python backend is temporarily starting up
+    const backendUrl = getBackendBaseUrl();
+    if (backendUrl) {
+      try {
+        await fetch(`${backendUrl}/api/upstox/sync-token`, {
+          method: "POST",
+          headers: {
+            ...getForwardHeaders(req),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            access_token: accessToken,
+            user_name: userName,
+            user_id: userId,
+            email: email,
+            broker: broker,
+            connected_at: connectedAt,
+          }),
+        });
+      } catch {
+        // Non-blocking if Python backend is temporarily starting up
+      }
     }
 
     // 8. Handle JSON Response vs Browser Redirect

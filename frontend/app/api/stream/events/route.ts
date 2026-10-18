@@ -1,39 +1,46 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
-  const upstreamUrl = `${BACKEND_URL}/api/stream/events`;
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
 
-  try {
-    const upstreamRes = await fetch(upstreamUrl, {
-      headers: {
-        Accept: "text/event-stream",
-        "Cache-Control": "no-cache",
-      },
-      signal: AbortSignal.timeout(2500),
-      cache: "no-store",
-    });
-
-    if (upstreamRes.ok && upstreamRes.body) {
-      return new Response(upstreamRes.body, {
-        status: 200,
+  if (backendUrl) {
+    const upstreamUrl = `${backendUrl}/api/stream/events`;
+    try {
+      const upstreamRes = await fetch(upstreamUrl, {
         headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-          "X-Accel-Buffering": "no",
+          ...getForwardHeaders(req),
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
         },
+        signal: AbortSignal.timeout(3000),
+        cache: "no-store",
       });
+
+      if (upstreamRes.ok && upstreamRes.body) {
+        return new Response(upstreamRes.body, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+    } catch (err: any) {
+      // Upstream unavailable or timed out; fall through
     }
-  } catch (err: any) {
-    // Upstream unavailable or timed out; fall through to resilient native stream
   }
 
   // Resilient native SSE stream with heartbeat

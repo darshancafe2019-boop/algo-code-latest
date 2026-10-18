@@ -1,48 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
-  try {
-    const backendRes = await fetch(`${BACKEND_URL}/api/trading/live-readiness`, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "X-Request-Id": req.headers.get("x-request-id") || `readiness_${Date.now()}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(3000),
-    });
+  const BACKEND_URL = getBackendBaseUrl();
+  const requestId = req.headers.get("x-request-id") || `readiness_${Date.now()}`;
 
-    if (backendRes.ok) {
-      const data = await backendRes.json();
-      return NextResponse.json(data, { status: 200 });
+  if (BACKEND_URL) {
+    try {
+      const backendRes = await fetch(`${BACKEND_URL}/api/trading/live-readiness`, {
+        method: "GET",
+        headers: getForwardHeaders(req, requestId),
+        cache: "no-store",
+        signal: AbortSignal.timeout(3000),
+      });
+
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        return NextResponse.json(data, { status: 200 });
+      }
+      if (backendRes.status === 401 || backendRes.status === 403) {
+        const data = await backendRes.json().catch(() => ({ error: "Authentication required" }));
+        return NextResponse.json(data, { status: backendRes.status });
+      }
+    } catch (err) {
+      // Backend offline
     }
-  } catch (err) {
-    // Fallback response
   }
 
   return NextResponse.json({
-    status: "SUCCESS",
+    status: isProduction() && !BACKEND_URL ? "UNAVAILABLE" : "DEGRADED",
     readiness: {
-      auth_ready: true,
-      broker_ready: true,
-      market_data_ready: true,
-      reconciled: true,
-      risk_ready: true,
+      auth_ready: false,
+      broker_ready: false,
+      market_data_ready: false,
+      reconciled: false,
+      risk_ready: false,
       kill_switch_ready: true,
-      account_ready: true,
-      instrument_ready: true,
+      account_ready: false,
+      instrument_ready: false,
       overall_ready: false,
       active_mode: "PAPER",
-      live_providers_count: 3,
+      live_providers_count: 0,
       gate_details: {
         kill_switch_active: false,
-        daily_loss_limit_ok: true,
-        margin_available_usd: 25000.0,
+        daily_loss_limit_ok: false,
+        margin_available_usd: 0,
         unresolved_unknown_orders: 0,
       },
       timestamp: new Date().toISOString(),

@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CanonicalFuturesContract, FuturesUniverseResponse } from "@/src/features/markets/futures/types/futures";
 
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
+
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
 
 function generateRealWorldFuturesUniverse(): CanonicalFuturesContract[] {
   const now = new Date().toISOString();
@@ -1249,32 +1250,38 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const targetUrl = `${BACKEND_URL}/api/futures/universe${url.search}`;
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
 
-  try {
-    const backendRes = await fetch(targetUrl, {
-      method: "GET",
-      headers: {
-        "Accept": "application/json",
-        "X-Request-Id": req.headers.get("x-request-id") || `fut_${Date.now()}`,
-      },
-      cache: "no-store",
-      signal: AbortSignal.timeout(3000),
-    });
+  if (backendUrl) {
+    const targetUrl = `${backendUrl}/api/futures/universe${url.search}`;
+    try {
+      const backendRes = await fetch(targetUrl, {
+        method: "GET",
+        headers: getForwardHeaders(req),
+        cache: "no-store",
+        signal: AbortSignal.timeout(3000),
+      });
 
-    if (backendRes.ok) {
-      const data = await backendRes.json();
-      if (Array.isArray(data?.contracts) && data.contracts.length > 0) {
-        if (futuresMicroCache.size > 100) futuresMicroCache.clear();
-        futuresMicroCache.set(cacheKey, { data, timestamp: Date.now() });
-        return NextResponse.json(data, {
-          status: 200,
-          headers: { "X-Cache-Hit": "false" },
-        });
+      if (backendRes.ok) {
+        const data = await backendRes.json();
+        if (Array.isArray(data?.contracts) && data.contracts.length > 0) {
+          if (futuresMicroCache.size > 100) futuresMicroCache.clear();
+          futuresMicroCache.set(cacheKey, { data, timestamp: Date.now() });
+          return NextResponse.json(data, {
+            status: 200,
+            headers: { "X-Cache-Hit": "false" },
+          });
+        }
       }
+    } catch (err) {
+      // Fallback
     }
-  } catch (err) {
-    // Graceful fallback to real-world generator
   }
 
   // Generate complete real-world market universe
@@ -1339,7 +1346,7 @@ export async function GET(req: NextRequest) {
     total_volume_usd: Math.round(totalVolUsd),
     total_open_interest_usd: Math.round(totalOiUsd),
     avg_funding_rate_apr: fundingCount > 0 ? parseFloat((totalApr / fundingCount).toFixed(2)) : 10.5,
-    connected_providers_count: 5,
+    connected_providers_count: 0,
     total_providers_count: 6,
     contracts: allContracts,
   };

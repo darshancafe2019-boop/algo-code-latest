@@ -301,12 +301,17 @@ class ResilientApiClient {
     }
 
     // Server-side environment (SSR/Route Handlers): use server-only internal URL
-    const backendBase = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
+    const backendBase =
+      process.env.BACKEND_INTERNAL_URL ||
+      process.env.BACKEND_API_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.NEXT_PUBLIC_API_URL ||
+      (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:5050");
     if (path.startsWith("http://") || path.startsWith("https://")) {
       return path;
     }
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
-    return `${backendBase}${cleanPath}`;
+    return backendBase ? `${backendBase.replace(/\/+$/, "")}${cleanPath}` : cleanPath;
   }
 
   /**

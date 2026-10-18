@@ -1,23 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 async function proxyAction(
   req: NextRequest,
   params: { id: string; action: string[] } | Promise<{ id: string; action: string[] }>
 ) {
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
+  }
+
   const resolved = params instanceof Promise ? await params : params;
   const botId = resolved?.id;
   const actionPath = Array.isArray(resolved?.action) ? resolved.action.join("/") : resolved?.action || "";
   const url = new URL(req.url);
-  const targetUrl = `${BACKEND_URL}/api/bots/${botId}/${actionPath}${url.search}`;
+  const targetUrl = `${backendUrl}/api/bots/${botId}/${actionPath}${url.search}`;
   const requestId =
     req.headers.get("x-request-id") ||
     `bot_act_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;

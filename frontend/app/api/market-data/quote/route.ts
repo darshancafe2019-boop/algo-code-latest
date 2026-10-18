@@ -1,14 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { instrumentMaster } from "@/lib/market-data/instrument-master";
 import { NormalizedQuote, BrokerProvider } from "@/lib/market-data/types";
+import { getBackendBaseUrl, getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const GATEWAY_HTTP_URL =
-  process.env.MARKET_DATA_GATEWAY_HTTP_URL ||
-  process.env.MARKET_GATEWAY_URL ||
-  "http://127.0.0.1:5051";
 
 export async function GET(req: NextRequest) {
   try {
@@ -68,12 +64,20 @@ export async function GET(req: NextRequest) {
       symbolsToQuery.push(cleanSym.replace("/", ""));
     }
 
-    try {
-      const url = `${GATEWAY_HTTP_URL}/snapshot?symbols=${encodeURIComponent(symbolsToQuery.join(","))}`;
-      const gwRes = await fetch(url, {
-        cache: "no-store",
-        signal: AbortSignal.timeout(2500),
-      });
+    const GATEWAY_HTTP_URL = getGatewayHttpUrl();
+    const GATEWAY_SECRET = getGatewaySecret();
+
+    if (GATEWAY_HTTP_URL) {
+      try {
+        const url = `${GATEWAY_HTTP_URL}/snapshot?symbols=${encodeURIComponent(symbolsToQuery.join(","))}`;
+        const gwRes = await fetch(url, {
+          cache: "no-store",
+          headers: {
+            "Accept": "application/json",
+            ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+          },
+          signal: AbortSignal.timeout(2500),
+        });
 
       if (!gwRes.ok) {
         return NextResponse.json(
@@ -188,10 +192,15 @@ export async function GET(req: NextRequest) {
         timestamp: new Date().toISOString(),
       }, { status: 200 });
 
-    } catch (fetchErr: any) {
-      // In case Gateway is unreachable, fallback to Quantitative Backend Ticker API
+      } catch (fetchErr: any) {
+        // Fallback to backend below
+      }
+    }
+
+    // In case Gateway is unreachable or not configured, fallback to Quantitative Backend Ticker API
+    const BACKEND_URL = getBackendBaseUrl();
+    if (BACKEND_URL) {
       try {
-        const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
         const bRes = await fetch(`${BACKEND_URL}/api/ticker?symbol=${encodeURIComponent(cleanSym)}`, {
           cache: "no-store",
           signal: AbortSignal.timeout(2500),
@@ -241,21 +250,21 @@ export async function GET(req: NextRequest) {
           }
         }
       } catch {}
-
-      // If backend is also unreachable, respond with UNAVAILABLE instead of 404
-      return NextResponse.json(
-        {
-          status: "UNAVAILABLE",
-          symbol: cleanSym,
-          reason: "GATEWAY_UNAVAILABLE",
-          resolvedInstrument: safeInst,
-          quote: null,
-          message: `Market data gateway is currently offline: ${fetchErr?.message || fetchErr}`,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 200 }
-      );
     }
+
+    // If backend is also unreachable, respond with UNAVAILABLE instead of 404
+    return NextResponse.json(
+      {
+        status: "UNAVAILABLE",
+        symbol: cleanSym,
+        reason: "GATEWAY_UNAVAILABLE",
+        resolvedInstrument: safeInst,
+        quote: null,
+        message: `Market data gateway is currently offline or unreachable.`,
+        timestamp: new Date().toISOString(),
+      },
+      { status: 200 }
+    );
   } catch (globalErr: any) {
     console.error("[API:quote] Unexpected runtime error:", globalErr);
     return NextResponse.json(

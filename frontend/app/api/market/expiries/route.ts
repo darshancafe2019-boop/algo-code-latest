@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  getBackendBaseUrl,
+  getGatewayHttpUrl,
+  getGatewaySecret,
+} from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const GATEWAY_URL =
-  process.env.MARKET_GATEWAY_URL ||
-  process.env.NEXT_PUBLIC_MARKET_GATEWAY_URL ||
-  `http://127.0.0.1:${process.env.MARKET_GATEWAY_PORT || "5051"}`;
-
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * Calculates dynamic future expiries starting strictly from today onwards.
@@ -54,16 +49,23 @@ export async function GET(req: NextRequest) {
   const marketType = (searchParams.get("market_type") || searchParams.get("market") || "INDIA_OPTION").toUpperCase();
   const isCrypto = ["BTC", "ETH", "SOL", "XRP"].includes(underlying) || marketType.includes("CRYPTO");
 
-  // ── 1. Query Central Market Data Gateway directly (Port 5051) ─────────────
-  // Gateway maintains the authoritative in-memory cache for Upstox, Delta, and Indian instruments.
-  try {
-    const prov = isCrypto ? "DELTA" : "UPSTOX";
-    const gwUrl = `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&provider=${prov}`;
-    const gwRes = await fetch(gwUrl, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(3000),
-    });
+  const GATEWAY_URL = getGatewayHttpUrl();
+  const BACKEND_URL = getBackendBaseUrl();
+  const GATEWAY_SECRET = getGatewaySecret();
+
+  // ── 1. Query Central Market Data Gateway directly if configured ─────────────
+  if (GATEWAY_URL) {
+    try {
+      const prov = isCrypto ? "DELTA" : "UPSTOX";
+      const gwUrl = `${GATEWAY_URL}/api/options/chain?underlying=${encodeURIComponent(underlying)}&provider=${prov}`;
+      const gwRes = await fetch(gwUrl, {
+        cache: "no-store",
+        headers: {
+          Accept: "application/json",
+          ...(GATEWAY_SECRET ? { "X-Gateway-Secret": GATEWAY_SECRET } : {}),
+        },
+        signal: AbortSignal.timeout(3000),
+      });
 
     if (gwRes.ok) {
       const gwData = await gwRes.json();
@@ -158,6 +160,7 @@ export async function GET(req: NextRequest) {
   } catch (gwErr: any) {
     console.warn("[/api/market/expiries] Gateway probe notice:", gwErr?.message);
   }
+}
 
   // ── 2. Crypto Specialization: Delta Product Service fallback ──────────────
   if (isCrypto) {
@@ -198,20 +201,22 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // ── 3. Query Backend API (Port 5050) ───────────────────────────────────────
-  try {
-    const upstreamRes = await fetch(
-      `${BACKEND_URL}/api/market/expiries?${searchParams.toString()}`,
-      { cache: "no-store", signal: AbortSignal.timeout(4000) }
-    );
-    if (upstreamRes.ok) {
-      const body = await upstreamRes.json();
-      if (body && (body.data || body.expiries)) {
-        return NextResponse.json(body);
+  // ── 3. Query Backend API if configured ────────────────────────────────────
+  if (BACKEND_URL) {
+    try {
+      const upstreamRes = await fetch(
+        `${BACKEND_URL}/api/market/expiries?${searchParams.toString()}`,
+        { cache: "no-store", signal: AbortSignal.timeout(4000) }
+      );
+      if (upstreamRes.ok) {
+        const body = await upstreamRes.json();
+        if (body && (body.data || body.expiries)) {
+          return NextResponse.json(body);
+        }
       }
+    } catch (err: any) {
+      console.warn("[/api/market/expiries] Backend query fallback:", err?.message);
     }
-  } catch (err: any) {
-    console.warn("[/api/market/expiries] Backend query fallback:", err?.message);
   }
 
   // ── 4. Dynamic Calendar Future Fallback (Guaranteed never in past) ─────────

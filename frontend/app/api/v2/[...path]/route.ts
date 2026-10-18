@@ -1,16 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 /**
  * Dedicated Next.js Route Handler for Quant.OS Data Core v2 API (/api/v2/*)
- * Forwards requests directly to the authoritative Flask backend on port 5050.
+ * Forwards requests directly to the authoritative Flask backend.
  */
 // High-speed in-memory micro-cache for idempotent GET queries (TTL 1000ms)
 interface CacheEntry {
@@ -26,10 +23,40 @@ async function handleV2Proxy(
   req: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
+  const BACKEND_URL = getBackendBaseUrl();
+  const requestId =
+    req.headers.get("x-request-id") ||
+    `v2_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+  const startTime = performance.now();
+
+  if (!BACKEND_URL && isProduction()) {
+    return NextResponse.json(
+      {
+        ok: false,
+        success: false,
+        status: "error",
+        data: null,
+        error: {
+          code: "BACKEND_NOT_CONFIGURED",
+          message: "Backend internal URL is not configured in production environment.",
+          retryable: false,
+        },
+        requestId,
+        timestamp: new Date().toISOString(),
+        latencyMs: 0,
+      },
+      {
+        status: 503,
+        headers: { "X-Request-Id": requestId, "Content-Type": "application/json" },
+      }
+    );
+  }
+
+  const effectiveBackendUrl = BACKEND_URL || (isProduction() ? "" : "http://127.0.0.1:5050");
   const pathSegments = params?.path || [];
   const subPath = pathSegments.join("/");
   const url = new URL(req.url);
-  const targetUrl = `${BACKEND_URL}/api/v2/${subPath}${url.search}`;
+  const targetUrl = `${effectiveBackendUrl}/api/v2/${subPath}${url.search}`;
   const cacheKey = `${req.method}:${subPath}${url.search}`;
 
   // Invalidate cache on mutations
@@ -54,33 +81,7 @@ async function handleV2Proxy(
     }
   }
 
-  const requestId =
-    req.headers.get("x-request-id") ||
-    `v2_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
-  const startTime = performance.now();
-
-  // Forward incoming headers while filtering hop-by-hop headers
-  const forwardHeaders = new Headers();
-  req.headers.forEach((val, key) => {
-    const lowerKey = key.toLowerCase();
-    if (
-      ![
-        "host",
-        "connection",
-        "content-length",
-        "transfer-encoding",
-      ].includes(lowerKey)
-    ) {
-      forwardHeaders.set(key, val);
-    }
-  });
-
-  forwardHeaders.set("X-Request-Id", requestId);
-  const clientIp =
-    req.headers.get("x-forwarded-for") ||
-    req.headers.get("x-real-ip") ||
-    "127.0.0.1";
-  forwardHeaders.set("X-Forwarded-For", clientIp);
+  const forwardHeaders = getForwardHeaders(req, requestId);
 
   // Read body for state-modifying HTTP methods
   let bodyData: BodyInit | null = null;

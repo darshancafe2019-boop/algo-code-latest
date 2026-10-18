@@ -13,9 +13,23 @@ export interface ApiResponse<T> {
   };
 }
 
-const API_BASE_URL = typeof window !== "undefined" ? "/api" : (process.env.BACKEND_INTERNAL_URL || "http://127.0.0.1:5050/api");
+const API_BASE_URL =
+  typeof window !== "undefined"
+    ? "/api"
+    : (process.env.BACKEND_INTERNAL_URL
+        ? `${process.env.BACKEND_INTERNAL_URL.replace(/\/+$/, "")}/api`
+        : process.env.BACKEND_API_URL
+        ? `${process.env.BACKEND_API_URL.replace(/\/+$/, "")}/api`
+        : process.env.NEXT_PUBLIC_BACKEND_URL
+        ? `${process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/+$/, "")}/api`
+        : process.env.NODE_ENV === "production"
+        ? ""
+        : "http://127.0.0.1:5050/api");
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new Error("Backend URL is not configured in production environment.");
+  }
   const cleanEndpoint = endpoint.startsWith("/api") ? endpoint.replace(/^\/api/, "") : endpoint;
   const url = `${API_BASE_URL}${cleanEndpoint.startsWith("/") ? "" : "/"}${cleanEndpoint}`;
   const isGet = !options?.method || options.method.toUpperCase() === "GET";

@@ -124,7 +124,13 @@ export const HeaderConnectionStatus = memo(function HeaderConnectionStatus() {
                 <Server className="h-3 w-3 text-sky-400" />
                 Backend Gateway:
               </span>
-              <span className="text-slate-200 font-bold">127.0.0.1:5050</span>
+              <span className="text-slate-200 font-bold">
+                {process.env.NEXT_PUBLIC_BACKEND_URL
+                  ? (() => {
+                      try { return new URL(process.env.NEXT_PUBLIC_BACKEND_URL).host; } catch { return process.env.NEXT_PUBLIC_BACKEND_URL; }
+                    })()
+                  : (process.env.NODE_ENV === "production" ? "Production Backend" : "127.0.0.1:5050")}
+              </span>
             </div>
 
             <div className="flex items-center justify-between text-slate-400">

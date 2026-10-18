@@ -1,43 +1,52 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
-
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const symbol = searchParams.get("symbol") || "BTCUSDT";
-  const upstreamUrl = `${BACKEND_URL}/api/stream/ticker?symbol=${encodeURIComponent(symbol)}`;
-
-  try {
-    const upstreamRes = await fetch(upstreamUrl, {
-      headers: {
-        Accept: "text/event-stream",
-        "Cache-Control": "no-cache",
-      },
-      signal: AbortSignal.timeout(2500),
-      cache: "no-store",
-    });
-
-    if (upstreamRes.ok && upstreamRes.body) {
-      return new Response(upstreamRes.body, {
-        status: 200,
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-          "X-Accel-Buffering": "no",
-        },
-      });
-    }
-  } catch (err: any) {
-    // Upstream timed out/error; fall through
+  const backendUrl = getBackendBaseUrl();
+  if (isProduction() && !backendUrl) {
+    return NextResponse.json(
+      { error: "Backend service URL is not configured in production environment." },
+      { status: 503 }
+    );
   }
 
+  const { searchParams } = new URL(req.url);
+  const symbol = searchParams.get("symbol") || "BTCUSDT";
+
+  if (backendUrl) {
+    const upstreamUrl = `${backendUrl}/api/stream/ticker?symbol=${encodeURIComponent(symbol)}`;
+    try {
+      const upstreamRes = await fetch(upstreamUrl, {
+        headers: {
+          ...getForwardHeaders(req),
+          Accept: "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+        signal: AbortSignal.timeout(3000),
+        cache: "no-store",
+      });
+
+      if (upstreamRes.ok && upstreamRes.body) {
+        return new Response(upstreamRes.body, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
+      }
+    } catch (err: any) {
+      // Upstream timed out/error; fall through
+    }
+  }
+
+  // Truthful fallback stream: report offline status with no fabricated prices
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     start(ctrl) {
@@ -45,11 +54,12 @@ export async function GET(req: NextRequest) {
         encoder.encode(
           `data: ${JSON.stringify({
             symbol: symbol,
-            price: 83723.5,
-            change_24h: 1.84,
-            high_24h: 84650.0,
-            low_24h: 82110.0,
-            volume_24h: 28410.5,
+            price: null,
+            change_24h: 0,
+            high_24h: null,
+            low_24h: null,
+            volume_24h: 0,
+            status: "OFFLINE",
             timestamp: new Date().toISOString(),
           })}\n\n`
         )

@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const BACKEND_INTERNAL_URL =
-  process.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_API_URL ||
-  "http://127.0.0.1:5050";
 
 /**
  * POST /api/fyers/disconnect
@@ -14,14 +11,22 @@ const BACKEND_INTERNAL_URL =
  */
 export async function POST(req: NextRequest) {
   try {
-    try {
-      await fetch(`${BACKEND_INTERNAL_URL}/api/fyers/disconnect`, {
-        method: "POST",
-        cache: "no-store",
-        signal: AbortSignal.timeout(3000),
-      });
-    } catch {
-      // Backend offline
+    const backendUrl = getBackendBaseUrl();
+    if (backendUrl) {
+      try {
+        const res = await fetch(`${backendUrl}/api/fyers/disconnect`, {
+          method: "POST",
+          headers: getForwardHeaders(req),
+          cache: "no-store",
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.status === 401 || res.status === 403) {
+          const data = await res.json().catch(() => null);
+          return NextResponse.json(data || { success: false, message: "Unauthorized" }, { status: res.status });
+        }
+      } catch {
+        // Backend offline
+      }
     }
 
     process.env.FYERS_APP_ID = "";

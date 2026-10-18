@@ -1,38 +1,35 @@
 import { NextResponse } from "next/server";
+import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const BACKEND_URL = process.env.BACKEND_INTERNAL_URL || process.env.BACKEND_API_URL || "http://127.0.0.1:5050";
-
 export async function GET(req: Request) {
   const startTime = performance.now();
   const requestId = req.headers.get("x-request-id") || `health_${Date.now().toString(36)}`;
+  const BACKEND_URL = getBackendBaseUrl();
 
-  // Probe Flask backend on port 5050 or 5000
-  try {
-    const liveRes = await fetch(`${BACKEND_URL}/api/health/live`, {
-      cache: "no-store",
-      signal: AbortSignal.timeout(3000),
-      headers: { Accept: "application/json", "X-Request-Id": requestId },
+  if (!BACKEND_URL && isProduction()) {
+    return NextResponse.json({
+      status: "unavailable",
+      error: {
+        code: "BACKEND_NOT_CONFIGURED",
+        message: "Backend internal URL is not configured in production environment.",
+      },
+      frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+      proxy_latency_ms: Math.round(performance.now() - startTime),
+    }, {
+      status: 503,
+      headers: { "X-Request-Id": requestId, "Cache-Control": "no-store, max-age=0" },
     });
-    if (liveRes.ok) {
-      const liveData = await liveRes.json().catch(() => ({ status: "ok" }));
-      return NextResponse.json({
-        status: liveData.status || "ok",
-        service: liveData.service || "alpha-algo-backend",
-        frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
-        proxy_latency_ms: Math.round(performance.now() - startTime),
-      }, {
-        status: 200,
-        headers: { "X-Request-Id": requestId, "Cache-Control": "no-store, max-age=0" },
-      });
-    }
-  } catch {
-    // Fallback probe to alternate /api/health/live or port 5000 if 5050 had an issue
+  }
+
+  const effectiveBackendUrl = BACKEND_URL || (isProduction() ? "" : "http://127.0.0.1:5050");
+
+  if (effectiveBackendUrl) {
+    // Probe Flask backend
     try {
-      const fallbackUrl = BACKEND_URL.includes("5050") ? "http://127.0.0.1:5000" : "http://127.0.0.1:5050";
-      const liveRes = await fetch(`${fallbackUrl}/api/health/live`, {
+      const liveRes = await fetch(`${effectiveBackendUrl}/api/health/live`, {
         cache: "no-store",
         signal: AbortSignal.timeout(3000),
         headers: { Accept: "application/json", "X-Request-Id": requestId },
@@ -50,7 +47,31 @@ export async function GET(req: Request) {
         });
       }
     } catch {
-      // Backend genuinely unreachable
+      // In local development only, try alternative port 5000
+      if (!isProduction()) {
+        try {
+          const fallbackUrl = effectiveBackendUrl.includes("5050") ? "http://127.0.0.1:5000" : "http://127.0.0.1:5050";
+          const liveRes = await fetch(`${fallbackUrl}/api/health/live`, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(3000),
+            headers: { Accept: "application/json", "X-Request-Id": requestId },
+          });
+          if (liveRes.ok) {
+            const liveData = await liveRes.json().catch(() => ({ status: "ok" }));
+            return NextResponse.json({
+              status: liveData.status || "ok",
+              service: liveData.service || "alpha-algo-backend",
+              frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
+              proxy_latency_ms: Math.round(performance.now() - startTime),
+            }, {
+              status: 200,
+              headers: { "X-Request-Id": requestId, "Cache-Control": "no-store, max-age=0" },
+            });
+          }
+        } catch {
+          // Backend genuinely unreachable
+        }
+      }
     }
   }
 
@@ -58,8 +79,9 @@ export async function GET(req: Request) {
     status: "unavailable",
     error: {
       code: "BACKEND_UNREACHABLE",
-      message: `Quantitative backend unreachable at ${BACKEND_URL}`,
+      message: `Quantitative backend unreachable at ${effectiveBackendUrl || "unconfigured backend"}`,
     },
+    frontend: { status: "ALIVE", uptime_seconds: process.uptime(), timestamp: new Date().toISOString() },
     proxy_latency_ms: Math.round(performance.now() - startTime),
   }, {
     status: 503,

@@ -173,6 +173,8 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // ───────────────────────────────────────────────────────────────────────────
 
   const wsRef = useRef<WebSocket | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const streamIdRef = useRef<string>("");
   const mountedRef = useRef(true);
   const reconnectAttemptRef = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -180,6 +182,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const fallbackPollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastHeartbeatRef = useRef<number>(Date.now());
   const heartbeatWatchdogRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingSubscriptionFlushRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const subRefsRef = useRef<Map<string, SubRef>>(new Map());
   const quotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const symbolListenersRef = useRef<Map<string, Set<(quote: NormalizedQuote) => void>>>(new Map());
@@ -214,7 +217,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       return process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws";
     }
 
-    // In production on Vercel: NEVER connect to window.location.hostname:5051 or 127.0.0.1:5051
+    // In production on Vercel: NEVER connect directly to 127.0.0.1:5051
     if (process.env.NODE_ENV === "production") {
       return "";
     }
@@ -228,7 +231,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Safe WebSocket Teardown
+  // Safe Teardown Helpers
   // ───────────────────────────────────────────────────────────────────────────
 
   const safeCloseSocket = useCallback(
@@ -260,9 +263,242 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     []
   );
 
+  const safeCloseEventSource = useCallback((es: EventSource | null) => {
+    if (!es) return;
+    es.onopen = null;
+    es.onmessage = null;
+    es.onerror = null;
+    try {
+      es.close();
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Transport Selection: SSE vs Direct WS
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const shouldUseSSE = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    // In production on Vercel, browser WebSocket cannot send X-Gateway-Secret header; must use SSE proxy
+    if (process.env.NODE_ENV === "production") return true;
+    if (process.env.NEXT_PUBLIC_USE_SSE === "true") return true;
+
+    // In local development, check if direct WS URL is a local loopback
+    const wsUrl = getGatewayWsUrl();
+    if (!wsUrl) return true;
+    try {
+      const parsed = new URL(wsUrl);
+      const isLoopback =
+        parsed.hostname === "127.0.0.1" ||
+        parsed.hostname === "localhost" ||
+        parsed.hostname === "::1";
+      if (!isLoopback) return true;
+    } catch {
+      return true;
+    }
+    return false;
+  }, [getGatewayWsUrl]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Unified Message Processing (Handles Quotes, Snapshots, Health, Status)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const processIncomingMessage = useCallback((msg: any) => {
+    if (!msg || typeof msg !== "object") return;
+    lastHeartbeatRef.current = Date.now();
+
+    if (msg.type === "QUOTE" && msg.data) {
+      const quote = msg.data as NormalizedQuote;
+      const sym = (quote.symbol || "").toUpperCase();
+      const provider = (quote.provider || "UNKNOWN").toUpperCase();
+      const exchange = (quote.exchange || "").toUpperCase();
+
+      const incomingTs = new Date(quote.event_timestamp || quote.received_timestamp).getTime();
+      const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
+      if (existing) {
+        const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
+        if (existingTs > 0 && incomingTs < existingTs) return;
+      }
+
+      const aliases = getQuoteAliases(sym, exchange, provider);
+      aliases.forEach((alias) => {
+        quotesRef.current.set(alias, quote);
+        pendingQuotesRef.current.set(alias, quote);
+      });
+
+      useMarketFeedStore.getState().ingestTick({
+        symbol: sym,
+        exchange: quote.exchange,
+        provider: quote.provider,
+        lastPrice: quote.last_price,
+        bid: quote.bid,
+        ask: quote.ask,
+        volume: quote.volume,
+        open: quote.open,
+        high: quote.high,
+        low: quote.low,
+        close: quote.close,
+        changePercent: quote.change_pct ?? 0,
+        eventTimestamp: quote.event_timestamp,
+        feedLatencyMs: quote.feed_latency_ms,
+        dataMode: quote.data_mode,
+        isStale: quote.is_stale,
+        ageMs: (quote.age_seconds || 0) * 1000,
+      });
+
+      aliases.forEach((alias) => {
+        const listeners = symbolListenersRef.current.get(alias);
+        if (listeners && listeners.size > 0) {
+          listeners.forEach((fn) => {
+            try {
+              fn(quote);
+            } catch {
+              // ignore
+            }
+          });
+        }
+      });
+    } else if (msg.type === "SNAPSHOT" && msg.data) {
+      const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
+      snapshotEntries.forEach(([rawSym, q]) => {
+        const sym = rawSym.toUpperCase();
+        const provider = (q.provider || "UNKNOWN").toUpperCase();
+        const provKey = `${provider}:${sym}`;
+
+        quotesRef.current.set(provKey, q);
+        quotesRef.current.set(sym, q);
+        pendingQuotesRef.current.set(provKey, q);
+        pendingQuotesRef.current.set(sym, q);
+
+        useMarketFeedStore.getState().ingestTick({
+          symbol: sym,
+          exchange: q.exchange,
+          provider: q.provider,
+          lastPrice: q.last_price,
+          bid: q.bid,
+          ask: q.ask,
+          volume: q.volume,
+          open: q.open,
+          high: q.high,
+          low: q.low,
+          close: q.close,
+          changePercent: q.change_pct ?? 0,
+          eventTimestamp: q.event_timestamp,
+          feedLatencyMs: q.feed_latency_ms,
+          dataMode: q.data_mode,
+          isStale: q.is_stale,
+          ageMs: (q.age_seconds || 0) * 1000,
+        });
+
+        const listeners = symbolListenersRef.current.get(sym);
+        if (listeners && listeners.size > 0) {
+          listeners.forEach((fn) => {
+            try {
+              fn(q);
+            } catch {
+              // ignore
+            }
+          });
+        }
+      });
+    } else if ((msg.type === "FUTURES_TICK" || msg.type === "TICK") && msg.data) {
+      const rawTick = msg.data;
+      const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
+      const provider = (rawTick.provider || "UNKNOWN").toUpperCase();
+      const exchange = (rawTick.exchange || provider).toUpperCase();
+      const lastPrice = rawTick.last_price ?? rawTick.lastPrice ?? rawTick.price ?? null;
+
+      if (sym && lastPrice !== null) {
+        const quote: NormalizedQuote = {
+          symbol: sym,
+          exchange: exchange,
+          provider: provider,
+          last_price: Number(lastPrice),
+          bid: Number(rawTick.bid ?? lastPrice),
+          ask: Number(rawTick.ask ?? lastPrice),
+          volume: Number(rawTick.volume ?? rawTick.volume_24h ?? 0),
+          high: rawTick.high ? Number(rawTick.high) : null,
+          low: rawTick.low ? Number(rawTick.low) : null,
+          open: rawTick.open ? Number(rawTick.open) : null,
+          close: rawTick.close ? Number(rawTick.close) : null,
+          change_pct: rawTick.change_pct ?? rawTick.changePercent ?? rawTick.change_24h_pct ?? null,
+          vwap: rawTick.vwap ?? null,
+          event_timestamp: rawTick.timestamp || rawTick.event_timestamp || new Date().toISOString(),
+          received_timestamp: new Date().toISOString(),
+          feed_latency_ms: rawTick.latency_ms ?? 0,
+          data_mode: "REAL_TIME",
+          is_stale: false,
+          age_seconds: 0,
+        };
+
+        const existingKey = `${provider}:${sym}`;
+        quotesRef.current.set(existingKey, quote);
+        quotesRef.current.set(sym, quote);
+        pendingQuotesRef.current.set(existingKey, quote);
+        pendingQuotesRef.current.set(sym, quote);
+
+        useMarketFeedStore.getState().ingestTick({
+          symbol: sym,
+          exchange: exchange,
+          provider: provider,
+          lastPrice: quote.last_price,
+          bid: quote.bid,
+          ask: quote.ask,
+          volume: quote.volume,
+          open: quote.open,
+          high: quote.high,
+          low: quote.low,
+          close: quote.close,
+          changePercent: quote.change_pct ?? 0,
+          eventTimestamp: quote.event_timestamp,
+          feedLatencyMs: quote.feed_latency_ms,
+          dataMode: quote.data_mode,
+          isStale: false,
+          ageMs: 0,
+          rawPayload: rawTick,
+        });
+      }
+    } else if (msg.type === "PROVIDER_HEALTH" && msg.data) {
+      const h = msg.data;
+      const pName = (h.provider || "").toUpperCase();
+      if (pName) {
+        useMarketFeedStore.getState().updateProviderStat(pName, {
+          status: h.connected ? "CONNECTED" : "OFFLINE",
+          latencyMs: h.latency_ms ?? 0,
+          lastMessageAt: h.last_message_ms ? new Date(h.last_message_ms).toISOString() : new Date().toISOString(),
+          lastTickAgeMs: h.last_message_ms ? Math.max(0, Date.now() - h.last_message_ms) : 0,
+          errorCount: h.error ? 1 : 0,
+        });
+      }
+    } else if (msg.type === "STATUS" && msg.data) {
+      const s = msg.data.status;
+      if (s === "GATEWAY_CONNECTED" || s === "CONNECTED") {
+        setConnectionStatus("CONNECTED");
+        useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
+      } else if (s === "CONNECTING_TO_GATEWAY" || s === "CONNECTING") {
+        setConnectionStatus("CONNECTING");
+        useMarketFeedStore.getState().setConnectionStatus("CONNECTING");
+      } else if (
+        s === "GATEWAY_DISCONNECTED" ||
+        s === "GATEWAY_ERROR" ||
+        s === "GATEWAY_UNREACHABLE"
+      ) {
+        setConnectionStatus("RECONNECTING");
+        useMarketFeedStore.getState().setConnectionStatus("RECONNECTING");
+      }
+    } else if (msg.type === "GATEWAY_READY" || msg.type === "READY" || msg.type === "HEARTBEAT") {
+      setConnectionStatus("CONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
+    }
+  }, []);
+
   // ───────────────────────────────────────────────────────────────────────────
   // Reconnect Scheduler
   // ───────────────────────────────────────────────────────────────────────────
+
+  const connectRef = useRef<() => void>(() => {});
 
   const scheduleReconnect = useCallback(() => {
     if (!mountedRef.current) return;
@@ -287,17 +523,98 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (mountedRef.current) {
         if (typeof window !== "undefined" && window.requestAnimationFrame) {
           window.requestAnimationFrame(() => {
-            if (mountedRef.current) connectWS();
+            if (mountedRef.current) connectRef.current();
           });
         } else {
-          connectWS();
+          connectRef.current();
         }
       }
     }, delay);
   }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // WebSocket Connection
+  // Server-Sent Events (SSE) Connection
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const connectSSE = useCallback(() => {
+    if (!mountedRef.current) return;
+
+    if (eventSourceRef.current) {
+      if (
+        eventSourceRef.current.readyState === EventSource.OPEN ||
+        eventSourceRef.current.readyState === EventSource.CONNECTING
+      ) {
+        return;
+      }
+    }
+
+    const nextStatus = reconnectAttemptRef.current > 0 ? "RECONNECTING" : "CONNECTING";
+    setConnectionStatus(nextStatus);
+    useMarketFeedStore.getState().setConnectionStatus(nextStatus);
+
+    if (!streamIdRef.current) {
+      streamIdRef.current = `sse_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
+    }
+
+    const allSubs: string[] = [];
+    subRefsRef.current.forEach((ref, sym) => {
+      const hasActive = Array.from(ref.reasons.values()).some((c) => c > 0);
+      if (hasActive) allSubs.push(sym);
+    });
+
+    const symbolsParam = allSubs.length > 0 ? allSubs.join(",") : "*";
+    const sseUrl = `/api/market-data/stream?streamId=${encodeURIComponent(streamIdRef.current)}&symbols=${encodeURIComponent(symbolsParam)}`;
+
+    let es: EventSource;
+    try {
+      es = new EventSource(sseUrl, { withCredentials: true });
+      eventSourceRef.current = es;
+    } catch {
+      scheduleReconnect();
+      return;
+    }
+
+    const connectTimeout = setTimeout(() => {
+      if (es.readyState !== EventSource.CONNECTING) return;
+      if (eventSourceRef.current === es) eventSourceRef.current = null;
+      safeCloseEventSource(es);
+      scheduleReconnect();
+    }, 10000);
+
+    connectTimeoutRef.current = connectTimeout;
+
+    es.onopen = () => {
+      clearTimeout(connectTimeout);
+      if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
+      if (!mountedRef.current || eventSourceRef.current !== es) return;
+
+      reconnectAttemptRef.current = 0;
+      lastHeartbeatRef.current = Date.now();
+      setConnectionStatus("CONNECTED");
+      useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
+    };
+
+    es.onmessage = (event) => {
+      if (!mountedRef.current || eventSourceRef.current !== es) return;
+      try {
+        const msg = JSON.parse(event.data);
+        processIncomingMessage(msg);
+      } catch {}
+    };
+
+    es.onerror = () => {
+      clearTimeout(connectTimeout);
+      if (connectTimeoutRef.current === connectTimeout) connectTimeoutRef.current = null;
+      if (!mountedRef.current || eventSourceRef.current !== es) return;
+
+      if (eventSourceRef.current === es) eventSourceRef.current = null;
+      safeCloseEventSource(es);
+      scheduleReconnect();
+    };
+  }, [processIncomingMessage, safeCloseEventSource, scheduleReconnect]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // WebSocket Connection (Local Development)
   // ───────────────────────────────────────────────────────────────────────────
 
   const connectWS = useCallback(() => {
@@ -318,8 +635,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
     const wsUrl = getGatewayWsUrl();
     if (!wsUrl) {
-      setConnectionStatus("DISCONNECTED");
-      useMarketFeedStore.getState().setConnectionStatus("DISCONNECTED");
+      connectSSE();
       return;
     }
 
@@ -384,182 +700,10 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (!mountedRef.current || wsRef.current !== ws || (ws as ManagedWebSocket)._suppressReconnect) {
         return;
       }
-
-      lastHeartbeatRef.current = Date.now();
-
       try {
         const msg = JSON.parse(event.data);
-
-        if (msg.type === "QUOTE" && msg.data) {
-          const quote = msg.data as NormalizedQuote;
-          const sym = quote.symbol.toUpperCase();
-          const provider = (quote.provider || "UNKNOWN").toUpperCase();
-          const exchange = (quote.exchange || "").toUpperCase();
-
-          const incomingTs = new Date(quote.event_timestamp || quote.received_timestamp).getTime();
-          const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
-          if (existing) {
-            const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
-            if (existingTs > 0 && incomingTs < existingTs) return;
-          }
-
-          const aliases = getQuoteAliases(sym, exchange, provider);
-          aliases.forEach((alias) => {
-            quotesRef.current.set(alias, quote);
-            pendingQuotesRef.current.set(alias, quote);
-          });
-
-          useMarketFeedStore.getState().ingestTick({
-            symbol: sym,
-            exchange: quote.exchange,
-            provider: quote.provider,
-            lastPrice: quote.last_price,
-            bid: quote.bid,
-            ask: quote.ask,
-            volume: quote.volume,
-            open: quote.open,
-            high: quote.high,
-            low: quote.low,
-            close: quote.close,
-            changePercent: quote.change_pct ?? 0,
-            eventTimestamp: quote.event_timestamp,
-            feedLatencyMs: quote.feed_latency_ms,
-            dataMode: quote.data_mode,
-            isStale: quote.is_stale,
-            ageMs: (quote.age_seconds || 0) * 1000,
-          });
-
-          aliases.forEach((alias) => {
-            const listeners = symbolListenersRef.current.get(alias);
-            if (listeners && listeners.size > 0) {
-              listeners.forEach((fn) => {
-                try {
-                  fn(quote);
-                } catch {
-                  // ignore
-                }
-              });
-            }
-          });
-        } else if (msg.type === "SNAPSHOT" && msg.data) {
-          const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
-          snapshotEntries.forEach(([rawSym, q]) => {
-            const sym = rawSym.toUpperCase();
-            const provider = (q.provider || "UNKNOWN").toUpperCase();
-            const provKey = `${provider}:${sym}`;
-
-            quotesRef.current.set(provKey, q);
-            quotesRef.current.set(sym, q);
-            pendingQuotesRef.current.set(provKey, q);
-            pendingQuotesRef.current.set(sym, q);
-
-            useMarketFeedStore.getState().ingestTick({
-              symbol: sym,
-              exchange: q.exchange,
-              provider: q.provider,
-              lastPrice: q.last_price,
-              bid: q.bid,
-              ask: q.ask,
-              volume: q.volume,
-              open: q.open,
-              high: q.high,
-              low: q.low,
-              close: q.close,
-              changePercent: q.change_pct ?? 0,
-              eventTimestamp: q.event_timestamp,
-              feedLatencyMs: q.feed_latency_ms,
-              dataMode: q.data_mode,
-              isStale: q.is_stale,
-              ageMs: (q.age_seconds || 0) * 1000,
-            });
-
-            const listeners = symbolListenersRef.current.get(sym);
-            if (listeners && listeners.size > 0) {
-              listeners.forEach((fn) => {
-                try {
-                  fn(q);
-                } catch {
-                  // ignore
-                }
-              });
-            }
-          });
-        } else if ((msg.type === "FUTURES_TICK" || msg.type === "TICK") && msg.data) {
-          const rawTick = msg.data;
-          const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
-          const provider = (rawTick.provider || "UNKNOWN").toUpperCase();
-          const exchange = (rawTick.exchange || provider).toUpperCase();
-          const lastPrice = rawTick.last_price ?? rawTick.lastPrice ?? rawTick.price ?? null;
-
-          if (sym && lastPrice !== null) {
-            const quote: NormalizedQuote = {
-              symbol: sym,
-              exchange: exchange,
-              provider: provider,
-              last_price: Number(lastPrice),
-              bid: Number(rawTick.bid ?? lastPrice),
-              ask: Number(rawTick.ask ?? lastPrice),
-              volume: Number(rawTick.volume ?? rawTick.volume_24h ?? 0),
-              high: rawTick.high ? Number(rawTick.high) : null,
-              low: rawTick.low ? Number(rawTick.low) : null,
-              open: rawTick.open ? Number(rawTick.open) : null,
-              close: rawTick.close ? Number(rawTick.close) : null,
-              change_pct: rawTick.change_pct ?? rawTick.changePercent ?? rawTick.change_24h_pct ?? null,
-              vwap: rawTick.vwap ?? null,
-              event_timestamp: rawTick.timestamp || rawTick.event_timestamp || new Date().toISOString(),
-              received_timestamp: new Date().toISOString(),
-              feed_latency_ms: rawTick.latency_ms ?? 0,
-              data_mode: "REAL_TIME",
-              is_stale: false,
-              age_seconds: 0,
-            };
-
-            const existingKey = `${provider}:${sym}`;
-            quotesRef.current.set(existingKey, quote);
-            quotesRef.current.set(sym, quote);
-            pendingQuotesRef.current.set(existingKey, quote);
-            pendingQuotesRef.current.set(sym, quote);
-
-            useMarketFeedStore.getState().ingestTick({
-              symbol: sym,
-              exchange: exchange,
-              provider: provider,
-              lastPrice: quote.last_price,
-              bid: quote.bid,
-              ask: quote.ask,
-              volume: quote.volume,
-              open: quote.open,
-              high: quote.high,
-              low: quote.low,
-              close: quote.close,
-              changePercent: quote.change_pct ?? 0,
-              eventTimestamp: quote.event_timestamp,
-              feedLatencyMs: quote.feed_latency_ms,
-              dataMode: quote.data_mode,
-              isStale: false,
-              ageMs: 0,
-              rawPayload: rawTick,
-            });
-          }
-        } else if (msg.type === "PROVIDER_HEALTH" && msg.data) {
-          const h = msg.data;
-          const pName = (h.provider || "").toUpperCase();
-          if (pName) {
-            useMarketFeedStore.getState().updateProviderStat(pName, {
-              status: h.connected ? "CONNECTED" : "OFFLINE",
-              latencyMs: h.latency_ms ?? 0,
-              lastMessageAt: h.last_message_ms ? new Date(h.last_message_ms).toISOString() : new Date().toISOString(),
-              lastTickAgeMs: h.last_message_ms ? Math.max(0, Date.now() - h.last_message_ms) : 0,
-              errorCount: h.error ? 1 : 0,
-            });
-          }
-        } else if (msg.type === "GATEWAY_READY" || msg.type === "READY" || msg.type === "HEARTBEAT") {
-          setConnectionStatus("CONNECTED");
-          useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
-        }
-      } catch {
-        // ignore frame parse errors
-      }
+        processIncomingMessage(msg);
+      } catch {}
     };
 
     ws.onerror = () => {
@@ -584,7 +728,96 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       wsRef.current = null;
       scheduleReconnect();
     };
-  }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect]);
+  }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect, connectSSE, processIncomingMessage]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Primary Dispatcher
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const connect = useCallback(() => {
+    if (shouldUseSSE()) {
+      connectSSE();
+    } else {
+      connectWS();
+    }
+  }, [shouldUseSSE, connectSSE, connectWS]);
+
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Subscription Batching & Dynamic Syncing
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const flushSubscriptionUpdates = useCallback(async () => {
+    if (!mountedRef.current) return;
+
+    const allSubs: string[] = [];
+    subRefsRef.current.forEach((ref, sym) => {
+      const hasActive = Array.from(ref.reasons.values()).some((c) => c > 0);
+      if (hasActive) allSubs.push(sym);
+    });
+
+    // If using direct WebSocket, send subscription command
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (allSubs.length > 0) {
+        try {
+          wsRef.current.send(
+            JSON.stringify({
+              action: "subscribe",
+              symbols: allSubs,
+              reason: "SUBSCRIPTION_SYNC",
+            })
+          );
+        } catch {}
+      }
+      return;
+    }
+
+    // If using SSE, sync via POST or debounced reconnect
+    if (eventSourceRef.current && streamIdRef.current) {
+      const symbolsToSend = allSubs.length > 0 ? allSubs : ["*"];
+      try {
+        const res = await fetch("/api/market-data/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            streamId: streamIdRef.current,
+            action: "set",
+            symbols: symbolsToSend,
+            reason: "SUBSCRIPTION_SYNC",
+          }),
+          credentials: "include",
+        });
+
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.handled) {
+            return;
+          }
+        }
+      } catch {
+        // Fall back to reconnect below
+      }
+
+      if (mountedRef.current && eventSourceRef.current) {
+        safeCloseEventSource(eventSourceRef.current);
+        eventSourceRef.current = null;
+        connectSSE();
+      }
+    }
+  }, [safeCloseEventSource, connectSSE]);
+
+  const scheduleSubscriptionFlush = useCallback(() => {
+    if (pendingSubscriptionFlushRef.current) {
+      clearTimeout(pendingSubscriptionFlushRef.current);
+    }
+    pendingSubscriptionFlushRef.current = setTimeout(() => {
+      pendingSubscriptionFlushRef.current = null;
+      flushSubscriptionUpdates();
+    }, 150);
+  }, [flushSubscriptionUpdates]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Initial Connection Lifecycle
@@ -592,11 +825,15 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
   useEffect(() => {
     mountedRef.current = true;
-    connectWS();
+    connect();
 
     return () => {
       mountedRef.current = false;
 
+      if (pendingSubscriptionFlushRef.current) {
+        clearTimeout(pendingSubscriptionFlushRef.current);
+        pendingSubscriptionFlushRef.current = null;
+      }
       if (batchFrameRef.current !== null) {
         cancelAnimationFrame(batchFrameRef.current);
         batchFrameRef.current = null;
@@ -621,8 +858,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       const ws = wsRef.current as ManagedWebSocket | null;
       wsRef.current = null;
       if (ws) safeCloseSocket(ws, 1000, "Component unmounted");
+
+      const es = eventSourceRef.current;
+      eventSourceRef.current = null;
+      if (es) safeCloseEventSource(es);
     };
-  }, [connectWS, safeCloseSocket]);
+  }, [connect, safeCloseSocket, safeCloseEventSource]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Heartbeat Watchdog
@@ -643,6 +884,13 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         if (wsRef.current === staleWs) wsRef.current = null;
         safeCloseSocket(staleWs, 4001, "Heartbeat stale");
       }
+
+      if (eventSourceRef.current) {
+        const staleEs = eventSourceRef.current;
+        eventSourceRef.current = null;
+        safeCloseEventSource(staleEs);
+      }
+
       scheduleReconnect();
     }, 5000);
 
@@ -652,16 +900,58 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         heartbeatWatchdogRef.current = null;
       }
     };
-  }, [connectionStatus, safeCloseSocket, scheduleReconnect]);
+  }, [connectionStatus, safeCloseSocket, safeCloseEventSource, scheduleReconnect]);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // HTTP Fallback Polling (When Disconnected / Reconnecting)
+  // Tab Focus / Visibility Change Handler
+  // ───────────────────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (typeof document === "undefined" || !mountedRef.current) return;
+      if (document.visibilityState === "visible") {
+        const isWsActive = wsRef.current?.readyState === WebSocket.OPEN;
+        const isSseActive = eventSourceRef.current?.readyState === EventSource.OPEN;
+        const age = Date.now() - lastHeartbeatRef.current;
+
+        if (!isWsActive && !isSseActive) {
+          connect();
+        } else if (age > HEARTBEAT_STALE_MS) {
+          if (eventSourceRef.current) {
+            const staleEs = eventSourceRef.current;
+            eventSourceRef.current = null;
+            safeCloseEventSource(staleEs);
+          }
+          if (wsRef.current) {
+            const staleWs = wsRef.current;
+            wsRef.current = null;
+            safeCloseSocket(staleWs, 4001, "Tab focused with stale connection");
+          }
+          connect();
+        }
+      }
+    };
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
+    return () => {
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
+    };
+  }, [connect, safeCloseSocket, safeCloseEventSource]);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // HTTP Fallback Polling (Only When Disconnected / Reconnecting)
   // ───────────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const pollFallbackSnapshots = async () => {
       if (!mountedRef.current) return;
-      if (wsRef.current?.readyState === WebSocket.OPEN) return;
+      const isWsOpen = wsRef.current?.readyState === WebSocket.OPEN;
+      const isSseOpen = eventSourceRef.current?.readyState === EventSource.OPEN;
+      if (isWsOpen || isSseOpen) return;
 
       const activeSymbols: string[] = [];
       subRefsRef.current.forEach((ref, sym) => {
@@ -799,65 +1089,71 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   // Subscribe & Unsubscribe Actions
   // ───────────────────────────────────────────────────────────────────────────
 
-  const subscribe = useCallback((symbol: string, reason: SubscriptionReason) => {
-    if (!symbol) return;
-    const sym = symbol.toUpperCase().trim();
-    let ref = subRefsRef.current.get(sym);
+  const subscribe = useCallback(
+    (symbol: string, reason: SubscriptionReason) => {
+      if (!symbol) return;
+      const sym = symbol.toUpperCase().trim();
+      let ref = subRefsRef.current.get(sym);
 
-    if (!ref) {
-      ref = { reasons: new Map() };
-      subRefsRef.current.set(sym, ref);
-    }
-
-    const currentCount = ref.reasons.get(reason) ?? 0;
-    ref.reasons.set(reason, currentCount + 1);
-
-    if (currentCount === 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-      try {
-        wsRef.current.send(
-          JSON.stringify({
-            action: "subscribe",
-            symbols: [sym],
-            reason,
-          })
-        );
-      } catch {
-        // ignore
+      if (!ref) {
+        ref = { reasons: new Map() };
+        subRefsRef.current.set(sym, ref);
       }
-    }
-  }, []);
 
-  const unsubscribe = useCallback((symbol: string, reason: SubscriptionReason) => {
-    if (!symbol) return;
-    const sym = symbol.toUpperCase().trim();
-    const ref = subRefsRef.current.get(sym);
-    if (!ref) return;
+      const currentCount = ref.reasons.get(reason) ?? 0;
+      ref.reasons.set(reason, currentCount + 1);
 
-    const currentCount = ref.reasons.get(reason) ?? 0;
-    if (currentCount <= 1) {
-      ref.reasons.delete(reason);
-    } else {
-      ref.reasons.set(reason, currentCount - 1);
-    }
-
-    const anyRemaining = Array.from(ref.reasons.values()).some((count) => count > 0);
-    if (!anyRemaining) {
-      subRefsRef.current.delete(sym);
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
-        try {
-          wsRef.current.send(
-            JSON.stringify({
-              action: "unsubscribe",
-              symbols: [sym],
-              reason,
-            })
-          );
-        } catch {
-          // ignore
+      if (currentCount === 0) {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          try {
+            wsRef.current.send(
+              JSON.stringify({
+                action: "subscribe",
+                symbols: [sym],
+                reason,
+              })
+            );
+          } catch {}
         }
+        scheduleSubscriptionFlush();
       }
-    }
-  }, []);
+    },
+    [scheduleSubscriptionFlush]
+  );
+
+  const unsubscribe = useCallback(
+    (symbol: string, reason: SubscriptionReason) => {
+      if (!symbol) return;
+      const sym = symbol.toUpperCase().trim();
+      const ref = subRefsRef.current.get(sym);
+      if (!ref) return;
+
+      const currentCount = ref.reasons.get(reason) ?? 0;
+      if (currentCount <= 1) {
+        ref.reasons.delete(reason);
+      } else {
+        ref.reasons.set(reason, currentCount - 1);
+      }
+
+      const anyRemaining = Array.from(ref.reasons.values()).some((count) => count > 0);
+      if (!anyRemaining) {
+        subRefsRef.current.delete(sym);
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          try {
+            wsRef.current.send(
+              JSON.stringify({
+                action: "unsubscribe",
+                symbols: [sym],
+                reason,
+              })
+            );
+          } catch {}
+        }
+        scheduleSubscriptionFlush();
+      }
+    },
+    [scheduleSubscriptionFlush]
+  );
 
   // ───────────────────────────────────────────────────────────────────────────
   // Quote Getter

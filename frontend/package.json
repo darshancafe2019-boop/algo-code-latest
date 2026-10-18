@@ -17,6 +17,7 @@
     "clean": "node -e \"const fs=require('fs');try{fs.rmSync('.next',{recursive:true,force:true});fs.rmSync('tsconfig.tsbuildinfo',{force:true});console.log('.next and tsbuildinfo cleaned');}catch(e){}\"",
     "test": "tsc --noEmit && next lint",
     "test:market-data-unit": "tsx tests/test_market_data_unit.ts",
+    "test:stream-auth": "tsx tests/test_stream_auth_and_architecture.ts",
     "test:market-data-integration": "tsx tests/test_market_data_integration.ts",
     "test:options-live": "tsx tests/test_delta_options_live.ts",
     "test:upstox-live": "../.venv/bin/python ../scripts/test_upstox_live.py",

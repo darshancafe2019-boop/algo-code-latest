@@ -1,26 +1,191 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import WebSocket from "ws";
 import {
   getGatewayWsUrl,
   getGatewaySecret,
+  getBackendBaseUrl,
   isProduction,
 } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const MAX_STREAM_SYMBOLS = 100;
+const SYMBOL_PATTERN = /^[A-Z0-9_\-\.\:\/ ]{1,40}$/i;
+
+// In-memory token validation cache to reduce load on backend auth endpoint
+const tokenAuthCache = new Map<string, { authenticated: boolean; expiresAt: number }>();
+const TOKEN_CACHE_TTL_MS = 20_000;
+
+// Registry of active stream connections on this server worker instance for fast dynamic updates
+interface ActiveStreamEntry {
+  ws: WebSocket;
+  subscribedSymbols: Set<string>;
+  providerFilter: string;
+  isCleanedUp: boolean;
+}
+const activeStreams = new Map<string, ActiveStreamEntry>();
+
+/**
+ * Validates and sanitizes a list of symbols against allowable formats and lengths.
+ */
+function sanitizeSymbols(rawList: string[]): string[] {
+  const result: string[] = [];
+  for (const s of rawList) {
+    const trimmed = String(s || "").trim().toUpperCase();
+    if (!trimmed) continue;
+    if (trimmed === "*") {
+      result.push("*");
+      break;
+    }
+    if (SYMBOL_PATTERN.test(trimmed) && !result.includes(trimmed)) {
+      result.push(trimmed);
+    }
+    if (result.length >= MAX_STREAM_SYMBOLS) break;
+  }
+  return result;
+}
+
+/**
+ * Authenticates the incoming request against session cookies, bearer tokens, or query param token.
+ */
+async function authenticateRequest(
+  req: NextRequest
+): Promise<{ authenticated: boolean; error?: string; status?: number }> {
+  const url = new URL(req.url);
+  const token =
+    req.cookies.get("algo_session_token")?.value ||
+    req.cookies.get("session")?.value ||
+    (req.headers.get("authorization")?.startsWith("Bearer ")
+      ? req.headers.get("authorization")!.slice(7).trim()
+      : null) ||
+    url.searchParams.get("token") ||
+    null;
+
+  const authRequired = isProduction() || process.env.AUTH_REQUIRE_LOGIN === "true";
+
+  if (!token) {
+    if (authRequired) {
+      return {
+        authenticated: false,
+        error: "Authentication required to access real-time market data stream.",
+        status: 401,
+      };
+    }
+    // Permitted in local development when authentication is not explicitly forced
+    return { authenticated: true };
+  }
+
+  // Check token cache
+  const cached = tokenAuthCache.get(token);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { authenticated: cached.authenticated };
+  }
+
+  const backendUrl = getBackendBaseUrl();
+  if (!backendUrl) {
+    if (authRequired) {
+      return {
+        authenticated: false,
+        error: "Backend authentication engine is not configured in production.",
+        status: 503,
+      };
+    }
+    return { authenticated: true };
+  }
+
+  try {
+    const authRes = await fetch(`${backendUrl}/api/auth/me`, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${token}`,
+        Cookie: `algo_session_token=${token}`,
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(3500),
+    });
+
+    if (authRes.ok) {
+      const data = await authRes.json().catch(() => ({}));
+      if (data.status === "success" && (data.authenticated !== false && data.user)) {
+        tokenAuthCache.set(token, {
+          authenticated: true,
+          expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+        });
+        return { authenticated: true };
+      }
+    }
+
+    if (authRes.status === 401 || authRes.status === 403) {
+      tokenAuthCache.set(token, {
+        authenticated: false,
+        expiresAt: Date.now() + 5000,
+      });
+      return {
+        authenticated: false,
+        error: "Invalid or expired session credentials.",
+        status: 401,
+      };
+    }
+
+    if (authRequired) {
+      return {
+        authenticated: false,
+        error: "Authentication verification failed.",
+        status: 401,
+      };
+    }
+    return { authenticated: true };
+  } catch (err: any) {
+    if (authRequired) {
+      return {
+        authenticated: false,
+        error: "Authentication service currently unreachable.",
+        status: 503,
+      };
+    }
+    return { authenticated: true };
+  }
+}
+
+/**
+ * GET Handler: Real-time SSE Market Data Stream
+ * Authenticates client, validates symbols, and proxies WebSocket connection to Render Gateway with X-Gateway-Secret.
+ */
 export async function GET(req: NextRequest) {
+  // 1. Enforce authentication and authorization
+  const auth = await authenticateRequest(req);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "UNAUTHORIZED",
+        message: auth.error || "Authentication required.",
+      },
+      { status: auth.status || 401 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
+  const streamId =
+    searchParams.get("streamId") ||
+    `sse_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   const symbolsParam = searchParams.get("symbols") || "";
   const providerFilter = (searchParams.get("provider") || "").toLowerCase().trim();
 
-  const requestedSymbols = symbolsParam
+  // 2. Validate and limit requested symbols
+  const rawSymbols = symbolsParam
     .split(",")
     .map((s) => s.trim().toUpperCase())
     .filter(Boolean);
 
-  const encoder = new TextEncoder();
+  let requestedSymbols = sanitizeSymbols(rawSymbols);
+  if (requestedSymbols.length === 0) {
+    requestedSymbols = ["*"];
+  }
 
+  const encoder = new TextEncoder();
   let ws: WebSocket | null = null;
   let heartbeatTimer: NodeJS.Timeout | null = null;
   let isCleanedUp = false;
@@ -30,16 +195,16 @@ export async function GET(req: NextRequest) {
     if (isCleanedUp) return;
     isCleanedUp = true;
 
-    // 1. Clear heartbeat timer
+    activeStreams.delete(streamId);
+
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
 
-    // 2. Safely unsubscribe and close WebSocket connection
     if (ws) {
       try {
-        if (ws.readyState === WebSocket.OPEN && requestedSymbols.length > 0) {
+        if (ws.readyState === WebSocket.OPEN && requestedSymbols.length > 0 && !requestedSymbols.includes("*")) {
           ws.send(
             JSON.stringify({
               action: "unsubscribe",
@@ -48,28 +213,21 @@ export async function GET(req: NextRequest) {
             })
           );
         }
-      } catch {
-        // ignore send failure during teardown
-      }
+      } catch {}
 
       try {
         ws.removeAllListeners();
         if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
           ws.close();
         }
-      } catch {
-        // ignore close error
-      }
+      } catch {}
       ws = null;
     }
 
-    // 3. Safely close SSE controller
     if (controllerRef) {
       try {
         controllerRef.close();
-      } catch {
-        // controller might already be closed/errored
-      }
+      } catch {}
       controllerRef = null;
     }
   };
@@ -109,12 +267,13 @@ export async function GET(req: NextRequest) {
         return;
       }
 
-      // 1. Send immediate connecting status packet
+      // Notify connecting status
       safeEnqueue(
         `data: ${JSON.stringify({
           type: "STATUS",
           data: {
             status: "CONNECTING_TO_GATEWAY",
+            streamId,
             provider: providerFilter || "ALL",
             subscribedSymbols: requestedSymbols,
             timestamp: new Date().toISOString(),
@@ -122,14 +281,13 @@ export async function GET(req: NextRequest) {
         })}\n\n`
       );
 
-      // 2. Connect dedicated WebSocket to Python Market Data Gateway
+      // Connect authenticated server-side WebSocket to Render Gateway
       try {
         const wsUrl = new URL(wsEndpoint);
-        // Pass secret exclusively via secure header to prevent logging in proxy query parameters
         ws = new WebSocket(wsUrl.toString(), {
           headers: gatewaySecret ? { "X-Gateway-Secret": gatewaySecret } : undefined,
           handshakeTimeout: 5000,
-          perMessageDeflate: false, // Ensure zero native bufferutil/zlib compression issues
+          perMessageDeflate: false,
         });
 
         ws.on("open", () => {
@@ -140,12 +298,22 @@ export async function GET(req: NextRequest) {
             return;
           }
 
+          if (ws) {
+            activeStreams.set(streamId, {
+              ws,
+              subscribedSymbols: new Set(requestedSymbols),
+              providerFilter,
+              isCleanedUp: false,
+            });
+          }
+
           // Notify browser of gateway connection
           safeEnqueue(
             `data: ${JSON.stringify({
               type: "STATUS",
               data: {
                 status: "GATEWAY_CONNECTED",
+                streamId,
                 provider: providerFilter || "ALL",
                 subscribedSymbols: requestedSymbols,
                 timestamp: new Date().toISOString(),
@@ -153,8 +321,8 @@ export async function GET(req: NextRequest) {
             })}\n\n`
           );
 
-          // Subscribe to requested symbols on the gateway
-          if (requestedSymbols.length > 0 && ws && ws.readyState === WebSocket.OPEN) {
+          // Dispatch subscriptions
+          if (ws && ws.readyState === WebSocket.OPEN) {
             try {
               ws.send(
                 JSON.stringify({
@@ -192,23 +360,18 @@ export async function GET(req: NextRequest) {
 
               // Provider filtering
               if (providerFilter && providerFilter !== "all") {
-                if (providerFilter === "dhan" && quoteProvider !== "dhan" && quoteProvider !== "dhan_ws") {
-                  return;
-                }
-                if (providerFilter === "delta" && quoteProvider !== "delta" && quoteProvider !== "delta_options_ws") {
-                  return;
-                }
-                if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") {
-                  return;
-                }
-                if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") {
-                  return;
-                }
+                if (providerFilter === "dhan" && quoteProvider !== "dhan" && quoteProvider !== "dhan_ws") return;
+                if (providerFilter === "delta" && quoteProvider !== "delta" && quoteProvider !== "delta_options_ws") return;
+                if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") return;
+                if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") return;
               }
 
-              // Symbol filtering if specific symbols were requested
-              if (requestedSymbols.length > 0) {
-                const matches = requestedSymbols.some((s) => {
+              // Symbol filtering
+              const activeEntry = activeStreams.get(streamId);
+              const currentSubs = activeEntry ? activeEntry.subscribedSymbols : new Set(requestedSymbols);
+
+              if (!currentSubs.has("*")) {
+                const matches = Array.from(currentSubs).some((s) => {
                   const sClean = s.replace(/[\s/|_:]+/g, "").toUpperCase();
                   const symClean = sym.replace(/[\s/|_:]+/g, "").toUpperCase();
                   return s === sym || sClean === symClean || s === sym.replace("/", "") || s.replace("/", "") === sym;
@@ -227,18 +390,10 @@ export async function GET(req: NextRequest) {
                 const quoteProvider = String(quoteObj.provider || "").toLowerCase();
 
                 if (providerFilter && providerFilter !== "all") {
-                  if (providerFilter === "dhan" && quoteProvider !== "dhan" && quoteProvider !== "dhan_ws") {
-                    continue;
-                  }
-                  if (providerFilter === "delta" && quoteProvider !== "delta" && quoteProvider !== "delta_options_ws") {
-                    continue;
-                  }
-                  if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") {
-                    continue;
-                  }
-                  if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") {
-                    continue;
-                  }
+                  if (providerFilter === "dhan" && quoteProvider !== "dhan" && quoteProvider !== "dhan_ws") continue;
+                  if (providerFilter === "delta" && quoteProvider !== "delta" && quoteProvider !== "delta_options_ws") continue;
+                  if (providerFilter === "binance" && quoteProvider !== "binance" && quoteProvider !== "binance_ws") continue;
+                  if (providerFilter === "upstox" && quoteProvider !== "upstox" && quoteProvider !== "upstox_ws") continue;
                 }
                 filtered[s] = quoteObj;
               }
@@ -246,11 +401,16 @@ export async function GET(req: NextRequest) {
               if (Object.keys(filtered).length > 0) {
                 safeEnqueue(`data: ${JSON.stringify({ type: "SNAPSHOT", data: filtered })}\n\n`);
               }
-            } else if (msg.type === "STATUS") {
+            } else if (
+              msg.type === "STATUS" ||
+              msg.type === "GATEWAY_READY" ||
+              msg.type === "PROVIDER_HEALTH" ||
+              msg.type === "HEARTBEAT"
+            ) {
               safeEnqueue(`data: ${JSON.stringify(msg)}\n\n`);
             }
           } catch {
-            // non-JSON or malformed message safely ignored
+            // Malformed message safely ignored
           }
         });
 
@@ -261,7 +421,7 @@ export async function GET(req: NextRequest) {
               type: "STATUS",
               data: {
                 status: "GATEWAY_ERROR",
-                message: err?.message || "Gateway WebSocket error",
+                message: err?.message || "Gateway WebSocket connection error",
                 timestamp: new Date().toISOString(),
               },
             })}\n\n`
@@ -310,7 +470,7 @@ export async function GET(req: NextRequest) {
         );
       }, 3000);
 
-      // 4. Request Abort Signal Listener
+      // 4. Client Request Abort Listener
       if (req.signal) {
         if (req.signal.aborted) {
           cleanup();
@@ -322,7 +482,6 @@ export async function GET(req: NextRequest) {
       }
     },
     cancel() {
-      // 5. ReadableStream cancellation (e.g. client disconnects, curl aborted)
       cleanup();
     },
   });
@@ -335,4 +494,119 @@ export async function GET(req: NextRequest) {
       "X-Accel-Buffering": "no",
     },
   });
+}
+
+/**
+ * POST Handler: Dynamic Symbol Subscription & Unsubscription
+ * Allows client to update active symbols on an existing stream connection without full reconnect if on same instance.
+ */
+export async function POST(req: NextRequest) {
+  const auth = await authenticateRequest(req);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "UNAUTHORIZED",
+        message: auth.error || "Authentication required.",
+      },
+      { status: auth.status || 401 }
+    );
+  }
+
+  try {
+    const body = await req.json().catch(() => ({}));
+    const streamId = String(body.streamId || "").trim();
+    const action = String(body.action || "").toLowerCase().trim();
+    const rawSymbols = Array.isArray(body.symbols) ? body.symbols : body.symbols ? [body.symbols] : [];
+    const reason = body.reason || "SSE_DYNAMIC_UPDATE";
+
+    if (!streamId) {
+      return NextResponse.json({ ok: false, error: "Missing streamId" }, { status: 400 });
+    }
+
+    if (action !== "subscribe" && action !== "unsubscribe" && action !== "set") {
+      return NextResponse.json(
+        { ok: false, error: "Action must be 'subscribe', 'unsubscribe', or 'set'" },
+        { status: 400 }
+      );
+    }
+
+    const sanitizedSymbols = sanitizeSymbols(rawSymbols);
+    if (sanitizedSymbols.length === 0) {
+      return NextResponse.json({ ok: false, error: "No valid symbols provided" }, { status: 400 });
+    }
+
+    const streamEntry = activeStreams.get(streamId);
+    if (!streamEntry || !streamEntry.ws || streamEntry.ws.readyState !== WebSocket.OPEN) {
+      return NextResponse.json(
+        {
+          ok: false,
+          handled: false,
+          message: "Stream connection not active on this instance; debounced reconnect recommended",
+        },
+        { status: 404 }
+      );
+    }
+
+    if (action === "set") {
+      const newSymbolsSet = new Set(sanitizedSymbols);
+      const toRemove = Array.from(streamEntry.subscribedSymbols).filter(
+        (s) => !newSymbolsSet.has(s) && s !== "*"
+      );
+      if (toRemove.length > 0) {
+        try {
+          streamEntry.ws.send(
+            JSON.stringify({
+              action: "unsubscribe",
+              symbols: toRemove,
+              reason,
+            })
+          );
+        } catch {}
+      }
+      try {
+        streamEntry.ws.send(
+          JSON.stringify({
+            action: "subscribe",
+            symbols: sanitizedSymbols,
+            reason,
+          })
+        );
+      } catch {}
+      streamEntry.subscribedSymbols = newSymbolsSet;
+    } else {
+      // Forward subscription directly over existing WebSocket to gateway
+      try {
+        streamEntry.ws.send(
+          JSON.stringify({
+            action,
+            symbols: sanitizedSymbols,
+            reason,
+          })
+        );
+      } catch {}
+
+      if (action === "subscribe") {
+        if (streamEntry.subscribedSymbols.has("*") && sanitizedSymbols.length > 0) {
+          streamEntry.subscribedSymbols.delete("*");
+        }
+        sanitizedSymbols.forEach((s) => streamEntry.subscribedSymbols.add(s));
+      } else {
+        sanitizedSymbols.forEach((s) => streamEntry.subscribedSymbols.delete(s));
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      handled: true,
+      action,
+      symbols: sanitizedSymbols,
+      activeCount: streamEntry.subscribedSymbols.size,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message || "Internal error updating stream subscriptions" },
+      { status: 500 }
+    );
+  }
 }

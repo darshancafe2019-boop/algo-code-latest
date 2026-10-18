@@ -113,7 +113,11 @@ async function runUnitTests() {
   console.log("=======================================================\n");
 }
 
-runUnitTests().catch((err) => {
-  console.error("Test execution failed:", err);
-  process.exit(1);
-});
+runUnitTests()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch((err) => {
+    console.error("Test execution failed:", err);
+    process.exit(1);
+  });

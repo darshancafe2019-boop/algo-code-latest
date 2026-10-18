@@ -58,6 +58,9 @@ def ensure_admin_state():
         "is_2fa_enabled": 0,
         "must_change_password": 0,
     })
+    yield
+    pwd_hash_def, salt_def = PasswordManager.hash_password("AlgoTrading@2026!")
+    db.update_user_password(admin_id, pwd_hash_def, salt_def, must_change_password=0)
 
 
 def test_admin_user_has_correct_email():

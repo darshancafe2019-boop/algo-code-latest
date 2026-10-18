@@ -29,7 +29,7 @@ os.environ["LIVE_TRADING_ENABLED"] = "false"
 os.environ["MASTER_LIVE_TRADING"] = "false"
 os.environ["FORCE_SQLITE"] = "true"
 os.environ["AUTH_ADMIN_EMAIL"] = "admin_test@quantos.local"
-os.environ["AUTH_BOOTSTRAP_PASSWORD"] = "TestAdminPass@2026!"
+os.environ["AUTH_BOOTSTRAP_PASSWORD"] = "AlgoTrading@2026!"
 os.environ["AUTH_BOOTSTRAP_ENABLED"] = "true"
 
 from src import config, db
@@ -43,6 +43,14 @@ class TestQuantOSAuditRepair(unittest.TestCase):
     def setUpClass(cls):
         db.init_db()
 
+    @classmethod
+    def tearDownClass(cls):
+        os.environ["AUTH_BOOTSTRAP_PASSWORD"] = "AlgoTrading@2026!"
+        h_def, s_def = PasswordManager.hash_password("AlgoTrading@2026!")
+        admin = db.get_user_by_username("admin")
+        if admin:
+            db.update_user_password(admin["id"], h_def, s_def, must_change_password=0)
+
     def test_01_fail_closed_trading_guardrails(self):
         """Verify institutional trading safety settings are strictly fail-closed."""
         self.assertEqual(os.environ.get("TRADING_MODE"), "PAPER")
@@ -54,7 +62,10 @@ class TestQuantOSAuditRepair(unittest.TestCase):
 
     def test_02_admin_bootstrap_no_existing_user_error(self):
         """Verify initialize_bootstrap_admin executes cleanly with no undefined variable error."""
+        orig_force = os.environ.get("AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET")
+        orig_pass = os.environ.get("AUTH_BOOTSTRAP_PASSWORD")
         try:
+            os.environ["AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET"] = "false"
             SecurityAuthManager.initialize_bootstrap_admin()
             admin = db.get_user_by_username("admin")
             self.assertIsNotNone(admin, "Admin user must exist after bootstrap")
@@ -76,6 +87,19 @@ class TestQuantOSAuditRepair(unittest.TestCase):
             print(f"[PASS] Test 2: Admin bootstrap succeeded and preserved established password without unexpected reset.")
         except NameError as ne:
             self.fail(f"Admin bootstrap threw NameError: {ne}")
+        finally:
+            if orig_force is not None:
+                os.environ["AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET"] = orig_force
+            else:
+                os.environ.pop("AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET", None)
+            if orig_pass is not None:
+                os.environ["AUTH_BOOTSTRAP_PASSWORD"] = orig_pass
+            else:
+                os.environ["AUTH_BOOTSTRAP_PASSWORD"] = "AlgoTrading@2026!"
+            h_def, s_def = PasswordManager.hash_password("AlgoTrading@2026!")
+            admin = db.get_user_by_username("admin")
+            if admin:
+                db.update_user_password(admin["id"], h_def, s_def, must_change_password=0)
 
     def test_03_dynamic_admin_email_resolution(self):
         """Verify admin email is resolved dynamically without hardcoded fallback."""

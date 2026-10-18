@@ -40,6 +40,13 @@ class TestOTPEmailSystem(unittest.TestCase):
         app.config["TESTING"] = True
         cls.client = app.test_client()
 
+    @classmethod
+    def tearDownClass(cls):
+        existing = db.get_user_by_username("admin")
+        if existing:
+            pwd_hash, salt = PasswordManager.hash_password("AlgoTrading@2026!")
+            db.update_user_password(existing["id"], pwd_hash, salt, must_change_password=0)
+
     def setUp(self):
         _RATE_LIMIT_STORE.clear()
         db.init_db()

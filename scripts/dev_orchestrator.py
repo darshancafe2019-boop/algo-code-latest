@@ -575,6 +575,7 @@ class ServiceSupervisor:
         backend_env["PORT"] = str(BACKEND_PORT)
         backend_env["MARKET_GATEWAY_PORT"] = str(GATEWAY_PORT)
         backend_env["PYTHONUNBUFFERED"] = "1"
+        backend_env["AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET"] = "true"
         self.services["BACKEND"] = ManagedService(
             name="BACKEND",
             command=[PYTHON_EXEC, "dashboard.py"],

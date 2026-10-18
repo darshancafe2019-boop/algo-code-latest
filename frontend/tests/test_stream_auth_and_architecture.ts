@@ -36,23 +36,21 @@ async function runStreamAuthTests() {
   const originalEnv = { ...process.env };
 
   try {
-    // ── TEST 1: Unauthorized Access in Production Mode ──
-    console.log("--- 1. Testing Unauthorized Access Rejection in Production ---");
+    // ── TEST 1: Authentication Enforcement in Production Mode ──
+    console.log("--- 1. Testing Authentication Enforcement in Production ---");
     (process.env as any).NODE_ENV = "production";
     delete process.env.AUTH_REQUIRE_LOGIN;
 
+    // 1A. Missing credentials fail closed (HTTP 401)
     const unauthReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
       method: "GET",
     });
-
     const unauthRes = await GET(unauthReq);
     assert(unauthRes.status === 401, `GET without credentials returns HTTP 401 (got ${unauthRes.status})`);
-
     const unauthData = await unauthRes.json();
     assert(unauthData.ok === false, "Response body contains ok: false");
     assert(unauthData.error === "UNAUTHORIZED", "Error code is UNAUTHORIZED");
 
-    // Also test POST without auth in production
     const unauthPostReq = new NextRequest("http://localhost:3000/api/market-data/stream", {
       method: "POST",
       body: JSON.stringify({
@@ -64,6 +62,115 @@ async function runStreamAuthTests() {
     });
     const unauthPostRes = await POST(unauthPostReq);
     assert(unauthPostRes.status === 401, `POST without credentials returns HTTP 401 (got ${unauthPostRes.status})`);
+
+    // 1B. Query token alone (?token=...) is strictly REJECTED (HTTP 401)
+    console.log("--- 1B. Testing Query-Parameter Token Rejection (?token=...) ---");
+    const queryTokenGetReq = new NextRequest(
+      "http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50&token=session_jwt_secret_token_12345",
+      { method: "GET" }
+    );
+    const queryTokenGetRes = await GET(queryTokenGetReq);
+    assert(
+      queryTokenGetRes.status === 401,
+      `GET with query token alone is strictly rejected with HTTP 401 (got ${queryTokenGetRes.status})`
+    );
+
+    const queryTokenPostReq = new NextRequest(
+      "http://localhost:3000/api/market-data/stream?token=session_jwt_secret_token_12345",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          streamId: "test_stream_1",
+          action: "subscribe",
+          symbols: ["NSE:RELIANCE"],
+        }),
+        headers: { "Content-Type": "application/json" },
+      }
+    );
+    const queryTokenPostRes = await POST(queryTokenPostReq);
+    assert(
+      queryTokenPostRes.status === 401,
+      `POST with query token alone is strictly rejected with HTTP 401 (got ${queryTokenPostRes.status})`
+    );
+
+    // 1C. Supported Credentials & Fail-Closed Auth Service Verification
+    console.log("--- 1C. Testing Supported Credentials & Fail-Closed Behavior ---");
+    process.env.BACKEND_INTERNAL_URL = "http://mock-backend:5050";
+    const originalFetch = global.fetch;
+
+    try {
+      // Mock 1: Auth service fails (HTTP 500 error) -> MUST fail closed in production (HTTP 401/503)
+      global.fetch = (async (url: string) => {
+        if (url.includes("/api/auth/me")) {
+          return new Response(JSON.stringify({ error: "Internal Auth Failure" }), { status: 500 });
+        }
+        return originalFetch(url);
+      }) as any;
+
+      const failedAuthReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
+        method: "GET",
+        headers: { Authorization: "Bearer failing_token" },
+      });
+      const failedAuthRes = await GET(failedAuthReq);
+      assert(
+        failedAuthRes.status === 401 || failedAuthRes.status === 503,
+        `Auth service error fails closed (got ${failedAuthRes.status})`
+      );
+
+      // Mock 2: Auth service returns valid user for Authorization Bearer header
+      global.fetch = (async (url: string, init?: any) => {
+        if (url.includes("/api/auth/me")) {
+          const authHeader = init?.headers?.Authorization || "";
+          const cookieHeader = init?.headers?.Cookie || "";
+          if (authHeader.includes("valid_bearer") || cookieHeader.includes("valid_cookie")) {
+            return new Response(
+              JSON.stringify({ status: "success", authenticated: true, user: { id: "user_1" } }),
+              { status: 200, headers: { "Content-Type": "application/json" } }
+            );
+          }
+          return new Response(JSON.stringify({ status: "error", error: "Invalid token" }), { status: 401 });
+        }
+        return originalFetch(url, init);
+      }) as any;
+
+      // Valid Bearer header passes authentication on GET
+      const bearerReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
+        method: "GET",
+        headers: { Authorization: "Bearer valid_bearer" },
+      });
+      const bearerRes = await GET(bearerReq);
+      assert(bearerRes.status === 200, `Valid Bearer token passes authentication (got HTTP ${bearerRes.status})`);
+
+      // Valid Session Cookie passes authentication on GET
+      const cookieReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
+        method: "GET",
+        headers: { Cookie: "algo_session_token=valid_cookie" },
+      });
+      const cookieRes = await GET(cookieReq);
+      assert(cookieRes.status === 200, `Valid Session Cookie passes authentication (got HTTP ${cookieRes.status})`);
+
+      // Valid Session Cookie passes authentication on POST (advances past auth to stream validation)
+      const validPostReq = new NextRequest("http://localhost:3000/api/market-data/stream", {
+        method: "POST",
+        body: JSON.stringify({
+          streamId: "test_stream_active",
+          action: "subscribe",
+          symbols: ["NSE:TCS"],
+        }),
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: "algo_session_token=valid_cookie",
+        },
+      });
+      const validPostRes = await POST(validPostReq);
+      // Status 404 (handled: false) means it passed auth and reached stream lookup
+      assert(
+        validPostRes.status !== 401 && validPostRes.status !== 403,
+        `Valid credentials on POST pass authentication check (got HTTP ${validPostRes.status})`
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
 
     // ── TEST 2: Secret Isolation and Non-Exposure ──
     console.log("\n--- 2. Testing Gateway Secret Isolation ---");

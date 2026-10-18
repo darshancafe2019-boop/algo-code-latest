@@ -47,20 +47,19 @@ function sanitizeSymbols(rawList: string[]): string[] {
 }
 
 /**
- * Authenticates the incoming request against session cookies, bearer tokens, or query param token.
+ * Authenticates the incoming request against session cookies or bearer tokens.
+ * STRICT SECURITY: Query-parameter tokens (?token=...) are strictly rejected to prevent
+ * credential leakage in URLs, browser history, proxy logs, and Referer headers.
  */
 async function authenticateRequest(
   req: NextRequest
 ): Promise<{ authenticated: boolean; error?: string; status?: number }> {
-  const url = new URL(req.url);
   const token =
     req.cookies.get("algo_session_token")?.value ||
     req.cookies.get("session")?.value ||
     (req.headers.get("authorization")?.startsWith("Bearer ")
       ? req.headers.get("authorization")!.slice(7).trim()
-      : null) ||
-    url.searchParams.get("token") ||
-    null;
+      : null);
 
   const authRequired = isProduction() || process.env.AUTH_REQUIRE_LOGIN === "true";
 
@@ -79,7 +78,14 @@ async function authenticateRequest(
   // Check token cache
   const cached = tokenAuthCache.get(token);
   if (cached && cached.expiresAt > Date.now()) {
-    return { authenticated: cached.authenticated };
+    if (cached.authenticated) {
+      return { authenticated: true };
+    }
+    return {
+      authenticated: false,
+      error: "Invalid or expired session credentials.",
+      status: 401,
+    };
   }
 
   const backendUrl = getBackendBaseUrl();

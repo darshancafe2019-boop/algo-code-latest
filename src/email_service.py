@@ -206,7 +206,7 @@ class ResendEmailProvider(BaseEmailProvider):
             
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(resend.Emails.send, params)
-                resp = future.result(timeout=3.5)
+                resp = future.result(timeout=8.0)
 
             # Robust response inspection: ensure msg_id is present and no error dict was returned
             msg_id = None

@@ -13676,6 +13676,15 @@ def api_auth_login():
             request_id=request_id
         )
 
+        masked_dest = _mask_email_address(user_email)
+
+        # Real provider check: in non-production development or testing, include dev_otp
+        is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
+        is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
+        is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
+        has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
+        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
+
         # Dispatch real email via Resend
         email_sent, email_err, msg_id = global_email_service.send_login_otp(
             to_email=user_email,
@@ -13685,6 +13694,26 @@ def api_auth_login():
         )
 
         if not email_sent:
+            if include_dev_otp:
+                # In local development mode, activate the challenge so the developer can continue via Dev OTP
+                db.activate_auth_otp_challenge(
+                    challenge_id=challenge_id,
+                    user_id=user["id"],
+                    purpose="LOGIN",
+                    provider_message_id="dev_fallback",
+                    provider_status="DEV_FALLBACK"
+                )
+                logger.warning("[LOGIN_EMAIL_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", email_err)
+                return jsonify({
+                    "status": "EMAIL_OTP_REQUIRED",
+                    "challenge_id": challenge_id,
+                    "destination": masked_dest,
+                    "message": "Verification code generated. Use Development OTP to enter terminal.",
+                    "dev_otp": otp_code,
+                    "dev_mode": True,
+                    "request_id": request_id
+                }), 200
+
             db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=email_err or "")
             logger.error("[LOGIN_EMAIL_DELIVERY_FAILED] request_id=%s user=%s destination=%s error=%s", request_id, username, _mask_email_address(user_email), email_err)
             return jsonify({
@@ -13710,15 +13739,6 @@ def api_auth_login():
             ip_address=client_ip,
             details={"challenge_id": challenge_id, "destination": _mask_email_address(user_email)}
         )
-
-        masked_dest = _mask_email_address(user_email)
-
-        # Real provider check: in non-production development or testing, include dev_otp
-        is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
-        is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
-        is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
-        has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
 
         response_payload: Dict[str, Any] = {
             "status": "EMAIL_OTP_REQUIRED",
@@ -14099,6 +14119,14 @@ def api_auth_email_otp_resend():
     )
     logger.info("[OTP] OTP stored in PENDING status")
 
+    masked_dest = _mask_email_address(user_email)
+
+    is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
+    is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
+    is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
+    has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
+    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
+
     # Send email through Resend
     logger.info("[OTP] Sending email via configured provider")
     if purpose == "PASSWORD_RESET":
@@ -14107,6 +14135,28 @@ def api_auth_email_otp_resend():
         sent, err, msg_id = global_email_service.send_login_otp(user_email, otp_code, user["username"], user_id=user["id"])
 
     if not sent:
+        if include_dev_otp:
+            db.activate_auth_otp_challenge(
+                challenge_id=new_challenge_id,
+                user_id=user["id"],
+                purpose=purpose,
+                provider_message_id="dev_fallback",
+                provider_status="DEV_FALLBACK"
+            )
+            logger.warning("[OTP_RESEND_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", err)
+            resend_payload = {
+                "status": "success",
+                "success": True,
+                "challenge_id": new_challenge_id,
+                "destination": masked_dest,
+                "message": "New verification code generated. Use Development OTP to proceed.",
+                "cooldown_seconds": 60,
+                "dev_otp": otp_code,
+                "dev_mode": True,
+                "request_id": request_id
+            }
+            return jsonify(resend_payload), 200
+
         db.mark_auth_otp_challenge_send_failed(new_challenge_id, error_details=err or "")
         logger.error("[OTP] [EMAIL_PROVIDER_ERROR] Failed delivering OTP email to %s: %s", _mask_email_address(user_email), err)
         return jsonify({
@@ -14127,13 +14177,6 @@ def api_auth_email_otp_resend():
     )
     logger.info("[OTP] Email accepted by provider [Message ID: %s] | Challenge activated", msg_id)
 
-    masked_dest = _mask_email_address(user_email)
-
-    is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
-    is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
-    is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
-    has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
     resend_payload = {
         "status": "success",
         "success": True,

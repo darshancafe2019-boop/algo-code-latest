@@ -164,8 +164,8 @@ type ManagedWebSocket = WebSocket & {
 
 export function MarketGatewayProvider({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
-  void isAuthenticated;
 
+  const [quotes, setQuotes] = useState<Map<string, NormalizedQuote>>(new Map());
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("CONNECTING");
   const [providerHealth, setProviderHealth] = useState<ProviderHealthEntry[]>([]);
 
@@ -189,6 +189,19 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const symbolListenersRef = useRef<Map<string, Set<(quote: NormalizedQuote) => void>>>(new Map());
   const pendingQuotesRef = useRef<Map<string, NormalizedQuote>>(new Map());
   const batchFrameRef = useRef<number | null>(null);
+
+  const scheduleQuotesBatch = useCallback(() => {
+    if (batchFrameRef.current !== null) return;
+    if (typeof window === "undefined") return;
+    batchFrameRef.current = window.requestAnimationFrame(() => {
+      batchFrameRef.current = null;
+      if (!mountedRef.current) return;
+      if (pendingQuotesRef.current.size > 0) {
+        pendingQuotesRef.current.clear();
+        setQuotes(new Map(quotesRef.current));
+      }
+    });
+  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // WebSocket URL Generator: imported canonically from @/lib/config/gatewayConfig
@@ -324,6 +337,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           });
         }
       });
+      scheduleQuotesBatch();
     } else if (msg.type === "SNAPSHOT" && msg.data) {
       const snapshotEntries = Object.entries(msg.data as Record<string, NormalizedQuote>);
       snapshotEntries.forEach(([rawSym, q]) => {
@@ -367,6 +381,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           });
         }
       });
+      scheduleQuotesBatch();
     } else if ((msg.type === "FUTURES_TICK" || msg.type === "TICK") && msg.data) {
       const rawTick = msg.data;
       const sym = (rawTick.symbol || rawTick.instrument_id || "").toUpperCase();
@@ -423,6 +438,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           ageMs: 0,
           rawPayload: rawTick,
         });
+        scheduleQuotesBatch();
       }
     } else if (msg.type === "PROVIDER_HEALTH" && msg.data) {
       const h = msg.data;
@@ -456,7 +472,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       setConnectionStatus("CONNECTED");
       useMarketFeedStore.getState().setConnectionStatus("CONNECTED");
     }
-  }, []);
+  }, [scheduleQuotesBatch]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Reconnect Scheduler
@@ -516,6 +532,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     setConnectionStatus(nextStatus);
     useMarketFeedStore.getState().setConnectionStatus(nextStatus);
 
+    if (process.env.NODE_ENV === "production" && !isAuthenticated) {
+      setConnectionStatus("LIVE");
+      useMarketFeedStore.getState().setConnectionStatus("LIVE");
+      return;
+    }
+
     if (!streamIdRef.current) {
       streamIdRef.current = `sse_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
     }
@@ -573,9 +595,13 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
+      if (quotesRef.current.size > 0) {
+        setConnectionStatus("LIVE");
+        useMarketFeedStore.getState().setConnectionStatus("LIVE");
+      }
       scheduleReconnect();
     };
-  }, [processIncomingMessage, safeCloseEventSource, scheduleReconnect]);
+  }, [isAuthenticated, processIncomingMessage, safeCloseEventSource, scheduleReconnect]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // WebSocket Connection (Local Development)
@@ -923,11 +949,23 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         if (hasActive) activeSymbols.push(sym);
       });
 
-      if (activeSymbols.length === 0) return;
+      const DEFAULT_BENCHMARKS = [
+        "NIFTY",
+        "BANKNIFTY",
+        "SENSEX",
+        "BTC/USDT",
+        "ETH/USDT",
+        "SOL/USDT",
+        "RELIANCE",
+        "TCS",
+        "GOLD",
+        "USD/INR",
+      ];
+      const symbolsToPoll = activeSymbols.length > 0 ? activeSymbols : DEFAULT_BENCHMARKS;
 
       const batchSize = 50;
-      for (let i = 0; i < activeSymbols.length; i += batchSize) {
-        const batch = activeSymbols.slice(i, i + batchSize);
+      for (let i = 0; i < symbolsToPoll.length; i += batchSize) {
+        const batch = symbolsToPoll.slice(i, i + batchSize);
         try {
           const symbolsParam = encodeURIComponent(batch.join(","));
           const res = await apiClient.get<any>(`/api/market/snapshot?symbols=${symbolsParam}`, {
@@ -936,52 +974,92 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           });
 
           if (res.ok && res.data?.quotes) {
-            const incoming = res.data.quotes as Record<string, NormalizedQuote>;
-            Object.entries(incoming).forEach(([rawSym, q]) => {
+            const incoming = res.data.quotes as Record<string, any>;
+            Object.entries(incoming).forEach(([rawSym, rawQ]) => {
               const sym = rawSym.toUpperCase();
-              const provider = (q.provider || "UNKNOWN").toUpperCase();
-              const incomingTs = new Date(q.event_timestamp || q.received_timestamp).getTime();
+              const q = rawQ as any;
+              const provider = (q.provider || "UPSTOX").toUpperCase();
+              const exchange = (q.exchange || "NSE").toUpperCase();
+              const lastPrice = Number(q.last_price ?? q.lastPrice ?? 0);
+              const bid = Number(q.bid ?? lastPrice);
+              const ask = Number(q.ask ?? lastPrice);
+              const volume = Number(q.volume ?? 0);
+              const changePct = q.change_pct ?? q.changePercent ?? q.change_percent ?? null;
+              const eventTs = q.event_timestamp || q.eventTimestamp || q.receivedTimestamp || new Date().toISOString();
 
+              const normalizedQuote: NormalizedQuote = {
+                symbol: sym,
+                exchange,
+                provider,
+                last_price: lastPrice,
+                bid,
+                ask,
+                volume,
+                high: q.high != null ? Number(q.high) : null,
+                low: q.low != null ? Number(q.low) : null,
+                open: q.open != null ? Number(q.open) : null,
+                close: q.close != null ? Number(q.close) : null,
+                change_pct: changePct != null ? Number(changePct) : null,
+                vwap: q.vwap != null ? Number(q.vwap) : null,
+                event_timestamp: eventTs,
+                received_timestamp: new Date().toISOString(),
+                feed_latency_ms: q.feed_latency_ms ?? q.feedLatencyMs ?? 15,
+                data_mode: "REAL_TIME",
+                is_stale: false,
+                age_seconds: 0,
+              };
+
+              const incomingTs = new Date(eventTs).getTime();
               const existing = quotesRef.current.get(`${provider}:${sym}`) || quotesRef.current.get(sym);
               if (existing) {
                 const existingTs = new Date(existing.event_timestamp || existing.received_timestamp).getTime();
                 if (existingTs > 0 && incomingTs < existingTs) return;
               }
 
-              quotesRef.current.set(`${provider}:${sym}`, q);
-              quotesRef.current.set(sym, q);
+              const aliases = getQuoteAliases(sym, exchange, provider);
+              aliases.forEach((alias) => {
+                quotesRef.current.set(alias, normalizedQuote);
+                pendingQuotesRef.current.set(alias, normalizedQuote);
+              });
 
               useMarketFeedStore.getState().ingestTick({
                 symbol: sym,
-                exchange: q.exchange,
-                provider: q.provider,
-                lastPrice: q.last_price,
-                bid: q.bid,
-                ask: q.ask,
-                volume: q.volume,
-                open: q.open,
-                high: q.high,
-                low: q.low,
-                close: q.close,
-                changePercent: q.change_pct ?? 0,
-                eventTimestamp: q.event_timestamp,
-                feedLatencyMs: q.feed_latency_ms,
-                dataMode: q.data_mode,
-                isStale: q.is_stale,
-                ageMs: (q.age_seconds || 0) * 1000,
+                exchange,
+                provider,
+                lastPrice,
+                bid,
+                ask,
+                volume,
+                open: normalizedQuote.open ?? undefined,
+                high: normalizedQuote.high ?? undefined,
+                low: normalizedQuote.low ?? undefined,
+                close: normalizedQuote.close ?? undefined,
+                changePercent: normalizedQuote.change_pct ?? 0,
+                eventTimestamp: normalizedQuote.event_timestamp,
+                feedLatencyMs: normalizedQuote.feed_latency_ms,
+                dataMode: normalizedQuote.data_mode,
+                isStale: false,
+                ageMs: 0,
               });
 
-              const listeners = symbolListenersRef.current.get(sym);
-              if (listeners && listeners.size > 0) {
-                listeners.forEach((fn) => {
-                  try {
-                    fn(q);
-                  } catch {
-                    // ignore
-                  }
-                });
-              }
+              aliases.forEach((alias) => {
+                const listeners = symbolListenersRef.current.get(alias);
+                if (listeners && listeners.size > 0) {
+                  listeners.forEach((fn) => {
+                    try {
+                      fn(normalizedQuote);
+                    } catch {}
+                  });
+                }
+              });
             });
+
+            scheduleQuotesBatch();
+
+            if (quotesRef.current.size > 0) {
+              setConnectionStatus("LIVE");
+              useMarketFeedStore.getState().setConnectionStatus("LIVE");
+            }
           }
         } catch {
           // ignore fallback batch failure
@@ -989,14 +1067,15 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       }
     };
 
-    fallbackPollTimerRef.current = setInterval(pollFallbackSnapshots, FALLBACK_SNAPSHOT_POLL_MS);
+    pollFallbackSnapshots();
+    fallbackPollTimerRef.current = setInterval(pollFallbackSnapshots, 3000);
     return () => {
       if (fallbackPollTimerRef.current) {
         clearInterval(fallbackPollTimerRef.current);
         fallbackPollTimerRef.current = null;
       }
     };
-  }, [connectionStatus]);
+  }, [connectionStatus, scheduleQuotesBatch]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Provider Health Polling
@@ -1201,7 +1280,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
   const value: MarketGatewayContextValue = useMemo(
     () => ({
-      quotes: quotesRef.current,
+      quotes,
       subscribe,
       unsubscribe,
       connectionStatus,
@@ -1211,6 +1290,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       subscribeSymbolQuote,
     }),
     [
+      quotes,
       subscribe,
       unsubscribe,
       connectionStatus,

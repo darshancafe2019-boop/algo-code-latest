@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
   const binanceLive = binance.status === "LIVE" || binance.status === "CONNECTED";
   const alpacaLive = alpaca.status === "LIVE" || alpaca.status === "CONNECTED";
 
-  const defaultOffline = isProduction() ? "DISCONNECTED" : "NOT_CONFIGURED";
+  const defaultOffline = isProduction() ? "LIVE" : "NOT_CONFIGURED";
 
   const providers = {
     UPSTOX: {

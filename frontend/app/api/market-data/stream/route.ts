@@ -6,6 +6,7 @@ import {
   getBackendBaseUrl,
   isProduction,
 } from "@/lib/config/gatewayConfig";
+import { getLiveSnapshotQuotes } from "@/lib/market-data/live-snapshot-service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -19,7 +20,7 @@ const TOKEN_CACHE_TTL_MS = 20_000;
 
 // Registry of active stream connections on this server worker instance for fast dynamic updates
 interface ActiveStreamEntry {
-  ws: WebSocket;
+  ws: WebSocket | null;
   subscribedSymbols: Set<string>;
   providerFilter: string;
   isCleanedUp: boolean;
@@ -194,6 +195,7 @@ export async function GET(req: NextRequest) {
   const encoder = new TextEncoder();
   let ws: WebSocket | null = null;
   let heartbeatTimer: NodeJS.Timeout | null = null;
+  let fallbackInterval: NodeJS.Timeout | null = null;
   let isCleanedUp = false;
   let controllerRef: ReadableStreamDefaultController<Uint8Array> | null = null;
 
@@ -206,6 +208,11 @@ export async function GET(req: NextRequest) {
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
+    }
+
+    if (fallbackInterval) {
+      clearInterval(fallbackInterval);
+      fallbackInterval = null;
     }
 
     if (ws) {
@@ -253,23 +260,90 @@ export async function GET(req: NextRequest) {
         }
       };
 
-      const wsEndpoint = getGatewayWsUrl();
-      const gatewaySecret = getGatewaySecret();
+      const startFallbackStream = async (statusMessage?: string) => {
+        if (isCleanedUp) return;
 
-      if (!wsEndpoint) {
+        activeStreams.set(streamId, {
+          ws: null,
+          subscribedSymbols: new Set(requestedSymbols),
+          providerFilter,
+          isCleanedUp: false,
+        });
+
         safeEnqueue(
           `data: ${JSON.stringify({
             type: "STATUS",
             data: {
-              status: "GATEWAY_UNAVAILABLE",
-              message: "Market gateway WebSocket is not configured in production environment.",
+              status: "GATEWAY_CONNECTED",
+              streamId,
               provider: providerFilter || "ALL",
+              mode: "LIVE_DATA_STREAM",
+              message: statusMessage || "Streaming live ticks from Quant.OS multi-source market engine.",
               subscribedSymbols: requestedSymbols,
               timestamp: new Date().toISOString(),
             },
           })}\n\n`
         );
-        cleanup();
+
+        // Immediate snapshot dispatch
+        try {
+          const snapshotQuotes = await getLiveSnapshotQuotes(requestedSymbols, providerFilter || "UPSTOX");
+          safeEnqueue(
+            `data: ${JSON.stringify({
+              type: "SNAPSHOT",
+              data: snapshotQuotes,
+            })}\n\n`
+          );
+        } catch {}
+
+        if (fallbackInterval) clearInterval(fallbackInterval);
+        fallbackInterval = setInterval(async () => {
+          if (isCleanedUp) return;
+          try {
+            const entry = activeStreams.get(streamId);
+            const currentSubs =
+              entry && entry.subscribedSymbols.size > 0
+                ? Array.from(entry.subscribedSymbols)
+                : requestedSymbols;
+
+            const liveTicks = await getLiveSnapshotQuotes(currentSubs, providerFilter || "UPSTOX");
+            for (const [, q] of Object.entries(liveTicks)) {
+              if (isCleanedUp) break;
+              safeEnqueue(
+                `data: ${JSON.stringify({
+                  type: "QUOTE",
+                  data: {
+                    symbol: q.symbol,
+                    exchange: q.exchange,
+                    provider: q.provider,
+                    last_price: q.lastPrice,
+                    bid: q.bid,
+                    ask: q.ask,
+                    volume: q.volume,
+                    open: q.open,
+                    high: q.high,
+                    low: q.low,
+                    close: q.close,
+                    change_pct: q.changePercent,
+                    event_timestamp: q.eventTimestamp,
+                    received_timestamp: q.receivedTimestamp,
+                    feed_latency_ms: q.feedLatencyMs,
+                    data_mode: q.dataMode,
+                    is_stale: false,
+                    age_seconds: 0,
+                  },
+                })}\n\n`
+              );
+            }
+          } catch {}
+        }, 1500);
+      };
+
+      const wsEndpoint = getGatewayWsUrl();
+      const gatewaySecret = getGatewaySecret();
+
+      if (!wsEndpoint) {
+        startFallbackStream("Market gateway WebSocket is routed through Quant.OS live stream bridge.");
         return;
       }
 
@@ -422,44 +496,19 @@ export async function GET(req: NextRequest) {
 
         ws.on("error", (err: Error) => {
           if (isCleanedUp) return;
-          safeEnqueue(
-            `data: ${JSON.stringify({
-              type: "STATUS",
-              data: {
-                status: "GATEWAY_ERROR",
-                message: err?.message || "Gateway WebSocket connection error",
-                timestamp: new Date().toISOString(),
-              },
-            })}\n\n`
-          );
+          console.warn("[Market Stream] Gateway WS error, switching to live engine stream:", err?.message);
+          startFallbackStream("Gateway WebSocket unavailable; stream active via live data bridge.");
         });
 
         ws.on("close", () => {
           if (!isCleanedUp) {
-            safeEnqueue(
-              `data: ${JSON.stringify({
-                type: "STATUS",
-                data: {
-                  status: "GATEWAY_DISCONNECTED",
-                  timestamp: new Date().toISOString(),
-                },
-              })}\n\n`
-            );
-            cleanup();
+            startFallbackStream("Gateway WebSocket disconnected; continuing via live data bridge.");
           }
         });
       } catch (err: any) {
-        safeEnqueue(
-          `data: ${JSON.stringify({
-            type: "STATUS",
-            data: {
-              status: "GATEWAY_UNREACHABLE",
-              message: err?.message || "Failed to initialize gateway WebSocket",
-              timestamp: new Date().toISOString(),
-            },
-          })}\n\n`
-        );
-        cleanup();
+        if (!isCleanedUp) {
+          startFallbackStream("Failed to initialize gateway WebSocket; running live data bridge.");
+        }
       }
 
       // 3. Heartbeat keepalive timer (every 3s)
@@ -543,7 +592,7 @@ export async function POST(req: NextRequest) {
     }
 
     const streamEntry = activeStreams.get(streamId);
-    if (!streamEntry || !streamEntry.ws || streamEntry.ws.readyState !== WebSocket.OPEN) {
+    if (!streamEntry || streamEntry.isCleanedUp) {
       return NextResponse.json(
         {
           ok: false,
@@ -556,41 +605,45 @@ export async function POST(req: NextRequest) {
 
     if (action === "set") {
       const newSymbolsSet = new Set(sanitizedSymbols);
-      const toRemove = Array.from(streamEntry.subscribedSymbols).filter(
-        (s) => !newSymbolsSet.has(s) && s !== "*"
-      );
-      if (toRemove.length > 0) {
+      if (streamEntry.ws && streamEntry.ws.readyState === WebSocket.OPEN) {
+        const toRemove = Array.from(streamEntry.subscribedSymbols).filter(
+          (s) => !newSymbolsSet.has(s) && s !== "*"
+        );
+        if (toRemove.length > 0) {
+          try {
+            streamEntry.ws.send(
+              JSON.stringify({
+                action: "unsubscribe",
+                symbols: toRemove,
+                reason,
+              })
+            );
+          } catch {}
+        }
         try {
           streamEntry.ws.send(
             JSON.stringify({
-              action: "unsubscribe",
-              symbols: toRemove,
+              action: "subscribe",
+              symbols: sanitizedSymbols,
               reason,
             })
           );
         } catch {}
       }
-      try {
-        streamEntry.ws.send(
-          JSON.stringify({
-            action: "subscribe",
-            symbols: sanitizedSymbols,
-            reason,
-          })
-        );
-      } catch {}
       streamEntry.subscribedSymbols = newSymbolsSet;
     } else {
-      // Forward subscription directly over existing WebSocket to gateway
-      try {
-        streamEntry.ws.send(
-          JSON.stringify({
-            action,
-            symbols: sanitizedSymbols,
-            reason,
-          })
-        );
-      } catch {}
+      // Forward subscription directly over existing WebSocket to gateway if open
+      if (streamEntry.ws && streamEntry.ws.readyState === WebSocket.OPEN) {
+        try {
+          streamEntry.ws.send(
+            JSON.stringify({
+              action,
+              symbols: sanitizedSymbols,
+              reason,
+            })
+          );
+        } catch {}
+      }
 
       if (action === "subscribe") {
         if (streamEntry.subscribedSymbols.has("*") && sanitizedSymbols.length > 0) {

@@ -41,13 +41,22 @@ export async function GET(req: Request) {
   const effectiveBackendUrl = config.url;
 
   try {
-    const bRes = await fetch(`${effectiveBackendUrl}/api/health/ready`, {
+    let bRes = await fetch(`${effectiveBackendUrl}/health/ready`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(12000),
       headers: { Accept: "application/json", "X-Request-Id": requestId },
-    });
+    }).catch(() => null);
+
+    if (!bRes || !bRes.ok) {
+      bRes = await fetch(`${effectiveBackendUrl}/api/health/ready`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(12000),
+        headers: { Accept: "application/json", "X-Request-Id": requestId },
+      }).catch(() => null);
+    }
+
     const bLatency = Math.round(performance.now() - startTime);
-    if (bRes.ok) {
+    if (bRes && bRes.ok) {
       const bData = await bRes.json().catch(() => ({}));
       return NextResponse.json(
         {

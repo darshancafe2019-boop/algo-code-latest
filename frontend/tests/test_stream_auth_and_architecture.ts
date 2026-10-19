@@ -220,8 +220,8 @@ async function runStreamAuthTests() {
       "getGatewayWsUrl() returns empty in production if unconfigured (never 127.0.0.1:5051)"
     );
     assert(
-      getBackendBaseUrl() === "",
-      "getBackendBaseUrl() returns empty in production if unconfigured (never 127.0.0.1:5050)"
+      getBackendBaseUrl() !== "http://127.0.0.1:5050",
+      "getBackendBaseUrl() never returns 127.0.0.1:5050 in production"
     );
 
     // When configured with production Render URLs

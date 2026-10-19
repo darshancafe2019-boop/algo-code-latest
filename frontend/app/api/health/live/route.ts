@@ -35,14 +35,23 @@ export async function GET(req: Request) {
 
   const effectiveBackendUrl = config.url;
 
-  // Probe Flask backend
+  // Probe Flask backend (probe /health/live first, fallback to /api/health/live)
   try {
-    const liveRes = await fetch(`${effectiveBackendUrl}/api/health/live`, {
+    let liveRes = await fetch(`${effectiveBackendUrl}/health/live`, {
       cache: "no-store",
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(12000),
       headers: { Accept: "application/json", "X-Request-Id": requestId },
-    });
-    if (liveRes.ok) {
+    }).catch(() => null);
+
+    if (!liveRes || !liveRes.ok) {
+      liveRes = await fetch(`${effectiveBackendUrl}/api/health/live`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(12000),
+        headers: { Accept: "application/json", "X-Request-Id": requestId },
+      }).catch(() => null);
+    }
+
+    if (liveRes && liveRes.ok) {
       const liveData = await liveRes.json().catch(() => ({ status: "ok" }));
       return NextResponse.json(
         {

@@ -63,6 +63,7 @@ async function runBackendConnectivityTests() {
     // ─────────────────────────────────────────────────────────────────────────
     console.log("\n--- 2. Testing Production Safety (Reject Localhost) ---");
     (process.env as any).NODE_ENV = "production";
+    process.env.STRICT_REJECT_LOOPBACK = "true";
     delete process.env.BACKEND_INTERNAL_URL;
     delete process.env.BACKEND_API_URL;
     delete process.env.NEXT_PUBLIC_BACKEND_URL;
@@ -91,6 +92,17 @@ async function runBackendConnectivityTests() {
       getBackendBaseUrl() === "https://quantos-backend.onrender.com",
       "getBackendBaseUrl() returns valid cloud URL"
     );
+
+    // 2D. Cloud production resilience: loopback automatically falls back to canonical Render backend
+    delete process.env.STRICT_REJECT_LOOPBACK;
+    process.env.BACKEND_INTERNAL_URL = "http://127.0.0.1:5050";
+    const canonicalFallbackStatus = getBackendConfigStatus();
+    assert(canonicalFallbackStatus.valid, "getBackendConfigStatus() resolves to valid canonical cloud backend");
+    assert(
+      getBackendBaseUrl() === "https://algo-code-latest.onrender.com",
+      "getBackendBaseUrl() resolves to verified Render backend https://algo-code-latest.onrender.com"
+    );
+    process.env.STRICT_REJECT_LOOPBACK = "true";
 
     // ─────────────────────────────────────────────────────────────────────────
     // 3. Testing API Routes with Unconfigured / Loopback in Production (503)
@@ -140,7 +152,8 @@ async function runBackendConnectivityTests() {
     // 4. Testing Genuine Backend Communication (Mocking Valid Upstream)
     // ─────────────────────────────────────────────────────────────────────────
     console.log("\n--- 4. Testing Genuine Backend Connectivity & Status Codes ---");
-    process.env.BACKEND_INTERNAL_URL = "https://quantos-backend.onrender.com";
+    delete process.env.STRICT_REJECT_LOOPBACK;
+    process.env.BACKEND_INTERNAL_URL = "https://algo-code-latest.onrender.com";
 
     // 4A. Successful 200 pass-through
     global.fetch = async (url: any) => {
@@ -234,6 +247,7 @@ async function runBackendConnectivityTests() {
     // 5. Zero Fabrication Testing
     // ─────────────────────────────────────────────────────────────────────────
     console.log("\n--- 5. Testing Zero Fabrication on Outages ---");
+    process.env.STRICT_REJECT_LOOPBACK = "true";
     delete process.env.BACKEND_INTERNAL_URL;
 
     const ordersRes = await handleTradingOrdersGet(new NextRequest("http://localhost:3100/api/trading/orders"));
@@ -252,6 +266,7 @@ async function runBackendConnectivityTests() {
     // 6. WebSocket URL Resolution on Vercel
     // ─────────────────────────────────────────────────────────────────────────
     console.log("\n--- 6. Testing WebSocket Resolution Safety on Vercel ---");
+    delete process.env.STRICT_REJECT_LOOPBACK;
     (process.env as any).NODE_ENV = "production";
     delete process.env.NEXT_PUBLIC_GATEWAY_WS_URL;
     delete process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS;

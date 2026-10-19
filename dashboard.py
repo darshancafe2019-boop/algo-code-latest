@@ -18830,21 +18830,30 @@ def api_markets_providers_health():
     fyers_diag = global_fyers_adapter.get_safe_diagnostic()
 
     # Public crypto feeds
+    binance_outbound_code = None
+    try:
+        import requests
+        r = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT", timeout=3.0)
+        binance_outbound_code = r.status_code
+    except Exception as e:
+        binance_outbound_code = f"Error: {e}"
+
     binance_diag = {
         "configured": True,
         "authentication_status": "PUBLIC_FEED",
+        "outbound_http_status": binance_outbound_code,
         "token_status": "N/A",
         "token_expiry": None,
         "data_entitlement": "ACTIVE",
-        "rest_status": "UP",
+        "rest_status": "UP" if binance_outbound_code == 200 else f"HTTP_{binance_outbound_code}",
         "websocket_status": "LIVE",
         "subscription_status": "ACTIVE",
         "decoder_status": "JSON_OK",
         "last_real_tick_at": datetime.now(timezone.utc).isoformat(),
         "last_tick_age_ms": 120,
-        "error_code": None,
-        "safe_error_message": None,
-        "status": "LIVE",
+        "error_code": None if binance_outbound_code == 200 else str(binance_outbound_code),
+        "safe_error_message": None if binance_outbound_code == 200 else f"Binance public endpoint returned {binance_outbound_code}",
+        "status": "LIVE" if binance_outbound_code == 200 else "DEGRADED",
     }
 
     delta_diag = {
@@ -18984,27 +18993,77 @@ def api_market_quotes_snapshot():
         )
 
         if is_crypto:
+            lp = None
+            bid = None
+            ask = None
+            vol = 0.0
+            chg_pct = 0.0
+            provider_name = "binance"
+            high_24h = None
+            low_24h = None
+            ts = now_dt.isoformat()
+
             ticker = binance_svc.get_ticker(clean.replace("/", "").replace("-", ""))
             if ticker and ticker.get("last_price"):
                 lp = ticker.get("last_price")
+                bid = ticker.get("bid_price") or lp
+                ask = ticker.get("ask_price") or lp
+                vol = ticker.get("volume_24h") or 0.0
+                chg_pct = ticker.get("change_pct_24h") or 0.0
+                high_24h = ticker.get("high_24h")
+                low_24h = ticker.get("low_24h")
+                ts = ticker.get("timestamp") or ts
+            else:
+                # Working public fallback when Binance is geo-blocked (e.g. HTTP 451/403 on cloud IPs)
+                coin = "BTC" if "BTC" in clean else ("ETH" if "ETH" in clean else ("SOL" if "SOL" in clean else clean.split("/")[0]))
+                try:
+                    import urllib.request
+                    cb_req = urllib.request.Request(
+                        f"https://api.coinbase.com/v2/prices/{coin}-USD/spot",
+                        headers={"User-Agent": "QuantOS/2.0", "Accept": "application/json"}
+                    )
+                    with urllib.request.urlopen(cb_req, timeout=2.5) as cb_resp:
+                        if cb_resp.status == 200:
+                            cb_data = json.loads(cb_resp.read().decode())
+                            if cb_data.get("data") and cb_data["data"].get("amount"):
+                                lp = round(float(cb_data["data"]["amount"]), 2)
+                                bid = lp
+                                ask = lp
+                                provider_name = "coinbase-public"
+                except Exception:
+                    pass
+
+                if not lp:
+                    yf_quote = LiveQuoteFetcher.fetch_live_data(f"{coin}-USD", "CRYPTO")
+                    if yf_quote and yf_quote.get("last_price"):
+                        lp = yf_quote.get("last_price")
+                        bid = lp
+                        ask = lp
+                        vol = yf_quote.get("volume") or 0.0
+                        chg_pct = yf_quote.get("change_pct") or 0.0
+                        high_24h = yf_quote.get("high")
+                        low_24h = yf_quote.get("low")
+                        provider_name = "yahoo-public"
+
+            if lp:
                 q = {
                     "symbol": s,
                     "clean_symbol": clean,
-                    "exchange": "BINANCE",
-                    "provider": "binance",
+                    "exchange": "CRYPTO",
+                    "provider": provider_name,
                     "last_price": lp,
                     "lastPrice": lp,
-                    "bid": ticker.get("bid_price") or lp,
-                    "ask": ticker.get("ask_price") or lp,
-                    "volume": ticker.get("volume_24h") or 0.0,
-                    "change_pct": ticker.get("change_pct_24h") or 0.0,
-                    "changePercent": ticker.get("change_pct_24h") or 0.0,
-                    "high": ticker.get("high_24h"),
-                    "low": ticker.get("low_24h"),
+                    "bid": bid,
+                    "ask": ask,
+                    "volume": vol,
+                    "change_pct": chg_pct,
+                    "changePercent": chg_pct,
+                    "high": high_24h,
+                    "low": low_24h,
                     "market_status": "OPEN",
                     "price_state": "LIVE",
                     "status_label": "LIVE",
-                    "timestamp": ticker.get("timestamp") or now_dt.isoformat(),
+                    "timestamp": ts,
                 }
                 result[s] = q
                 result[clean] = q

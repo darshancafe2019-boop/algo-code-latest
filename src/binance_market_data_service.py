@@ -189,18 +189,9 @@ class BinanceMarketDataService:
             quote_volume_24h = float(spot_ticker.get("quoteVolume") or 0.0)
             change_pct_24h = float(spot_ticker.get("priceChangePercent") or 0.0)
 
-        # In case API is temporarily unavailable, use last known cache or safe baseline
+        # Zero mock / fake price policy: if live ticker not received, do not invent prices
         if last_price == 0.0:
-            if clean_sym.startswith("BTC"):
-                last_price, mark_price, index_price = 65000.0, 65000.0, 65000.0
-            elif clean_sym.startswith("ETH"):
-                last_price, mark_price, index_price = 3450.0, 3450.0, 3450.0
-            elif clean_sym.startswith("SOL"):
-                last_price, mark_price, index_price = 145.0, 145.0, 145.0
-            else:
-                last_price, mark_price, index_price = 100.0, 100.0, 100.0
-            bid_price = last_price * 0.9999
-            ask_price = last_price * 1.0001
+            return None
 
         mid_price = round((bid_price + ask_price) / 2.0, 2)
 

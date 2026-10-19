@@ -137,6 +137,7 @@ def add_cors_headers(response):
         "http://127.0.0.1:3100",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://algo-code-latest.vercel.app",
     ]
     frontend_url = os.environ.get("FRONTEND_URL") or os.environ.get("APP_PUBLIC_URL") or getattr(config, "APP_PUBLIC_URL", "")
     if frontend_url:
@@ -146,7 +147,12 @@ def add_cors_headers(response):
     if allowed_extra:
         allowed_origins.extend([o.strip().rstrip("/") for o in allowed_extra.split(",") if o.strip()])
 
-    is_allowed = origin in allowed_origins or (frontend_url and origin == frontend_url.rstrip("/"))
+    is_allowed = (
+        origin in allowed_origins
+        or (frontend_url and origin == frontend_url.rstrip("/"))
+        or origin.endswith(".vercel.app")
+        or origin.endswith(".onrender.com")
+    )
     if is_allowed:
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
@@ -18944,26 +18950,109 @@ def api_market_quotes_snapshot():
                 return jsonify({"status": "success", "quote": quotes[symbol], "data": quotes[symbol]})
             return jsonify({"status": "success", "quotes": quotes, "data": quotes})
 
-    # Direct fallback for single quote
+    # Direct fallback querying live authoritative adapters
     result = {}
     from src.binance_market_data_service import BinanceMarketDataService
+    from market_data.stocks.quote_engine import LiveQuoteFetcher
     binance_svc = BinanceMarketDataService()
+
+    now_dt = datetime.now(timezone.utc)
+    # Indian market trading schedule: Monday-Friday 09:15-15:30 IST
+    ist_hour = (now_dt.hour + 5 + (now_dt.minute + 30) // 60) % 24
+    ist_min = (now_dt.minute + 30) % 60
+    is_indian_open = ((ist_hour == 9 and ist_min >= 15) or (10 <= ist_hour < 15) or (ist_hour == 15 and ist_min <= 30)) and now_dt.weekday() < 5
+
     for s in symbols:
-        if "BTC" in s or "ETH" in s or "SOL" in s:
-            ticker = binance_svc.get_ticker(s.replace("/", ""))
-            if ticker:
-                result[s] = {
+        clean = (
+            s.replace("BINANCE:", "")
+            .replace("NSE:", "")
+            .replace("BSE:", "")
+            .replace("NASDAQ:", "")
+            .replace("NYSE:", "")
+            .replace("OANDA:", "")
+            .replace(":SPOT", "")
+            .replace(":EQ", "")
+            .replace(":PERP", "")
+            .strip()
+        )
+
+        # 1. Crypto instruments (24x7 continuous live trading)
+        is_crypto = (
+            s.startswith("BINANCE:")
+            or s.startswith("DELTA:")
+            or any(coin in clean for coin in ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "USDT"])
+        )
+
+        if is_crypto:
+            ticker = binance_svc.get_ticker(clean.replace("/", "").replace("-", ""))
+            if ticker and ticker.get("last_price"):
+                lp = ticker.get("last_price")
+                q = {
                     "symbol": s,
+                    "clean_symbol": clean,
+                    "exchange": "BINANCE",
                     "provider": "binance",
-                    "last_price": ticker.get("lastPrice") or ticker.get("price"),
-                    "bid": ticker.get("bidPrice"),
-                    "ask": ticker.get("askPrice"),
-                    "volume": ticker.get("volume"),
-                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                    "last_price": lp,
+                    "lastPrice": lp,
+                    "bid": ticker.get("bid_price") or lp,
+                    "ask": ticker.get("ask_price") or lp,
+                    "volume": ticker.get("volume_24h") or 0.0,
+                    "change_pct": ticker.get("change_pct_24h") or 0.0,
+                    "changePercent": ticker.get("change_pct_24h") or 0.0,
+                    "high": ticker.get("high_24h"),
+                    "low": ticker.get("low_24h"),
+                    "market_status": "OPEN",
+                    "price_state": "LIVE",
+                    "status_label": "LIVE",
+                    "timestamp": ticker.get("timestamp") or now_dt.isoformat(),
                 }
+                result[s] = q
+                result[clean] = q
+                if "/" in clean:
+                    result[clean.replace("/", "")] = q
+            continue
+
+        # 2. Indian & Global instruments (Equities, Indices, Forex)
+        exchange = "NSE"
+        if s.startswith("BSE:") or clean in ["SENSEX", "BSESN"]:
+            exchange = "BSE"
+        elif s.startswith("NASDAQ:") or clean in ["NVDA", "AAPL", "MSFT", "TSLA"]:
+            exchange = "NASDAQ"
+        elif s.startswith("OANDA:") or "USD" in clean or "EUR" in clean or "GBP" in clean or "JPY" in clean:
+            exchange = "FOREX"
+
+        live = LiveQuoteFetcher.fetch_live_data(clean, exchange)
+        if live and live.get("last_price"):
+            lp = live.get("last_price")
+            status_open = is_indian_open if exchange in ["NSE", "BSE"] else True
+            q = {
+                "symbol": s,
+                "clean_symbol": clean,
+                "exchange": exchange,
+                "provider": live.get("provider") or ("NSE" if exchange == "NSE" else "BSE"),
+                "last_price": lp,
+                "lastPrice": lp,
+                "open": live.get("open") or lp,
+                "high": live.get("high") or lp,
+                "low": live.get("low") or lp,
+                "close": live.get("previous_close") or lp,
+                "previous_close": live.get("previous_close") or lp,
+                "change_pct": live.get("change_pct") or 0.0,
+                "changePercent": live.get("change_pct") or 0.0,
+                "change": live.get("change_abs") or 0.0,
+                "volume": live.get("volume") or 0.0,
+                "bid": lp,
+                "ask": lp,
+                "market_status": "OPEN" if status_open else "CLOSED",
+                "price_state": "LIVE" if status_open else "LAST_TRADED",
+                "status_label": "LIVE" if status_open else "MARKET CLOSED / LAST CLOSE",
+                "timestamp": now_dt.isoformat(),
+            }
+            result[s] = q
+            result[clean] = q
 
     if len(symbols) == 1 and symbol in result:
-        return jsonify({"status": "success", "quote": result[symbol], "data": result[symbol]})
+        return jsonify({"status": "success", "quote": result[symbol], "data": result[symbol], "quotes": result})
     return jsonify({"status": "success", "quotes": result, "data": result})
 
 

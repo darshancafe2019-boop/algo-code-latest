@@ -27,6 +27,20 @@ class LiveQuoteFetcher:
     @classmethod
     def get_ticker_symbol(cls, symbol: str, exchange: str) -> str:
         s = symbol.strip().upper()
+        if s.startswith("^"):
+            return s
+        if s in ["NIFTY", "NIFTY50", "NIFTY 50", "NSE:NIFTY", "NSEI"]:
+            return "^NSEI"
+        if s in ["BANKNIFTY", "BANK NIFTY", "NSE:BANKNIFTY", "NSEBANK"]:
+            return "^NSEBANK"
+        if s in ["SENSEX", "BSESN", "BSE:SENSEX"]:
+            return "^BSESN"
+        if s in ["EURUSD", "EUR/USD", "EURUSD=X", "OANDA:EURUSD"]:
+            return "EURUSD=X"
+        if s in ["USDINR", "USD/INR", "USDINR=X"]:
+            return "USDINR=X"
+        if s in ["GBPUSD", "GBP/USD", "GBPUSD=X"]:
+            return "GBPUSD=X"
         ex = exchange.strip().upper()
         if ex in ["NSE", "NSI"]:
             return f"{s}.NS" if not s.endswith(".NS") else s
@@ -84,7 +98,7 @@ class LiveQuoteFetcher:
             logger.debug(f"Gateway live fetch note for {symbol}: {e}")
 
         # 1. Secondary Live Feed: YFinance Fast Info (if gateway had no quote)
-        if not data and (symbol.isalnum() or symbol.replace("-", "").isalnum()):
+        if not data and ticker_str:
             try:
                 import logging as _log
                 _log.getLogger("yfinance").setLevel(_log.CRITICAL)

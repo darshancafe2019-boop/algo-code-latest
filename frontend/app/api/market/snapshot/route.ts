@@ -1,50 +1,98 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getLiveSnapshotQuotes } from "@/lib/market-data/live-snapshot-service";
+import { getBackendBaseUrl, CANONICAL_CLOUD_BACKEND_URL } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const searchParams = req.nextUrl.searchParams;
-  const symbolsParam = searchParams.get("symbols") || searchParams.get("symbol") || "";
-  const providerParam = (searchParams.get("provider") || "UPSTOX").toUpperCase();
+  const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
+  const targetUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?${searchParams.toString()}`;
 
-  const symbols = symbolsParam
-    ? symbolsParam.split(",").map((s) => s.trim().toUpperCase()).filter(Boolean)
-    : [];
-
-  const quotes = await getLiveSnapshotQuotes(symbols, providerParam);
-
-  return NextResponse.json({
-    status: "success",
-    timestamp: Date.now(),
-    quotes,
-    totalCount: Object.keys(quotes).length,
-    source: "REAL_MARKET_GATEWAY",
-  });
-}
-
-export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const symbols = Array.isArray(body.symbols) ? body.symbols.map((s: string) => s.toUpperCase()) : [];
-    const providerParam = (body.provider || "UPSTOX").toUpperCase();
-
-    const quotes = await getLiveSnapshotQuotes(symbols, providerParam);
-
-    return NextResponse.json({
-      status: "success",
-      timestamp: Date.now(),
-      quotes,
-      totalCount: Object.keys(quotes).length,
-      source: "REAL_MARKET_GATEWAY",
+    const res = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "QuantOS-NextJS-Proxy",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
     });
-  } catch {
+
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json(data);
+    }
+
     return NextResponse.json(
       {
         status: "error",
-        message: "Failed to parse request body",
+        quotes: {},
+        data: {},
+        message: `Backend responded with HTTP ${res.status}`,
       },
-      { status: 400 }
+      { status: res.status }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        status: "error",
+        quotes: {},
+        data: {},
+        message: `Failed to connect to backend snapshot: ${err?.message || err}`,
+      },
+      { status: 503 }
+    );
+  }
+}
+
+export async function POST(req: NextRequest) {
+  const backendBase = getBackendBaseUrl() || CANONICAL_CLOUD_BACKEND_URL;
+  let symbolsStr = "";
+  try {
+    const body = await req.json();
+    const symbols = Array.isArray(body.symbols) ? body.symbols.map((s: string) => s.toUpperCase()) : [];
+    symbolsStr = symbols.join(",");
+  } catch {
+    // If empty body
+  }
+
+  const targetUrl = `${backendBase.replace(/\/+$/, "")}/api/market/snapshot?symbols=${encodeURIComponent(symbolsStr)}`;
+
+  try {
+    const res = await fetch(targetUrl, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "QuantOS-NextJS-Proxy",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json(data);
+    }
+
+    return NextResponse.json(
+      {
+        status: "error",
+        quotes: {},
+        data: {},
+        message: `Backend responded with HTTP ${res.status}`,
+      },
+      { status: res.status }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        status: "error",
+        quotes: {},
+        data: {},
+        message: `Failed to connect to backend snapshot: ${err?.message || err}`,
+      },
+      { status: 503 }
     );
   }
 }

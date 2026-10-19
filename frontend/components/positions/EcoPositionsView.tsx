@@ -336,7 +336,7 @@ export function EcoPositionsView() {
   };
 
   return (
-    <div className="space-y-4 font-sans select-none text-[#F7FAFC] pb-12">
+    <div className="w-full space-y-5 font-sans select-none text-[#F7FAFC] pb-12">
       {/* Toast Notification */}
       {statusNotification && (
         <div

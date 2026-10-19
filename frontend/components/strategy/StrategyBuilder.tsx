@@ -509,7 +509,7 @@ export function StrategyBuilder() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-16">
+    <div className="w-full pb-16 font-sans">
       {/* Streamlined Single-Column Workflow Workspace */}
       <StrategySimplifiedCanvas
         strategy={strategy}

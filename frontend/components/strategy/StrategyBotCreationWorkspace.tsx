@@ -1225,7 +1225,7 @@ export function StrategyBotCreationWorkspace() {
 
       {/* Dynamic View based on Workspace Mode */}
       {workspaceMode === "SOURCE_STRATEGIES" ? (
-        <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+        <div className="w-full px-2 sm:px-4 py-6">
           <SourceStrategyCreationView
             onSelectDerivativeMode={() => setWorkspaceMode("DERIVATIVES_WIZARD")}
           />
@@ -1284,7 +1284,7 @@ export function StrategyBotCreationWorkspace() {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-6xl w-full mx-auto px-4 sm:px-6 py-6 flex-1 flex flex-col gap-6">
+      <div className="w-full px-2 sm:px-4 py-6 flex-1 flex flex-col gap-6">
         {/* Source: OPTION CHAIN Banner & Two-Way Navigation */}
         {(optionOriginContext?.isFromOptionChain || strategyLegs.length > 0) && (
           <div className="bg-[#0B1929] border border-purple-500/40 rounded-2xl p-4 sm:p-5 shadow-xl space-y-3 animate-in fade-in duration-150">
@@ -2263,7 +2263,7 @@ export function StrategyBotCreationWorkspace() {
 
       {/* 4. Sticky Bottom Command Bar matching Dashboard */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-[#07111F]/95 backdrop-blur-md border-t border-[#12304A] px-4 sm:px-6 py-3">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-4">
+        <div className="w-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             {currentStep !== "market" && (
               <button

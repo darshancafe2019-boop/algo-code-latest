@@ -420,7 +420,7 @@ export function MarketUniverse() {
   };
 
   return (
-    <div className="space-y-3.5 font-sans select-none text-slate-100 pb-16 w-full max-w-[1750px] mx-auto px-2 sm:px-4">
+    <div className="w-full space-y-5 font-sans select-none text-slate-100 pb-12">
       {/* 1. Header: Universal Search, Category Tabs, Telemetry & Filter Controls */}
       <ErrorBoundary title="Markets Header Error">
         <SimpleMarketsHeader

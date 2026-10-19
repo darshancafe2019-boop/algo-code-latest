@@ -273,7 +273,7 @@ function BotControlTabInner() {
   // SUBVIEW 1: Bot Creation Wizard (7-step canonical control plane)
   if (activeView === "create") {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-5 w-full text-slate-100 font-sans pb-12 animate-fadeIn">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
           <button
             onClick={() => {
@@ -305,7 +305,7 @@ function BotControlTabInner() {
   // SUBVIEW 2: Bot Terminal / Details Snapshot
   if (activeView === "details" && selectedBotId) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fadeIn">
+      <div className="flex flex-col gap-5 w-full text-slate-100 font-sans pb-12 animate-fadeIn">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800/80">
           <button
             onClick={() => {
@@ -333,7 +333,7 @@ function BotControlTabInner() {
 
 // PRIMARY VIEW: Upgraded Institutional Trading Bot Fleet Dashboard
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 animate-fadeIn">
+    <div className="flex flex-col gap-5 w-full text-slate-100 font-sans pb-12 animate-fadeIn">
       {/* Top Header */}
       <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 sm:p-7 shadow-2xl backdrop-blur-xl">
         {/* Subtle accent glow */}
@@ -1136,7 +1136,7 @@ export function BotControlTab() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-7xl px-4 py-12 text-center text-slate-400">
+        <div className="w-full py-12 text-center text-slate-400">
           <div className="flex flex-col items-center justify-center gap-3">
             <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
             <p className="font-mono text-sm text-slate-300">Loading Trading Bot Fleet Control...</p>

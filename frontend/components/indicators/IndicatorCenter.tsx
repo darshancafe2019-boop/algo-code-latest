@@ -629,7 +629,7 @@ export function IndicatorCenter() {
       {/* PAGE */}
       {/* =========================================================== */}
 
-      <div className="relative mx-auto w-full max-w-[1780px] px-3 pb-12 pt-3 sm:px-4 lg:px-6">
+      <div className="relative w-full pb-12">
 
         {/* ========================================================= */}
         {/* MAIN COMMAND PANEL */}

@@ -211,7 +211,7 @@ export function StrategyCenter() {
   };
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 space-y-6 max-w-[1800px] mx-auto min-w-0 font-sans text-slate-100">
+    <div className="w-full space-y-6 min-w-0 font-sans text-slate-100 pb-12">
       {/* 1. Master Strategy Center Executive Header */}
       <div className="relative overflow-hidden p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-[#0C1322] via-[#0E172A] to-[#121B2F] border border-[#1E293B] shadow-2xl">
         <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-6 relative z-10">

@@ -329,7 +329,7 @@ export function BotControlCenterVNext({ botId: propBotId, onBack }: BotControlCe
       : null;
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2 pb-16 space-y-6 animate-fadeIn">
+    <div className="flex flex-col gap-5 w-full text-slate-100 font-sans pb-12 animate-fadeIn">
       {/* 1. TOP BREADCRUMB & METADATA BAR */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-mono">
         <div className="flex items-center gap-2">

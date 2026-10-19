@@ -6,7 +6,7 @@ import { ProviderManagerFullView } from "@/components/providers/ProviderManagerF
 export default function SettingsProvidersPage() {
   return (
     <DirectPageLayout activeTab="settings">
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="w-full pb-12">
         <ProviderManagerFullView />
       </div>
     </DirectPageLayout>

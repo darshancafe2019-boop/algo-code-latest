@@ -220,7 +220,7 @@ export function AccountSecurity() {
   const anyError = keysError || gateError || liveError;
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 pb-12 font-sans">
       {/* Header Banner */}
       <div className="p-6 rounded-2xl bg-gradient-to-r from-[#121824] via-[#101726] to-[#121824] border border-[#1A2A3F] shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">

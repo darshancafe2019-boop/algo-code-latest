@@ -177,7 +177,7 @@ export function SecurityCenter() {
   const backups = (backupsData?.backups || []) as BackupSnapshot[];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
+    <div className="w-full space-y-6 pb-12 font-sans">
       {/* Header Strip */}
       <div className="p-5 rounded-2xl bg-[#080E18] border border-[#172338] shadow-2xl relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none" />

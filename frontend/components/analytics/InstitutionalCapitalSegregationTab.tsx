@@ -369,7 +369,7 @@ export function InstitutionalCapitalSegregationTab() {
   const isQuarantined = reconciliationStatus === "RECONCILIATION_REQUIRED" || discrepanciesCount > 0;
 
   return (
-    <div className="space-y-6 font-sans select-none animate-fadeIn pb-12">
+    <div className="w-full space-y-6 font-sans select-none animate-fadeIn pb-12">
       {/* 1. TOP INSTITUTIONAL COMMAND & CONTROL HEADER (CUSTOMER CAPITAL OVERVIEW) */}
       <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-5 shadow-lg flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">

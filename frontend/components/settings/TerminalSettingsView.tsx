@@ -53,7 +53,7 @@ export function TerminalSettingsView() {
   if (!isMounted) return null;
 
   return (
-    <div className="space-y-5 max-w-[1400px] mx-auto min-w-0 font-sans pb-12">
+    <div className="w-full space-y-5 min-w-0 font-sans pb-12">
       {/* 1. SECURITY & ACCESS CONTROL CENTER */}
       <SimpleSecuritySection telemetry={telemetry} onRefresh={refetch} />
 

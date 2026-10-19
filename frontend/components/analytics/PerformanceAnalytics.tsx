@@ -199,7 +199,7 @@ export function PerformanceAnalytics() {
   }, [barsData?.bars]);
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1900px] mx-auto min-w-0 font-sans">
+    <div className="w-full space-y-5 min-w-0 font-sans pb-12">
       {/* 1. TOP FILTER BAR */}
       <JournalFilterBar
         filters={filters}

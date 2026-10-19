@@ -74,7 +74,7 @@ export function BackendAvailabilityBanner() {
       role="alert"
       className="sticky top-0 z-50 w-full bg-gradient-to-r from-rose-950/95 via-amber-950/95 to-rose-950/95 border-b border-rose-500/40 text-white px-4 py-2.5 shadow-2xl backdrop-blur-md transition-all font-mono text-xs"
     >
-      <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div className="w-full flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="p-1.5 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 animate-pulse">
             <WifiOff className="w-4 h-4" />

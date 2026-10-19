@@ -227,7 +227,7 @@ export function TradeOperationsWorkspace() {
   ];
 
   return (
-    <div className="w-full space-y-3.5 font-sans max-w-[1600px] mx-auto px-4 pt-4 pb-12 bg-[#05101A]">
+    <div className="w-full space-y-5 font-sans pb-12">
       {/* ── 1. TOP HEADER STRIP ───────────────────────────────────── */}
       <div className="p-3.5 sm:p-4 rounded-[10px] bg-[#0A1422] border border-[#12304A] flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">

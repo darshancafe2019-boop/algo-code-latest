@@ -296,7 +296,7 @@ export function BotCreationControlPlane({
   const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 1));
 
   return (
-    <div className={`mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 space-y-6 ${isModal ? "p-4" : ""}`}>
+    <div className={`w-full space-y-6 pb-12 text-slate-100 font-sans ${isModal ? "p-4" : ""}`}>
       {/* Top Header Card */}
       <div className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-r from-[#0B1528] via-[#09101F] to-[#0D182E] p-6 sm:p-7 shadow-2xl backdrop-blur-xl">
         <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-blue-500 via-cyan-400 to-indigo-600" />

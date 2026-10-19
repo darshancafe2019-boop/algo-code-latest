@@ -257,7 +257,7 @@ export function CryptoOptionChainTerminal({ initialUnderlying = "BTC" }: Props) 
   const pcr = totalCallOi > 0 ? (totalPutOi / totalCallOi).toFixed(2) : "—";
 
   return (
-    <div className="flex flex-col gap-4 text-slate-100 font-sans pb-12">
+    <div className="w-full flex flex-col gap-5 text-slate-100 font-sans pb-12">
       {/* Top Header & Navigation Bar */}
       <div className="bg-[#0B1220] border border-slate-800 rounded-xl p-4 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">

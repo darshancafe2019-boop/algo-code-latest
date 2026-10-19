@@ -223,7 +223,7 @@ export function OrderExecutionCenter({
   });
 
   return (
-    <div className="bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-6 space-y-4 font-sans select-none">
+    <div className="w-full bg-[#0A1422] border border-[#1A2A3F] rounded-xl p-4 sm:p-6 space-y-5 font-sans select-none pb-12">
       {/* 1. Header with Mode Switch & Latency */}
       <OrderCommandHeader
         executionMode={executionMode}

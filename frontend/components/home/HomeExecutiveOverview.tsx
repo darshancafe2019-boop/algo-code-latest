@@ -279,7 +279,7 @@ export function HomeExecutiveOverview() {
   }, [snapshotData?.movers, topMoversFilter, quotes]);
 
   return (
-    <div className="w-full space-y-3.5 font-sans max-w-[1600px] mx-auto px-4 pt-4 pb-12 bg-[#05101A]">
+    <div className="w-full space-y-5 font-sans pb-12">
       {/* ── 1. TOP KPI ROW (EXACTLY 5 CARDS, HEIGHT 110–115px, RADIUS 10px) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
         {/* Card 1: Total Portfolio */}

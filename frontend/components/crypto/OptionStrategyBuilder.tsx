@@ -107,7 +107,7 @@ export function OptionStrategyBuilder() {
   ];
 
   return (
-    <div className="flex flex-col gap-6 text-slate-100 font-sans pb-12">
+    <div className="w-full flex flex-col gap-5 text-slate-100 font-sans pb-12">
       {/* Header */}
       <div className="bg-[#131B2A] border border-slate-800 rounded-xl p-5 shadow-xl flex flex-wrap items-center justify-between gap-4">
         <div>

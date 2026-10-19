@@ -105,7 +105,7 @@ export function SystemHealthHub() {
   const isOverallHealthy = (data?.status || "").toUpperCase() === "HEALTHY";
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
+    <div className="w-full space-y-6 pb-12 font-sans">
       {/* Top Banner */}
       <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">

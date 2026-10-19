@@ -127,7 +127,7 @@ export function RiskManagement() {
   ] as const;
 
   return (
-    <div className="space-y-5 font-sans select-none text-[var(--theme-text-primary)] max-w-7xl mx-auto pb-12">
+    <div className="w-full space-y-5 font-sans select-none text-[var(--theme-text-primary)] pb-12">
       {/* 1. TOP AUTHORITATIVE RISK STATUS BAR */}
       <ErrorBoundary title="Global Risk Bar Error">
         <UnifiedRiskTopBar

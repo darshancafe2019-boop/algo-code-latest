@@ -119,7 +119,7 @@ export function LogsDebugging() {
                   (source === "DIAGNOSTICS" && isErrorDiag);
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 pb-12 font-sans">
       {/* Header Banner */}
       <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4">
         <div>

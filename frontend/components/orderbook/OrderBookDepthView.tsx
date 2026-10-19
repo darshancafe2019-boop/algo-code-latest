@@ -50,7 +50,7 @@ export function OrderBookDepthView({ defaultSymbol = "BTC/USDT" }: { defaultSymb
   );
 
   return (
-    <div className="space-y-4 text-slate-100 font-sans">
+    <div className="w-full space-y-5 text-slate-100 font-sans pb-12">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-[#131B2A] border border-slate-800 rounded-2xl p-4 shadow-xl">
         <div className="flex items-center gap-3">

@@ -255,7 +255,7 @@ export function FuturesWorkspace({
   const totalCount = healthData?.total_providers_count ?? 5;
 
   return (
-    <div className="w-full space-y-3 font-sans text-slate-100 select-none max-w-[1750px] mx-auto min-w-0">
+    <div className="w-full space-y-4 font-sans text-slate-100 select-none min-w-0 pb-12">
       {/* 1. Multi-Board Navigation Switcher Tabs */}
       <div className="flex items-center justify-between gap-2 p-1.5 rounded-xl bg-[#080E1C] border border-[#12304A] overflow-x-auto shadow-lg">
         <div className="flex items-center gap-1.5 min-w-0">

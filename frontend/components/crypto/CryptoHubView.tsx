@@ -79,7 +79,7 @@ export function CryptoHubView() {
   ];
 
   return (
-    <div className="flex flex-col gap-4 text-slate-100 font-sans pb-12 select-none w-full max-w-7xl mx-auto">
+    <div className="flex flex-col gap-5 text-slate-100 font-sans pb-12 select-none w-full">
       {/* 1. Simplified Master Header */}
       <CryptoHeader
         selectedUnderlying={selectedUnderlying}

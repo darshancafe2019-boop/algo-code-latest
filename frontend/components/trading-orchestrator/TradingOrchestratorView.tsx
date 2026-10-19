@@ -65,7 +65,7 @@ export const TradingOrchestratorView: React.FC = () => {
   } = useSharedTradingState();
 
   return (
-    <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 py-4 text-slate-100 space-y-4 font-sans select-none">
+    <div className="w-full space-y-4 text-slate-100 font-sans select-none pb-12">
       {/* 1. Persistent Top Command Bar */}
       <TopCommandBar
         system={systemStatus}

@@ -906,7 +906,7 @@ export const OptionChainTerminal: React.FC<OptionChainTerminalProps> = ({
   }, []);
 
   return (
-    <div className="flex flex-col gap-3 text-slate-100 font-sans w-full max-w-[1700px] mx-auto min-w-0">
+    <div className="w-full flex flex-col gap-5 text-slate-100 font-sans min-w-0 pb-12">
       {/* 1. TOP HEADER */}
       <OptionTerminalHeader
         underlying={underlying}

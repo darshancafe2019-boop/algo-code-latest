@@ -269,7 +269,7 @@ export function AlertsMonitoring() {
   };
 
   return (
-    <div className="space-y-4 max-w-7xl mx-auto pb-12">
+    <div className="w-full space-y-5 pb-12 font-sans">
       {/* 1. Master Header */}
       <AlertsCenterHeader
         metrics={summaryData?.metrics}

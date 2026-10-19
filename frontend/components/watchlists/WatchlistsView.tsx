@@ -216,7 +216,7 @@ export function WatchlistsView() {
   const assetClasses = ["ALL", "CRYPTO", "EQUITIES", "INDICES", "FOREX", "COMMODITIES", "DERIVATIVES"];
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-2 sm:px-4 lg:px-6 py-4 font-sans select-none">
+    <div className="w-full space-y-6 pb-12 font-sans select-none">
       {/* 1. Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-[var(--theme-surface)] border border-[var(--theme-border)] shadow-md">
         <div className="space-y-1">

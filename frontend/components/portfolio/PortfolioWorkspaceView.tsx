@@ -31,7 +31,7 @@ export function PortfolioWorkspaceView() {
   ];
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+    <div className="w-full space-y-5 min-w-0 font-sans pb-12">
       <WorkspaceHeader
         title="Institutional Portfolio & Terminal Desk"
         subtitle="Authoritative QuantDataCore multi-broker capital aggregation, live MTM risk engine, OMS execution routing & factor attribution"

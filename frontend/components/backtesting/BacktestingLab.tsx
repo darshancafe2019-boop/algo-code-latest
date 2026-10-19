@@ -89,7 +89,7 @@ export function BacktestingLab() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 pb-12 font-sans">
       {/* Top Banner Header */}
       <div className="bg-[#121824] border border-[#1A2A3F] rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 shadow-xl">
         <div className="flex items-center gap-3">

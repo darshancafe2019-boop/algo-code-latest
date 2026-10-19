@@ -56,7 +56,7 @@ export function ProviderFailoverBanner() {
 
   return (
     <div className="w-full bg-gradient-to-r from-amber-950/90 via-red-950/80 to-amber-950/90 border-b border-red-500/40 px-4 py-2 text-white shadow-lg backdrop-blur-md transition-all">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-2.5">
           <div className="rounded-full bg-red-500/20 p-1 border border-red-500/40 animate-pulse">
             <AlertTriangle className="h-4 w-4 text-red-400" />

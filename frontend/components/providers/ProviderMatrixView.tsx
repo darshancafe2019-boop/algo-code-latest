@@ -6,7 +6,7 @@ import { ProviderCapabilityMatrix } from "@/components/market/ProviderCapability
 
 export function ProviderMatrixView() {
   return (
-    <div className="space-y-6">
+    <div className="w-full space-y-6 pb-12 font-sans">
       <MarketHealthTelemetry />
       <ProviderCapabilityMatrix />
     </div>

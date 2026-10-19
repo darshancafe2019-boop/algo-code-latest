@@ -330,7 +330,7 @@ export function MarketCommandCenter() {
   const providers = health.providers;
 
   return (
-    <div className="p-3 sm:p-4 md:p-6 space-y-5 max-w-[1850px] mx-auto min-w-0 font-sans text-slate-200">
+    <div className="w-full space-y-5 min-w-0 font-sans text-slate-200 pb-12">
       {/* ─────────────────────────────────────────────────────────────────────────────
           1. TOP PROVIDER BAR (Multi-Provider Live Cards)
       ───────────────────────────────────────────────────────────────────────────── */}

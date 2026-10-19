@@ -347,7 +347,7 @@ function MainApp() {
         {/* 11.6 Capital & Funds Management */}
         {isTabActive("capital-funds", ["capital", "funds"]) && (
           <ErrorBoundary title="Capital & Funds Tab Failed">
-            <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
+            <div className="w-full space-y-6 pb-12">
               <InstitutionalCapitalSegregationTab />
             </div>
           </ErrorBoundary>
@@ -419,7 +419,7 @@ function MainApp() {
         {/* 20. Modular Futures Universe Terminal */}
         {isTabActive("crypto-futures", ["futures"]) && (
           <ErrorBoundary title="Futures & Derivatives Terminal Failed">
-            <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+            <div className="w-full space-y-4 pb-12 min-w-0 font-sans">
               <FuturesWorkspace activeBoard="ALL" boardTitle="Universal Futures Workstation" />
             </div>
           </ErrorBoundary>

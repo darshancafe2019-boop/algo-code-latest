@@ -302,7 +302,7 @@ export function TradeJournal() {
   ];
 
   return (
-    <div className="space-y-4 max-w-[1700px] mx-auto pb-16 px-2 sm:px-4 select-none font-sans">
+    <div className="w-full space-y-5 pb-12 select-none font-sans">
       {/* 1. Header Strip */}
       <JournalHeader
         timeframe={timeframe}

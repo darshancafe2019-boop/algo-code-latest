@@ -3,6 +3,8 @@
  * STRICT TRUTH-IN-DATA: Never expose access tokens or secrets to client bundles.
  */
 
+import { getGatewayHttpUrl, getGatewaySecret } from "@/lib/config/gatewayConfig";
+
 export interface MarketDataConfig {
   dhan: {
     clientId: string;
@@ -73,14 +75,8 @@ export const marketDataConfig: MarketDataConfig = {
     enabled: !!(process.env.REDIS_URL || process.env.REDIS_CACHE_URL),
   },
   gateway: {
-    url:
-      process.env.MARKET_GATEWAY_URL ||
-      process.env.MARKET_DATA_GATEWAY_URL ||
-      process.env.MARKET_DATA_GATEWAY_HTTP_URL ||
-      (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:5051"),
-    secret: typeof window === "undefined"
-      ? (process.env.MARKET_GATEWAY_SECRET || process.env.MARKET_DATA_GATEWAY_SECRET || "")
-      : "",
+    url: getGatewayHttpUrl(),
+    secret: getGatewaySecret(),
   },
   isServer: typeof window === "undefined",
 };

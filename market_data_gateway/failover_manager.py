@@ -17,17 +17,31 @@ from market_data_gateway.adapters.base import BaseProviderAdapter, NormalizedQuo
 logger = logging.getLogger("MDGateway.Failover")
 
 # Provider priority chains per asset class
+FAILOVER_CHAINS: Dict[str, List[str]] = {
+    "CRYPTO": ["binance_ws", "delta_options_ws", "yahoo_fallback"],
+    "CRYPTO_OPTIONS": ["delta_options_ws", "yahoo_fallback"],
+    "INDIAN_EQUITIES": ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"],
+    "INDIAN_INDICES": ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"],
+    "INDIAN_OPTIONS": ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"],
+    "GLOBAL_EQUITIES": ["twelve_data", "polygon", "alpaca_iex", "yahoo_fallback"],
+    "GLOBAL_INDICES": ["twelve_data", "yahoo_fallback"],
+    "FOREX": ["twelve_data", "oanda_ws", "yahoo_fallback"],
+    "COMMODITIES": ["upstox_ws", "fyers_ws", "twelve_data", "yahoo_fallback"],
+    "FUTURES": ["upstox_ws", "dhan_ws", "binance_ws", "delta_options_ws", "fyers_ws", "databento", "yahoo_fallback"],
+    "OPTIONS": ["upstox_ws", "dhan_ws", "fyers_ws", "delta_options_ws", "angelone", "twelve_data"],
+}
+
 # Dynamic resolution respecting environment configuration (INDIA_BROKER, FEED_MODE)
 def get_failover_chain(asset_class: str) -> List[str]:
     pref = os.environ.get("INDIA_BROKER", "UPSTOX").upper()
     sim_enabled = os.environ.get("FEED_MODE", "").upper() == "SIMULATION"
 
     if pref == "FYERS":
-        indian_chain = ["fyers_ws", "upstox_ws", "angelone", "yahoo_fallback"]
+        indian_chain = ["fyers_ws", "upstox_ws", "dhan_ws", "angelone", "yahoo_fallback"]
     elif pref == "DHAN":
-        indian_chain = ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"]
+        indian_chain = ["dhan_ws", "upstox_ws", "fyers_ws", "angelone", "yahoo_fallback"]
     else:
-        indian_chain = ["upstox_ws", "fyers_ws", "angelone", "yahoo_fallback"]
+        indian_chain = ["upstox_ws", "dhan_ws", "fyers_ws", "angelone", "yahoo_fallback"]
 
     if sim_enabled:
         indian_chain = ["sim_feed"] + indian_chain
@@ -47,10 +61,10 @@ def get_failover_chain(asset_class: str) -> List[str]:
         "GLOBAL_INDICES": ["twelve_data", "yahoo_fallback"],
         "FOREX": ["twelve_data", "oanda_ws", "yahoo_fallback"],
         "COMMODITIES": ["upstox_ws", "fyers_ws", "twelve_data", "yahoo_fallback"],
-        "FUTURES": ["upstox_ws", "binance_ws", "delta_options_ws", "fyers_ws", "databento", "yahoo_fallback"],
-        "OPTIONS": ["upstox_ws", "fyers_ws", "delta_options_ws", "angelone", "twelve_data"],
+        "FUTURES": ["upstox_ws", "dhan_ws", "binance_ws", "delta_options_ws", "fyers_ws", "databento", "yahoo_fallback"],
+        "OPTIONS": ["upstox_ws", "dhan_ws", "fyers_ws", "delta_options_ws", "angelone", "twelve_data"],
     }
-    return chains.get(asset_class, ["yahoo_fallback"])
+    return chains.get(asset_class, FAILOVER_CHAINS.get(asset_class, ["yahoo_fallback"]))
 
 
 # Symbol hints for rapid zero-cost classification

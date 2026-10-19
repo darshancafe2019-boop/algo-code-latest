@@ -57,6 +57,10 @@ const InstitutionalCapitalSegregationTab = dynamic(
   () => import("@/components/analytics/InstitutionalCapitalSegregationTab").then((m) => m.InstitutionalCapitalSegregationTab),
   { ssr: false, loading: () => null }
 );
+const PortfolioWorkspaceView = dynamic(
+  () => import("@/components/portfolio/PortfolioWorkspaceView").then((m) => m.PortfolioWorkspaceView),
+  { ssr: false, loading: () => null }
+);
 const TradeJournal = dynamic(
   () => import("@/components/trade-journal/TradeJournal").then((m) => m.TradeJournal),
   { ssr: false, loading: () => null }
@@ -333,9 +337,16 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 11.5 Portfolio & Capital Management */}
-        {isTabActive("portfolio", ["capital-funds", "capital", "funds"]) && (
-          <ErrorBoundary title="Portfolio & Capital Tab Failed">
+        {/* 11.5 Portfolio & Terminal Desk */}
+        {isTabActive("portfolio") && (
+          <ErrorBoundary title="Portfolio & Terminal Desk Failed">
+            <PortfolioWorkspaceView />
+          </ErrorBoundary>
+        )}
+
+        {/* 11.6 Capital & Funds Management */}
+        {isTabActive("capital-funds", ["capital", "funds"]) && (
+          <ErrorBoundary title="Capital & Funds Tab Failed">
             <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">
               <InstitutionalCapitalSegregationTab />
             </div>

@@ -1,200 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getBackendBaseUrl, isProduction } from "@/lib/config/gatewayConfig";
-import { getForwardHeaders } from "@/lib/proxy-headers";
+import { proxyToBackend } from "@/lib/backend-proxy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
  * Dedicated Next.js Route Handler for Quant.OS Data Core v2 API (/api/v2/*)
- * Forwards requests directly to the authoritative Flask backend.
+ * Forwards requests cleanly to the authoritative Quant.OS backend engine.
  */
-// High-speed in-memory micro-cache for idempotent GET queries (TTL 1000ms)
-interface CacheEntry {
-  status: number;
-  body: ArrayBuffer;
-  contentType: string;
-  timestamp: number;
-}
-const v2MicroCache = new Map<string, CacheEntry>();
-const CACHE_TTL_MS = 1000;
-
 async function handleV2Proxy(
   req: NextRequest,
-  { params }: { params: { path: string[] } }
+  ctx: { params?: { path: string[] } | Promise<{ path: string[] }> }
 ) {
-  const BACKEND_URL = getBackendBaseUrl();
-  const requestId =
-    req.headers.get("x-request-id") ||
-    `v2_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
-  const startTime = performance.now();
-
-  if (!BACKEND_URL && isProduction()) {
-    return NextResponse.json(
-      {
-        ok: false,
-        success: false,
-        status: "error",
-        data: null,
-        error: {
-          code: "BACKEND_NOT_CONFIGURED",
-          message: "Backend internal URL is not configured in production environment.",
-          retryable: false,
-        },
-        requestId,
-        timestamp: new Date().toISOString(),
-        latencyMs: 0,
-      },
-      {
-        status: 503,
-        headers: { "X-Request-Id": requestId, "Content-Type": "application/json" },
-      }
-    );
-  }
-
-  const effectiveBackendUrl = BACKEND_URL || (isProduction() ? "" : "http://127.0.0.1:5050");
-  const pathSegments = params?.path || [];
-  const subPath = pathSegments.join("/");
-  const url = new URL(req.url);
-  const targetUrl = `${effectiveBackendUrl}/api/v2/${subPath}${url.search}`;
-  const cacheKey = `${req.method}:${subPath}${url.search}`;
-
-  // Invalidate cache on mutations
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
-    v2MicroCache.clear();
-  }
-
-  // Check micro-cache for idempotent GET
-  if (req.method === "GET") {
-    const cached = v2MicroCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-      const responseHeaders = new Headers();
-      responseHeaders.set("X-Cache-Hit", "true");
-      responseHeaders.set("X-Response-Time-Ms", "0");
-      if (cached.contentType) {
-        responseHeaders.set("Content-Type", cached.contentType);
-      }
-      return new NextResponse(cached.body.slice(0), {
-        status: cached.status,
-        headers: responseHeaders,
-      });
-    }
-  }
-
-  const forwardHeaders = getForwardHeaders(req, requestId);
-
-  // Read body for state-modifying HTTP methods
-  let bodyData: BodyInit | null = null;
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
-    try {
-      const clonedReq = req.clone();
-      bodyData = await clonedReq.arrayBuffer();
-    } catch {
-      bodyData = null;
-    }
-  }
-
-  const timeoutMs = 15000;
-  const controller = new AbortController();
-  const timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
-
-  if (req.signal) {
-    req.signal.addEventListener("abort", () => {
-      try {
-        controller.abort();
-      } catch {}
-    });
-  }
-
+  let pathSegments: string[] = [];
   try {
-    const backendRes = await fetch(targetUrl, {
-      method: req.method,
-      headers: forwardHeaders,
-      body: bodyData,
-      signal: controller.signal,
-      cache: "no-store",
-    });
-
-    clearTimeout(timeoutTimer);
-
-    const contentType = backendRes.headers.get("content-type") || "";
-    const latencyMs = Math.round(performance.now() - startTime);
-
-    const responseHeaders = new Headers();
-    responseHeaders.set("X-Request-Id", requestId);
-    responseHeaders.set("X-Response-Time-Ms", latencyMs.toString());
-    responseHeaders.set("X-Cache-Hit", "false");
-    if (contentType) {
-      responseHeaders.set("Content-Type", contentType);
-    }
-
-    if (typeof (backendRes.headers as any).getSetCookie === "function") {
-      const cookies: string[] = (backendRes.headers as any).getSetCookie();
-      for (const cookie of cookies) {
-        responseHeaders.append("set-cookie", cookie);
-      }
-    } else {
-      const setCookie = backendRes.headers.get("set-cookie");
-      if (setCookie) {
-        responseHeaders.set("set-cookie", setCookie);
+    if (ctx?.params) {
+      const resolved = ctx.params instanceof Promise ? await ctx.params : ctx.params;
+      if (Array.isArray(resolved?.path)) {
+        pathSegments = resolved.path;
       }
     }
+  } catch {}
 
-    const rawBody = await backendRes.arrayBuffer();
-
-    // Cache successful GET responses
-    if (req.method === "GET" && backendRes.ok) {
-      if (v2MicroCache.size > 200) {
-        v2MicroCache.clear();
-      }
-      v2MicroCache.set(cacheKey, {
-        status: backendRes.status,
-        body: rawBody,
-        contentType,
-        timestamp: Date.now(),
-      });
-    }
-
-    return new NextResponse(rawBody, {
-      status: backendRes.status,
-      headers: responseHeaders,
-    });
-  } catch (err: any) {
-    clearTimeout(timeoutTimer);
-    const latencyMs = Math.round(performance.now() - startTime);
-    const isTimeout = err?.name === "AbortError";
-    const statusCode = isTimeout ? 504 : 503;
-    const errorCode = isTimeout ? "GATEWAY_TIMEOUT" : "BACKEND_UNAVAILABLE";
-    const errorMessage = isTimeout
-      ? `Backend request to /api/v2/${subPath} timed out after ${timeoutMs}ms`
-      : `Quant.OS Engine backend is unreachable at ${BACKEND_URL}`;
-
-    return NextResponse.json(
-      {
-        ok: false,
-        success: false,
-        status: "error",
-        data: null,
-        error: {
-          code: errorCode,
-          message: errorMessage,
-          retryable: true,
-          details: err?.message || String(err),
-        },
-        requestId,
-        timestamp: new Date().toISOString(),
-        latencyMs,
-      },
-      {
-        status: statusCode,
-        headers: {
-          "X-Request-Id": requestId,
-          "X-Response-Time-Ms": latencyMs.toString(),
-          "Content-Type": "application/json",
-        },
-      }
-    );
+  if (pathSegments.length === 0) {
+    const urlObj = new URL(req.url);
+    const cleanPath = urlObj.pathname.replace(/^\/api\/v2\/?/, "");
+    pathSegments = cleanPath.split("/").filter(Boolean);
   }
+
+  const subPath = pathSegments.join("/");
+  return proxyToBackend(req, subPath, {
+    apiPrefix: "/api/v2",
+    timeoutMs: 15000,
+    cacheTtlMs: 1000,
+  });
 }
 
 export async function GET(

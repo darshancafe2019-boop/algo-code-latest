@@ -849,7 +849,7 @@ class OrderExecutionService:
             if trade_id:
                 from src.trade_ledger import trade_ledger
                 ok, ledger_res = trade_ledger.close_trade(
-                    trade_id=int(trade_id),
+                    trade_id=trade_id,
                     exit_price=fill_avg_price,
                     exit_reason=exit_reason,
                     exit_qty=fill_qty,
@@ -953,8 +953,9 @@ class OrderExecutionService:
             # Partial Exit
             rem_qty = round(curr_qty - exit_qty, 4)
             from src.trade_ledger import trade_ledger
+            trade_id_int = int(trade_id) if trade_id is not None else 0
             trade_ledger.record_partial_fill(
-                trade_id=int(trade_id),
+                trade_id=trade_id_int,
                 order_id=f"PART_EXIT_{uuid.uuid4().hex[:6]}",
                 fill_price=current_price,
                 fill_qty=exit_qty,

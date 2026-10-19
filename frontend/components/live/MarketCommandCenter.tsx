@@ -34,6 +34,7 @@ import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import { useMarketFeedStore, NormalizedMarketTick, ProviderStat } from "@/lib/market-data/market-feed-store";
 import { MarketStreamObservatory } from "./MarketStreamObservatory";
 import { MarketDepthViewer } from "./MarketDepthViewer";
+import { getGatewayWsUrl } from "@/lib/config/gatewayConfig";
 
 export interface MasterInstrument {
   symbol: string;
@@ -137,12 +138,7 @@ export function MarketCommandCenter() {
     }
 
     try {
-      const wsUrl =
-        process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
-        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
-        process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
-        process.env.NEXT_PUBLIC_MARKET_WS_URL ||
-        (process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws/market");
+      const wsUrl = getGatewayWsUrl();
 
       if (!wsUrl) {
         setConnectionStatus("DISCONNECTED");

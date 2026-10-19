@@ -79,6 +79,11 @@ class InstrumentRef:
     execution_supported: bool = True
     metadata: Dict[str, Any] = field(default_factory=dict)
 
+    @property
+    def canonical_symbol(self) -> str:
+        """Returns canonical trading symbol."""
+        return self.trading_symbol
+
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
 

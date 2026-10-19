@@ -52,6 +52,7 @@ interface AuthContextType {
   }) => Promise<LoginResult>;
   verifyEmailOTP: (challengeId: string, otp: string) => Promise<LoginResult>;
   resendEmailOTP: (challengeId: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }>;
+  sendLoginOTP: (emailOrUsername: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; cooldown_seconds?: number; error?: string; devOtp?: string; devMode?: boolean }>;
   verify2FA: (challengeId: string, code: string) => Promise<LoginResult>;
   forgotPassword: (emailOrUsername: string) => Promise<{ success: boolean; message: string; challengeId?: string; destination?: string; error?: string }>;
   verifyResetOTP: (challengeId: string, otp: string) => Promise<{ success: boolean; resetToken?: string; message?: string; error?: string }>;
@@ -504,6 +505,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Request / Send Login OTP to registered email (Passwordless login)
+  const sendLoginOTP = async (
+    emailOrUsername: string
+  ): Promise<{
+    success: boolean;
+    message: string;
+    challengeId?: string;
+    destination?: string;
+    cooldown_seconds?: number;
+    error?: string;
+    devOtp?: string;
+    devMode?: boolean;
+  }> => {
+    try {
+      const res = await fetch("/api/auth/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: emailOrUsername.trim() }),
+      });
+
+      const data = await res.json();
+      if (res.ok && (data.status === "success" || data.success === true)) {
+        return {
+          success: true,
+          message: data.message || `Verification code sent to ${data.destination || emailOrUsername}.`,
+          challengeId: data.challenge_id,
+          destination: data.destination,
+          cooldown_seconds: data.cooldown_seconds || 60,
+          devOtp: data.dev_otp,
+          devMode: data.dev_mode,
+        };
+      }
+      return {
+        success: false,
+        message: data.message || "Failed to send verification code.",
+        error: data.message,
+        cooldown_seconds: data.cooldown_seconds || 60,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        message: "Network error while requesting verification code.",
+        error: err?.message,
+      };
+    }
+  };
+
   // Verify 2FA via challenge
   const verify2FA = async (
     challengeId: string,
@@ -791,6 +839,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       verifyEmailOTP,
       resendEmailOTP,
+      sendLoginOTP,
       verify2FA,
       forgotPassword,
       verifyResetOTP,
@@ -815,6 +864,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       login,
       verifyEmailOTP,
       resendEmailOTP,
+      sendLoginOTP,
       verify2FA,
       forgotPassword,
       verifyResetOTP,

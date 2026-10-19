@@ -1,36 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getForwardHeaders } from "@/lib/proxy-headers";
-import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
+import { getBackendConfigStatus } from "@/lib/config/gatewayConfig";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const statusFilter = searchParams.get("status") || "";
+  const config = getBackendConfigStatus();
 
-  const BACKEND_URL = getBackendBaseUrl();
-  if (BACKEND_URL) {
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/orders`, {
-        headers: getForwardHeaders(req),
-        cache: "no-store",
-      });
-      if (res.ok) {
-        const data = await res.json();
-        return NextResponse.json(data);
-      }
-      if (res.status === 401 || res.status === 403) {
-        const data = await res.json().catch(() => ({ error: "Authentication or authorization required" }));
-        return NextResponse.json(data, { status: res.status });
-      }
-    } catch {}
+  if (!config.valid) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_NOT_CONFIGURED",
+        message: config.reason || "Quant.OS Engine backend is not configured.",
+        orders: [],
+        count: 0,
+        filter: statusFilter || "ALL",
+        timestamp: Date.now(),
+      },
+      { status: 503 }
+    );
   }
 
-  return NextResponse.json({
-    status: "success",
-    timestamp: Date.now(),
-    orders: [],
-    count: 0,
-    filter: statusFilter || "ALL",
-  });
+  const BACKEND_URL = config.url;
+  try {
+    const res = await fetch(`${BACKEND_URL}/api/orders`, {
+      headers: getForwardHeaders(req),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json(data);
+    }
+    if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({ error: "Authentication or authorization required" }));
+      return NextResponse.json(data, { status: res.status });
+    }
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "UPSTREAM_ERROR",
+        message: `Backend returned status ${res.status}`,
+        orders: [],
+        count: 0,
+      },
+      { status: res.status }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_UNAVAILABLE",
+        message: `Quant.OS Engine backend is unreachable at ${BACKEND_URL}: ${err.message}`,
+        orders: [],
+        count: 0,
+        filter: statusFilter || "ALL",
+        timestamp: Date.now(),
+      },
+      { status: 503 }
+    );
+  }
 }

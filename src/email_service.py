@@ -417,7 +417,7 @@ class EmailService:
         Enforces that admin challenges strictly deliver to ashishparadkar1999@gmail.com.
         """
         clean_recipient = normalize_email(to_email)
-        if not clean_recipient or username == "admin" or user_id in ("usr_admin_01", "usr_authoritative_admin"):
+        if not clean_recipient:
             clean_recipient = get_target_admin_email()
 
         subject = "Your Quant.OS verification code"
@@ -479,10 +479,10 @@ If you did not request this code, ignore this email.
     ) -> Tuple[bool, Optional[str], Optional[str]]:
         """
         Dispatches 6-digit Password Reset Verification Code.
-        Enforces that admin password recovery strictly delivers to ashishparadkar1999@gmail.com.
+        Delivers to the provided email or authoritative administrator recipient.
         """
         clean_recipient = normalize_email(to_email)
-        if not clean_recipient or username == "admin" or user_id in ("usr_admin_01", "usr_authoritative_admin"):
+        if not clean_recipient:
             clean_recipient = get_target_admin_email()
 
         subject = "Your Quant.OS password reset code"

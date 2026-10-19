@@ -16,6 +16,8 @@ import uuid
 import time
 import sqlite3
 import logging
+import urllib.request
+import urllib.parse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
@@ -501,34 +503,39 @@ def list_bots() -> List[Dict[str, Any]]:
             pos_open_map: Dict[str, Tuple[int, float]] = {}
             try:
                 for prow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(unrealized_pnl), 0.0) FROM positions WHERE quantity > 0 GROUP BY bot_id").fetchall():
-                    pos_open_map[prow[0]] = (int(prow[1] or 0), float(prow[2] or 0.0))
+                    if prow[0]:
+                        pos_open_map[str(prow[0])] = (int(prow[1] or 0), float(prow[2] or 0.0))
             except Exception:
                 pass
 
             pos_real_map: Dict[str, float] = {}
             try:
                 for prow in conn.execute("SELECT bot_id, COALESCE(sum(realized_pnl), 0.0) FROM positions GROUP BY bot_id").fetchall():
-                    pos_real_map[prow[0]] = float(prow[1] or 0.0)
+                    if prow[0]:
+                        pos_real_map[str(prow[0])] = float(prow[1] or 0.0)
             except Exception:
                 pass
 
             trades_map: Dict[str, Tuple[int, float]] = {}
             try:
                 for trow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(fees), 0.0) FROM trades GROUP BY bot_id").fetchall():
-                    trades_map[trow[0]] = (int(trow[1] or 0), float(trow[2] or 0.0))
+                    if trow[0]:
+                        trades_map[str(trow[0])] = (int(trow[1] or 0), float(trow[2] or 0.0))
             except Exception:
                 pass
 
             for r in rows:
                 try:
-                    cfg = json.loads(r["configuration_json"])
+                    cfg = json.loads(r["configuration_json"] or "{}")
                 except Exception:
                     cfg = {}
+                if not isinstance(cfg, dict):
+                    cfg = {}
 
-                bot_id = r["id"]
+                bot_id = str(r["id"]) if r["id"] is not None else ""
                 status = r["status"]
                 mode = r["execution_mode"]
-                name = r["name"]
+                name = str(r["name"] or "")
 
                 open_pos_count, unrealized_pnl = pos_open_map.get(bot_id, (0, 0.0))
                 realized_pnl = pos_real_map.get(bot_id, 0.0)
@@ -622,9 +629,11 @@ def get_bot_snapshot(bot_id: str) -> Dict[str, Any]:
             raise KeyError(f"Bot '{bot_id}' not found.")
 
         try:
-            bot_cfg = json.loads(row["configuration_json"])
+            bot_cfg = json.loads(row["configuration_json"] or "{}")
         except Exception:
             bot_cfg = {"id": bot_id, "name": row["name"], "status": row["status"]}
+        if not isinstance(bot_cfg, dict):
+            bot_cfg = {}
 
         bot_cfg["id"] = bot_id
         bot_cfg["name"] = row["name"]
@@ -638,7 +647,7 @@ def get_bot_snapshot(bot_id: str) -> Dict[str, Any]:
             provider=provider,
             market_type=bot_cfg.get("market", {}).get("market_type", ""),
             explicit_currency=bot_cfg.get("currency") or "",
-            name=row["name"],
+            name=str(row["name"] or ""),
         )
         bot_cfg["currency"] = bot_currency
 
@@ -781,7 +790,9 @@ def set_bot_status(bot_id: str, new_status: str, event_type: str, event_msg: str
         if not row:
             raise KeyError(f"Bot '{bot_id}' not found.")
 
-        cfg = json.loads(row["configuration_json"])
+        cfg = json.loads(row["configuration_json"] or "{}")
+        if not isinstance(cfg, dict):
+            cfg = {}
         cfg["status"] = new_status
         cfg["updated_at"] = datetime.now(timezone.utc).isoformat()
 
@@ -889,7 +900,7 @@ def start_all_bots() -> Dict[str, Any]:
 
     with _get_db_connection() as conn:
         rows = conn.execute("SELECT id FROM bots WHERE status != 'ARCHIVED'").fetchall()
-        started_ids = [r["id"] for r in rows]
+        started_ids = [str(r["id"]) for r in rows if r["id"] is not None]
         if started_ids:
             conn.execute("UPDATE bots SET status = 'RUNNING', updated_at = CURRENT_TIMESTAMP WHERE status != 'ARCHIVED'")
             now_ts = datetime.now(timezone.utc).isoformat()
@@ -948,7 +959,7 @@ def stop_all_bots() -> Dict[str, Any]:
     stopped_ids: List[str] = []
     with _get_db_connection() as conn:
         rows = conn.execute("SELECT id FROM bots WHERE status = 'RUNNING'").fetchall()
-        stopped_ids = [r["id"] for r in rows]
+        stopped_ids = [str(r["id"]) for r in rows if r["id"] is not None]
         if stopped_ids:
             conn.execute("UPDATE bots SET status = 'STOPPED', updated_at = CURRENT_TIMESTAMP WHERE status = 'RUNNING'")
             now_ts = datetime.now(timezone.utc).isoformat()
@@ -990,7 +1001,7 @@ def delete_all_bots(force: bool = True) -> Dict[str, Any]:
 
     try:
         from src.process_manager import multi_bot_manager
-        multi_bot_manager.stop_all()
+        multi_bot_manager.stop_all_bots()
     except Exception as e:
         logger.warning(f"Error stopping all bots during delete_all: {e}")
 
@@ -1135,13 +1146,10 @@ def get_live_quote(symbol: str = "BTCUSD", provider: Optional[str] = None, marke
 def _get_live_quote_uncached(symbol: str = "BTCUSD", provider: Optional[str] = None, market_type: Optional[str] = None) -> Dict[str, Any]:
     """Underlying implementation for quote lookup using market data gateway (primary) or ticker service fallback."""
     clean_sym = symbol.replace("/", "").replace("-", "").upper()
-    is_option_contract = symbol.startswith(("C-", "P-", "O-")) or "OPTION" in str(market_type or "").upper() or (len(symbol.split("-")) >= 3)
+    is_option_contract = symbol.startswith(("C-", "P-", "O-")) or "OPTION" in (market_type or "").upper() or (len(symbol.split("-")) >= 3)
 
     # 1. Query Central Market Data Gateway for authoritative real-time tick (fastest, in-memory)
     try:
-        import urllib.request
-        import json
-        import urllib.parse
         gw_port = os.getenv("MARKET_GATEWAY_PORT", "5051")
         req = urllib.request.Request(
             f"http://127.0.0.1:{gw_port}/api/market/quote?symbol={urllib.parse.quote(symbol)}",
@@ -1624,9 +1632,6 @@ def get_dynamic_expiries(market_type: str = "CRYPTO_OPTION", underlying: str = "
 
     # 1. Query Central Market Data Gateway for authoritative live active option expiries
     try:
-        import urllib.request
-        import json
-        import urllib.parse
         gw_port = os.getenv("MARKET_GATEWAY_PORT", "5051")
         url = f"http://127.0.0.1:{gw_port}/api/options/chain?underlying={urllib.parse.quote(und)}&provider={prov}"
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
@@ -1692,9 +1697,6 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
 
     # 1. Fetch authoritative live option chain from Central Market Data Gateway
     try:
-        import urllib.request
-        import json
-        import urllib.parse
         gw_port = os.getenv("MARKET_GATEWAY_PORT", "5051")
         url = f"http://127.0.0.1:{gw_port}/api/options/chain?underlying={urllib.parse.quote(und)}&provider={prov}"
         if exp:
@@ -1901,7 +1903,7 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
         chain_rows.append({
             "strike": st,
             "call": {
-                "symbol": f"{underlying}-{exp}-{int(st)}-CE",
+                "symbol": f"{underlying}-{exp}-{st}-CE",
                 "strike": st,
                 "option_type": "CE",
                 "bid": round(call_prem * 0.99, 1),
@@ -1921,7 +1923,7 @@ def get_live_option_chain(market_type: str = "CRYPTO_OPTION", underlying: str = 
                 "greeks": {"delta": 0.52, "gamma": 0.0001, "theta": -12.4, "vega": 18.2, "iv": 48.5},
             },
             "put": {
-                "symbol": f"{underlying}-{exp}-{int(st)}-PE",
+                "symbol": f"{underlying}-{exp}-{st}-PE",
                 "strike": st,
                 "option_type": "PE",
                 "bid": round(put_prem * 0.99, 1),

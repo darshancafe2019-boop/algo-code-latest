@@ -605,12 +605,12 @@ class UniversalOptionsEngine:
                 pe=pe_quote,
             ))
 
-        max_pain = min(pain_by_strike, key=pain_by_strike.get) if pain_by_strike else atm_strike
+        max_pain = min(pain_by_strike, key=lambda k: pain_by_strike.get(k, 0.0)) if pain_by_strike else atm_strike
         pcr_oi = round(total_put_oi / max(1.0, total_call_oi), 2)
         pcr_vol = round(total_put_vol / max(1.0, total_call_vol), 2)
 
-        put_oi_strikes = sorted(strike_rows, key=lambda r: r.pe.OI, reverse=True)
-        call_oi_strikes = sorted(strike_rows, key=lambda r: r.ce.OI, reverse=True)
+        put_oi_strikes = sorted(strike_rows, key=lambda r: r.pe.OI or 0.0, reverse=True)
+        call_oi_strikes = sorted(strike_rows, key=lambda r: r.ce.OI or 0.0, reverse=True)
         support_zones = [r.strike for r in put_oi_strikes[:2]]
         resistance_zones = [r.strike for r in call_oi_strikes[:2]]
 
@@ -1239,7 +1239,7 @@ class UniversalOptionsEngine:
         underlying: str,
         spot_price: float,
         selected_expiry: str,
-        latency_ms: float = 25.0,
+        latency_ms: Optional[float] = 25.0,
         freshness_status: str = "CONNECTED",
     ) -> OptionChainSnapshot:
         """

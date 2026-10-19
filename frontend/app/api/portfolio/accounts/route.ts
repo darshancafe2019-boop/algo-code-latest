@@ -1,63 +1,64 @@
-import { NextResponse } from "next/server";
-import { marketDataConfig } from "@/lib/market-data/config";
+import { NextRequest, NextResponse } from "next/server";
+import { getBackendConfigStatus } from "@/lib/config/gatewayConfig";
+import { getForwardHeaders } from "@/lib/proxy-headers";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const hasDhan = Boolean(marketDataConfig.dhan.clientId && marketDataConfig.dhan.accessToken);
-  const hasUpstox = Boolean(marketDataConfig.upstox.apiKey && marketDataConfig.upstox.accessToken);
-  const hasDelta = Boolean(marketDataConfig.delta.apiKey);
+export async function GET(req: NextRequest) {
+  const config = getBackendConfigStatus();
 
-  const accounts = [
-    {
-      brokerId: "dhan",
-      brokerName: "Dhan HQ",
-      accountType: "EQUITY_DERIVATIVES",
-      currency: "INR",
-      status: hasDhan ? "CONNECTED" : "NOT_CONFIGURED",
-      balance: {
-        totalCapital: 1000000.0,
-        availableMargin: 850000.0,
-        usedMargin: 150000.0,
-        unrealizedPnl: 0.0,
-        realizedPnl: 0.0,
+  if (!config.valid) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_NOT_CONFIGURED",
+        message: config.reason || "Quant.OS Engine backend is not configured.",
+        accounts: [],
+        count: 0,
+        timestamp: Date.now(),
       },
-    },
-    {
-      brokerId: "upstox",
-      brokerName: "Upstox V3",
-      accountType: "EQUITY_DERIVATIVES",
-      currency: "INR",
-      status: hasUpstox ? "CONNECTED" : "NOT_CONFIGURED",
-      balance: {
-        totalCapital: 500000.0,
-        availableMargin: 500000.0,
-        usedMargin: 0.0,
-        unrealizedPnl: 0.0,
-        realizedPnl: 0.0,
-      },
-    },
-    {
-      brokerId: "delta",
-      brokerName: "Delta Exchange India",
-      accountType: "CRYPTO_DERIVATIVES",
-      currency: "USD / USDT",
-      status: hasDelta ? "CONNECTED" : "PUBLIC_DATA_ONLY",
-      balance: {
-        totalCapital: 10000.0,
-        availableMargin: 10000.0,
-        usedMargin: 0.0,
-        unrealizedPnl: 0.0,
-        realizedPnl: 0.0,
-      },
-    },
-  ];
+      { status: 503 }
+    );
+  }
 
-  return NextResponse.json({
-    status: "success",
-    timestamp: Date.now(),
-    tradingMode: process.env.TRADING_MODE || "PAPER",
-    paperTrading: true,
-    accounts,
-  });
+  const BACKEND_URL = config.url;
+  try {
+    const url = new URL(req.url);
+    const targetUrl = `${BACKEND_URL}/api/v2/accounts${url.search}`;
+    const res = await fetch(targetUrl, {
+      headers: getForwardHeaders(req),
+      cache: "no-store",
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return NextResponse.json(data);
+    }
+    if (res.status === 401 || res.status === 403) {
+      const data = await res.json().catch(() => ({ error: "Authentication or authorization required" }));
+      return NextResponse.json(data, { status: res.status });
+    }
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "UPSTREAM_ERROR",
+        message: `Backend returned status ${res.status}`,
+        accounts: [],
+        count: 0,
+      },
+      { status: res.status }
+    );
+  } catch (err: any) {
+    return NextResponse.json(
+      {
+        status: "error",
+        code: "BACKEND_UNAVAILABLE",
+        message: `Quant.OS Engine backend is unreachable at ${BACKEND_URL}: ${err.message}`,
+        accounts: [],
+        count: 0,
+        timestamp: Date.now(),
+      },
+      { status: 503 }
+    );
+  }
 }

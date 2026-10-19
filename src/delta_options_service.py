@@ -929,6 +929,10 @@ class DeltaOptionsService:
     def get_contract_by_symbol(self, symbol: str) -> Optional[Dict[str, Any]]:
         return db.get_delta_contract_by_symbol(symbol)
 
+    def get_all_quotes(self) -> Dict[str, Dict[str, Any]]:
+        """Returns all real-time raw quotes from WebSocket cache."""
+        return delta_options_ws_adapter.get_all_raw_quotes()
+
     def get_health(self) -> Dict[str, Any]:
         rest_health = self.client.health_check()
         ws_health = delta_options_ws_adapter.get_sync_health()

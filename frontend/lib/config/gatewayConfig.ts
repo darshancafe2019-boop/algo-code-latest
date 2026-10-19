@@ -1,35 +1,127 @@
 /**
- * QUANT.OS — Canonical Gateway Configuration (Frontend)
- * ======================================================
+ * QUANT.OS — Canonical Gateway & Backend Configuration (Frontend)
+ * ================================================================
  * Authoritative configuration module for internal and external gateway & backend endpoints.
  * - In local development: defaults to 127.0.0.1 IPv4 addressing to prevent macOS ::1 IPv6 resolution timeouts.
- * - In production (Vercel): strictly resolves configured environment variables (BACKEND_INTERNAL_URL,
- *   BACKEND_API_URL, MARKET_GATEWAY_URL, NEXT_PUBLIC_GATEWAY_WS_URL, etc.) and NEVER silently routes
- *   requests to 127.0.0.1 or localhost.
+ * - In production / cloud environments (Vercel): strictly resolves configured environment variables
+ *   (BACKEND_INTERNAL_URL, BACKEND_API_URL, MARKET_GATEWAY_URL, NEXT_PUBLIC_GATEWAY_WS_URL, etc.)
+ *   and NEVER routes requests to 127.0.0.1 or localhost.
+ * - Loopback addresses (127.0.0.1, localhost, 0.0.0.0, ::1) are strictly rejected in cloud/production
+ *   environments to prevent futile connection attempts from serverless edge runtimes.
  * - Server secrets (MARKET_GATEWAY_SECRET) are never exposed to browser client code.
  */
 
-export function isProduction(): boolean {
-  return process.env.NODE_ENV === "production";
+export interface BackendConfigStatus {
+  configured: boolean;
+  valid: boolean;
+  url: string;
+  reason?: string;
+  isProduction: boolean;
 }
 
 /**
- * Resolves the Python Flask Backend HTTP URL.
- * Order of precedence:
- * 1. BACKEND_INTERNAL_URL (Server-side private network URL, e.g. Render service)
- * 2. BACKEND_API_URL (Server-side public URL)
- * 3. NEXT_PUBLIC_BACKEND_URL (Public URL available to client & server)
- * 4. NEXT_PUBLIC_API_URL
- * 5. In development only: fallback to "http://127.0.0.1:5050"
+ * Returns true if running in a cloud production environment (e.g. Vercel) or production NODE_ENV.
  */
-export function getBackendBaseUrl(): string {
-  const url =
+export function isProduction(): boolean {
+  return (
+    process.env.NODE_ENV === "production" ||
+    process.env.VERCEL === "1" ||
+    Boolean(process.env.VERCEL_ENV)
+  );
+}
+
+/**
+ * Determines whether a URL or host string points to a local loopback interface.
+ */
+export function isLoopbackUrl(urlStr: string): boolean {
+  if (!urlStr) return false;
+  const trimmed = urlStr.trim().toLowerCase();
+  try {
+    const protoNormalized = trimmed.startsWith("ws://")
+      ? trimmed.replace("ws://", "http://")
+      : trimmed.startsWith("wss://")
+      ? trimmed.replace("wss://", "https://")
+      : trimmed;
+    const u = new URL(protoNormalized);
+    const h = u.hostname.toLowerCase();
+    return (
+      h === "127.0.0.1" ||
+      h === "localhost" ||
+      h === "0.0.0.0" ||
+      h === "::1" ||
+      h === "[::1]" ||
+      h.endsWith(".local") ||
+      h.endsWith(".internal")
+    );
+  } catch {
+    return (
+      trimmed.includes("127.0.0.1") ||
+      trimmed.includes("localhost") ||
+      trimmed.includes("0.0.0.0") ||
+      trimmed.includes("::1")
+    );
+  }
+}
+
+/**
+ * Validates backend configuration and returns full diagnostic status.
+ */
+export function getBackendConfigStatus(): BackendConfigStatus {
+  const prod = isProduction();
+  const rawUrl =
     process.env.BACKEND_INTERNAL_URL ||
     process.env.BACKEND_API_URL ||
     process.env.NEXT_PUBLIC_BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    (isProduction() ? "" : "http://127.0.0.1:5050");
-  return url ? url.replace(/\/+$/, "") : "";
+    "";
+
+  const cleanUrl = rawUrl.trim().replace(/\/+$/, "");
+
+  if (prod) {
+    if (!cleanUrl) {
+      return {
+        configured: false,
+        valid: false,
+        url: "",
+        reason:
+          "Quant.OS Engine backend URL is not configured. Set BACKEND_INTERNAL_URL or BACKEND_API_URL in production environment.",
+        isProduction: true,
+      };
+    }
+    if (isLoopbackUrl(cleanUrl)) {
+      return {
+        configured: true,
+        valid: false,
+        url: "",
+        reason: `Invalid production configuration: Backend URL is set to loopback address "${cleanUrl}". In cloud production (Vercel), Quant.OS Engine must point to a reachable deployed cloud service (e.g. https://quantos-backend.onrender.com). Localhost/127.0.0.1 cannot be reached from Vercel.`,
+        isProduction: true,
+      };
+    }
+    return {
+      configured: true,
+      valid: true,
+      url: cleanUrl,
+      isProduction: true,
+    };
+  }
+
+  // Local development
+  const devUrl = cleanUrl || "http://127.0.0.1:5050";
+  return {
+    configured: Boolean(cleanUrl),
+    valid: true,
+    url: devUrl,
+    isProduction: false,
+  };
+}
+
+/**
+ * Resolves the Python Flask Backend HTTP URL.
+ * In production: returns the validated remote URL, or empty string if unconfigured or loopback.
+ * In development: defaults to "http://127.0.0.1:5050".
+ */
+export function getBackendBaseUrl(): string {
+  return getBackendConfigStatus().url;
 }
 
 /**
@@ -42,13 +134,26 @@ export function getBackendBaseUrl(): string {
  * 5. In development only: fallback to "http://127.0.0.1:5051"
  */
 export function getGatewayHttpUrl(): string {
-  const url =
+  const rawUrl =
     process.env.MARKET_GATEWAY_URL ||
     process.env.MARKET_DATA_GATEWAY_URL ||
     process.env.MARKET_DATA_GATEWAY_HTTP_URL ||
     process.env.NEXT_PUBLIC_MARKET_GATEWAY_URL ||
-    (isProduction() ? "" : "http://127.0.0.1:5051");
-  return url ? url.replace(/\/+$/, "") : "";
+    "";
+
+  const cleanUrl = rawUrl.trim().replace(/\/+$/, "");
+
+  if (isProduction()) {
+    if (cleanUrl && isLoopbackUrl(cleanUrl)) {
+      console.warn(
+        `[QUANT.OS CONFIG WARNING] Ignoring loopback gateway HTTP URL in production: "${cleanUrl}".`
+      );
+      return "";
+    }
+    return cleanUrl;
+  }
+
+  return cleanUrl || "http://127.0.0.1:5051";
 }
 
 /**
@@ -63,18 +168,32 @@ export function getGatewayHttpUrl(): string {
  * 7. In development only: fallback to "ws://127.0.0.1:5051/ws"
  */
 export function getGatewayWsUrl(): string {
-  const explicitWs =
+  const explicitWs = (
     process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
     process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
     process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
     process.env.NEXT_PUBLIC_MARKET_WS_URL ||
     (typeof window === "undefined"
       ? process.env.MARKET_DATA_GATEWAY_WS_URL || process.env.MARKET_GATEWAY_WS_URL
-      : undefined);
+      : undefined) ||
+    ""
+  ).trim();
 
   if (explicitWs) {
+    if (isProduction() && isLoopbackUrl(explicitWs)) {
+      console.warn(
+        `[QUANT.OS CONFIG WARNING] Ignoring loopback gateway WebSocket URL in production: "${explicitWs}".`
+      );
+      return "";
+    }
+
     if (explicitWs.startsWith("/")) {
       if (typeof window !== "undefined") {
+        // In browser on Vercel: Vercel does not route custom WebSocket ports.
+        // Return empty string in production to enable SSE streaming fallback.
+        if (isProduction()) {
+          return "";
+        }
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
         return `${proto}//${window.location.host}${explicitWs}`;
       }
@@ -86,10 +205,7 @@ export function getGatewayWsUrl(): string {
   }
 
   // Derive from configured HTTP gateway URL if available
-  const httpUrl =
-    process.env.MARKET_GATEWAY_URL ||
-    process.env.MARKET_DATA_GATEWAY_URL ||
-    process.env.MARKET_DATA_GATEWAY_HTTP_URL;
+  const httpUrl = getGatewayHttpUrl();
   if (httpUrl) {
     const wsBase = httpUrl
       .replace(/\/+$/, "")
@@ -118,42 +234,44 @@ export function getGatewaySecret(): string {
 }
 
 export const GatewayConfig = {
+  get isProduction(): boolean {
+    return isProduction();
+  },
+  get isLoopback(): boolean {
+    return isLoopbackUrl(getBackendBaseUrl());
+  },
+  get backendConfigStatus(): BackendConfigStatus {
+    return getBackendConfigStatus();
+  },
   // Server-side internal API proxy destination
   get httpBaseUrl(): string {
     return getGatewayHttpUrl();
   },
-
   // Real-time WebSocket connection URL
   get wsBaseUrl(): string {
     return getGatewayWsUrl();
   },
-
   // Backend Core HTTP URL
   get backendBaseUrl(): string {
     return getBackendBaseUrl();
   },
-
   // Specific Health & Telemetry Routes
   get healthUrl(): string {
     const base = getGatewayHttpUrl();
     return base ? `${base}/health` : (isProduction() ? "" : "http://127.0.0.1:5051/health");
   },
-
   get snapshotUrl(): string {
     const base = getGatewayHttpUrl();
     return base ? `${base}/snapshot` : (isProduction() ? "" : "http://127.0.0.1:5051/snapshot");
   },
-
   get searchUrl(): string {
     const base = getGatewayHttpUrl();
     return base ? `${base}/search` : (isProduction() ? "" : "http://127.0.0.1:5051/search");
   },
-
   get systemHealthUrl(): string {
     const base = getBackendBaseUrl();
     return base ? `${base}/api/system/health` : (isProduction() ? "" : "http://127.0.0.1:5050/api/system/health");
   },
-
   // Tolerances
   maxQuoteAgeMs: 15000,
   maxLegQuoteSkewMs: 5000,

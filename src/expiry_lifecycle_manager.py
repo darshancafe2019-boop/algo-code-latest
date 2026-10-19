@@ -311,15 +311,16 @@ class DerivativeExpiryManager:
             if instrument_or_symbol.expiry:
                 exp_d = OptionContractNormalizer.parse_expiry_date(instrument_or_symbol.expiry)
             if not exp_d:
-                exp_d = OptionContractNormalizer.parse_expiry_date(instrument_or_symbol.canonical_symbol)
+                sym_can = getattr(instrument_or_symbol, "canonical_symbol", None) or getattr(instrument_or_symbol, "trading_symbol", "")
+                exp_d = OptionContractNormalizer.parse_expiry_date(sym_can)
             exchange = instrument_or_symbol.exchange.upper()
         elif isinstance(instrument_or_symbol, dict):
             exp_str = instrument_or_symbol.get("expiry") or instrument_or_symbol.get("expiry_date") or instrument_or_symbol.get("symbol") or ""
             exp_d = OptionContractNormalizer.parse_expiry_date(exp_str)
             exchange = str(instrument_or_symbol.get("exchange") or instrument_or_symbol.get("provider") or "").upper()
         else:
-            exp_d = OptionContractNormalizer.parse_expiry_date(str(instrument_or_symbol))
-            exchange = "NSE" if any(k in str(instrument_or_symbol).upper() for k in ("NIFTY", "BANKNIFTY", "NSE", "UPSTOX", "DHAN")) else "DELTA"
+            exp_d = OptionContractNormalizer.parse_expiry_date(instrument_or_symbol)
+            exchange = "NSE" if any(k in instrument_or_symbol.upper() for k in ("NIFTY", "BANKNIFTY", "NSE", "UPSTOX", "DHAN")) else "DELTA"
 
         if not exp_d:
             return {
@@ -439,7 +440,7 @@ class DerivativeExpiryManager:
                 INSERT INTO expiry_lifecycle_events (position_id, bot_id, symbol, event_type, state, idempotency_key, details, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (str(position_id), str(bot_id), str(symbol), event_type, state, idempotency_key, details_json, now_iso)
+                (position_id, bot_id, symbol, event_type, state, idempotency_key, details_json, now_iso)
             )
             return True
         except Exception as e:
@@ -638,8 +639,10 @@ class DerivativeExpiryManager:
             try:
                 from src.bot_wizard_service import get_live_quote
                 wq = get_live_quote(sym)
-                if wq and float(wq.get("last") or wq.get("price") or 0.0) > 0:
-                    exec_price = float(wq.get("last") or wq.get("price"))
+                if wq:
+                    raw_val = wq.get("last") or wq.get("price")
+                    if raw_val is not None and float(raw_val) > 0:
+                        exec_price = float(raw_val)
             except Exception:
                 pass
 
@@ -766,7 +769,7 @@ class DerivativeExpiryManager:
             # LIVE Execution via Broker Adapter
             try:
                 from src.broker_router import global_broker_router
-                adapter = global_broker_router.get_broker_adapter(record.execution_broker)
+                adapter = global_broker_router.get_adapter(record.execution_broker)
                 if hasattr(adapter, "square_off_position"):
                     broker_res = adapter.square_off_position(pos_id)
                 else:
@@ -865,7 +868,7 @@ class DerivativeExpiryManager:
         now_utc = datetime.now(timezone.utc)
 
         for p in positions:
-            if str(p.environment).upper() == "PAPER":
+            if p.environment.upper() == "PAPER":
                 continue
             in_window, cutoff_utc, code = self.is_contract_in_expiry_window(p.trading_symbol, now=now_utc)
             if in_window:
@@ -888,7 +891,7 @@ class DerivativeExpiryManager:
             if not p.auto_square_off_on_expiry:
                 continue
             # Paper trading positions are managed autonomously by their strategy TP/SL
-            if str(p.environment).upper() == "PAPER":
+            if p.environment.upper() == "PAPER":
                 continue
 
             info = self.get_contract_expiry_info(p.trading_symbol, square_off_minutes=p.expiry_exit_buffer_minutes, now=now_utc)

@@ -24,7 +24,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple, Union, cast
 import pandas as pd
 
 try:
@@ -1415,8 +1415,8 @@ class UpstoxService:
                         df.sort_values(by="timestamp", inplace=True)
                         df.reset_index(drop=True, inplace=True)
                         if len(df) > limit:
-                            df = df.iloc[-limit:].reset_index(drop=True)
-                        return df
+                            df = cast(pd.DataFrame, df.iloc[-limit:].reset_index(drop=True))
+                        return cast(pd.DataFrame, df)
             except Exception as e:
                 logger.warning("Upstox historical candle fetch notice for %s: %s (using simulation feed)", symbol, e)
 

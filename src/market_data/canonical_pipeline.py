@@ -548,7 +548,7 @@ def resolve_canonical_quote(
                                     "is_tradeable": cq.is_tradeable,
                                     "canonical_quote": cq.to_dict()
                                 }
-                    except (ValueError, UnicodeDecodeError) as json_err:
+                    except ValueError as json_err:
                         logger.debug("Gateway :%d returned invalid JSON for %s: %s", port, clean_symbol, json_err)
         except urllib.error.HTTPError as http_err:
             try:

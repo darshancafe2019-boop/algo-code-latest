@@ -13600,6 +13600,9 @@ def api_auth_login():
             }), 429
 
         user = db.get_user_by_username(username)
+        if not user and "@" in username:
+            user = db.get_user_by_email(username)
+
         # Constant-time comparison check: reject both unknown user and bad password with identical generic error
         if not user or not PasswordManager.verify_password(password, user["password_hash"], user["salt"]):
             db.log_security_audit_event(
@@ -13643,8 +13646,8 @@ def api_auth_login():
 
         # Resolve authoritative operator email address strictly server-side
         user_email = (user.get("email") or "").strip()
-        if username == "admin":
-            user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "admin@quantos.internal").strip()
+        if user.get("username") == "admin":
+            user_email = (os.getenv("AUTH_ADMIN_EMAIL") or os.getenv("AUTH_BOOTSTRAP_EMAIL") or getattr(config, "AUTH_ADMIN_EMAIL", "") or user_email or "ashishparadkar1999@gmail.com").strip()
             db.sync_admin_email_in_db("admin", user_email)
             user["email"] = user_email
         elif not user_email or "@" not in user_email or user_email.endswith(".local"):
@@ -14182,7 +14185,7 @@ def api_auth_email_otp_resend():
         "success": True,
         "challenge_id": new_challenge_id,
         "destination": masked_dest,
-        "message": "If the email is eligible, a verification code has been sent.",
+        "message": f"Verification code sent to {masked_dest}.",
         "cooldown_seconds": 60,
         "request_id": request_id
     }
@@ -21616,7 +21619,7 @@ if __name__ == "__main__":
             logger.info(f"Starting production WSGI server (Waitress) on port {port}...")
             print(f"[+] Starting Production WSGI Server (Waitress) on 0.0.0.0:{port}...")
             waitress.serve(app, host="0.0.0.0", port=port, threads=int(os.getenv("WSGI_THREADS", "16")), channel_timeout=120)
-        except (ImportError, ModuleNotFoundError, Exception):
+        except Exception:
             logger.info(f"Waitress not installed or failed; starting multi-threaded Flask server on port {port}...")
             app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
     else:

@@ -506,7 +506,7 @@ def get_connection() -> sqlite3.Connection:
                     conn.execute("PRAGMA journal_mode=WAL;")
                     _sqlite_pragmas_applied = True
         return conn
-    except (sqlite3.DatabaseError, sqlite3.OperationalError) as db_err:
+    except sqlite3.DatabaseError as db_err:
         err_msg = str(db_err).lower()
         if any(w in err_msg for w in ["unsupported file format", "malformed", "file is not a database", "corrupt"]):
             logger.critical("Corrupt database detected during get_connection(): %s. Running auto-recovery...", db_err)
@@ -844,7 +844,9 @@ def init_db(force: bool = False) -> None:
             except Exception as e:
                 logger.warning("PostgreSQL verification notice: %s", e)
 
+        conn = None
         for attempt in range(5):
+            conn = None
             try:
                 conn = get_connection()
                 cursor = conn.cursor()

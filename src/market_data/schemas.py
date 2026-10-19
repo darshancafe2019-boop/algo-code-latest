@@ -138,7 +138,7 @@ class OptionQuote:
     exchangeTimestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     lastUpdated: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     dataAgeMs: float = 0.0
-    latencyMs: float = 0.0
+    latencyMs: Optional[float] = 0.0
     freshnessStatus: str = "CONNECTED"  # CONNECTED, CONNECTING, DISCONNECTED, STALE, ERROR, RECONCILIATION_REQUIRED, AUTHENTICATION_FAILED, RATE_LIMITED, PROVIDER_UNAVAILABLE
     connectionStatus: str = "CONNECTED"
     isExecutable: bool = True
@@ -187,13 +187,13 @@ class OptionChainSnapshot:
     selected_expiry: str
     available_expiries: List[str]
     strikes: List[OptionStrikeRow]
-    max_pain: float
-    pcr_oi: float
-    pcr_volume: float
-    total_call_oi: float
-    total_put_oi: float
-    total_call_volume: float
-    total_put_volume: float
+    max_pain: Optional[float] = None
+    pcr_oi: Optional[float] = None
+    pcr_volume: Optional[float] = None
+    total_call_oi: Optional[float] = None
+    total_put_oi: Optional[float] = None
+    total_call_volume: Optional[float] = None
+    total_put_volume: Optional[float] = None
     support_zones: List[float] = field(default_factory=list)
     resistance_zones: List[float] = field(default_factory=list)
     timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
@@ -207,7 +207,7 @@ class OptionChainSnapshot:
     segment: str = "OPTIONS"
     currency: str = "INR"
     freshnessStatus: str = "CONNECTED"
-    latencyMs: float = 0.0
+    latencyMs: Optional[float] = 0.0
     dataAgeMs: float = 0.0
     diagnostics: Optional[OptionChainDiagnostics] = None
     streamKey: str = ""

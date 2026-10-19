@@ -29,6 +29,7 @@ import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 import { getQuoteAliases } from "@/lib/market-data/canonical-symbol";
+import { getGatewayWsUrl } from "@/lib/config/gatewayConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -190,45 +191,8 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
   const batchFrameRef = useRef<number | null>(null);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // WebSocket URL Generator
+  // WebSocket URL Generator: imported canonically from @/lib/config/gatewayConfig
   // ───────────────────────────────────────────────────────────────────────────
-
-  const getGatewayWsUrl = useCallback((): string => {
-    const envWsUrl =
-      process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
-      process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
-      process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
-      process.env.NEXT_PUBLIC_MARKET_WS_URL;
-
-    if (envWsUrl) {
-      if (envWsUrl.startsWith("/")) {
-        if (typeof window !== "undefined") {
-          const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-          return `${proto}//${window.location.host}${envWsUrl}`;
-        }
-        return process.env.NODE_ENV === "production" ? "" : `ws://127.0.0.1:5051${envWsUrl}`;
-      }
-      if (envWsUrl.startsWith("http://")) return envWsUrl.replace("http://", "ws://");
-      if (envWsUrl.startsWith("https://")) return envWsUrl.replace("https://", "wss://");
-      return envWsUrl;
-    }
-
-    if (typeof window === "undefined") {
-      return process.env.NODE_ENV === "production" ? "" : "ws://127.0.0.1:5051/ws";
-    }
-
-    // In production on Vercel: NEVER connect directly to 127.0.0.1:5051
-    if (process.env.NODE_ENV === "production") {
-      return "";
-    }
-
-    const rawHost = window.location.hostname;
-    const host = (!rawHost || rawHost === "localhost") ? "127.0.0.1" : rawHost;
-    const port = process.env.NEXT_PUBLIC_MARKET_GATEWAY_PORT || "5051";
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-
-    return `${protocol}//${host}:${port}/ws`;
-  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Safe Teardown Helpers
@@ -299,7 +263,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       return true;
     }
     return false;
-  }, [getGatewayWsUrl]);
+  }, []);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Unified Message Processing (Handles Quotes, Snapshots, Health, Status)

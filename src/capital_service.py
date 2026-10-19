@@ -294,7 +294,7 @@ class CapitalAccountingService:
             # 3. Realized & Unrealized P&L from trades_log via high-speed SQL aggregates
             trade_sql = """
                 SELECT 
-                    COALESCE(SUM(result_pnl), 0.0) as sum_realized,
+                    COALESCE(SUM(CASE WHEN UPPER(status) IN ('CLOSED', 'FILLED', 'SETTLED', 'SQUARED_OFF') THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0.0) ELSE 0.0 END), 0.0) as sum_realized,
                     COALESCE(SUM(CASE WHEN UPPER(status) = 'OPEN' THEN unrealized_pnl ELSE 0.0 END), 0.0) as sum_unrealized
                 FROM trades_log WHERE customer_id = ?
             """

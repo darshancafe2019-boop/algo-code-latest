@@ -35,11 +35,16 @@ export function LoginGateway() {
     login,
     verifyEmailOTP,
     resendEmailOTP,
+    sendLoginOTP,
     verify2FA,
     lockoutUntil,
     failedAttempts,
     isQuickFillAvailable,
   } = useAuth();
+
+  // Mode Selection: Instant Email OTP vs Password + OTP
+  const [loginMode, setLoginMode] = useState<"instant_otp" | "password">("instant_otp");
+  const [emailInput, setEmailInput] = useState<string>("ashishparadkar1999@gmail.com");
 
   // Primary Credentials Form State
   const [username, setUsername] = useState("");
@@ -145,6 +150,46 @@ export function LoginGateway() {
     setErrorMessage(null);
   };
 
+  // Submit Request for Instant Email OTP
+  const handleSendInstantOTP = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const target = emailInput.trim();
+    if (!target) {
+      setErrorMessage("Please enter your registered email address or username.");
+      return;
+    }
+
+    if (resendCooldown > 0) {
+      setErrorMessage(`Please wait ${resendCooldown}s before requesting a new code.`);
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const res = await sendLoginOTP(target);
+      if (res.success) {
+        setAuthStep("email_otp");
+        if (res.challengeId) setChallengeId(res.challengeId);
+        if (res.destination) setDestinationEmail(res.destination);
+        if (res.devOtp) setDevOtp(res.devOtp);
+        setResendCooldown(res.cooldown_seconds || 60);
+        setOtpDigits(["", "", "", "", "", ""]);
+        setSuccessMessage(res.message || `A 6-digit verification code was sent to ${res.destination || target}.`);
+        setTimeout(() => {
+          digitInputRefs.current[0]?.focus();
+        }, 200);
+      } else {
+        setErrorMessage(res.error || res.message || "Failed to dispatch verification code.");
+        if (res.cooldown_seconds) setResendCooldown(res.cooldown_seconds);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // Submit Primary Credentials (Step 1)
   const handleSubmitCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -224,6 +269,11 @@ export function LoginGateway() {
         digitInputRefs.current[0]?.focus();
       } else {
         setSuccessMessage("Email verified successfully! Entering terminal...");
+        setTimeout(() => {
+          if (typeof window !== "undefined") {
+            window.location.reload();
+          }
+        }, 600);
       }
     } finally {
       setIsSubmitting(false);
@@ -232,14 +282,19 @@ export function LoginGateway() {
 
   // Handle Resend OTP
   const handleResendOTP = async () => {
-    if (resendCooldown > 0 || !challengeId || isResending) return;
+    if (resendCooldown > 0 || isResending) return;
     setIsResending(true);
     setErrorMessage(null);
     setSuccessMessage(null);
 
     try {
-      const res = await resendEmailOTP(challengeId);
-      if (res.success) {
+      let res;
+      if (challengeId) {
+        res = await resendEmailOTP(challengeId);
+      } else if (destinationEmail || emailInput) {
+        res = await sendLoginOTP(destinationEmail || emailInput);
+      }
+      if (res && res.success) {
         if (res.challengeId) setChallengeId(res.challengeId);
         if (res.destination) setDestinationEmail(res.destination);
         if (res.devOtp) {
@@ -256,8 +311,8 @@ export function LoginGateway() {
         setOtpDigits(["", "", "", "", "", ""]);
         digitInputRefs.current[0]?.focus();
       } else {
-        setErrorMessage(res.error || res.message || "Failed to resend verification code. Please wait and try again.");
-        if (res.cooldown_seconds) setResendCooldown(res.cooldown_seconds);
+        setErrorMessage(res?.error || res?.message || "Failed to resend verification code. Please wait and try again.");
+        if (res?.cooldown_seconds) setResendCooldown(res.cooldown_seconds);
       }
     } finally {
       setIsResending(false);
@@ -439,167 +494,274 @@ export function LoginGateway() {
         )}
 
         {/* =================================================================== */}
-        {/* STAGE 1: PRIMARY CREDENTIALS (USERNAME & PASSWORD)                  */}
+        {/* STAGE 1: DUAL-MODE AUTHENTICATION SELECTOR & FORMS                  */}
         {/* =================================================================== */}
         {authStep === "credentials" && (
-          <form onSubmit={handleSubmitCredentials} className="space-y-4">
-            {/* Username Input */}
-            <div>
-              <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
-                Operator Identity / Username
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <User className="h-4 w-4" />
-                </div>
-                <input
-                  id="login-username"
-                  name="username"
-                  type="text"
-                  autoComplete="username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter operator username"
-                  disabled={isSubmitting || lockoutSec > 0}
-                  className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
-                />
-              </div>
-            </div>
-
-            {/* Password Input */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-mono text-slate-300 uppercase tracking-wider">
-                  Master Password
-                </label>
-                {isCapsOn && (
-                  <span className="text-[11px] font-mono text-amber-400 flex items-center gap-1">
-                    <AlertTriangle className="h-3 w-3" /> Caps Lock Active
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
-                  <KeyRound className="h-4 w-4" />
-                </div>
-                <input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyUp={handleKeyUp}
-                  placeholder="••••••••••••"
-                  disabled={isSubmitting || lockoutSec > 0}
-                  className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-
-              {/* Password Strength Meter */}
-              {password.length > 0 && (
-                <div className="mt-2.5 p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2">
-                  <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-slate-400">Security Strength:</span>
-                    <span className="font-bold text-slate-200">{strength.label}</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${strength.color} transition-all duration-300`}
-                      style={{ width: `${strength.score}%` }}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono text-slate-400">
-                    <span className={`flex items-center gap-1 ${strength.criteria.minLength ? "text-emerald-400" : ""}`}>
-                      <Check className="h-3 w-3" /> 10+ Characters
-                    </span>
-                    <span className={`flex items-center gap-1 ${strength.criteria.hasUpper && strength.criteria.hasLower ? "text-emerald-400" : ""}`}>
-                      <Check className="h-3 w-3" /> Upper & Lowercase
-                    </span>
-                    <span className={`flex items-center gap-1 ${strength.criteria.hasNumber ? "text-emerald-400" : ""}`}>
-                      <Check className="h-3 w-3" /> Numbers (0-9)
-                    </span>
-                    <span className={`flex items-center gap-1 ${strength.criteria.hasSpecial ? "text-emerald-400" : ""}`}>
-                      <Check className="h-3 w-3" /> Special Symbol (!@#$)
-                    </span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Remember Me & Attempt Counter & Forgot Password */}
-            <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400"
-                />
-                <span>Trust this terminal</span>
-              </label>
-              <a
-                href="/forgot-password"
-                className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium hover:underline"
-              >
-                Forgot Password?
-              </a>
-            </div>
-
-            {failedAttempts > 0 && lockoutSec === 0 && (
-              <div className="text-right text-[11px] font-mono text-amber-400">
-                Failed Attempts: {failedAttempts}/5
-              </div>
-            )}
-
-            {/* Operator Quick-Fill ONLY in dev when DEMO mode enabled */}
-            {isQuickFillAvailable && (
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleQuickFill}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/15 hover:border-cyan-400 transition-all text-left text-xs font-mono group"
-                >
-                  <div className="flex items-center gap-2">
-                    <Zap className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
-                    <span>Development Bootstrap Credentials</span>
-                  </div>
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 font-semibold">
-                    Dev Fill
-                  </span>
-                </button>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            <div className="pt-2 space-y-2.5">
+          <div className="space-y-4">
+            {/* Mode Switcher Tabs */}
+            <div className="flex rounded-2xl bg-slate-900/90 p-1 border border-slate-800 shadow-inner">
               <button
-                type="submit"
-                disabled={isSubmitting || lockoutSec > 0}
-                className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold font-mono text-sm tracking-wide shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                type="button"
+                onClick={() => {
+                  setLoginMode("instant_otp");
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all ${
+                  loginMode === "instant_otp"
+                    ? "bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
               >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Verifying Credentials...</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="h-4 w-4" />
-                    <span>Continue to Two-Step Verification</span>
-                    <ArrowRight className="h-4 w-4" />
-                  </>
-                )}
+                <Mail className="h-4 w-4 text-cyan-400" />
+                <span>Instant Email OTP</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode("password");
+                  setErrorMessage(null);
+                }}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all ${
+                  loginMode === "password"
+                    ? "bg-gradient-to-r from-cyan-500/20 to-emerald-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <KeyRound className="h-4 w-4 text-emerald-400" />
+                <span>Password + OTP</span>
               </button>
             </div>
-          </form>
+
+            {/* TAB 1: INSTANT EMAIL OTP (PASSWORDLESS) */}
+            {loginMode === "instant_otp" && (
+              <form onSubmit={handleSendInstantOTP} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
+                    Authorized Email Address / Username
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <Mail className="h-4 w-4 text-cyan-400" />
+                    </div>
+                    <input
+                      id="instant-otp-email"
+                      name="email"
+                      type="text"
+                      autoComplete="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      placeholder="ashishparadkar1999@gmail.com"
+                      disabled={isSubmitting || lockoutSec > 0}
+                      className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
+                    />
+                  </div>
+                  <p className="text-[11px] font-mono text-slate-400 mt-1.5">
+                    A secure 6-digit verification code will be dispatched to this inbox.
+                  </p>
+                </div>
+
+                {/* Operator Email Preset Button */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEmailInput("ashishparadkar1999@gmail.com")}
+                    className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/15 hover:border-cyan-400 transition-all text-left text-xs font-mono group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                      <span>Operator: ashishparadkar1999@gmail.com</span>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 font-semibold">
+                      Use Default
+                    </span>
+                  </button>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || lockoutSec > 0 || !emailInput.trim()}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold font-mono text-sm tracking-wide shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Dispatching Verification Code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mail className="h-4 w-4" />
+                        <span>Send 6-Digit OTP to Email</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 2: TRADITIONAL PASSWORD + EMAIL OTP (2-STEP GATE) */}
+            {loginMode === "password" && (
+              <form onSubmit={handleSubmitCredentials} className="space-y-4">
+                {/* Username / Email Input */}
+                <div>
+                  <label className="block text-xs font-mono text-slate-300 uppercase tracking-wider mb-1.5">
+                    Operator Identity (Username or Email)
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <User className="h-4 w-4" />
+                    </div>
+                    <input
+                      id="login-username"
+                      name="username"
+                      type="text"
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="admin or ashishparadkar1999@gmail.com"
+                      disabled={isSubmitting || lockoutSec > 0}
+                      className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-4 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
+                    />
+                  </div>
+                </div>
+
+                {/* Password Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-mono text-slate-300 uppercase tracking-wider">
+                      Master Password
+                    </label>
+                    {isCapsOn && (
+                      <span className="text-[11px] font-mono text-amber-400 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Caps Lock Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500">
+                      <KeyRound className="h-4 w-4" />
+                    </div>
+                    <input
+                      id="login-password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyUp={handleKeyUp}
+                      placeholder="••••••••••••"
+                      disabled={isSubmitting || lockoutSec > 0}
+                      className="w-full bg-[#060913]/90 border border-slate-700/80 rounded-xl pl-10 pr-10 py-2.5 text-sm font-mono text-white placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all disabled:opacity-50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+
+                  {/* Password Strength Meter */}
+                  {password.length > 0 && (
+                    <div className="mt-2.5 p-2.5 bg-slate-900/60 border border-slate-800 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between text-[11px] font-mono">
+                        <span className="text-slate-400">Security Strength:</span>
+                        <span className="font-bold text-slate-200">{strength.label}</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full ${strength.color} transition-all duration-300`}
+                          style={{ width: `${strength.score}%` }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 pt-1 text-[10px] font-mono text-slate-400">
+                        <span className={`flex items-center gap-1 ${strength.criteria.minLength ? "text-emerald-400" : ""}`}>
+                          <Check className="h-3 w-3" /> 10+ Characters
+                        </span>
+                        <span className={`flex items-center gap-1 ${strength.criteria.hasUpper && strength.criteria.hasLower ? "text-emerald-400" : ""}`}>
+                          <Check className="h-3 w-3" /> Upper & Lowercase
+                        </span>
+                        <span className={`flex items-center gap-1 ${strength.criteria.hasNumber ? "text-emerald-400" : ""}`}>
+                          <Check className="h-3 w-3" /> Numbers (0-9)
+                        </span>
+                        <span className={`flex items-center gap-1 ${strength.criteria.hasSpecial ? "text-emerald-400" : ""}`}>
+                          <Check className="h-3 w-3" /> Special Symbol (!@#$)
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Remember Me & Attempt Counter & Forgot Password */}
+                <div className="flex items-center justify-between text-xs font-mono text-slate-400 pt-1">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400"
+                    />
+                    <span>Trust this terminal</span>
+                  </label>
+                  <a
+                    href="/forgot-password"
+                    className="text-cyan-400 hover:text-cyan-300 transition-colors font-medium hover:underline"
+                  >
+                    Forgot Password?
+                  </a>
+                </div>
+
+                {failedAttempts > 0 && lockoutSec === 0 && (
+                  <div className="text-right text-[11px] font-mono text-amber-400">
+                    Failed Attempts: {failedAttempts}/5
+                  </div>
+                )}
+
+                {/* Operator Quick-Fill ONLY in dev when DEMO mode enabled */}
+                {isQuickFillAvailable && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={handleQuickFill}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-cyan-950/30 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/15 hover:border-cyan-400 transition-all text-left text-xs font-mono group"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span>Development Bootstrap Credentials</span>
+                      </div>
+                      <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-200 border border-cyan-500/30 font-semibold">
+                        Dev Fill
+                      </span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="pt-2 space-y-2.5">
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || lockoutSec > 0}
+                    className="w-full flex items-center justify-center gap-2 py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-400 hover:to-emerald-400 text-slate-950 font-bold font-mono text-sm tracking-wide shadow-lg shadow-cyan-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Verifying Credentials...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="h-4 w-4" />
+                        <span>Continue to Two-Step Verification</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         )}
 
         {/* =================================================================== */}

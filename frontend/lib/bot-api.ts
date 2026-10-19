@@ -2,6 +2,7 @@ import { BotConfig, BotSnapshot, BotValidationResult } from "@/types/bot";
 import { CanonicalOrder, OrderSide } from "@/types/order";
 import { CanonicalTrade } from "@/types/trade";
 import { CanonicalPosition } from "@/types/position";
+import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
 
 export interface ApiResponse<T> {
   success: boolean;
@@ -13,18 +14,11 @@ export interface ApiResponse<T> {
   };
 }
 
+const serverBackendBase = getBackendBaseUrl();
 const API_BASE_URL =
   typeof window !== "undefined"
     ? "/api"
-    : (process.env.BACKEND_INTERNAL_URL
-        ? `${process.env.BACKEND_INTERNAL_URL.replace(/\/+$/, "")}/api`
-        : process.env.BACKEND_API_URL
-        ? `${process.env.BACKEND_API_URL.replace(/\/+$/, "")}/api`
-        : process.env.NEXT_PUBLIC_BACKEND_URL
-        ? `${process.env.NEXT_PUBLIC_BACKEND_URL.replace(/\/+$/, "")}/api`
-        : process.env.NODE_ENV === "production"
-        ? ""
-        : "http://127.0.0.1:5050/api");
+    : (serverBackendBase ? `${serverBackendBase}/api` : "");
 
 async function request<T>(endpoint: string, options?: RequestInit): Promise<T> {
   if (!API_BASE_URL) {

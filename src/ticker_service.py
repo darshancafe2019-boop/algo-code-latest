@@ -257,8 +257,10 @@ class ResilientTickerService:
         """Convenience method to retrieve spot price as a float."""
         try:
             ticker = self.get_ticker(raw_symbol)
-            if ticker and (ticker.get("last") or ticker.get("price")):
-                return float(ticker.get("last") or ticker.get("price"))
+            if ticker:
+                val = ticker.get("last") or ticker.get("price")
+                if val is not None:
+                    return float(val)
         except Exception as e:
             logger.debug("Failed to get spot price for %s: %s", raw_symbol, e)
         return None
@@ -356,7 +358,7 @@ class ResilientTickerService:
                     }
                     logger.debug("[TickerService] Fetched %s from Binance in %dms (freshness: %s)", symbol, latency_ms, freshness)
                     return payload
-            except (ccxt.RequestTimeout, ccxt.NetworkError, ccxt.RateLimitExceeded) as ex:
+            except (ccxt.RequestTimeout, ccxt.NetworkError) as ex:
                 self._binance_cb.record_failure()
                 logger.warning("[TickerService] Binance error for %s (%s). Attempting secondary provider.", symbol, type(ex).__name__)
             except Exception as ex:

@@ -578,6 +578,10 @@ class BrokerRouter:
             return self.adapters.get("DHAN")
         return self.adapters.get(clean)
 
+    def get_broker_adapter(self, broker: str) -> Optional[BaseBrokerAdapter]:
+        """Alias for get_adapter."""
+        return self.get_adapter(broker)
+
     # ------------------------------------------------------------------------
     # 10-STAGE PRE-TRADE VALIDATION & SAFETY GATE
     # ------------------------------------------------------------------------

@@ -207,8 +207,8 @@ class QuantBotEngine:
                 for r in rows:
                     pos_id = r["id"]
                     direction = r["direction"]
-                    qty = float(r["quantity"])
-                    entry = float(r["average_entry_price"])
+                    qty = float(r["quantity"] or 0.0)
+                    entry = float(r["average_entry_price"] or 0.0)
                     realized = float(r["realized_pnl"] or 0.0)
 
                     mult = 1.0 if direction == "LONG" else -1.0
@@ -260,14 +260,16 @@ class QuantBotEngine:
 
             # ── 0. Max Daily Loss Guardrail Check ─────────────────────────────────
             pos_pnl_row = conn.execute("SELECT COALESCE(SUM(realized_pnl), 0.0), COALESCE(SUM(unrealized_pnl), 0.0) FROM positions WHERE bot_id = ?", (self.bot_id,)).fetchone()
-            daily_pnl = float(pos_pnl_row[0] or 0.0) + float(pos_pnl_row[1] or 0.0)
+            daily_pnl = 0.0
+            if pos_pnl_row is not None:
+                daily_pnl = float(pos_pnl_row[0] or 0.0) + float(pos_pnl_row[1] or 0.0)
             if daily_pnl <= -max_daily_loss:
                 logger.warning(f"Bot {self.bot_id} hit Max Daily Loss (${daily_pnl:.2f} <= -${max_daily_loss:.2f}). Pausing bot.")
                 if open_pos:
                     close_side = "SELL" if open_pos["direction"] == "LONG" else "BUY"
                     self.execute_order(
                         side=close_side,
-                        quantity=float(open_pos["quantity"]),
+                        quantity=float(open_pos["quantity"] or 0.0),
                         price=current_price,
                         reason=f"Max Daily Loss Circuit Breaker Triggered (${daily_pnl:.2f} <= -${max_daily_loss:.2f})",
                         is_automated=True
@@ -288,7 +290,7 @@ class QuantBotEngine:
                         close_side = "SELL" if open_pos["direction"] == "LONG" else "BUY"
                         self.execute_order(
                             side=close_side,
-                            quantity=float(open_pos["quantity"]),
+                            quantity=float(open_pos["quantity"] or 0.0),
                             price=current_price,
                             reason=f"Intraday Auto Square-Off ({now_time_str} >= {square_off})",
                             is_automated=True
@@ -347,8 +349,8 @@ class QuantBotEngine:
             # ── 3. Automated Take Profit, Stop Loss, Trailing Stop & Reversal Management ──
             if open_pos:
                 direction = open_pos["direction"]
-                qty = float(open_pos["quantity"])
-                entry = float(open_pos["average_entry_price"])
+                qty = float(open_pos["quantity"] or 0.0)
+                entry = float(open_pos["average_entry_price"] or 0.0)
 
                 if entry > 0:
                     mult = 1.0 if direction == "LONG" else -1.0
@@ -468,7 +470,7 @@ class QuantBotEngine:
                     "SELECT COUNT(*) FROM trades WHERE bot_id = ? AND date(timestamp) = date('now')",
                     (self.bot_id,)
                 ).fetchone()
-                trades_today = trade_count_row[0] if trade_count_row else 0
+                trades_today = int(trade_count_row[0]) if (trade_count_row and trade_count_row[0] is not None) else 0
                 effective_max = max_trades if self.exec_mode != "PAPER" else max(max_trades, 1000)
                 if trades_today >= effective_max:
                     if not hasattr(self, "_logged_daily_limit_ts") or (now - getattr(self, "_logged_daily_limit_ts", 0)) > 300:
@@ -598,8 +600,8 @@ class QuantBotEngine:
             else:
                 pos_id = existing_pos["id"]
                 cur_dir = existing_pos["direction"]
-                cur_qty = float(existing_pos["quantity"])
-                cur_entry = float(existing_pos["average_entry_price"])
+                cur_qty = float(existing_pos["quantity"] or 0.0)
+                cur_entry = float(existing_pos["average_entry_price"] or 0.0)
                 cur_realized = float(existing_pos["realized_pnl"] or 0.0)
 
                 signed_existing = cur_qty if cur_dir == "LONG" else -cur_qty
@@ -783,7 +785,10 @@ class BotEngineManager:
                     row = conn.execute("SELECT configuration_json FROM bots WHERE id = ?", (bot_id,)).fetchone()
                     if not row:
                         raise KeyError(f"Bot '{bot_id}' not found in database.")
-                    bot_config = json.loads(row["configuration_json"])
+                    bot_config = json.loads(row["configuration_json"] or "{}")
+
+            if not isinstance(bot_config, dict):
+                bot_config = {}
 
             engine = QuantBotEngine(bot_config)
             self._engines[bot_id] = engine
@@ -849,7 +854,9 @@ class BotEngineManager:
             row = conn.execute("SELECT configuration_json FROM bots WHERE id = ?", (bot_id,)).fetchone()
             if not row:
                 raise KeyError(f"Bot '{bot_id}' not found.")
-            cfg = json.loads(row["configuration_json"])
+            cfg = json.loads(row["configuration_json"] or "{}")
+        if not isinstance(cfg, dict):
+            cfg = {}
 
         temp_engine = QuantBotEngine(cfg)
         return temp_engine.execute_order(side=side, quantity=quantity, price=price, reason="Manual Order Placement", is_automated=False)
@@ -865,11 +872,14 @@ class BotEngineManager:
             with _get_db() as conn:
                 rows = conn.execute("SELECT id, configuration_json FROM bots WHERE status = 'RUNNING'").fetchall()
                 for r in rows:
-                    bot_id = r["id"]
+                    bot_id = str(r["id"]) if r["id"] is not None else ""
+                    if not bot_id:
+                        continue
                     try:
-                        cfg = json.loads(r["configuration_json"])
-                        self.start_bot(bot_id, cfg)
-                        logger.info(f"Auto-recovered running BotEngine: {bot_id}")
+                        cfg = json.loads(r["configuration_json"] or "{}")
+                        if isinstance(cfg, dict):
+                            self.start_bot(bot_id, cfg)
+                            logger.info(f"Auto-recovered running BotEngine: {bot_id}")
                     except Exception as e:
                         logger.warning(f"Could not recover BotEngine {bot_id}: {e}")
         except Exception as e:

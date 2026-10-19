@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getForwardHeaders } from "@/lib/proxy-headers";
 import {
   getBackendBaseUrl,
+  getBackendConfigStatus,
   getGatewayHttpUrl,
   getGatewaySecret,
   isProduction,
@@ -43,12 +44,13 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const requestId = req.headers.get("x-request-id") || `bff_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = performance.now();
 
-  const BACKEND_URL = getBackendBaseUrl();
+  const configStatus = getBackendConfigStatus();
+  const BACKEND_URL = configStatus.url;
   const GATEWAY_URL = getGatewayHttpUrl();
   const GATEWAY_SECRET = getGatewaySecret();
 
-  // Fail-closed in production if backend URL is not configured
-  if (isProduction() && !BACKEND_URL) {
+  // Fail-closed in production if backend URL is not configured or points to an invalid loopback address
+  if (!configStatus.valid) {
     return NextResponse.json(
       {
         ok: false,
@@ -57,7 +59,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
         data: null,
         error: {
           code: "BACKEND_NOT_CONFIGURED",
-          message: "Quant.OS Engine backend URL is not configured. Set BACKEND_INTERNAL_URL or BACKEND_API_URL in production environment.",
+          message:
+            configStatus.reason ||
+            "Quant.OS Engine backend URL is not configured. Set BACKEND_INTERNAL_URL or BACKEND_API_URL in production environment.",
           retryable: false,
         },
         requestId,
@@ -69,6 +73,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
         headers: {
           "X-Request-Id": requestId,
           "Content-Type": "application/json",
+          "Cache-Control": "no-store, max-age=0",
         },
       }
     );

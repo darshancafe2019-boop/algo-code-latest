@@ -912,6 +912,10 @@ class MultiBotManager:
 
         return {"status": "success", "message": f"Stopped {len(stopped)} bot(s).", "count": len(stopped)}
 
+    def stop_all(self) -> Dict[str, Any]:
+        """Alias for stop_all_bots."""
+        return self.stop_all_bots()
+
     def execute_group_action(self, group_name: str, action: str) -> Dict[str, Any]:
         """Execute a bulk START, PAUSE, RESUME, or STOP action for all bots in a named group."""
         action = (action or "").upper()

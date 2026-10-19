@@ -160,7 +160,7 @@ DELTA_CANONICAL_SYMBOL_MAP: Dict[str, str] = {
 
 def to_delta_symbol(symbol: str) -> str:
     """Translates any canonical/UI symbol (e.g. BTC/USDT, BINANCE:BTC/USDT:SPOT) to Delta symbol (BTCUSD)."""
-    s = str(symbol or "").strip().upper()
+    s = (symbol or "").strip().upper()
     if s in DELTA_CANONICAL_SYMBOL_MAP:
         return DELTA_CANONICAL_SYMBOL_MAP[s]
     if s.startswith("DELTA:"):
@@ -181,7 +181,7 @@ def to_delta_symbol(symbol: str) -> str:
 
 def get_symbol_aliases(delta_symbol: str) -> List[str]:
     """Returns all common aliases for a Delta symbol to populate the central quote caches."""
-    ds = str(delta_symbol or "").strip().upper()
+    ds = (delta_symbol or "").strip().upper()
     aliases = [ds, f"delta:{ds.lower()}", f"DELTA:{ds}"]
     for k, v in DELTA_CANONICAL_SYMBOL_MAP.items():
         if v == ds and k not in aliases:
@@ -749,7 +749,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             self.sub_mgr.ticker_symbols.discard(delta_sym)
             self._subscribed_symbols.discard(s_up)
             self._subscribed_symbols.discard(delta_sym)
-        if self._is_ws_open():
+        if self._ws is not None and self._is_ws_open():
             unsub_msg = {
                 "type": "unsubscribe",
                 "payload": {
@@ -898,7 +898,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             }))
 
     async def _safe_send(self, payload: Dict[str, Any]) -> None:
-        if self._is_ws_open():
+        if self._ws is not None and self._is_ws_open():
             try:
                 await self._ws.send(json.dumps(payload))
             except Exception as e:
@@ -1228,6 +1228,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             raw_trade = item.get("close") or item.get("c") or close_px
             trade_price: Optional[float] = float(raw_trade) if raw_trade is not None and float(raw_trade) > 0 else None
 
+            ts_str = exchange_ts or now_iso
             # Construct Strongly-Typed DeltaTicker with strict LTP / Mark separation
             delta_ticker = DeltaTicker(
                 symbol=symbol,
@@ -1258,7 +1259,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 price_band_lower=pb_lower,
                 price_band_upper=pb_upper,
                 chain_symbol=chain_symbol,
-                exchange_timestamp=exchange_ts,
+                exchange_timestamp=ts_str,
                 received_at=now_iso,
                 source="delta_public_ws",
                 is_stale=False,
@@ -1290,7 +1291,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 change_pct=delta_ticker.change_24h,
                 oi=delta_ticker.open_interest,
                 funding_rate=delta_ticker.funding_rate,
-                event_timestamp=exchange_ts,
+                event_timestamp=ts_str,
                 received_timestamp=now_iso,
                 data_mode="REAL_TIME",
                 is_stale=False,
@@ -1630,7 +1631,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
 
         return res
 
-    def get_raw_quote(self, symbol_or_product_id: str) -> Optional[Dict[str, Any]]:
+    def get_raw_quote(self, symbol_or_product_id: Union[str, int]) -> Optional[Dict[str, Any]]:
         return self._raw_quote_cache.get(str(symbol_or_product_id))
 
     def get_all_raw_quotes(self) -> Dict[str, Dict[str, Any]]:

@@ -12,6 +12,7 @@
  * 8. Server/Client environment isolation: uses relative paths on browser, BACKEND_INTERNAL_URL on server.
  * 9. Standardized ApiResponse envelope with request correlation IDs and audit timestamps.
  */
+import { getBackendBaseUrl } from "@/lib/config/gatewayConfig";
 
 export type ConnectionState =
   | "CONNECTED"
@@ -301,12 +302,7 @@ class ResilientApiClient {
     }
 
     // Server-side environment (SSR/Route Handlers): use server-only internal URL
-    const backendBase =
-      process.env.BACKEND_INTERNAL_URL ||
-      process.env.BACKEND_API_URL ||
-      process.env.NEXT_PUBLIC_BACKEND_URL ||
-      process.env.NEXT_PUBLIC_API_URL ||
-      (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:5050");
+    const backendBase = getBackendBaseUrl();
     if (path.startsWith("http://") || path.startsWith("https://")) {
       return path;
     }

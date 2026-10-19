@@ -343,12 +343,19 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       snapshotEntries.forEach(([rawSym, q]) => {
         const sym = rawSym.toUpperCase();
         const provider = (q.provider || "UNKNOWN").toUpperCase();
+        const exchange = (q.exchange || provider).toUpperCase();
         const provKey = `${provider}:${sym}`;
 
         quotesRef.current.set(provKey, q);
         quotesRef.current.set(sym, q);
         pendingQuotesRef.current.set(provKey, q);
         pendingQuotesRef.current.set(sym, q);
+
+        const aliases = getQuoteAliases(sym, exchange, provider);
+        aliases.forEach((alias) => {
+          quotesRef.current.set(alias, q);
+          pendingQuotesRef.current.set(alias, q);
+        });
 
         useMarketFeedStore.getState().ingestTick({
           symbol: sym,
@@ -370,16 +377,18 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
           ageMs: (q.age_seconds || 0) * 1000,
         });
 
-        const listeners = symbolListenersRef.current.get(sym);
-        if (listeners && listeners.size > 0) {
-          listeners.forEach((fn) => {
-            try {
-              fn(q);
-            } catch {
-              // ignore
-            }
-          });
-        }
+        aliases.forEach((alias) => {
+          const listeners = symbolListenersRef.current.get(alias);
+          if (listeners && listeners.size > 0) {
+            listeners.forEach((fn) => {
+              try {
+                fn(q);
+              } catch {
+                // ignore
+              }
+            });
+          }
+        });
       });
       scheduleQuotesBatch();
     } else if ((msg.type === "FUTURES_TICK" || msg.type === "TICK") && msg.data) {
@@ -1231,10 +1240,26 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       return direct;
     }
 
+    const bareSym = sym.includes(":") ? sym.split(":")[1] : sym;
+    if (bareSym && quotesRef.current.has(bareSym)) {
+      return quotesRef.current.get(bareSym)!;
+    }
+    if (bareSym && prov && quotesRef.current.has(`${prov}:${bareSym}`)) {
+      return quotesRef.current.get(`${prov}:${bareSym}`)!;
+    }
+
     const aliases = getQuoteAliases(symbol, exchange, provider);
     for (const alias of aliases) {
       const quote = quotesRef.current.get(alias);
       if (quote) return quote;
+    }
+
+    if (bareSym.includes("/")) {
+      const noSlash = bareSym.replace(/\//g, "");
+      if (quotesRef.current.has(noSlash)) return quotesRef.current.get(noSlash)!;
+    } else if (bareSym.endsWith("USDT") && bareSym.length > 4) {
+      const withSlash = `${bareSym.slice(0, -4)}/USDT`;
+      if (quotesRef.current.has(withSlash)) return quotesRef.current.get(withSlash)!;
     }
 
     return null;

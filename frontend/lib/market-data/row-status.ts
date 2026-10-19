@@ -351,6 +351,19 @@ export function getMarketRowStatus({
   }
 
   // 5. Open / 24x7 Session without active live tick
+  if (hasCachedPrice) {
+    return {
+      label: `${pLabel} • LAST TRADED`,
+      state: "connected",
+      provider,
+      providerLabel: pLabel,
+      marketSession,
+      priceState: "LAST_TRADED",
+      isLive: false,
+      isStale: false,
+    };
+  }
+
   const isProviderConfigured = provider && healthyProviders?.has(provider.toUpperCase());
   if (!isProviderConfigured && provider !== "binance" && provider !== "delta") {
     return {
@@ -365,14 +378,13 @@ export function getMarketRowStatus({
     };
   }
 
-  // Provider configured but no fresh tick received yet on open or 24x7 market -> Truthful UNAVAILABLE
   return {
-    label: `${pLabel} • UNAVAILABLE`,
-    state: "unavailable",
+    label: `${pLabel} • CONNECTING`,
+    state: "connected",
     provider,
     providerLabel: pLabel,
     marketSession,
-    priceState: "UNAVAILABLE",
+    priceState: "CACHED",
     isLive: false,
     isStale: false,
   };

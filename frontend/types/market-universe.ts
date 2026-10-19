@@ -72,6 +72,8 @@ export interface MarketInstrument {
   name?: string;
   notes?: string;
   tags?: string[];
+  marketSession?: string;
+  priceState?: string;
   display_name?: string;
   watch_enabled?: boolean;
   last_change?: number;

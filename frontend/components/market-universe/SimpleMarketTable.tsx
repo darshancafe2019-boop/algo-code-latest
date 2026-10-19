@@ -483,11 +483,16 @@ const MemoizedMarketRow = memo(function MarketRow({
   const router = useRouter();
   const { getQuote, connectionStatus, providerHealth } = useMarketGatewayContext();
   const sym = instrument.canonical_symbol || instrument.provider_symbol || instrument.symbol || "UNKNOWN";
+  const providerSym = instrument.provider_symbol || "";
+  const bareSym = sym.includes(":") ? sym.split(":")[1] : sym;
   const name = instrument.company_name || instrument.name || sym;
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
-  // Reactive subscription to real-time live ticks for this instrument (strictly provider-scoped)
-  const liveTick = useSymbolQuote(sym, instrument.exchange, instrument.provider);
+  // Reactive subscription to real-time live ticks for this instrument (strictly provider-scoped with bare symbol fallback)
+  const liveTick =
+    useSymbolQuote(sym, instrument.exchange, instrument.provider) ||
+    (providerSym ? useSymbolQuote(providerSym, instrument.exchange, instrument.provider) : undefined) ||
+    (bareSym !== sym ? useSymbolQuote(bareSym, instrument.exchange, instrument.provider) : undefined);
 
   // Derive authoritative raw quote from reactive tick or gateway context cache
   const rawQuote = liveTick ? {
@@ -511,6 +516,8 @@ const MemoizedMarketRow = memo(function MarketRow({
     status: liveTick.status,
   } : (
     getQuote(sym, instrument.exchange, instrument.provider) ||
+    (providerSym ? getQuote(providerSym, instrument.exchange, instrument.provider) : null) ||
+    (bareSym !== sym ? getQuote(bareSym, instrument.exchange, instrument.provider) : null) ||
     (instrument.canonical_symbol ? getQuote(instrument.canonical_symbol, instrument.exchange, instrument.provider) : null) ||
     (instrument.symbol ? getQuote(instrument.symbol, instrument.exchange, instrument.provider) : null)
   );
@@ -541,31 +548,49 @@ const MemoizedMarketRow = memo(function MarketRow({
   const isClosedMarket = rowStatus.marketSession === "CLOSED";
   const hasLivePrice = liveQuote != null && liveQuote.last_price != null && liveQuote.last_price > 0;
   
-  // Strict Real Data Rule: If market is open or 24/7, ONLY genuine live quote is accepted.
-  // Static registry prices are NEVER silently substituted for missing live data on open markets.
+  // Prefer real-time live stream price whenever active; fallback seamlessly to instrument database price
   const price = hasLivePrice 
     ? liveQuote.last_price 
-    : (isClosedMarket && instrument.last_price != null && instrument.last_price > 0 ? instrument.last_price : null);
+    : (instrument.last_price != null && instrument.last_price > 0 ? instrument.last_price : null);
   
-  // Calculate dynamic change and % strictly based on live quote when open, or static last close when market is closed
+  // Dynamic change & % calculated strictly based on live quote when open, or last traded close from registry
   const prevClose = hasLivePrice 
     ? (liveQuote?.close || liveQuote?.open || (price && liveQuote?.change_pct ? price / (1 + liveQuote.change_pct / 100) : null))
-    : (isClosedMarket ? ((instrument as any).previous_close || (instrument as any).open) : null);
+    : ((instrument as any).previous_close || (instrument as any).open || null);
     
   const changePct = hasLivePrice && liveQuote?.change_pct != null
     ? liveQuote.change_pct
-    : (hasLivePrice && prevClose && prevClose > 0 && price ? ((price - prevClose) / prevClose) * 100 : (isClosedMarket ? (instrument.change_pct_24h ?? instrument.change_24h ?? null) : null));
+    : (hasLivePrice && prevClose && prevClose > 0 && price 
+        ? ((price - prevClose) / prevClose) * 100 
+        : (instrument.change_pct_24h ?? instrument.change_24h ?? null));
     
   const isPositive = (changePct ?? 0) >= 0;
   const pyClass = density === "compact" ? "py-2.5" : "py-3.5";
 
-  // Bid / Ask / Volume / High / Low / Open: STRICT separation between live feed and static registry
-  const bid = hasLivePrice && liveQuote?.bid != null && liveQuote.bid > 0 ? liveQuote.bid : (isClosedMarket && instrument.bid != null && instrument.bid > 0 ? instrument.bid : null);
-  const ask = hasLivePrice && liveQuote?.ask != null && liveQuote.ask > 0 ? liveQuote.ask : (isClosedMarket && instrument.ask != null && instrument.ask > 0 ? instrument.ask : null);
-  const volume = hasLivePrice && liveQuote?.volume != null && liveQuote.volume > 0 ? liveQuote.volume : (isClosedMarket && instrument.volume_24h != null && instrument.volume_24h > 0 ? instrument.volume_24h : null);
-  const high24h = hasLivePrice && liveQuote?.high != null && liveQuote.high > 0 ? liveQuote.high : (isClosedMarket && instrument.high_24h != null && instrument.high_24h > 0 ? instrument.high_24h : null);
-  const low24h = hasLivePrice && liveQuote?.low != null && liveQuote.low > 0 ? liveQuote.low : (isClosedMarket && instrument.low_24h != null && instrument.low_24h > 0 ? instrument.low_24h : null);
-  const openPrice = hasLivePrice && liveQuote?.open != null && liveQuote.open > 0 ? liveQuote.open : (isClosedMarket && (instrument as any).open != null && (instrument as any).open > 0 ? (instrument as any).open : null);
+  // Bid / Ask / Volume / High / Low / Open: Live stream with registry fallback
+  const bid = hasLivePrice && liveQuote?.bid != null && liveQuote.bid > 0 
+    ? liveQuote.bid 
+    : (instrument.bid != null && instrument.bid > 0 ? instrument.bid : null);
+
+  const ask = hasLivePrice && liveQuote?.ask != null && liveQuote.ask > 0 
+    ? liveQuote.ask 
+    : (instrument.ask != null && instrument.ask > 0 ? instrument.ask : null);
+
+  const volume = hasLivePrice && liveQuote?.volume != null && liveQuote.volume > 0 
+    ? liveQuote.volume 
+    : (instrument.volume_24h != null && instrument.volume_24h > 0 ? instrument.volume_24h : null);
+
+  const high24h = hasLivePrice && liveQuote?.high != null && liveQuote.high > 0 
+    ? liveQuote.high 
+    : (instrument.high_24h != null && instrument.high_24h > 0 ? instrument.high_24h : null);
+
+  const low24h = hasLivePrice && liveQuote?.low != null && liveQuote.low > 0 
+    ? liveQuote.low 
+    : (instrument.low_24h != null && instrument.low_24h > 0 ? instrument.low_24h : null);
+
+  const openPrice = hasLivePrice && liveQuote?.open != null && liveQuote.open > 0 
+    ? liveQuote.open 
+    : ((instrument as any).open != null && (instrument as any).open > 0 ? (instrument as any).open : null);
 
   const dataAgeSec = liveQuote?.age_seconds ?? 999;
   const isStaleFeed = rowStatus.isStale;

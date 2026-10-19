@@ -516,14 +516,27 @@ export const useMarketFeedStore = create<MarketFeedStore>((set, get) => ({
       return quotes[sym];
     }
 
+    const bareSym = sym.includes(":") ? sym.split(":")[1] : sym;
+    if (bareSym && quotes[bareSym]) {
+      return quotes[bareSym];
+    }
+    if (bareSym && prov && quotes[`${prov}:${bareSym}`]) {
+      return quotes[`${prov}:${bareSym}`];
+    }
+
     return (
       quotes[sym.replace(" 50", "")] ||
       quotes[sym.replace(" ", "")] ||
       quotes[sym.replace("/", "")] ||
+      quotes[bareSym.replace("/", "")] ||
+      (bareSym.endsWith("USDT") && bareSym.length > 4 ? quotes[`${bareSym.slice(0, -4)}/USDT`] : undefined) ||
       quotes[`NSE:${sym}`] ||
       quotes[`BSE:${sym}`] ||
       quotes[`BINANCE:${sym}`] ||
-      quotes[`DELTA:${sym}`]
+      quotes[`DELTA:${sym}`] ||
+      quotes[`BINANCE:${bareSym}`] ||
+      quotes[`DELTA:${bareSym}`] ||
+      quotes[`NSE:${bareSym}`]
     );
   },
 }));
@@ -564,14 +577,27 @@ export function useSymbolQuote(
       return quotes[sym];
     }
 
+    const bareSym = sym.includes(":") ? sym.split(":")[1] : sym;
+    if (bareSym && quotes[bareSym]) {
+      return quotes[bareSym];
+    }
+    if (bareSym && prov && quotes[`${prov}:${bareSym}`]) {
+      return quotes[`${prov}:${bareSym}`];
+    }
+
     return (
       quotes[sym.replace(" 50", "")] ||
       quotes[sym.replace(" ", "")] ||
       quotes[sym.replace("/", "")] ||
+      quotes[bareSym.replace("/", "")] ||
+      (bareSym.endsWith("USDT") && bareSym.length > 4 ? quotes[`${bareSym.slice(0, -4)}/USDT`] : undefined) ||
       quotes[`NSE:${sym}`] ||
       quotes[`BSE:${sym}`] ||
       quotes[`BINANCE:${sym}`] ||
-      quotes[`DELTA:${sym}`]
+      quotes[`DELTA:${sym}`] ||
+      quotes[`BINANCE:${bareSym}`] ||
+      quotes[`DELTA:${bareSym}`] ||
+      quotes[`NSE:${bareSym}`]
     );
   });
 }

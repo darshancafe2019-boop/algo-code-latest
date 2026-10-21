@@ -648,13 +648,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
     const baseWsUrl = getGatewayWsUrl();
     if (!baseWsUrl) {
-      if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
-        console.warn("[QUANT.OS] Live market gateway WebSocket is not configured (NEXT_PUBLIC_GATEWAY_WS_URL is unset). Entering GATEWAY_NOT_CONFIGURED state.");
-        setConnectionStatus("GATEWAY_NOT_CONFIGURED");
-        useMarketFeedStore.getState().setConnectionStatus("GATEWAY_NOT_CONFIGURED" as any);
-        return;
+      if (isAuthenticated) {
+        connectSSE();
+      } else {
+        setConnectionStatus("POLLING");
+        useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
       }
-      connectSSE();
       return;
     }
 
@@ -1107,9 +1106,6 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
               if (wsRef.current?.readyState === WebSocket.OPEN) {
                 setConnectionStatus("LIVE");
                 useMarketFeedStore.getState().setConnectionStatus("LIVE");
-              } else if (!isGatewayWsConfigured()) {
-                setConnectionStatus("GATEWAY_NOT_CONFIGURED");
-                useMarketFeedStore.getState().setConnectionStatus("GATEWAY_NOT_CONFIGURED" as any);
               } else {
                 setConnectionStatus("POLLING");
                 useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);

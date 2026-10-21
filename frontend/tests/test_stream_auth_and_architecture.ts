@@ -12,7 +12,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { GET, POST } from "../app/api/market-data/stream/route";
+import { GET, POST, DELETE } from "../app/api/market-data/stream/route";
 import {
   getGatewaySecret,
   getGatewayWsUrl,
@@ -99,7 +99,7 @@ async function runStreamAuthTests() {
     const originalFetch = global.fetch;
 
     try {
-      // Mock 1: Auth service fails (HTTP 500 error) -> MUST fail closed in production (HTTP 401/503)
+      // Mock 1: Auth service fails (HTTP 500 error) -> MUST fail closed in production (HTTP 503)
       global.fetch = (async (url: string) => {
         if (url.includes("/api/auth/me")) {
           return new Response(JSON.stringify({ error: "Internal Auth Failure" }), { status: 500 });
@@ -109,12 +109,52 @@ async function runStreamAuthTests() {
 
       const failedAuthReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
         method: "GET",
-        headers: { Authorization: "Bearer failing_token" },
+        headers: { Authorization: "Bearer failing_token_500" },
       });
       const failedAuthRes = await GET(failedAuthReq);
       assert(
-        failedAuthRes.status === 401 || failedAuthRes.status === 503,
-        `Auth service error fails closed (got ${failedAuthRes.status})`
+        failedAuthRes.status === 503,
+        `Auth service error (500) fails closed with HTTP 503 (got ${failedAuthRes.status})`
+      );
+
+      // Mock 1B: Auth service timeout (AbortError) -> MUST fail closed with HTTP 503
+      global.fetch = (async (url: string) => {
+        if (url.includes("/api/auth/me")) {
+          const timeoutErr = new Error("The operation was aborted due to timeout");
+          timeoutErr.name = "TimeoutError";
+          throw timeoutErr;
+        }
+        return originalFetch(url);
+      }) as any;
+
+      const timeoutAuthReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
+        method: "GET",
+        headers: { Authorization: "Bearer timeout_token" },
+      });
+      const timeoutAuthRes = await GET(timeoutAuthReq);
+      assert(
+        timeoutAuthRes.status === 503,
+        `Auth service timeout fails closed with HTTP 503 (got ${timeoutAuthRes.status})`
+      );
+      const timeoutData = await timeoutAuthRes.json();
+      assert(timeoutData.message.includes("timed out"), "Response message explicitly indicates timeout");
+
+      // Mock 1C: Auth service rejects token with 401
+      global.fetch = (async (url: string) => {
+        if (url.includes("/api/auth/me")) {
+          return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 });
+        }
+        return originalFetch(url);
+      }) as any;
+
+      const rejectAuthReq = new NextRequest("http://localhost:3000/api/market-data/stream?symbols=NSE:NIFTY50", {
+        method: "GET",
+        headers: { Authorization: "Bearer invalid_bearer" },
+      });
+      const rejectAuthRes = await GET(rejectAuthReq);
+      assert(
+        rejectAuthRes.status === 401,
+        `Auth service 401 returns HTTP 401 (got ${rejectAuthRes.status})`
       );
 
       // Mock 2: Auth service returns valid user for Authorization Bearer header
@@ -122,7 +162,7 @@ async function runStreamAuthTests() {
         if (url.includes("/api/auth/me")) {
           const authHeader = init?.headers?.Authorization || "";
           const cookieHeader = init?.headers?.Cookie || "";
-          if (authHeader.includes("valid_bearer") || cookieHeader.includes("valid_cookie")) {
+          if (authHeader.includes("valid_bearer") || cookieHeader.includes("valid_cookie") || cookieHeader.includes("quantos_token")) {
             return new Response(
               JSON.stringify({ status: "success", authenticated: true, user: { id: "user_1" } }),
               { status: 200, headers: { "Content-Type": "application/json" } }
@@ -231,9 +271,16 @@ async function runStreamAuthTests() {
       "getGatewayHttpUrl() correctly resolves configured Render HTTP URL"
     );
     assert(
-      getGatewayWsUrl() === "wss://quantos-gateway.onrender.com/ws",
-      "getGatewayWsUrl() derives wss:// endpoint from configured Render HTTP URL"
+      getGatewayWsUrl() === "",
+      "getGatewayWsUrl() returns empty in production without explicit NEXT_PUBLIC_GATEWAY_WS_URL"
     );
+
+    process.env.NEXT_PUBLIC_GATEWAY_WS_URL = "wss://quantos-gateway.onrender.com/ws";
+    assert(
+      getGatewayWsUrl() === "wss://quantos-gateway.onrender.com/ws",
+      "getGatewayWsUrl() strictly resolves NEXT_PUBLIC_GATEWAY_WS_URL in production"
+    );
+    delete process.env.NEXT_PUBLIC_GATEWAY_WS_URL;
 
     // ── TEST 4: Development Destination Resolution (Safe Fallbacks Allowed) ──
     console.log("\n--- 4. Testing Development Destination Resolution ---");
@@ -304,7 +351,7 @@ async function runStreamAuthTests() {
     const noSymbolsRes = await POST(noSymbolsReq);
     assert(noSymbolsRes.status === 400, "Empty symbols list returns HTTP 400");
 
-    // Unknown stream ID (instance mismatch) returns 404 handled: false
+    // Unknown stream ID (instance mismatch) returns 200 with handled: false, instanceMismatch: true
     const unknownStreamReq = new NextRequest("http://localhost:3000/api/market-data/stream", {
       method: "POST",
       body: JSON.stringify({ streamId: "stream_non_existent", action: "subscribe", symbols: ["NSE:TCS"] }),
@@ -312,11 +359,22 @@ async function runStreamAuthTests() {
     });
     const unknownStreamRes = await POST(unknownStreamReq);
     assert(
-      unknownStreamRes.status === 404,
-      `Unknown streamId returns HTTP 404 (got ${unknownStreamRes.status})`
+      unknownStreamRes.status === 200,
+      `Unknown streamId returns HTTP 200 for clean client-side reconnect (got ${unknownStreamRes.status})`
     );
     const unknownData = await unknownStreamRes.json();
     assert(unknownData.handled === false, "Response returns handled: false for debounced reconnect");
+    assert(unknownData.instanceMismatch === true, "Response returns instanceMismatch: true");
+
+    // ── TEST 7: DELETE Stream Cleanup ──
+    console.log("\n--- 7. Testing DELETE Stream Cleanup ---");
+    const deleteReq = new NextRequest("http://localhost:3000/api/market-data/stream?streamId=stream_test_del", {
+      method: "DELETE",
+    });
+    const deleteRes = await DELETE(deleteReq);
+    assert(deleteRes.status === 200, `DELETE returns HTTP 200 (got ${deleteRes.status})`);
+    const deleteData = await deleteRes.json();
+    assert(deleteData.ok === true, "DELETE response contains ok: true");
 
     console.log("\n=======================================================");
     console.log("ALL STREAM AUTH & ARCHITECTURE TESTS PASSED! ✅");

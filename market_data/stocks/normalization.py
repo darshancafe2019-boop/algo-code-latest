@@ -83,10 +83,38 @@ class StockQuoteNormalizer:
         market_cap = float(raw["market_cap"]) if raw.get("market_cap") is not None else None
         vwap = float(raw["vwap"]) if raw.get("vwap") is not None else None
 
-        # Status and quality
-        market_status = raw.get("market_status") or "REGULAR"
-        data_quality = raw.get("data_quality") or "LIVE"
+        # Real exchange hours evaluation (e.g. US stocks closed outside 09:30-16:00 EDT)
+        from market_data.stocks.session_engine import StockSessionEngine
+        session_info = StockSessionEngine.get_session_status(exchange)
+        is_session_open = session_info.get("is_open", False)
+        if not is_session_open:
+            market_status = "CLOSED"
+        else:
+            market_status = raw.get("market_status") or "REGULAR"
+
+        # Compute data_age_ms from real timestamp
         exchange_ts = raw.get("timestamp_exchange") or raw.get("timestamp") or now_utc
+        data_age_ms = float(raw.get("data_age_ms") or 0.0)
+        try:
+            raw_ts = raw.get("timestamp_exchange") or raw.get("timestamp")
+            if raw_ts:
+                if isinstance(raw_ts, (int, float)):
+                    ts_sec = raw_ts / 1000.0 if raw_ts > 1e11 else float(raw_ts)
+                    dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+                else:
+                    dt = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+                now_dt = datetime.now(timezone.utc)
+                data_age_ms = max(0.0, (now_dt - dt).total_seconds() * 1000.0)
+        except Exception:
+            pass
+
+        # A row is LIVE only if its timestamp is under 15s old; otherwise show STALE
+        if market_status == "CLOSED":
+            data_quality = "MARKET_CLOSED"
+        elif data_age_ms <= 15000.0:
+            data_quality = "LIVE"
+        else:
+            data_quality = "STALE"
 
         return NormalizedStockQuote(
             instrument_id=instrument_id,
@@ -119,6 +147,6 @@ class StockQuoteNormalizer:
             provider=provider,
             timestamp_exchange=exchange_ts,
             timestamp_received=now_utc,
-            data_age_ms=float(raw.get("data_age_ms") or 0.0),
+            data_age_ms=data_age_ms,
             data_quality=data_quality,
         )

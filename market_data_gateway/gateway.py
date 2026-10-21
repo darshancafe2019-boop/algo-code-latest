@@ -14,6 +14,8 @@ Next.js BFF proxies /api/market/* -> this service.
 from __future__ import annotations
 
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -21,7 +23,7 @@ import time
 import uuid
 from collections import deque
 from datetime import datetime, timezone, timedelta
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import aiohttp
 from aiohttp import web
@@ -60,6 +62,65 @@ logging.basicConfig(
 logger = logging.getLogger("MDGateway")
 
 GATEWAY_SECRET = os.environ.get("MARKET_GATEWAY_SECRET", "")
+
+
+def verify_gateway_token(token: str, secret: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Verifies an HMAC-SHA256 gateway token.
+    Token payload format: `<userId>:<expiresAt>`
+    Token format: `<payload>:<signature>` or `<payload>.<signature>`
+    Returns (is_valid, user_id, error_reason).
+    """
+    if not token or not secret:
+        return False, None, "Missing token or gateway secret"
+
+    token = token.strip()
+    sig = ""
+    payload = ""
+    user_id = ""
+    expires_str = ""
+
+    if ":" in token:
+        parts = token.rsplit(":", 2)
+        if len(parts) == 3:
+            user_id, expires_str, sig = parts
+            payload = f"{user_id}:{expires_str}"
+        elif len(parts) == 2:
+            payload, sig = parts
+            user_id = payload
+            expires_str = "0"
+    elif "." in token:
+        parts = token.rsplit(".", 1)
+        if len(parts) == 2:
+            payload, sig = parts
+            sub_parts = payload.split(":")
+            user_id = sub_parts[0] if sub_parts else "user"
+            expires_str = sub_parts[1] if len(sub_parts) > 1 else "0"
+
+    if not sig or not payload or not expires_str:
+        return False, None, "Invalid gateway token format"
+
+    # Expiry verification
+    try:
+        expires_at = float(expires_str)
+    except (ValueError, TypeError):
+        return False, None, "Invalid token expiry timestamp"
+
+    if time.time() > expires_at:
+        return False, None, "Gateway token expired"
+
+    # Constant-time comparison of HMAC-SHA256
+    expected_sig = hmac.new(
+        secret.encode("utf-8"),
+        payload.encode("utf-8"),
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(sig.lower(), expected_sig.lower()):
+        return False, None, "Invalid gateway token signature"
+
+    return True, user_id, None
+
 def get_instrument_identity(provider: str, exchange: str, symbol: str, contract_type: str = "SPOT") -> str:
     """Returns canonical immutable instrument identity: PROVIDER:EXCHANGE:SYMBOL:CONTRACT_TYPE."""
     prov = (provider or "UNKNOWN").upper().strip()
@@ -1046,12 +1107,17 @@ class MarketDataGateway:
         })
 
     async def handle_ws(self, request: web.Request) -> web.WebSocketResponse:
-        """Internal WebSocket endpoint. Accepts X-Gateway-Secret header, query param, or loopback clients."""
-        secret = (
-            request.headers.get("X-Gateway-Secret", "")
-            or request.rel_url.query.get("secret", "")
-            or request.rel_url.query.get("token", "")
-        )
+        """
+        WebSocket streaming endpoint.
+        Authentication rules:
+        1. X-Gateway-Secret header or ?secret= query parameter (server-to-server)
+        2. ?token= short-lived HMAC-SHA256 token (browser-to-gateway)
+        3. Loopback clients allowed in non-production or for internal probes.
+        """
+        raw_secret_hdr = request.headers.get("X-Gateway-Secret", "")
+        raw_secret_query = request.rel_url.query.get("secret", "")
+        raw_token_query = request.rel_url.query.get("token", "")
+
         remote_host = (request.remote or "").lower().strip()
         is_loopback = (
             remote_host in ("127.0.0.1", "::1", "localhost", "testclient", "")
@@ -1059,13 +1125,55 @@ class MarketDataGateway:
             or remote_host.startswith("::ffff:127.")
             or remote_host in ("0.0.0.0", "::")
         )
-
         is_prod = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
-        if not is_loopback:
+
+        authenticated = False
+        auth_client = "unknown"
+
+        # 1. Header or query secret path (constant-time compare)
+        provided_secret = raw_secret_hdr or raw_secret_query
+        if provided_secret:
             if not GATEWAY_SECRET and is_prod:
                 raise web.HTTPForbidden(reason="Gateway secret must be configured in production")
-            if GATEWAY_SECRET and secret != GATEWAY_SECRET:
+            if GATEWAY_SECRET and hmac.compare_digest(provided_secret, GATEWAY_SECRET):
+                authenticated = True
+                auth_client = "service_secret"
+            elif GATEWAY_SECRET:
                 raise web.HTTPForbidden(reason="Invalid gateway secret")
+
+        # 2. Short-lived token path (?token=)
+        if not authenticated and raw_token_query:
+            if not GATEWAY_SECRET:
+                if is_prod:
+                    raise web.HTTPForbidden(reason="Gateway secret must be configured in production to verify token")
+                # In non-production with no secret set, allow token if format is valid
+                is_valid, user_id, err_reason = verify_gateway_token(raw_token_query, "dev-fallback-secret")
+                if is_valid:
+                    authenticated = True
+                    auth_client = f"user:{user_id}"
+                else:
+                    raise web.HTTPForbidden(reason=err_reason or "Invalid or expired gateway token")
+            else:
+                is_valid, user_id, err_reason = verify_gateway_token(raw_token_query, GATEWAY_SECRET)
+                if is_valid:
+                    authenticated = True
+                    auth_client = f"user:{user_id}"
+                else:
+                    raise web.HTTPForbidden(reason=err_reason or "Invalid or expired gateway token")
+
+        # 3. Loopback bypass for local health checks/dev
+        if not authenticated:
+            if is_loopback and not is_prod:
+                authenticated = True
+                auth_client = f"loopback:{remote_host}"
+            elif is_loopback and is_prod:
+                if not GATEWAY_SECRET and not provided_secret and not raw_token_query:
+                    authenticated = True
+                    auth_client = "loopback:prod"
+                else:
+                    raise web.HTTPForbidden(reason="Authentication required: valid gateway token or secret required")
+            else:
+                raise web.HTTPForbidden(reason="Authentication required: valid gateway token or secret required")
 
         ws = web.WebSocketResponse(heartbeat=30)
         await ws.prepare(request)
@@ -1430,18 +1538,56 @@ class MarketDataGateway:
 # ENTRYPOINT
 # ─────────────────────────────────────────────────────────────────────────────
 
+def get_allowed_cors_origins() -> List[str]:
+    raw = os.environ.get("ALLOWED_CORS_ORIGINS", "")
+    origins = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
+    frontend = os.environ.get("FRONTEND_URL", "").strip().rstrip("/")
+    if frontend and frontend not in origins:
+        origins.append(frontend)
+    app_url = os.environ.get("APP_PUBLIC_URL", "").strip().rstrip("/")
+    if app_url and app_url not in origins:
+        origins.append(app_url)
+    return origins
+
+
+def is_origin_allowed(origin: str, is_prod: bool) -> bool:
+    if not origin:
+        return False
+    norm_origin = origin.strip().rstrip("/")
+    allowed = get_allowed_cors_origins()
+    if norm_origin in allowed:
+        return True
+    # In non-production, allow local dev servers
+    if not is_prod:
+        if norm_origin in ("http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5050", "http://127.0.0.1:5050"):
+            return True
+        if norm_origin.startswith("http://localhost:") or norm_origin.startswith("http://127.0.0.1:"):
+            return True
+    return False
+
+
 @web.middleware
 async def cors_middleware(request: web.Request, handler):
+    origin = request.headers.get("Origin", "").strip()
+    is_prod = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
+    origin_ok = is_origin_allowed(origin, is_prod)
+
     if request.method == "OPTIONS":
+        if origin and not origin_ok:
+            return web.Response(status=403, text="CORS origin forbidden")
         response = web.Response(status=204)
     else:
         try:
             response = await handler(request)
         except web.HTTPException as ex:
             response = ex
+
     if not isinstance(response, web.StreamResponse) or not response.prepared:
         try:
-            response.headers["Access-Control-Allow-Origin"] = "*"
+            if origin and origin_ok:
+                response.headers["Access-Control-Allow-Origin"] = origin
+                response.headers["Access-Control-Allow-Credentials"] = "true"
+                response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Gateway-Secret, X-Request-Id, Authorization, X-Idempotency-Key"
         except Exception:

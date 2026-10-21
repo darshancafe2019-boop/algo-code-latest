@@ -48,17 +48,21 @@ class SimulationFeedAdapter(BaseProviderAdapter):
 
     async def connect(self) -> None:
         import os
-        if os.environ.get("FEED_MODE", "").upper() != "SIMULATION":
+        sim_mode = (
+            os.environ.get("FEED_MODE", "").strip().upper() == "SIMULATION"
+            or os.environ.get("ENABLE_SIMULATION_FEED", "").strip().lower() in ("true", "1")
+        )
+        if not sim_mode:
             self._running = False
             self._status = "IDLE"
-            logger.info("Simulation feed idle (FEED_MODE!=SIMULATION). Synthetic ticks disabled in production.")
+            logger.info("Simulation feed idle (disabled by default in production). Set FEED_MODE=SIMULATION to enable.")
             return
 
         self._running = True
-        self._status = "LIVE"
+        self._status = "SIMULATED"
         if self._task is None or self._task.done():
             self._task = asyncio.create_task(self._simulation_loop())
-        logger.info("[OK] Simulation feed connected and generating synthetic ticks.")
+        logger.info("[OK] Simulation feed connected and generating synthetic ticks (Status: SIMULATED).")
 
     async def disconnect(self) -> None:
         self._running = False
@@ -98,8 +102,8 @@ class SimulationFeedAdapter(BaseProviderAdapter):
                         change_pct=round((drift / base) * 100.0, 2),
                         event_timestamp=now_iso,
                         received_timestamp=now_iso,
-                        data_mode="SIMULATION",
-                        status="LIVE",
+                        data_mode="SIMULATED",
+                        status="SIMULATED",
                     )
                     self._quote_cache[sym] = q
                     self._emit(q)
@@ -128,16 +132,17 @@ class SimulationFeedAdapter(BaseProviderAdapter):
         return []
 
     async def health_check(self) -> ProviderHealth:
+        status_val = "SIMULATED" if self._running else "IDLE"
         return ProviderHealth(
             provider_id="sim_feed",
             provider_name="Simulation Feed Engine",
-            status="LIVE",
+            status=status_val,
             asset_classes=["INDIAN_EQUITIES", "INDIAN_INDICES", "CRYPTO"],
             subscribed_symbols=len(self._subscribed_symbols),
             latency_ms=1.0,
-            message="Deterministic Simulator Active (Mode: SIMULATION)",
+            message=f"Deterministic Simulator Active (Mode: {status_val})",
             auth_status="HEALTHY",
             rest_status="HEALTHY",
-            stream_status="CONNECTED",
+            stream_status="CONNECTED" if self._running else "DISCONNECTED",
             capabilities={"simulation": True},
         )

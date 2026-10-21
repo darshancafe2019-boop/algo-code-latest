@@ -489,10 +489,9 @@ const MemoizedMarketRow = memo(function MarketRow({
   const currSymbol = instrument.currency === "INR" ? "₹" : "$";
 
   // Reactive subscription to real-time live ticks for this instrument (strictly provider-scoped with bare symbol fallback)
-  const liveTick =
-    useSymbolQuote(sym, instrument.exchange, instrument.provider) ||
-    (providerSym ? useSymbolQuote(providerSym, instrument.exchange, instrument.provider) : undefined) ||
-    (bareSym !== sym ? useSymbolQuote(bareSym, instrument.exchange, instrument.provider) : undefined);
+  const primaryTick = useSymbolQuote(sym, instrument.exchange, instrument.provider);
+  const providerTick = useSymbolQuote(providerSym || undefined, instrument.exchange, instrument.provider);
+  const liveTick = primaryTick || providerTick;
 
   // Derive authoritative raw quote from reactive tick or gateway context cache
   const rawQuote = liveTick ? {

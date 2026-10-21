@@ -1,5 +1,5 @@
 import { useBotStore } from "./store/bot-store";
-import { getGatewayWsUrl } from "@/lib/config/gatewayConfig";
+import { getAuthenticatedGatewayWsUrl } from "@/lib/config/gatewayConfig";
 
 export interface WsMessage {
   type: string;
@@ -30,48 +30,58 @@ class WebSocketClient {
     }
 
     this.isExplicitDisconnect = false;
-    try {
-      const wsUrl = getGatewayWsUrl();
+    getAuthenticatedGatewayWsUrl()
+      .then((wsUrl) => {
+        if (!wsUrl || this.isExplicitDisconnect) return;
+        if (
+          this.socket &&
+          (this.socket.readyState === WebSocket.OPEN || this.socket.readyState === WebSocket.CONNECTING)
+        ) {
+          return;
+        }
 
-      if (!wsUrl) {
-        return;
-      }
-
-      this.socket = new WebSocket(wsUrl);
-
-      this.socket.onopen = () => {
-        this.retryDelay = 2000;
         try {
-          useBotStore.getState().setWsConnected(true);
-        } catch (_) {}
-        this.startHeartbeat();
-      };
+          this.socket = new WebSocket(wsUrl);
 
-      this.socket.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          this.notifyListeners(msg);
-        } catch (e) {}
-      };
+          this.socket.onopen = () => {
+            this.retryDelay = 2000;
+            try {
+              useBotStore.getState().setWsConnected(true);
+            } catch (_) {}
+            this.startHeartbeat();
+          };
 
-      this.socket.onclose = () => {
-        this.stopHeartbeat();
-        try {
-          useBotStore.getState().setWsConnected(false);
-        } catch (_) {}
-        if (!this.isExplicitDisconnect && this.listeners.size > 0) {
+          this.socket.onmessage = (event) => {
+            try {
+              const msg = JSON.parse(event.data);
+              this.notifyListeners(msg);
+            } catch (e) {}
+          };
+
+          this.socket.onclose = () => {
+            this.stopHeartbeat();
+            try {
+              useBotStore.getState().setWsConnected(false);
+            } catch (_) {}
+            if (!this.isExplicitDisconnect && this.listeners.size > 0) {
+              this.scheduleReconnect();
+            }
+          };
+
+          this.socket.onerror = () => {
+            // Handled in onclose
+          };
+        } catch (e) {
+          if (this.listeners.size > 0) {
+            this.scheduleReconnect();
+          }
+        }
+      })
+      .catch(() => {
+        if (this.listeners.size > 0) {
           this.scheduleReconnect();
         }
-      };
-
-      this.socket.onerror = () => {
-        // Handled in onclose
-      };
-    } catch (e) {
-      if (this.listeners.size > 0) {
-        this.scheduleReconnect();
-      }
-    }
+      });
   }
 
   public disconnect(): void {

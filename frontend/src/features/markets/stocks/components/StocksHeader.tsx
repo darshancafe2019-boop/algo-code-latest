@@ -10,6 +10,9 @@ interface StocksHeaderProps {
   providerCount?: number;
   lastUpdated?: string | null;
   isLoading?: boolean;
+  isPolling?: boolean;
+  isWsConnected?: boolean;
+  connectionStatus?: string;
   onRefresh?: () => void;
 }
 
@@ -19,6 +22,9 @@ export const StocksHeader: React.FC<StocksHeaderProps> = ({
   providerCount = 3,
   lastUpdated,
   isLoading = false,
+  isPolling = true,
+  isWsConnected = false,
+  connectionStatus,
   onRefresh,
 }) => {
   return (
@@ -46,6 +52,24 @@ export const StocksHeader: React.FC<StocksHeaderProps> = ({
 
         {/* Live KPI Badges */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          {/* Stream Status: GATEWAY NOT CONFIGURED vs LIVE vs POLLING */}
+          {connectionStatus === "GATEWAY_NOT_CONFIGURED" ? (
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-2 font-mono text-xs font-bold shadow-[0_0_8px_rgba(245,158,11,0.2)]" title="NEXT_PUBLIC_GATEWAY_WS_URL is not set">
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
+              <span>GATEWAY NOT CONFIGURED</span>
+            </div>
+          ) : isWsConnected ? (
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center gap-2 font-mono text-xs font-bold shadow-[0_0_8px_rgba(16,185,129,0.2)]">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span>LIVE</span>
+            </div>
+          ) : (
+            <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center gap-2 font-mono text-xs font-bold shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span>POLLING</span>
+            </div>
+          )}
+
           <div className="px-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 flex items-center gap-2">
             <Activity className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
             <div className="text-[11px]">

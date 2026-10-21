@@ -680,13 +680,15 @@ export function MarketUniverse() {
     };
   }, [displayedInstruments, quotes, getQuote]);
 
-  const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE" => {
+  const feedStatus = useMemo((): "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE" | "POLLING" | "GATEWAY_NOT_CONFIGURED" => {
+    if (connectionStatus === "GATEWAY_NOT_CONFIGURED") return "GATEWAY_NOT_CONFIGURED";
     if (connectionStatus === "RECONNECTING" || connectionStatus === "CONNECTING") return "RECONNECTING";
     if (connectionStatus === "DISCONNECTED" && providerCount === 0) return "OFFLINE";
-    if (liveCount > 0) return "LIVE";
-    if (providerCount > 0 || connectionStatus === "CONNECTED" || connectionStatus === "LIVE") return "PARTIAL";
+    if (connectionStatus === "CONNECTED" || connectionStatus === "LIVE") {
+      return liveCount > 0 ? "LIVE" : "PARTIAL";
+    }
     if (connectionStatus === "STALE") return "STALE";
-    return "OFFLINE";
+    return "POLLING";
   }, [connectionStatus, providerCount, liveCount]);
 
   const handleLaunchOptionChainDirect = (underlying: string, exchange?: string, provider?: string) => {

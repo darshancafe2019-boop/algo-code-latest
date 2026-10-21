@@ -30,7 +30,7 @@ export const StockRow: React.FC<StockRowProps> = ({
   const isNegative = changePct < 0;
 
   const trendStyle = getTrendColor(stock.directional_bias);
-  const qualityBadge = getDataQualityBadge(stock.data_quality);
+  const qualityBadge = getDataQualityBadge(stock.data_quality, stock.data_age_ms, stock.timestamp_exchange);
 
   const colVisible = (id: string) => columns.find((c) => c.id === id)?.visible !== false;
 

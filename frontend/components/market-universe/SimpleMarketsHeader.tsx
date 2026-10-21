@@ -30,7 +30,7 @@ interface SimpleMarketsHeaderProps {
   lastUpdateMs?: number;
   averageLatencyMs?: number;
   isLiveFeed: boolean;
-  feedStatus?: "LIVE" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE";
+  feedStatus?: "LIVE" | "POLLING" | "GATEWAY_NOT_CONFIGURED" | "PARTIAL" | "RECONNECTING" | "STALE" | "OFFLINE";
   searchQuery: string;
   onSearchChange: (q: string) => void;
   activeCategory: string;
@@ -169,6 +169,16 @@ export function SimpleMarketsHeader({
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-emerald-500/10 border-emerald-500/30 text-emerald-400 shadow-[0_0_8px_rgba(16,185,129,0.2)]">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span>● LIVE</span>
+              </div>
+            ) : effectiveStatus === "POLLING" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.2)]">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>● POLLING</span>
+              </div>
+            ) : effectiveStatus === "GATEWAY_NOT_CONFIGURED" ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-amber-500/10 border-amber-500/30 text-amber-400" title="NEXT_PUBLIC_GATEWAY_WS_URL is not set">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>● GATEWAY NOT CONFIGURED</span>
               </div>
             ) : effectiveStatus === "PARTIAL" ? (
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-extrabold border transition-all bg-cyan-500/10 border-cyan-500/30 text-cyan-400">

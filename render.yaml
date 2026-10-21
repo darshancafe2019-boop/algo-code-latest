@@ -5,7 +5,7 @@ services:
     runtime: python
     region: singapore
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn dashboard:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120
+    startCommand: gunicorn dashboard:app --bind 0.0.0.0:$PORT --workers 1 --worker-class gthread --threads 16 --timeout 120
     healthCheckPath: /health/live
     envVars:
       - key: PYTHON_VERSION
@@ -43,7 +43,10 @@ services:
       - key: AUTH_TOTP_ENCRYPTION_KEY
         sync: false
       - key: MARKET_GATEWAY_URL
-        sync: false
+        fromService:
+          type: web
+          name: quantos-gateway
+          property: host
       - key: MARKET_GATEWAY_SECRET
         sync: false
       - key: APP_PUBLIC_URL
@@ -57,26 +60,84 @@ services:
     runtime: python
     region: singapore
     buildCommand: pip install -r requirements.txt
-    startCommand: python start_gateway.py
+    startCommand: python start_gateway.py --port $PORT
     healthCheckPath: /health/live
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: MARKET_GATEWAY_HOST
-        value: 0.0.0.0
+        sync: false
       - key: TRADING_MODE
-        value: PAPER
+        sync: false
       - key: LIVE_TRADING_ENABLED
-        value: "false"
+        sync: false
       - key: MASTER_LIVE_TRADING
-        value: "false"
+        sync: false
       - key: ENABLE_DELTA_OPTIONS
-        value: "true"
+        sync: false
+      - key: BACKEND_INTERNAL_URL
+        sync: false
+      - key: BACKEND_API_URL
+        sync: false
+      - key: ALLOWED_CORS_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
       - key: MARKET_GATEWAY_SECRET
+        sync: false
+      - key: FEED_MODE
+        sync: false
+      - key: INDIA_BROKER
         sync: false
       - key: DELTA_API_KEY
         sync: false
       - key: DELTA_API_SECRET
         sync: false
+      - key: DELTA_PUBLIC_WS_URL
+        sync: false
+      - key: DELTA_MAX_SUBSCRIPTIONS
+        sync: false
+      - key: UPSTOX_CLIENT_ID
+        sync: false
+      - key: UPSTOX_CLIENT_SECRET
+        sync: false
       - key: UPSTOX_ACCESS_TOKEN
+        sync: false
+      - key: UPSTOX_MAX_SUBSCRIPTIONS
+        sync: false
+      - key: DHAN_CLIENT_ID
+        sync: false
+      - key: DHAN_ACCESS_TOKEN
+        sync: false
+      - key: DHAN_MAX_SUBSCRIPTIONS
+        sync: false
+      - key: DHAN_ONLY_DIAGNOSTIC_MODE
+        sync: false
+      - key: FYERS_APP_ID
+        sync: false
+      - key: FYERS_CLIENT_ID
+        sync: false
+      - key: FYERS_ACCESS_TOKEN
+        sync: false
+      - key: FYERS_WS_URL
+        sync: false
+      - key: FYERS_MAX_SUBSCRIPTIONS
+        sync: false
+      - key: ANGELONE_API_KEY
+        sync: false
+      - key: ANGELONE_AUTH_TOKEN
+        sync: false
+      - key: ANGELONE_CLIENT_ID
+        sync: false
+      - key: ANGELONE_TOTP_SECRET
+        sync: false
+      - key: ANGELONE_PIN
+        sync: false
+      - key: ALPACA_API_KEY
+        sync: false
+      - key: ALPACA_API_SECRET
+        sync: false
+      - key: TWELVE_DATA_API_KEY
+        sync: false
+      - key: RAW_FEED_DEBUG
         sync: false

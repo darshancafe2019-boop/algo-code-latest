@@ -18,19 +18,37 @@ export function getTrendColor(bias?: string): { bg: string; text: string; border
   }
 }
 
-export function getDataQualityBadge(quality?: string): { bg: string; text: string; border: string; label: string } {
-  switch (quality?.toUpperCase()) {
-    case "LIVE":
-      return { bg: "bg-emerald-500/10", text: "text-emerald-400", border: "border-emerald-500/30", label: "LIVE" };
-    case "DELAYED":
-      return { bg: "bg-amber-500/10", text: "text-amber-400", border: "border-amber-500/30", label: "DELAYED" };
-    case "STALE":
-      return { bg: "bg-orange-500/10", text: "text-orange-400", border: "border-orange-500/30", label: "STALE" };
-    case "MARKET_CLOSED":
-      return { bg: "bg-slate-800/80", text: "text-slate-400", border: "border-slate-700", label: "CLOSED" };
-    case "PROVIDER_DOWN":
-      return { bg: "bg-rose-500/10", text: "text-rose-400", border: "border-rose-500/30", label: "DOWN" };
-    default:
-      return { bg: "bg-slate-800/60", text: "text-slate-400", border: "border-slate-700/60", label: quality || "FEED" };
+export function getDataQualityBadge(
+  quality?: string,
+  dataAgeMs?: number | null,
+  timestamp?: string | null
+): { bg: string; text: string; border: string; label: string } {
+  let ageSec = 0;
+  if (dataAgeMs != null && dataAgeMs > 0) {
+    ageSec = Math.floor(dataAgeMs / 1000);
+  } else if (timestamp) {
+    try {
+      const ts = new Date(timestamp).getTime();
+      if (!isNaN(ts)) {
+        ageSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      }
+    } catch {}
   }
+
+  const q = quality?.toUpperCase();
+  if (q === "MARKET_CLOSED") {
+    return { bg: "bg-slate-800/80", text: "text-slate-400 font-bold", border: "border-slate-700", label: "CLOSED" };
+  }
+
+  if (q === "PROVIDER_DOWN") {
+    return { bg: "bg-rose-500/10", text: "text-rose-400 font-bold", border: "border-rose-500/30", label: "DOWN" };
+  }
+
+  // A row is LIVE only if its timestamp is under 15s old; otherwise show STALE with the age
+  if (ageSec <= 15 && (q === "LIVE" || q == null || q === "REAL_TIME")) {
+    return { bg: "bg-emerald-500/10", text: "text-emerald-400 font-bold", border: "border-emerald-500/30", label: "LIVE" };
+  }
+
+  const ageStr = ageSec > 0 ? `STALE (${ageSec}s)` : "STALE";
+  return { bg: "bg-orange-500/10", text: "text-orange-400 font-bold", border: "border-orange-500/30", label: ageStr };
 }

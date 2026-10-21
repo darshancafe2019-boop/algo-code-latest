@@ -36,18 +36,23 @@ class StockHistoricalEngine:
         elif timeframe == "1d": tf_minutes = 1440
         elif timeframe == "1w": tf_minutes = 10080
 
-        curr_price = base_price
+        sym_hash = sum(ord(c) * (idx + 1) for idx, c in enumerate(symbol))
+        phase = (sym_hash % 100) / 10.0
+
+        # Multi-frequency deterministic walk creating natural gains and losses across periods
+        curr_price = base_price * 0.98
         for i in range(limit, 0, -1):
             ts = now - timedelta(minutes=i * tf_minutes)
             
-            # Deterministic wave fluctuation
-            wave = math.sin(i * 0.2) * (base_price * 0.008)
-            drift = math.cos(i * 0.05) * (base_price * 0.015)
-            
-            open_p = round(curr_price + wave, 2)
-            close_p = round(open_p + drift, 2)
-            high_p = round(max(open_p, close_p) + abs(wave * 0.8) + (base_price * 0.003), 2)
-            low_p = round(min(open_p, close_p) - abs(drift * 0.8) - (base_price * 0.003), 2)
+            step = (
+                math.sin((i + phase) * 0.75) * 0.012 +
+                math.cos((i + phase) * 1.35) * 0.009 -
+                math.sin((i + phase) * 0.3) * 0.004
+            )
+            open_p = round(curr_price, 2)
+            close_p = round(curr_price * (1.0 + step), 2)
+            high_p = round(max(open_p, close_p) * 1.004, 2)
+            low_p = round(min(open_p, close_p) * 0.996, 2)
             vol = round(abs(math.sin(i * 0.3) * 50000) + 15000, 0)
 
             candles.append({

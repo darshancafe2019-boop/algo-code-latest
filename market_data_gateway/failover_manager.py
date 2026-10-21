@@ -34,7 +34,10 @@ FAILOVER_CHAINS: Dict[str, List[str]] = {
 # Dynamic resolution respecting environment configuration (INDIA_BROKER, FEED_MODE)
 def get_failover_chain(asset_class: str) -> List[str]:
     pref = os.environ.get("INDIA_BROKER", "UPSTOX").upper()
-    sim_enabled = os.environ.get("FEED_MODE", "").upper() == "SIMULATION"
+    sim_enabled = (
+        os.environ.get("FEED_MODE", "").strip().upper() == "SIMULATION"
+        or os.environ.get("ENABLE_SIMULATION_FEED", "").strip().lower() in ("true", "1")
+    )
 
     if pref == "FYERS":
         indian_chain = ["fyers_ws", "upstox_ws", "dhan_ws", "angelone", "yahoo_fallback"]

@@ -5,6 +5,7 @@ Orchestrates multi-parameter screening, sorting, pagination, and data enrichment
 """
 
 from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
 from market_data.stocks.instrument_master import global_stock_master
 from market_data.stocks.quote_engine import global_stock_quote_engine
 from market_data.stocks.fundamentals_engine import global_stock_fundamentals_engine
@@ -102,7 +103,36 @@ class StockScreenerEngine:
             rec["low_52w"] = q.low_52w
             if q.market_cap:
                 rec["market_cap"] = q.market_cap
-            rec["data_quality"] = q.data_quality
+            from market_data.stocks.session_engine import StockSessionEngine
+            session_info = StockSessionEngine.get_session_status(inst.exchange)
+            is_session_open = session_info.get("is_open", False)
+            row_market_status = "REGULAR" if is_session_open else "CLOSED"
+            rec["market_status"] = row_market_status
+
+            # Compute real data_age_ms dynamically from timestamp_exchange
+            now_dt = datetime.now(timezone.utc)
+            real_data_age_ms = 0.0
+            raw_ts = q.timestamp_exchange or q.timestamp_received
+            if raw_ts:
+                try:
+                    if isinstance(raw_ts, (int, float)):
+                        ts_sec = raw_ts / 1000.0 if raw_ts > 1e11 else float(raw_ts)
+                        dt = datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+                    else:
+                        dt = datetime.fromisoformat(str(raw_ts).replace("Z", "+00:00"))
+                    real_data_age_ms = max(0.0, (now_dt - dt).total_seconds() * 1000.0)
+                except Exception:
+                    real_data_age_ms = float(q.data_age_ms or 0.0)
+
+            # A row is LIVE only if its timestamp is under 15s old; otherwise show STALE
+            if row_market_status == "CLOSED":
+                row_quality = "MARKET_CLOSED"
+            elif real_data_age_ms <= 15000.0:
+                row_quality = "LIVE"
+            else:
+                row_quality = "STALE"
+
+            rec["data_quality"] = row_quality
 
             candles = global_stock_historical_engine.get_candles(
                 symbol=inst.symbol,
@@ -139,7 +169,9 @@ class StockScreenerEngine:
                 "turnover_usd": q.turnover_usd,
                 "turnover_inr": q.turnover_inr,
                 "vwap": q.vwap,
-                "data_age_ms": q.data_age_ms,
+                "data_age_ms": real_data_age_ms,
+                "data_quality": row_quality,
+                "market_status": row_market_status,
                 "provider": q.provider,
                 "timestamp_exchange": q.timestamp_exchange,
 

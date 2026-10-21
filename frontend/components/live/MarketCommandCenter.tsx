@@ -34,7 +34,7 @@ import { dispatchBotCreation } from "@/lib/store/useBotCreationIntentStore";
 import { useMarketFeedStore, NormalizedMarketTick, ProviderStat } from "@/lib/market-data/market-feed-store";
 import { MarketStreamObservatory } from "./MarketStreamObservatory";
 import { MarketDepthViewer } from "./MarketDepthViewer";
-import { getGatewayWsUrl } from "@/lib/config/gatewayConfig";
+import { getGatewayWsUrl, getAuthenticatedGatewayWsUrl } from "@/lib/config/gatewayConfig";
 
 export interface MasterInstrument {
   symbol: string;
@@ -122,7 +122,7 @@ export function MarketCommandCenter() {
   }, [subscribedSymbols]);
 
   // 1. WebSocket Gateway Connection
-  const connectGatewayWS = useCallback(() => {
+  const connectGatewayWS = useCallback(async () => {
     if (typeof window === "undefined") return;
     if (
       wsRef.current &&
@@ -138,7 +138,7 @@ export function MarketCommandCenter() {
     }
 
     try {
-      const wsUrl = getGatewayWsUrl();
+      const wsUrl = await getAuthenticatedGatewayWsUrl();
 
       if (!wsUrl) {
         setConnectionStatus("DISCONNECTED");

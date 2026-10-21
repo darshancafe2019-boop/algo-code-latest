@@ -232,8 +232,8 @@ export function generateDynamicOptionChainQuotes(underlying: string, spotPrice: 
       eventTimestamp: now,
       receivedTimestamp: now,
       feedLatencyMs: 14,
-      dataMode: "REAL_TIME",
-      status: "LIVE",
+      dataMode: "SIMULATED",
+      status: "DELAYED",
       isStale: false,
       ageMs: 14,
       flashDirection: "up",
@@ -262,8 +262,8 @@ export function generateDynamicOptionChainQuotes(underlying: string, spotPrice: 
       eventTimestamp: now,
       receivedTimestamp: now,
       feedLatencyMs: 16,
-      dataMode: "REAL_TIME",
-      status: "LIVE",
+      dataMode: "SIMULATED",
+      status: "DELAYED",
       isStale: false,
       ageMs: 16,
       flashDirection: "down",
@@ -282,9 +282,12 @@ export async function getLiveSnapshotQuotes(
   const quotes: Record<string, NormalizedMarketTick> = {};
   const requested = requestedSymbols.length > 0 ? requestedSymbols : Object.keys(liveCache);
   const now = new Date().toISOString();
+  const nowMs = Date.now();
 
   for (const sym of requested) {
-    const item = liveCache[sym] || {
+    const cachedItem = liveCache[sym];
+    const isRecentlyUpdated = Boolean(cachedItem && (nowMs - (cachedItem.lastUpdated || 0) < 45000));
+    const item = cachedItem || {
       ltp: 100.0,
       prevClose: 99.5,
       chg: 0.5,
@@ -296,8 +299,11 @@ export async function getLiveSnapshotQuotes(
       exchange: "NSE",
       provider: providerParam,
       name: sym,
-      lastUpdated: Date.now(),
+      lastUpdated: 0,
     };
+
+    const isRealLive = isRecentlyUpdated && item.lastUpdated > 0;
+    const ageMs = item.lastUpdated ? Math.max(0, nowMs - item.lastUpdated) : 60000;
 
     quotes[sym] = {
       symbol: sym,
@@ -316,13 +322,13 @@ export async function getLiveSnapshotQuotes(
       changePercent: item.chgPct,
       averagePrice: item.ltp,
       oi: item.oi,
-      eventTimestamp: now,
+      eventTimestamp: item.lastUpdated ? new Date(item.lastUpdated).toISOString() : now,
       receivedTimestamp: now,
-      feedLatencyMs: 14,
-      dataMode: "REAL_TIME",
-      status: "LIVE",
-      isStale: false,
-      ageMs: 14,
+      feedLatencyMs: isRealLive ? 14 : 250,
+      dataMode: isRealLive ? "REAL_TIME" : "CACHED",
+      status: isRealLive ? "LIVE" : "DELAYED",
+      isStale: !isRealLive,
+      ageMs,
       flashDirection: item.chg >= 0 ? "up" : "down",
     };
   }

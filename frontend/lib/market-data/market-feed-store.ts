@@ -30,7 +30,7 @@ export interface NormalizedMarketTick {
   eventTimestamp: string;
   receivedTimestamp: string;
   feedLatencyMs: number;
-  dataMode: "REAL_TIME" | "DELAYED" | "EOD" | "CACHED";
+  dataMode: "REAL_TIME" | "DELAYED" | "EOD" | "CACHED" | "SIMULATED";
   status: "LIVE" | "DELAYED" | "STALE" | "MARKET_CLOSED" | "UNAVAILABLE" | "UNKNOWN";
   isStale: boolean;
   ageMs: number;

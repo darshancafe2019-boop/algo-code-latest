@@ -12,7 +12,7 @@ import { StockDetailsDrawer } from "./StockDetailsDrawer";
 import { StockFiltersDrawer } from "./StockFiltersDrawer";
 
 export const StocksUniverseView: React.FC = () => {
-  const { stocks, meta, isLoading, isError, refetch } = useStocks();
+  const { stocks, meta, isLoading, isError, refetch, isWsConnected, isPolling, connectionStatus } = useStocks();
   const { filters } = useStockFilters();
   const { selectedStock, setSelectedStock } = useStocksStore();
 
@@ -40,6 +40,9 @@ export const StocksUniverseView: React.FC = () => {
         providerCount={3}
         lastUpdated={meta?.receivedTimestamp}
         isLoading={isLoading}
+        isPolling={isPolling}
+        isWsConnected={isWsConnected}
+        connectionStatus={connectionStatus}
         onRefresh={() => refetch()}
       />
 

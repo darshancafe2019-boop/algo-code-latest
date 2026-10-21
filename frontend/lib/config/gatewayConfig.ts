@@ -195,15 +195,15 @@ export function getGatewayHttpUrl(): string {
  * 6. Derived from MARKET_GATEWAY_URL (translating http:// -> ws:// and https:// -> wss://)
  * 7. In development only: fallback to "ws://127.0.0.1:5051/ws"
  */
+/**
+ * Resolves the Market Data Gateway WebSocket URL for browser and server transport.
+ * - In production: Strictly resolves from NEXT_PUBLIC_GATEWAY_WS_URL.
+ *   If unset, returns empty string to trigger an explicit "GATEWAY_NOT_CONFIGURED" state.
+ * - In development: Defaults to "ws://127.0.0.1:5051/ws".
+ */
 export function getGatewayWsUrl(): string {
   const explicitWs = (
     process.env.NEXT_PUBLIC_GATEWAY_WS_URL ||
-    process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS ||
-    process.env.NEXT_PUBLIC_MARKET_GATEWAY_WS_URL ||
-    process.env.NEXT_PUBLIC_MARKET_WS_URL ||
-    (typeof window === "undefined"
-      ? process.env.MARKET_DATA_GATEWAY_WS_URL || process.env.MARKET_GATEWAY_WS_URL
-      : undefined) ||
     ""
   ).trim();
 
@@ -217,11 +217,6 @@ export function getGatewayWsUrl(): string {
 
     if (explicitWs.startsWith("/")) {
       if (typeof window !== "undefined") {
-        // In browser on Vercel: Vercel does not route custom WebSocket ports.
-        // Return empty string in production to enable SSE streaming fallback.
-        if (isProduction()) {
-          return "";
-        }
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
         return `${proto}//${window.location.host}${explicitWs}`;
       }
@@ -232,17 +227,21 @@ export function getGatewayWsUrl(): string {
     return explicitWs;
   }
 
-  // Derive from configured HTTP gateway URL if available
-  const httpUrl = getGatewayHttpUrl();
-  if (httpUrl) {
-    const wsBase = httpUrl
-      .replace(/\/+$/, "")
-      .replace(/^http:\/\//, "ws://")
-      .replace(/^https:\/\//, "wss://");
-    return wsBase.endsWith("/ws") ? wsBase : `${wsBase}/ws`;
+  // In cloud production (Vercel), require explicit NEXT_PUBLIC_GATEWAY_WS_URL
+  if (isProduction()) {
+    return "";
   }
 
-  return isProduction() ? "" : "ws://127.0.0.1:5051/ws";
+  // Local development default to standalone gateway on port 5051
+  return "ws://127.0.0.1:5051/ws";
+}
+
+export function isGatewayWsConfigured(): boolean {
+  if (isProduction()) {
+    const ws = (process.env.NEXT_PUBLIC_GATEWAY_WS_URL || "").trim();
+    return Boolean(ws && !isLoopbackUrl(ws));
+  }
+  return true;
 }
 
 /**
@@ -260,6 +259,51 @@ export function getGatewaySecret(): string {
     ""
   );
 }
+
+/**
+ * Fetches a short-lived HMAC-SHA256 token from the Next.js BFF (/api/gateway-token).
+ * Returns null if authentication is missing or token generation fails.
+ */
+export async function fetchGatewayToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const res = await fetch("/api/gateway-token", {
+      method: "GET",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (data && data.token) {
+        return String(data.token);
+      }
+    }
+  } catch (err) {
+    // Non-blocking fallback
+  }
+  return null;
+}
+
+/**
+ * Returns the WebSocket URL with fresh short-lived token parameter attached.
+ */
+export async function getAuthenticatedGatewayWsUrl(): Promise<string> {
+  const baseWs = getGatewayWsUrl();
+  if (!baseWs) return "";
+  const token = await fetchGatewayToken();
+  if (!token) return baseWs;
+
+  try {
+    const u = new URL(baseWs);
+    u.searchParams.set("token", token);
+    return u.toString();
+  } catch {
+    const sep = baseWs.includes("?") ? "&" : "?";
+    return `${baseWs}${sep}token=${encodeURIComponent(token)}`;
+  }
+}
+
 
 export const GatewayConfig = {
   get isProduction(): boolean {

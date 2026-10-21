@@ -29,7 +29,7 @@ import { apiClient } from "@/lib/apiClient";
 import { useAuth } from "@/context/AuthContext";
 import { useMarketFeedStore } from "@/lib/market-data/market-feed-store";
 import { getQuoteAliases } from "@/lib/market-data/canonical-symbol";
-import { getGatewayWsUrl } from "@/lib/config/gatewayConfig";
+import { getGatewayWsUrl, isGatewayWsConfigured } from "@/lib/config/gatewayConfig";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -65,7 +65,9 @@ export type ConnectionStatus =
   | "LIVE"
   | "RECONNECTING"
   | "STALE"
-  | "DISCONNECTED";
+  | "DISCONNECTED"
+  | "GATEWAY_NOT_CONFIGURED"
+  | "POLLING";
 
 export type SubscriptionReason =
   | "WATCHLIST"
@@ -258,23 +260,12 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
 
   const shouldUseSSE = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
-    // In production on Vercel, browser WebSocket cannot send X-Gateway-Secret header; must use SSE proxy
-    if (process.env.NODE_ENV === "production") return true;
+    // Allow explicit SSE override via environment variable if requested
     if (process.env.NEXT_PUBLIC_USE_SSE === "true") return true;
 
-    // In local development, check if direct WS URL is a local loopback
+    // Use direct WebSocket if URL is resolvable (default in both production and development)
     const wsUrl = getGatewayWsUrl();
     if (!wsUrl) return true;
-    try {
-      const parsed = new URL(wsUrl);
-      const isLoopback =
-        parsed.hostname === "127.0.0.1" ||
-        parsed.hostname === "localhost" ||
-        parsed.hostname === "::1";
-      if (!isLoopback) return true;
-    } catch {
-      return true;
-    }
     return false;
   }, []);
 
@@ -605,18 +596,41 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       if (eventSourceRef.current === es) eventSourceRef.current = null;
       safeCloseEventSource(es);
       if (quotesRef.current.size > 0) {
-        setConnectionStatus("LIVE");
-        useMarketFeedStore.getState().setConnectionStatus("LIVE");
+        setConnectionStatus("POLLING");
+        useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
       }
       scheduleReconnect();
     };
   }, [isAuthenticated, processIncomingMessage, safeCloseEventSource, scheduleReconnect]);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // WebSocket Connection (Local Development)
+  // ───────────────────────────────────────────────────────────────────────────
+  // Stream Token Helper (Cross-Domain WebSocket Authentication)
   // ───────────────────────────────────────────────────────────────────────────
 
-  const connectWS = useCallback(() => {
+  const fetchStreamToken = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/gateway-token", {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        return data.token || null;
+      }
+    } catch {
+      // non-blocking fallback
+    }
+    return null;
+  }, []);
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // WebSocket Connection (Production & Local Development)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const connectWS = useCallback(async () => {
     if (!mountedRef.current) return;
 
     if (wsRef.current) {
@@ -632,16 +646,40 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
     setConnectionStatus(nextStatus);
     useMarketFeedStore.getState().setConnectionStatus(nextStatus);
 
-    const wsUrl = getGatewayWsUrl();
-    if (!wsUrl) {
+    const baseWsUrl = getGatewayWsUrl();
+    if (!baseWsUrl) {
+      if (process.env.NODE_ENV === "production" || process.env.VERCEL === "1") {
+        console.warn("[QUANT.OS] Live market gateway WebSocket is not configured (NEXT_PUBLIC_GATEWAY_WS_URL is unset). Entering GATEWAY_NOT_CONFIGURED state.");
+        setConnectionStatus("GATEWAY_NOT_CONFIGURED");
+        useMarketFeedStore.getState().setConnectionStatus("GATEWAY_NOT_CONFIGURED" as any);
+        return;
+      }
       connectSSE();
+      return;
+    }
+
+    // Acquire fresh short-lived token for authenticated WebSocket streaming (re-fetched on every connect/reconnect)
+    let finalWsUrl = baseWsUrl;
+    try {
+      const token = await fetchStreamToken();
+      if (token) {
+        const u = new URL(finalWsUrl);
+        u.searchParams.set("token", token);
+        finalWsUrl = u.toString();
+      }
+    } catch {
+      // proceed with baseWsUrl
+    }
+
+    if (!mountedRef.current) return;
+    if (wsRef.current && (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
     let ws: WebSocket;
 
     try {
-      ws = new WebSocket(wsUrl);
+      ws = new WebSocket(finalWsUrl);
       wsRef.current = ws;
     } catch {
       scheduleReconnect();
@@ -727,7 +765,7 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
       wsRef.current = null;
       scheduleReconnect();
     };
-  }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect, connectSSE, processIncomingMessage]);
+  }, [getGatewayWsUrl, safeCloseSocket, scheduleReconnect, connectSSE, processIncomingMessage, fetchStreamToken]);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Primary Dispatcher
@@ -1066,8 +1104,16 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
             scheduleQuotesBatch();
 
             if (quotesRef.current.size > 0) {
-              setConnectionStatus("LIVE");
-              useMarketFeedStore.getState().setConnectionStatus("LIVE");
+              if (wsRef.current?.readyState === WebSocket.OPEN) {
+                setConnectionStatus("LIVE");
+                useMarketFeedStore.getState().setConnectionStatus("LIVE");
+              } else if (!isGatewayWsConfigured()) {
+                setConnectionStatus("GATEWAY_NOT_CONFIGURED");
+                useMarketFeedStore.getState().setConnectionStatus("GATEWAY_NOT_CONFIGURED" as any);
+              } else {
+                setConnectionStatus("POLLING");
+                useMarketFeedStore.getState().setConnectionStatus("POLLING" as any);
+              }
             }
           }
         } catch {

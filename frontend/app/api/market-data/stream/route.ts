@@ -55,8 +55,10 @@ function sanitizeSymbols(rawList: string[]): string[] {
 async function authenticateRequest(
   req: NextRequest
 ): Promise<{ authenticated: boolean; error?: string; status?: number }> {
+  const requestId = req.headers.get("x-request-id") || `auth_${Date.now().toString(36)}`;
   const token =
     req.cookies.get("algo_session_token")?.value ||
+    req.cookies.get("quantos_session_token")?.value ||
     req.cookies.get("session")?.value ||
     (req.headers.get("authorization")?.startsWith("Bearer ")
       ? req.headers.get("authorization")!.slice(7).trim()
@@ -92,6 +94,7 @@ async function authenticateRequest(
   const backendUrl = getBackendBaseUrl();
   if (!backendUrl) {
     if (authRequired) {
+      console.error(`[STREAM_AUTH] [req_id=${requestId}] Backend authentication engine is not configured in production.`);
       return {
         authenticated: false,
         error: "Backend authentication engine is not configured in production.",
@@ -108,19 +111,30 @@ async function authenticateRequest(
         Accept: "application/json",
         Authorization: `Bearer ${token}`,
         Cookie: `algo_session_token=${token}`,
+        "X-Request-Id": requestId,
       },
       cache: "no-store",
-      signal: AbortSignal.timeout(3500),
+      signal: AbortSignal.timeout(12000),
     });
 
     if (authRes.ok) {
       const data = await authRes.json().catch(() => ({}));
-      if (data.status === "success" && (data.authenticated !== false && data.user)) {
+      if (data.status === "success" && data.authenticated !== false && data.user) {
         tokenAuthCache.set(token, {
           authenticated: true,
           expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
         });
         return { authenticated: true };
+      } else {
+        tokenAuthCache.set(token, {
+          authenticated: false,
+          expiresAt: Date.now() + 5000,
+        });
+        return {
+          authenticated: false,
+          error: "Invalid or expired session credentials.",
+          status: 401,
+        };
       }
     }
 
@@ -136,6 +150,17 @@ async function authenticateRequest(
       };
     }
 
+    if (authRes.status >= 500) {
+      console.error(`[STREAM_AUTH] [req_id=${requestId}] Upstream auth endpoint returned HTTP ${authRes.status}`);
+      if (authRequired) {
+        return {
+          authenticated: false,
+          error: "Authentication service temporarily degraded.",
+          status: 503,
+        };
+      }
+    }
+
     if (authRequired) {
       return {
         authenticated: false,
@@ -145,10 +170,16 @@ async function authenticateRequest(
     }
     return { authenticated: true };
   } catch (err: any) {
+    const isTimeout = err?.name === "AbortError" || err?.name === "TimeoutError";
+    console.error(
+      `[STREAM_AUTH] [req_id=${requestId}] Auth verification error (timeout=${isTimeout}): ${err?.message || "network failure"}`
+    );
     if (authRequired) {
       return {
         authenticated: false,
-        error: "Authentication service currently unreachable.",
+        error: isTimeout
+          ? "Authentication verification timed out."
+          : "Authentication service currently unreachable.",
         status: 503,
       };
     }
@@ -595,11 +626,12 @@ export async function POST(req: NextRequest) {
     if (!streamEntry || streamEntry.isCleanedUp) {
       return NextResponse.json(
         {
-          ok: false,
+          ok: true,
           handled: false,
+          instanceMismatch: true,
           message: "Stream connection not active on this instance; debounced reconnect recommended",
         },
-        { status: 404 }
+        { status: 200 }
       );
     }
 
@@ -668,4 +700,38 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+/**
+ * DELETE Handler: Gracefully deregisters and cleans up an active stream on this instance.
+ */
+export async function DELETE(req: NextRequest) {
+  const auth = await authenticateRequest(req);
+  if (!auth.authenticated) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "UNAUTHORIZED",
+        message: auth.error || "Authentication required.",
+      },
+      { status: auth.status || 401 }
+    );
+  }
+
+  const { searchParams } = new URL(req.url);
+  const streamId = searchParams.get("streamId");
+  if (streamId) {
+    const entry = activeStreams.get(streamId);
+    if (entry) {
+      entry.isCleanedUp = true;
+      if (entry.ws) {
+        try {
+          entry.ws.close();
+        } catch {}
+      }
+      activeStreams.delete(streamId);
+    }
+  }
+
+  return NextResponse.json({ ok: true, message: "Stream connection closed." }, { status: 200 });
 }

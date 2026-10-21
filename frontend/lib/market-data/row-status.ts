@@ -258,9 +258,18 @@ export function getMarketRowStatus({
     instrument.canonical_symbol || instrument.symbol
   );
 
-  const dataAgeSec = rawQuote?.age_seconds ?? (rawQuote ? 0 : 999);
-  const isStaleTick = rawQuote != null && (rawQuote.is_stale || dataAgeSec >= 30);
-  const hasLiveTick = rawQuote != null && rawQuote.last_price != null && rawQuote.last_price > 0 && !isStaleTick;
+  let dataAgeSec = rawQuote?.age_seconds ?? (rawQuote ? 0 : 999);
+  if (rawQuote?.event_timestamp || rawQuote?.received_timestamp) {
+    try {
+      const ts = new Date(rawQuote.event_timestamp || rawQuote.received_timestamp).getTime();
+      if (!isNaN(ts)) {
+        dataAgeSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+      }
+    } catch {}
+  }
+  // A row is LIVE only if its timestamp is under 15s old; otherwise show STALE with the age
+  const isStaleTick = rawQuote != null && (rawQuote.is_stale || dataAgeSec >= 15);
+  const hasLiveTick = rawQuote != null && rawQuote.last_price != null && rawQuote.last_price > 0 && !isStaleTick && dataAgeSec < 15;
   const hasCachedPrice =
     (rawQuote != null && rawQuote.last_price != null && rawQuote.last_price > 0) ||
     (instrument.last_price != null && instrument.last_price > 0);
@@ -308,7 +317,7 @@ export function getMarketRowStatus({
     };
   }
 
-  // 2. Open market / 24x7 with FRESH LIVE TICK
+  // 2. Open market / 24x7 with FRESH LIVE TICK (< 15s)
   if (hasLiveTick) {
     return {
       label: `${pLabel} • LIVE`,
@@ -322,10 +331,11 @@ export function getMarketRowStatus({
     };
   }
 
-  // 3. Stale tick (received earlier, but now older than freshness threshold)
+  // 3. Stale tick (received earlier, but now older than 15s freshness threshold)
   if (rawQuote != null && isStaleTick) {
+    const ageLabel = dataAgeSec > 0 && dataAgeSec < 3600 ? `${pLabel} • STALE (${dataAgeSec}s)` : `${pLabel} • STALE`;
     return {
-      label: `${pLabel} • STALE`,
+      label: ageLabel,
       state: "stale",
       provider,
       providerLabel: pLabel,

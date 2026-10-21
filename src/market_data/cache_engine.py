@@ -8,6 +8,7 @@ Hybrid Redis and ultra-fast thread-safe In-Memory cache for:
 - Centralized Subscription Pub/Sub
 """
 
+import os
 import time
 import json
 import logging
@@ -39,21 +40,27 @@ class MarketDataCache:
         self._hits = 0
         self._misses = 0
 
-        # Try connecting to Redis if available
-        if REDIS_INSTALLED:
+        # Try connecting to Redis if explicitly enabled or configured
+        redis_enabled = (
+            os.getenv("ENABLE_REDIS", "false").lower() in ("true", "1")
+            or bool(os.getenv("REDIS_URL"))
+            or bool(os.getenv("REDIS_HOST"))
+        )
+        if REDIS_INSTALLED and redis_enabled:
             try:
+                host_to_use = "127.0.0.1" if redis_host == "localhost" else redis_host
                 r = redis.Redis(
-                    host=redis_host,
+                    host=host_to_use,
                     port=redis_port,
                     db=redis_db,
-                    socket_connect_timeout=0.5,
-                    socket_timeout=0.5,
+                    socket_connect_timeout=0.2,
+                    socket_timeout=0.2,
                     decode_responses=True,
                 )
                 r.ping()
                 self._redis_client = r
                 self._is_redis_active = True
-                logger.info("Connected to Redis market data cache on %s:%d", redis_host, redis_port)
+                logger.info("Connected to Redis market data cache on %s:%d", host_to_use, redis_port)
             except Exception:
                 logger.info("Redis server not reachable. Using thread-safe in-memory cache.")
 

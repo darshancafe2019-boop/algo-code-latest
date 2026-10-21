@@ -1128,17 +1128,22 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
             ask_size: Optional[float] = None
 
             if isinstance(quotes_raw, list) and len(quotes_raw) >= 4:
-                ask_val = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
-                ask_sz  = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
-                bid_val = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
-                bid_sz  = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
+                val0 = float(quotes_raw[0]) if quotes_raw[0] is not None and float(quotes_raw[0]) > 0 else None
+                sz1  = float(quotes_raw[1]) if quotes_raw[1] is not None and float(quotes_raw[1]) > 0 else None
+                val2 = float(quotes_raw[2]) if quotes_raw[2] is not None and float(quotes_raw[2]) > 0 else None
+                sz3  = float(quotes_raw[3]) if quotes_raw[3] is not None and float(quotes_raw[3]) > 0 else None
 
-                best_ask = ask_val
-                ask_size = ask_sz
-                best_bid = bid_val
-                bid_size = bid_sz
+                # Delta WS ticker spec: q = [best_bid, bid_size, best_ask, ask_size, impact_mid]
+                if val0 is not None and val2 is not None and val0 <= val2:
+                    best_bid, bid_size = val0, sz1
+                    best_ask, ask_size = val2, sz3
+                elif val0 is not None and val2 is not None and val0 > val2:
+                    best_ask, ask_size = val0, sz1
+                    best_bid, bid_size = val2, sz3
+                else:
+                    best_bid, bid_size = val0, sz1
+                    best_ask, ask_size = val2, sz3
 
-                # Do not use min/max to hide crossed books; preserve raw exchange data and log warning
                 if best_bid is not None and best_ask is not None and best_bid > best_ask:
                     self._logger.warning(f"[DELTA_WS] Crossed order book on {symbol}: Bid {best_bid} > Ask {best_ask}")
             elif isinstance(quotes_raw, dict):
@@ -1174,18 +1179,18 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 vega  = float(greeks_raw["vega"]) if greeks_raw.get("vega") is not None else None
                 rho   = float(greeks_raw["rho"]) if greeks_raw.get("rho") is not None else None
 
-            # IV: Official Delta spec is qiv = [ask_iv, bid_iv, mark_iv]
+            # IV: Official Delta spec is qiv = [mark_iv, bid_iv, ask_iv]
             qiv_raw = item.get("qiv") or []
             ask_iv: Optional[float] = None
             bid_iv: Optional[float] = None
             mark_iv: Optional[float] = None
             if isinstance(qiv_raw, list):
                 if len(qiv_raw) >= 1 and qiv_raw[0] is not None and float(qiv_raw[0]) > 0:
-                    ask_iv = float(qiv_raw[0])
+                    mark_iv = float(qiv_raw[0])
                 if len(qiv_raw) >= 2 and qiv_raw[1] is not None and float(qiv_raw[1]) > 0:
                     bid_iv = float(qiv_raw[1])
                 if len(qiv_raw) >= 3 and qiv_raw[2] is not None and float(qiv_raw[2]) > 0:
-                    mark_iv = float(qiv_raw[2])
+                    ask_iv = float(qiv_raw[2])
 
             # Open Interest: raw contract / underlying value
             oi_raw = item.get("oi") or []
@@ -1278,7 +1283,7 @@ class DeltaOptionsWSAdapter(BaseProviderAdapter):
                 symbol=symbol,
                 exchange="DELTA",
                 provider="delta_options_ws",
-                last_price=float(delta_ticker.last_price or 0.0),
+                last_price=float(delta_ticker.last_price if delta_ticker.last_price is not None else (delta_ticker.mark_price or 0.0)),
                 bid=delta_ticker.best_bid,
                 ask=delta_ticker.best_ask,
                 mark_price=delta_ticker.mark_price,

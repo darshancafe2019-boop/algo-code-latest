@@ -10,7 +10,7 @@ import json
 import pytest
 import sqlite3
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from src import config
 from src import db
@@ -18,6 +18,13 @@ from src.delta_options_client import DeltaOptionsClient, CircuitBreakerOpenExcep
 from market_data_gateway.adapters.delta_options_ws import DeltaOptionsWSAdapter
 from src.delta_options_service import DeltaOptionsService, _format_expiry_date_display
 from src.instrument_resolver import global_instrument_resolver, ResolutionStatus, AssetClass, InstrumentType
+
+_FUTURE_DT = datetime.now(timezone.utc) + timedelta(days=90)
+TEST_EXPIRY_DATE = _FUTURE_DT.strftime("%d-%m-%Y")
+TEST_EXPIRY_CODE = _FUTURE_DT.strftime("%d%m%y")
+TEST_SETTLEMENT_TIME = _FUTURE_DT.strftime("%Y-%m-%dT12:00:00Z")
+TEST_CALL_SYMBOL = f"C-BTC-80000-{TEST_EXPIRY_CODE}"
+TEST_PUT_SYMBOL = f"P-BTC-80000-{TEST_EXPIRY_CODE}"
 
 
 @pytest.fixture(autouse=True)
@@ -142,8 +149,8 @@ def test_delta_database_crud_operations():
     # 2. Upsert Expiries
     exp_count = db.upsert_delta_expiries("BTC", [
         {
-            "expiry_date": "25-09-2026",
-            "settlement_time": "2026-09-25T12:00:00Z",
+            "expiry_date": TEST_EXPIRY_DATE,
+            "settlement_time": TEST_SETTLEMENT_TIME,
             "days_to_expiry": 26.5,
             "is_active": 1,
         }
@@ -152,30 +159,30 @@ def test_delta_database_crud_operations():
 
     expiries = db.get_delta_expiries("BTC", active_only=True)
     assert len(expiries) >= 1
-    assert any(e["expiry_date"] == "25-09-2026" for e in expiries)
+    assert any(e["expiry_date"] == TEST_EXPIRY_DATE for e in expiries)
 
     # 3. Upsert Contracts
     contracts_count = db.upsert_delta_contracts([
         {
             "product_id": 999001,
-            "symbol": "C-BTC-80000-250926",
+            "symbol": TEST_CALL_SYMBOL,
             "underlying_symbol": "BTC",
             "contract_type": "call_options",
             "strike_price": 80000.0,
-            "settlement_time": "2026-09-25T12:00:00Z",
-            "expiry_date": "25-09-2026",
+            "settlement_time": TEST_SETTLEMENT_TIME,
+            "expiry_date": TEST_EXPIRY_DATE,
             "tick_size": 0.1,
             "contract_value": "0.001",
             "is_active": 1,
         },
         {
             "product_id": 999002,
-            "symbol": "P-BTC-80000-250926",
+            "symbol": TEST_PUT_SYMBOL,
             "underlying_symbol": "BTC",
             "contract_type": "put_options",
             "strike_price": 80000.0,
-            "settlement_time": "2026-09-25T12:00:00Z",
-            "expiry_date": "25-09-2026",
+            "settlement_time": TEST_SETTLEMENT_TIME,
+            "expiry_date": TEST_EXPIRY_DATE,
             "tick_size": 0.1,
             "contract_value": "0.001",
             "is_active": 1,
@@ -185,9 +192,9 @@ def test_delta_database_crud_operations():
 
     c_by_id = db.get_delta_contract_by_id(999001)
     assert c_by_id is not None
-    assert c_by_id["symbol"] == "C-BTC-80000-250926"
+    assert c_by_id["symbol"] == TEST_CALL_SYMBOL
 
-    c_by_sym = db.get_delta_contract_by_symbol("P-BTC-80000-250926")
+    c_by_sym = db.get_delta_contract_by_symbol(TEST_PUT_SYMBOL)
     assert c_by_sym is not None
     assert c_by_sym["product_id"] == 999002
 
@@ -195,11 +202,11 @@ def test_delta_database_crud_operations():
     quotes_count = db.upsert_delta_quotes([
         {
             "product_id": 999001,
-            "symbol": "C-BTC-80000-250926",
+            "symbol": TEST_CALL_SYMBOL,
             "underlying_symbol": "BTC",
             "contract_type": "call_options",
             "strike_price": 80000.0,
-            "settlement_time": "2026-09-25T12:00:00Z",
+            "settlement_time": TEST_SETTLEMENT_TIME,
             "mark_price": 620.0,
             "spot_price": 78500.0,
             "best_bid": 615.0,
@@ -215,15 +222,15 @@ def test_delta_database_crud_operations():
     ])
     assert quotes_count == 1
 
-    quotes = db.get_delta_quotes("BTC", "2026-09-25")
+    quotes = db.get_delta_quotes("BTC", TEST_SETTLEMENT_TIME[:10])
     assert len(quotes) >= 1
     assert any(q["product_id"] == 999001 and q["mark_price"] == 620.0 for q in quotes)
 
     # 5. Save & Fetch Chain Snapshot
     snap_id = db.save_delta_chain_snapshot({
         "underlying_symbol": "BTC",
-        "expiry_date": "25-09-2026",
-        "settlement_time": "2026-09-25T12:00:00Z",
+        "expiry_date": TEST_EXPIRY_DATE,
+        "settlement_time": TEST_SETTLEMENT_TIME,
         "spot_price": 78500.0,
         "atm_strike": 78000.0,
         "pcr_oi": 1.15,
@@ -233,7 +240,7 @@ def test_delta_database_crud_operations():
     })
     assert snap_id > 0
 
-    latest_snap = db.get_latest_delta_chain_snapshot("BTC", "25-09-2026")
+    latest_snap = db.get_latest_delta_chain_snapshot("BTC", TEST_EXPIRY_DATE)
     assert latest_snap is not None
     assert latest_snap["spot_price"] == 78500.0
     assert latest_snap["atm_strike"] == 78000.0
@@ -256,7 +263,7 @@ def test_instrument_resolver_rejection_of_category_labels():
 
 def test_instrument_resolver_delta_executable_symbols():
     # Test resolution of exact Delta contract symbol
-    res = global_instrument_resolver.resolve("C-BTC-80000-250926")
+    res = global_instrument_resolver.resolve(TEST_CALL_SYMBOL)
     assert res.status == ResolutionStatus.RESOLVED
     assert res.is_valid is True
     assert res.instrument.exchange == "DELTA"
@@ -270,18 +277,18 @@ def test_instrument_resolver_delta_product_id():
     # Ensure contract exists in DB
     db.upsert_delta_contracts([{
         "product_id": 999001,
-        "symbol": "C-BTC-80000-250926",
+        "symbol": TEST_CALL_SYMBOL,
         "underlying_symbol": "BTC",
         "contract_type": "call_options",
         "strike_price": 80000.0,
-        "settlement_time": "2026-09-25T12:00:00Z",
-        "expiry_date": "25-09-2026",
+        "settlement_time": TEST_SETTLEMENT_TIME,
+        "expiry_date": TEST_EXPIRY_DATE,
         "is_active": 1,
     }])
     res = global_instrument_resolver.resolve("999001")
     assert res.status == ResolutionStatus.RESOLVED
     assert res.is_valid is True
-    assert res.instrument.canonical_symbol == "C-BTC-80000-250926"
+    assert res.instrument.canonical_symbol == TEST_CALL_SYMBOL
 
 
 # ------------------------------------------------------------------------------
@@ -290,7 +297,7 @@ def test_instrument_resolver_delta_product_id():
 
 def test_delta_options_service_chain_builder():
     service = DeltaOptionsService()
-    chain = service.get_option_chain("BTC", expiry="25-09-2026")
+    chain = service.get_option_chain("BTC", expiry=TEST_EXPIRY_DATE)
 
     assert chain["underlying"] == "BTC"
     assert "spot_price" in chain

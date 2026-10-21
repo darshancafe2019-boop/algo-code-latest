@@ -1150,6 +1150,7 @@ class InstrumentResolver:
             or " CALL" in clean_query
             or " PUT" in clean_query
             or bool(re.search(r"\d+\s*(?:CE|PE)$", clean_query))
+            or clean_query.isdigit()
             or (asset_class and str(asset_class).upper() in ("CRYPTO_OPTIONS", "OPTIONS", "INDIAN_OPTIONS"))
         ):
             opt_res = OptionContractNormalizer.normalize(clean_query, provider=provider, market_date=market_date)

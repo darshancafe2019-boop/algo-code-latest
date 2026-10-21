@@ -234,8 +234,6 @@ def validate_wizard_api():
 
 
 @bot_wizard_blueprint.route("/api/wizard/deploy", methods=["POST"])
-@bot_wizard_blueprint.route("/api/bots/create", methods=["POST"])
-@bot_wizard_blueprint.route("/api/bots", methods=["POST"])
 def deploy_wizard_api():
     try:
         data = request.get_json(force=True) or {}
@@ -273,8 +271,16 @@ def deploy_wizard_api():
                 },
                 "auto_start": True,
             }
-            deployed = bot_wizard_service.deploy_wizard_bot(wizard_format)
-        return jsonify({"success": True, "ok": True, "data": deployed, "bot": deployed})
+        bot_id = deployed.get("bot_id") or deployed.get("id") or (deployed.get("config", {}) if isinstance(deployed.get("config"), dict) else {}).get("id")
+        return jsonify({
+            "success": True,
+            "ok": True,
+            "status": "success",
+            "bot_id": bot_id,
+            "id": bot_id,
+            "data": deployed,
+            "bot": deployed
+        })
     except Exception as e:
         logger.error(f"Deploy error: {e}")
         return jsonify({"success": False, "ok": False, "error": {"code": "DEPLOY_FAILED", "message": str(e)}}), 400
@@ -296,7 +302,6 @@ def get_instruments_api():
     return jsonify({"success": True, "data": instruments})
 
 
-@bot_wizard_blueprint.route("/api/market/quote", methods=["GET"])
 @bot_wizard_blueprint.route("/api/market-data/ltp", methods=["GET"])
 @bot_wizard_blueprint.route("/api/market-data/quote", methods=["GET"])
 def get_quote_api():

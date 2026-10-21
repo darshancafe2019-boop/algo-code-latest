@@ -20,11 +20,17 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import json
 import time
 import pytest
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from dashboard import app, _quick_trade_idempotency_cache, _quick_trade_cache_lock
 from src import config, db
 from src.execution_service import order_execution_service
+
+_FUTURE_DT = datetime.now(timezone.utc) + timedelta(days=90)
+TEST_EXPIRY_CODE = _FUTURE_DT.strftime("%d%m%y")
+TEST_EXPIRY_DISPLAY = _FUTURE_DT.strftime("%d-%b-%Y").upper()
+TEST_CALL_SYMBOL = f"C-BTC-77800-{TEST_EXPIRY_CODE}"
+TEST_PUT_SYMBOL = f"P-BTC-78000-{TEST_EXPIRY_CODE}"
 
 
 class TestActionableOptionChainExecution:
@@ -43,7 +49,7 @@ class TestActionableOptionChainExecution:
         client_order_id = f"OPT_TEST_BUY_CE_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "C-BTC-77800-120926",
+            "symbol": TEST_CALL_SYMBOL,
             "direction": "LONG",
             "side": "BUY",
             "order_type": "LIMIT",
@@ -55,7 +61,7 @@ class TestActionableOptionChainExecution:
             "underlying": "BTC",
             "strike": 77800,
             "option_type": "CALL",
-            "expiry": "12-SEP-2026",
+            "expiry": TEST_EXPIRY_DISPLAY,
         }
 
         res = self.client.post(
@@ -68,7 +74,7 @@ class TestActionableOptionChainExecution:
         assert data["status"] == "success"
         assert data["mode"] == "PAPER"
         assert data["direction"] == "LONG"
-        assert data["symbol"] == "C-BTC-77800-120926"
+        assert data["symbol"] == TEST_CALL_SYMBOL
         assert data["client_order_id"] == client_order_id
         assert data["order_state"] in ["OPEN", "FILLED"]
 
@@ -77,7 +83,7 @@ class TestActionableOptionChainExecution:
         client_order_id = f"OPT_TEST_SELL_CE_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "C-BTC-77800-120926",
+            "symbol": TEST_CALL_SYMBOL,
             "direction": "SHORT",
             "side": "SELL",
             "order_type": "LIMIT",
@@ -89,7 +95,7 @@ class TestActionableOptionChainExecution:
             "underlying": "BTC",
             "strike": 77800,
             "option_type": "CALL",
-            "expiry": "12-SEP-2026",
+            "expiry": TEST_EXPIRY_DISPLAY,
         }
 
         res = self.client.post(
@@ -101,14 +107,14 @@ class TestActionableOptionChainExecution:
         data = res.get_json()
         assert data["status"] == "success"
         assert data["direction"] == "SHORT"
-        assert data["symbol"] == "C-BTC-77800-120926"
+        assert data["symbol"] == TEST_CALL_SYMBOL
 
     def test_btc_put_buy_execution(self):
         """Test BUY BTC Put option on Delta Exchange under PAPER mode."""
         client_order_id = f"OPT_TEST_BUY_PE_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "P-BTC-78000-120926",
+            "symbol": TEST_PUT_SYMBOL,
             "direction": "LONG",
             "side": "BUY",
             "order_type": "LIMIT",
@@ -120,7 +126,7 @@ class TestActionableOptionChainExecution:
             "underlying": "BTC",
             "strike": 78000,
             "option_type": "PUT",
-            "expiry": "12-SEP-2026",
+            "expiry": TEST_EXPIRY_DISPLAY,
         }
 
         res = self.client.post(
@@ -131,7 +137,7 @@ class TestActionableOptionChainExecution:
         assert res.status_code == 200
         data = res.get_json()
         assert data["status"] == "success"
-        assert data["symbol"] == "P-BTC-78000-120926"
+        assert data["symbol"] == TEST_PUT_SYMBOL
         assert data["direction"] == "LONG"
 
     def test_btc_put_sell_execution(self):
@@ -139,7 +145,7 @@ class TestActionableOptionChainExecution:
         client_order_id = f"OPT_TEST_SELL_PE_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "P-BTC-78000-120926",
+            "symbol": TEST_PUT_SYMBOL,
             "direction": "SHORT",
             "side": "SELL",
             "order_type": "LIMIT",
@@ -151,7 +157,7 @@ class TestActionableOptionChainExecution:
             "underlying": "BTC",
             "strike": 78000,
             "option_type": "PUT",
-            "expiry": "12-SEP-2026",
+            "expiry": TEST_EXPIRY_DISPLAY,
         }
 
         res = self.client.post(
@@ -162,7 +168,7 @@ class TestActionableOptionChainExecution:
         assert res.status_code == 200
         data = res.get_json()
         assert data["status"] == "success"
-        assert data["symbol"] == "P-BTC-78000-120926"
+        assert data["symbol"] == TEST_PUT_SYMBOL
         assert data["direction"] == "SHORT"
 
     def test_different_moneyness_strikes(self):
@@ -170,9 +176,10 @@ class TestActionableOptionChainExecution:
         strikes = [70000, 78000, 85000] # Deep ITM, ATM, Deep OTM
         for strike in strikes:
             client_order_id = f"OPT_TEST_STRIKE_{strike}_{int(time.time() * 1000)}"
+            strike_sym = f"C-BTC-{strike}-{TEST_EXPIRY_CODE}"
             payload = {
                 "client_order_id": client_order_id,
-                "symbol": f"C-BTC-{strike}-120926",
+                "symbol": strike_sym,
                 "direction": "LONG",
                 "quantity": 1.0,
                 "price": 600.0,
@@ -190,14 +197,14 @@ class TestActionableOptionChainExecution:
             assert res.status_code == 200
             data = res.get_json()
             assert data["status"] == "success"
-            assert data["symbol"] == f"C-BTC-{strike}-120926"
+            assert data["symbol"] == strike_sym
 
     def test_duplicate_order_protection(self):
         """Test that submitting the exact same client_order_id returns cached idempotent result without double execution."""
         idempotency_key = f"IDEMPOTENT_OPT_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": idempotency_key,
-            "symbol": "C-BTC-77800-120926",
+            "symbol": TEST_CALL_SYMBOL,
             "direction": "LONG",
             "quantity": 1.0,
             "price": 525.0,
@@ -226,7 +233,7 @@ class TestActionableOptionChainExecution:
         client_order_id = f"OPT_KILL_TEST_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "C-BTC-77800-120926",
+            "symbol": TEST_CALL_SYMBOL,
             "direction": "LONG",
             "quantity": 1.0,
             "price": 525.0,
@@ -244,7 +251,7 @@ class TestActionableOptionChainExecution:
         client_order_id = f"OPT_LIVE_SAFETY_{int(time.time() * 1000)}"
         payload = {
             "client_order_id": client_order_id,
-            "symbol": "C-BTC-77800-120926",
+            "symbol": TEST_CALL_SYMBOL,
             "direction": "LONG",
             "quantity": 1.0,
             "price": 525.0,

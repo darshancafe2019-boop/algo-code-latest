@@ -785,10 +785,23 @@ if not os.environ.get("PYTEST_CURRENT_TEST"):
     bg_thread.start()
 
 # Server Startup Reconciliation & Audit
-db_audit_report = db.audit_and_clean_db()
 welcome_summary_data = db.reconcile_stale_bot_statuses()
-db.seed_default_bots_if_empty()
-logger.info(f"Startup DB Audit: {db_audit_report}")
+
+def _async_startup_maintenance():
+    try:
+        report = db.audit_and_clean_db()
+        logger.info(f"Startup DB Audit completed: {report}")
+    except Exception as ex:
+        logger.warning(f"Startup DB Audit warning: {ex}")
+    try:
+        db.seed_default_bots_if_empty()
+    except Exception as ex:
+        logger.debug(f"Default bots seeding notice: {ex}")
+
+if not os.environ.get("PYTEST_CURRENT_TEST"):
+    threading.Thread(target=_async_startup_maintenance, daemon=True, name="StartupDBAudit").start()
+else:
+    db.seed_default_bots_if_empty()
 
 def background_server_heartbeat_loop():
     """Background daemon thread updating server session heartbeat in DB."""

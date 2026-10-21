@@ -1004,18 +1004,18 @@ export function MarketGatewayProvider({ children }: { children: React.ReactNode 
         "SOL/USDT",
         "RELIANCE",
         "TCS",
-        "GOLD",
-        "USD/INR",
+        "GOLDBEES",
+        "USDINR",
       ];
       const symbolsToPoll = activeSymbols.length > 0 ? activeSymbols : DEFAULT_BENCHMARKS;
 
-      const batchSize = 50;
+      const batchSize = 10;
       for (let i = 0; i < symbolsToPoll.length; i += batchSize) {
         const batch = symbolsToPoll.slice(i, i + batchSize);
         try {
           const symbolsParam = encodeURIComponent(batch.join(","));
           const res = await apiClient.get<any>(`/api/market/snapshot?symbols=${symbolsParam}`, {
-            timeoutMs: 4000,
+            timeoutMs: 15000,
             deduplicate: true,
           });
 

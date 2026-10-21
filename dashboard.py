@@ -19197,10 +19197,13 @@ def api_markets_providers_health():
 
 
 @app.route("/api/market/quote", methods=["GET"])
+_SNAPSHOT_QUOTE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_SNAPSHOT_CACHE_LOCK = threading.Lock()
+
 @app.route("/api/market/quotes", methods=["GET"])
 @app.route("/api/market/snapshot", methods=["GET"])
 def api_market_quotes_snapshot():
-    """Returns real-time normalized market quote for requested symbol(s)."""
+    """Returns real-time normalized market quote for requested symbol(s) with parallel fetching & TTL caching."""
     from market_data_gateway.gateway_client import gateway_client
     symbol = request.args.get("symbol", "").strip().upper()
     symbols_raw = request.args.get("symbols", "")
@@ -19218,156 +19221,181 @@ def api_market_quotes_snapshot():
                 return jsonify({"status": "success", "quote": quotes[symbol], "data": quotes[symbol]})
             return jsonify({"status": "success", "quotes": quotes, "data": quotes})
 
-    # Direct fallback querying live authoritative adapters
-    result = {}
-    from src.binance_market_data_service import BinanceMarketDataService
-    from market_data.stocks.quote_engine import LiveQuoteFetcher
-    binance_svc = BinanceMarketDataService()
-
+    now_t = time.time()
     now_dt = datetime.now(timezone.utc)
     # Indian market trading schedule: Monday-Friday 09:15-15:30 IST
     ist_hour = (now_dt.hour + 5 + (now_dt.minute + 30) // 60) % 24
     ist_min = (now_dt.minute + 30) % 60
     is_indian_open = ((ist_hour == 9 and ist_min >= 15) or (10 <= ist_hour < 15) or (ist_hour == 15 and ist_min <= 30)) and now_dt.weekday() < 5
 
-    for s in symbols:
-        clean = (
-            s.replace("BINANCE:", "")
-            .replace("NSE:", "")
-            .replace("BSE:", "")
-            .replace("NASDAQ:", "")
-            .replace("NYSE:", "")
-            .replace("OANDA:", "")
-            .replace(":SPOT", "")
-            .replace(":EQ", "")
-            .replace(":PERP", "")
-            .strip()
-        )
+    result = {}
+    missing_symbols = []
 
-        # 1. Crypto instruments (24x7 continuous live trading)
-        is_crypto = (
-            s.startswith("BINANCE:")
-            or s.startswith("DELTA:")
-            or any(coin in clean for coin in ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "USDT"])
-        )
-
-        if is_crypto:
-            lp = None
-            bid = None
-            ask = None
-            vol = 0.0
-            chg_pct = 0.0
-            provider_name = "binance"
-            high_24h = None
-            low_24h = None
-            ts = now_dt.isoformat()
-
-            ticker = binance_svc.get_ticker(clean.replace("/", "").replace("-", ""))
-            if ticker and ticker.get("last_price"):
-                lp = ticker.get("last_price")
-                bid = ticker.get("bid_price") or lp
-                ask = ticker.get("ask_price") or lp
-                vol = ticker.get("volume_24h") or 0.0
-                chg_pct = ticker.get("change_pct_24h") or 0.0
-                high_24h = ticker.get("high_24h")
-                low_24h = ticker.get("low_24h")
-                ts = ticker.get("timestamp") or ts
+    # 1. Check TTL cache (5.0 seconds)
+    with _SNAPSHOT_CACHE_LOCK:
+        for s in symbols:
+            clean = (
+                s.replace("BINANCE:", "")
+                .replace("NSE:", "")
+                .replace("BSE:", "")
+                .replace("NASDAQ:", "")
+                .replace("NYSE:", "")
+                .replace("OANDA:", "")
+                .replace(":SPOT", "")
+                .replace(":EQ", "")
+                .replace(":PERP", "")
+                .strip()
+            )
+            cached = _SNAPSHOT_QUOTE_CACHE.get(s) or _SNAPSHOT_QUOTE_CACHE.get(clean)
+            if cached and (now_t - cached[0]) < 5.0:
+                result[s] = cached[1]
+                result[clean] = cached[1]
             else:
-                # Working public fallback when Binance is geo-blocked (e.g. HTTP 451/403 on cloud IPs)
-                coin = "BTC" if "BTC" in clean else ("ETH" if "ETH" in clean else ("SOL" if "SOL" in clean else clean.split("/")[0]))
-                try:
-                    import urllib.request
-                    cb_req = urllib.request.Request(
-                        f"https://api.coinbase.com/v2/prices/{coin}-USD/spot",
-                        headers={"User-Agent": "QuantOS/2.0", "Accept": "application/json"}
-                    )
-                    with urllib.request.urlopen(cb_req, timeout=2.5) as cb_resp:
-                        if cb_resp.status == 200:
-                            cb_data = json.loads(cb_resp.read().decode())
-                            if cb_data.get("data") and cb_data["data"].get("amount"):
-                                lp = round(float(cb_data["data"]["amount"]), 2)
-                                bid = lp
-                                ask = lp
-                                provider_name = "coinbase-public"
-                except Exception:
-                    pass
+                missing_symbols.append(s)
 
-                if not lp:
-                    yf_quote = LiveQuoteFetcher.fetch_live_data(f"{coin}-USD", "CRYPTO")
-                    if yf_quote and yf_quote.get("last_price"):
-                        lp = yf_quote.get("last_price")
-                        bid = lp
-                        ask = lp
-                        vol = yf_quote.get("volume") or 0.0
-                        chg_pct = yf_quote.get("change_pct") or 0.0
-                        high_24h = yf_quote.get("high")
-                        low_24h = yf_quote.get("low")
-                        provider_name = "yahoo-public"
+    # 2. Fetch missing symbols in parallel
+    if missing_symbols:
+        from src.binance_market_data_service import BinanceMarketDataService
+        from market_data.stocks.quote_engine import LiveQuoteFetcher
+        binance_svc = BinanceMarketDataService()
 
-            if lp:
-                q = {
+        def _fetch_single_symbol(s: str) -> Optional[Dict[str, Any]]:
+            clean = (
+                s.replace("BINANCE:", "")
+                .replace("NSE:", "")
+                .replace("BSE:", "")
+                .replace("NASDAQ:", "")
+                .replace("NYSE:", "")
+                .replace("OANDA:", "")
+                .replace(":SPOT", "")
+                .replace(":EQ", "")
+                .replace(":PERP", "")
+                .strip()
+            )
+
+            is_crypto = (
+                s.startswith("BINANCE:")
+                or s.startswith("DELTA:")
+                or any(coin in clean for coin in ["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "USDT"])
+            )
+
+            if is_crypto:
+                lp = None
+                bid = None
+                ask = None
+                vol = 0.0
+                chg_pct = 0.0
+                provider_name = "binance"
+                high_24h = None
+                low_24h = None
+                ts = now_dt.isoformat()
+
+                ticker = binance_svc.get_ticker(clean.replace("/", "").replace("-", ""))
+                if ticker and ticker.get("last_price"):
+                    lp = ticker.get("last_price")
+                    bid = ticker.get("bid_price") or lp
+                    ask = ticker.get("ask_price") or lp
+                    vol = ticker.get("volume_24h") or 0.0
+                    chg_pct = ticker.get("change_pct_24h") or 0.0
+                    high_24h = ticker.get("high_24h")
+                    low_24h = ticker.get("low_24h")
+                    ts = ticker.get("timestamp") or ts
+                else:
+                    coin = "BTC" if "BTC" in clean else ("ETH" if "ETH" in clean else ("SOL" if "SOL" in clean else clean.split("/")[0]))
+                    try:
+                        import urllib.request
+                        cb_req = urllib.request.Request(
+                            f"https://api.coinbase.com/v2/prices/{coin}-USD/spot",
+                            headers={"User-Agent": "QuantOS/2.0", "Accept": "application/json"}
+                        )
+                        with urllib.request.urlopen(cb_req, timeout=1.5) as cb_resp:
+                            if cb_resp.status == 200:
+                                cb_data = json.loads(cb_resp.read().decode())
+                                if cb_data.get("data") and cb_data["data"].get("amount"):
+                                    lp = round(float(cb_data["data"]["amount"]), 2)
+                                    bid = lp
+                                    ask = lp
+                                    provider_name = "coinbase-public"
+                    except Exception:
+                        pass
+
+                if lp:
+                    return {
+                        "symbol": s,
+                        "clean_symbol": clean,
+                        "exchange": "CRYPTO",
+                        "provider": provider_name,
+                        "last_price": lp,
+                        "lastPrice": lp,
+                        "bid": bid,
+                        "ask": ask,
+                        "volume": vol,
+                        "change_pct": chg_pct,
+                        "changePercent": chg_pct,
+                        "high": high_24h,
+                        "low": low_24h,
+                        "market_status": "OPEN",
+                        "price_state": "LIVE",
+                        "status_label": "LIVE",
+                        "timestamp": ts,
+                    }
+                return None
+
+            exchange = "NSE"
+            if s.startswith("BSE:") or clean in ["SENSEX", "BSESN"]:
+                exchange = "BSE"
+            elif s.startswith("NASDAQ:") or clean in ["NVDA", "AAPL", "MSFT", "TSLA"]:
+                exchange = "NASDAQ"
+            elif s.startswith("OANDA:") or "USD" in clean or "EUR" in clean or "GBP" in clean or "JPY" in clean:
+                exchange = "FOREX"
+            elif clean in ["GOLD", "XAUUSD", "SILVER", "CRUDEOIL"]:
+                exchange = "COMMODITY"
+
+            live = LiveQuoteFetcher.fetch_live_data(clean, exchange)
+            if live and live.get("last_price"):
+                lp = live.get("last_price")
+                status_open = is_indian_open if exchange in ["NSE", "BSE"] else True
+                return {
                     "symbol": s,
                     "clean_symbol": clean,
-                    "exchange": "CRYPTO",
-                    "provider": provider_name,
+                    "exchange": exchange,
+                    "provider": live.get("provider") or ("NSE" if exchange == "NSE" else "BSE"),
                     "last_price": lp,
                     "lastPrice": lp,
-                    "bid": bid,
-                    "ask": ask,
-                    "volume": vol,
-                    "change_pct": chg_pct,
-                    "changePercent": chg_pct,
-                    "high": high_24h,
-                    "low": low_24h,
-                    "market_status": "OPEN",
-                    "price_state": "LIVE",
-                    "status_label": "LIVE",
-                    "timestamp": ts,
+                    "open": live.get("open") or lp,
+                    "high": live.get("high") or lp,
+                    "low": live.get("low") or lp,
+                    "close": live.get("previous_close") or lp,
+                    "previous_close": live.get("previous_close") or lp,
+                    "change_pct": live.get("change_pct") or 0.0,
+                    "changePercent": live.get("change_pct") or 0.0,
+                    "change": live.get("change_abs") or 0.0,
+                    "volume": live.get("volume") or 0.0,
+                    "bid": lp,
+                    "ask": lp,
+                    "market_status": "OPEN" if status_open else "CLOSED",
+                    "price_state": "LIVE" if status_open else "LAST_TRADED",
+                    "status_label": "LIVE" if status_open else "MARKET CLOSED / LAST CLOSE",
+                    "timestamp": now_dt.isoformat(),
                 }
-                result[s] = q
-                result[clean] = q
-                if "/" in clean:
-                    result[clean.replace("/", "")] = q
-            continue
+            return None
 
-        # 2. Indian & Global instruments (Equities, Indices, Forex)
-        exchange = "NSE"
-        if s.startswith("BSE:") or clean in ["SENSEX", "BSESN"]:
-            exchange = "BSE"
-        elif s.startswith("NASDAQ:") or clean in ["NVDA", "AAPL", "MSFT", "TSLA"]:
-            exchange = "NASDAQ"
-        elif s.startswith("OANDA:") or "USD" in clean or "EUR" in clean or "GBP" in clean or "JPY" in clean:
-            exchange = "FOREX"
-
-        live = LiveQuoteFetcher.fetch_live_data(clean, exchange)
-        if live and live.get("last_price"):
-            lp = live.get("last_price")
-            status_open = is_indian_open if exchange in ["NSE", "BSE"] else True
-            q = {
-                "symbol": s,
-                "clean_symbol": clean,
-                "exchange": exchange,
-                "provider": live.get("provider") or ("NSE" if exchange == "NSE" else "BSE"),
-                "last_price": lp,
-                "lastPrice": lp,
-                "open": live.get("open") or lp,
-                "high": live.get("high") or lp,
-                "low": live.get("low") or lp,
-                "close": live.get("previous_close") or lp,
-                "previous_close": live.get("previous_close") or lp,
-                "change_pct": live.get("change_pct") or 0.0,
-                "changePercent": live.get("change_pct") or 0.0,
-                "change": live.get("change_abs") or 0.0,
-                "volume": live.get("volume") or 0.0,
-                "bid": lp,
-                "ask": lp,
-                "market_status": "OPEN" if status_open else "CLOSED",
-                "price_state": "LIVE" if status_open else "LAST_TRADED",
-                "status_label": "LIVE" if status_open else "MARKET CLOSED / LAST CLOSE",
-                "timestamp": now_dt.isoformat(),
-            }
-            result[s] = q
-            result[clean] = q
+        workers = min(len(missing_symbols), 6)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+            future_to_sym = {executor.submit(_fetch_single_symbol, s): s for s in missing_symbols}
+            for fut in concurrent.futures.as_completed(future_to_sym, timeout=5.0):
+                orig_s = future_to_sym[fut]
+                try:
+                    q = fut.result()
+                    if q:
+                        result[orig_s] = q
+                        clean_sym = q.get("clean_symbol") or orig_s
+                        result[clean_sym] = q
+                        with _SNAPSHOT_CACHE_LOCK:
+                            _SNAPSHOT_QUOTE_CACHE[orig_s] = (now_t, q)
+                            _SNAPSHOT_QUOTE_CACHE[clean_sym] = (now_t, q)
+                except Exception as ex:
+                    logger.debug("Parallel quote fetch error for %s: %s", orig_s, ex)
 
     if len(symbols) == 1 and symbol in result:
         return jsonify({"status": "success", "quote": result[symbol], "data": result[symbol], "quotes": result})

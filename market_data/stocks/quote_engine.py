@@ -41,6 +41,14 @@ class LiveQuoteFetcher:
             return "USDINR=X"
         if s in ["GBPUSD", "GBP/USD", "GBPUSD=X"]:
             return "GBPUSD=X"
+        if s in ["GOLD", "XAUUSD", "GC=F", "COM:GOLD", "COM:XAUUSD"]:
+            return "GC=F"
+        if s in ["GOLDBEES", "NSE:GOLDBEES"]:
+            return "GOLDBEES.NS"
+        if s in ["SILVER", "SI=F"]:
+            return "SI=F"
+        if s in ["CRUDEOIL", "CL=F"]:
+            return "CL=F"
         ex = exchange.strip().upper()
         if ex in ["NSE", "NSI"]:
             return f"{s}.NS" if not s.endswith(".NS") else s
@@ -61,41 +69,42 @@ class LiveQuoteFetcher:
         data = None
         ticker_str = cls.get_ticker_symbol(symbol, exchange)
 
-        # 0. Primary Authoritative Feed for Indian Equities & Global Equities: Market Data Gateway (port 5051)
-        try:
-            import urllib.request
-            import json
-            gw_url = f"http://127.0.0.1:5051/api/market/quote?symbol={symbol}"
-            req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
-            with urllib.request.urlopen(req, timeout=0.6) as resp:
-                if resp.status == 200:
-                    gw_data = json.loads(resp.read().decode("utf-8"))
-                    if gw_data.get("ok") and gw_data.get("price"):
-                        p = float(gw_data["price"])
-                        vol = float(gw_data.get("volume") or 100000.0)
-                        open_p = float(gw_data.get("open") or p)
-                        high_p = float(gw_data.get("high") or p * 1.01)
-                        low_p = float(gw_data.get("low") or p * 0.99)
-                        prev_close = float(gw_data.get("previous_close") or open_p or p)
-                        chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
-                        chg_abs = round(p - prev_close, 2)
-                        data = {
-                            "last_price": round(p, 2),
-                            "open": round(open_p, 2),
-                            "high": round(high_p, 2),
-                            "low": round(low_p, 2),
-                            "previous_close": round(prev_close, 2),
-                            "change_pct": chg_pct,
-                            "change_abs": chg_abs,
-                            "volume": vol,
-                            "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
-                            "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
-                            "market_cap": None,
-                            "data_quality": "LIVE",
-                            "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
-                        }
-        except Exception as e:
-            logger.debug(f"Gateway live fetch note for {symbol}: {e}")
+        # 0. Primary Authoritative Feed: Market Data Gateway (port 5051) in local dev
+        if not os.environ.get("RENDER") and not os.environ.get("VERCEL"):
+            try:
+                import urllib.request
+                import json
+                gw_url = f"http://127.0.0.1:5051/api/market/quote?symbol={symbol}"
+                req = urllib.request.Request(gw_url, headers={"User-Agent": "StockQuoteEngine"})
+                with urllib.request.urlopen(req, timeout=0.25) as resp:
+                    if resp.status == 200:
+                        gw_data = json.loads(resp.read().decode("utf-8"))
+                        if gw_data.get("ok") and gw_data.get("price"):
+                            p = float(gw_data["price"])
+                            vol = float(gw_data.get("volume") or 100000.0)
+                            open_p = float(gw_data.get("open") or p)
+                            high_p = float(gw_data.get("high") or p * 1.01)
+                            low_p = float(gw_data.get("low") or p * 0.99)
+                            prev_close = float(gw_data.get("previous_close") or open_p or p)
+                            chg_pct = round(((p - prev_close) / prev_close * 100.0), 2) if prev_close > 0 else 0.0
+                            chg_abs = round(p - prev_close, 2)
+                            data = {
+                                "last_price": round(p, 2),
+                                "open": round(open_p, 2),
+                                "high": round(high_p, 2),
+                                "low": round(low_p, 2),
+                                "previous_close": round(prev_close, 2),
+                                "change_pct": chg_pct,
+                                "change_abs": chg_abs,
+                                "volume": vol,
+                                "high_52w": round(float(gw_data.get("high_52w") or p * 1.25), 2),
+                                "low_52w": round(float(gw_data.get("low_52w") or p * 0.75), 2),
+                                "market_cap": None,
+                                "data_quality": "LIVE",
+                                "provider": "Upstox-Live" if gw_data.get("source") == "UPSTOX" else (gw_data.get("source") or "Live-Market-Feed"),
+                            }
+            except Exception as e:
+                logger.debug(f"Gateway live fetch note for {symbol}: {e}")
 
         # 1. Secondary Live Feed: YFinance Fast Info (if gateway had no quote)
         if not data and ticker_str:

@@ -227,9 +227,10 @@ export function getGatewayWsUrl(): string {
     return explicitWs;
   }
 
-  // In cloud production (Vercel), default to canonical Render backend WebSocket if not overridden
+  // In cloud production (Vercel), only use explicit NEXT_PUBLIC_GATEWAY_WS_URL.
+  // When unconfigured, return empty string so frontend seamlessly uses SSE / REST Snapshot Polling
   if (isProduction()) {
-    return "wss://algo-code-latest.onrender.com/ws";
+    return "";
   }
 
   // Local development default to standalone gateway on port 5051

@@ -25,10 +25,9 @@ export async function POST(req: NextRequest) {
 async function generateGatewayToken(req: NextRequest) {
   const secret = getGatewaySecret();
   if (!secret) {
-    console.error("[GATEWAY_TOKEN] MARKET_GATEWAY_SECRET is not configured on server.");
     return NextResponse.json(
-      { ok: false, error: "Gateway secret is not configured on server" },
-      { status: 500 }
+      { ok: false, token: null, error: "GATEWAY_SECRET_NOT_CONFIGURED", disabled: true },
+      { status: 200 }
     );
   }
 

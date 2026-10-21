@@ -227,9 +227,9 @@ export function getGatewayWsUrl(): string {
     return explicitWs;
   }
 
-  // In cloud production (Vercel), require explicit NEXT_PUBLIC_GATEWAY_WS_URL
+  // In cloud production (Vercel), default to canonical Render backend WebSocket if not overridden
   if (isProduction()) {
-    return "";
+    return "wss://algo-code-latest.onrender.com/ws";
   }
 
   // Local development default to standalone gateway on port 5051
@@ -237,10 +237,6 @@ export function getGatewayWsUrl(): string {
 }
 
 export function isGatewayWsConfigured(): boolean {
-  if (isProduction()) {
-    const ws = (process.env.NEXT_PUBLIC_GATEWAY_WS_URL || "").trim();
-    return Boolean(ws && !isLoopbackUrl(ws));
-  }
   return true;
 }
 

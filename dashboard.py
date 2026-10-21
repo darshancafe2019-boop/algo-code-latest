@@ -19196,10 +19196,11 @@ def api_markets_providers_health():
     })
 
 
-@app.route("/api/market/quote", methods=["GET"])
 _SNAPSHOT_QUOTE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _SNAPSHOT_CACHE_LOCK = threading.Lock()
 
+
+@app.route("/api/market/quote", methods=["GET"])
 @app.route("/api/market/quotes", methods=["GET"])
 @app.route("/api/market/snapshot", methods=["GET"])
 def api_market_quotes_snapshot():

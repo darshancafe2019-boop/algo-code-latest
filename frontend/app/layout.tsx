@@ -106,21 +106,21 @@ export default function RootLayout({
         <QueryProvider>
           <ThemeProvider>
             <AuthProvider>
-              <ActiveBotProvider>
-                <GlobalLayoutProvider>
-                  <MarketGatewayProvider>
-                    <QuantDataCoreProvider>
-                      <GlobalDataProvider>
-                        <BackendAvailabilityBanner />
-                        <GlobalDataDrawer />
-                        <AuthGuard>
+              <AuthGuard>
+                <ActiveBotProvider>
+                  <GlobalLayoutProvider>
+                    <MarketGatewayProvider>
+                      <QuantDataCoreProvider>
+                        <GlobalDataProvider>
+                          <BackendAvailabilityBanner />
+                          <GlobalDataDrawer />
                           {children}
-                        </AuthGuard>
-                      </GlobalDataProvider>
-                    </QuantDataCoreProvider>
-                  </MarketGatewayProvider>
-                </GlobalLayoutProvider>
-              </ActiveBotProvider>
+                        </GlobalDataProvider>
+                      </QuantDataCoreProvider>
+                    </MarketGatewayProvider>
+                  </GlobalLayoutProvider>
+                </ActiveBotProvider>
+              </AuthGuard>
             </AuthProvider>
           </ThemeProvider>
         </QueryProvider>

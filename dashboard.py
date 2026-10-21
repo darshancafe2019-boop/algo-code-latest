@@ -13951,7 +13951,11 @@ def api_auth_login():
         is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
         is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
         has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
+        allow_dev_fallback = (
+            os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
+            or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
+        )
+        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod) or allow_dev_fallback
 
         # Dispatch real email via Resend
         email_sent, email_err, msg_id = global_email_service.send_login_otp(
@@ -14393,7 +14397,11 @@ def api_auth_email_otp_resend():
     is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
     is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
     has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod)
+    allow_dev_fallback = (
+        os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
+        or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
+    )
+    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod) or allow_dev_fallback
 
     # Send email through Resend
     logger.info("[OTP] Sending email via configured provider")

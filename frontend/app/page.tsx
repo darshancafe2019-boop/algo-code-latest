@@ -137,22 +137,6 @@ const TaxIntelligenceTab = dynamic(
   () => import("@/components/tax-intelligence/TaxIntelligenceTab").then((m) => m.TaxIntelligenceTab),
   { ssr: false, loading: () => null }
 );
-const MarketCommandCenter = dynamic(
-  () => import("@/components/live/MarketCommandCenter").then((m) => m.MarketCommandCenter),
-  { ssr: false, loading: () => null }
-);
-const DhanLiveMarketFeed = dynamic(
-  () => import("@/components/live/DhanLiveMarketFeed").then((m) => m.DhanLiveMarketFeed),
-  { ssr: false, loading: () => null }
-);
-const UpstoxLiveMarketFeed = dynamic(
-  () => import("@/components/live/UpstoxLiveMarketFeed").then((m) => m.UpstoxLiveMarketFeed),
-  { ssr: false, loading: () => null }
-);
-const DeltaLiveMarketFeed = dynamic(
-  () => import("@/components/live/DeltaLiveMarketFeed").then((m) => m.DeltaLiveMarketFeed),
-  { ssr: false, loading: () => null }
-);
 
 
 function MainApp() {
@@ -208,10 +192,6 @@ function MainApp() {
       import("@/components/logs/LogsDebugging").catch(() => {});
       import("@/components/tax-intelligence/TaxIntelligenceTab").catch(() => {});
       import("@/components/settings/TerminalSettingsView").catch(() => {});
-      import("@/components/live/MarketCommandCenter").catch(() => {});
-      import("@/components/live/DhanLiveMarketFeed").catch(() => {});
-      import("@/components/live/UpstoxLiveMarketFeed").catch(() => {});
-      import("@/components/live/DeltaLiveMarketFeed").catch(() => {});
     };
 
     if (typeof window !== "undefined") {
@@ -239,12 +219,6 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* 0.5 Real-Time Live Feed */}
-        {isTabActive("live", ["live-feed", "live-data"]) && (
-          <ErrorBoundary title="Live Market Feed Failed">
-            <MarketCommandCenter />
-          </ErrorBoundary>
-        )}
 
         {/* 1. Markets Discovery & Analysis */}
         {isTabActive("markets", ["market-universe", "universe"]) && (

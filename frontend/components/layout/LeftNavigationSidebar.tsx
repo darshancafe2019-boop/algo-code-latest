@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   LineChart,
-  Radio,
   Bot,
   CalendarClock,
   Code,
@@ -43,7 +42,6 @@ export interface NavItem {
 export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard },
   { id: "markets", label: "Markets", path: "/markets", icon: LineChart },
-  { id: "live", label: "Live Feed", path: "/live", icon: Radio },
   { id: "bots", label: "Bots", path: "/bots", icon: Bot },
   { id: "strategies", label: "Strategy", path: "/strategies", icon: Code },
   { id: "indicators", label: "Indicators", path: "/indicators", icon: Activity },

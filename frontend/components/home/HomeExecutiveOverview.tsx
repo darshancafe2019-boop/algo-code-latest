@@ -22,6 +22,7 @@ import {
   formatDecimal,
   toFiniteNumber,
   safeArray,
+  resolveCurrencySymbol,
 } from "@/lib/formatters";
 import { apiClient } from "@/lib/apiClient";
 import { useGlobalData } from "@/context/GlobalDataContext";
@@ -168,11 +169,19 @@ export function HomeExecutiveOverview() {
   const balance = portfolioSnapshot?.equity ?? snapshotData?.portfolio?.equity ?? null;
   const todaysPnl = portfolioSnapshot?.dailyPnl ?? snapshotData?.pnl?.dailyPnl ?? 0;
   const isProfit = todaysPnl >= 0;
+  const portfolioCurrency = portfolioSnapshot?.baseCurrency || snapshotData?.portfolio?.baseCurrency || "USD";
+  const currSymbol = resolveCurrencySymbol(portfolioCurrency);
 
-  const positionsCount = safeArray(rawPositions).length;
+  const positionsCount = safeArray(rawPositions).length > 0
+    ? safeArray(rawPositions).length
+    : (portfolioSnapshot?.openPositions ?? snapshotData?.positionsSummary?.openPositionsCount ?? 0);
+  const openContractsCount = portfolioSnapshot?.openContracts ?? snapshotData?.positionsSummary?.openContractsCount ?? positionsCount;
   const winRate = portfolioSnapshot?.winRate ?? snapshotData?.performance?.winRate ?? 0;
   const winningTrades = portfolioSnapshot?.winningTradesCount ?? snapshotData?.performance?.winningTradesCount ?? 0;
   const totalTrades = portfolioSnapshot?.totalTradesCount ?? snapshotData?.performance?.totalTradesCount ?? 0;
+  const systemHealth = snapshotData?.health?.overall || "HEALTHY";
+  const isHealthDegraded = systemHealth === "DEGRADED";
+  const isHealthCritical = systemHealth === "CRITICAL";
 
   // ── Live Market Indices ──────────────────────────────────────────────────
   const marketIndices = useMemo(() => {
@@ -295,12 +304,12 @@ export function HomeExecutiveOverview() {
           </div>
           <div>
             <span className="text-[24px] font-bold tracking-tight text-[#F8FAFC] tabular-nums leading-none">
-              {balance !== null ? formatCurrency(balance, "₹", 0) : <span className="text-sm font-normal text-[#7D8EA5] animate-pulse">Loading...</span>}
+              {balance !== null ? formatCurrency(balance, currSymbol, 0) : <span className="text-sm font-normal text-[#7D8EA5] animate-pulse">Loading...</span>}
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
             <span className="text-[#00E89A] font-semibold">
-              {portfolioSnapshot?.marginUsed ? formatCurrency(portfolioSnapshot.marginUsed, "₹", 0) : "₹0"}
+              {portfolioSnapshot?.marginUsed !== undefined ? formatCurrency(portfolioSnapshot.marginUsed, currSymbol, 0) : `${currSymbol}0`}
             </span>
             <span>unified margin used</span>
           </div>
@@ -323,8 +332,8 @@ export function HomeExecutiveOverview() {
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
-            <span className="text-[#00E89A] font-semibold">0 breaches</span>
-            <span>exposure guarded</span>
+            <span className="text-[#00E89A] font-semibold">{openContractsCount} contracts</span>
+            <span>• exposure guarded</span>
           </div>
         </div>
 
@@ -350,7 +359,7 @@ export function HomeExecutiveOverview() {
                 isProfit ? "text-[#00E89A]" : "text-[#FF3B5C]"
               )}
             >
-              {isProfit ? `+${formatCurrency(todaysPnl, "₹", 0)}` : formatCurrency(todaysPnl, "₹", 0)}
+              {isProfit ? `+${formatCurrency(todaysPnl, currSymbol, 0)}` : formatCurrency(todaysPnl, currSymbol, 0)}
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
@@ -381,18 +390,37 @@ export function HomeExecutiveOverview() {
         </div>
 
         {/* Card 5: System Status */}
-        <div className="h-[112px] p-3.5 rounded-[10px] bg-gradient-to-b from-[#00E89A]/5 to-[#0A1422] border border-[#00E89A]/30 hover:border-[#00E89A]/50 transition-colors flex flex-col justify-between">
+        <div className={cn(
+          "h-[112px] p-3.5 rounded-[10px] transition-colors flex flex-col justify-between border",
+          isHealthCritical
+            ? "bg-gradient-to-b from-[#FF3B5C]/10 to-[#0A1422] border-[#FF3B5C]/40 hover:border-[#FF3B5C]/60"
+            : isHealthDegraded
+            ? "bg-gradient-to-b from-amber-500/10 to-[#0A1422] border-amber-500/40 hover:border-amber-500/60"
+            : "bg-gradient-to-b from-[#00E89A]/5 to-[#0A1422] border-[#00E89A]/30 hover:border-[#00E89A]/50"
+        )}>
           <div className="flex items-center justify-between text-[#7D8EA5]">
             <span className="text-[11px] font-medium tracking-tight">System Status</span>
-            <div className="h-6 w-6 rounded-md bg-[#00E89A]/15 flex items-center justify-center">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#00E89A]" />
+            <div className={cn(
+              "h-6 w-6 rounded-md flex items-center justify-center",
+              isHealthCritical ? "bg-[#FF3B5C]/15" : isHealthDegraded ? "bg-amber-500/15" : "bg-[#00E89A]/15"
+            )}>
+              <CheckCircle2 className={cn(
+                "h-3.5 w-3.5",
+                isHealthCritical ? "text-[#FF3B5C]" : isHealthDegraded ? "text-amber-400" : "text-[#00E89A]"
+              )} />
             </div>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-[#00E89A] animate-pulse" />
-              <span className="text-[22px] font-bold tracking-tight text-[#00E89A] leading-none">
-                {snapshotData?.health?.overall || "HEALTHY"}
+              <span className={cn(
+                "h-2.5 w-2.5 rounded-full animate-pulse",
+                isHealthCritical ? "bg-[#FF3B5C]" : isHealthDegraded ? "bg-amber-400" : "bg-[#00E89A]"
+              )} />
+              <span className={cn(
+                "text-[22px] font-bold tracking-tight leading-none",
+                isHealthCritical ? "text-[#FF3B5C]" : isHealthDegraded ? "text-amber-400" : "text-[#00E89A]"
+              )}>
+                {isSnapshotLoading ? "CHECKING..." : systemHealth}
               </span>
             </div>
           </div>

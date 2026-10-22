@@ -6026,16 +6026,48 @@ def api_positions_rest():
         bot_id = request.args.get("bot_id")
         broker_filter = request.args.get("broker")
         
-        if bot_id:
-            raw_positions = safe_query(
-                "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC",
-                (mode, bot_id)
-            )
+        # Fetch active open positions: check authoritative positions table first
+        pos_table_rows = []
+        try:
+            if bot_id:
+                pos_table_rows = safe_query(
+                    "SELECT * FROM positions WHERE status = 'OPEN' AND quantity > 0 AND bot_id = ? ORDER BY updated_at DESC",
+                    (bot_id,)
+                )
+            else:
+                pos_table_rows = safe_query(
+                    "SELECT * FROM positions WHERE status = 'OPEN' AND quantity > 0 ORDER BY updated_at DESC"
+                )
+        except Exception as e:
+            logger.warning(f"Error querying positions table: {e}")
+            pos_table_rows = []
+
+        seen_keys = set()
+        deduped_pos = []
+        for p in pos_table_rows:
+            k = (str(p.get("bot_id")), str(p.get("symbol")))
+            if k not in seen_keys:
+                seen_keys.add(k)
+                p_mapped = dict(p)
+                p_mapped["position_size"] = float(p.get("quantity") or 0.0)
+                p_mapped["entry_price"] = float(p.get("average_entry_price") or p.get("entry_price") or 0.0)
+                p_mapped["side"] = "BUY" if str(p.get("direction", "LONG")).upper() == "LONG" else "SELL"
+                p_mapped["trade_id"] = p.get("id")
+                deduped_pos.append(p_mapped)
+
+        if deduped_pos:
+            raw_positions = deduped_pos
         else:
-            raw_positions = safe_query(
-                "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC",
-                (mode,)
-            )
+            if bot_id:
+                raw_positions = safe_query(
+                    "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? AND bot_id = ? ORDER BY id DESC LIMIT 100",
+                    (mode, bot_id)
+                )
+            else:
+                raw_positions = safe_query(
+                    "SELECT * FROM trades_log WHERE status IN ('OPEN', 'RUNNING', 'PARTIAL') AND execution_mode = ? ORDER BY id DESC LIMIT 100",
+                    (mode,)
+                )
 
         now = datetime.now(timezone.utc)
         now_str = now.isoformat()
@@ -7278,18 +7310,38 @@ def health_ready():
         status_str = "ok"
 
     is_legacy_ready = request.path == "/health/ready"
+    pool_stats = db.get_db_pool_stats()
+    database_pool = {
+        key: pool_stats[key]
+        for key in (
+            "configured",
+            "engine",
+            "status",
+            "pool_min",
+            "pool_max",
+            "pool_size",
+            "pool_available",
+            "requests_waiting",
+            "requests_queued",
+            "connection_errors",
+            "usage_ms",
+        )
+        if key in pool_stats
+    }
 
     payload = {
         "status": "READY" if (is_legacy_ready and db_ok) else status_str,
         "backend": backend_ok,
         "database": db_ok if not is_legacy_ready else ("OK" if db_ok else "ERROR"),
+        "database_engine": "postgresql" if config.IS_POSTGRES else "sqlite",
+        "database_pool": database_pool,
         "market_data": market_data_ok,
         "binance": binance_ok,
         "upstox": upstox_ok,
         "timestamp": now_iso
     }
 
-    return jsonify(payload), 200
+    return jsonify(payload), 200 if db_ok else 503
 
 
 @app.route("/health/system", methods=["GET"])
@@ -8210,7 +8262,18 @@ def api_bots_list():
         # Merge by id to eliminate duplicates while keeping live runtime data
         bot_map = {b["id"]: b for b in wizard_bots}
         for b in runtime_bots:
-            bot_map[b["id"]] = b
+            bot_id = b.get("id")
+            if bot_id in bot_map:
+                merged = dict(bot_map[bot_id])
+                for k, v in b.items():
+                    if k not in ("pnl", "currency", "positions_count", "open_contracts", "trades_count", "win_rate") and v is not None:
+                        merged[k] = v
+                if b.get("status"):
+                    merged["status"] = b["status"]
+                    merged["state"] = b.get("state") or b["status"]
+                bot_map[bot_id] = merged
+            else:
+                bot_map[bot_id] = b
         all_bots = list(bot_map.values())
 
         metrics = dict(snapshot.get("metrics") or {})
@@ -10081,6 +10144,17 @@ def execute_permanent_bot_deletion(bot_id: str, force: bool = False) -> Dict[str
         conn.execute("DELETE FROM data_core_persisted_bots WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM strategy_deployments WHERE bot_id = ?", (bot_id,))
         conn.execute("DELETE FROM live_deployment_authorizations WHERE bot_id = ?", (bot_id,))
+        try:
+            conn.execute("DELETE FROM bots WHERE id = ?", (bot_id,))
+            conn.execute("DELETE FROM bot_events WHERE bot_id = ?", (bot_id,))
+            conn.execute("DELETE FROM positions WHERE bot_id = ?", (bot_id,))
+        except Exception:
+            pass
+        try:
+            from src import bot_wizard_service
+            bot_wizard_service._bot_snapshot_cache.pop(bot_id, None)
+        except Exception:
+            pass
         conn.commit()
     except Exception as exc:
         conn.rollback()
@@ -10238,6 +10312,18 @@ def execute_bulk_permanent_bot_deletion(bot_ids: List[str], force: bool = False)
         cursor.execute(f"DELETE FROM data_core_persisted_bots WHERE bot_id IN ({placeholders})", tuple(clean_ids))
         cursor.execute(f"DELETE FROM strategy_deployments WHERE bot_id IN ({placeholders})", tuple(clean_ids))
         cursor.execute(f"DELETE FROM live_deployment_authorizations WHERE bot_id IN ({placeholders})", tuple(clean_ids))
+        try:
+            cursor.execute(f"DELETE FROM bots WHERE id IN ({placeholders})", tuple(clean_ids))
+            cursor.execute(f"DELETE FROM bot_events WHERE bot_id IN ({placeholders})", tuple(clean_ids))
+            cursor.execute(f"DELETE FROM positions WHERE bot_id IN ({placeholders})", tuple(clean_ids))
+        except Exception:
+            pass
+        try:
+            from src import bot_wizard_service
+            for bid in clean_ids:
+                bot_wizard_service._bot_snapshot_cache.pop(bid, None)
+        except Exception:
+            pass
         conn.commit()
     except Exception as exc:
         conn.rollback()
@@ -18600,12 +18686,12 @@ def api_dashboard_snapshot():
         # 4. Top Movers Calculation from real quotes / universe
         movers_payload = _compute_top_movers()
         
-        # 5. Open Positions Summary
-        open_pos_row = db.safe_query(
-            "SELECT COUNT(*) as cnt FROM trades_log WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')",
-            (mode,)
+        # 5. Open Positions Summary from authoritative positions table
+        open_pos_rows = db.safe_query(
+            "SELECT count(DISTINCT symbol || '_' || bot_id) as cnt, COALESCE(sum(quantity), 0.0) as contracts FROM positions WHERE status = 'OPEN' AND quantity > 0"
         )
-        open_positions_count = int(open_pos_row[0].get("cnt", 0)) if open_pos_row else 0
+        open_positions_count = int(open_pos_rows[0].get("cnt", 0)) if open_pos_rows else 0
+        open_contracts_count = float(open_pos_rows[0].get("contracts", 0.0)) if open_pos_rows else 0.0
         
         # 6. Recent Alerts
         alerts_rows = db.safe_query(
@@ -18678,6 +18764,7 @@ def api_dashboard_snapshot():
             "portfolio": portfolio_snap,
             "positionsSummary": {
                 "openPositionsCount": open_positions_count,
+                "openContractsCount": open_contracts_count,
                 "marginUsed": portfolio_snap.get("marginUsed", 0.0),
                 "unrealizedPnl": portfolio_snap.get("unrealizedPnl", 0.0),
             },

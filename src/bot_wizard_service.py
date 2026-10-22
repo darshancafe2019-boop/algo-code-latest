@@ -499,12 +499,17 @@ def list_bots() -> List[Dict[str, Any]]:
         with _get_db_connection() as conn:
             rows = conn.execute("SELECT id, name, status, execution_mode, configuration_json, created_at, updated_at FROM bots ORDER BY updated_at DESC").fetchall()
 
-            # Pre-fetch aggregated metrics across all bots in 3 bulk queries (eliminating 150+ sequential roundtrips)
-            pos_open_map: Dict[str, Tuple[int, float]] = {}
+            # Pre-fetch aggregated metrics across all bots in bulk queries (eliminating sequential roundtrips)
+            pos_open_map: Dict[str, Tuple[int, float, float]] = {}
             try:
-                for prow in conn.execute("SELECT bot_id, count(*), COALESCE(sum(unrealized_pnl), 0.0) FROM positions WHERE quantity > 0 GROUP BY bot_id").fetchall():
+                for prow in conn.execute(
+                    """
+                    SELECT bot_id, count(DISTINCT symbol), COALESCE(sum(unrealized_pnl), 0.0), COALESCE(sum(quantity), 0.0)
+                    FROM positions WHERE quantity > 0 GROUP BY bot_id
+                    """
+                ).fetchall():
                     if prow[0]:
-                        pos_open_map[str(prow[0])] = (int(prow[1] or 0), float(prow[2] or 0.0))
+                        pos_open_map[str(prow[0])] = (int(prow[1] or 0), float(prow[2] or 0.0), float(prow[3] or 0.0))
             except Exception:
                 pass
 
@@ -537,14 +542,18 @@ def list_bots() -> List[Dict[str, Any]]:
                 mode = r["execution_mode"]
                 name = str(r["name"] or "")
 
-                open_pos_count, unrealized_pnl = pos_open_map.get(bot_id, (0, 0.0))
+                open_pos_count, unrealized_pnl, open_contracts = pos_open_map.get(bot_id, (0, 0.0, 0.0))
                 realized_pnl = pos_real_map.get(bot_id, 0.0)
                 total_trades, total_fees = trades_map.get(bot_id, (0, 0.0))
 
                 realized_pnl = round(realized_pnl, 2)
                 unrealized_pnl = round(unrealized_pnl, 2)
                 total_fees = round(total_fees, 2)
-                net_pnl = round(realized_pnl + unrealized_pnl - total_fees, 2)
+                # Note: positions.realized_pnl is already recorded net of fees by the execution engine.
+                # Do NOT subtract total_fees a second time.
+                net_pnl = round(realized_pnl + unrealized_pnl, 2)
+                gross_realized = round(realized_pnl + total_fees, 2)
+                gross_pnl = round(gross_realized + unrealized_pnl, 2)
                 total_pnl = round(realized_pnl + unrealized_pnl, 2)
                 win_rate = 66.7 if total_trades > 0 else 0.0
 
@@ -590,7 +599,9 @@ def list_bots() -> List[Dict[str, Any]]:
                 )
                 cfg["pnl"] = {
                     "net_pnl": net_pnl,
+                    "gross_pnl": gross_pnl,
                     "realized_pnl": realized_pnl,
+                    "gross_realized": gross_realized,
                     "unrealized_pnl": unrealized_pnl,
                     "fees": total_fees,
                     "daily": net_pnl,
@@ -604,6 +615,7 @@ def list_bots() -> List[Dict[str, Any]]:
                 cfg["currency"] = bot_currency
                 cfg["positions_count"] = open_pos_count
                 cfg["open_positions_count"] = open_pos_count
+                cfg["contracts_count"] = open_contracts
                 cfg["trades_count"] = total_trades
                 cfg["created_at"] = r["created_at"]
                 cfg["updated_at"] = r["updated_at"]

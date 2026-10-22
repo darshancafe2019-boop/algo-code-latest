@@ -64,10 +64,13 @@ export interface BotConfig {
   kill_switch: "ARMED" | "TRIGGERED" | "RESET_REQUIRED";
   created_at: string;
   updated_at: string;
+  currency?: string;
+  open_contracts?: number;
   pnl?: {
     realized_pnl: number;
     unrealized_pnl: number;
     net_pnl: number;
+    gross_pnl?: number;
     fees: number;
     currency?: string;
   };

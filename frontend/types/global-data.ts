@@ -69,6 +69,7 @@ export interface PortfolioSnapshot {
   fees: number;
   funding: number;
   openPositions: number;
+  openContracts?: number;
   openOrders: number;
   totalTradesCount: number;
   winningTradesCount: number;

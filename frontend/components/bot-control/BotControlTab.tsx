@@ -10,6 +10,7 @@ import {
   Play,
   Pause,
   Square,
+  CheckSquare,
   ArrowUpRight,
   TrendingUp,
   TrendingDown,
@@ -40,6 +41,7 @@ import {
   formatPercent,
   formatDateTime,
   formatRelativeTime,
+  detectMarketCurrency,
 } from "@/lib/formatters";
 import { BotCreationControlPlane } from "@/components/bot-instance/BotCreationControlPlane";
 import { BotControlCenterVNext } from "./BotControlCenterVNext";
@@ -57,6 +59,7 @@ function BotControlTabInner() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [currencyFilter, setCurrencyFilter] = useState<"ALL" | "INR" | "USD">("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -65,6 +68,11 @@ function BotControlTabInner() {
   // Delete modal state
   const [botToDelete, setBotToDelete] = useState<BotConfig | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Multi-selection state for bulk deletion and batch management
+  const [selectedBotIds, setSelectedBotIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
 
   // Check query params for direct create or detail navigation
   useEffect(() => {
@@ -157,6 +165,11 @@ function BotControlTabInner() {
     setIsDeleting(true);
     try {
       await api.deleteBot(botToDelete.id);
+      setSelectedBotIds((prev) => {
+        const next = new Set(prev);
+        next.delete(botToDelete.id);
+        return next;
+      });
       setBotToDelete(null);
       await loadBots();
     } catch (err: any) {
@@ -166,37 +179,92 @@ function BotControlTabInner() {
     }
   };
 
-  // Fleet Aggregations
+  const toggleSelectBot = useCallback((botId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setSelectedBotIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(botId)) {
+        next.delete(botId);
+      } else {
+        next.add(botId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Fleet Aggregations segregated strictly by currency (Requirement 3: Never combine INR and USD)
   const fleetMetrics = useMemo(() => {
-    let totalNetPnl = 0;
-    let totalRealized = 0;
-    let totalUnrealized = 0;
-    let totalFees = 0;
     let runningCount = 0;
-    let totalPositions = 0;
-    let totalTrades = 0;
+    let pausedCount = 0;
+    let readyCount = 0;
+    let stoppedCount = 0;
+    let errorCount = 0;
+
+    const inr = {
+      netPnl: 0,
+      realized: 0,
+      unrealized: 0,
+      grossPnl: 0,
+      fees: 0,
+      positions: 0,
+      contracts: 0,
+      trades: 0,
+      botsCount: 0,
+    };
+
+    const usd = {
+      netPnl: 0,
+      realized: 0,
+      unrealized: 0,
+      grossPnl: 0,
+      fees: 0,
+      positions: 0,
+      contracts: 0,
+      trades: 0,
+      botsCount: 0,
+    };
 
     bots.forEach((b) => {
-      if (b.status === "RUNNING") runningCount++;
+      const st = (b.status || "").toUpperCase();
+      if (st === "RUNNING") runningCount++;
+      else if (st === "PAUSED") pausedCount++;
+      else if (st === "READY") readyCount++;
+      else if (st === "ERROR") errorCount++;
+      else stoppedCount++;
+
+      const isIndia = b.currency === "INR" || detectMarketCurrency(b).code === "INR";
+      const target = isIndia ? inr : usd;
+      target.botsCount++;
+
       if (b.pnl) {
-        totalNetPnl += b.pnl.net_pnl || 0;
-        totalRealized += b.pnl.realized_pnl || 0;
-        totalUnrealized += b.pnl.unrealized_pnl || 0;
-        totalFees += b.pnl.fees || 0;
+        target.netPnl += b.pnl.net_pnl || 0;
+        target.realized += b.pnl.realized_pnl || 0;
+        target.unrealized += b.pnl.unrealized_pnl || 0;
+        target.grossPnl += b.pnl.gross_pnl || (b.pnl.realized_pnl || 0) + (b.pnl.unrealized_pnl || 0);
+        target.fees += b.pnl.fees || 0;
       }
-      totalPositions += b.positions_count || 0;
-      totalTrades += b.trades_count || 0;
+      target.positions += b.positions_count || 0;
+      target.contracts += b.open_contracts || b.positions_count || 0;
+      target.trades += b.trades_count || 0;
     });
 
+    const totalBots = bots.length;
+    const totalPositions = inr.positions + usd.positions;
+    const totalContracts = inr.contracts + usd.contracts;
+    const totalTrades = inr.trades + usd.trades;
+
     return {
-      totalNetPnl,
-      totalRealized,
-      totalUnrealized,
-      totalFees,
       runningCount,
-      totalBots: bots.length,
+      pausedCount,
+      readyCount,
+      stoppedCount,
+      errorCount,
+      totalBots,
       totalPositions,
+      totalContracts,
       totalTrades,
+      inr,
+      usd,
     };
   }, [bots]);
 
@@ -205,6 +273,11 @@ function BotControlTabInner() {
     return bots.filter((b) => {
       const matchesStatus =
         statusFilter === "ALL" || b.status.toUpperCase() === statusFilter.toUpperCase();
+      const isIndia = b.currency === "INR" || detectMarketCurrency(b).code === "INR";
+      const matchesCurrency =
+        currencyFilter === "ALL" ||
+        (currencyFilter === "INR" && isIndia) ||
+        (currencyFilter === "USD" && !isIndia);
       const query = searchQuery.toLowerCase().trim();
       const matchesSearch =
         !query ||
@@ -213,9 +286,41 @@ function BotControlTabInner() {
         (b.market?.symbol && b.market.symbol.toLowerCase().includes(query)) ||
         (b.strategy?.type && b.strategy.type.toLowerCase().includes(query)) ||
         (b.market?.exchange && b.market.exchange.toLowerCase().includes(query));
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesCurrency && matchesSearch;
     });
-  }, [bots, statusFilter, searchQuery]);
+  }, [bots, statusFilter, currencyFilter, searchQuery]);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelectedBotIds((prev) => {
+      const allFilteredIds = filteredBots.map((b) => b.id);
+      const allSelected = allFilteredIds.length > 0 && allFilteredIds.every((id) => prev.has(id));
+      if (allSelected) {
+        return new Set();
+      } else {
+        return new Set(allFilteredIds);
+      }
+    });
+  }, [filteredBots]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedBotIds(new Set());
+  }, []);
+
+  const handleBulkDelete = async () => {
+    if (selectedBotIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const idsToDelete = Array.from(selectedBotIds);
+      await api.bulkDeleteBots(idsToDelete, true);
+      setSelectedBotIds(new Set());
+      setShowBulkDeleteModal(false);
+      await loadBots();
+    } catch (err: any) {
+      alert(`Bulk delete failed: ${err.message}`);
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
 
   const getStatusBadge = (status: BotStatus | string) => {
     switch (status) {
@@ -404,17 +509,22 @@ function BotControlTabInner() {
         {/* Total Net P&L Card */}
         <div className="group relative overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-[#0D182E] to-[#080E1B] p-5 sm:p-6 shadow-xl hover:border-slate-700 transition-all">
           <div className="flex items-center justify-between">
-            <span className="text-xs sm:text-sm font-mono font-bold text-slate-300 uppercase tracking-wider">
-              Fleet Net P&L
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs sm:text-sm font-mono font-bold text-slate-300 uppercase tracking-wider">
+                Fleet Net P&L
+              </span>
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-cyan-400 font-bold">
+                {currencyFilter}
+              </span>
+            </div>
             <div
               className={`p-2.5 rounded-xl border ${
-                fleetMetrics.totalNetPnl >= 0
+                (currencyFilter === "INR" ? fleetMetrics.inr.netPnl : currencyFilter === "USD" ? fleetMetrics.usd.netPnl : (fleetMetrics.inr.netPnl + fleetMetrics.usd.netPnl)) >= 0
                   ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-sm shadow-emerald-500/20"
                   : "bg-rose-500/10 text-rose-400 border-rose-500/30 shadow-sm shadow-rose-500/20"
               }`}
             >
-              {fleetMetrics.totalNetPnl >= 0 ? (
+              {(currencyFilter === "INR" ? fleetMetrics.inr.netPnl : currencyFilter === "USD" ? fleetMetrics.usd.netPnl : fleetMetrics.inr.netPnl) >= 0 ? (
                 <TrendingUp className="h-5 w-5" />
               ) : (
                 <TrendingDown className="h-5 w-5" />
@@ -422,28 +532,49 @@ function BotControlTabInner() {
             </div>
           </div>
           <div className="mt-3">
-            <div
-              className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${
-                fleetMetrics.totalNetPnl > 0
-                  ? "text-emerald-400"
-                  : fleetMetrics.totalNetPnl < 0
-                  ? "text-rose-400"
-                  : "text-slate-100"
-              }`}
-            >
-              {formatSignedMoney(fleetMetrics.totalNetPnl)}
-            </div>
+            {currencyFilter === "INR" ? (
+              <div className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${fleetMetrics.inr.netPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {formatSignedMoney(fleetMetrics.inr.netPnl, "₹")}
+              </div>
+            ) : currencyFilter === "USD" ? (
+              <div className={`text-3xl sm:text-4xl font-black font-mono tracking-tight ${fleetMetrics.usd.netPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                {formatSignedMoney(fleetMetrics.usd.netPnl, "$")}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${fleetMetrics.inr.netPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {formatSignedMoney(fleetMetrics.inr.netPnl, "₹")}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-400">INR</span>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className={`text-lg sm:text-xl font-bold font-mono tracking-tight ${fleetMetrics.usd.netPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+                    {formatSignedMoney(fleetMetrics.usd.netPnl, "$")}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-slate-400">USD</span>
+                </div>
+              </div>
+            )}
             <div className="mt-3.5 grid grid-cols-2 gap-2 text-xs sm:text-sm font-mono text-slate-300 border-t border-slate-800/80 pt-3">
               <div>
-                <span className="text-slate-400 block text-xs font-bold">REALIZED</span>
-                <span className={`font-bold ${fleetMetrics.totalRealized >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {formatSignedMoney(fleetMetrics.totalRealized)}
+                <span className="text-slate-400 block text-[11px] font-bold">REALIZED</span>
+                <span className="font-bold text-emerald-400">
+                  {currencyFilter === "INR"
+                    ? formatSignedMoney(fleetMetrics.inr.realized, "₹")
+                    : currencyFilter === "USD"
+                    ? formatSignedMoney(fleetMetrics.usd.realized, "$")
+                    : `${formatSignedMoney(fleetMetrics.inr.realized, "₹")}`}
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-slate-400 block text-xs font-bold">UNREALIZED</span>
-                <span className={`font-bold ${fleetMetrics.totalUnrealized >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
-                  {formatSignedMoney(fleetMetrics.totalUnrealized)}
+                <span className="text-slate-400 block text-[11px] font-bold">UNREALIZED</span>
+                <span className="font-bold text-slate-300">
+                  {currencyFilter === "INR"
+                    ? formatSignedMoney(fleetMetrics.inr.unrealized, "₹")
+                    : currencyFilter === "USD"
+                    ? formatSignedMoney(fleetMetrics.usd.unrealized, "$")
+                    : `${formatSignedMoney(fleetMetrics.inr.unrealized, "₹")}`}
                 </span>
               </div>
             </div>
@@ -478,7 +609,7 @@ function BotControlTabInner() {
                 </span>
               </div>
               <span className="text-slate-400 font-medium">
-                {fleetMetrics.totalBots - fleetMetrics.runningCount} Idle / Paused
+                {fleetMetrics.pausedCount} Paused • {fleetMetrics.readyCount} Ready
               </span>
             </div>
           </div>
@@ -496,8 +627,14 @@ function BotControlTabInner() {
           </div>
           <div className="mt-3">
             <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
-              {fleetMetrics.totalPositions}{" "}
-              <span className="text-sm font-bold font-mono text-slate-400">Contracts</span>
+              {currencyFilter === "INR"
+                ? fleetMetrics.inr.positions
+                : currencyFilter === "USD"
+                ? fleetMetrics.usd.positions
+                : fleetMetrics.totalPositions}{" "}
+              <span className="text-sm font-bold font-mono text-slate-400">
+                Positions ({currencyFilter === "INR" ? fleetMetrics.inr.contracts : currencyFilter === "USD" ? fleetMetrics.usd.contracts : fleetMetrics.totalContracts} Contracts)
+              </span>
             </div>
             <div className="mt-3.5 flex items-center justify-between text-xs sm:text-sm font-mono text-slate-300 border-t border-slate-800/80 pt-3">
               <span className="text-slate-400">Risk State:</span>
@@ -520,21 +657,50 @@ function BotControlTabInner() {
           </div>
           <div className="mt-3">
             <div className="text-3xl sm:text-4xl font-black font-mono tracking-tight text-white">
-              {fleetMetrics.totalTrades}{" "}
+              {(currencyFilter === "INR"
+                ? fleetMetrics.inr.trades
+                : currencyFilter === "USD"
+                ? fleetMetrics.usd.trades
+                : fleetMetrics.totalTrades
+              ).toLocaleString()}{" "}
               <span className="text-sm font-bold font-mono text-slate-400">Executions</span>
             </div>
             <div className="mt-3.5 flex items-center justify-between text-xs sm:text-sm font-mono text-slate-300 border-t border-slate-800/80 pt-3">
               <span className="text-slate-400">Fees Paid:</span>
-              <span className="text-slate-200 font-bold font-mono">{formatMoney(fleetMetrics.totalFees)}</span>
+              <span className="text-slate-200 font-bold font-mono">
+                {currencyFilter === "INR"
+                  ? formatMoney(fleetMetrics.inr.fees, "₹")
+                  : currencyFilter === "USD"
+                  ? formatMoney(fleetMetrics.usd.fees, "$")
+                  : `₹${fleetMetrics.inr.fees.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})} • $${fleetMetrics.usd.fees.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Control Filters & Search Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#0B1426]/90 p-3.5 rounded-2xl border border-slate-800/80 shadow-lg backdrop-blur-md">
-        {/* Status Filter Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-[#0B1426]/90 p-3.5 rounded-2xl border border-slate-800/80 shadow-lg backdrop-blur-md">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Currency Segregation Filter */}
+          <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+            {(["ALL", "INR", "USD"] as const).map((curr) => (
+              <button
+                key={curr}
+                onClick={() => setCurrencyFilter(curr)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                  currencyFilter === curr
+                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                {curr === "ALL" ? "ALL CURRENCIES" : curr === "INR" ? "INR (₹)" : "USD ($)"}
+              </button>
+            ))}
+          </div>
+
+          {/* Status Filter Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
           {["ALL", "RUNNING", "READY", "PAUSED", "STOPPED", "ERROR"].map((status) => {
             const count =
               status === "ALL"
@@ -562,6 +728,7 @@ function BotControlTabInner() {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* Search & View Mode Toggle */}
@@ -609,8 +776,72 @@ function BotControlTabInner() {
               <List className="h-4 w-4" />
             </button>
           </div>
+
+          {/* Quick Bulk Select Button */}
+          <button
+            onClick={toggleSelectAll}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer border ${
+              selectedBotIds.size > 0
+                ? "bg-cyan-500/15 border-cyan-500/40 text-cyan-300"
+                : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800"
+            }`}
+            title="Select / Deselect all visible bots"
+          >
+            {selectedBotIds.size > 0 && selectedBotIds.size === filteredBots.length ? (
+              <CheckSquare className="h-4 w-4 text-cyan-400" />
+            ) : (
+              <Square className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline">Select All</span>
+            {selectedBotIds.size > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full bg-cyan-500 text-slate-950 text-[10px] font-black">
+                {selectedBotIds.size}
+              </span>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Multi-Selection Sticky / Floating Action Bar */}
+      {selectedBotIds.size > 0 && (
+        <div className="sticky top-4 z-40 w-full bg-[#0D182E]/95 border border-cyan-500/50 rounded-2xl p-4 shadow-2xl backdrop-blur-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center flex-shrink-0">
+              <Bot className="h-5 w-5 text-cyan-400" />
+            </div>
+            <div>
+              <div className="text-sm font-mono font-bold text-white flex items-center gap-2">
+                <span>{selectedBotIds.size} bot{selectedBotIds.size > 1 ? "s" : ""} selected</span>
+                <span className="text-xs font-normal text-slate-400">({filteredBots.length} visible)</span>
+              </div>
+              <div className="text-xs text-slate-400 font-mono">
+                Bulk management and permanent decommissioning
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            <button
+              onClick={toggleSelectAll}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 transition-colors cursor-pointer"
+            >
+              {selectedBotIds.size === filteredBots.length ? "Deselect All" : `Select All (${filteredBots.length})`}
+            </button>
+            <button
+              onClick={clearSelection}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold text-slate-400 hover:text-slate-200 bg-slate-800/50 hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Clear
+            </button>
+            <button
+              onClick={() => setShowBulkDeleteModal(true)}
+              className="px-4 py-2 rounded-xl text-xs font-mono font-black text-white bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete Selected ({selectedBotIds.size})
+            </button>
+          </div>
+        </div>
+      )}
 
 
       {/* Main Bot Presentation */}
@@ -689,8 +920,22 @@ function BotControlTabInner() {
                 {/* Top Status & Mode Banner */}
                 <div className="p-5 sm:p-6 pb-4 border-b border-slate-800/70">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2.5 flex-wrap">
+                    <div className="flex items-start gap-3 flex-1 min-w-0">
+                      {/* Checkbox for Multi-Select */}
+                      <button
+                        onClick={(e) => toggleSelectBot(bot.id, e)}
+                        className={`mt-1 h-5 w-5 rounded-md flex items-center justify-center border transition-all flex-shrink-0 cursor-pointer ${
+                          selectedBotIds.has(bot.id)
+                            ? "bg-cyan-500 border-cyan-400 text-slate-950 shadow-sm shadow-cyan-500/40"
+                            : "bg-slate-900/90 border-slate-700 text-transparent hover:border-slate-500"
+                        }`}
+                        title={selectedBotIds.has(bot.id) ? "Deselect bot" : "Select bot for bulk deletion"}
+                      >
+                        <Check className="h-3.5 w-3.5 stroke-[3]" />
+                      </button>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2.5 flex-wrap">
                         {getStatusBadge(bot.status)}
                         <span
                           className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold tracking-wide border ${
@@ -733,13 +978,15 @@ function BotControlTabInner() {
                       </div>
                     </div>
 
+                    </div>
+
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setBotToDelete(bot);
                       }}
-                      className="p-2 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
-                      title="Delete Bot"
+                      className="p-2 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 border border-slate-800/80 hover:border-rose-900/40 transition-colors cursor-pointer"
+                      title="Delete This Bot"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -948,6 +1195,19 @@ function BotControlTabInner() {
             <table className="w-full text-left text-xs sm:text-sm">
               <thead className="border-b border-slate-800 bg-slate-900/80 text-slate-300 font-mono uppercase text-xs sm:text-[13px] font-bold">
                 <tr>
+                  <th className="px-4 py-4 w-12 text-center">
+                    <button
+                      onClick={toggleSelectAll}
+                      className={`h-4 w-4 rounded flex items-center justify-center border transition-all cursor-pointer ${
+                        selectedBotIds.size > 0 && selectedBotIds.size === filteredBots.length
+                          ? "bg-cyan-500 border-cyan-400 text-slate-950"
+                          : "bg-slate-900 border-slate-700 text-transparent hover:border-slate-500"
+                      }`}
+                      title="Select all"
+                    >
+                      <Check className="h-3 w-3 stroke-[3]" />
+                    </button>
+                  </th>
                   <th className="px-5 py-4">Status</th>
                   <th className="px-5 py-4">Bot Identity</th>
                   <th className="px-5 py-4">Market / Mode</th>
@@ -972,8 +1232,23 @@ function BotControlTabInner() {
                         setSelectedBotId(bot.id);
                         setActiveView("details");
                       }}
-                      className="hover:bg-slate-900/60 transition-colors group cursor-pointer"
+                      className={`hover:bg-slate-900/60 transition-colors group cursor-pointer ${
+                        selectedBotIds.has(bot.id) ? "bg-cyan-950/20" : ""
+                      }`}
                     >
+                      <td className="px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => toggleSelectBot(bot.id, e)}
+                          className={`h-4 w-4 rounded flex items-center justify-center border transition-all cursor-pointer ${
+                            selectedBotIds.has(bot.id)
+                              ? "bg-cyan-500 border-cyan-400 text-slate-950 shadow-sm"
+                              : "bg-slate-900 border-slate-700 text-transparent hover:border-slate-500"
+                          }`}
+                          title={selectedBotIds.has(bot.id) ? "Deselect" : "Select"}
+                        >
+                          <Check className="h-3 w-3 stroke-[3]" />
+                        </button>
+                      </td>
                       <td className="px-5 py-4">{getStatusBadge(bot.status)}</td>
                       <td className="px-5 py-4">
                         <div className="font-black text-white text-sm sm:text-base group-hover:text-cyan-300 transition-colors">
@@ -1076,6 +1351,16 @@ function BotControlTabInner() {
                             <span>Terminal</span>
                             <ArrowUpRight className="h-4 w-4" />
                           </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setBotToDelete(bot);
+                            }}
+                            className="p-2.5 rounded-xl bg-rose-950/40 text-rose-300 border border-rose-500/30 hover:bg-rose-900/60 hover:text-white transition-colors cursor-pointer"
+                            title="Delete Bot"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1123,6 +1408,59 @@ function BotControlTabInner() {
               >
                 {isDeleting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                 Confirm Decommission
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Delete Bots Safeguard Modal */}
+      {showBulkDeleteModal && selectedBotIds.size > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="w-full max-w-lg rounded-2xl border border-rose-500/30 bg-[#0B1426] p-7 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3.5 text-rose-400">
+              <div className="h-12 w-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+                <ShieldAlert className="h-6 w-6 text-rose-400" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-white">Bulk Decommission Trading Bots</h3>
+                <span className="text-xs sm:text-sm text-rose-400 font-mono font-bold">
+                  {selectedBotIds.size} Units Selected • Irreversible Action
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-slate-200 leading-relaxed font-medium">
+              Are you sure you want to permanently decommission and remove the following{" "}
+              <span className="font-bold text-white">{selectedBotIds.size}</span> trading bots from your active fleet?
+            </p>
+            <div className="max-h-48 overflow-y-auto space-y-2 p-3 rounded-xl bg-slate-950/70 border border-slate-800 font-mono text-xs text-slate-300">
+              {bots
+                .filter((b) => selectedBotIds.has(b.id))
+                .map((b) => (
+                  <div key={b.id} className="flex items-center justify-between py-1 border-b border-slate-800/50 last:border-0">
+                    <span className="font-bold text-white truncate max-w-[220px]">{b.name}</span>
+                    <span className="text-slate-400 text-[11px]">{b.id}</span>
+                  </div>
+                ))}
+            </div>
+            <div className="text-xs sm:text-sm text-slate-300 font-mono bg-rose-950/30 border border-rose-800/30 p-3.5 rounded-xl leading-relaxed">
+              WARNING: This will permanently stop and remove these runtime instances from your fleet. All historical trade ledger records and metrics remain safely preserved in the database.
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                disabled={bulkDeleting}
+                className="px-5 py-2.5 rounded-xl border border-slate-700 bg-slate-800/80 text-sm font-mono font-bold text-slate-300 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkDeleting}
+                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-sm font-mono font-black text-white shadow-lg shadow-rose-600/30 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              >
+                {bulkDeleting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                Confirm Delete ({selectedBotIds.size} Bots)
               </button>
             </div>
           </div>

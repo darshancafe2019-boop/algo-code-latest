@@ -118,6 +118,11 @@ export const api = {
     request<{ bot_id: string; deleted: boolean }>(`/bots/${botId}`, {
       method: "DELETE",
     }),
+  bulkDeleteBots: (botIds: string[], force: boolean = true) =>
+    request<{ status: string; deleted_count: number; deleted_bot_ids: string[]; message?: string }>("/bots/bulk-delete", {
+      method: "POST",
+      body: JSON.stringify({ bot_ids: botIds, force }),
+    }),
   deleteAllBots: () =>
     request<{ success: boolean; deleted_count: number; message?: string }>("/bots/delete-all", {
       method: "POST",

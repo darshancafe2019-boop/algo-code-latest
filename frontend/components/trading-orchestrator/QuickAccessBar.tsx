@@ -4,7 +4,6 @@ import React from "react";
 import Link from "next/link";
 import {
   TrendingUp,
-  Radio,
   Layers,
   Bot,
   Sliders,
@@ -23,7 +22,6 @@ export const QuickAccessBar: React.FC<QuickAccessBarProps> = ({
 }) => {
   const links = [
     { label: "MARKETS", href: "/markets", icon: TrendingUp },
-    { label: "LIVE FEED", href: "/live", icon: Radio },
     { label: "OPTIONS", href: "/options", icon: Layers },
     { label: "FUTURES", href: "/futures", icon: Zap },
     { label: "BOTS", href: "/bots", icon: Bot },

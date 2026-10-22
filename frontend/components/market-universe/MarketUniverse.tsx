@@ -26,8 +26,8 @@ import { ErrorBoundary } from "../ErrorBoundary";
 import { useWatchlist } from "@/hooks/useWatchlist";
 import { useMarketGatewayContext } from "@/context/MarketGatewayContext";
 import { StocksUniverseView } from "@/src/features/markets/stocks";
-import { MarketStreamObservatory } from "@/components/live/MarketStreamObservatory";
-import { MarketDepthViewer } from "@/components/live/MarketDepthViewer";
+import { MarketStreamObservatory } from "./MarketStreamObservatory";
+import { MarketDepthViewer } from "./MarketDepthViewer";
 import {
   X,
   TrendingUp,

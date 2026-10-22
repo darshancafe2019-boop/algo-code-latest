@@ -157,6 +157,7 @@ class GlobalDataEngine:
                     TOTAL(CASE WHEN COALESCE(exit_timestamp, timestamp) >= ? THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as monthly_pnl,
                     COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN 1 END) as win_count,
                     COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN 1 END) as loss_count,
+                    COUNT(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) = 0 THEN 1 END) as breakeven_count,
                     TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) > 0 THEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) ELSE 0 END) as win_sum,
                     TOTAL(CASE WHEN COALESCE(net_pnl, realized_pnl, result_pnl, 0) < 0 THEN ABS(COALESCE(net_pnl, realized_pnl, result_pnl, 0)) ELSE 0 END) as loss_sum
                 FROM trades_log 
@@ -165,20 +166,21 @@ class GlobalDataEngine:
                 (today_start_iso, week_start_iso, month_start_iso, trading_mode),
             ) or {}
 
-            # 2. Fetch Active Open Positions for Mode (Grouped by symbol to scale to large trade logs)
-            open_positions = db.safe_query(
+            # 2. Fetch Active Open Positions from authoritative positions table (deduplicated by bot_id, symbol)
+            raw_pos_rows = db.safe_query(
                 """
-                SELECT symbol, COALESCE(direction, side, 'LONG') as side_dir, 
-                       SUM(position_size) as total_size,
-                       AVG(entry_price) as avg_price,
-                       AVG(COALESCE(leverage, 1.0)) as avg_leverage,
-                       SUM(fees) as total_fees
-                FROM trades_log 
-                WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
-                GROUP BY symbol, COALESCE(direction, side, 'LONG')
-                """,
-                (trading_mode,),
+                SELECT * FROM positions 
+                WHERE status = 'OPEN' AND quantity > 0
+                ORDER BY updated_at DESC
+                """
             )
+            seen_keys = set()
+            open_positions = []
+            for p in raw_pos_rows:
+                k = (str(p.get("bot_id") or ""), str(p.get("symbol") or ""))
+                if k not in seen_keys:
+                    seen_keys.add(k)
+                    open_positions.append(p)
 
             # 3. Fetch Open Orders Count
             open_orders_row = db.safe_query_one(
@@ -190,17 +192,22 @@ class GlobalDataEngine:
             )
             open_orders_count = int(open_orders_row.get("cnt") or 0) if open_orders_row else 0
 
-            # 4. Fetch Bot Allocations & Starting Capital
+            # 4. Fetch Bot Allocations & Starting Capital from verified ledger / broker account
             bots = db.safe_query(
                 "SELECT allocated_capital, current_equity FROM bot_instances WHERE execution_mode = ?",
                 (trading_mode,),
             )
+            paper_acc = db.safe_query_one(
+                "SELECT broker_balance FROM broker_accounts WHERE environment = ? LIMIT 1",
+                (trading_mode,)
+            ) or {}
+            starting_balance = float(paper_acc.get("broker_balance") or 100000.0) if is_paper else max(10000.0, sum(float(b.get("allocated_capital") or 0.0) for b in bots))
         except Exception as e:
             logger.warning("Error reading portfolio database state: %s", e)
             agg_row = {}
-
-        total_allocated = sum(float(b["allocated_capital"] or 0.0) for b in bots)
-        starting_balance = 50000.0 if is_paper else max(10000.0, total_allocated)
+            open_positions = []
+            open_orders_count = 0
+            starting_balance = 100000.0
 
         # 5. Extract Realized P&L, Fees, and Trading Metrics directly from SQL aggregate
         gross_realized = Decimal(str(agg_row.get("total_gross") or 0.0))
@@ -213,21 +220,25 @@ class GlobalDataEngine:
 
         win_count = int(agg_row.get("win_count") or 0)
         loss_count = int(agg_row.get("loss_count") or 0)
-        total_trades = int(agg_row.get("total_trades") or (win_count + loss_count))
+        breakeven_count = int(agg_row.get("breakeven_count") or 0)
+        total_trades = int(agg_row.get("total_trades") or (win_count + loss_count + breakeven_count))
+        eligible_trades = win_count + loss_count
         sum_wins = float(agg_row.get("win_sum") or 0.0)
         sum_losses = float(agg_row.get("loss_sum") or 0.0)
 
-        # 6. Calculate Mark-to-Market Unrealized P&L across Open Positions
+        # 6. Calculate Mark-to-Market Unrealized P&L & Unified Margin across authoritative Active Open Positions
         total_unrealized = Decimal("0.0")
         margin_used = Decimal("0.0")
+        total_contracts = 0.0
 
         for pos in open_positions:
-            sym = pos.get("symbol", "BTC/USDT")
-            direction = str(pos.get("side_dir") or pos.get("direction") or pos.get("side") or "LONG").upper()
-            entry_p = float(pos.get("avg_price") or pos.get("entry_price") or pos.get("average_entry_price") or 0.0)
-            qty = float(pos.get("total_size") or pos.get("position_size") or pos.get("entry_quantity") or 0.0)
-            multiplier = float(pos.get("avg_leverage") or pos.get("leverage") or 1.0)
-            fee = float(pos.get("total_fees") or pos.get("fees") or 0.0)
+            sym = str(pos.get("symbol") or "BTC/USDT").upper()
+            direction = str(pos.get("direction") or pos.get("side") or "LONG").upper()
+            entry_p = float(pos.get("average_entry_price") or pos.get("entry_price") or 0.0)
+            qty = float(pos.get("quantity") or 0.0)
+            multiplier = float(pos.get("leverage") or 1.0)
+            fee = float(pos.get("fees") or 0.0)
+            total_contracts += qty
 
             live_p = self.get_latest_price(sym) or entry_p
             pos_unrealized = compute_unrealized_pnl(
@@ -240,9 +251,16 @@ class GlobalDataEngine:
             unreal_amt = Decimal(str(pos_unrealized.get("unrealized_pnl", 0.0)))
             total_unrealized += unreal_amt
 
-            notional = Decimal(str(entry_p * qty))
-            lev = Decimal(str(max(1.0, multiplier)))
-            margin_used += notional / lev
+            notional = entry_p * qty
+            lev = max(1.0, multiplier)
+            margin_item = notional / lev
+            
+            # Currency-aware normalization to base USD
+            is_inr = any(ind in sym for ind in ["NIFTY", "BANKNIFTY", "RELIANCE", "TCS", "INFY", "HDFC"]) or "NSE" in sym
+            if is_inr and trading_mode == "PAPER":
+                margin_used += Decimal(str(round(margin_item / 84.15, 2)))
+            else:
+                margin_used += Decimal(str(round(margin_item, 2)))
 
         # 7. Aggregate Balances & Capital Metrics
         starting_dec = Decimal(str(starting_balance))
@@ -251,7 +269,7 @@ class GlobalDataEngine:
         available_capital = max(Decimal("0.0"), portfolio_equity - margin_used)
         buying_power = available_capital * Decimal("2.0")  # 2x standard intraday buying power
 
-        win_rate = (win_count / total_trades * 100.0) if total_trades > 0 else 0.0
+        win_rate = (win_count / eligible_trades * 100.0) if eligible_trades > 0 else ((win_count / total_trades * 100.0) if total_trades > 0 else 0.0)
         profit_factor = (sum_wins / sum_losses) if sum_losses > 0 else (99.9 if sum_wins > 0 else 0.0)
         avg_win = (sum_wins / win_count) if win_count > 0 else 0.0
         avg_loss = (sum_losses / loss_count) if loss_count > 0 else 0.0
@@ -261,7 +279,6 @@ class GlobalDataEngine:
         # 8. Check Reconciliation Status
         recon_status = "RECONCILED"
         if not is_paper:
-            # Live check
             recon_status = "RECONCILED" if len(open_positions) >= 0 else "UNRECONCILED"
 
         snapshot = {
@@ -276,6 +293,7 @@ class GlobalDataEngine:
             "buyingPower": _decimal_round(float(buying_power)),
             "grossRealizedPnl": _decimal_round(float(gross_realized)),
             "netRealizedPnl": _decimal_round(float(net_realized)),
+            "realizedPnl": _decimal_round(float(net_realized)),
             "unrealizedPnl": _decimal_round(float(total_unrealized)),
             "netPnl": _decimal_round(float(net_realized + total_unrealized)),
             "dailyPnl": _decimal_round(float(daily_pnl)),
@@ -285,10 +303,13 @@ class GlobalDataEngine:
             "fees": _decimal_round(float(total_fees)),
             "funding": _decimal_round(float(total_funding)),
             "openPositions": len(open_positions),
+            "openContracts": round(total_contracts, 2),
             "openOrders": open_orders_count,
             "totalTradesCount": total_trades,
             "winningTradesCount": win_count,
             "losingTradesCount": loss_count,
+            "breakevenTradesCount": breakeven_count,
+            "eligibleTradesCount": eligible_trades,
             "winRate": round(win_rate, 2),
             "profitFactor": round(profit_factor, 2),
             "averageWin": round(avg_win, 2),
@@ -325,25 +346,31 @@ class GlobalDataEngine:
 
         rows = []
         try:
-            rows = db.safe_query(
+            raw_pos = db.safe_query(
                 """
-                SELECT * FROM trades_log 
-                WHERE execution_mode = ? AND status IN ('OPEN', 'RUNNING', 'PARTIAL')
-                ORDER BY timestamp DESC
-                """,
-                (trading_mode,),
+                SELECT * FROM positions 
+                WHERE status = 'OPEN' AND quantity > 0
+                ORDER BY updated_at DESC
+                """
             )
+            # Deduplicate by (bot_id, symbol)
+            seen = set()
+            for r in raw_pos:
+                k = (str(r.get("bot_id")), str(r.get("symbol")))
+                if k not in seen:
+                    seen.add(k)
+                    rows.append(r)
         except Exception as e:
             logger.warning("Error fetching positions from database: %s", e)
 
         positions = []
         for r in rows:
-            sym = r.get("symbol", "BTC/USDT")
-            direction = str(r.get("direction") or r.get("side") or "LONG").upper()
-            entry_p = float(r.get("entry_price") or r.get("average_entry_price") or 0.0)
-            qty = float(r.get("position_size") or r.get("entry_quantity") or 0.0)
-            sl = float(r.get("stop_loss") or 0.0)
-            tp = float(r.get("take_profit") or 0.0)
+            sym = str(r.get("symbol") or "BTC/USDT").upper()
+            direction = str(r.get("direction") or "LONG").upper()
+            entry_p = float(r.get("average_entry_price") or r.get("entry_price") or 0.0)
+            qty = float(r.get("quantity") or 0.0)
+            sl = float(r.get("stop_loss") or 0.0) if r.get("stop_loss") else None
+            tp = float(r.get("take_profit") or 0.0) if r.get("take_profit") else None
             fee = float(r.get("fees") or 0.0)
 
             live_p = self.get_latest_price(sym) or entry_p
@@ -356,20 +383,21 @@ class GlobalDataEngine:
             )
 
             positions.append({
-                "id": f"POS-{r.get('id')}",
+                "id": str(r.get("id")),
                 "trade_id": r.get("id"),
                 "symbol": sym,
                 "direction": direction,
                 "entry_price": entry_p,
                 "mark_price": live_p,
                 "quantity": qty,
+                "position_size": qty,
                 "notional_value": round(entry_p * qty, 2),
                 "unrealized_pnl": pnl_data.get("unrealized_pnl", 0.0),
                 "unrealized_pnl_pct": pnl_data.get("unrealized_pnl_pct", 0.0),
-                "stop_loss": sl if sl > 0 else None,
-                "take_profit": tp if tp > 0 else None,
+                "stop_loss": sl,
+                "take_profit": tp,
                 "status": "OPEN",
-                "created_at": r.get("timestamp") or r.get("created_at"),
+                "created_at": r.get("opened_at") or r.get("created_at") or datetime.now(timezone.utc).isoformat(),
                 "bot_id": r.get("bot_id") or "master-paper-bot",
                 "execution_mode": trading_mode,
             })

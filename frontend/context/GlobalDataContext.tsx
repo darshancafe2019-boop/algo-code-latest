@@ -65,7 +65,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
     queryFn: async () => {
       const res = await apiClient.get<{ status: string; positions: PositionItem[] }>(
         `/api/positions?mode=${tradingMode}`,
-        { timeoutMs: 5000 }
+        { timeoutMs: 15000 }
       );
       if (!res.ok || !res.data) {
         throw new Error(res.error?.message || "Failed to fetch positions");
@@ -84,7 +84,7 @@ export function GlobalDataProvider({ children }: { children: React.ReactNode }) 
     queryFn: async () => {
       const res = await apiClient.get<{ status: string; orders: OrderItem[] }>(
         `/api/orders?mode=${tradingMode}&limit=100`,
-        { timeoutMs: 5000 }
+        { timeoutMs: 15000 }
       );
       if (!res.ok || !res.data) {
         throw new Error(res.error?.message || "Failed to fetch orders");

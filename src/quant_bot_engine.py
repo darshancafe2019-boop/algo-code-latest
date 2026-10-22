@@ -583,6 +583,15 @@ class QuantBotEngine:
                 WHERE bot_id = ? AND symbol = ?
             """, (self.bot_id, self.symbol)).fetchone()
 
+            is_closing_order = False
+            closing_qty = 0.0
+            order_realized_pnl = 0.0
+            position_flipped = False
+            flip_qty = 0.0
+            flip_dir = ""
+            cur_dir = "LONG" if side == "BUY" else "SHORT"
+            new_signed = quantity if side == "BUY" else -quantity
+
             if not existing_pos:
                 # Open brand new position
                 new_pos_id = f"POS-{uuid.uuid4().hex[:8].upper()}"
@@ -604,7 +613,7 @@ class QuantBotEngine:
                 cur_entry = float(existing_pos["average_entry_price"] or 0.0)
                 cur_realized = float(existing_pos["realized_pnl"] or 0.0)
 
-                signed_existing = cur_qty if cur_dir == "LONG" else -cur_qty
+                signed_existing = cur_qty if cur_dir == "LONG" else (-cur_qty if cur_dir == "SHORT" else 0.0)
                 signed_order = quantity if side == "BUY" else -quantity
                 new_signed = signed_existing + signed_order
 
@@ -636,9 +645,11 @@ class QuantBotEngine:
 
                 else:
                     # Reducing, closing, or flipping position
+                    is_closing_order = True
                     closing_qty = min(cur_qty, quantity)
                     mult = 1.0 if cur_dir == "LONG" else -1.0
                     trade_realized = (price - cur_entry) * closing_qty * mult
+                    order_realized_pnl = trade_realized
                     new_realized = cur_realized + trade_realized - fees
 
                     if new_signed == 0:
@@ -662,14 +673,15 @@ class QuantBotEngine:
                         """, (new_qty, price, new_realized, unrealized, total_pnl, now_ts, pos_id))
                     else:
                         # Flipped to opposite direction
-                        new_dir = "LONG" if new_signed > 0 else "SHORT"
-                        new_qty = abs(new_signed)
+                        position_flipped = True
+                        flip_qty = abs(new_signed)
+                        flip_dir = "LONG" if new_signed > 0 else "SHORT"
                         conn.execute("""
                             UPDATE positions 
                             SET direction = ?, quantity = ?, average_entry_price = ?, current_price = ?,
                                 realized_pnl = ?, unrealized_pnl = 0.0, total_pnl = ?, updated_at = ?
                             WHERE id = ?
-                        """, (new_dir, new_qty, price, price, new_realized, new_realized, now_ts, pos_id))
+                        """, (flip_dir, flip_qty, price, price, new_realized, new_realized, now_ts, pos_id))
 
             # 4. Log Bot Event
             evt_id = f"EVT-{uuid.uuid4().hex[:12].upper()}"
@@ -698,22 +710,95 @@ class QuantBotEngine:
                     bot_name = self.bot_config.get("name") or self.bot_config.get("bot_name") or self.bot_id
                     strat_name = self.bot_config.get("strategy", {}).get("type") or self.bot_config.get("trading_strategy", {}).get("strategy_name") or "Quant Strategy"
                     strat_id = self.bot_config.get("strategy", {}).get("parameters", {}).get("trading_strategy", {}).get("strategy_id") or "quant_strategy"
-                    gross_pnl = 0.0
-                    net_pnl = -fees
 
-                    conn_algo.execute("""
-                        INSERT INTO trades_log (
-                            timestamp, trade_id, symbol, direction, entry_price, position_size,
-                            status, gross_pnl, net_pnl, fees, result_pnl, execution_mode,
-                            bot_id, bot_instance_id, bot_instance_name, strategy_id, strategy_name,
-                            canonical_symbol, side, position_side, created_at, updated_at
-                        ) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (
-                        now_ts, trade_id, self.symbol, "LONG" if side == "BUY" else "SHORT",
-                        price, quantity, gross_pnl, net_pnl, fees, net_pnl, self.exec_mode,
-                        self.bot_id, self.bot_id, bot_name, strat_id, strat_name,
-                        self.symbol, side, "LONG" if side == "BUY" else "SHORT", now_ts, now_ts
-                    ))
+                    if is_closing_order:
+                        # Close matching open trade(s) in trades_log for this bot & symbol
+                        rem_close = closing_qty
+                        open_trades = conn_algo.execute("""
+                            SELECT id, position_size, entry_price, fees
+                            FROM trades_log
+                            WHERE bot_id = ? AND symbol = ? AND status = 'OPEN'
+                            ORDER BY id ASC
+                        """, (self.bot_id, self.symbol)).fetchall()
+
+                        for ot_id, ot_size, ot_entry, ot_fees in open_trades:
+                            if rem_close <= 0:
+                                break
+                            ot_sz = float(ot_size or 0.0)
+                            ot_en = float(ot_entry or price)
+                            matched_sz = min(ot_sz, rem_close)
+                            rem_close -= matched_sz
+                            pnl_mult = 1.0 if cur_dir == "LONG" else -1.0
+                            t_gross = round((price - ot_en) * matched_sz * pnl_mult, 2)
+                            t_net = round(t_gross - fees, 2)
+
+                            if matched_sz >= ot_sz:
+                                # Full close of this trade log record
+                                conn_algo.execute("""
+                                    UPDATE trades_log
+                                    SET status = 'CLOSED',
+                                        exit_price = ?,
+                                        exit_timestamp = ?,
+                                        exit_quantity = ?,
+                                        gross_pnl = ?,
+                                        net_pnl = ?,
+                                        realized_pnl = ?,
+                                        result_pnl = ?,
+                                        exit_reason = ?,
+                                        updated_at = ?
+                                    WHERE id = ?
+                                """, (price, now_ts, ot_sz, t_gross, t_net, t_net, t_net, reason or "Closed by bot", now_ts, ot_id))
+                            else:
+                                # Partial close - reduce open size
+                                conn_algo.execute("""
+                                    UPDATE trades_log
+                                    SET position_size = ?,
+                                        updated_at = ?
+                                    WHERE id = ?
+                                """, (round(ot_sz - matched_sz, 4), now_ts, ot_id))
+
+                        # If position reached 0, ensure no orphaned open trades remain
+                        if new_signed == 0:
+                            conn_algo.execute("""
+                                UPDATE trades_log
+                                SET status = 'CLOSED',
+                                    exit_price = COALESCE(exit_price, ?),
+                                    exit_timestamp = COALESCE(exit_timestamp, ?),
+                                    exit_reason = COALESCE(exit_reason, ?),
+                                    updated_at = ?
+                                WHERE bot_id = ? AND symbol = ? AND status = 'OPEN'
+                            """, (price, now_ts, reason or "Position flattened", now_ts, self.bot_id, self.symbol))
+
+                        # If position flipped, record the new opposite trade as OPEN
+                        if position_flipped and flip_qty > 0:
+                            conn_algo.execute("""
+                                INSERT INTO trades_log (
+                                    timestamp, trade_id, symbol, direction, entry_price, position_size,
+                                    status, gross_pnl, net_pnl, fees, result_pnl, execution_mode,
+                                    bot_id, bot_instance_id, bot_instance_name, strategy_id, strategy_name,
+                                    canonical_symbol, side, position_side, created_at, updated_at
+                                ) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                now_ts, trade_id, self.symbol, flip_dir,
+                                price, flip_qty, -fees, fees, -fees, self.exec_mode,
+                                self.bot_id, self.bot_id, bot_name, strat_id, strat_name,
+                                self.symbol, side, flip_dir, now_ts, now_ts
+                            ))
+                    else:
+                        # Opening or adding to position
+                        conn_algo.execute("""
+                            INSERT INTO trades_log (
+                                timestamp, trade_id, symbol, direction, entry_price, position_size,
+                                status, gross_pnl, net_pnl, fees, result_pnl, execution_mode,
+                                bot_id, bot_instance_id, bot_instance_name, strategy_id, strategy_name,
+                                canonical_symbol, side, position_side, created_at, updated_at
+                            ) VALUES (?, ?, ?, ?, ?, ?, 'OPEN', 0.0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            now_ts, trade_id, self.symbol, "LONG" if side == "BUY" else "SHORT",
+                            price, quantity, -fees, fees, -fees, self.exec_mode,
+                            self.bot_id, self.bot_id, bot_name, strat_id, strat_name,
+                            self.symbol, side, "LONG" if side == "BUY" else "SHORT", now_ts, now_ts
+                        ))
 
                     with _get_db() as conn_check:
                         pos_row = conn_check.execute("SELECT * FROM positions WHERE bot_id = ? AND symbol = ?", (self.bot_id, self.symbol)).fetchone()

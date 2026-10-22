@@ -13828,6 +13828,17 @@ def get_daily_cookie_max_age() -> int:
     return max(300, min(86400, secs))
 
 
+def _auth_storage_unavailable(request_id: str, operation: str):
+    logger.exception("[AUTH_STORAGE_UNAVAILABLE] request_id=%s operation=%s", request_id, operation)
+    return jsonify({
+        "status": "error",
+        "success": False,
+        "error_code": "AUTH_STORAGE_UNAVAILABLE",
+        "message": "Authentication is temporarily unavailable. Please try again shortly.",
+        "request_id": request_id,
+    }), 503
+
+
 @app.route("/api/auth/login", methods=["POST"])
 def api_auth_login():
     """
@@ -13933,29 +13944,34 @@ def api_auth_login():
         expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
 
         # Store in auth_otp_challenges in PENDING state
-        db.create_auth_otp_challenge(
-            challenge_id=challenge_id,
-            user_id=user["id"],
-            purpose="LOGIN",
-            recipient_email=user_email,
-            otp_hash=otp_hash,
-            expires_at=expires_at,
-            requested_ip=client_ip,
-            request_id=request_id
-        )
+        try:
+            db.create_auth_otp_challenge(
+                challenge_id=challenge_id,
+                user_id=user["id"],
+                purpose="LOGIN",
+                recipient_email=user_email,
+                otp_hash=otp_hash,
+                expires_at=expires_at,
+                requested_ip=client_ip,
+                request_id=request_id
+            )
+        except Exception:
+            return _auth_storage_unavailable(request_id, "create_login_challenge")
 
         masked_dest = _mask_email_address(user_email)
 
         # Real provider check: in non-production development or testing, include dev_otp
         is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
         is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
-        is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
+        is_prod = config.IS_PRODUCTION
         has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-        allow_dev_fallback = (
+        allow_dev_fallback = not is_prod and (
             os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
             or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
         )
-        include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod) or allow_dev_fallback
+        include_dev_otp = not is_prod and (
+            (is_test_mode and not has_real_provider) or is_dev or allow_dev_fallback
+        )
 
         # Dispatch real email via Resend
         email_sent, email_err, msg_id = global_email_service.send_login_otp(
@@ -13968,13 +13984,16 @@ def api_auth_login():
         if not email_sent:
             if include_dev_otp:
                 # In local development mode, activate the challenge so the developer can continue via Dev OTP
-                db.activate_auth_otp_challenge(
-                    challenge_id=challenge_id,
-                    user_id=user["id"],
-                    purpose="LOGIN",
-                    provider_message_id="dev_fallback",
-                    provider_status="DEV_FALLBACK"
-                )
+                try:
+                    db.activate_auth_otp_challenge(
+                        challenge_id=challenge_id,
+                        user_id=user["id"],
+                        purpose="LOGIN",
+                        provider_message_id="dev_fallback",
+                        provider_status="DEV_FALLBACK"
+                    )
+                except Exception:
+                    return _auth_storage_unavailable(request_id, "activate_login_challenge")
                 logger.warning("[LOGIN_EMAIL_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", email_err)
                 return jsonify({
                     "status": "EMAIL_OTP_REQUIRED",
@@ -13996,13 +14015,16 @@ def api_auth_login():
             }), 502
 
         # Resend accepted: Atomically mark ACTIVE, record provider message ID, and invalidate prior active OTPs
-        db.activate_auth_otp_challenge(
-            challenge_id=challenge_id,
-            user_id=user["id"],
-            purpose="LOGIN",
-            provider_message_id=msg_id or "",
-            provider_status="SUBMITTED"
-        )
+        try:
+            db.activate_auth_otp_challenge(
+                challenge_id=challenge_id,
+                user_id=user["id"],
+                purpose="LOGIN",
+                provider_message_id=msg_id or "",
+                provider_status="SUBMITTED"
+            )
+        except Exception:
+            return _auth_storage_unavailable(request_id, "activate_login_challenge")
 
         db.log_security_audit_event(
             action="LOGIN_EMAIL_OTP_DISPATCHED",
@@ -14179,8 +14201,15 @@ def api_auth_email_otp_verify():
                 "message": "Verification code has expired. Please request a new code.",
                 "request_id": request_id
             }), 400
-    except Exception:
-        pass
+    except (TypeError, ValueError, KeyError):
+        logger.warning("[OTP_EXPIRY_INVALID] request_id=%s challenge_id=%s", request_id, actual_challenge_id)
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "CHALLENGE_INVALID",
+            "message": "Authentication challenge is invalid. Please sign in again.",
+            "request_id": request_id
+        }), 400
 
     user = db.get_user_by_id(challenge["user_id"])
     if not user or not user.get("is_active"):
@@ -14224,8 +14253,19 @@ def api_auth_email_otp_verify():
             "request_id": request_id
         }), 401
 
-    # Mark challenge permanently used (consumed)
-    db.mark_auth_otp_challenge_used(actual_challenge_id)
+    # Consume atomically so concurrent requests cannot reuse the same code.
+    try:
+        consumed = db.consume_auth_otp_challenge(actual_challenge_id)
+    except Exception:
+        return _auth_storage_unavailable(request_id, "consume_login_challenge")
+    if not consumed:
+        return jsonify({
+            "status": "error",
+            "success": False,
+            "error_code": "CHALLENGE_INVALID",
+            "message": "Authentication challenge is invalid or has expired. Please sign in again.",
+            "request_id": request_id
+        }), 400
     logger.info("[OTP] Verification successful for user=%s [Challenge ID: %s]", user["username"], actual_challenge_id)
 
     # Issue Authenticated Session
@@ -14378,30 +14418,35 @@ def api_auth_email_otp_resend():
     logger.info("[OTP] OTP generated (6 digits) [New Challenge ID: %s]", new_challenge_id)
 
     # Insert new challenge in PENDING state
-    db.create_auth_otp_challenge(
-        challenge_id=new_challenge_id,
-        user_id=user["id"],
-        purpose=purpose,
-        recipient_email=user_email,
-        otp_hash=otp_hash,
-        expires_at=expires_at,
-        requested_ip=client_ip,
-        request_id=request_id,
-        resend_of=challenge_id or None
-    )
+    try:
+        db.create_auth_otp_challenge(
+            challenge_id=new_challenge_id,
+            user_id=user["id"],
+            purpose=purpose,
+            recipient_email=user_email,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            requested_ip=client_ip,
+            request_id=request_id,
+            resend_of=challenge_id or None
+        )
+    except Exception:
+        return _auth_storage_unavailable(request_id, "create_otp_challenge")
     logger.info("[OTP] OTP stored in PENDING status")
 
     masked_dest = _mask_email_address(user_email)
 
     is_test_mode = bool(os.environ.get("PYTEST_CURRENT_TEST")) or bool(app.config.get("TESTING"))
     is_dev = os.getenv("APP_ENV") == "development" or os.getenv("FLASK_ENV") == "development"
-    is_prod = os.getenv("APP_ENV") == "production" or os.getenv("NODE_ENV") == "production" or os.getenv("FLASK_ENV") == "production"
+    is_prod = config.IS_PRODUCTION
     has_real_provider = bool(config.RESEND_API_KEY or config.SMTP_HOST)
-    allow_dev_fallback = (
+    allow_dev_fallback = not is_prod and (
         os.getenv("AUTH_BOOTSTRAP_ENABLED", "true").lower() in ("true", "1")
         or os.getenv("ALLOW_DEV_OTP", "true").lower() in ("true", "1")
     )
-    include_dev_otp = (is_test_mode and not has_real_provider) or (is_dev and not is_prod) or allow_dev_fallback
+    include_dev_otp = not is_prod and (
+        (is_test_mode and not has_real_provider) or is_dev or allow_dev_fallback
+    )
 
     # Send email through Resend
     logger.info("[OTP] Sending email via configured provider")
@@ -14412,13 +14457,16 @@ def api_auth_email_otp_resend():
 
     if not sent:
         if include_dev_otp:
-            db.activate_auth_otp_challenge(
-                challenge_id=new_challenge_id,
-                user_id=user["id"],
-                purpose=purpose,
-                provider_message_id="dev_fallback",
-                provider_status="DEV_FALLBACK"
-            )
+            try:
+                db.activate_auth_otp_challenge(
+                    challenge_id=new_challenge_id,
+                    user_id=user["id"],
+                    purpose=purpose,
+                    provider_message_id="dev_fallback",
+                    provider_status="DEV_FALLBACK"
+                )
+            except Exception:
+                return _auth_storage_unavailable(request_id, "activate_otp_challenge")
             logger.warning("[OTP_RESEND_DEV_FALLBACK] Email delivery failed (%s), proceeding in dev mode with dev_otp.", err)
             resend_payload = {
                 "status": "success",
@@ -14444,13 +14492,16 @@ def api_auth_email_otp_resend():
         }), 502
 
     # Atomically activate new challenge and invalidate all prior challenges for this user/purpose
-    db.activate_auth_otp_challenge(
-        challenge_id=new_challenge_id,
-        user_id=user["id"],
-        purpose=purpose,
-        provider_message_id=msg_id or "",
-        provider_status="SUBMITTED"
-    )
+    try:
+        db.activate_auth_otp_challenge(
+            challenge_id=new_challenge_id,
+            user_id=user["id"],
+            purpose=purpose,
+            provider_message_id=msg_id or "",
+            provider_status="SUBMITTED"
+        )
+    except Exception:
+        return _auth_storage_unavailable(request_id, "activate_otp_challenge")
     logger.info("[OTP] Email accepted by provider [Message ID: %s] | Challenge activated", msg_id)
 
     resend_payload = {
@@ -14830,16 +14881,19 @@ def api_auth_username_request_otp():
     challenge_id = f"chall_usr_{secrets.token_urlsafe(24)}"
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
 
-    db.create_auth_otp_challenge(
-        challenge_id=challenge_id,
-        user_id=user["id"],
-        purpose="USERNAME_CHANGE",
-        recipient_email=user_email,
-        otp_hash=otp_hash,
-        expires_at=expires_at,
-        requested_ip=client_ip,
-        request_id=request_id
-    )
+    try:
+        db.create_auth_otp_challenge(
+            challenge_id=challenge_id,
+            user_id=user["id"],
+            purpose="USERNAME_CHANGE",
+            recipient_email=user_email,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            requested_ip=client_ip,
+            request_id=request_id
+        )
+    except Exception:
+        return _auth_storage_unavailable(request_id, "create_username_change_challenge")
 
     sent, err, msg_id = global_email_service.send_username_change_otp(
         to_email=user_email,
@@ -14852,23 +14906,33 @@ def api_auth_username_request_otp():
     is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
     no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST) or ("@example.com" in user_email)
 
-    if sent or no_real_provider:
-        db.activate_auth_otp_challenge(
-            challenge_id=challenge_id,
-            user_id=user["id"],
-            purpose="USERNAME_CHANGE",
-            provider_message_id=msg_id or "",
-            provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
-        )
+    dev_fallback = not config.IS_PRODUCTION and no_real_provider
+    if sent or dev_fallback:
+        try:
+            db.activate_auth_otp_challenge(
+                challenge_id=challenge_id,
+                user_id=user["id"],
+                purpose="USERNAME_CHANGE",
+                provider_message_id=msg_id or "",
+                provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
+            )
+        except Exception:
+            return _auth_storage_unavailable(request_id, "activate_username_change_challenge")
     else:
         db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=err or "")
+        return jsonify({
+            "status": "error",
+            "error_code": "EMAIL_DELIVERY_FAILED",
+            "message": "We couldn't deliver the verification code. Please try again later.",
+            "request_id": request_id
+        }), 502
 
     masked_dest = _mask_email_address(user_email)
 
     db.log_security_audit_event(
         action="USERNAME_CHANGE_OTP_REQUESTED",
         actor_user_id=user["id"],
-        result="SUCCESS" if (sent or no_real_provider) else "FAILED",
+        result="SUCCESS" if (sent or dev_fallback) else "FAILED",
         ip_address=client_ip,
         details={"challenge_id": challenge_id, "new_username": new_username}
     )
@@ -14882,7 +14946,7 @@ def api_auth_username_request_otp():
         "request_id": request_id
     }
 
-    if no_real_provider or is_dev_console:
+    if dev_fallback:
         resp_payload["dev_otp"] = otp_code
         resp_payload["dev_mode"] = True
 
@@ -14936,8 +15000,8 @@ def api_auth_username_change():
         if exp < datetime.now(timezone.utc):
             db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
             return jsonify({"status": "error", "error_code": "EXPIRED", "message": "Verification code has expired. Please request a new one."}), 400
-    except Exception:
-        pass
+    except (TypeError, ValueError, KeyError):
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
 
     attempts = challenge.get("attempt_count", 0)
     if attempts >= 5:
@@ -14955,8 +15019,12 @@ def api_auth_username_change():
             "remaining_attempts": remaining
         }), 401
 
-    # Consume challenge
-    db.mark_auth_otp_challenge_used(challenge_id)
+    try:
+        consumed = db.consume_auth_otp_challenge(challenge_id)
+    except Exception:
+        return _auth_storage_unavailable(request_id, "consume_username_change_challenge")
+    if not consumed:
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
 
     # Perform DB update
     old_username = user["username"]
@@ -15029,16 +15097,19 @@ def api_auth_password_request_change_otp():
     challenge_id = f"chall_pwc_{secrets.token_urlsafe(24)}"
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat()
 
-    db.create_auth_otp_challenge(
-        challenge_id=challenge_id,
-        user_id=user["id"],
-        purpose="PASSWORD_CHANGE",
-        recipient_email=user_email,
-        otp_hash=otp_hash,
-        expires_at=expires_at,
-        requested_ip=client_ip,
-        request_id=request_id
-    )
+    try:
+        db.create_auth_otp_challenge(
+            challenge_id=challenge_id,
+            user_id=user["id"],
+            purpose="PASSWORD_CHANGE",
+            recipient_email=user_email,
+            otp_hash=otp_hash,
+            expires_at=expires_at,
+            requested_ip=client_ip,
+            request_id=request_id
+        )
+    except Exception:
+        return _auth_storage_unavailable(request_id, "create_password_change_challenge")
 
     sent, err, msg_id = global_email_service.send_password_change_otp(
         to_email=user_email,
@@ -15050,23 +15121,33 @@ def api_auth_password_request_change_otp():
     is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
     no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST) or ("@example.com" in user_email)
 
-    if sent or no_real_provider:
-        db.activate_auth_otp_challenge(
-            challenge_id=challenge_id,
-            user_id=user["id"],
-            purpose="PASSWORD_CHANGE",
-            provider_message_id=msg_id or "",
-            provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
-        )
+    dev_fallback = not config.IS_PRODUCTION and no_real_provider
+    if sent or dev_fallback:
+        try:
+            db.activate_auth_otp_challenge(
+                challenge_id=challenge_id,
+                user_id=user["id"],
+                purpose="PASSWORD_CHANGE",
+                provider_message_id=msg_id or "",
+                provider_status="SUBMITTED" if sent else "DEV_ACTIVE"
+            )
+        except Exception:
+            return _auth_storage_unavailable(request_id, "activate_password_change_challenge")
     else:
         db.mark_auth_otp_challenge_send_failed(challenge_id, error_details=err or "")
+        return jsonify({
+            "status": "error",
+            "error_code": "EMAIL_DELIVERY_FAILED",
+            "message": "We couldn't deliver the verification code. Please try again later.",
+            "request_id": request_id
+        }), 502
 
     masked_dest = _mask_email_address(user_email)
 
     db.log_security_audit_event(
         action="PASSWORD_CHANGE_OTP_REQUESTED",
         actor_user_id=user["id"],
-        result="SUCCESS" if (sent or no_real_provider) else "FAILED",
+        result="SUCCESS" if (sent or dev_fallback) else "FAILED",
         ip_address=client_ip,
         details={"challenge_id": challenge_id}
     )
@@ -15079,7 +15160,7 @@ def api_auth_password_request_change_otp():
         "request_id": request_id
     }
 
-    if no_real_provider or is_dev_console:
+    if dev_fallback:
         resp_payload["dev_otp"] = otp_code
         resp_payload["dev_mode"] = True
 
@@ -15135,8 +15216,8 @@ def api_auth_password_change_with_otp():
         if exp < datetime.now(timezone.utc):
             db.safe_execute("UPDATE auth_otp_challenges SET status = 'EXPIRED' WHERE id = ?", (challenge_id,))
             return jsonify({"status": "error", "error_code": "EXPIRED", "message": "Verification code has expired. Please request a new one."}), 400
-    except Exception:
-        pass
+    except (TypeError, ValueError, KeyError):
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
 
     attempts = challenge.get("attempt_count", 0)
     if attempts >= 5:
@@ -15154,8 +15235,12 @@ def api_auth_password_change_with_otp():
             "remaining_attempts": remaining
         }), 401
 
-    # Consume challenge
-    db.mark_auth_otp_challenge_used(challenge_id)
+    try:
+        consumed = db.consume_auth_otp_challenge(challenge_id)
+    except Exception:
+        return _auth_storage_unavailable(request_id, "consume_password_change_challenge")
+    if not consumed:
+        return jsonify({"status": "error", "error_code": "INVALID_CHALLENGE", "message": "Verification challenge invalid or expired."}), 400
 
     # Hash new password with fresh salt
     new_hash, new_salt = PasswordManager.hash_password(new_password)
@@ -15548,7 +15633,7 @@ def api_auth_password_forgot():
     }
     is_dev_console = (config.EMAIL_PROVIDER or "console").strip().lower() not in ("resend", "smtp")
     no_real_provider = is_dev_console or (not config.RESEND_API_KEY and not config.SMTP_HOST)
-    if no_real_provider and user and otp_code:
+    if not config.IS_PRODUCTION and no_real_provider and user and otp_code:
         response_payload["dev_otp"] = otp_code
         response_payload["dev_mode"] = True
 
@@ -15615,8 +15700,13 @@ def api_auth_password_verify_reset_otp():
                 "message": "Reset code has expired. Please request a new one.",
                 "request_id": request_id
             }), 400
-    except Exception:
-        pass
+    except (TypeError, ValueError, KeyError):
+        return jsonify({
+            "status": "error",
+            "error_code": "INVALID_CHALLENGE",
+            "message": "Reset verification challenge invalid or expired.",
+            "request_id": request_id
+        }), 400
 
     attempts = challenge.get("attempt_count", 0)
     if attempts >= 5:
@@ -15640,8 +15730,17 @@ def api_auth_password_verify_reset_otp():
             "request_id": request_id
         }), 401
 
-    # Mark OTP challenge consumed
-    db.mark_auth_otp_challenge_used(challenge_id)
+    try:
+        consumed = db.consume_auth_otp_challenge(challenge_id)
+    except Exception:
+        return _auth_storage_unavailable(request_id, "consume_password_reset_challenge")
+    if not consumed:
+        return jsonify({
+            "status": "error",
+            "error_code": "INVALID_CHALLENGE",
+            "message": "Reset verification challenge invalid or expired.",
+            "request_id": request_id
+        }), 400
 
     # Issue 10-minute password reset authorization token
     raw_reset_token = f"rst_{secrets.token_urlsafe(32)}"

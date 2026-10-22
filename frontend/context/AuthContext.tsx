@@ -526,6 +526,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       const data = await res.json();
+      const requestId =
+        data.request_id || data.requestId || data.error?.requestId;
+      const errorMessage =
+        data.message ||
+        data.error?.message ||
+        "Failed to send verification code.";
+      const diagnosticMessage =
+        !res.ok && requestId
+          ? `${errorMessage} (Request ID: ${requestId})`
+          : errorMessage;
+
       if (res.ok && (data.status === "success" || data.success === true)) {
         return {
           success: true,
@@ -539,8 +550,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return {
         success: false,
-        message: data.message || "Failed to send verification code.",
-        error: data.message,
+        message: diagnosticMessage,
+        error: diagnosticMessage,
         cooldown_seconds: data.cooldown_seconds || 60,
       };
     } catch (err: any) {

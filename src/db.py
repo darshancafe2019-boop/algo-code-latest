@@ -11841,6 +11841,7 @@ def revoke_all_user_reset_tokens(user_id: str) -> bool:
     )
 
 
+@with_db_retry(max_retries=5)
 def create_auth_otp_challenge(
     challenge_id: str,
     user_id: str,
@@ -11852,10 +11853,11 @@ def create_auth_otp_challenge(
     request_id: str = "",
     resend_of: Optional[str] = None
 ) -> bool:
-    """Inserts a new single-use hashed auth OTP challenge in PENDING state."""
+    """Atomically inserts a new hashed OTP challenge and its legacy mirror."""
     now_iso = datetime.now(timezone.utc).isoformat()
-    ok = safe_execute(
-        """
+    with get_authoritative_connection() as conn:
+        conn.execute(
+            """
         INSERT INTO auth_otp_challenges (
             id, user_id, purpose, recipient_email, otp_hash, status, provider,
             provider_message_id, provider_status, created_at, expires_at, activated_at,
@@ -11863,20 +11865,23 @@ def create_auth_otp_challenge(
             request_ip, request_id, used_at
         ) VALUES (?, ?, ?, ?, ?, 'PENDING', 'resend', '', 'PENDING', ?, ?, NULL, NULL, 0, NULL, ?, 0, ?, ?, NULL)
         """,
-        (challenge_id, user_id, purpose, recipient_email, otp_hash, now_iso, expires_at, resend_of or "", requested_ip, request_id)
-    )
-    # Also sync legacy email_otp_challenges table
-    safe_execute(
-        """
+            (
+                challenge_id, user_id, purpose, recipient_email, otp_hash,
+                now_iso, expires_at, resend_of or "", requested_ip, request_id,
+            ),
+        )
+        conn.execute(
+            """
         INSERT INTO email_otp_challenges (
             id, user_id, purpose, otp_hash, created_at, expires_at, used_at, attempt_count, requested_ip, request_id
         ) VALUES (?, ?, ?, ?, ?, ?, NULL, 0, ?, ?)
         """,
-        (challenge_id, user_id, purpose, otp_hash, now_iso, expires_at, requested_ip, request_id)
-    )
-    return ok
+            (challenge_id, user_id, purpose, otp_hash, now_iso, expires_at, requested_ip, request_id),
+        )
+    return True
 
 
+@with_db_retry(max_retries=5)
 def activate_auth_otp_challenge(
     challenge_id: str,
     user_id: str,
@@ -11889,28 +11894,29 @@ def activate_auth_otp_challenge(
     Enforces that exactly ONE challenge for (user_id, purpose) is ACTIVE.
     """
     now_iso = datetime.now(timezone.utc).isoformat()
-    # 1. Invalidate all existing ACTIVE challenges for this user/purpose
-    safe_execute(
-        """
-        UPDATE auth_otp_challenges
-        SET status = 'INVALIDATED'
-        WHERE user_id = ? AND purpose = ? AND status = 'ACTIVE' AND id != ?
-        """,
-        (user_id, purpose, challenge_id)
-    )
-    # 2. Mark this challenge ACTIVE
-    ok = safe_execute(
-        """
-        UPDATE auth_otp_challenges
-        SET status = 'ACTIVE',
-            provider_message_id = ?,
-            provider_status = ?,
-            activated_at = ?
-        WHERE id = ?
-        """,
-        (provider_message_id, provider_status, now_iso, challenge_id)
-    )
-    return ok
+    with get_authoritative_connection() as conn:
+        result = conn.execute(
+            """
+            UPDATE auth_otp_challenges
+            SET status = 'ACTIVE',
+                provider_message_id = ?,
+                provider_status = ?,
+                activated_at = ?
+            WHERE id = ? AND user_id = ? AND purpose = ? AND status = 'PENDING'
+            """,
+            (provider_message_id, provider_status, now_iso, challenge_id, user_id, purpose),
+        )
+        if result.rowcount != 1:
+            return False
+        conn.execute(
+            """
+            UPDATE auth_otp_challenges
+            SET status = 'INVALIDATED'
+            WHERE user_id = ? AND purpose = ? AND status = 'ACTIVE' AND id != ?
+            """,
+            (user_id, purpose, challenge_id),
+        )
+    return True
 
 
 def mark_auth_otp_challenge_send_failed(challenge_id: str, error_details: str = "") -> bool:
@@ -11980,6 +11986,29 @@ def mark_auth_otp_challenge_used(challenge_id: str) -> bool:
     )
     ok2 = safe_execute("UPDATE email_otp_challenges SET used_at = ? WHERE id = ?", (now_iso, challenge_id))
     return ok1 or ok2
+
+
+@with_db_retry(max_retries=5)
+def consume_auth_otp_challenge(challenge_id: str, now_iso: Optional[str] = None) -> bool:
+    """Atomically consumes an active, unexpired OTP once and updates the legacy mirror."""
+    consumed_at = now_iso or datetime.now(timezone.utc).isoformat()
+    with get_authoritative_connection() as conn:
+        result = conn.execute(
+            """
+            UPDATE auth_otp_challenges
+            SET status = 'USED', used_at = ?, verified_at = ?
+            WHERE id = ? AND status = 'ACTIVE' AND used_at IS NULL
+              AND expires_at > ? AND attempt_count < 5
+            """,
+            (consumed_at, consumed_at, challenge_id, consumed_at),
+        )
+        if result.rowcount != 1:
+            return False
+        conn.execute(
+            "UPDATE email_otp_challenges SET used_at = ? WHERE id = ?",
+            (consumed_at, challenge_id),
+        )
+    return True
 
 
 def invalidate_user_auth_otp_challenges(user_id: str, purpose: str) -> bool:
@@ -12840,10 +12869,6 @@ def purge_all_expired_records(current_time_iso: Optional[str] = None) -> Dict[st
         cursor.execute("DELETE FROM pending_signal_approvals WHERE expires_at < ?", (current_time_iso,))
         results["pending_signal_approvals"] = cursor.rowcount
     return results
-
-
-
-
 
 
 

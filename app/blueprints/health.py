@@ -72,14 +72,36 @@ def get_readiness():
     # 1. Authoritative Database Probe
     db_status = "ERROR"
     db_pool_info = {}
+    database_engine = "postgresql" if config.IS_POSTGRES else "sqlite"
     try:
         from src.db import safe_query_one, get_db_pool_stats
-        db_pool_info = get_db_pool_stats()
+        pool_stats = get_db_pool_stats()
+        db_pool_info = {
+            key: pool_stats[key]
+            for key in (
+                "configured",
+                "engine",
+                "status",
+                "pool_min",
+                "pool_max",
+                "pool_size",
+                "pool_available",
+                "requests_waiting",
+                "requests_queued",
+                "connection_errors",
+                "usage_ms",
+            )
+            if key in pool_stats
+        }
         row = safe_query_one("SELECT 1 AS alive")
         if row and (row.get("alive") == 1 or list(row.values())[0] == 1):
             db_status = "HEALTHY"
     except Exception as exc:
-        logger.exception("Readiness probe database error: %s", exc)
+        logger.error(
+            "Readiness probe database error; request_id=%s exception_type=%s",
+            getattr(request, "request_id", ""),
+            type(exc).__name__,
+        )
         db_status = "ERROR"
 
     # 2. Market Data Gateway Probe
@@ -123,6 +145,7 @@ def get_readiness():
         "overall_status": overall_status,
         "backend": True,
         "mode": mode,
+        "database_engine": database_engine,
         "services": {
             "backend": {
                 "status": "HEALTHY",

@@ -26,6 +26,12 @@ services:
         value: "false"
       - key: AUTH_REQUIRE_LOGIN
         value: "true"
+      - key: AUTH_BOOTSTRAP_ENABLED
+        value: "true"
+      - key: AUTH_BOOTSTRAP_USERNAME
+        value: admin
+      - key: AUTH_BOOTSTRAP_PASSWORD
+        sync: false
       - key: EMAIL_PROVIDER
         value: resend
       - key: AUTH_ADMIN_EMAIL
@@ -33,7 +39,7 @@ services:
       - key: AUTH_BOOTSTRAP_EMAIL
         sync: false
       - key: AUTH_EMAIL_FROM
-        value: onboarding@resend.dev
+        sync: false
       - key: DATABASE_URL
         sync: false
       - key: RESEND_API_KEY

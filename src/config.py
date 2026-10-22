@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 def _load_env_fallback(file_path: Path):
     """Simple parser for KEY=VALUE pairs when python-dotenv is not present."""
@@ -111,11 +112,40 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Database Configuration (PostgreSQL / SQLite)
 _raw_db_url = os.getenv("DATABASE_URL", "").strip()
-_has_pg_url = _raw_db_url.startswith("postgresql://") or _raw_db_url.startswith("postgres://")
+try:
+    _parsed_db_url = urlsplit(_raw_db_url)
+    _has_pg_url = (
+        _parsed_db_url.scheme in ("postgresql", "postgres")
+        and bool(_parsed_db_url.hostname)
+        and bool(_parsed_db_url.path.strip("/"))
+    )
+except ValueError:
+    _has_pg_url = False
 _force_sqlite = os.getenv("FORCE_SQLITE", "").lower() in ("true", "1", "yes")
 
-_is_production = os.getenv("APP_ENV", "").lower() == "production" or os.getenv("FLASK_ENV", "").lower() == "production"
-DATABASE_PROVIDER = os.getenv("DATABASE_PROVIDER", "postgresql" if _has_pg_url and not _force_sqlite else "sqlite").lower()
+IS_PRODUCTION = (
+    os.getenv("APP_ENV", "").lower() == "production"
+    or os.getenv("FLASK_ENV", "").lower() == "production"
+    or os.getenv("NODE_ENV", "").lower() == "production"
+    or os.getenv("RENDER", "").lower() == "true"
+    or bool(os.getenv("RENDER_SERVICE_ID"))
+)
+_is_production = IS_PRODUCTION
+DATABASE_PROVIDER = os.getenv(
+    "DATABASE_PROVIDER",
+    "postgresql" if _has_pg_url and not _force_sqlite else "sqlite",
+).strip().lower()
+
+if IS_PRODUCTION:
+    if _force_sqlite:
+        raise RuntimeError(
+            "FATAL CONFIGURATION ERROR: FORCE_SQLITE cannot be enabled in production."
+        )
+    if DATABASE_PROVIDER != "postgresql" or not _has_pg_url:
+        raise RuntimeError(
+            "FATAL CONFIGURATION ERROR: Production requires DATABASE_PROVIDER=postgresql "
+            "and a valid PostgreSQL DATABASE_URL. SQLite fallback is disabled."
+        )
 
 if _force_sqlite:
     DATABASE_URL = f"sqlite:///{DB_PATH.as_posix()}"

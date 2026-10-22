@@ -18,6 +18,10 @@ import hashlib
 import hmac
 import json
 import secrets
+import os
+import sqlite3
+import subprocess
+import sys
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
@@ -111,6 +115,33 @@ def test_unauthenticated_me_returns_200_not_401(client):
     assert data["status"] == "success"
     assert data["authenticated"] is False
     assert data["user"] is None
+
+
+def test_readiness_reports_configured_database_engine(client):
+    response = client.get("/health/ready")
+    assert response.status_code == 200
+    payload = response.get_json()
+    expected_engine = "postgresql" if config.IS_POSTGRES else "sqlite"
+    assert payload["database_engine"] == expected_engine
+    assert payload["services"]["database"]["pool"]["engine"] in (
+        "sqlite",
+        "postgres_no_pool",
+        "postgresql",
+    )
+
+
+def test_readiness_fails_closed_without_database_connection(client, monkeypatch):
+    monkeypatch.setattr(
+        "src.db.safe_query_one",
+        lambda *args, **kwargs: (_ for _ in ()).throw(OSError("private db detail")),
+    )
+
+    response = client.get("/health/ready")
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["services"]["database"]["status"] == "ERROR"
+    assert "private db detail" not in response.get_data(as_text=True)
 
 
 def test_login_invalid_password(client):
@@ -261,12 +292,17 @@ def test_atomic_single_active_challenge_on_resend(client):
         assert verify_new.get_json()["status"] == "success"
 
 
-def test_resend_failure_does_not_activate_challenge(client):
+def test_resend_failure_does_not_activate_challenge(client, monkeypatch):
     """
     Test Resend failure handling:
     If Resend API returns an error, the challenge must be marked SEND_FAILED, not ACTIVE,
     and no fake success message is presented.
     """
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("FLASK_ENV", "production")
+    monkeypatch.setenv("NODE_ENV", "production")
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+
     def mock_send_login_otp_failure(to_email, otp_code, username=None, user_id=None):
         return False, "Resend 403 Forbidden: Unverified Domain", None
 
@@ -281,6 +317,243 @@ def test_resend_failure_does_not_activate_challenge(client):
         data = res.get_json()
         assert data["status"] == "EMAIL_DELIVERY_FAILED"
         assert "couldn't deliver" in data["message"].lower() or "not send" in data["message"].lower()
+
+
+@pytest.mark.parametrize(
+    ("path", "payload"),
+    [
+        (
+            "/api/auth/login",
+            {"username": "admin", "password": "AdminSecurePassword2026!"},
+        ),
+        ("/api/auth/send-otp", {"email": TARGET_ADMIN_EMAIL}),
+    ],
+)
+def test_production_email_failure_never_returns_dev_otp(client, monkeypatch, path, payload):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("FLASK_ENV", "production")
+    monkeypatch.setenv("NODE_ENV", "production")
+    monkeypatch.setenv("AUTH_BOOTSTRAP_ENABLED", "true")
+    monkeypatch.setenv("ALLOW_DEV_OTP", "true")
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+
+    with patch(
+        "dashboard.global_email_service.send_login_otp",
+        return_value=(False, "Resend unavailable", None),
+    ):
+        response = client.post(path, json=payload, headers={"X-Unauthenticated": "true"})
+
+    assert response.status_code == 502
+    data = response.get_json()
+    assert data["error_code"] == "EMAIL_DELIVERY_FAILED"
+    assert "dev_otp" not in data
+
+
+def test_otp_challenge_storage_failure_returns_safe_request_id(client, monkeypatch):
+    monkeypatch.setattr(
+        "dashboard.db.create_auth_otp_challenge",
+        lambda **kwargs: (_ for _ in ()).throw(OSError("private storage detail")),
+    )
+
+    response = client.post(
+        "/api/auth/login",
+        json={"username": "admin", "password": "AdminSecurePassword2026!"},
+        headers={"X-Unauthenticated": "true"},
+    )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error_code"] == "AUTH_STORAGE_UNAVAILABLE"
+    assert payload["request_id"].startswith("req_")
+    assert "private storage detail" not in response.get_data(as_text=True)
+
+
+def test_send_otp_storage_failure_returns_safe_request_id(client, monkeypatch):
+    monkeypatch.setattr(
+        "dashboard.db.create_auth_otp_challenge",
+        lambda **kwargs: (_ for _ in ()).throw(OSError("private storage detail")),
+    )
+
+    response = client.post(
+        "/api/auth/send-otp",
+        json={"email": TARGET_ADMIN_EMAIL},
+        headers={"X-Unauthenticated": "true"},
+    )
+
+    assert response.status_code == 503
+    payload = response.get_json()
+    assert payload["error_code"] == "AUTH_STORAGE_UNAVAILABLE"
+    assert payload["request_id"].startswith("req_")
+    assert "private storage detail" not in response.get_data(as_text=True)
+
+
+def test_otp_challenge_creation_rolls_back_both_tables():
+    challenge_id = f"test_atomic_{uuid.uuid4().hex}"
+    trigger_name = f"test_fail_legacy_{uuid.uuid4().hex}"
+    with db.get_authoritative_connection() as conn:
+        conn.execute(
+            f"""
+            CREATE TRIGGER {trigger_name}
+            BEFORE INSERT ON email_otp_challenges
+            WHEN NEW.id = '{challenge_id}'
+            BEGIN
+                SELECT RAISE(ABORT, 'intentional test failure');
+            END
+            """
+        )
+
+    try:
+        with pytest.raises(sqlite3.IntegrityError):
+            db.create_auth_otp_challenge(
+                challenge_id=challenge_id,
+                user_id="usr_atomic_test",
+                purpose="LOGIN",
+                recipient_email=TARGET_ADMIN_EMAIL,
+                otp_hash="hashed-test-code",
+                expires_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+            )
+        assert db.get_auth_otp_challenge(challenge_id) is None
+    finally:
+        with db.get_authoritative_connection() as conn:
+            conn.execute(f"DROP TRIGGER IF EXISTS {trigger_name}")
+
+
+def test_otp_challenge_consumption_is_single_use():
+    challenge_id = f"test_consume_{uuid.uuid4().hex}"
+    db.create_auth_otp_challenge(
+        challenge_id=challenge_id,
+        user_id="usr_atomic_test",
+        purpose="LOGIN",
+        recipient_email=TARGET_ADMIN_EMAIL,
+        otp_hash="hashed-test-code",
+        expires_at=(datetime.now(timezone.utc) + timedelta(minutes=5)).isoformat(),
+    )
+    assert db.activate_auth_otp_challenge(challenge_id, "usr_atomic_test", "LOGIN")
+    assert db.consume_auth_otp_challenge(challenge_id)
+    assert not db.consume_auth_otp_challenge(challenge_id)
+    assert db.get_auth_otp_challenge(challenge_id)["status"] == "USED"
+
+
+def test_malformed_otp_expiration_fails_closed(client):
+    challenge_id = f"test_expiry_{uuid.uuid4().hex}"
+    admin = db.get_user_by_username("admin")
+    db.create_auth_otp_challenge(
+        challenge_id=challenge_id,
+        user_id=admin["id"],
+        purpose="LOGIN",
+        recipient_email=TARGET_ADMIN_EMAIL,
+        otp_hash=hashlib.sha256(b"123456").hexdigest(),
+        expires_at="not-a-timestamp",
+    )
+    db.activate_auth_otp_challenge(challenge_id, admin["id"], "LOGIN")
+
+    response = client.post(
+        "/api/auth/email-otp/verify",
+        json={"challenge_id": challenge_id, "otp": "123456"},
+        headers={"X-Unauthenticated": "true"},
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error_code"] == "CHALLENGE_INVALID"
+
+
+@pytest.mark.parametrize(
+    ("provider", "force_sqlite"),
+    [("sqlite", "false"), ("postgresql", "true"), ("postgresql", "false")],
+)
+def test_production_database_configuration_rejects_sqlite(provider, force_sqlite):
+    env = os.environ.copy()
+    for key in ("RENDER", "RENDER_SERVICE_ID"):
+        env.pop(key, None)
+    env.update({
+        "APP_ENV": "production",
+        "FLASK_ENV": "production",
+        "DATABASE_URL": "",
+        "DATABASE_PROVIDER": provider,
+        "FORCE_SQLITE": force_sqlite,
+        "AUTH_SESSION_SECRET": "test-session-secret-for-production-config",
+        "AUTH_TOTP_ENCRYPTION_KEY": "test-totp-encryption-key-not-a-real-secret",
+    })
+    result = subprocess.run(
+        [sys.executable, "-c", "import src.config"],
+        cwd=os.getcwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode != 0
+    assert "SQLite fallback is disabled" in result.stderr or "FORCE_SQLITE" in result.stderr
+
+
+def test_production_database_configuration_selects_postgresql():
+    env = os.environ.copy()
+    env.update({
+        "APP_ENV": "production",
+        "FLASK_ENV": "production",
+        "DATABASE_PROVIDER": "postgresql",
+        "DATABASE_URL": "postgresql://quantos@db.example.invalid:5432/quantos",
+        "FORCE_SQLITE": "false",
+        "AUTH_SESSION_SECRET": "test-session-secret-for-production-config",
+        "AUTH_TOTP_ENCRYPTION_KEY": "test-totp-encryption-key-not-a-real-secret",
+    })
+    result = subprocess.run(
+        [sys.executable, "-c", "from src import config; print(config.IS_POSTGRES)"],
+        cwd=os.getcwd(),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "True"
+
+
+def test_production_email_configuration_fails_closed(monkeypatch, tmp_path):
+    from src.email_service import ConsoleLogEmailProvider, EmailService, UnavailableEmailProvider
+
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+    monkeypatch.setattr(config, "EMAIL_PROVIDER", "console")
+    monkeypatch.setattr(config, "RESEND_API_KEY", "")
+    monkeypatch.setattr(config, "SMTP_HOST", "")
+    provider = EmailService().get_provider()
+    assert isinstance(provider, UnavailableEmailProvider)
+
+    console = ConsoleLogEmailProvider(tmp_path / "outbox.log")
+    sent, error, _ = console.send_email(
+        TARGET_ADMIN_EMAIL, "OTP", "code", "code"
+    )
+    assert not sent
+    assert error
+    assert not (tmp_path / "outbox.log").exists()
+
+
+def test_production_email_requires_explicit_sender(monkeypatch):
+    from src.email_service import EmailService, ResendEmailProvider, UnavailableEmailProvider
+
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+    monkeypatch.setattr(config, "EMAIL_PROVIDER", "resend")
+    monkeypatch.setattr(config, "RESEND_API_KEY", "test-resend-key")
+    for name in ("OTP_FROM_EMAIL", "AUTH_EMAIL_FROM", "RESEND_FROM_EMAIL"):
+        monkeypatch.delenv(name, raising=False)
+    assert isinstance(EmailService().get_provider(), UnavailableEmailProvider)
+
+    monkeypatch.setenv("AUTH_EMAIL_FROM", "security@example.com")
+    monkeypatch.setattr(config, "AUTH_EMAIL_FROM", "security@example.com")
+    monkeypatch.setattr(config, "OTP_FROM_EMAIL", "security@example.com")
+    assert isinstance(EmailService().get_provider(), ResendEmailProvider)
+
+
+def test_production_bootstrap_without_password_does_not_create_admin(monkeypatch):
+    from src.security_auth import SecurityAuthManager
+
+    monkeypatch.setattr(config, "IS_PRODUCTION", True)
+    monkeypatch.setenv("AUTH_BOOTSTRAP_ENABLED", "true")
+    monkeypatch.delenv("AUTH_BOOTSTRAP_PASSWORD", raising=False)
+    monkeypatch.setattr("src.security_auth.db.init_db", lambda: None)
+    with patch("src.security_auth.db.upsert_user") as upsert_user:
+        SecurityAuthManager.initialize_bootstrap_admin()
+    upsert_user.assert_not_called()
 
 
 def test_resend_email_otp_cooldown(client):

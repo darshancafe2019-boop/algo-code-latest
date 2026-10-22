@@ -569,7 +569,7 @@ class SecurityAuthManager:
         db.init_db()
 
         enabled_raw = os.environ.get("AUTH_BOOTSTRAP_ENABLED", "").strip().lower()
-        is_prod = os.environ.get("NODE_ENV") == "production" or os.environ.get("FLASK_ENV") == "production"
+        is_prod = bool(getattr(config, "IS_PRODUCTION", False))
         if enabled_raw:
             is_enabled = enabled_raw in ["true", "1", "yes"]
         else:
@@ -591,12 +591,15 @@ class SecurityAuthManager:
                     "Production bootstrap error: AUTH_BOOTSTRAP_PASSWORD environment variable is not configured. "
                     "Halting administrator auto-creation to prevent insecure credentials."
                 )
+                return
         if is_prod:
             explicit_email = os.environ.get("AUTH_ADMIN_EMAIL") or os.environ.get("AUTH_BOOTSTRAP_EMAIL")
             if not explicit_email:
-                logging.getLogger(__name__).warning(
-                    "Production security notice: AUTH_ADMIN_EMAIL or AUTH_BOOTSTRAP_EMAIL must be explicitly configured in production environment."
+                logging.getLogger(__name__).error(
+                    "Production bootstrap error: AUTH_ADMIN_EMAIL or AUTH_BOOTSTRAP_EMAIL must be explicitly configured. "
+                    "Halting administrator bootstrap to avoid assigning an unintended address."
                 )
+                return
             enc_key = os.environ.get("AUTH_TOTP_ENCRYPTION_KEY") or getattr(config, "AUTH_TOTP_ENCRYPTION_KEY", None)
             if not enc_key or enc_key == "algo-crypto-secret-key-32bytes!!":
                 logging.getLogger(__name__).warning(

@@ -16,6 +16,7 @@ import smtplib
 import uuid
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
+from email.utils import parseaddr
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
@@ -24,6 +25,21 @@ from typing import Any, Dict, Optional, Tuple
 from src import config, db
 
 logger = logging.getLogger("email_service")
+
+
+def _has_valid_production_sender() -> bool:
+    sender_is_explicit = any(
+        os.getenv(name, "").strip()
+        for name in ("OTP_FROM_EMAIL", "AUTH_EMAIL_FROM", "RESEND_FROM_EMAIL")
+    )
+    sender = config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or config.RESEND_FROM_EMAIL or ""
+    sender_address = parseaddr(sender)[1]
+    return (
+        sender_is_explicit
+        and "@" in sender_address
+        and "." in sender_address.rsplit("@", 1)[-1]
+    )
+
 
 def get_target_admin_email() -> str:
     """Returns authoritative administrator recipient email from configuration."""
@@ -108,6 +124,10 @@ class ConsoleLogEmailProvider(BaseEmailProvider):
         text_content: str,
         from_email: Optional[str] = None
     ) -> Tuple[bool, Optional[str], Optional[str]]:
+        if config.IS_PRODUCTION:
+            logger.error("[EMAIL_CONSOLE_DISABLED] Console email delivery is disabled in production.")
+            return False, "Console email delivery is disabled in production.", None
+
         timestamp = datetime.now(timezone.utc).isoformat()
         sender = from_email or config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or "Quant.OS Security <security@algotrading.local>"
         mock_id = f"mock_{uuid.uuid4().hex[:12]}"
@@ -130,6 +150,24 @@ class ConsoleLogEmailProvider(BaseEmailProvider):
 
         logger.info("[OUTBOX DEV EMAIL] To: %s | Subject: %s | ID: %s", mask_email_address(to_email), subject, mock_id)
         return True, None, mock_id
+
+
+class UnavailableEmailProvider(BaseEmailProvider):
+    """Fail-closed provider used when production email configuration is incomplete."""
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    def send_email(
+        self,
+        to_email: str,
+        subject: str,
+        html_content: str,
+        text_content: str,
+        from_email: Optional[str] = None
+    ) -> Tuple[bool, Optional[str], Optional[str]]:
+        logger.error("[EMAIL_PROVIDER_UNAVAILABLE] %s", self.reason)
+        return False, self.reason, None
 
 
 def normalize_email(email: Optional[str]) -> str:
@@ -304,14 +342,19 @@ class EmailService:
             return self._provider
 
         provider_name = (config.EMAIL_PROVIDER or "console").strip().lower()
-        if provider_name == "resend" and config.RESEND_API_KEY:
+        production_sender_ok = not config.IS_PRODUCTION or _has_valid_production_sender()
+        if provider_name == "resend" and config.RESEND_API_KEY and production_sender_ok:
             self._provider = ResendEmailProvider(api_key=config.RESEND_API_KEY)
-        elif provider_name == "smtp" and config.SMTP_HOST:
+        elif provider_name == "smtp" and config.SMTP_HOST and production_sender_ok:
             self._provider = SmtpEmailProvider(
                 host=config.SMTP_HOST,
                 port=config.SMTP_PORT,
                 user=config.SMTP_USER,
                 password=config.SMTP_PASSWORD
+            )
+        elif config.IS_PRODUCTION:
+            self._provider = UnavailableEmailProvider(
+                "Production email provider requires supported credentials and an explicitly configured sender address."
             )
         else:
             self._provider = ConsoleLogEmailProvider()
@@ -327,13 +370,19 @@ class EmailService:
         provider_name = (config.EMAIL_PROVIDER or "console").strip().lower()
         is_configured = False
         if provider_name == "resend":
-            is_configured = bool(config.RESEND_API_KEY)
+            is_configured = bool(config.RESEND_API_KEY) and (
+                not config.IS_PRODUCTION or _has_valid_production_sender()
+            )
         elif provider_name == "smtp":
-            is_configured = bool(config.SMTP_HOST)
+            is_configured = bool(config.SMTP_HOST) and (
+                not config.IS_PRODUCTION or _has_valid_production_sender()
+            )
         else:
-            is_configured = True
+            is_configured = not config.IS_PRODUCTION
 
         sender = config.OTP_FROM_EMAIL or config.AUTH_EMAIL_FROM or config.RESEND_FROM_EMAIL or "onboarding@resend.dev"
+        if config.IS_PRODUCTION and not _has_valid_production_sender():
+            sender = "not configured"
         return {
             "provider": provider_name,
             "configured": is_configured,
@@ -735,4 +784,3 @@ If you did not request this change, ignore this email and secure your account im
 
 global_email_service = EmailService()
 email_service = global_email_service
-

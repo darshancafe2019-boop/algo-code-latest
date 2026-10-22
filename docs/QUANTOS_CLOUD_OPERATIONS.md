@@ -1,23 +1,22 @@
 # QUANT.OS — Institutional Cloud Deployment, Security & Operations Manual
 
-**Authoritative Target Environment:** Render (Backend, Gateway, Persistent PostgreSQL) & Vercel (Frontend Next.js)  
+**Intended Target Environment:** Render (Backend and Gateway) & Vercel (Frontend Next.js)
 **Target Repository:** `darshancafe2019-boop/algo-code-latest`  
-**Deployment Branch:** `deploy/render-vercel-production`  
-**Production Active Region:** Singapore (`sin` / `ap-southeast-1`)  
-**Security Level:** Level-4 Institutional Hardened, Strict Zero-Trust, Fail-Closed  
+**Deployment Branch:** Confirm the active branch in the hosting dashboards
+**Production Region and database plan:** Confirm in Render before migration or backup planning
 
 ---
 
 ## Executive Summary & Architecture Overview
 
-Quant.OS is a high-frequency, multi-broker, multi-asset quantitative trading platform. The cloud architecture decouples real-time WebSocket market streaming, transactional REST APIs, and modern reactive user interfaces into resilient micro-services backed by an authoritative PostgreSQL persistence engine.
+The repository's Render blueprint intends to use PostgreSQL, but a blueprint is not proof of the live service's environment. The reported production readiness response identifies SQLite. The active Render variables, database resource, region, plan, and stored data must be confirmed in the Render dashboard before changing the database.
 
 ```
 +---------------------------------------------------------------------------------------+
 |                                    VERCEL EDGE NETWORK                                |
 |                                                                                       |
-|   Next.js 14 App Router (Node.js 18+ runtime)                                         |
-|   Domain: https://quantos.vercel.app (or custom production domain)                     |
+|   Next.js frontend (Vercel deployment)                                                 |
+|   Domain: https://algo-code-latest.vercel.app                                         |
 |   Static Assets + SSR + Server-Side Streaming Proxies                                 |
 +---------------------------------------------------------------------------------------+
                 |                                               |
@@ -26,67 +25,55 @@ Quant.OS is a high-frequency, multi-broker, multi-asset quantitative trading pla
 +-----------------------------------------------+   +-----------------------------------+
 |               RENDER BACKEND                  |   |          RENDER GATEWAY           |
 |                                               |   |                                   |
-| Service: quantos-backend                      |   | Service: quantos-gateway          |
+| Service: verify active Render service name    |   | Service: verify active service    |
 | Type: Python Web Service (Gunicorn / WSGI)    |   | Type: Python Web Service (aiohttp)|
-| Port: 5050 (Dual Bridge: 5000)                |   | Port: 5051                        |
-| Region: Singapore (singapore)                 |   | Region: Singapore (singapore)     |
-| Scaling: Min 1 Instance (Worker dyno)         |   | Stream: Multi-Broker Live Tickers |
+| Port: Render-managed                          |   | Port: Render-managed              |
+| Region and scaling: verify in Render          |   | Region and scaling: verify        |
 +-----------------------------------------------+   +-----------------------------------+
         |                       ^                                   |
         | SQL Queries           | Bot Commands / Signals            | Market Quotes
         v                       v                                   v
 +---------------------------------------------------------------------------------------+
-|                         RENDER POSTGRESQL 16 PERSISTENCE                              |
+|                      DATABASE CONFIGURED IN RENDER                                   |
 |                                                                                       |
-| Database: quantos-staging-db                                                          |
-| Region: Singapore (singapore)                                                         |
-| Engine: PostgreSQL 16.x with psycopg3 connection pooling (min=1, max=10)             |
-| Tables: 144 authoritative tables (bots, trades, orders, security_sessions, users, ...) |
-| Fail-Closed Strategy: Fatal abort on unreachable DB; zero ephemeral SQLite split-brain|
+| Intended engine: PostgreSQL; live engine must be checked at /health/ready             |
+| Database name, region, plan, and data: not confirmed by repository configuration       |
+| Keep DATABASE_URL in Render's secret environment settings                             |
 +---------------------------------------------------------------------------------------+
 ```
 
 ---
 
-## 1. Database Lifecycle & Critical Expiry Countdown
+## 1. Database Lifecycle and Backups
 
 > [!WARNING]
-> ### RENDER FREE TIER POSTGRESQL EXPIRY NOTICE
-> **Target Database:** `quantos-staging-db`  
-> **Instance Region:** Singapore (`singapore`)  
-> **Free Tier Hard Expiry Date:** **November 16, 2026**  
-> Render Free Tier PostgreSQL databases are spun down and destroyed automatically 30 days after creation.
-> **Action Required Before November 16, 2026:**
-> 1. Upgrade the instance to an active paid plan (Starter $7/month or Standard $15/month) within the Render Dashboard to retain data seamlessly without IP or connection string churn.
-> 2. Alternatively, create an automated nightly backup via `pg_dump` and store encrypted snapshots in secure object storage.
+> The live Render database resource, plan, expiry/retention terms, region, and connection URL have not been inspected. Verify these in Render; do not infer them from this document or the blueprint.
 
 ### Point-in-Time Database Backup Procedure
 Before initiating migrations, schema updates, or infrastructure teardowns, execute an authoritative snapshot:
 
 ```bash
-# 1. Local SQLite Point-in-Time ACID Snapshot (Verified)
-python -c "import sqlite3; s=sqlite3.connect('data/trading_bot.db'); b=sqlite3.connect('backup/trading_bot_pre_cutover.db'); s.backup(b); b.close(); s.close(); print('[OK] Local DB snapshotted.')"
+# Example only: replace both paths with the confirmed source path and protected backup destination.
+python -c "import sqlite3; s=sqlite3.connect('data/trading_bot.db'); b=sqlite3.connect('backup/trading_bot_pre_cutover.db'); s.backup(b); print(b.execute('PRAGMA integrity_check').fetchone()[0]); b.close(); s.close()"
 
 # 2. Remote PostgreSQL Cloud Snapshot (pg_dump)
 pg_dump "$DATABASE_URL" \
   --format=custom \
-  --clean \
   --no-owner \
   --no-privileges \
   --file="backup/quantos_pg_backup_$(date +%Y%m%d_%H%M%S).dump"
 ```
 
-### PostgreSQL Schema & Data Migration Run
-To migrate authoritative SQLite data (including all 22 bots, 21,800+ trades and orders, and institutional audit events) to PostgreSQL:
+### PostgreSQL Schema and Data Migration
+The migration utility is additive: it uses `ON CONFLICT DO NOTHING`, so it does not overwrite conflicting target rows. A successful run can therefore leave source and target records different. Review its per-table counts and run its verification mode before cutover. Never point production at an empty target or run a migration against a populated target without a verified backup and a written conflict/data-preservation plan.
 
 ```bash
-# Dry-run validation (Offline, zero side-effects)
-python scripts/migrate_sqlite_to_postgres.py --dry-run
+# Source-only dry run (no PostgreSQL URL; no database writes)
+python scripts/migrate_sqlite_to_postgres.py --pg-url "" --dry-run
 
-# Authoritative migration execution into Singapore PostgreSQL
-python scripts/migrate_sqlite_to_postgres.py \
-  --pg-url="postgresql://<user>:<password>@<render-pg-host>/<database>" \
-  --sqlite-path="data/trading_bot.db"
+# Execute only against an approved disposable/empty target, with its URL injected
+# into DATABASE_URL by a secret manager or protected process environment.
+python scripts/migrate_sqlite_to_postgres.py --sqlite-path="data/trading_bot.db"
 ```
 
 ---
@@ -98,13 +85,21 @@ python scripts/migrate_sqlite_to_postgres.py \
 | :--- | :--- | :--- | :--- |
 | `PYTHON_VERSION` | `3.11.9` | Static | Python runtime version lock |
 | `DATABASE_PROVIDER` | `postgresql` | Plaintext | Authoritative database selector |
-| `DATABASE_URL` | `postgresql://...` | Secret (Render DB) | Authoritative Singapore PostgreSQL connection string |
-| `FORCE_SQLITE` | `false` | Plaintext | Fail-closed enforcement; disables SQLite fallback |
+| `DATABASE_URL` | `postgresql://...` | Secret (Render DB) | Authoritative PostgreSQL connection string |
+| `FORCE_SQLITE` | `false` | Plaintext | SQLite override; production startup rejects `true` |
+| `APP_ENV` / `FLASK_ENV` | `production` | Plaintext | Production mode; Render service detection is also supported |
+| `DB_PATH` | Unset | Plaintext | SQLite path only; not a production persistence solution |
 | `AUTH_REQUIRE_LOGIN` | `true` | Plaintext | Enforces mandatory session authentication |
+| `AUTH_BOOTSTRAP_ENABLED` | `true` | Plaintext | Creates the initial admin account when the database is empty |
+| `AUTH_BOOTSTRAP_USERNAME` | `admin` | Plaintext | Initial administrator username |
+| `AUTH_BOOTSTRAP_PASSWORD` | Strong unique password | Secret | Initial administrator password; required for first-time bootstrap |
+| `AUTH_ADMIN_EMAIL` / `AUTH_BOOTSTRAP_EMAIL` | Login mailbox | Secret/config | Must match the administrator's authorized email address |
 | `AUTH_SESSION_SECRET` | 64-char hex string | Secret | Cryptographic session cookie HMAC signature |
 | `AUTH_TOTP_ENCRYPTION_KEY`| 32-byte Fernet base64 | Secret | Envelope encryption key for TOTP secrets and broker tokens |
+| `RESEND_API_KEY` | Resend API key | Secret | Sends production login and password-reset OTP messages |
+| `AUTH_EMAIL_FROM` | Verified sender address | Config | Must be an allowed sender in the Resend account |
 | `GATEWAY_SECRET` | High-entropy secret | Secret | Shared HMAC secret for Backend-to-Gateway internal auth |
-| `FRONTEND_URL` | `https://quantos.vercel.app`| Config | Strict CORS origin verification |
+| `FRONTEND_URL` / `APP_PUBLIC_URL` | `https://algo-code-latest.vercel.app` | Config | Frontend origin and public URL |
 | `TRADING_MODE` | `PAPER` | Fail-Closed | Enforces zero real-money order routing |
 | `LIVE_TRADING_ENABLED` | `false` | Fail-Closed | Master live trading gate; strictly disabled |
 | `PORT` | `5050` | Render managed | Backend HTTP WSGI port |
@@ -121,9 +116,9 @@ python scripts/migrate_sqlite_to_postgres.py \
 ### Vercel Frontend
 | Variable | Value / Format | Exposure | Purpose |
 | :--- | :--- | :--- | :--- |
-| `NEXT_PUBLIC_API_URL` | `https://quantos-backend.onrender.com` | Public Client | Backend REST API root |
-| `NEXT_PUBLIC_GATEWAY_WS_URL`| `wss://quantos-gateway.onrender.com` | Public Client | Live market tick WebSocket |
-| `BACKEND_INTERNAL_URL` | `https://quantos-backend.onrender.com` | Server-Side Only | Server actions and SSR proxy target |
+| `BACKEND_INTERNAL_URL` | `https://algo-code-latest.onrender.com` | Server-Side Only | Server-side API proxy target; set for Production and Preview |
+| `MARKET_GATEWAY_URL` | Render gateway HTTPS URL | Server-Side Only | Optional server-side gateway proxy target |
+| `NEXT_PUBLIC_GATEWAY_WS_URL` | Render gateway WSS URL | Public Client | Live market tick WebSocket, if enabled |
 | `GATEWAY_SECRET` | High-entropy secret | Server-Side Only | Server-side WebSocket proxy authentication (never client) |
 
 ---
@@ -133,16 +128,20 @@ python scripts/migrate_sqlite_to_postgres.py \
 ### Phase A: Render Blueprint Deployment
 1. Log in to the [Render Dashboard](https://dashboard.render.com).
 2. Navigate to **Blueprints** -> **New Blueprint Instance**.
-3. Connect repository `darshancafe2019-boop/algo-code-latest` and select branch `deploy/render-vercel-production`.
+3. Connect repository `darshancafe2019-boop/algo-code-latest` and select branch `main` (the branch specified for this deployment).
 4. Render will parse `render.yaml` and discover:
-   - `quantos-backend` (Web Service, Singapore)
-   - `quantos-gateway` (Web Service, Singapore)
-   - Link existing database: Attach `quantos-staging-db` as `DATABASE_URL`.
+   - `quantos-backend` (Web Service; verify this matches the active service before applying)
+   - `quantos-gateway` (Web Service; verify this matches the active service before applying)
+   - The blueprint does not provision a PostgreSQL database; link the intended database only after verifying its contents and backup.
 5. Enter required environment secrets in the Render Web UI:
    - `AUTH_SESSION_SECRET` (Generate with `openssl rand -hex 32`)
    - `AUTH_TOTP_ENCRYPTION_KEY` (Generate with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`)
    - `GATEWAY_SECRET` (Generate with `openssl rand -hex 24`)
-6. Click **Apply Blueprint**.
+   - `AUTH_BOOTSTRAP_PASSWORD` (only needed to create the initial admin; never use a development password)
+   - `AUTH_ADMIN_EMAIL` and `AUTH_BOOTSTRAP_EMAIL` (set both to the mailbox that should receive login OTPs)
+   - `RESEND_API_KEY` and a Resend-verified `AUTH_EMAIL_FROM` sender
+   - Confirm which existing database is attached, and set its internal connection string as `DATABASE_URL`. Do not attach an empty database as a cutover until SQLite data is backed up, migrated, and verified.
+6. Review Render's proposed changes against the current services. Do not apply changes that recreate services, replace `DATABASE_URL`, or switch databases until the active data has a verified backup and migration plan.
 
 ### Phase B: Vercel Frontend Deployment
 1. Log in to the [Vercel Dashboard](https://vercel.com).
@@ -154,12 +153,10 @@ python scripts/migrate_sqlite_to_postgres.py \
    - **Build Command:** `next build`
    - **Output Directory:** `.next`
 5. Configure Environment Variables:
-   - `NEXT_PUBLIC_API_URL` = `https://quantos-backend.onrender.com`
-   - `NEXT_PUBLIC_GATEWAY_WS_URL` = `wss://quantos-gateway.onrender.com`
-   - `BACKEND_INTERNAL_URL` = `https://quantos-backend.onrender.com`
+   - `BACKEND_INTERNAL_URL` = `https://algo-code-latest.onrender.com` (Production; set Preview only if preview deployments should access production data)
    - `GATEWAY_SECRET` = `<SAME_GATEWAY_SECRET_AS_RENDER>`
 6. Deploy the project and record the generated Vercel production URL.
-7. Return to Render Dashboard, open `quantos-backend` -> **Environment**, update `FRONTEND_URL` to match the exact Vercel URL (e.g., `https://quantos.vercel.app`), and trigger manual redeploy.
+7. Return to the active Render backend service, set `FRONTEND_URL` and `APP_PUBLIC_URL` to `https://algo-code-latest.vercel.app`, then redeploy.
 
 ---
 
@@ -219,7 +216,36 @@ curl -i -X OPTIONS https://quantos-backend.onrender.com/api/bots \
   1. Verify `GATEWAY_SECRET` on Render matches Vercel environment variables exactly.
   2. Ensure header `X-Gateway-Secret` is transmitted without leading/trailing whitespace.
 
-### Incident 4: Global Trading Kill Switch Activation
+### Incident 4: Login OTP Not Delivered or Administrator Cannot Sign In
+- **Symptom:** The Vercel login screen loads, but no verification email arrives or the login remains unauthenticated.
+- **Known failure:** A Render log entry with `Path: POST /api/auth/send-otp` and `Error: disk I/O error`, together with `/api/health/live` reporting `db.engine: "sqlite"`, identifies a failing SQLite write. This is a backend storage/database problem, not a Vercel cookie or CORS problem.
+- **What is not yet known:** The exception does not identify whether SQLite failed because of an ephemeral/missing mount, disk capacity, permissions, WAL sidecars, corruption, or another filesystem issue. The effective Render environment and any SQLite data must be inspected before choosing a migration or backup procedure.
+- **Checks and resolution:**
+  1. Confirm `https://algo-code-latest.vercel.app/api/health/live` returns `status: "ok"`; this verifies the Vercel-to-Render backend route, not the user's login session.
+  2. Inspect the effective Render environment (redacting values in logs/screenshots): `DATABASE_PROVIDER`, whether `DATABASE_URL` is set and its scheme, `FORCE_SQLITE`, `DB_PATH`, `APP_ENV`, and `FLASK_ENV`. Do not print the connection string.
+  3. Confirm the live database engine at `https://algo-code-latest.onrender.com/health/ready` and `https://algo-code-latest.onrender.com/health/live`. After this code revision is deployed, readiness includes `database_engine` and pool information, and startup rejects production SQLite or `FORCE_SQLITE=true`.
+  4. Confirm whether a Render PostgreSQL resource is already attached and whether it contains existing data. Back up the existing SQLite file and any existing PostgreSQL target before migration. Do not switch to an empty database or migrate into a populated one without reviewing conflicts and verifying row counts.
+  5. Set Render `DATABASE_URL` to the intended PostgreSQL internal connection string, `DATABASE_PROVIDER=postgresql`, and `FORCE_SQLITE=false`. Keep the URL in Render's secret environment settings. The repository's `render.yaml` declares these names but does not create or prove the existence of a database.
+  6. Configure `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and an explicitly set `AUTH_EMAIL_FROM` sender verified by Resend. Production email will fail closed if these are missing; the console/outbox provider and response-body development OTPs are disabled in production.
+  7. Set `AUTH_ADMIN_EMAIL` or `AUTH_BOOTSTRAP_EMAIL` to the intended login mailbox. Set `AUTH_BOOTSTRAP_PASSWORD` only if the initial administrator must be created; production bootstrap now refuses creation without an explicit password and mailbox. Existing administrator passwords are preserved unless `AUTH_BOOTSTRAP_FORCE_PASSWORD_RESET=true` is deliberately enabled.
+  8. In Vercel, set server-only `BACKEND_INTERNAL_URL=https://algo-code-latest.onrender.com` (or the supported `BACKEND_API_URL` fallback) for the relevant environment. Auth uses same-origin `/api/auth/*` proxies; do not expose backend secrets via `NEXT_PUBLIC_*` variables or set an `.onrender.com` cookie domain.
+  9. Redeploy only after reviewing the target database and data plan. Verify both Render and Vercel health routes report the backend as ready and PostgreSQL as active, then complete the UI end-to-end OTP check below.
+
+### Safe SQLite-to-PostgreSQL cutover
+1. Identify the actual SQLite file from the effective `DB_PATH` (default: `data/trading_bot.db`) and confirm whether that filesystem survives service restarts. Do not assume a Render disk is attached.
+2. Stop writes or schedule a maintenance window. Use SQLite's online backup API against the actual file, store the backup outside the Render service filesystem, and verify the backup with `PRAGMA integrity_check`.
+3. Take a provider-side snapshot of any existing PostgreSQL target. Prefer a new/empty target only after confirming SQLite contains all existing user, session, trading, audit, and configuration data that must be retained.
+4. Review `scripts/migrate_sqlite_to_postgres.py`: `--dry-run` without a PostgreSQL URL only checks SQLite integrity and lists tables; with a URL it connects but does not write. It is not a full PostgreSQL schema-compatibility test. `--verify-only` compares source/target counts and selected aggregates. Migration inserts use `ON CONFLICT DO NOTHING`, so conflicting target rows are not updated. Run against a disposable clone first and inspect every discrepancy; do not put `--pg-url` credentials in shell history or logs.
+5. Perform the approved migration, run `--verify-only`, compare source and destination table counts, explicitly verify the administrator account and representative trading/configuration rows, then point Render at PostgreSQL and confirm readiness. Keep the SQLite backup and PostgreSQL snapshot until the new deployment has been validated and the rollback window has passed.
+
+### End-to-end authentication verification
+1. Open `https://algo-code-latest.vercel.app` and log in with an existing account's credentials.
+2. Confirm the response is an OTP challenge and that the message reaches the account's registered mailbox. Production responses must not include `dev_otp`.
+3. Enter the emailed code once; confirm the UI becomes authenticated and the dashboard loads protected data.
+4. Attempt to reuse the code and confirm verification is rejected. Confirm a newly requested code expires after its configured window.
+5. While signed out, `GET /api/auth/me` should return `200` with `authenticated: false`; protected API `401` responses are expected until a session is established.
+
+### Incident 5: Global Trading Kill Switch Activation
 - **Symptom:** Emergency market volatility or broker connectivity loss requires halting all fleet activity.
 - **Immediate Action:**
   1. Authenticate to Quant.OS Dashboard as `ADMIN`.

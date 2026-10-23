@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getForwardHeaders } from "@/lib/proxy-headers";
+import { getForwardHeaders, isSameOriginBrowserRequest } from "@/lib/proxy-headers";
 import {
   getBackendBaseUrl,
   getBackendConfigStatus,
@@ -52,6 +52,26 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const url = new URL(req.url);
   const requestId = req.headers.get("x-request-id") || `bff_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
   const startTime = performance.now();
+
+  const isMutation = ["POST", "PUT", "PATCH", "DELETE"].includes(req.method);
+  const hasBrowserOrigin = Boolean(req.headers.get("origin") || req.headers.get("referer"));
+  const sameOriginBrowserRequest = isSameOriginBrowserRequest(req);
+
+  if (isMutation && hasBrowserOrigin && !sameOriginBrowserRequest) {
+    return NextResponse.json(
+      {
+        ok: false,
+        success: false,
+        status: "error",
+        error: {
+          code: "CSRF_VALIDATION_FAILED",
+          message: "Cross-origin state-changing requests are not allowed.",
+        },
+        requestId,
+      },
+      { status: 403, headers: { "X-Request-Id": requestId } }
+    );
+  }
 
   const configStatus = getBackendConfigStatus();
   const BACKEND_URL = configStatus.url;
@@ -279,6 +299,9 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   // ── 3. General Proxy Forwarding with Intelligent Path Fallback ──────────────
   const forwardHeaders = getForwardHeaders(req, requestId);
+  if (isMutation && sameOriginBrowserRequest) {
+    forwardHeaders.set("X-Requested-With", "XMLHttpRequest");
+  }
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders");

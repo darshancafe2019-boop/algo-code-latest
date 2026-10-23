@@ -1,5 +1,16 @@
 import { NextRequest } from "next/server";
 
+export function isSameOriginBrowserRequest(req: NextRequest): boolean {
+  const origin = req.headers.get("origin") || req.headers.get("referer");
+  if (!origin) return false;
+
+  try {
+    return new URL(origin).origin === req.nextUrl.origin;
+  } catch {
+    return false;
+  }
+}
+
 export function getForwardHeaders(req: NextRequest, requestId?: string): Headers {
   const forwardHeaders = new Headers();
   req.headers.forEach((val, key) => {

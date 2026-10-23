@@ -25,6 +25,7 @@ import { GET as handleV2Get } from "../app/api/v2/[...path]/route";
 import { GET as handleHealthLiveGet } from "../app/api/health/live/route";
 import { GET as handleHealthReadyGet } from "../app/api/health/ready/route";
 import { GET as handleTradingOrdersGet } from "../app/api/trading/orders/route";
+import { POST as handleApiProxyPost } from "../app/api/[...path]/route";
 import { GET as handleTradingTradesGet } from "../app/api/trading/trades/route";
 import { GET as handlePortfolioPositionsGet } from "../app/api/portfolio/positions/route";
 import { GET as handlePortfolioAccountsGet } from "../app/api/portfolio/accounts/route";
@@ -182,6 +183,60 @@ async function runBackendConnectivityTests() {
     assert(validAccountsRes.status === 200, "Valid backend returns HTTP 200 for /api/v2/accounts");
     const validAccountsBody = await validAccountsRes.json();
     assert(validAccountsBody.status === "success", "Response contains genuine backend data");
+
+    const originalFetchForWizard = global.fetch;
+    let wizardCsrfMarkerForwarded = false;
+    global.fetch = (async (url: string, init?: RequestInit) => {
+      assert(
+        url === "https://algo-code-latest.onrender.com/api/wizard/deploy",
+        "Wizard deployment is forwarded to the configured backend"
+      );
+      const headers = new Headers(init?.headers);
+      wizardCsrfMarkerForwarded = headers.get("x-requested-with") === "XMLHttpRequest";
+      assert(
+        headers.get("cookie") === "algo_session_token=test-session",
+        "Wizard proxy preserves the authenticated session cookie"
+      );
+      return new Response(JSON.stringify({ success: true, data: { bot_id: "bot-csrf-test" } }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as any;
+    const sameOriginWizardReq = new NextRequest("http://localhost:3100/api/wizard/deploy", {
+      method: "POST",
+      headers: {
+        Origin: "http://localhost:3100",
+        Cookie: "algo_session_token=test-session",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bot_name: "CSRF regression test" }),
+    });
+    const sameOriginWizardRes = await handleApiProxyPost(sameOriginWizardReq, {
+      params: { path: ["wizard", "deploy"] },
+    });
+    assert(sameOriginWizardRes.status === 200, "Same-origin wizard deployment is accepted");
+    assert(wizardCsrfMarkerForwarded, "Verified same-origin wizard request carries the backend CSRF marker");
+
+    let crossOriginReachedBackend = false;
+    global.fetch = (async () => {
+      crossOriginReachedBackend = true;
+      return new Response("unexpected", { status: 200 });
+    }) as any;
+    const crossOriginWizardReq = new NextRequest("http://localhost:3100/api/wizard/deploy", {
+      method: "POST",
+      headers: {
+        Origin: "https://attacker.example",
+        Cookie: "algo_session_token=test-session",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bot_name: "cross-origin request" }),
+    });
+    const crossOriginWizardRes = await handleApiProxyPost(crossOriginWizardReq, {
+      params: { path: ["wizard", "deploy"] },
+    });
+    assert(crossOriginWizardRes.status === 403, "Cross-origin wizard deployment is rejected");
+    assert(!crossOriginReachedBackend, "Cross-origin wizard request is stopped before backend forwarding");
+    global.fetch = originalFetchForWizard;
 
     const validLiveReq = new NextRequest("http://localhost:3100/api/health/live");
     const validLiveRes = await handleHealthLiveGet(validLiveReq);

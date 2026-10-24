@@ -165,9 +165,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      // If running locally in development or demo mode, provide automatic operator fallback session
+      if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_AUTH_DEMO_MODE === "true") {
+        const demoUser: AuthUser = {
+          id: "usr_operator_admin",
+          username: "admin",
+          email: "ashishparadkar1999@gmail.com",
+          role: "ADMIN",
+          is_2fa_enabled: false,
+        };
+        const demoSession: AuthSession = {
+          session_id: "sess_dev_operator_active",
+          device_name: "QUANT.OS Local Workspace",
+          ip_address: "127.0.0.1",
+          last_active_at: new Date().toISOString(),
+        };
+        setUser(demoUser);
+        setSession(demoSession);
+        setIsAuthenticated(true);
+        setIsLocked(false);
+        return true;
+      }
+
       clearSessionState();
       return false;
     } catch {
+      if (process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_AUTH_DEMO_MODE === "true") {
+        const demoUser: AuthUser = {
+          id: "usr_operator_admin",
+          username: "admin",
+          email: "ashishparadkar1999@gmail.com",
+          role: "ADMIN",
+          is_2fa_enabled: false,
+        };
+        setUser(demoUser);
+        setIsAuthenticated(true);
+        setIsLocked(false);
+        return true;
+      }
       clearSessionState();
       return false;
     } finally {

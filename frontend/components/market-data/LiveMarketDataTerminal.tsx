@@ -525,127 +525,56 @@ export const LiveMarketDataTerminal = memo(function LiveMarketDataTerminal() {
 
             {/* Category Filter Tabs */}
             <div className="flex items-center gap-1 pb-2 mb-2 border-b border-[#10263A] overflow-x-auto no-scrollbar">
-              {INDEX_CATEGORIES.map((cat) => {
-                const count = cat === "All"
-                  ? (snapshotData?.indices?.length || 0)
-                  : (snapshotData?.indices?.filter((idx: any) => (idx.category || "India").toLowerCase() === cat.toLowerCase())?.length || 0);
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setIndexCategory(cat)}
-                    className={cn(
-                      "px-2.5 py-1 rounded text-[11px] font-semibold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5",
-                      indexCategory === cat
-                        ? "bg-[#168BFF] text-[#F8FAFC] shadow-sm shadow-[#168BFF]/30"
-                        : "text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0F1C2F]"
-                    )}
-                  >
-                    <span>{cat}</span>
-                    {count > 0 && (
-                      <span className={cn(
-                        "text-[9px] px-1 py-0.2 rounded-full font-mono",
-                        indexCategory === cat ? "bg-white/20 text-white" : "bg-[#05101A] text-[#7D8EA5]"
-                      )}>
-                        {count}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
+              {INDEX_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setIndexCategory(cat)}
+                  className={cn(
+                    "px-2.5 py-1 rounded text-[11px] font-semibold transition-colors cursor-pointer whitespace-nowrap",
+                    indexCategory === cat
+                      ? "bg-[#168BFF] text-[#F8FAFC] shadow-sm"
+                      : "text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0F1C2F]"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
 
-            {/* Dedicated Card Sections or Single Category Table */}
-            {indexCategory === "All" ? (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 no-scrollbar">
-                {(["India", "US", "Crypto", "Commodities", "MCX"] as const).map((catName) => {
-                  const catItems = marketIndices.filter(
-                    (idx) => (idx.category || "India").toLowerCase() === catName.toLowerCase()
-                  );
-                  if (catItems.length === 0) return null;
-                  return (
-                    <div
-                      key={catName}
-                      className="rounded-lg bg-[#05101A]/80 border border-[#10263A] p-2.5 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between pb-1 border-b border-[#10263A]/60">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-[#22D3EE] uppercase tracking-wide">
-                            {catName}
-                          </span>
-                          <span className="text-[9px] font-mono text-[#7D8EA5] px-1.5 py-0.2 bg-[#0B1728] rounded border border-[#12304A]">
-                            {catItems.length} {catItems.length === 1 ? "instrument" : "instruments"}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setIndexCategory(catName)}
-                          className="text-[10px] text-[#22D3EE] hover:underline flex items-center gap-0.5"
-                        >
-                          Focus
-                          <ChevronRight className="h-2.5 w-2.5" />
-                        </button>
-                      </div>
-                      <table className="w-full text-left text-[11px]">
-                        <thead>
-                          <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A]/40 h-[24px]">
-                            <th className="pb-1 text-left font-medium">Symbol</th>
-                            <th className="pb-1 text-right font-medium">LTP</th>
-                            <th className="pb-1 text-right font-medium">Change</th>
-                            <th className="pb-1 text-right font-medium">%</th>
-                            <th className="pb-1 text-right font-medium hidden md:table-cell">Exch</th>
-                            <th className="pb-1 text-right font-medium hidden sm:table-cell">Source</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#10263A]/30">
-                          {catItems.map((idx) => (
-                            <LiveMarketIndexRow
-                              key={idx.symbol}
-                              symbol={idx.symbol}
-                              fallback={idx}
-                              onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
-                            />
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-[11px]">
-                  <thead>
-                    <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[30px]">
-                      <th className="pb-1 text-left font-medium">Symbol</th>
-                      <th className="pb-1 text-right font-medium">LTP</th>
-                      <th className="pb-1 text-right font-medium">Change</th>
-                      <th className="pb-1 text-right font-medium">%</th>
-                      <th className="pb-1 text-right font-medium hidden md:table-cell">Exch</th>
-                      <th className="pb-1 text-right font-medium hidden sm:table-cell">Source</th>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[11px]">
+                <thead>
+                  <tr className="text-[10px] font-medium text-[#7D8EA5] border-b border-[#10263A] h-[30px]">
+                    <th className="pb-1 text-left font-medium">Symbol</th>
+                    <th className="pb-1 text-right font-medium">LTP</th>
+                    <th className="pb-1 text-right font-medium">Change</th>
+                    <th className="pb-1 text-right font-medium">%</th>
+                    <th className="pb-1 text-right font-medium hidden md:table-cell">Exch</th>
+                    <th className="pb-1 text-right font-medium hidden sm:table-cell">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#10263A]">
+                  {marketIndices.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="text-center py-6 text-slate-500 text-[11px] font-mono">
+                        No instruments registered in category {indexCategory}
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#10263A]">
-                    {marketIndices.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="text-center py-6 text-slate-500 text-[11px] font-mono">
-                          No instruments registered in category {indexCategory}
-                        </td>
-                      </tr>
-                    ) : (
-                      marketIndices.map((idx) => (
-                        <LiveMarketIndexRow
-                          key={idx.symbol}
-                          symbol={idx.symbol}
-                          fallback={idx}
-                          onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
-                        />
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                  ) : (
+                    marketIndices.map((idx) => (
+                      <LiveMarketIndexRow
+                        key={idx.symbol}
+                        symbol={idx.symbol}
+                        fallback={idx}
+                        onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
+                      />
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           <div className="pt-2 mt-2 border-t border-[#10263A] flex items-center justify-between text-[10px] text-[#7D8EA5] font-mono">

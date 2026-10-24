@@ -420,7 +420,6 @@ def enforce_server_side_security():
     if (
         path in [
             "/", "/health", "/api/health", "/api/health/live", "/api/health/ready", "/api/health/dependencies", "/api/health/system",
-            "/api/dashboard/snapshot",
             "/api/delta/ping", "/api/market-data/status", "/api/market-data/dhan/quotes", "/api/market-data/delta/quotes",
             "/api/market-data/stream", "/api/market/providers/health", "/api/options/chain", "/api/options/sources/status",
             "/api/options/analyze-strategy", "/api/indicators/compute",

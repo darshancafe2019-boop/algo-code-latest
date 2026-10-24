@@ -65,10 +65,6 @@ const TradeJournal = dynamic(
   () => import("@/components/trade-journal/TradeJournal").then((m) => m.TradeJournal),
   { ssr: false, loading: () => null }
 );
-const LiveMarketDataTerminal = dynamic(
-  () => import("@/components/market-data/LiveMarketDataTerminal").then((m) => m.LiveMarketDataTerminal),
-  { ssr: false, loading: () => null }
-);
 const MarketUniverse = dynamic(
   () => import("@/components/market-universe/MarketUniverse").then((m) => m.MarketUniverse),
   { ssr: false, loading: () => null }
@@ -216,19 +212,10 @@ function MainApp() {
   return (
     <CommandCenterShell activeTab={activeTab} onTabSelect={handleTabSelect}>
       <div className="w-full h-full">
-        {/* 0. Executive Home Overview (Page 1) */}
+        {/* 0. Executive Home Overview */}
         {isTabActive("home", ["dashboard"]) && (
           <ErrorBoundary title="Executive Home Overview Failed">
             <HomeExecutiveOverview />
-          </ErrorBoundary>
-        )}
-
-        {/* 0.5. Live Market Data Terminal (Page 2 - Handwritten Reference) */}
-        {isTabActive("live-market-data", ["market-data", "live-data"]) && (
-          <ErrorBoundary title="Live Market Data Terminal Failed">
-            <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
-              <LiveMarketDataTerminal />
-            </div>
           </ErrorBoundary>
         )}
 

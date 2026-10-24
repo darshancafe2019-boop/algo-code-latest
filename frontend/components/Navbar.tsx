@@ -192,16 +192,10 @@ export function Navbar(props: NavbarProps = {}) {
 
   const navItems = [
     { id: "home", label: "🏠 Home", icon: Activity },
-    { id: "live-market-data", label: "📈 Live Market Data", icon: TrendingUp },
-    { id: "indian-markets", label: "🇮🇳 Indian Markets", icon: Activity },
-    { id: "global-markets", label: "🌐 Global Markets", icon: Globe },
-    { id: "stocks", label: "📊 Stocks Screener", icon: TrendingUp },
-    { id: "crypto-derivatives", label: "🪙 Crypto Hub", icon: Zap },
-    { id: "commodities", label: "🔥 MCX Commodities", icon: Activity },
-    { id: "us-markets", label: "🏛️ US Markets", icon: Landmark },
-    { id: "markets", label: "🌐 Market Universe", icon: Globe },
     { id: "orchestrator", label: "🤖 AI Orchestrator", icon: BrainCircuit },
+    { id: "markets", label: "🌐 Markets", icon: Globe },
     { id: "command-center", label: "⚡ Command Center", icon: Terminal },
+    { id: "crypto-derivatives", label: "🪙 Crypto Hub", icon: Zap },
     { id: "crypto-futures", label: "📈 Crypto Futures", icon: TrendingUp },
     { id: "crypto-options-chain", label: "⚡ Crypto Options", icon: Layers },
     { id: "options", label: "📊 Index Options", icon: Layers },

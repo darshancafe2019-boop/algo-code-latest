@@ -141,26 +141,6 @@ const TaxIntelligenceTab = dynamic(
   () => import("@/components/tax-intelligence/InstitutionalTaxIntelligenceTerminal").then((m) => m.InstitutionalTaxIntelligenceTerminal),
   { ssr: false, loading: () => null }
 );
-const IndianMarketsTerminal = dynamic(
-  () => import("@/app/indian-markets/page").then((m) => m.IndianMarketsTerminal),
-  { ssr: false, loading: () => null }
-);
-const GlobalMarketsTerminal = dynamic(
-  () => import("@/app/global-markets/page").then((m) => m.GlobalMarketsTerminal),
-  { ssr: false, loading: () => null }
-);
-const StocksIntelligenceTerminal = dynamic(
-  () => import("@/app/stocks/page").then((m) => m.StocksIntelligenceTerminal),
-  { ssr: false, loading: () => null }
-);
-const McxCommoditiesTerminal = dynamic(
-  () => import("@/app/commodities/page").then((m) => m.McxCommoditiesTerminal),
-  { ssr: false, loading: () => null }
-);
-const UsMarketsTerminal = dynamic(
-  () => import("@/app/us-markets/page").then((m) => m.UsMarketsTerminal),
-  { ssr: false, loading: () => null }
-);
 
 
 function MainApp() {
@@ -252,36 +232,6 @@ function MainApp() {
           </ErrorBoundary>
         )}
 
-        {/* Dedicated Market Intelligence Terminals */}
-        {isTabActive("indian-markets", ["nse", "india"]) && (
-          <ErrorBoundary title="Indian Markets Terminal Failed">
-            <IndianMarketsTerminal />
-          </ErrorBoundary>
-        )}
-
-        {isTabActive("global-markets", ["global", "world"]) && (
-          <ErrorBoundary title="Global Markets Terminal Failed">
-            <GlobalMarketsTerminal />
-          </ErrorBoundary>
-        )}
-
-        {isTabActive("stocks", ["screener", "equities"]) && (
-          <ErrorBoundary title="Stocks Screener Failed">
-            <StocksIntelligenceTerminal />
-          </ErrorBoundary>
-        )}
-
-        {isTabActive("commodities", ["mcx"]) && (
-          <ErrorBoundary title="MCX Commodities Terminal Failed">
-            <McxCommoditiesTerminal />
-          </ErrorBoundary>
-        )}
-
-        {isTabActive("us-markets", ["us", "nyse", "nasdaq"]) && (
-          <ErrorBoundary title="US Markets Desk Failed">
-            <UsMarketsTerminal />
-          </ErrorBoundary>
-        )}
 
         {/* 1. Markets Discovery & Analysis */}
         {isTabActive("markets", ["market-universe", "universe"]) && (

@@ -31,7 +31,7 @@ import { useSymbolQuote, useFeedHealth } from "@/lib/market-data/market-feed-sto
 import { cn } from "@/lib/utils";
 import { DashboardDataDiagnosticsPanel } from "./DashboardDataDiagnosticsPanel";
 
-const INDEX_SYMBOLS = ["NIFTY 50", "BANKNIFTY", "FINNIFTY", "SENSEX", "MIDCPNIFTY"];
+const INDEX_CATEGORIES = ["India", "Crypto", "Commodities", "MCX", "US", "All"] as const;
 
 function LiveMarketIndexRow({
   symbol,
@@ -76,7 +76,7 @@ function LiveMarketIndexRow({
               "h-1.5 w-1.5 rounded-full transition-colors",
               isLive ? "bg-[#00E89A] animate-pulse" : (ltp !== null ? "bg-[#F59E0B]" : "bg-slate-600")
             )}
-            title={isLive ? "Live Real-Time Feed" : (ltp !== null ? "Cached / Stale" : "Unavailable")}
+            title={isLive ? "Live Real-Time Feed" : (ltp !== null ? "Cached / Last Traded" : "Unavailable")}
           />
         </div>
       </td>
@@ -113,31 +113,11 @@ export function HomeExecutiveOverview() {
   const { quotes, subscribe, unsubscribe } = useMarketGatewayContext();
   const feedHealth = useFeedHealth();
 
+  const [indexCategory, setIndexCategory] = useState<string>("India");
   const [topMoversFilter, setTopMoversFilter] = useState<"gainers" | "losers" | "active">("gainers");
   const [showDiagnostics, setShowDiagnostics] = useState<boolean>(false);
 
-  // 1. Subscribe to Live Market Indices on Mount
-  useEffect(() => {
-    INDEX_SYMBOLS.forEach((sym) => {
-      subscribe(sym, "BENCHMARK");
-    });
-    // Also subscribe to open position symbols
-    const posSymbols = safeArray(rawPositions).map((p: any) => p.symbol).filter(Boolean);
-    posSymbols.forEach((sym: string) => {
-      subscribe(sym.toUpperCase(), "OPEN_POSITION");
-    });
-
-    return () => {
-      INDEX_SYMBOLS.forEach((sym) => {
-        unsubscribe(sym, "BENCHMARK");
-      });
-      posSymbols.forEach((sym: string) => {
-        unsubscribe(sym.toUpperCase(), "OPEN_POSITION");
-      });
-    };
-  }, [subscribe, unsubscribe, rawPositions]);
-
-  // 2. Fetch Authoritative Dashboard Snapshot (Requirement 33)
+  // 1. Fetch Authoritative Dashboard Snapshot (Requirement 33)
   const { data: snapshotData, isLoading: isSnapshotLoading, isError: isSnapshotError } = useQuery({
     queryKey: ["dashboardSnapshot", tradingMode],
     queryFn: async () => {
@@ -148,27 +128,48 @@ export function HomeExecutiveOverview() {
     refetchInterval: 6000,
   });
 
-  // Dynamic subscription for Top Movers symbols from snapshot
+  // Dynamic subscription for Top Movers & Index symbols from snapshot
   useEffect(() => {
-    if (!snapshotData?.movers) return;
-    const gList = snapshotData.movers.gainers || [];
-    const lList = snapshotData.movers.losers || [];
-    const aList = snapshotData.movers.active || [];
-    const allMoverSyms = Array.from(new Set([...gList, ...lList, ...aList].map((m: any) => m.symbol).filter(Boolean)));
-    allMoverSyms.forEach((sym: string) => {
+    if (!snapshotData) return;
+    const gList = snapshotData.movers?.gainers || [];
+    const lList = snapshotData.movers?.losers || [];
+    const aList = snapshotData.movers?.active || [];
+    const idxList = snapshotData.indices || [];
+    const allSyms = Array.from(new Set([
+      ...gList.map((m: any) => m.symbol),
+      ...lList.map((m: any) => m.symbol),
+      ...aList.map((m: any) => m.symbol),
+      ...idxList.map((i: any) => i.symbol),
+    ].filter(Boolean)));
+
+    allSyms.forEach((sym: string) => {
       subscribe(sym.toUpperCase(), "WATCHLIST");
     });
     return () => {
-      allMoverSyms.forEach((sym: string) => {
+      allSyms.forEach((sym: string) => {
         unsubscribe(sym.toUpperCase(), "WATCHLIST");
       });
     };
-  }, [snapshotData?.movers, subscribe, unsubscribe]);
+  }, [snapshotData, subscribe, unsubscribe]);
+
+  // Also subscribe to open position symbols
+  useEffect(() => {
+    const posSymbols = safeArray(rawPositions).map((p: any) => p.symbol).filter(Boolean);
+    posSymbols.forEach((sym: string) => {
+      subscribe(sym.toUpperCase(), "OPEN_POSITION");
+    });
+    return () => {
+      posSymbols.forEach((sym: string) => {
+        unsubscribe(sym.toUpperCase(), "OPEN_POSITION");
+      });
+    };
+  }, [rawPositions, subscribe, unsubscribe]);
 
   // ── Authoritative Financial Metrics ──────────────────────────────────────
   const balance = portfolioSnapshot?.equity ?? snapshotData?.portfolio?.equity ?? null;
-  const todaysPnl = portfolioSnapshot?.dailyPnl ?? snapshotData?.pnl?.dailyPnl ?? 0;
-  const isProfit = todaysPnl >= 0;
+  const rawTodaysPnl = portfolioSnapshot?.dailyPnl ?? snapshotData?.pnl?.dailyPnl;
+  const todaysPnl = rawTodaysPnl !== undefined && rawTodaysPnl !== null ? rawTodaysPnl : null;
+  const isProfit = todaysPnl !== null ? todaysPnl >= 0 : true;
   const portfolioCurrency = portfolioSnapshot?.baseCurrency || snapshotData?.portfolio?.baseCurrency || "USD";
   const currSymbol = resolveCurrencySymbol(portfolioCurrency);
 
@@ -176,18 +177,28 @@ export function HomeExecutiveOverview() {
     ? safeArray(rawPositions).length
     : (portfolioSnapshot?.openPositions ?? snapshotData?.positionsSummary?.openPositionsCount ?? 0);
   const openContractsCount = portfolioSnapshot?.openContracts ?? snapshotData?.positionsSummary?.openContractsCount ?? positionsCount;
-  const winRate = portfolioSnapshot?.winRate ?? snapshotData?.performance?.winRate ?? 0;
-  const winningTrades = portfolioSnapshot?.winningTradesCount ?? snapshotData?.performance?.winningTradesCount ?? 0;
+  
+  // Win rate and trade metrics (Strict adherence to contract: null when zero closed trades)
   const totalTrades = portfolioSnapshot?.totalTradesCount ?? snapshotData?.performance?.totalTradesCount ?? 0;
+  const winningTrades = portfolioSnapshot?.winningTradesCount ?? snapshotData?.performance?.winningTradesCount ?? 0;
+  const losingTrades = portfolioSnapshot?.losingTradesCount ?? snapshotData?.performance?.losingTradesCount ?? 0;
+  const rawWinRate = portfolioSnapshot?.winRate ?? snapshotData?.performance?.winRate;
+  const winRate = totalTrades > 0 && rawWinRate !== undefined && rawWinRate !== null ? rawWinRate : null;
+
   const systemHealth = snapshotData?.health?.overall || "HEALTHY";
   const isHealthDegraded = systemHealth === "DEGRADED";
   const isHealthCritical = systemHealth === "CRITICAL";
+  const servicesHealth = snapshotData?.health?.services || [];
 
-  // ── Live Market Indices ──────────────────────────────────────────────────
+  // ── Live Market Indices Filtered by Category ────────────────────────────
   const marketIndices = useMemo(() => {
-    const snapshotIndices = snapshotData?.indices || [];
+    const allSnapshotIndices = snapshotData?.indices || [];
+    const filtered = indexCategory === "All"
+      ? allSnapshotIndices
+      : allSnapshotIndices.filter((idx: any) => (idx.category || "India").toLowerCase() === indexCategory.toLowerCase());
 
-    return INDEX_SYMBOLS.map((sym) => {
+    return filtered.map((snapshotItem: any) => {
+      const sym = snapshotItem.symbol;
       const upperSym = sym.toUpperCase();
       const liveQuote = 
         quotes.get(upperSym) || 
@@ -195,10 +206,6 @@ export function HomeExecutiveOverview() {
         quotes.get(`NSE:${sym.replace(" 50", "").toUpperCase()}`) ||
         quotes.get(`NSE_INDEX|${sym}`) ||
         quotes.get(`BSE:${sym.toUpperCase()}`);
-
-      const snapshotItem = snapshotIndices.find(
-        (idx: any) => idx.symbol === sym || idx.symbol?.toUpperCase() === upperSym || idx.symbol?.toUpperCase() === sym.replace(" 50", "").toUpperCase()
-      );
 
       if (liveQuote && liveQuote.last_price > 0) {
         const ltp = liveQuote.last_price;
@@ -212,12 +219,13 @@ export function HomeExecutiveOverview() {
         const change = prevClose && prevClose > 0 ? ltp - prevClose : (changePct !== null ? (changePct * ltp) / 100 : null);
         return {
           symbol: sym,
+          category: snapshotItem.category || "India",
           ltp,
           previousClose: prevClose,
           change: change !== null ? Math.abs(change) : null,
           pct: changePct,
           isUp: (changePct ?? 0) >= 0,
-          source: liveQuote.provider || "Gateway",
+          source: liveQuote.provider || snapshotItem.source || "Gateway",
           status: liveQuote.is_stale ? "STALE" : "LIVE",
           lastTick: liveQuote.received_timestamp || new Date().toISOString(),
         };
@@ -230,6 +238,7 @@ export function HomeExecutiveOverview() {
 
       return {
         symbol: sym,
+        category: snapshotItem.category || "India",
         ltp,
         previousClose: prevClose,
         change: change !== null ? Math.abs(change) : null,
@@ -240,7 +249,7 @@ export function HomeExecutiveOverview() {
         lastTick: snapshotItem?.lastTick || snapshotItem?.timestamp || new Date().toISOString(),
       };
     });
-  }, [quotes, snapshotData, feedHealth.connectionStatus]);
+  }, [snapshotData?.indices, indexCategory, quotes, feedHealth.connectionStatus]);
 
   // ── Real Top Movers (Dynamically Enriched from WebSocket & Market Cache) ──
   const currentTopMovers = useMemo(() => {
@@ -304,7 +313,13 @@ export function HomeExecutiveOverview() {
           </div>
           <div>
             <span className="text-[24px] font-bold tracking-tight text-[#F8FAFC] tabular-nums leading-none">
-              {balance !== null ? formatCurrency(balance, currSymbol, 0) : <span className="text-sm font-normal text-[#7D8EA5] animate-pulse">Loading...</span>}
+              {balance !== null ? (
+                formatCurrency(balance, currSymbol, 0)
+              ) : isSnapshotLoading ? (
+                <span className="text-sm font-normal text-[#7D8EA5] animate-pulse">Loading...</span>
+              ) : (
+                <span className="text-sm font-medium text-slate-400">Unavailable</span>
+              )}
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
@@ -356,15 +371,15 @@ export function HomeExecutiveOverview() {
             <span
               className={cn(
                 "text-[24px] font-bold tracking-tight tabular-nums leading-none",
-                isProfit ? "text-[#00E89A]" : "text-[#FF3B5C]"
+                todaysPnl === null ? "text-slate-400 text-lg font-medium" : (isProfit ? "text-[#00E89A]" : "text-[#FF3B5C]")
               )}
             >
-              {isProfit ? `+${formatCurrency(todaysPnl, currSymbol, 0)}` : formatCurrency(todaysPnl, currSymbol, 0)}
+              {todaysPnl !== null ? (isProfit ? `+${formatCurrency(todaysPnl, currSymbol, 0)}` : formatCurrency(todaysPnl, currSymbol, 0)) : "Unavailable"}
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
             <span className={cn("font-semibold", isProfit ? "text-[#00E89A]" : "text-[#FF3B5C]")}>
-              {balance && balance > 0 ? formatPercent((todaysPnl / balance) * 100, 2, "—", false, true) : "0.00%"}
+              {todaysPnl !== null && balance && balance > 0 ? formatPercent((todaysPnl / balance) * 100, 2, "—", false, true) : "0.00%"}
             </span>
             <span>realized + unrealized</span>
           </div>
@@ -379,8 +394,8 @@ export function HomeExecutiveOverview() {
             </div>
           </div>
           <div>
-            <span className="text-[24px] font-bold tracking-tight text-[#F8FAFC] tabular-nums leading-none">
-              {formatPercent(winRate, 1)}
+            <span className={cn("tracking-tight tabular-nums leading-none", winRate !== null ? "text-[24px] font-bold text-[#F8FAFC]" : "text-sm font-medium text-slate-400")}>
+              {winRate !== null ? formatPercent(winRate, 1) : "N/A — No closed trades"}
             </span>
           </div>
           <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
@@ -417,15 +432,23 @@ export function HomeExecutiveOverview() {
                 isHealthCritical ? "bg-[#FF3B5C]" : isHealthDegraded ? "bg-amber-400" : "bg-[#00E89A]"
               )} />
               <span className={cn(
-                "text-[22px] font-bold tracking-tight leading-none",
+                "text-[20px] font-bold tracking-tight leading-none",
                 isHealthCritical ? "text-[#FF3B5C]" : isHealthDegraded ? "text-amber-400" : "text-[#00E89A]"
               )}>
                 {isSnapshotLoading ? "CHECKING..." : systemHealth}
               </span>
             </div>
           </div>
-          <div className="text-[11px] text-[#7D8EA5] flex items-center gap-1 font-medium">
-            <span>Core v2.4 • Paper Mode</span>
+          <div className="text-[10px] text-[#7D8EA5] flex items-center gap-1.5 font-mono truncate">
+            <span className={servicesHealth.find((s: any) => s.service === "Database")?.isOk ? "text-[#00E89A]" : "text-amber-400"}>
+              DB: {servicesHealth.find((s: any) => s.service === "Database")?.status === "Operational" ? "OK" : "DEGRADED"}
+            </span>
+            <span>•</span>
+            <span className={servicesHealth.find((s: any) => s.service === "Backend")?.isOk ? "text-[#22D3EE]" : "text-rose-400"}>
+              API: {servicesHealth.find((s: any) => s.service === "Backend")?.isOk ? "OK" : "OFFLINE"}
+            </span>
+            <span>•</span>
+            <span className="text-slate-300 font-semibold">{tradingMode}</span>
           </div>
         </div>
       </div>
@@ -480,6 +503,25 @@ export function HomeExecutiveOverview() {
               </div>
             </div>
 
+            {/* Category Filter Tabs */}
+            <div className="flex items-center gap-1 pb-2 mb-2 border-b border-[#10263A] overflow-x-auto">
+              {INDEX_CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setIndexCategory(cat)}
+                  className={cn(
+                    "px-2 py-0.5 rounded text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap",
+                    indexCategory === cat
+                      ? "bg-[#168BFF] text-[#F8FAFC]"
+                      : "text-[#7D8EA5] hover:text-[#F8FAFC] hover:bg-[#0F1C2F]"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-[11px]">
                 <thead>
@@ -491,14 +533,22 @@ export function HomeExecutiveOverview() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#10263A]">
-                  {marketIndices.map((idx) => (
-                    <LiveMarketIndexRow
-                      key={idx.symbol}
-                      symbol={idx.symbol}
-                      fallback={idx}
-                      onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
-                    />
-                  ))}
+                  {marketIndices.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="text-center py-5 text-slate-500 text-[11px]">
+                        No instruments registered in category {indexCategory}
+                      </td>
+                    </tr>
+                  ) : (
+                    marketIndices.map((idx) => (
+                      <LiveMarketIndexRow
+                        key={idx.symbol}
+                        symbol={idx.symbol}
+                        fallback={idx}
+                        onSelect={(sym) => router.push(`/charts?symbol=${encodeURIComponent(sym)}`)}
+                      />
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -507,7 +557,7 @@ export function HomeExecutiveOverview() {
           {/* Real-time Telemetry Bar */}
           <div className="pt-2 mt-2 border-t border-[#10263A] flex items-center justify-between text-[10px] text-[#7D8EA5]">
             <div className="flex items-center gap-2">
-              <span>Last update: <span className="text-[#F8FAFC] font-mono">{feedHealth.lastTickTime ? new Date(feedHealth.lastTickTime).toLocaleTimeString() : "00:59:31"}</span></span>
+              <span>Last update: <span className="text-[#F8FAFC] font-mono">{feedHealth.lastTickTime ? new Date(feedHealth.lastTickTime).toLocaleTimeString() : new Date().toLocaleTimeString()}</span></span>
               <span>•</span>
               <span>Source: <span className="text-[#22D3EE] font-medium">{marketIndices[0]?.source || "Dhan HQ"}</span></span>
             </div>

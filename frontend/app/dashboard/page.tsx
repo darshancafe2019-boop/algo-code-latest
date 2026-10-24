@@ -1,12 +1,14 @@
 "use client";
 
 import { DirectPageLayout } from "@/components/layout/DirectPageLayout";
-import { RuntimeCommandCenter } from "@/components/command-center/RuntimeCommandCenter";
+import { HomeExecutiveOverview } from "@/components/home/HomeExecutiveOverview";
 
 export default function DashboardPage() {
   return (
-    <DirectPageLayout activeTab="command-center">
-      <RuntimeCommandCenter />
+    <DirectPageLayout activeTab="dashboard">
+      <div className="p-3 sm:p-4 md:p-6 space-y-4 max-w-[1750px] mx-auto min-w-0 font-sans">
+        <HomeExecutiveOverview />
+      </div>
     </DirectPageLayout>
   );
 }

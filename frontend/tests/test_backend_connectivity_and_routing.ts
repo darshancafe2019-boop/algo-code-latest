@@ -29,6 +29,10 @@ import { POST as handleApiProxyPost } from "../app/api/[...path]/route";
 import { GET as handleTradingTradesGet } from "../app/api/trading/trades/route";
 import { GET as handlePortfolioPositionsGet } from "../app/api/portfolio/positions/route";
 import { GET as handlePortfolioAccountsGet } from "../app/api/portfolio/accounts/route";
+import {
+  getProxyTimeoutMs,
+  isSameOriginBrowserRequest,
+} from "../lib/proxy-headers";
 
 function assert(condition: boolean, msg: string) {
   if (!condition) {
@@ -42,6 +46,23 @@ async function runBackendConnectivityTests() {
   console.log("\n=======================================================");
   console.log("RUNNING BACKEND CONNECTIVITY & RESILIENCE TEST SUITE");
   console.log("=======================================================\n");
+
+  assert(
+    getProxyTimeoutMs("auth/send-otp", false, false, false) === 90_000,
+    "Local OTP delivery allows the backend development fallback to complete"
+  );
+  assert(
+    getProxyTimeoutMs("auth/send-otp", false, false, true) === 50_000,
+    "Production OTP proxy timeout remains within the configured route duration"
+  );
+  assert(
+    getProxyTimeoutMs("auth/email-otp/resend", false, false, false) === 90_000,
+    "OTP resend uses the extended local delivery timeout"
+  );
+  assert(
+    getProxyTimeoutMs("wizard/deploy", false, false, false) === 25_000,
+    "Unrelated proxy timeouts are unchanged"
+  );
 
   const originalEnv = { ...process.env };
   const originalFetch = global.fetch;
@@ -216,6 +237,21 @@ async function runBackendConnectivityTests() {
     });
     assert(sameOriginWizardRes.status === 200, "Same-origin wizard deployment is accepted");
     assert(wizardCsrfMarkerForwarded, "Verified same-origin wizard request carries the backend CSRF marker");
+
+    const proxiedOriginReq = new NextRequest("http://internal:3100/api/wizard/deploy", {
+      method: "POST",
+      headers: {
+        Host: "localhost:3100",
+        Origin: "http://localhost:3100",
+        Cookie: "algo_session_token=test-session",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ bot_name: "proxied origin regression test" }),
+    });
+    assert(
+      isSameOriginBrowserRequest(proxiedOriginReq),
+      "Same-origin browser requests are recognized when the proxy URL differs from the incoming host"
+    );
 
     let crossOriginReachedBackend = false;
     global.fetch = (async () => {

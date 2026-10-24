@@ -269,12 +269,12 @@ class GlobalDataEngine:
         available_capital = max(Decimal("0.0"), portfolio_equity - margin_used)
         buying_power = available_capital * Decimal("2.0")  # 2x standard intraday buying power
 
-        win_rate = (win_count / eligible_trades * 100.0) if eligible_trades > 0 else ((win_count / total_trades * 100.0) if total_trades > 0 else 0.0)
-        profit_factor = (sum_wins / sum_losses) if sum_losses > 0 else (99.9 if sum_wins > 0 else 0.0)
+        win_rate = (win_count / eligible_trades * 100.0) if eligible_trades > 0 else ((win_count / total_trades * 100.0) if total_trades > 0 else None)
+        profit_factor = (sum_wins / sum_losses) if sum_losses > 0 else (99.9 if sum_wins > 0 else None)
         avg_win = (sum_wins / win_count) if win_count > 0 else 0.0
         avg_loss = (sum_losses / loss_count) if loss_count > 0 else 0.0
-        rr_ratio = (avg_win / avg_loss) if avg_loss > 0 else 0.0
-        expectancy = ((win_rate / 100.0) * avg_win) - (((100.0 - win_rate) / 100.0) * avg_loss)
+        rr_ratio = (avg_win / avg_loss) if avg_loss > 0 else None
+        expectancy = (((win_rate / 100.0) * avg_win) - (((100.0 - win_rate) / 100.0) * avg_loss)) if win_rate is not None else None
 
         # 8. Check Reconciliation Status
         recon_status = "RECONCILED"
@@ -310,12 +310,12 @@ class GlobalDataEngine:
             "losingTradesCount": loss_count,
             "breakevenTradesCount": breakeven_count,
             "eligibleTradesCount": eligible_trades,
-            "winRate": round(win_rate, 2),
-            "profitFactor": round(profit_factor, 2),
+            "winRate": round(win_rate, 2) if win_rate is not None else None,
+            "profitFactor": round(profit_factor, 2) if profit_factor is not None else None,
             "averageWin": round(avg_win, 2),
             "averageLoss": round(avg_loss, 2),
-            "riskRewardRatio": round(rr_ratio, 2),
-            "expectancy": round(expectancy, 2),
+            "riskRewardRatio": round(rr_ratio, 2) if rr_ratio is not None else None,
+            "expectancy": round(expectancy, 2) if expectancy is not None else None,
             "maxDrawdownPct": 2.45,
             "currentDrawdownPct": 0.35,
             "accountingMethod": "FIFO",

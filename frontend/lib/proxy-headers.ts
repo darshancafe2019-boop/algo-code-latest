@@ -1,11 +1,35 @@
 import { NextRequest } from "next/server";
 
+export function getProxyTimeoutMs(
+  subPath: string,
+  isStream: boolean,
+  isHeavy: boolean,
+  production: boolean
+): number {
+  if (isStream) return 0;
+  if (subPath === "auth/send-otp" || subPath === "auth/email-otp/resend") {
+    return production ? 50_000 : 90_000;
+  }
+  return isHeavy ? 45_000 : 25_000;
+}
+
 export function isSameOriginBrowserRequest(req: NextRequest): boolean {
   const origin = req.headers.get("origin") || req.headers.get("referer");
   if (!origin) return false;
 
   try {
-    return new URL(origin).origin === req.nextUrl.origin;
+    const browserOrigin = new URL(origin).origin;
+    const requestHost =
+      req.headers.get("host") ||
+      req.headers.get("x-forwarded-host") ||
+      req.nextUrl.host;
+    const forwardedProtocol = req.headers.get("x-forwarded-proto")?.split(",")[0].trim();
+    const requestProtocol = forwardedProtocol
+      ? `${forwardedProtocol}:`
+      : req.nextUrl.protocol;
+    const requestOrigin = new URL(`${requestProtocol}//${requestHost}`).origin;
+
+    return browserOrigin === requestOrigin;
   } catch {
     return false;
   }

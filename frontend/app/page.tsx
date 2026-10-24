@@ -134,7 +134,7 @@ const FuturesWorkspace = dynamic(
   { ssr: false, loading: () => null }
 );
 const TaxIntelligenceTab = dynamic(
-  () => import("@/components/tax-intelligence/InstitutionalTaxIntelligenceTerminal").then((m) => m.InstitutionalTaxIntelligenceTerminal),
+  () => import("@/components/tax-intelligence/TaxIntelligenceTab").then((m) => m.TaxIntelligenceTab),
   { ssr: false, loading: () => null }
 );
 

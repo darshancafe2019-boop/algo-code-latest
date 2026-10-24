@@ -18608,30 +18608,17 @@ def api_dashboard_snapshot():
         matrix = global_connection_registry.get_connection_matrix()
         brokers = matrix.get("connections", [])
         
-        # 3. Market Indices (Authoritative Real-Time & Last-Traded Quotes across Categories)
+        # 3. Market Indices (Authoritative Real-Time & Last-Traded Quotes)
         indices_list = []
         indices_symbols = [
-            # India
-            ("NIFTY 50", ["NIFTY 50", "NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"], "India", "NSE"),
-            ("BANKNIFTY", ["BANKNIFTY", "BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"], "India", "NSE"),
-            ("FINNIFTY", ["FINNIFTY", "FIN NIFTY", "NSE:FINNIFTY", "NSE_INDEX|Nifty Fin Service"], "India", "NSE"),
-            ("SENSEX", ["SENSEX", "BSE:SENSEX", "BSE_INDEX|SENSEX"], "India", "BSE"),
-            ("MIDCPNIFTY", ["MIDCPNIFTY", "MIDCAP NIFTY", "NSE:MIDCPNIFTY", "NIFTY MIDCAP 50"], "India", "NSE"),
-            # US Markets
-            ("S&P 500", ["S&P 500", "SPX", "^GSPC", "US500"], "US", "CBOE"),
-            ("NASDAQ 100", ["NASDAQ 100", "NDX", "^NDX", "US100"], "US", "NASDAQ"),
-            ("Dow Jones", ["Dow Jones", "DJI", "^DJI", "US30"], "US", "NYSE"),
-            # Commodities & MCX
-            ("Gold (COMEX)", ["XAUUSD", "GOLD", "COMEX:XAUUSD"], "Commodities", "COMEX"),
-            ("Crude Oil (MCX)", ["CRUDEOIL", "MCX:CRUDEOIL", "CL=F"], "MCX", "MCX"),
-            ("Natural Gas (MCX)", ["NATGAS", "MCX:NATGAS", "NG=F"], "MCX", "MCX"),
-            # Crypto
-            ("Bitcoin", ["BTC/USDT", "BTCUSDT", "BINANCE:BTC/USDT"], "Crypto", "Binance"),
-            ("Ethereum", ["ETH/USDT", "ETHUSDT", "BINANCE:ETH/USDT"], "Crypto", "Binance"),
-            ("Solana", ["SOL/USDT", "SOLUSDT", "BINANCE:SOL/USDT"], "Crypto", "Binance"),
+            ("NIFTY 50", ["NIFTY 50", "NIFTY", "NSE:NIFTY", "NSE_INDEX|Nifty 50"]),
+            ("BANKNIFTY", ["BANKNIFTY", "BANK NIFTY", "NSE:BANKNIFTY", "NSE_INDEX|Nifty Bank"]),
+            ("FINNIFTY", ["FINNIFTY", "FIN NIFTY", "NSE:FINNIFTY", "NSE_INDEX|Nifty Fin Service"]),
+            ("SENSEX", ["SENSEX", "BSE:SENSEX", "BSE_INDEX|SENSEX"]),
+            ("MIDCPNIFTY", ["MIDCPNIFTY", "MIDCAP NIFTY", "NSE:MIDCPNIFTY", "NIFTY MIDCAP 50"]),
         ]
         
-        for primary_sym, alias_list, category, exchange in indices_symbols:
+        for primary_sym, alias_list in indices_symbols:
             q = None
             t = None
             for sym_alias in alias_list:
@@ -18666,7 +18653,7 @@ def api_dashboard_snapshot():
                 last_tick = t.receivedAt or datetime.now(timezone.utc).isoformat()
             else:
                 # Query DB instrument row for last traded baseline
-                row = db.safe_query("SELECT last_price, change_24h, provider FROM instruments WHERE canonical_symbol = ? OR provider_symbol = ? OR display_symbol = ? OR symbol = ? LIMIT 1", (primary_sym, primary_sym, primary_sym, primary_sym))
+                row = db.safe_query("SELECT last_price, change_24h FROM instruments WHERE canonical_symbol = ? OR provider_symbol = ? OR display_symbol = ? LIMIT 1", (primary_sym, primary_sym, primary_sym))
                 raw_lp = row[0].get("last_price") if row else None
                 if raw_lp is not None and float(raw_lp) > 0:
                     ltp = float(raw_lp)
@@ -18674,7 +18661,7 @@ def api_dashboard_snapshot():
                     pct = float(row[0].get("change_24h") or 0.0)
                     chg = round((pct * ltp) / 100.0, 2)
                     status = "LAST_TRADED"
-                    src_label = str(row[0].get("provider") or exchange).upper()
+                    src_label = "DHAN / NSE"
                     last_tick = datetime.now(timezone.utc).isoformat()
                 else:
                     ltp = None
@@ -18682,12 +18669,10 @@ def api_dashboard_snapshot():
                     pct = None
                     chg = None
                     status = "UNAVAILABLE"
-                    src_label = exchange
+                    src_label = "GATEWAY"
                     last_tick = datetime.now(timezone.utc).isoformat()
             indices_list.append({
                 "symbol": primary_sym,
-                "category": category,
-                "exchange": exchange,
                 "ltp": round(float(ltp), 2) if ltp is not None else None,
                 "previousClose": round(float(prev_close), 2) if prev_close is not None else None,
                 "change": round(float(chg), 2) if chg is not None else None,
@@ -18793,12 +18778,12 @@ def api_dashboard_snapshot():
                 "funding": portfolio_snap.get("funding", 0.0),
             },
             "performance": {
-                "winRate": portfolio_snap.get("winRate"),
+                "winRate": portfolio_snap.get("winRate", 0.0),
                 "totalTradesCount": portfolio_snap.get("totalTradesCount", 0),
                 "winningTradesCount": portfolio_snap.get("winningTradesCount", 0),
                 "losingTradesCount": portfolio_snap.get("losingTradesCount", 0),
-                "profitFactor": portfolio_snap.get("profitFactor"),
-                "expectancy": portfolio_snap.get("expectancy"),
+                "profitFactor": portfolio_snap.get("profitFactor", 0.0),
+                "expectancy": portfolio_snap.get("expectancy", 0.0),
             },
             "indices": indices_list,
             "movers": movers_payload,

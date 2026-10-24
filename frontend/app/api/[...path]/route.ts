@@ -1,9 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  getForwardHeaders,
-  getProxyTimeoutMs,
-  isSameOriginBrowserRequest,
-} from "@/lib/proxy-headers";
+import { getForwardHeaders, isSameOriginBrowserRequest } from "@/lib/proxy-headers";
 import {
   getBackendBaseUrl,
   getBackendConfigStatus,
@@ -309,7 +305,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
 
   const isStream = subPath.startsWith("stream") || subPath.includes("/stream") || subPath.includes("market-data/stream") || req.headers.get("accept")?.includes("text/event-stream");
   const isHeavy = subPath.includes("backtest") || subPath.includes("simulate") || subPath.includes("portfolio") || subPath.includes("risk") || subPath.includes("journal") || subPath.includes("positions") || subPath.includes("options") || subPath.includes("dashboard") || subPath.includes("snapshot") || subPath.includes("instruments") || subPath.includes("universe") || subPath.includes("orders");
-  const timeoutMs = getProxyTimeoutMs(subPath, isStream, isHeavy, isProduction());
+  const timeoutMs = isHeavy ? 45000 : 25000;
 
   let bodyData: BodyInit | null = null;
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
@@ -330,7 +326,7 @@ async function handleProxy(req: NextRequest, ctx: { params?: { path: string[] } 
   const controller = new AbortController();
   // Do not abort active SSE streaming connections with a static timer
   let timeoutTimer: NodeJS.Timeout | null = null;
-  if (timeoutMs > 0) {
+  if (!isStream) {
     timeoutTimer = setTimeout(() => controller.abort(), timeoutMs);
   }
 

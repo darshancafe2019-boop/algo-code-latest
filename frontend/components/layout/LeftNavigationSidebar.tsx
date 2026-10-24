@@ -41,7 +41,8 @@ export interface NavItem {
 
 export const CANONICAL_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", path: "/", icon: LayoutDashboard },
-  { id: "markets", label: "Markets", path: "/markets", icon: LineChart },
+  { id: "live-market-data", label: "Live Market Data", path: "/live-market-data", icon: LineChart },
+  { id: "markets", label: "Markets", path: "/markets", icon: Activity },
   { id: "bots", label: "Bots", path: "/bots", icon: Bot },
   { id: "strategies", label: "Strategy", path: "/strategies", icon: Code },
   { id: "indicators", label: "Indicators", path: "/indicators", icon: Activity },
